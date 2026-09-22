@@ -61,7 +61,9 @@ enum TreeLevel {
     func key(for row: BreakdownRow) -> Key {
         switch self {
         case .app:
-            return Key(id: "a:" + row.bundleID, title: row.appName.isEmpty ? row.bundleID : row.appName, detail: "", kind: .app) {
+            let detail = row.parentAgentName.isEmpty ? ""
+                : row.mcpServer.isEmpty ? "via \(row.parentAgentName)" : "\(row.mcpServer) MCP · \(row.parentAgentName)"
+            return Key(id: "a:" + row.bundleID, title: row.appName.isEmpty ? row.bundleID : row.appName, detail: detail, kind: .app) {
                 $0.bundleID = row.bundleID
             }
         case .hostname:

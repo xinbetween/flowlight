@@ -185,6 +185,22 @@ struct AgentDetail: View {
         GroupBox {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
+                    if !agent.tools.isEmpty {
+                        Text("Tools & MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
+                        ForEach(agent.tools.prefix(8)) { tool in
+                            HStack {
+                                Image(systemName: tool.isMCP ? "puzzlepiece.extension" : "terminal").foregroundStyle(.secondary)
+                                    .frame(width: 16)
+                                Text(tool.displayName).lineLimit(1)
+                                Spacer()
+                                Text("↑ \(ByteFormat.string(tool.counters.bytesOut))  ↓ \(ByteFormat.string(tool.counters.bytesIn))")
+                                    .monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
+                            .help(tool.isMCP ? "MCP server started by \(agent.name)" : "Process started by \(agent.name), e.g. from a shell tool")
+                        }
+                        Divider().padding(.vertical, 2)
+                    }
                     Text("AI providers").font(.caption.bold()).foregroundStyle(.secondary)
                     if agent.providers.isEmpty {
                         Text("None in this window").font(.caption).foregroundStyle(.secondary)
@@ -239,6 +255,13 @@ struct AgentDetail: View {
             if d.isUnnamed && d.label != d.ip { Text(d.ip).foregroundStyle(.secondary) }
             Text(d.protocols.joined(separator: ", ") + (d.ports.isEmpty ? "" : " · " + d.ports))
                 .foregroundStyle(d.isSensitive ? TrafficColors.anomaly : .secondary).lineLimit(1)
+            if !d.via.isEmpty {
+                Text("via " + d.via.prefix(2).joined(separator: ", "))
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+                    .lineLimit(1)
+                    .help("Opened by " + d.via.joined(separator: ", "))
+            }
             Spacer()
             Text("↑ \(ByteFormat.string(d.counters.bytesOut))  ↓ \(ByteFormat.string(d.counters.bytesIn))").monospacedDigit().foregroundStyle(.secondary)
         }

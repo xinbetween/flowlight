@@ -64,6 +64,25 @@ final class AgentTests: XCTestCase {
         XCTAssertFalse(IPOwnerLookup.isLocalNetwork("203.0.113.9"), "reserved ranges still count as leaving the Mac")
     }
 
+    func testModelFoldsToolsAndMCPServersIntoTheirAgent() {
+        func row(_ app: String, _ domain: String, out: Int64, parent: String = "", parentName: String = "", mcp: String = "") -> BreakdownRow {
+            BreakdownRow(bundleID: app, appName: app, appPath: "", domain: domain, remoteIP: "203.0.113.\(out % 200)", ports: "443",
+                         protocols: "https", counters: FlowCounters(bytesIn: 1, bytesOut: out, flows: 1),
+                         parentAgent: parent, parentAgentName: parentName, mcpServer: mcp)
+        }
+        let agents = AgentsModel.build(rows: [
+            row("claude", "api.anthropic.com", out: 100),
+            row("curl", "paste.example", out: 50, parent: "claude", parentName: "Claude Code"),
+            row("node", "api.github.com", out: 30, parent: "claude", parentName: "Claude Code", mcp: "github"),
+        ], alerts: [])
+        XCTAssertEqual(agents.count, 1, "tools don't appear as separate agents")
+        let claude = agents[0]
+        XCTAssertEqual(claude.name, "Claude Code")
+        XCTAssertEqual(claude.egress.bytesOut, 80)
+        XCTAssertEqual(Set(claude.tools.map(\.displayName)), ["curl", "github MCP"])
+        XCTAssertEqual(claude.otherDestinations.first { $0.label == "paste.example" }?.via, ["curl"])
+    }
+
     func testSensitiveChannelAndUnnamedHostAlerts() throws {
         let (engine, _, fired) = try makeEngine()
         try engine.observe([TrafficBatch(timestamp: 1000, records: [

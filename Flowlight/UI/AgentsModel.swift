@@ -10,6 +10,8 @@ struct AgentDestination: Identifiable, Sendable, Equatable {
     var counters: FlowCounters
     /// False when no hostname was seen (the label is an owner name or the bare IP).
     var hasHostname = true
+    /// The agent's tools or MCP servers that used this destination ("curl", "github MCP"); empty for the agent itself.
+    var via: [String] = []
     var id: String { label + "|" + ip }
 
     var categories: Set<ProtocolCategory> { Set(protocols.map(ProtocolCatalog.category(of:))) }
@@ -27,6 +29,8 @@ struct AgentSummary: Identifiable, Sendable, Equatable {
     var egress: FlowCounters
     var providers: [(name: String, counters: FlowCounters)]
     var destinations: [AgentDestination]    // everything, AI providers first
+    /// Processes the agent started (shell tools, MCP servers) and their traffic.
+    var tools: [AgentTool] = []
     var alerts: Int
     var id: String { bundleID }
 
@@ -48,8 +52,18 @@ struct AgentSummary: Identifiable, Sendable, Equatable {
     var riskScore: Int { sensitiveProtocols.count * 10 + alerts + (hasUnnamedHost ? 3 : 0) + (hasLargeUpload ? 5 : 0) }
 
     static func == (a: AgentSummary, b: AgentSummary) -> Bool {
-        a.bundleID == b.bundleID && a.ai == b.ai && a.egress == b.egress && a.alerts == b.alerts
+        a.bundleID == b.bundleID && a.ai == b.ai && a.egress == b.egress && a.alerts == b.alerts && a.tools == b.tools
     }
+}
+
+/// A process working for an agent: an MCP server, or a tool such as curl, git or npm.
+struct AgentTool: Identifiable, Sendable, Equatable {
+    var label: String            // "github" or "curl"
+    var isMCP: Bool
+    var counters: FlowCounters
+    var destinations: Int
+    var id: String { (isMCP ? "mcp:" : "tool:") + label }
+    var displayName: String { isMCP ? "\(label) MCP" : label }
 }
 
 enum AgentsModel {
@@ -65,14 +79,19 @@ enum AgentsModel {
 
     /// Finds agents in breakdown rows: known agents, plus any non-browser app that called an LLM API.
     static func build(rows: [BreakdownRow], alerts: [AlertRecord]) -> [AgentSummary] {
-        let byApp = Dictionary(grouping: TrafficNode.backfilled(rows), by: \.bundleID)
+        // Tools and MCP servers an agent started fold into that agent.
+        let byApp = Dictionary(grouping: TrafficNode.backfilled(rows)) { $0.parentAgent.isEmpty ? $0.bundleID : $0.parentAgent }
         let alertCounts = Dictionary(grouping: alerts, by: \.bundleID).mapValues(\.count)
         return byApp.compactMap { bundleID, appRows -> AgentSummary? in
-            let appName = appRows.first { !$0.appName.isEmpty }?.appName ?? bundleID
+            let ownRows = appRows.filter { $0.bundleID == bundleID }
+            let parentName = appRows.first { !$0.parentAgentName.isEmpty }?.parentAgentName
+            let appName = ownRows.first { !$0.appName.isEmpty }?.appName ?? parentName ?? bundleID
             let known = AgentCatalog.knownAgent(bundleID: bundleID, appName: appName)
             let providerOf: (BreakdownRow) -> String? = { AgentCatalog.provider(domain: $0.domain, owner: $0.owner) }
             let usesAI = appRows.contains { providerOf($0) != nil && $0.counters.total > 0 }
-            guard known != nil || (usesAI && !AgentCatalog.isBrowser(bundleID)) else { return nil }
+            guard known != nil || parentName != nil || (usesAI && !AgentCatalog.isBrowser(bundleID)) else { return nil }
+            var tools: [String: AgentTool] = [:]
+            var toolDestinations: [String: Set<String>] = [:]
 
             var ai = FlowCounters(), egress = FlowCounters()
             var providers: [String: FlowCounters] = [:]
@@ -89,6 +108,15 @@ enum AgentsModel {
                 let protos = row.protocols.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                 entry.protocols = Array(Set(entry.protocols + protos)).sorted()
                 entry.ports = mergedPorts(entry.ports, row.ports)
+                if row.bundleID != bundleID || !row.mcpServer.isEmpty {
+                    let isMCP = !row.mcpServer.isEmpty
+                    let label = isMCP ? row.mcpServer : row.appName
+                    var tool = tools[(isMCP ? "mcp:" : "tool:") + label] ?? AgentTool(label: label, isMCP: isMCP, counters: FlowCounters(), destinations: 0)
+                    tool.counters += row.counters
+                    tools[tool.id] = tool
+                    toolDestinations[tool.id, default: []].insert(label + "|" + key)
+                    if !entry.via.contains(tool.displayName) { entry.via.append(tool.displayName) }
+                }
                 destinations[key] = entry
             }
             let sortedDestinations: [AgentDestination] = destinations.values.sorted { x, y in
@@ -96,10 +124,14 @@ enum AgentsModel {
                 if xAI != yAI { return xAI }
                 return x.counters.total > y.counters.total
             }
-            return AgentSummary(bundleID: bundleID, name: known?.name ?? appName, vendor: known?.vendor, isKnown: known != nil,
-                                appPath: appRows.first { !$0.appPath.isEmpty }?.appPath ?? "", ai: ai, egress: egress,
+            let toolList = tools.values.map { tool -> AgentTool in
+                var t = tool; t.destinations = toolDestinations[tool.id]?.count ?? 0; return t
+            }.sorted { $0.counters.total > $1.counters.total }
+            return AgentSummary(bundleID: bundleID, name: known?.name ?? parentName ?? appName, vendor: known?.vendor,
+                                isKnown: known != nil || parentName != nil,
+                                appPath: ownRows.first { !$0.appPath.isEmpty }?.appPath ?? "", ai: ai, egress: egress,
                                 providers: providers.sorted { $0.value.total > $1.value.total }.map { ($0.key, $0.value) },
-                                destinations: sortedDestinations, alerts: alertCounts[bundleID] ?? 0)
+                                destinations: sortedDestinations, tools: toolList, alerts: alertCounts[bundleID] ?? 0)
         }
         .sorted { $0.total.total > $1.total.total }
     }
