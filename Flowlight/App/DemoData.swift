@@ -34,6 +34,14 @@ enum DemoData {
         var path: String
         var weight: Double      // how busy during work hours
         var flows: [Flow]
+        /// Set for tools and MCP servers an agent started: (agent bundle ID, agent name, MCP server).
+        var parent: (id: String, name: String, mcp: String?)? = nil
+
+        func key(_ flow: Flow) -> FlowKey {
+            FlowKey(pid: Int32(abs(bundleID.hashValue % 30_000) + 200), bundleID: bundleID, appName: name, appPath: path,
+                    remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport, appProtocol: flow.proto,
+                    parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp)
+        }
     }
 
     static let apps: [App] = [
@@ -71,6 +79,18 @@ enum DemoData {
             Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 300_000, outRate: 10_000),
             Flow(host: "github.com", ip: "198.51.100.11", port: 22, proto: "ssh", inRate: 50_000, outRate: 30_000),
         ]),
+        App(bundleID: "git", name: "git", path: "/usr/bin/git", weight: 0.5, flows: [
+            Flow(host: "github.com", ip: "198.51.100.11", port: 443, proto: "https", inRate: 400_000, outRate: 60_000),
+        ], parent: ("claude", "Claude Code", nil)),
+        App(bundleID: "node", name: "node", path: "/opt/homebrew/bin/node", weight: 0.5, flows: [
+            Flow(host: "api.github.com", ip: "198.51.100.12", port: 443, proto: "https", inRate: 120_000, outRate: 20_000),
+        ], parent: ("claude", "Claude Code", "github")),
+        App(bundleID: "uv", name: "uv", path: "/opt/homebrew/bin/uv", weight: 0.3, flows: [
+            Flow(host: "docs.python.org", ip: "198.51.100.13", port: 443, proto: "https", inRate: 200_000, outRate: 8_000),
+        ], parent: ("com.todesktop.230313mzl4w4u92", "Cursor", "fetch")),
+        App(bundleID: "curl", name: "curl", path: "/usr/bin/curl", weight: 0.05, flows: [
+            Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 30_000, outRate: 2_000),
+        ], parent: ("claude", "Claude Code", nil)),
         App(bundleID: "codex", name: "codex", path: "/opt/homebrew/bin/codex", weight: 0.6, flows: [
             Flow(host: "api.openai.com", ip: "198.51.100.90", port: 443, proto: "https", inRate: 500_000, outRate: 900_000),
             Flow(host: "pypi.org", ip: "198.51.100.91", port: 443, proto: "https", inRate: 200_000, outRate: 6_000),
@@ -106,6 +126,7 @@ enum DemoData {
         (95, "codex", Flow(host: "uploads.paste.example", ip: "203.0.113.20", port: 443, proto: "https", inRate: 0, outRate: 0), 180_000_000),
         (40, "claude", Flow(host: "smtp.relay.example", ip: "203.0.113.25", port: 587, proto: "smtp-submission", inRate: 0, outRate: 0), 2_400_000),
         (22, "python3", Flow(host: "", ip: "203.0.113.45", port: 4444, proto: "tcp", inRate: 0, outRate: 0), 9_000_000),
+        (12, "curl", Flow(host: "paste.example", ip: "203.0.113.60", port: 443, proto: "https", inRate: 0, outRate: 0), 1_200_000),
         (300, "Cursor", Flow(host: "files.share.example", ip: "203.0.113.30", port: 21, proto: "ftp", inRate: 0, outRate: 0), 35_000_000),
     ]
 
@@ -113,10 +134,7 @@ enum DemoData {
         ["198.51.100.150": IPOwner(asn: 714, name: "Apple Inc."), "203.0.113.45": IPOwner(asn: 64_512, name: "Example Hosting")]
     }
 
-    private static func key(_ app: App, _ flow: Flow) -> FlowKey {
-        FlowKey(pid: Int32(abs(app.bundleID.hashValue % 30_000) + 200), bundleID: app.bundleID, appName: app.name, appPath: app.path,
-                remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport, appProtocol: flow.proto)
-    }
+    private static func key(_ app: App, _ flow: Flow) -> FlowKey { app.key(flow) }
 
     /// Activity level by local hour: busy 9–19, quiet overnight, lighter on weekends.
     static func activity(at date: Date, calendar: Calendar = .current) -> Double {
@@ -180,12 +198,15 @@ enum DemoData {
         try db.insertAggregates("agg_1d", days.flatMap { ts, keys in keys.map { (ts, $0.key, $0.value) } })
         try db.setRollupWatermarks(minuteNow)
         for (ip, owner) in owners() { try db.saveOwner(ip: ip, owner) }
+        try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
+                                      patterns: ["github.com", "npmjs.org", "githubusercontent.com"]))
         try seedAlerts(db, now: now)
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {
         typealias K = AnomalyEngine.Kind
         let items: [(Int, K, String, String, String, Int)] = [
+            (12, .allowlistViolation, "claude", "Claude Code › curl", "Claude Code › curl contacted paste.example:443 (https), which isn't on Claude Code's allowlist — 1.2 MB sent", 3),
             (95, .agentExfiltration, "codex", "Codex", "Codex uploaded 180 MB to non-AI hosts in the last hour: uploads.paste.example (180 MB)", 3),
             (40, .agentSensitiveChannel, "claude", "Claude Code", "Claude Code used SMTP-SUBMISSION (email) to smtp.relay.example:587 — 2.4 MB sent", 3),
             (22, .agentUnnamedHost, "python3", "python3", "python3 connected to Example Hosting 203.0.113.45:4444 (tcp) with no hostname", 2),
@@ -229,9 +250,7 @@ final class DemoTrafficSource: TrafficSource, @unchecked Sendable {
             for flow in app.flows where Double.random(in: 0...1, using: &rng) < 0.5 {
                 let scale = Double.random(in: 0.1...1.6, using: &rng) / 60
                 let burst = Double.random(in: 0...1, using: &rng) < 0.03 ? 12.0 : 1.0
-                let key = FlowKey(pid: Int32(abs(app.bundleID.hashValue % 30_000) + 200), bundleID: app.bundleID, appName: app.name,
-                                  appPath: app.path, remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport,
-                                  appProtocol: flow.proto)
+                let key = app.key(flow)
                 records.append(TrafficRecord(key: key, counters: FlowCounters(bytesIn: Int64(flow.inRate * scale * burst),
                                                                              bytesOut: Int64(flow.outRate * scale * burst),
                                                                              flows: Double.random(in: 0...1, using: &rng) < 0.05 ? 1 : 0)))
