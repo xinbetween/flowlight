@@ -21,6 +21,7 @@ struct AgentsView: View {
     @AppStorage("agents.window") private var window: AgentWindow = .day
     @State private var agents: [AgentSummary] = []
     @State private var agentAlerts = 0
+    @State private var policies: [String: AgentPolicy] = [:]
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
@@ -48,7 +49,13 @@ struct AgentsView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 table.frame(minHeight: 180)
-                if let selected { AgentDetail(agent: selected, window: window) }
+                if let selected {
+                    AgentDetail(agent: selected, window: window,
+                                policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
+                        policies[policy.agentID] = policy
+                        monitor.savePolicy(policy)
+                    }
+                }
             }
         }
         .padding()
@@ -99,6 +106,8 @@ struct AgentsView: View {
                     .help("\(ShareFormat.string(agent.egressShare)) of this agent's uploads went to non-AI hosts")
             }
             .width(90)
+            TableColumn("Allowlist") { agent in AllowlistStatus(agent: agent, policy: policies[agent.bundleID]) }
+                .width(min: 80, ideal: 110)
             TableColumn("Risk", value: \.riskScore) { agent in RiskBadges(agent: agent) }
                 .width(min: 90, ideal: 160)
             TableColumn("Alerts", value: \.alerts) { agent in
@@ -118,10 +127,11 @@ struct AgentsView: View {
 
     private func load() async {
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
-        let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord]) in
-            (try db.breakdown(g, from: from, to: to), try db.alerts(limit: 2000).filter { $0.timestamp >= from })
+        let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy]) in
+            (try db.breakdown(g, from: from, to: to), try db.alerts(limit: 2000).filter { $0.timestamp >= from }, try db.loadPolicies())
         }
-        guard let (rows, alerts) = result else { return }
+        guard let (rows, alerts, loadedPolicies) = result else { return }
+        policies = loadedPolicies
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -176,10 +186,111 @@ struct RiskBadges: View {
     }
 }
 
+extension AgentDestination {
+    func isAllowed(by policy: AgentPolicy) -> Bool {
+        policy.allows(host: hasHostname ? label : "", ip: ip, isAIProvider: provider != nil)
+    }
+
+    /// What "Allow" adds: the registrable domain, or the IP when no hostname was seen.
+    var allowPattern: String { hasHostname ? AnomalyEngine.registrableDomain(label) : ip }
+}
+
+/// Table cell: whether an allowlist is on, and how many destinations break it.
+struct AllowlistStatus: View {
+    var agent: AgentSummary
+    var policy: AgentPolicy?
+
+    var body: some View {
+        if let policy, policy.enabled {
+            let violations = agent.otherDestinations.filter { !$0.isAllowed(by: policy) }.count
+            if violations > 0 {
+                Label("\(violations) not allowed", systemImage: "xmark.octagon.fill")
+                    .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
+            } else {
+                Label("All allowed", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
+            }
+        } else {
+            Text("Off").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Edits one agent's allowlist: on/off, AI providers, patterns, presets.
+struct AllowlistEditor: View {
+    var agentName: String
+    var policy: AgentPolicy
+    var save: (AgentPolicy) -> Void
+    @State private var draft = ""
+    @State private var invalid = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Allowlist").font(.caption.bold()).foregroundStyle(.secondary)
+            Toggle("Only allow listed destinations", isOn: Binding(get: { policy.enabled }, set: { var p = policy; p.enabled = $0; save(p) }))
+                .font(.caption)
+            Toggle("Always allow its AI providers", isOn: Binding(get: { policy.allowAIProviders }, set: { var p = policy; p.allowAIProviders = $0; save(p) }))
+                .font(.caption)
+                .disabled(!policy.enabled)
+            if !policy.patterns.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(policy.patterns, id: \.self) { pattern in
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark").font(.caption2).foregroundStyle(.green)
+                                Text(pattern).font(.caption.monospaced()).lineLimit(1)
+                                Spacer()
+                                Button { var p = policy; p.patterns.removeAll { $0 == pattern }; save(p) } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove \(pattern)")
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 90)
+            }
+            HStack(spacing: 4) {
+                TextField("github.com, 10.0.0.0/8…", text: $draft)
+                    .textFieldStyle(.roundedBorder).font(.caption)
+                    .onSubmit(add)
+                Button("Add", action: add).controlSize(.small).disabled(draft.isEmpty)
+                Menu("Presets") {
+                    ForEach(AgentPolicy.presets) { preset in
+                        Button(preset.name) { add(patterns: preset.patterns) }
+                    }
+                }
+                .controlSize(.small)
+                .fixedSize()
+            }
+            Text(invalid ? "Enter a domain, IP address or CIDR range." :
+                    "Anything else \(agentName) or its tools contact raises an alert. Flowlight doesn't block connections.")
+                .font(.caption2).foregroundStyle(invalid ? TrafficColors.anomaly : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func add() {
+        guard let pattern = AgentPolicy.normalize(draft) else { invalid = true; return }
+        invalid = false
+        draft = ""
+        add(patterns: [pattern])
+    }
+
+    private func add(patterns: [String]) {
+        var p = policy
+        for pattern in patterns where !p.patterns.contains(pattern) { p.patterns.append(pattern) }
+        if !p.enabled && policy.patterns.isEmpty { p.enabled = true }   // adding the first entry turns it on
+        save(p)
+    }
+}
+
 struct AgentDetail: View {
     @EnvironmentObject var nav: AppNavigation
     var agent: AgentSummary
     var window: AgentWindow
+    var policy: AgentPolicy
+    var save: (AgentPolicy) -> Void
 
     var body: some View {
         GroupBox {
@@ -215,8 +326,10 @@ struct AgentDetail: View {
                         }
                         .font(.caption)
                     }
+                    Divider().padding(.vertical, 2)
+                    AllowlistEditor(agentName: agent.name, policy: policy, save: save)
                 }
-                .frame(width: 260, alignment: .leading)
+                .frame(width: 280, alignment: .leading)
 
                 Divider()
 
@@ -239,7 +352,7 @@ struct AgentDetail: View {
                             }
                         }
                     }
-                    .frame(maxHeight: 150)
+                    .frame(maxHeight: 220)
                 }
             }
         } label: {
@@ -263,6 +376,16 @@ struct AgentDetail: View {
                     .help("Opened by " + d.via.joined(separator: ", "))
             }
             Spacer()
+            if policy.enabled && !d.isAllowed(by: policy) {
+                Text("Not allowed").font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
+                Button("Allow") {
+                    var p = policy
+                    if !p.patterns.contains(d.allowPattern) { p.patterns.append(d.allowPattern) }
+                    save(p)
+                }
+                .controlSize(.mini)
+                .help("Add \(d.allowPattern) to \(agent.name)'s allowlist")
+            }
             Text("↑ \(ByteFormat.string(d.counters.bytesOut))  ↓ \(ByteFormat.string(d.counters.bytesIn))").monospacedDigit().foregroundStyle(.secondary)
         }
         .font(.caption)
