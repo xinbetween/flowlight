@@ -1,0 +1,335 @@
+import AppKit
+import Combine
+import Foundation
+
+struct LiveTalker: Identifiable, Equatable {
+    var bundleID: String
+    var name: String
+    var path: String
+    var rateIn: Double
+    var rateOut: Double
+    var sessionIn: Int64
+    var sessionOut: Int64
+    var topDestination: String
+    var id: String { bundleID }
+}
+
+/// Owns the capture source, database, anomaly engine and live state.
+@MainActor
+final class TrafficMonitor: ObservableObject {
+    @Published private(set) var status = "Starting…"
+    @Published private(set) var mode: CaptureMode
+    @Published private(set) var talkers: [LiveTalker] = []
+    @Published private(set) var liveSeries: [SeriesPoint] = []
+    @Published private(set) var currentIn: Double = 0
+    @Published private(set) var currentOut: Double = 0
+    @Published private(set) var sessionIn: Int64 = 0
+    @Published private(set) var sessionOut: Int64 = 0
+    @Published private(set) var unacknowledgedAlerts = 0
+    @Published private(set) var isReceiving = false
+    @Published private(set) var captureState: PacketSniffer.State = .stopped
+    @Published private(set) var hostnamesLearned = 0
+    /// Share of traffic in the last hour with a hostname / with at least a network owner.
+    @Published private(set) var coverage: (named: Double, owned: Double) = (0, 0)
+    let sniffer = PacketSniffer()
+    /// First-launch offer to enable packet capture.
+    @Published var showCaptureOnboarding = false
+    private static let onboardingKey = "onboarding.captureOffered"
+    private var lastDataAt: Date?
+    @Published private(set) var dataVersion = 0 // bumps after each rollup so reports can refresh
+    @Published var lastError: String?
+
+    let db: TrafficDatabase
+    /// Read-only connection for UI queries.
+    private let readDB: TrafficDatabase
+    let activity = ActivityMonitor()
+    private let engine: AnomalyEngine
+    private var source: TrafficSource?
+    private var timers: [Timer] = []
+
+    private let liveWindow = 120
+    private let rateWindow = 5
+    private var perSecond: [Int64: [String: (name: String, path: String, counters: FlowCounters, topDest: String, topBytes: Int64)]] = [:]
+    private var sessionPerApp: [String: FlowCounters] = [:]
+
+    init() {
+        AnomalySettings.registerDefaults()
+        mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
+        do {
+            if DemoData.isEnabled {
+                DemoData.resetDatabase()
+                db = try TrafficDatabase(url: DemoData.databaseURL)
+            } else {
+                db = try TrafficDatabase()
+            }
+        } catch {
+            // Fall back to a throwaway database so the UI still works; surface the error.
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-\(UUID().uuidString).sqlite")
+            db = try! TrafficDatabase(url: tmp)
+            lastError = "Could not open database: \(error)"
+        }
+        readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
+        engine = AnomalyEngine(db: db, activity: activity)
+        IPOwnerLookup.shared.onResolved = { [db] ip, owner in
+            db.async { try $0.saveOwner(ip: ip, owner) }
+        }
+        sniffer.onStateChange = { [weak self] state in
+            Task { @MainActor in self?.captureState = state }
+        }
+        engine.onAlert = { [weak self] alerts in
+            Notifier.post(alerts)
+            Task { @MainActor in self?.refreshAlertCount() }
+        }
+    }
+
+    private var started = false
+
+    func start() {
+        guard !started else { return }
+        started = true
+        if DemoData.isEnabled {
+            IPOwnerLookup.shared.isEnabled = { false }
+            IPOwnerLookup.shared.preload(DemoData.owners())
+            UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+            db.async { [weak self] db in
+                try DemoData.seed(db)
+                Task { @MainActor in self?.dataVersion += 1; self?.refreshAlertCount() }
+            }
+        }
+        activity.start()
+        if UserDefaults.standard.bool(forKey: AnomalySettings.Keys.notifications) { Notifier.requestAuthorization() }
+        startSource()
+        db.async { [engine] db in
+            IPOwnerLookup.shared.preload(try db.loadOwners())
+            for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) { IPOwnerLookup.shared.owner(for: ip) }
+            let agents = try db.appDestinations(since: Date().addingTimeInterval(-7 * 86400))
+                .filter { AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil && !AgentCatalog.isBrowser($0.bundleID) }
+                .map(\.bundleID)
+            engine.seedDiscoveredAgents(Set(agents))
+        }
+        updatePacketCapture()
+        offerCaptureSetupIfNeeded()
+        refreshAlertCount()
+        timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tickLive() }
+        })
+        timers.append(Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.runMaintenance() }
+        })
+        timers.append(Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.sniffer.refreshInterface()
+                if self.captureState == .noPermission { self.updatePacketCapture() }
+            }
+        })
+        runMaintenance()
+    }
+
+    func setMode(_ newMode: CaptureMode) {
+        guard newMode != mode else { return }
+        mode = newMode
+        UserDefaults.standard.set(newMode.rawValue, forKey: AnomalySettings.Keys.captureMode)
+        startSource()
+    }
+
+    /// Passive hostname capture is only needed for the nettop source; the extension sees payloads itself.
+    func updatePacketCapture() {
+        let wanted = !DemoData.isEnabled && mode == .nettop && UserDefaults.standard.bool(forKey: AnomalySettings.Keys.packetCapture)
+        if wanted {
+            if case .running = captureState { return }
+            sniffer.start()
+        } else {
+            sniffer.stop()
+        }
+        captureState = sniffer.state
+    }
+
+    private func offerCaptureSetupIfNeeded() {
+        let defaults = UserDefaults.standard
+        // `-FLForceCaptureOnboarding YES` shows the offer regardless (for testing the flow).
+        if defaults.bool(forKey: "FLForceCaptureOnboarding") { showCaptureOnboarding = true; return }
+        guard !defaults.bool(forKey: Self.onboardingKey), mode == .nettop,
+              defaults.bool(forKey: AnomalySettings.Keys.packetCapture),
+              captureState == .noPermission, !CaptureAccess.isInstalled else { return }
+        showCaptureOnboarding = true
+    }
+
+    /// Once seen, the offer is not repeated (closing the window counts as "Not Now").
+    func markCaptureOnboardingShown() {
+        UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+    }
+
+    func dismissCaptureOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+        showCaptureOnboarding = false
+    }
+
+    /// Runs the admin-approved setup (or removal) and restarts capture. Returns a message for the UI.
+    func performCaptureSetup(_ action: CaptureAccess.Action) -> String? {
+        switch CaptureAccess.run(action) {
+        case .success:
+            sniffer.stop()
+            updatePacketCapture()
+            if action == .uninstall { return "Packet capture access was removed." }
+            if captureState == .noPermission { return "Access granted. Log out and back in to finish." }
+            return "Packet capture is enabled."
+        case .failure(let error):
+            return error.localizedDescription
+        }
+    }
+
+    private func startSource() {
+        source?.stop()
+        let newSource: TrafficSource
+        if DemoData.isEnabled { newSource = DemoTrafficSource() }
+        else if mode == .networkExtension { newSource = ExtensionTrafficSource() }
+        else { newSource = NettopTrafficSource() }
+        source = newSource
+        status = "Starting \(newSource.displayName)…"
+        if started { updatePacketCapture() }
+        newSource.start(sink: { [weak self] batches in
+            self?.ingest(batches)
+        }, status: { [weak self] message in
+            Task { @MainActor in self?.status = message }
+        })
+    }
+
+    // MARK: Ingest (any thread)
+
+    nonisolated func ingest(_ batches: [TrafficBatch]) {
+        // Anything without a hostname gets at least its network owner.
+        for batch in batches {
+            for record in batch.records where record.key.domain.isEmpty {
+                IPOwnerLookup.shared.owner(for: record.key.remoteIP)
+            }
+        }
+        db.async { [engine] db in
+            try db.insert(batches)
+            try engine.observe(batches)
+        }
+        Task { @MainActor in self.updateLive(with: batches) }
+    }
+
+    private func updateLive(with batches: [TrafficBatch]) {
+        lastDataAt = Date()
+        for batch in batches {
+            var bucket = perSecond[batch.timestamp] ?? [:]
+            for r in batch.records {
+                let k = r.key
+                var entry = bucket[k.bundleID] ?? (k.appName, k.appPath, FlowCounters(), "", 0)
+                entry.counters += r.counters
+                // Prefer a real remote host over local unconnected sockets (e.g. mDNS).
+                let dest = !k.domain.isEmpty ? k.domain : (IPOwnerLookup.shared.cached(k.remoteIP).map { "\($0.name) · \(k.remoteIP)" } ?? k.remoteIP)
+                let isRemote = k.remoteIP != "(unconnected)"
+                let weight = isRemote ? r.counters.total : 0
+                if entry.topDest.isEmpty || weight > entry.topBytes {
+                    entry.topBytes = weight
+                    entry.topDest = dest
+                }
+                bucket[k.bundleID] = entry
+                sessionPerApp[k.bundleID, default: FlowCounters()] += r.counters
+                sessionIn += r.counters.bytesIn
+                sessionOut += r.counters.bytesOut
+            }
+            perSecond[batch.timestamp] = bucket
+        }
+    }
+
+    private func tickLive() {
+        let now = Int64(Date().timeIntervalSince1970)
+        let receiving = lastDataAt.map { Date().timeIntervalSince($0) < 5 } ?? false
+        if receiving != isReceiving { isReceiving = receiving }
+        perSecond = perSecond.filter { $0.key > now - Int64(liveWindow) }
+
+        liveSeries = ((now - Int64(liveWindow))..<now).map { ts in
+            let values = perSecond[ts]?.values.map(\.counters) ?? []
+            return SeriesPoint(date: Date(timeIntervalSince1970: TimeInterval(ts)),
+                               bytesIn: values.reduce(0) { $0 + $1.bytesIn },
+                               bytesOut: values.reduce(0) { $0 + $1.bytesOut },
+                               flows: values.reduce(0) { $0 + $1.flows })
+        }
+
+        // Rates over the most recent complete seconds (sources lag ~1–2 s).
+        let window = ((now - Int64(rateWindow) - 1)..<(now - 1))
+        var rates: [String: (name: String, path: String, counters: FlowCounters, topDest: String, topBytes: Int64)] = [:]
+        for ts in window {
+            for (bundle, entry) in perSecond[ts] ?? [:] {
+                var agg = rates[bundle] ?? (entry.name, entry.path, FlowCounters(), entry.topDest, 0)
+                agg.counters += entry.counters
+                if entry.topBytes > agg.topBytes { agg.topBytes = entry.topBytes; agg.topDest = entry.topDest }
+                rates[bundle] = agg
+            }
+        }
+        let seconds = Double(rateWindow)
+        talkers = rates.map { bundle, v in
+            LiveTalker(bundleID: bundle, name: v.name, path: v.path, rateIn: Double(v.counters.bytesIn) / seconds,
+                       rateOut: Double(v.counters.bytesOut) / seconds, sessionIn: sessionPerApp[bundle]?.bytesIn ?? 0,
+                       sessionOut: sessionPerApp[bundle]?.bytesOut ?? 0, topDestination: v.topDest)
+        }
+        .filter { $0.rateIn + $0.rateOut > 0 }
+        .sorted { $0.rateIn + $0.rateOut > $1.rateIn + $1.rateOut }
+        currentIn = talkers.reduce(0) { $0 + $1.rateIn }
+        currentOut = talkers.reduce(0) { $0 + $1.rateOut }
+    }
+
+    // MARK: Maintenance
+
+    func runMaintenance() {
+        let retentionHours = UserDefaults.standard.double(forKey: AnomalySettings.Keys.retentionHours)
+        db.async { [engine, weak self] db in
+            var retention = TrafficDatabase.Retention()
+            retention.seconds = max(1, retentionHours) * 3600
+            let completed = try db.rollup(retention: retention)
+            for hour in completed.completedHours { try engine.hourCompleted(hour) }
+            for day in completed.completedDays { try engine.dayCompleted(day) }
+            try engine.evaluateIdleTraffic()
+            let coverage = try db.coverage(since: Date().addingTimeInterval(-3600))
+            Task { @MainActor in
+                self?.coverage = coverage
+                self?.hostnamesLearned = DNSCache.shared.learnedCount
+                self?.dataVersion += 1
+            }
+        }
+    }
+
+    func refreshAlertCount() {
+        db.async { [weak self] db in
+            let count = try db.unacknowledgedAlertCount()
+            Task { @MainActor in self?.unacknowledgedAlerts = count }
+        }
+    }
+
+    func clearAllData() {
+        db.async { [weak self] db in
+            try db.clearAll()
+            Task { @MainActor in
+                self?.sessionPerApp.removeAll()
+                self?.perSecond.removeAll()
+                self?.sessionIn = 0
+                self?.sessionOut = 0
+                self?.dataVersion += 1
+                self?.refreshAlertCount()
+            }
+        }
+    }
+
+    /// Runs a read query off the main thread on the read-only connection.
+    func read<T: Sendable>(_ body: @escaping @Sendable (TrafficDatabase) throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            readDB.queue.async { [readDB] in
+                continuation.resume(with: Result { try body(readDB) })
+            }
+        }
+    }
+
+    func acknowledgeAlerts(ids: [Int64]?) {
+        db.async { [weak self] db in
+            try db.acknowledgeAlerts(ids: ids)
+            Task { @MainActor in
+                self?.refreshAlertCount()
+                self?.dataVersion += 1
+            }
+        }
+    }
+}
