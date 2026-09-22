@@ -155,10 +155,10 @@ struct JSONNodeView: View {
             }
             .frame(width: 12)
             if let key {
-                Text(keyStyle == .key ? key : keyStyle == .index ? "[\(key)]" : key)
+                (Text(keyStyle == .key ? key : keyStyle == .index ? "[\(key)]" : key)
                     .foregroundStyle(keyStyle == .key ? Color.accentColor : .secondary)
                     .fontWeight(keyStyle == .event ? .semibold : .regular)
-                Text(":").foregroundStyle(.tertiary)
+                 + Text(":").foregroundStyle(.tertiary))
             }
             valueText
             Spacer(minLength: 0)

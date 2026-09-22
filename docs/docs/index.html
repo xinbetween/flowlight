@@ -122,9 +122,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Off by default. When you turn it on in <strong>Inspect</strong>, Flowlight runs a local proxy on <code>127.0.0.1:8877</code> with its own
         certificate authority, created on your Mac. For apps you route through it, it decrypts HTTPS and shows each request and response:
         headers, bodies, status and timing. From an AI agent's model responses it reads every <strong>tool call</strong> the model asked for
-        (Anthropic, OpenAI Chat and Responses, Gemini, and MCP <code>tools/call</code> requests), and it links each request a tool makes back to
-        the call that caused it: curl's request to <em>paste.example</em> shows <em>← Bash: curl -s https://paste.example/up</em>.
-        <strong>AI Agents</strong> lists the tools each agent ran, with counts and the latest command.</p>
+        (Anthropic, OpenAI Chat and Responses, Gemini, and MCP <code>tools/call</code> requests) and the result the agent sent back, and it
+        links each request a tool makes back to the call that caused it: curl's request to <em>paste.example</em> shows
+        <em>← Bash: curl -s https://paste.example/up</em>. In <strong>AI Agents</strong>, an agent's detail gets <strong>Tool calls</strong>
+        (each call with its command, result or error, and the requests it made) and <strong>MCP servers</strong> (name and version, local or
+        remote, the tools it offers, calls and failures). Bodies open as a collapsible JSON tree in their original key order; event streams
+        show one event at a time.</p>
       <ol>
         <li><strong>Turn it on</strong> in Inspect › Setup. By default only AI agents and the tools they start are decrypted; other apps sent through
           the proxy pass through encrypted and aren't recorded.</li>

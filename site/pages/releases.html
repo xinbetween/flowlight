@@ -13,6 +13,18 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
+        <header><h2>Next release</h2><span class="tag">In development</span></header>
+        <ul>
+          <li><strong>Tool results and MCP servers.</strong> With HTTPS inspection on, each tool call shows what came back (output or error),
+            and each agent's detail gets <em>Tool calls</em> and <em>MCP servers</em> tabs: server name and version, the tools it offers, calls
+            and failures.</li>
+          <li><strong>JSON tree viewer</strong> for request and response bodies, in their original key order, with a Raw view and Copy.</li>
+          <li><strong>Fixed:</strong> with the system proxy on, Flowlight's own connections looped back through its proxy, recording each
+            request many times and slowing traffic.</li>
+          <li><strong>Fixed:</strong> nettop sometimes hangs; Flowlight now restarts a stuck sample after 5 seconds instead of stopping capture.</li>
+        </ul>
+      </section>
+      <section class="release">
         <header><h2>0.1.4</h2><time datetime="2026-09-22">September 22, 2026</time><span class="tag">Latest</span></header>
         <ul>
           <li><strong>HTTPS inspection (optional, off by default).</strong> A local proxy with a certificate authority created on your Mac decrypts

@@ -165,9 +165,12 @@ open build/Build/Products/Release/Flowlight.app
  Off by default. When you turn it on in Inspect, Flowlight runs a local proxy on 127.0.0.1:8877 with its own
  certificate authority, created on your Mac. For apps you route through it, it decrypts HTTPS and shows each request and response:
  headers, bodies, status and timing. From an AI agent's model responses it reads every tool call the model asked for
- (Anthropic, OpenAI Chat and Responses, Gemini, and MCP tools/call requests), and it links each request a tool makes back to
- the call that caused it: curl's request to paste.example shows ← Bash: curl -s https://paste.example/up.
- AI Agents lists the tools each agent ran, with counts and the latest command.
+ (Anthropic, OpenAI Chat and Responses, Gemini, and MCP tools/call requests) and the result the agent sent back, and it
+ links each request a tool makes back to the call that caused it: curl's request to paste.example shows
+ ← Bash: curl -s https://paste.example/up. In AI Agents, an agent's detail gets Tool calls
+ (each call with its command, result or error, and the requests it made) and MCP servers (name and version, local or
+ remote, the tools it offers, calls and failures). Bodies open as a collapsible JSON tree in their original key order; event streams
+ show one event at a time.
 
  Turn it on in Inspect › Setup. By default only AI agents and the tools they start are decrypted; other apps sent through
  the proxy pass through encrypted and aren't recorded.
@@ -716,6 +719,20 @@ Releases
  What's new
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
+
+ Next release
+In development
+
+ Tool results and MCP servers. With HTTPS inspection on, each tool call shows what came back (output or error),
+ and each agent's detail gets Tool calls and MCP servers tabs: server name and version, the tools it offers, calls
+ and failures.
+
+ JSON tree viewer for request and response bodies, in their original key order, with a Raw view and Copy.
+
+ Fixed: with the system proxy on, Flowlight's own connections looped back through its proxy, recording each
+ request many times and slowing traffic.
+
+ Fixed: nettop sometimes hangs; Flowlight now restarts a stuck sample after 5 seconds instead of stopping capture.
 
  0.1.4
 September 22, 2026Latest
