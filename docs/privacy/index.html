@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight privacy</title>
+<meta name="description" content="What Flowlight records, where it stays, and every network request the app makes.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/privacy/">
+<meta property="og:title" content="Flowlight privacy">
+<meta property="og:description" content="What Flowlight records, where it stays, and every network request the app makes.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/privacy/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../#agents">AI agents</a>
+      <a href="../docs/">Docs</a>
+      <a href="../privacy/" aria-current="page">Privacy</a>
+      <a href="../releases/">Releases</a>
+      <a href="../about/">About</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Privacy</p>
+    <h1>Your traffic stays on your Mac</h1>
+    <p class="lede">Flowlight has no account, no server and no analytics. This page lists everything it records and every request it makes,
+      so you can check the claims against the <a href="https://github.com/xinbetween/flowlight">source</a>.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#short">In short</a><a href="#records">What it records</a><a href="#packets">Packet capture</a>
+      <a href="#requests">Network requests</a><a href="#permissions">Permissions</a><a href="#retention">Retention</a>
+      <a href="#website">This website</a><a href="#contact">Contact</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">In short</h2>
+      <ul>
+        <li>Flowlight records network metadata (which app, which host, which port, how many bytes, when) in a database on your Mac.</li>
+        <li>It never records packet contents and never decrypts traffic.</li>
+        <li>Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.</li>
+        <li>The app makes a few network requests of its own, listed below, and you can turn off each optional one.</li>
+      </ul>
+
+      <h2 id="records">What it records</h2>
+      <p>For each second: the app (bundle ID, name, executable path, process ID), the remote IP address, hostname, port, transport and
+        protocol, and bytes sent and received. It also stores the alerts it raises and per-app baselines used by the anomaly rules.
+        All of it lives in <code>~/Library/Application Support/Flowlight</code>.</p>
+
+      <h2 id="packets">Packet capture</h2>
+      <p>If you approve the one-time hostname setup, Flowlight reads packets on your primary network interface through a kernel filter that
+        passes only two things: DNS responses, and the first message of a TLS connection (the ClientHello). From those it keeps only
+        hostnames and the addresses they map to, in memory. Everything else is dropped in the kernel, and no packet is written to disk.</p>
+
+      <h2 id="requests">Network requests the app makes</h2>
+      <table>
+        <tr><th>Request</th><th>Sent to</th><th>What it contains</th><th>When</th></tr>
+        <tr><td>Update check</td><td><code>api.github.com</code></td><td>A standard HTTPS request for the latest release; GitHub sees your IP address and the <code>Flowlight/&lt;version&gt;</code> user agent</td><td>On launch and daily, from 0.1.2. Off switch in Settings › General</td></tr>
+        <tr><td>Update download</td><td><code>github.com</code></td><td>The disk image and its checksum file</td><td>Only when you click Download &amp; Open</td></tr>
+        <tr><td>Reverse DNS</td><td>Your configured DNS resolver</td><td>A lookup of an IP address's registered name, when no hostname was seen</td><td>As needed, in the default capture mode</td></tr>
+        <tr><td>Network owner lookup</td><td>Team Cymru, over DNS</td><td>Public IP addresses with no known hostname. Private and reserved addresses never leave your Mac</td><td>Off by default. Capture › Identify network owners</td></tr>
+      </table>
+
+      <h2 id="permissions">Permissions</h2>
+      <ul>
+        <li><strong>Administrator password, once,</strong> for packet-capture access. Removable from the Capture screen.</li>
+        <li><strong>Notifications,</strong> for warnings. Optional.</li>
+        <li><strong>Login item,</strong> only if you turn on Launch at login.</li>
+      </ul>
+
+      <h2 id="retention">Retention</h2>
+      <p>Per-second data 6 hours (adjustable), minute data 14 days, hourly data 400 days, daily totals indefinitely, alerts 90 days.
+        <strong>Capture › Clear all data</strong> deletes everything, and removing <code>~/Library/Application Support/Flowlight</code> does the same.</p>
+
+      <h2 id="website">This website</h2>
+      <p>This site is a static page hosted on GitHub Pages and served through Cloudflare. It sets no cookies and runs no analytics. GitHub
+        and Cloudflare process requests to serve it, and the fonts load from Google Fonts, which receives your IP address when you visit.</p>
+
+      <h2 id="contact">Contact</h2>
+      <p>Questions or a privacy concern? <a href="https://github.com/xinbetween/flowlight/issues">Open an issue</a>. For anything sensitive, use GitHub's
+        private vulnerability reporting on the repository.</p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="../releases/">Release notes</a></li>
+        <li><a href="../docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="../about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.1.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

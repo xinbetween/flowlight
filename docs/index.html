@@ -3,235 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta property="og:title" content="Flowlight: every app, every domain, every agent">
-<meta property="og:description" content="Free, open-source macOS network monitor with AI agent oversight.">
-<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
-<meta property="og:url" content="https://flowlight.xinbetween.com/">
-<link rel="canonical" href="https://flowlight.xinbetween.com/">
-<link rel="icon" href="assets/icon.png">
 <title>Flowlight for macOS</title>
-<meta name="description" content="Flowlight is a free, open-source macOS network monitor. See every app's traffic to every domain, and watch AI agents for data leaving your Mac.">
+<meta name="description" content="Flowlight is a free, open-source macOS network monitor. See every app&#x27;s traffic to every domain, and watch AI agents for data leaving your Mac.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/">
+<meta property="og:title" content="Flowlight for macOS">
+<meta property="og:description" content="Flowlight is a free, open-source macOS network monitor. See every app&#x27;s traffic to every domain, and watch AI agents for data leaving your Mac.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<style>
-  :root {
-    --ground: #f4f5f8;
-    --surface: #ffffff;
-    --surface-2: #eceef4;
-    --ink: #11131a;
-    --muted: #565d70;
-    --faint: #8a90a2;
-    --line: #dde0e8;
-    --accent: #4a3aa7;
-    --accent-ink: #ffffff;
-    --received: #2a78d6;
-    --sent: #d95926;
-    --critical: #c93b33;
-    --warning: #b86e00;
-    --log-bg: #12141d;
-    --log-ink: #d9dce6;
-    --log-muted: #7d8398;
-    --log-line: #262a38;
-    --shadow: 0 1px 2px rgba(17, 19, 26, .06), 0 12px 40px rgba(38, 30, 96, .10);
-    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-    --body: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
-    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #0d0f16; --surface: #151824; --surface-2: #1c2030; --ink: #eef0f6; --muted: #a3a9bb; --faint: #737a8f;
-      --line: #262b3b; --accent: #9085e9; --accent-ink: #0d0f16; --received: #4a93ea; --sent: #e5723f;
-      --critical: #ec6a62; --warning: #e0a13a; --log-bg: #090b11; --log-line: #1d2130;
-      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 48px rgba(0, 0, 0, .35); color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --ground: #0d0f16; --surface: #151824; --surface-2: #1c2030; --ink: #eef0f6; --muted: #a3a9bb; --faint: #737a8f;
-    --line: #262b3b; --accent: #9085e9; --accent-ink: #0d0f16; --received: #4a93ea; --sent: #e5723f;
-    --critical: #ec6a62; --warning: #e0a13a; --log-bg: #090b11; --log-line: #1d2130;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 48px rgba(0, 0, 0, .35); color-scheme: dark;
-  }
-
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--ground); color: var(--ink);
-    font: 16px/1.6 var(--body); -webkit-font-smoothing: antialiased;
-  }
-  .wrap { width: min(1160px, 100%); margin-inline: auto; padding-inline: 20px; }
-  a { color: inherit; }
-  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-  h1, h2, h3 { font-family: var(--display); line-height: 1.05; margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
-  h2 { font-size: clamp(30px, 4vw, 46px); font-weight: 800; }
-  h3 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-  p { margin: 0; }
-  .lede { color: var(--muted); font-size: 18px; max-width: 62ch; }
-  .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-  code, .mono { font-family: var(--mono); font-size: .92em; }
-
-  /* Nav */
-  .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--ground) 86%, transparent);
-         backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--line); }
-  .nav .wrap { display: flex; align-items: center; gap: 24px; min-height: 60px; }
-  .brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--display); text-decoration: none; }
-  .brand img { width: 30px; height: 30px; }
-  .nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; color: var(--muted); }
-  .nav-links a { text-decoration: none; }
-  .nav-links a:hover { color: var(--ink); }
-  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 12px; font: 600 15px var(--body);
-         text-decoration: none; border: 1px solid transparent; transition: transform .15s ease, box-shadow .15s ease; }
-  .btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
-  .btn-primary:hover { transform: translateY(-1px); }
-  .btn-ghost { border-color: var(--line); background: var(--surface); }
-  .btn-sm { padding: 8px 14px; font-size: 14px; border-radius: 10px; }
-  .btn svg { width: 18px; height: 18px; flex: none; }
-
-  /* Hero */
-  .hero { padding-block: 72px 56px; }
-  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: center; }
-  .hero h1 { font-size: clamp(42px, 6.2vw, 76px); font-weight: 800; }
-  .hero h1 .flow { color: var(--accent); }
-  .hero .lede { margin-top: 20px; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
-  .cta-note { font-size: 13px; color: var(--faint); width: 100%; }
-
-  .log { background: var(--log-bg); color: var(--log-ink); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden;
-         font: 12.5px/1.5 var(--mono); border: 1px solid var(--log-line); }
-  .log-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--log-line); color: var(--log-muted); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f52; }
-  .log-head .live { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-  .pulse { width: 7px; height: 7px; border-radius: 50%; background: #2fbf71; }
-  .log ol { list-style: none; margin: 0; padding: 6px 0; height: 356px; overflow: hidden; }
-  .log li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 6.2em; gap: 10px; padding: 5px 14px; align-items: baseline; }
-  .log li .app { color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .log li .dest { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--log-muted); }
-  .log li .dest b { font-weight: 500; color: var(--log-ink); }
-  .log li .bytes { text-align: right; font-variant-numeric: tabular-nums; }
-  .up { color: #f08a5d; } .down { color: #6aa9f0; }
-  .log li.flag { background: rgba(236, 106, 98, .12); box-shadow: inset 3px 0 0 #ec6a62; }
-  .log li.flag .note { grid-column: 2 / 4; color: #f19a93; font-size: 11.5px; }
-  .log li.enter { animation: slide .5s ease both; }
-  @keyframes slide { from { opacity: 0; transform: translateY(-8px); } }
-
-  /* Shot */
-  .shot { padding-block: 16px 88px; }
-  .frame { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: var(--surface); }
-  .frame img { display: block; width: 100%; height: auto; }
-  .caption { margin-top: 14px; color: var(--faint); font-size: 14px; text-align: center; }
-
-  section.band { padding-block: 88px; border-top: 1px solid var(--line); }
-  .section-head { display: grid; gap: 14px; margin-bottom: 40px; }
-
-  /* Two questions */
-  .pair { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-  .fact { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: grid; gap: 10px; align-content: start; }
-  .fact p { color: var(--muted); font-size: 15px; }
-  .fact .figure { font: 800 40px/1 var(--display); letter-spacing: -0.03em; }
-  .fact .figure small { font: 500 14px var(--body); color: var(--faint); letter-spacing: 0; margin-left: 6px; }
-
-  /* Agents */
-  .agents { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; align-items: start; }
-  .agent-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-  .chip { font: 500 12.5px/1 var(--mono); padding: 7px 10px; border-radius: 8px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
-  .rules { display: grid; gap: 12px; }
-  .rule { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 18px 20px; background: var(--surface);
-          border: 1px solid var(--line); border-radius: 14px; }
-  .rule .sev { display: inline-flex; align-items: center; gap: 6px; font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
-               padding: 6px 8px; border-radius: 6px; height: fit-content; white-space: nowrap; }
-  .sev.critical { color: var(--critical); background: color-mix(in srgb, var(--critical) 13%, transparent); }
-  .sev.warning { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
-  .sev.info { color: var(--muted); background: var(--surface-2); }
-  .rule h3 { font-size: 17px; }
-  .rule p { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
-  .rule .example { margin-top: 8px; font: 12.5px/1.5 var(--mono); color: var(--faint); }
-
-  /* Protocols */
-  .families { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
-  .family { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; align-content: start; }
-  .family header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .family h3 { font-size: 16px; }
-  .family .count { font: 12px var(--mono); color: var(--faint); }
-  .family .protos { display: flex; flex-wrap: wrap; gap: 6px; }
-  .family .protos span { font: 12px/1 var(--mono); padding: 5px 7px; border-radius: 6px; background: var(--surface-2); }
-  .family.egress { border-color: color-mix(in srgb, var(--critical) 35%, var(--line)); }
-  .family.egress header { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .family.egress .tag { font: 600 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--critical); }
-  .footnote { margin-top: 20px; color: var(--faint); font-size: 14px; max-width: 80ch; }
-
-  /* Privacy */
-  .privacy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-  .privacy div { display: grid; gap: 6px; align-content: start; }
-  .privacy strong { font: 700 18px var(--display); }
-  .privacy p { color: var(--muted); font-size: 15px; }
-
-  /* Screens */
-  .screens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-  .screens figure { margin: 0; display: grid; gap: 10px; }
-  .screens figcaption { color: var(--muted); font-size: 14px; }
-
-  /* Install */
-  .install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: step; }
-  .steps li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 14px; counter-increment: step; }
-  .steps li::before { content: counter(step); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-                      background: var(--accent); color: var(--accent-ink); font: 700 15px var(--display); }
-  .steps p { color: var(--muted); font-size: 15px; }
-  .steps strong { color: var(--ink); }
-  pre { margin: 0; background: var(--log-bg); color: var(--log-ink); border-radius: 12px; padding: 18px; overflow-x: auto;
-        font: 13px/1.7 var(--mono); border: 1px solid var(--log-line); }
-  pre .c { color: var(--log-muted); }
-
-  /* FAQ */
-  .faq { display: grid; gap: 10px; max-width: 820px; }
-  details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
-  summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
-  summary::-webkit-details-marker { display: none; }
-  summary::after { content: "+"; font: 500 20px/1 var(--mono); color: var(--faint); }
-  details[open] summary::after { content: "–"; }
-  details p { color: var(--muted); margin-top: 10px; font-size: 15px; }
-
-  .final { padding-block: 96px; text-align: center; border-top: 1px solid var(--line); }
-  .final .cta { justify-content: center; }
-  .final p { margin-inline: auto; margin-top: 14px; }
-  footer { padding-block: 28px 40px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
-  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; }
-
-  @media (max-width: 900px) {
-    .hero .wrap, .agents, .install { grid-template-columns: minmax(0, 1fr); gap: 36px; }
-    .pair, .screens { grid-template-columns: minmax(0, 1fr); }
-    .privacy { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .nav-links { display: none; }
-    .nav .btn { margin-left: auto; }
-  }
-  @media (max-width: 520px) {
-    .privacy { grid-template-columns: minmax(0, 1fr); }
-    .log li { grid-template-columns: 6em minmax(0, 1fr) 5.4em; font-size: 11.5px; padding-inline: 10px; }
-    .hero { padding-block: 44px 36px; }
-    section.band { padding-block: 64px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .log li.enter { animation: none; }
-    .btn { transition: none; }
-  }
-</style>
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="assets/icon.png" alt="">Flowlight</a>
-    <nav class="nav-links" aria-label="Sections">
+    <a class="brand" href=""><img src="assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
       <a href="#agents">AI agents</a>
-      <a href="#protocols">Protocols</a>
-      <a href="#privacy">Privacy</a>
-      <a href="#install">Install</a>
+      <a href="docs/">Docs</a>
+      <a href="privacy/">Privacy</a>
+      <a href="releases/">Releases</a>
+      <a href="about/">About</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
     </nav>
     <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
   </div>
 </header>
-
-<main id="top">
+<main id="main">
   <section class="hero">
     <div class="wrap">
       <div>
@@ -249,7 +51,7 @@
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
             Star on GitHub
           </a>
-          <p class="cta-note">Universal disk image, 4&nbsp;MB · No account, no cloud, no telemetry · GPL-3.0</p>
+          <p class="meta-row"><span>v0.1.1</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
         </div>
       </div>
 
@@ -280,6 +82,48 @@
       <p class="caption">The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.</p>
     </div>
   </section>
+  <section class="band" id="use-cases">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">When to reach for Flowlight</p>
+        <h2>Questions it answers in seconds</h2>
+      </div>
+      <div class="cases">
+        <div class="case"><span class="view">AI Agents</span><h3>An agent is running while you're in a meeting</h3>
+          <p>See every host it touched besides its model provider, and get an alert if it sends email, opens SSH or uploads 100&nbsp;MB somewhere new.</p></div>
+        <div class="case"><span class="view">Reports</span><h3>Your upload spiked and you don't know why</h3>
+          <p>Hover the spike to see the app behind it, click to zoom from the hour to the minute, and follow it to the exact domain and IP.</p></div>
+        <div class="case"><span class="view">Alerts</span><h3>A new app started phoning home</h3>
+          <p>First contact with a new domain, a non-standard port or a traffic spike each raise an alert that names the app and the number that tripped it.</p></div>
+        <div class="case"><span class="view">Live</span><h3>Something is saturating your connection right now</h3>
+          <p>Top talkers updated every second, with the busiest destination for each app, and live rates in your menu bar.</p></div>
+        <div class="case"><span class="view">Reports</span><h3>Your hotspot data vanished this month</h3>
+          <p>Switch to the month view and group by app. The biggest consumer is the top row, with CSV export if you need receipts.</p></div>
+        <div class="case"><span class="view">Reports · Destination</span><h3>You need to audit where data goes</h3>
+          <p>Group by destination to see every app that talks to a domain, or by IP to see what sits behind an address.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="views">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Inside the app</p>
+        <h2>Four views, one question each</h2>
+      </div>
+      <div class="views">
+        <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+          <h3>Live</h3><p>What's moving right now? Per-app rates, the last two minutes, the busiest destination.</p><span class="keys">⌘1</span></div>
+        <div class="view-card"><span class="glyph agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/></svg></span>
+          <h3>AI Agents</h3><p>What are my agents doing besides calling their model? Providers, other hosts, risk badges.</p><span class="keys">⌘2</span></div>
+        <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h3>Reports</h3><p>Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.</p><span class="keys">⌘3</span></div>
+        <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
+          <h3>Alerts</h3><p>What looked wrong? Explainable, per-app alerts with the destination and the threshold.</p><span class="keys">⌘4</span></div>
+      </div>
+    </div>
+  </section>
+
 
   <section class="band" id="capture">
     <div class="wrap">
@@ -398,7 +242,47 @@
     </div>
   </section>
 
-  <section class="band" id="privacy">
+  
+  <section class="band" id="compare">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">How it compares</p>
+        <h2>Built for the question the other tools skip</h2>
+        <p class="lede">Flowlight observes and explains; it doesn't block. It pairs well with a firewall.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th></th><th class="us">Flowlight</th><th>Activity Monitor</th><th>Firewalls<br><small>e.g. Little Snitch, LuLu</small></th><th>Packet analyzers<br><small>e.g. Wireshark</small></th></tr></thead>
+          <tbody>
+            <tr><td>Which app sent it</td><td class="us yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Which domain it went to</td><td class="us yes">Yes, from SNI and DNS</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes, per packet</td></tr>
+            <tr><td>History from second to year</td><td class="us yes">Yes</td><td class="no">No</td><td class="part">Varies</td><td class="part">Capture files</td></tr>
+            <tr><td>Rules for AI agents</td><td class="us yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Blocks connections</td><td class="us no">No, observe only</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Free and open source</td><td class="us yes">Yes, GPL-3.0</td><td class="part">Built in</td><td class="part">Varies</td><td class="yes">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="about">
+    <div class="wrap about">
+      <div style="display:grid;gap:16px">
+        <p class="eyebrow">Why Flowlight exists</p>
+        <blockquote>Your tools now make their own decisions. You should be able to see <span>where your data goes</span> when they do.</blockquote>
+      </div>
+      <div class="prose">
+        <p>Coding agents read your files, run commands and call tools, and any of those tools can open a socket. In September 2026,
+          an AI coding app was found packaging users' whole workspaces, Git history included, and uploading them in the background.
+          The researcher who caught it only noticed because a cache folder was eating disk space.</p>
+        <p>The uploads were encrypted, but the facts that mattered weren't: which app, which host, how many megabytes, and when.
+          macOS already knows all of that. Flowlight puts it on screen, keeps the history, and flags what doesn't look right.</p>
+        <p><a href="about/">Read the full story →</a></p>
+      </div>
+    </div>
+  </section>
+<section class="band" id="privacy">
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Privacy</p>
@@ -430,7 +314,7 @@
         <p class="eyebrow">Install</p>
         <h2>Running in under a minute</h2>
         <ol class="steps" style="margin-top:16px">
-          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/xinbetween/flowlight/releases/latest">.pkg installer</a> is also on every release.</p></div></li>
+          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/xinbetween/flowlight/releases/latest">.pkg installer</a> is also on every release. The first launch of this preview needs right-click › Open.</p></div></li>
           <li><div><strong>Launch it</strong><p>Traffic appears within a second, and live ↓↑ rates sit in your menu bar.</p></div></li>
           <li><div><strong>Name your traffic</strong><p>Approve the one-time setup (your password, once) so Flowlight can read hostnames.</p></div></li>
         </ol>
@@ -468,31 +352,28 @@ open Flowlight.app --args -FLDemo YES</pre>
           <p>Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
             ChatGPT, Claude, Zed, Perplexity and ZCode, plus any non-browser process that calls a known LLM API. Adding one is a
             one-line pull request.</p></details>
+        <details><summary>How does it update?</summary>
+          <p>Once a day Flowlight asks GitHub for the latest release. When there's one, it shows the notes and can download the
+            disk image, verify it against the published SHA-256 and open it. You can turn the check off in Settings.</p></details>
         <details><summary>Is it really free?</summary>
           <p>Yes. It's free software under the GPL-3.0: no paid tier, no data collection.</p></details>
       </div>
     </div>
   </section>
 
+  
   <section class="final">
     <div class="wrap">
       <h2>Know what leaves your Mac.</h2>
-      <p class="lede">Free and open source, for macOS 15 and later.</p>
+      <p class="lede">Free software for macOS 15 and later.</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a>
         <a class="btn btn-ghost" href="https://github.com/xinbetween/flowlight">View source</a>
       </div>
     </div>
   </section>
+
 </main>
-
-<footer>
-  <div class="wrap">
-    <span>© 2026 The Flowlight contributors · <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GPL-3.0</a></span>
-    <span>Not affiliated with Apple or any AI provider named here. Screenshots use synthetic demo data.</span>
-  </div>
-</footer>
-
 <script>
   // Stream new lines into the connection log. The full log is readable at rest.
   (function () {
@@ -529,5 +410,41 @@ open Flowlight.app --args -FLDemo YES</pre>
     }, 1900);
   })();
 </script>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href=""><img src="assets/icon.png" alt="">Flowlight</a>
+        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="releases/">Release notes</a></li>
+        <li><a href="docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="llms.txt">llms.txt</a></li>
+        <li><a href="llms-full.txt">llms-full.txt</a></li>
+        <li><a href="sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.1.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

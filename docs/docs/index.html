@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight documentation</title>
+<meta name="description" content="Install Flowlight, name your traffic, read the four views, tune the AI agent rules, and uninstall cleanly.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/docs/">
+<meta property="og:title" content="Flowlight documentation">
+<meta property="og:description" content="Install Flowlight, name your traffic, read the four views, tune the AI agent rules, and uninstall cleanly.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/docs/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../#agents">AI agents</a>
+      <a href="../docs/" aria-current="page">Docs</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../releases/">Releases</a>
+      <a href="../about/">About</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Documentation</p>
+    <h1>Using Flowlight</h1>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.1.1, macOS 15 or later.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
+      <a href="#views">The four views</a><a href="#agents">AI agent rules</a><a href="#alerts">Other alerts</a>
+      <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
+      <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#limits">Limitations</a>
+    </nav>
+    <article class="prose">
+      <h2 id="install">Install</h2>
+      <ol>
+        <li>Download <a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Flowlight.dmg</a>, open it and drag Flowlight into Applications.</li>
+        <li>Prefer an installer? Every <a href="https://github.com/xinbetween/flowlight/releases/latest">release</a> also has a <code>.pkg</code>.</li>
+        <li>Building from source needs Xcode 16 or later and <code>xcodegen</code>:</li>
+      </ol>
+<pre>brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git &amp;&amp; cd flowlight
+xcodegen generate &amp;&amp; scripts/build-local.sh
+open build/Build/Products/Release/Flowlight.app</pre>
+
+      <h2 id="first-launch">First launch</h2>
+      <p>This preview isn't notarized yet, so macOS says it can't verify the developer. Right-click Flowlight in Applications,
+        choose <strong>Open</strong>, then <strong>Open</strong> again. You only do this once. On macOS 15 and later you can also allow it in
+        System Settings › Privacy &amp; Security › <em>Open Anyway</em>.</p>
+      <p>Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.</p>
+
+      <h2 id="hostnames">Hostnames: the one-time setup</h2>
+      <p>By default macOS only tells Flowlight the IP address each app talks to. To show real hostnames, Flowlight reads two
+        things from network packets: DNS answers, and the server name a client asks for when it opens an HTTPS connection (TLS SNI).
+        A filter in the kernel drops every other packet before Flowlight sees it, and packet contents are never stored.</p>
+      <p>macOS only lets administrators read packets, so the <strong>Name Your Traffic</strong> window asks for your password once. It installs
+        <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>, which gives the <code>access_bpf</code> group read access to
+        <code>/dev/bpf*</code> at each boot, the same approach Wireshark uses. Remove it any time from <strong>Capture › Remove Packet Capture Access</strong>.</p>
+      <p>Optional: <strong>Identify network owners</strong> labels traffic with no hostname by who operates the address
+        (<em>Cloudflare, Inc. · AS13335</em>). It's off by default because it sends public IP addresses to Team Cymru's DNS service.</p>
+
+      <h2 id="views">The four views</h2>
+      <table>
+        <tr><th>View</th><th>Shortcut</th><th>What it answers</th></tr>
+        <tr><td>Live</td><td>⌘1</td><td>What's moving right now: per-app rates over the last few seconds and the busiest destination.</td></tr>
+        <tr><td>AI Agents</td><td>⌘2</td><td>Which agents are active, which AI providers they use, and what else they contacted.</td></tr>
+        <tr><td>Reports</td><td>⌘3</td><td>Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts; export CSV.</td></tr>
+        <tr><td>Alerts</td><td>⌘4</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
+      </table>
+      <p>In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.</p>
+
+      <h2 id="agents">AI agent rules</h2>
+      <p>An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
+        Gemini CLI, Ollama and ZCode) or if it calls one of 25 LLM API providers. Browsers are excluded.</p>
+      <table>
+        <tr><th>Rule</th><th>Fires when an agent…</th><th>Default</th></tr>
+        <tr><td>Sensitive channel</td><td>uses email, file transfer, SSH or remote desktop, a tunnel or proxy, peer-to-peer, or a database connection</td><td>On. Critical for email, file transfer, tunnels and P2P</td></tr>
+        <tr><td>Possible exfiltration</td><td>uploads to hosts that aren't AI providers, over an hour</td><td>100 MB/h</td></tr>
+        <tr><td>Unnamed host</td><td>connects to a raw IP with no hostname on an unusual port</td><td>On</td></tr>
+        <tr><td>Active while you're away</td><td>moves 1 MB or more in a minute after you stop using the keyboard and mouse</td><td>15 minutes</td></tr>
+      </table>
+      <p>Agents get a 1-hour learning period before new-destination alerts start. Change any of this in <strong>Settings › Detection</strong>.</p>
+
+      <h2 id="alerts">Other alerts</h2>
+      <ul>
+        <li><strong>Traffic spike:</strong> an hour at least 3σ above the app's rolling baseline (after 24 hours of history, above 1 MB).</li>
+        <li><strong>Unusual number of destinations</strong> in a day, against the app's baseline.</li>
+        <li><strong>Upload above 99th percentile</strong> of the app's hourly uploads over 30 days.</li>
+        <li><strong>First contact</strong> with a new domain, and <strong>non-standard ports</strong>, after a 24-hour learning period per app.</li>
+        <li><strong>Traffic without UI activity:</strong> a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.</li>
+      </ul>
+
+      <h2 id="engines">Capture engines</h2>
+      <p>The default engine samples macOS's <code>nettop</code> once a second, which needs no special permission. Connections shorter than
+        about a second can be missed. A Network Extension engine (a content filter that sees every flow) is included in the source for
+        builds signed with Apple's content-filter entitlement; see <a href="https://github.com/xinbetween/flowlight/blob/main/docs/DEVELOPMENT.md">the developer guide</a>.</p>
+
+      <h2 id="data">Your data</h2>
+      <p>Everything lives in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Per-second rows are kept 6 hours
+        (adjustable), minute rows 14 days, hourly rows 400 days, daily rows indefinitely, and alerts 90 days.
+        <strong>Capture › Clear all data</strong> deletes it.</p>
+
+      <h2 id="updates">Updates</h2>
+      <p>From version 0.1.2, Flowlight checks GitHub for a new release on launch and once a day, and <strong>Check for Updates…</strong> is in the app
+        and menu bar menus. <strong>Download &amp; Open</strong> fetches the disk image, checks it against the release's published SHA-256, saves it to
+        Downloads and opens it. Quit Flowlight, then drag the new version into Applications. Turn the check off in <strong>Settings › General</strong>.</p>
+
+      <h2 id="demo">Demo mode</h2>
+      <p><code>open /Applications/Flowlight.app --args -FLDemo YES</code> starts Flowlight with 90 days of synthetic traffic in a separate
+        database, so you can look around without recording your own. It's what the screenshots on this site show.</p>
+
+      <h2 id="uninstall">Uninstall</h2>
+      <ol>
+        <li>In <strong>Capture</strong>, choose <strong>Remove Packet Capture Access</strong> (asks for your password) if you enabled it.</li>
+        <li>Quit Flowlight and move it from Applications to the Trash.</li>
+        <li>Delete <code>~/Library/Application Support/Flowlight</code> to remove the recorded history.</li>
+      </ol>
+
+      <h2 id="limits">Limitations</h2>
+      <ul>
+        <li>TCP and UDP only. ICMP (ping) and other raw-IP protocols aren't attributed.</li>
+        <li>Attribution is per process, not per thread.</li>
+        <li>Flowlight reads metadata only and never decrypts traffic. QUIC server names come from DNS rather than the encrypted handshake.</li>
+        <li>Hostname capture follows the primary network interface.</li>
+      </ul>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="../releases/">Release notes</a></li>
+        <li><a href="../docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="../about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.1.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

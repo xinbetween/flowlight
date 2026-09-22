@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight releases</title>
+<meta name="description" content="Release notes for every version of Flowlight.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/releases/">
+<meta property="og:title" content="Flowlight releases">
+<meta property="og:description" content="Release notes for every version of Flowlight.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/releases/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../#agents">AI agents</a>
+      <a href="../docs/">Docs</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../releases/" aria-current="page">Releases</a>
+      <a href="../about/">About</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Releases</p>
+    <h1>What's new</h1>
+    <p class="lede">Downloads, checksums and full notes for each version are on <a href="https://github.com/xinbetween/flowlight/releases">GitHub Releases</a>.</p>
+  </div></section>
+  <div class="wrap" style="padding-block:8px 96px">
+    <article class="prose" style="max-width:820px;gap:28px">
+      <section class="release">
+        <header><h2>Next release</h2><span class="tag">In development</span></header>
+        <ul>
+          <li><strong>Update checks.</strong> Flowlight looks for new releases daily and offers a download verified against its published SHA-256.</li>
+          <li><strong>About window</strong> with copyright, license and links.</li>
+          <li><strong>Relicensed</strong> from MIT to the GNU General Public License v3.0.</li>
+        </ul>
+      </section>
+      <section class="release">
+        <header><h2>0.1.1</h2><time datetime="2026-09-21">September 21, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>ZCode is recognized as an AI agent.</strong> After the September 2026 incident, where ZCode uploaded workspace snapshots
+            (mostly <code>.git</code> history) to Alibaba Cloud storage in the background, a transfer like that raises a critical
+            <em>Possible exfiltration</em> alert, with or without a hostname.</li>
+          <li><strong>More LLM providers:</strong> Zhipu AI / Z.ai, Moonshot (Kimi), Alibaba Qwen (DashScope API hosts only) and MiniMax.
+            16 known agents and 25 providers in all.</li>
+        </ul>
+        <p><a href="https://github.com/xinbetween/flowlight/releases/tag/v0.1.1">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.1.0</h2><time datetime="2026-09-21">September 21, 2026</time><span class="tag">First preview</span></header>
+        <ul>
+          <li>Every TCP and UDP flow attributed to its app, with hostnames from TLS SNI and DNS.</li>
+          <li>AI Agents view with sensitive-channel, exfiltration, unnamed-host and while-away rules.</li>
+          <li>108 protocols in 13 families, reports from second to year, three breakdown groupings, charts and CSV export.</li>
+          <li>Anomaly alerts, a menu bar readout, a disk image and an installer package.</li>
+        </ul>
+        <p><a href="https://github.com/xinbetween/flowlight/releases/tag/v0.1.0">Downloads and checksums →</a></p>
+      </section>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="../releases/">Release notes</a></li>
+        <li><a href="../docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="../about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.1.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,637 @@
+# About Flowlight
+URL: https://flowlight.xinbetween.com/about/
+
+About
+
+ Why Flowlight exists
+
+ Software on your Mac now decides for itself what to do next. Flowlight is how you see what it did.
+
+ On this page
+ The storyPrinciplesWho makes itThanks
+
+ The story
+
+ For years, the question "what is my Mac talking to?" had a simple audience: people curious about an app that phoned home. Then
+ AI agents arrived. They read your files, run shell commands and call tools, often while you're doing something else, and any of
+ those tools can open a network connection.
+
+ In September 2026 a developer went looking for why a folder was eating 700 MB of disk and found that ZCode, an AI coding app,
+ had been packaging entire workspaces, Git history included, and uploading them to cloud storage in the background. The company
+ apologized, disabled the feature and open-sourced the app. But the discovery came from a disk-usage mystery, not from any tool
+ built to notice.
+
+ The uploads were encrypted. The part that mattered wasn't: which app, which host, how many megabytes, and when. macOS
+ already knows those facts for every connection. Flowlight exists to put them on screen, keep the history, and tell you when an app,
+ especially an agent, does something that doesn't look like its usual self.
+
+ Principles
+
+ Observe, don't block. Flowlight never breaks your network. It shows and explains; firewalls decide.
+
+ Metadata, not payloads. Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.
+
+ Local first. Your history is a file on your Mac. No account, no cloud, no telemetry.
+
+ Explainable alerts. Every alert names the app, the destination and the number that tripped it. No black-box scores.
+
+ Open source. A tool that watches your traffic should be one you can read. Flowlight is GPL-3.0.
+
+ Who makes it
+
+ Flowlight is an independent open-source project by xinbetween and
+ its contributors. It isn't affiliated with Apple or with any AI provider
+ named on this site. Ideas, bug reports and pull requests are welcome, especially new agents and providers to recognize.
+
+ Thanks
+
+ ferstar, for the ZCode teardown that made the case for this app.
+
+ The Wireshark project, whose ChmodBPF approach Flowlight's packet-capture setup follows.
+
+ Team Cymru, for the free IP-to-ASN service behind network-owner labels.
+
+---
+
+# Flowlight documentation
+URL: https://flowlight.xinbetween.com/docs/
+
+Documentation
+
+ Using Flowlight
+
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.1, macOS 15 or later.
+
+ On this page
+ InstallFirst launchHostnames
+ The four viewsAI agent rulesOther alerts
+ Capture enginesYour dataUpdates
+ Demo modeUninstallLimitations
+
+ Install
+
+ Download Flowlight.dmg, open it and drag Flowlight into Applications.
+
+ Prefer an installer? Every release also has a .pkg.
+
+ Building from source needs Xcode 16 or later and xcodegen:
+
+brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git && cd flowlight
+xcodegen generate && scripts/build-local.sh
+open build/Build/Products/Release/Flowlight.app
+
+ First launch
+
+ This preview isn't notarized yet, so macOS says it can't verify the developer. Right-click Flowlight in Applications,
+ choose Open, then Open again. You only do this once. On macOS 15 and later you can also allow it in
+ System Settings › Privacy & Security › Open Anyway.
+
+ Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.
+
+ Hostnames: the one-time setup
+
+ By default macOS only tells Flowlight the IP address each app talks to. To show real hostnames, Flowlight reads two
+ things from network packets: DNS answers, and the server name a client asks for when it opens an HTTPS connection (TLS SNI).
+ A filter in the kernel drops every other packet before Flowlight sees it, and packet contents are never stored.
+
+ macOS only lets administrators read packets, so the Name Your Traffic window asks for your password once. It installs
+ /Library/LaunchDaemons/com.flowlight.bpf-access.plist, which gives the access_bpf group read access to
+ /dev/bpf* at each boot, the same approach Wireshark uses. Remove it any time from Capture › Remove Packet Capture Access.
+
+ Optional: Identify network owners labels traffic with no hostname by who operates the address
+ (Cloudflare, Inc. · AS13335). It's off by default because it sends public IP addresses to Team Cymru's DNS service.
+
+ The four views
+
+ ViewShortcutWhat it answers
+
+ Live⌘1What's moving right now: per-app rates over the last few seconds and the busiest destination.
+
+ AI Agents⌘2Which agents are active, which AI providers they use, and what else they contacted.
+
+ Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts; export CSV.
+
+ Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
+
+ In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
+
+ AI agent rules
+
+ An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
+ Gemini CLI, Ollama and ZCode) or if it calls one of 25 LLM API providers. Browsers are excluded.
+
+ RuleFires when an agent…Default
+
+ Sensitive channeluses email, file transfer, SSH or remote desktop, a tunnel or proxy, peer-to-peer, or a database connectionOn. Critical for email, file transfer, tunnels and P2P
+
+ Possible exfiltrationuploads to hosts that aren't AI providers, over an hour100 MB/h
+
+ Unnamed hostconnects to a raw IP with no hostname on an unusual portOn
+
+ Active while you're awaymoves 1 MB or more in a minute after you stop using the keyboard and mouse15 minutes
+
+ Agents get a 1-hour learning period before new-destination alerts start. Change any of this in Settings › Detection.
+
+ Other alerts
+
+ Traffic spike: an hour at least 3σ above the app's rolling baseline (after 24 hours of history, above 1 MB).
+
+ Unusual number of destinations in a day, against the app's baseline.
+
+ Upload above 99th percentile of the app's hourly uploads over 30 days.
+
+ First contact with a new domain, and non-standard ports, after a 24-hour learning period per app.
+
+ Traffic without UI activity: a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.
+
+ Capture engines
+
+ The default engine samples macOS's nettop once a second, which needs no special permission. Connections shorter than
+ about a second can be missed. A Network Extension engine (a content filter that sees every flow) is included in the source for
+ builds signed with Apple's content-filter entitlement; see the developer guide.
+
+ Your data
+
+ Everything lives in ~/Library/Application Support/Flowlight/traffic.sqlite. Per-second rows are kept 6 hours
+ (adjustable), minute rows 14 days, hourly rows 400 days, daily rows indefinitely, and alerts 90 days.
+ Capture › Clear all data deletes it.
+
+ Updates
+
+ From version 0.1.2, Flowlight checks GitHub for a new release on launch and once a day, and Check for Updates… is in the app
+ and menu bar menus. Download & Open fetches the disk image, checks it against the release's published SHA-256, saves it to
+ Downloads and opens it. Quit Flowlight, then drag the new version into Applications. Turn the check off in Settings › General.
+
+ Demo mode
+
+ open /Applications/Flowlight.app --args -FLDemo YES starts Flowlight with 90 days of synthetic traffic in a separate
+ database, so you can look around without recording your own. It's what the screenshots on this site show.
+
+ Uninstall
+
+ In Capture, choose Remove Packet Capture Access (asks for your password) if you enabled it.
+
+ Quit Flowlight and move it from Applications to the Trash.
+
+ Delete ~/Library/Application Support/Flowlight to remove the recorded history.
+
+ Limitations
+
+ TCP and UDP only. ICMP (ping) and other raw-IP protocols aren't attributed.
+
+ Attribution is per process, not per thread.
+
+ Flowlight reads metadata only and never decrypts traffic. QUIC server names come from DNS rather than the encrypted handshake.
+
+ Hostname capture follows the primary network interface.
+
+---
+
+# Flowlight for macOS
+URL: https://flowlight.xinbetween.com/
+
+Free · open source · macOS 15+
+
+ Every app. Every domain. Every agent.
+
+ Flowlight shows which app on your Mac talked to which domain, over which protocol, and how much it sent.
+ It keeps a closer eye on AI agents, so an email, an SSH session or a 180 MB upload you never asked for
+ doesn't go unnoticed.
+
+ Download for macOS
+
+ Star on GitHub
+
+ v0.1.1macOS 15+UniversalGPL-3.0No telemetry
+
+ connectionslive
+
+ claudeapi.anthropic.com · https:443↑ 1.4 MB
+
+ Chromewww.youtube.com · quic:443↓ 9.2 MB
+
+ codexuploads.paste.example · https:443↑ 180 MB
+ ⚠ possible exfiltration: 180 MB to a non-AI host in 1 h
+
+ Slackwss-primary.slack.com · websocket↓ 120 KB
+
+ Mailimap.mail.me.com · imaps:993↓ 210 KB
+
+ claudesmtp.relay.example · smtp:587↑ 2.4 MB
+ ⚠ agent used email (SMTP submission)
+
+ Cursorapi2.cursor.sh · https:443↑ 800 KB
+
+ timedtime.apple.com · ntp:123↓ 90 B
+
+ mDNSResp…dns.google · dns-over-https↓ 6 KB
+
+ The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.
+
+ When to reach for Flowlight
+
+ Questions it answers in seconds
+
+ AI AgentsAn agent is running while you're in a meeting
+
+ See every host it touched besides its model provider, and get an alert if it sends email, opens SSH or uploads 100 MB somewhere new.
+
+ ReportsYour upload spiked and you don't know why
+
+ Hover the spike to see the app behind it, click to zoom from the hour to the minute, and follow it to the exact domain and IP.
+
+ AlertsA new app started phoning home
+
+ First contact with a new domain, a non-standard port or a traffic spike each raise an alert that names the app and the number that tripped it.
+
+ LiveSomething is saturating your connection right now
+
+ Top talkers updated every second, with the busiest destination for each app, and live rates in your menu bar.
+
+ ReportsYour hotspot data vanished this month
+
+ Switch to the month view and group by app. The biggest consumer is the top row, with CSV export if you need receipts.
+
+ Reports · DestinationYou need to audit where data goes
+
+ Group by destination to see every app that talks to a domain, or by IP to see what sits behind an address.
+
+ Inside the app
+
+ Four views, one question each
+
+ Live
+What's moving right now? Per-app rates, the last two minutes, the busiest destination.
+⌘1
+
+ AI Agents
+What are my agents doing besides calling their model? Providers, other hosts, risk badges.
+⌘2
+
+ Reports
+Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.
+⌘3
+
+ Alerts
+What looked wrong? Explainable, per-app alerts with the destination and the threshold.
+⌘4
+
+ Capture
+
+ The two questions Activity Monitor can't answer
+
+ Which app sent it? Where did it go? Flowlight ties every TCP and UDP flow to its app and its real
+ hostname, with bytes in and out, stored locally so you can look back an hour or a year.
+
+ Every app
+ Apps, command-line tools and background daemons, attributed by process. Your agents' helper scripts included.
+
+ Real hostnames
+ Taken from TLS server names and DNS answers seen on the wire, so you see api.openai.com, not
+ 104.18.7.192. Traffic with no name can show who owns the address.
+
+ 1 s → 1 year
+ Zoom from second to year. Group by app, by destination or by IP. Hover a spike to see the app behind it.
+
+ AI Agent Watch
+
+ Your agents have network access. Now you have oversight.
+
+ Flowlight knows 16 agents by name. It also spots any other process that calls one of 25 LLM API
+ providers, so a Python script talking to api.openai.com is an agent too. Browsers don't count:
+ a person chatting isn't an agent.
+
+ Claude CodeCodexCursor
+ WindsurfGitHub CopilotGemini CLI
+ AiderGooseOpenCode
+ OllamaLM StudioChatGPT
+ ClaudeZedPerplexityZCode
+ + anything that calls an LLM API
+
+ ⚠ Critical
+ Sensitive channel
+
+ The agent sends email, transfers files, opens SSH or remote desktop, goes through a tunnel or proxy, or talks to a database.
+
+ Claude Code used SMTP-SUBMISSION to smtp.relay.example:587, 2.4 MB sent
+
+ ⚠ Critical
+ Possible exfiltration
+
+ More than 100 MB an hour goes to hosts that aren't AI providers.
+
+ Codex uploaded 180 MB to non-AI hosts in the last hour: uploads.paste.example
+
+ ▲ Warning
+ Unnamed host
+
+ A connection to a bare IP address with no hostname, on an unusual port.
+
+ python3 connected to 203.0.113.45:4444 (tcp) with no hostname
+
+ ▲ Warning
+ Active while you're away
+
+ Data keeps moving after 15 minutes without keyboard or mouse input.
+
+ Codex moved 48 MB in the last minute while you were away (no input for 37 min)
+
+ ⓘ Info
+ New destination, sooner
+
+ Agents get a 1-hour learning period before new-domain alerts start (24 hours for other apps). Every threshold is adjustable.
+
+ Coverage
+
+ 108 protocols, named in 13 families
+
+ Recognized by port and by the first bytes on the wire (TLS handshakes, HTTP methods, mail and SSH
+ greetings, SOCKS requests). Families marked egress channel are the ones the
+ agent rules watch.
+
+ Web
+9
+ HTTPHTTPSHTTP/2QUIC · HTTP/3WebSocketTLSHTTP proxy
+
+ Email
+egress channel
+ SMTPSubmission 587SMTPSIMAPIMAPSPOP3POP3S
+
+ File transfer
+egress channel
+ FTPFTPSTFTPSFTPSMBAFPNFSrsyncgitsvn
+
+ Remote access
+egress channel
+ SSHRDPVNCTelnetTeamViewer
+
+ VPN, proxy & tunnels
+egress channel
+ WireGuardOpenVPNIPsecL2TPPPTPTailscaleSOCKS5Tor
+
+ Databases & caches
+egress channel
+ PostgresMySQLSQL ServerOracleRedisMongoDBCassandraElasticsearchMemcached
+
+ Peer-to-peer
+egress channel
+ BitTorrent
+
+ Name resolution
+8
+ DNSDNS over TLSDNS over HTTPSDNS over QUICmDNSLLMNRNetBIOSWHOIS
+
+ Messaging & queues
+12
+ MQTTAMQPKafkaNATSXMPPIRCNNTP
+
+ Voice, video & streaming
+5
+ SIPSIPSSTUNRTSPZoom media
+
+ Network services
+19
+ NTPDHCPSNMPSyslogSSDPKerberosLDAPIPPBGP
+
+ Push & developer
+6
+ APNsFCMDockerKubernetesOllama
+
+ Flowlight observes every TCP and UDP flow, which covers essentially all app traffic. ICMP (ping) and
+ other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted.
+
+ How it compares
+
+ Built for the question the other tools skip
+
+ Flowlight observes and explains; it doesn't block. It pairs well with a firewall.
+
+ FlowlightActivity MonitorFirewalls
+e.g. Little Snitch, LuLuPacket analyzers
+e.g. Wireshark
+
+ Which app sent itYesYesYesNo
+
+ Which domain it went toYes, from SNI and DNSNoYesYes, per packet
+
+ History from second to yearYesNoVariesCapture files
+
+ Rules for AI agentsYesNoNoNo
+
+ Blocks connectionsNo, observe onlyNoYesNo
+
+ Free and open sourceYes, GPL-3.0Built inVariesYes
+
+ Why Flowlight exists
+
+ Your tools now make their own decisions. You should be able to see where your data goes when they do.
+
+ Coding agents read your files, run commands and call tools, and any of those tools can open a socket. In September 2026,
+ an AI coding app was found packaging users' whole workspaces, Git history included, and uploading them in the background.
+ The researcher who caught it only noticed because a cache folder was eating disk space.
+
+ The uploads were encrypted, but the facts that mattered weren't: which app, which host, how many megabytes, and when.
+ macOS already knows all of that. Flowlight puts it on screen, keeps the history, and flags what doesn't look right.
+
+ Read the full story →
+
+ Privacy
+
+ A monitor you don't have to monitor
+
+ Stays on your MacOne local SQLite file. No account, no cloud sync, no telemetry.
+
+ Metadata onlyHostnames, ports and byte counts. Packet contents are never stored.
+
+ Filtered in the kernelCapture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.
+
+ Opt-in lookupsNaming who owns an address is off by default. The daily update check only asks GitHub for the latest version, and can be turned off.
+
+ Reports. Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.
+
+ Alerts. Each one names the app, the destination and the number that tripped it.
+
+ Install
+
+ Running in under a minute
+
+ Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. The first launch of this preview needs right-click › Open.
+
+ Launch itTraffic appears within a second, and live ↓↑ rates sit in your menu bar.
+
+ Name your trafficApprove the one-time setup (your password, once) so Flowlight can read hostnames.
+
+ Prefer to build it yourself, or look around with sample data first?
+
+# build from source (Xcode 16+, no Apple account needed)
+brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git
+cd flowlight && xcodegen generate
+scripts/build-local.sh
+
+# explore with 90 days of synthetic traffic
+open Flowlight.app --args -FLDemo YES
+
+ FAQ
+Questions
+
+ Does Flowlight block traffic?
+
+ No. It observes and alerts. Per-agent allowlists and block rules are on the roadmap for the Network Extension build.
+
+ Can it read my HTTPS traffic?
+
+ No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
+ DNS answers that map names to addresses. Contents stay encrypted.
+
+ How is this different from Little Snitch or LuLu?
+
+ Those are firewalls that ask you to allow connections. Flowlight is an analytics tool: history at any zoom,
+ anomaly baselines, and rules built for AI agents. They work well side by side.
+
+ Why does it ask for my password?
+
+ macOS only lets administrators read network packets. The one-time setup gives your account read access, the
+ same way Wireshark does. You can remove it any time from the Capture screen.
+
+ Which agents does it recognize?
+
+ Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
+ ChatGPT, Claude, Zed, Perplexity and ZCode, plus any non-browser process that calls a known LLM API. Adding one is a
+ one-line pull request.
+
+ How does it update?
+
+ Once a day Flowlight asks GitHub for the latest release. When there's one, it shows the notes and can download the
+ disk image, verify it against the published SHA-256 and open it. You can turn the check off in Settings.
+
+ Is it really free?
+
+ Yes. It's free software under the GPL-3.0: no paid tier, no data collection.
+
+ Know what leaves your Mac.
+
+ Free software for macOS 15 and later.
+
+ Download for macOS
+ View source
+
+---
+
+# Flowlight privacy
+URL: https://flowlight.xinbetween.com/privacy/
+
+Privacy
+
+ Your traffic stays on your Mac
+
+ Flowlight has no account, no server and no analytics. This page lists everything it records and every request it makes,
+ so you can check the claims against the source.
+
+ On this page
+ In shortWhat it recordsPacket capture
+ Network requestsPermissionsRetention
+ This websiteContact
+
+ In short
+
+ Flowlight records network metadata (which app, which host, which port, how many bytes, when) in a database on your Mac.
+
+ It never records packet contents and never decrypts traffic.
+
+ Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.
+
+ The app makes a few network requests of its own, listed below, and you can turn off each optional one.
+
+ What it records
+
+ For each second: the app (bundle ID, name, executable path, process ID), the remote IP address, hostname, port, transport and
+ protocol, and bytes sent and received. It also stores the alerts it raises and per-app baselines used by the anomaly rules.
+ All of it lives in ~/Library/Application Support/Flowlight.
+
+ Packet capture
+
+ If you approve the one-time hostname setup, Flowlight reads packets on your primary network interface through a kernel filter that
+ passes only two things: DNS responses, and the first message of a TLS connection (the ClientHello). From those it keeps only
+ hostnames and the addresses they map to, in memory. Everything else is dropped in the kernel, and no packet is written to disk.
+
+ Network requests the app makes
+
+ RequestSent toWhat it containsWhen
+
+ Update checkapi.github.comA standard HTTPS request for the latest release; GitHub sees your IP address and the Flowlight/<version> user agentOn launch and daily, from 0.1.2. Off switch in Settings › General
+
+ Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
+
+ Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the default capture mode
+
+ Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOff by default. Capture › Identify network owners
+
+ Permissions
+
+ Administrator password, once, for packet-capture access. Removable from the Capture screen.
+
+ Notifications, for warnings. Optional.
+
+ Login item, only if you turn on Launch at login.
+
+ Retention
+
+ Per-second data 6 hours (adjustable), minute data 14 days, hourly data 400 days, daily totals indefinitely, alerts 90 days.
+ Capture › Clear all data deletes everything, and removing ~/Library/Application Support/Flowlight does the same.
+
+ This website
+
+ This site is a static page hosted on GitHub Pages and served through Cloudflare. It sets no cookies and runs no analytics. GitHub
+ and Cloudflare process requests to serve it, and the fonts load from Google Fonts, which receives your IP address when you visit.
+
+ Contact
+
+ Questions or a privacy concern? Open an issue. For anything sensitive, use GitHub's
+ private vulnerability reporting on the repository.
+
+---
+
+# Flowlight releases
+URL: https://flowlight.xinbetween.com/releases/
+
+Releases
+
+ What's new
+
+ Downloads, checksums and full notes for each version are on GitHub Releases.
+
+ Next release
+In development
+
+ Update checks. Flowlight looks for new releases daily and offers a download verified against its published SHA-256.
+
+ About window with copyright, license and links.
+
+ Relicensed from MIT to the GNU General Public License v3.0.
+
+ 0.1.1
+September 21, 2026Latest
+
+ ZCode is recognized as an AI agent. After the September 2026 incident, where ZCode uploaded workspace snapshots
+ (mostly .git history) to Alibaba Cloud storage in the background, a transfer like that raises a critical
+ Possible exfiltration alert, with or without a hostname.
+
+ More LLM providers: Zhipu AI / Z.ai, Moonshot (Kimi), Alibaba Qwen (DashScope API hosts only) and MiniMax.
+ 16 known agents and 25 providers in all.
+
+ Downloads and checksums →
+
+ 0.1.0
+September 21, 2026First preview
+
+ Every TCP and UDP flow attributed to its app, with hostnames from TLS SNI and DNS.
+
+ AI Agents view with sensitive-channel, exfiltration, unnamed-host and while-away rules.
+
+ 108 protocols in 13 families, reports from second to year, three breakdown groupings, charts and CSV export.
+
+ Anomaly alerts, a menu bar readout, a disk image and an installer package.
+
+ Downloads and checksums →

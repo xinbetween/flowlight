@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>About Flowlight</title>
+<meta name="description" content="Why Flowlight exists, the principles it&#x27;s built on, and who makes it.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/about/">
+<meta property="og:title" content="About Flowlight">
+<meta property="og:description" content="Why Flowlight exists, the principles it&#x27;s built on, and who makes it.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/about/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../#agents">AI agents</a>
+      <a href="../docs/">Docs</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../releases/">Releases</a>
+      <a href="../about/" aria-current="page">About</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">About</p>
+    <h1>Why Flowlight exists</h1>
+    <p class="lede">Software on your Mac now decides for itself what to do next. Flowlight is how you see what it did.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#story">The story</a><a href="#principles">Principles</a><a href="#who">Who makes it</a><a href="#thanks">Thanks</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">The story</h2>
+      <p>For years, the question "what is my Mac talking to?" had a simple audience: people curious about an app that phoned home. Then
+        AI agents arrived. They read your files, run shell commands and call tools, often while you're doing something else, and any of
+        those tools can open a network connection.</p>
+      <p>In September 2026 a developer went looking for why a folder was eating 700&nbsp;MB of disk and found that ZCode, an AI coding app,
+        had been packaging entire workspaces, Git history included, and uploading them to cloud storage in the background. The company
+        apologized, disabled the feature and open-sourced the app. But the discovery came from a disk-usage mystery, not from any tool
+        built to notice.</p>
+      <p>The uploads were encrypted. The part that mattered wasn't: <strong>which app, which host, how many megabytes, and when.</strong> macOS
+        already knows those facts for every connection. Flowlight exists to put them on screen, keep the history, and tell you when an app,
+        especially an agent, does something that doesn't look like its usual self.</p>
+
+      <h2 id="principles">Principles</h2>
+      <ul>
+        <li><strong>Observe, don't block.</strong> Flowlight never breaks your network. It shows and explains; firewalls decide.</li>
+        <li><strong>Metadata, not payloads.</strong> Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.</li>
+        <li><strong>Local first.</strong> Your history is a file on your Mac. No account, no cloud, no telemetry.</li>
+        <li><strong>Explainable alerts.</strong> Every alert names the app, the destination and the number that tripped it. No black-box scores.</li>
+        <li><strong>Open source.</strong> A tool that watches your traffic should be one you can read. Flowlight is GPL-3.0.</li>
+      </ul>
+
+      <h2 id="who">Who makes it</h2>
+      <p>Flowlight is an independent open-source project by <a href="https://github.com/xinbetween">xinbetween</a> and
+        <a href="https://github.com/xinbetween/flowlight/graphs/contributors">its contributors</a>. It isn't affiliated with Apple or with any AI provider
+        named on this site. Ideas, bug reports and pull requests are welcome, especially new agents and providers to recognize.</p>
+
+      <h2 id="thanks">Thanks</h2>
+      <ul>
+        <li><a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a>, for the ZCode teardown that made the case for this app.</li>
+        <li>The Wireshark project, whose ChmodBPF approach Flowlight's packet-capture setup follows.</li>
+        <li>Team Cymru, for the free IP-to-ASN service behind network-owner labels.</li>
+      </ul>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="../releases/">Release notes</a></li>
+        <li><a href="../docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="../about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.1.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
