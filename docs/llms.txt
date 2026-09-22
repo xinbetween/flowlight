@@ -1,6 +1,6 @@
 # Flowlight
 
-> Free, open-source (GPL-3.0) macOS network monitor. It attributes every TCP/UDP flow to the app that made it and the domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start) with per-agent allowlists and rules for data leaving the Mac. Current version: 0.1.2.
+> Free, open-source (GPL-3.0) macOS network monitor. It attributes every TCP/UDP flow to the app that made it and the domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start) with per-agent allowlists and rules for data leaving the Mac. Current version: 0.1.3.
 
 - [Download Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)
 - [Source code](https://github.com/xinbetween/flowlight)
