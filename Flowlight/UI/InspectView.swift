@@ -295,6 +295,7 @@ private struct ExchangeDetail: View {
     var cause: ToolCallLinks.Link?
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
+    @State private var headersOpen: Bool?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -343,32 +344,44 @@ private struct ExchangeDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     let headers = tab == 0 ? exchange.requestHeaders : exchange.responseHeaders
+                    let data = tab == 0 ? bodies?.request : bodies?.response
                     if !headers.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(Array(headers.enumerated()), id: \.offset) { _, h in
-                                (Text(h.name + ": ").bold() + Text(h.value)).font(.caption.monospaced())
+                        DisclosureGroup(isExpanded: Binding(get: { headersOpen ?? (data?.isEmpty ?? true) }, set: { headersOpen = $0 })) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(headers.enumerated()), id: \.offset) { _, h in
+                                    (Text(h.name + ": ").bold() + Text(h.value)).font(.caption.monospaced())
+                                }
                             }
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                        } label: {
+                            Text("Headers (\(headers.count))").font(.caption.bold()).foregroundStyle(.secondary)
                         }
-                        .textSelection(.enabled)
                     }
                     Divider()
-                    let data = tab == 0 ? bodies?.request : bodies?.response
-                    let truncated = tab == 0 ? exchange.requestTruncated : exchange.responseTruncated
                     if let data, !data.isEmpty {
-                        Text(BodyFormatter.display(data)).font(.caption.monospaced()).textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if truncated { Text("Body truncated at 2 MB.").font(.caption).foregroundStyle(.secondary) }
+                        BodyView(data: data, truncated: tab == 0 ? exchange.requestTruncated : exchange.responseTruncated)
+                            .id("\(tab)-\(exchange.id ?? 0)")
                     } else {
-                        Text(bodies == nil ? "Loading…" : "No body").font(.caption).foregroundStyle(.secondary)
+                        Text(bodies == nil ? "Loading…" : emptyReason).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, 8)
             }
         }
         .task {
             guard let id = exchange.id else { return }
             bodies = (try? await monitor.read { try $0.exchangeBodies(id: id) }) ?? (Data(), Data())
         }
+    }
+
+    private var emptyReason: String {
+        if tab == 1, exchange.status == 304 { return "No body: 304 Not Modified means the app's cached copy is still current." }
+        if tab == 1, exchange.status == 204 { return "No body: 204 No Content." }
+        if tab == 0, ["GET", "HEAD", "DELETE", "OPTIONS"].contains(exchange.method) { return "No body (a \(exchange.method) request normally has none)." }
+        return "No body"
     }
 
     private var subtitle: String {
@@ -379,21 +392,5 @@ private struct ExchangeDetail: View {
         parts.append(String(format: "%.2f s", exchange.duration))
         parts.append("↑ \(ByteFormat.string(Int64(exchange.requestSize))) ↓ \(ByteFormat.string(Int64(exchange.responseSize)))")
         return parts.joined(separator: " · ")
-    }
-}
-
-enum BodyFormatter {
-    /// Pretty-printed JSON, the text of an event stream, or a hex summary for binary data. Capped for display.
-    static func display(_ data: Data, limit: Int = 200_000) -> String {
-        if let object = try? JSONSerialization.jsonObject(with: data),
-           let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) {
-            return cap(String(decoding: pretty, as: UTF8.self), limit)
-        }
-        if let text = String(data: data, encoding: .utf8) { return cap(text, limit) }
-        return "\(data.count) bytes of binary data\n" + data.prefix(256).map { String(format: "%02x", $0) }.joined(separator: " ")
-    }
-
-    private static func cap(_ s: String, _ limit: Int) -> String {
-        s.count > limit ? String(s.prefix(limit)) + "\n… (\(s.count - limit) more characters)" : s
     }
 }

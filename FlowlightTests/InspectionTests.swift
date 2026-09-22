@@ -338,3 +338,42 @@ final class ProxyAttributionTests: XCTestCase {
         XCTAssertEqual(out[1].key.bundleID, "com.flowlight.app")
     }
 }
+
+final class JSONValueTests: XCTestCase {
+    func testKeepsKeyOrderAndTypes() throws {
+        let v = try XCTUnwrap(JSONValue.parse(#"{"type":"tool_use","name":"Bash","input":{"command":"ls"},"n":-1.5e3,"ok":true,"x":null,"a":[1,"two"]}"#))
+        guard case .object(let pairs) = v else { return XCTFail() }
+        XCTAssertEqual(pairs.map(\.key), ["type", "name", "input", "n", "ok", "x", "a"])
+        XCTAssertEqual(v["n"], .number("-1.5e3"))
+        XCTAssertEqual(v["a"], .array([.number("1"), .string("two")]))
+        XCTAssertEqual(v["input"]?["command"], .string("ls"))
+    }
+
+    func testEscapesAndUnicode() throws {
+        let v = try XCTUnwrap(JSONValue.parse(#"["line\nbreak","été","🚀","café \"q\" \\ /"]"#))
+        XCTAssertEqual(v, .array([.string("line\nbreak"), .string("été"), .string("🚀"), .string("café \"q\" \\ /")]))
+        XCTAssertEqual(JSONValue.parse(Data("\"日本語\"".utf8)), .string("日本語"))
+    }
+
+    func testRejectsInvalid() {
+        for bad in ["", "{", "[1,]", "{\"a\" 1}", "tru", "{\"a\":1} x", "01x"] {
+            XCTAssertNil(JSONValue.parse(bad), bad)
+        }
+    }
+
+    func testPrettyRoundTrips() throws {
+        let text = #"{"b":[1,{"c":"d\n"}],"a":{}}"#
+        let v = try XCTUnwrap(JSONValue.parse(text))
+        XCTAssertEqual(JSONValue.parse(v.pretty()), v)
+        XCTAssertTrue(v.pretty().hasPrefix("{\n  \"b\": [\n    1,"))
+    }
+
+    func testClassifiesBodies() {
+        XCTAssertEqual(BodyContent.classify(Data()), .empty)
+        XCTAssertEqual(BodyContent.classify(Data("<html></html>".utf8)), .text("<html></html>"))
+        let sse = "event: message_start\ndata: {\"type\":\"message_start\"}\n\n: ping\ndata: {\"type\":\"ping\"}\n\ndata: [DONE]\n"
+        guard case .events(let events) = BodyContent.classify(Data(sse.utf8)) else { return XCTFail() }
+        XCTAssertEqual(events.map(\.event), ["message_start", nil])
+        guard case .json = BodyContent.classify(Data(#"{"a":1}"#.utf8)) else { return XCTFail() }
+    }
+}
