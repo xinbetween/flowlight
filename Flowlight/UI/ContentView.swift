@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var updater: UpdateChecker
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -15,6 +16,20 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .safeAreaInset(edge: .bottom) {
+              VStack(spacing: 0) {
+                if let update = updater.pendingUpdate {
+                    Button { openWindow(id: "update") } label: {
+                        Label("Flowlight \(update.version) is available", systemImage: "arrow.down.circle.fill")
+                            .font(.caption.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .help("See what's new and download the update")
+                }
                 Button { nav.selection = .capture } label: {
                     HStack(alignment: .top, spacing: 8) {
                         Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8).padding(.top, 4)
@@ -31,6 +46,7 @@ struct ContentView: View {
                 .padding(10)
                 .help("Capture source status — click to configure")
                 .accessibilityLabel("Capture status: \(monitor.status)")
+              }
             }
         } detail: {
             switch nav.selection {
@@ -40,6 +56,9 @@ struct ContentView: View {
             case .alerts: AlertsView()
             case .capture: CaptureView()
             }
+        }
+        .onChange(of: updater.showWindow) { _, show in
+            if show { openWindow(id: "update"); updater.showWindow = false }
         }
         .onChange(of: monitor.showCaptureOnboarding, initial: true) { was, show in
             // A single Window scene, so several restored main windows don't compete to present it.

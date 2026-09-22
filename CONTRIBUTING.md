@@ -34,3 +34,8 @@ Internals are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - **Explainable alerts.** Every alert names the app, the destination and the number that tripped it.
 - **Don't commit real traffic.** Screenshots and fixtures come from demo mode or synthetic data only.
 - Match the surrounding code style. Keep PRs focused, with tests for behavior changes.
+
+## License
+
+Flowlight is licensed under the [GNU GPL v3.0](LICENSE). By contributing, you agree that your contributions are
+licensed under the same terms.

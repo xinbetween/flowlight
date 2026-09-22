@@ -25,9 +25,11 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string></string>
+	<string>Copyright © 2026 The Flowlight contributors. Licensed under the GNU GPL v3.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>FLUpdateRepository</key>
+	<string>xinbetween/flowlight</string>
 	<key>FLAppGroupIdentifier</key>
 	<string>$(TeamIdentifierPrefix)com.flowlight.shared</string>
 </dict>

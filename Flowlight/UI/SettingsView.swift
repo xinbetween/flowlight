@@ -29,9 +29,10 @@ struct SettingsView: View {
                 if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
                 Toggle("Show live rates in the menu bar", isOn: $menuBarRates)
                 Toggle("Show notifications for warnings", isOn: $notifications)
+                UpdateSettingsRow()
             }
             .formStyle(.grouped)
-            .frame(height: 190)
+            .frame(height: 290)
             .tabItem { Label("General", systemImage: "gearshape") }
 
             Form {
@@ -102,6 +103,7 @@ struct SettingsView: View {
 struct MenuBarContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var updater: UpdateChecker
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -127,6 +129,52 @@ struct MenuBarContent: View {
                 NSApp.activate()
             }
         }
+        if let update = updater.pendingUpdate {
+            Button("Update Available: Flowlight \(update.version)…") {
+                openWindow(id: "update")
+                NSApp.activate()
+            }
+        } else {
+            CheckForUpdatesButton()
+        }
         Button("Quit") { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+}
+
+/// Automatic update checks: the toggle, the last result, and a manual check.
+struct UpdateSettingsRow: View {
+    @EnvironmentObject var updater: UpdateChecker
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { updater.automatic }, set: { updater.automatic = $0 })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Check for updates automatically")
+                Text("Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        LabeledContent("Version \(updater.currentVersion)") {
+            HStack(spacing: 8) {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+                Button("Check Now") {
+                    openWindow(id: "update")
+                    Task { await updater.check(userInitiated: true) }
+                }
+                .disabled(updater.state == .checking)
+            }
+        }
+    }
+
+    private var status: String {
+        switch updater.state {
+        case .checking: return "Checking…"
+        case .available(let r): return "\(r.version) available"
+        case .upToDate: return "Up to date"
+        case .failed: return "Last check failed"
+        case .downloading: return "Downloading…"
+        case .idle:
+            return updater.lastCheck.map { "Checked \($0.formatted(.relative(presentation: .named)))" } ?? "Not checked yet"
+        }
     }
 }

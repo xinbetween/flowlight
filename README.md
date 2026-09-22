@@ -17,7 +17,7 @@ uploading your repo while you're away.
 
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111?logo=apple)
 ![Swift](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-4a3aa7)
+![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-4a3aa7)
 ![No telemetry](https://img.shields.io/badge/telemetry-none-1baf7a)
 
 <img src="docs/assets/screenshots/agents.png" width="880" alt="Flowlight's AI Agents view listing Claude Code, Cursor, Codex and a Python script, with risk badges for SMTP, SSH, FTP, a large upload and a raw-IP connection">
@@ -80,7 +80,8 @@ the app, the destination and the number that tripped it.
 No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
 The one optional network lookup (who owns an IP) is **off by default**. If you turn it on, it sends public IPs to
-Team Cymru's DNS service.
+Team Cymru's DNS service. The daily update check asks GitHub for the latest release, and you can switch it off in
+Settings.
 
 <table>
 <tr>
@@ -98,6 +99,7 @@ Team Cymru's DNS service.
 1. Download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
    Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
+   Flowlight checks for new releases daily and offers a verified download (Flowlight › Check for Updates…).
 3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
    for your password once) and, optionally, network-owner lookups.
 
@@ -186,5 +188,8 @@ docs/                website (GitHub Pages) and developer guide
 
 ## License
 
-[MIT](LICENSE). Flowlight isn't affiliated with Apple or with any AI provider named here. Product names are
+Flowlight is free software under the [GNU General Public License v3.0](LICENSE). You can use, study, share and modify
+it, and if you distribute a modified version, you must release its source under the same license.
+
+Flowlight isn't affiliated with Apple or with any AI provider named here. Product names are
 trademarks of their owners.
