@@ -201,6 +201,7 @@ enum DemoData {
         try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
                                       patterns: ["github.com", "npmjs.org", "githubusercontent.com"]))
         try seedAlerts(db, now: now)
+        try seedInspection(db, now: now)
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {

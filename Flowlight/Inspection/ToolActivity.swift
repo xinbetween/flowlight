@@ -62,7 +62,24 @@ enum ToolActivityBuilder {
                     result: call.callID.flatMap { results[$0] }, requests: requests))
             }
         }
-        return byAgent.mapValues { $0.sorted { $0.at > $1.at } }
+        return byAgent.mapValues { mergeDirectMCPCalls($0).sorted { $0.at > $1.at } }
+    }
+
+    /// When the model calls an MCP tool on a remote server, Flowlight sees it twice: in the model's response, then as
+    /// the agent's JSON-RPC call to the server. Keep one entry (the model's), with the server's result if it has none.
+    static func mergeDirectMCPCalls(_ list: [ToolActivity]) -> [ToolActivity] {
+        var out = list.filter { $0.call.source != .mcp }
+        for direct in list where direct.call.source == .mcp {
+            if let i = out.lastIndex(where: {
+                $0.call.mcpServer?.lowercased() == direct.call.mcpServer?.lowercased() && $0.call.name == direct.call.name
+                    && $0.at <= direct.at && direct.at.timeIntervalSince($0.at) < 120
+            }) {
+                if out[i].result == nil { out[i].result = direct.result }
+            } else {
+                out.append(direct)
+            }
+        }
+        return out
     }
 
     /// Agent id → the MCP servers it used, busiest first. `configured` adds servers seen only as local processes.

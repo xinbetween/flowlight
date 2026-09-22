@@ -488,3 +488,24 @@ final class ToolActivityTests: XCTestCase {
         XCTAssertEqual(usage.first { $0.name == "linear › create_issue" }?.errors, 1)
     }
 }
+
+final class DemoInspectionTests: XCTestCase {
+    func testDemoSessionIsComplete() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+        try DemoData.seedInspection(db, now: Date())
+        let exchanges = try db.exchanges(since: Date().addingTimeInterval(-3600))
+        let activity = ToolActivityBuilder.activities(exchanges)["claude"] ?? []
+        XCTAssertEqual(activity.map(\.call.displayName).sorted(),
+                       ["Bash", "Bash", "Bash", "Read", "docs › search_docs", "github › create_issue"])
+        XCTAssertTrue(activity.allSatisfy { $0.result != nil }, "every call has its result")
+        XCTAssertEqual(activity.filter { $0.outcome == .error }.map { $0.call.summary }, ["git push origin main"])
+        let upload = activity.first { $0.call.summary?.contains("paste.example") == true }
+        XCTAssertEqual(upload?.requests.map(\.host), ["paste.example"])
+        let docs = ToolActivityBuilder.servers(exchanges, activities: ["claude": activity])["claude"]?.first { $0.name == "docs" }
+        XCTAssertEqual(docs?.version, "1.4.2")
+        XCTAssertEqual(docs?.tools, ["fetch_page", "list_spaces", "search_docs"])
+        XCTAssertFalse(exchanges.flatMap(\.requestHeaders).contains { $0.value.contains("sk-ant") }, "demo keys are redacted too")
+    }
+}

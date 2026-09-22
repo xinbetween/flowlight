@@ -22,10 +22,7 @@ private struct InspectContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if DemoData.isEnabled {
-                ContentUnavailableView("Not available in demo mode", systemImage: "lock.open.display",
-                                       description: Text("HTTPS inspection runs only on your real traffic."))
-            } else if !inspection.enabled || showSetup {
+            if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
                 ScrollView { InspectionSetup(inspection: inspection, done: { showSetup = false }).padding(.bottom, 20) }
             } else {
                 statusBar
@@ -72,20 +69,23 @@ private struct InspectContent: View {
 
     private var statusBar: some View {
         HStack(spacing: 10) {
-            Circle().fill(inspection.running && inspection.trusted ? Color.green : Color.orange).frame(width: 8, height: 8)
+            Circle().fill(DemoData.isEnabled || inspection.running && inspection.trusted ? Color.green : Color.orange).frame(width: 8, height: 8)
             Text(statusText).font(.callout)
             Spacer()
             Picker("Window", selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
-            Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
-                .help("A Terminal window whose agents and tools go through Flowlight")
-            Button("Setup…") { showSetup = true }
+            if !DemoData.isEnabled {
+                Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
+                    .help("A Terminal window whose agents and tools go through Flowlight")
+                Button("Setup…") { showSetup = true }
+            }
         }
     }
 
     private var statusText: String {
+        if DemoData.isEnabled { return "Demo data: a synthetic Claude Code session, decrypted by the local proxy" }
         guard inspection.running, let port = inspection.port else { return "Starting the proxy…" }
         var parts = ["Proxy on 127.0.0.1:\(port)"]
         if !inspection.trusted { parts.append("certificate not trusted yet") }
