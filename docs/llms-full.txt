@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.2, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -183,7 +183,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Updates
 
- From version 0.1.2, Flowlight checks GitHub for a new release on launch and once a day, and Check for Updates… is in the app
+ Flowlight checks GitHub for a new release on launch and once a day, and Check for Updates… is in the app
  and menu bar menus. Download & Open fetches the disk image, checks it against the release's published SHA-256, saves it to
  Downloads and opens it. Quit Flowlight, then drag the new version into Applications. Turn the check off in Settings › General.
 
@@ -227,7 +227,7 @@ Free · open source · macOS 15+
 
  Star on GitHub
 
- v0.1.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.1.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -659,8 +659,8 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- Next release
-In development
+ 0.1.2
+September 21, 2026Latest
 
  Per-agent allowlists. "Claude Code may talk to GitHub and npm, nothing else": domains, IPs, CIDR ranges and presets,
  with a critical alert and one-click Allow for anything else.
@@ -674,8 +674,10 @@ In development
 
  Relicensed from MIT to the GNU General Public License v3.0.
 
+ Downloads and checksums →
+
  0.1.1
-September 21, 2026Latest
+September 21, 2026
 
  ZCode is recognized as an AI agent. After the September 2026 incident, where ZCode uploaded workspace snapshots
  (mostly .git history) to Alibaba Cloud storage in the background, a transfer like that raises a critical
