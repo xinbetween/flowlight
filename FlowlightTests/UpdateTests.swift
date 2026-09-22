@@ -49,3 +49,43 @@ final class UpdateTests: XCTestCase {
         XCTAssertThrowsError(try AppRelease.parse(Data(pre.utf8)), "pre-releases are never offered")
     }
 }
+
+final class UpdateInstallerTests: XCTestCase {
+    func testInstallTargetLeavesDiskImagesAndTranslocation() {
+        XCTAssertEqual(UpdateInstaller.installTarget(for: URL(fileURLWithPath: "/Applications/Flowlight.app")).path, "/Applications/Flowlight.app")
+        XCTAssertEqual(UpdateInstaller.installTarget(for: URL(fileURLWithPath: "/Users/a/Apps/Flowlight.app")).path, "/Users/a/Apps/Flowlight.app")
+        XCTAssertEqual(UpdateInstaller.installTarget(for: URL(fileURLWithPath: "/Volumes/Flowlight/Flowlight.app")).path, "/Applications/Flowlight.app")
+        XCTAssertEqual(UpdateInstaller.installTarget(for: URL(fileURLWithPath: "/private/var/folders/x/AppTranslocation/ABC/d/Flowlight.app")).path,
+                       "/Applications/Flowlight.app")
+    }
+
+    func testQuoting() {
+        XCTAssertEqual(UpdateInstaller.shellQuote("it's"), "'it'\\''s'")
+        XCTAssertEqual(UpdateInstaller.appleScriptQuote("say \"hi\" \\"), "\"say \\\"hi\\\" \\\\\"")
+    }
+
+    /// Runs the real swap script against a fake install: the old bundle is replaced and no backup is left behind.
+    func testSwapScriptReplacesBundle() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("swap-\(UUID().uuidString)")
+        let target = root.appendingPathComponent("Apps/Flowlight.app")
+        let staged = root.appendingPathComponent("staging/Flowlight.app")
+        for (dir, marker) in [(target, "old"), (staged, "new")] {
+            try fm.createDirectory(at: dir.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+            try marker.write(to: dir.appendingPathComponent("Contents/marker"), atomically: true, encoding: .utf8)
+        }
+        let script = root.appendingPathComponent("swap.sh")
+        try UpdateInstaller.swapScript.write(to: script, atomically: true, encoding: .utf8)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        // PID 999999 doesn't exist, so the script doesn't wait.
+        process.arguments = [script.path, "999999", staged.path, target.path, String(getuid()), "--no-launch"]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+        XCTAssertEqual(try String(contentsOf: target.appendingPathComponent("Contents/marker"), encoding: .utf8), "new")
+        XCTAssertFalse(fm.fileExists(atPath: target.path + ".previous"))
+        XCTAssertFalse(fm.fileExists(atPath: staged.deletingLastPathComponent().path))
+        try? fm.removeItem(at: root)
+    }
+}

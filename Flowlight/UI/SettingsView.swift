@@ -173,6 +173,8 @@ struct UpdateSettingsRow: View {
         case .upToDate: return "Up to date"
         case .failed: return "Last check failed"
         case .downloading: return "Downloading…"
+        case .ready(let r, _): return "\(r.version) ready to install"
+        case .installing: return "Installing…"
         case .idle:
             return updater.lastCheck.map { "Checked \($0.formatted(.relative(presentation: .named)))" } ?? "Not checked yet"
         }

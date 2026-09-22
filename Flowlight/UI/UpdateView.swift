@@ -29,6 +29,9 @@ struct UpdateView: View {
             if case .downloading = updater.state {
                 ProgressView("Downloading and verifying…").controlSize(.small)
             }
+            if case .installing = updater.state {
+                ProgressView("Preparing the update. Flowlight will quit and reopen…").controlSize(.small)
+            }
             if case .failed(let message) = updater.state {
                 Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
@@ -39,21 +42,34 @@ struct UpdateView: View {
                     Spacer()
                     Button("View on GitHub") { NSWorkspace.shared.open(release.pageURL) }
                     Button("Remind Me Later") { dismissWindow(id: "update") }
-                    Button("Download & Open") { updater.downloadAndOpen(release) }
+                    Button("Download") { updater.download(release) }
                         .keyboardShortcut(.defaultAction)
                         .disabled(isDownloading)
+                } else if case .ready(let release, let dmg) = updater.state {
+                    Button("Open Disk Image") { updater.openDiskImage() }
+                    Spacer()
+                    Button("Install Later") { dismissWindow(id: "update") }
+                    Button("Quit & Install") { updater.installAndRelaunch(release, dmg: dmg) }
+                        .keyboardShortcut(.defaultAction)
+                } else if case .installing = updater.state {
+                    Spacer()
+                } else if case .downloading = updater.state {
+                    Spacer()
                 } else if case .checking = updater.state {
                     ProgressView().controlSize(.small)
                     Spacer()
                 } else {
+                    if updater.downloadedDMG != nil {
+                        Button("Open Disk Image") { updater.openDiskImage() }
+                    }
                     Spacer()
                     Button("Check Again") { Task { await updater.check(userInitiated: true) } }
                     Button("OK") { dismissWindow(id: "update") }.keyboardShortcut(.defaultAction)
                 }
             }
 
-            if case .available = updater.state {
-                Text("After it opens: quit Flowlight, then drag the new version into Applications and replace the old one. Your history and settings are kept.")
+            if let hint {
+                Text(hint)
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -63,9 +79,24 @@ struct UpdateView: View {
     }
 
     private var shownRelease: AppRelease? {
-        if case .available(let release) = updater.state { return release }
-        if case .downloading = updater.state { return updater.latest }
-        return nil
+        switch updater.state {
+        case .available(let r), .ready(let r, _), .installing(let r): return r
+        case .downloading: return updater.latest
+        default: return nil
+        }
+    }
+
+    private var hint: String? {
+        switch updater.state {
+        case .available:
+            return "Flowlight downloads the update and checks it against the release's published SHA-256. Nothing is installed until you choose."
+        case .ready:
+            return "Flowlight needs to quit to finish. It replaces itself and reopens, keeping your history and settings. Choose Install Later to keep using it now."
+        case .failed where updater.downloadedDMG != nil:
+            return "You can still install by hand: quit Flowlight, then drag the new version from the disk image into Applications."
+        default:
+            return nil
+        }
     }
 
     private var isDownloading: Bool {
@@ -77,9 +108,11 @@ struct UpdateView: View {
         switch updater.state {
         case .available(let r): return "Flowlight \(r.version) is available"
         case .downloading: return "Downloading Flowlight \(updater.latest?.version ?? "")"
+        case .ready(let r, _): return "Flowlight \(r.version) is ready to install"
+        case .installing(let r): return "Installing Flowlight \(r.version)"
         case .checking: return "Checking for updates…"
         case .upToDate: return "Flowlight is up to date"
-        case .failed: return "Couldn't check for updates"
+        case .failed: return updater.downloadedDMG == nil ? "Couldn't check for updates" : "The update didn't finish"
         case .idle: return "Software Update"
         }
     }

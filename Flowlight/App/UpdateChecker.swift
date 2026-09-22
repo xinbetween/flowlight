@@ -76,6 +76,9 @@ enum VersionCompare {
 final class UpdateChecker: ObservableObject {
     enum State: Equatable {
         case idle, checking, upToDate, available(AppRelease), downloading(Double), failed(String)
+        /// Downloaded and verified; waiting for the user to choose when Flowlight quits to install it.
+        case ready(AppRelease, URL)
+        case installing(AppRelease)
     }
 
     enum Keys {
@@ -87,6 +90,8 @@ final class UpdateChecker: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var latest: AppRelease?
     @Published var showWindow = false
+    /// The most recent verified disk image, kept so the user can still install by hand if the automatic swap fails.
+    @Published private(set) var downloadedDMG: URL?
 
     let currentVersion: String
     let repository: String
@@ -116,9 +121,12 @@ final class UpdateChecker: ObservableObject {
 
     /// A newer release the user hasn't chosen to skip.
     var pendingUpdate: AppRelease? {
-        guard case .available(let release) = state,
-              UserDefaults.standard.string(forKey: Keys.skipped) != release.version else { return nil }
-        return release
+        let release: AppRelease
+        switch state {
+        case .available(let r), .ready(let r, _): release = r
+        default: return nil
+        }
+        return UserDefaults.standard.string(forKey: Keys.skipped) != release.version ? release : nil
     }
 
     func start() {
@@ -141,7 +149,12 @@ final class UpdateChecker: ObservableObject {
     }
 
     func check(userInitiated: Bool) async {
-        if case .downloading = state { return }
+        switch state {
+        case .downloading, .ready, .installing:
+            if userInitiated { showWindow = true }
+            return
+        default: break
+        }
         state = .checking
         do {
             let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
@@ -171,8 +184,9 @@ final class UpdateChecker: ObservableObject {
         objectWillChange.send()
     }
 
-    /// Downloads the DMG to ~/Downloads, verifies it against SHA256SUMS.txt when the release has one, and opens it.
-    func downloadAndOpen(_ release: AppRelease) {
+    /// Downloads the DMG to ~/Downloads and verifies it against SHA256SUMS.txt when the release has one.
+    /// It then waits in `.ready` so the user decides when Flowlight quits to install it.
+    func download(_ release: AppRelease) {
         guard let dmgURL = release.dmgURL else { state = .failed(UpdateError.noDownload.localizedDescription); return }
         downloadTask?.cancel()
         state = .downloading(0)
@@ -191,13 +205,38 @@ final class UpdateChecker: ObservableObject {
                 let destination = downloads.appendingPathComponent("Flowlight-\(release.version).dmg")
                 try? FileManager.default.removeItem(at: destination)
                 try FileManager.default.moveItem(at: temp, to: destination)
-                state = .available(release)
-                NSWorkspace.shared.open(destination)
+                downloadedDMG = destination
+                state = .ready(release, destination)
+                showWindow = true
             } catch is CancellationError {
                 state = .available(release)
             } catch {
                 state = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// Quits Flowlight and replaces it with the downloaded version, which relaunches itself.
+    func installAndRelaunch(_ release: AppRelease, dmg: URL) {
+        state = .installing(release)
+        let bundleID = Bundle.main.bundleIdentifier
+        Task {
+            do {
+                let staged = try await Task.detached(priority: .userInitiated) {
+                    try UpdateInstaller.stage(dmg: dmg, expectedVersion: release.version, bundleID: bundleID)
+                }.value
+                try UpdateInstaller.launchSwap(staged: staged, target: UpdateInstaller.installTarget())
+                NSApp.terminate(nil)
+            } catch InstallError.cancelled {
+                state = .ready(release, dmg)
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Fallback: open the verified disk image so the user can drag the app across themselves.
+    func openDiskImage() {
+        if let downloadedDMG { NSWorkspace.shared.open(downloadedDMG) }
     }
 }
