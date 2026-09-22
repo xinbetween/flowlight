@@ -15,8 +15,9 @@ final class AnomalyEngine: @unchecked Sendable {
         case agentExfiltration = "Possible data exfiltration by agent"
         case agentUnnamedHost = "Agent contacted an unnamed host"
         case agentWhileAway = "Agent active while you were away"
+        case allowlistViolation = "Allowlist violation"
 
-        static let agentKinds: Set<String> = [Kind.agentSensitiveChannel, .agentExfiltration, .agentUnnamedHost, .agentWhileAway]
+        static let agentKinds: Set<String> = [Kind.agentSensitiveChannel, .agentExfiltration, .agentUnnamedHost, .agentWhileAway, .allowlistViolation]
             .reduce(into: Set<String>()) { $0.insert($1.rawValue) }
     }
 
@@ -45,6 +46,9 @@ final class AnomalyEngine: @unchecked Sendable {
     private var agentMinutes: [String: [AgentMinute]] = [:]
     private var agentNames: [String: String] = [:]
     private var agentAlertedAt: [String: Date] = [:]
+    private(set) var policies: [String: AgentPolicy] = [:]
+
+    func reloadPolicies() throws { policies = try db.loadPolicies() }
 
     /// Display name if the app is an AI agent (known, or discovered by its LLM API traffic).
     func agentName(bundleID: String, appName: String) -> String? {
@@ -72,6 +76,7 @@ final class AnomalyEngine: @unchecked Sendable {
     private func loadIfNeeded() throws {
         guard !loaded else { return }
         let seen = try db.loadSeen()
+        policies = try db.loadPolicies()
         seenDestinations = seen.destinations
         seenPorts = seen.ports
         appsFirstSeen = seen.apps
@@ -189,6 +194,18 @@ final class AnomalyEngine: @unchecked Sendable {
             history[history.count - 1].destinations[destination, default: 0] += c.bytesOut
         }
         agentMinutes[agentKey] = Array(history.suffix(60))
+
+        // Allowlist: anything the agent (or its tools) contacts that isn't listed.
+        if let policy = policies[agentKey], policy.enabled, c.total > 0,
+           !policy.allows(host: k.domain, ip: k.remoteIP, isAIProvider: provider != nil) {
+            let target = k.domain.isEmpty ? k.remoteIP : Self.registrableDomain(k.domain)
+            if shouldAlert("allow|\(agentKey)|\(target)", every: 6 * 3600) {
+                let owner = k.parentAgentName ?? agent
+                alerts.append(try db.addAlert(kind: Kind.allowlistViolation.rawValue, bundleID: agentKey, appName: agent,
+                                              detail: "\(agent) contacted \(destination):\(k.port) (\(k.appProtocol)), which isn't on \(owner)'s allowlist — \(ByteFormat.string(c.bytesOut)) sent",
+                                              severity: 3))
+            }
+        }
 
         let category = ProtocolCatalog.category(of: k.appProtocol)
         if s.agentSensitiveChannels, category.isSensitiveEgress, !local, c.total > 0,

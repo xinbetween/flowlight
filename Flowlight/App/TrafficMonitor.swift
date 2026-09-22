@@ -325,6 +325,15 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    /// Saves an agent's allowlist and applies it to new traffic right away.
+    func savePolicy(_ policy: AgentPolicy) {
+        db.async { [engine, weak self] db in
+            try db.savePolicy(policy)
+            try engine.reloadPolicies()
+            Task { @MainActor in self?.dataVersion += 1 }
+        }
+    }
+
     func acknowledgeAlerts(ids: [Int64]?) {
         db.async { [weak self] db in
             try db.acknowledgeAlerts(ids: ids)
