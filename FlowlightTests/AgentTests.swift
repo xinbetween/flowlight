@@ -88,6 +88,40 @@ final class AgentTests: XCTestCase {
         XCTAssertEqual(fired().count, before)
     }
 
+    /// The September 2026 ZCode incident: an AI coding app packaged whole workspaces (86% .git history) and
+    /// uploaded ~313 MB snapshots to Alibaba Cloud storage in the background.
+    func testZCodeStyleWorkspaceUploadIsFlagged() throws {
+        XCTAssertEqual(AgentCatalog.knownAgent(bundleID: "ai.z.zcode", appName: "ZCode")?.vendor, "Zhipu AI")
+        XCTAssertEqual(AgentCatalog.provider(domain: "open.bigmodel.cn"), "Zhipu AI")
+        XCTAssertEqual(AgentCatalog.provider(domain: "api.z.ai"), "Zhipu AI")
+        XCTAssertEqual(AgentCatalog.provider(domain: "dashscope.aliyuncs.com"), "Alibaba Qwen")
+        XCTAssertNil(AgentCatalog.provider(domain: "zcode-snapshots.oss-cn-beijing.aliyuncs.com"), "cloud storage is not an AI API")
+
+        let (engine, _, fired) = try makeEngine()
+        let now = Date()
+        let ts = Int64(now.timeIntervalSince1970)
+        try engine.observe([TrafficBatch(timestamp: ts, records: [
+            TrafficRecord(key: key("ai.z.zcode", name: "ZCode", domain: "open.bigmodel.cn"),
+                          counters: FlowCounters(bytesIn: 40_000, bytesOut: 20_000, flows: 1)),
+            TrafficRecord(key: key("ai.z.zcode", name: "ZCode", domain: "zcode-snapshots.oss-cn-beijing.aliyuncs.com"),
+                          counters: FlowCounters(bytesIn: 2_000, bytesOut: 313_000_000, flows: 1)),
+        ])])
+        try engine.evaluateAgents(now: now)
+        let exfil = fired().first { $0.kind == AnomalyEngine.Kind.agentExfiltration.rawValue }
+        XCTAssertNotNil(exfil, "a 313 MB upload to non-AI storage raises a critical alert")
+        XCTAssertEqual(exfil?.severity, 3)
+        XCTAssertTrue(exfil?.detail.contains("oss-cn-beijing.aliyuncs.com") == true)
+
+        // Also caught with no hostname at all (packet capture off): egress is counted by destination, not name.
+        let (bare, _, bareFired) = try makeEngine()
+        try bare.observe([TrafficBatch(timestamp: ts, records: [
+            TrafficRecord(key: key("ai.z.zcode", name: "ZCode", domain: "", ip: "47.95.1.10"),
+                          counters: FlowCounters(bytesIn: 0, bytesOut: 313_000_000, flows: 1)),
+        ])])
+        try bare.evaluateAgents(now: now)
+        XCTAssertTrue(bareFired().contains { $0.kind == AnomalyEngine.Kind.agentExfiltration.rawValue })
+    }
+
     func testDiscoveryExfiltrationAndWhileAway() throws {
         let activity = FakeActivity()
         let (engine, _, fired) = try makeEngine(activity)

@@ -49,8 +49,8 @@ Flowlight answers that for every app on your Mac, then goes deeper for AI agents
   MongoDB…) · messaging and queues (MQTT, AMQP, Kafka, XMPP, IRC) · voice and video (SIP, STUN, RTSP) · and more.
 
 ### AI Agent Watch
-Flowlight recognizes **15 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
-Aider, Goose, Ollama and more). It also finds **any other process that calls one of 21 LLM API providers**, so a
+Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
+Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 25 LLM API providers**, so a
 Python script hitting `api.openai.com` shows up too. Browsers are excluded, because a person chatting isn't an agent.
 
 For each agent you see which AI providers it uses, and **everything else it contacted**. These rules watch it:

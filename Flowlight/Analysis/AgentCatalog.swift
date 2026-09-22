@@ -30,6 +30,7 @@ enum AgentCatalog {
         KnownAgent(name: "Ollama", vendor: "Ollama", bundleIDs: ["com.electron.ollama"], processNames: ["ollama"]),
         KnownAgent(name: "LM Studio", vendor: "Element Labs", bundleIDs: ["ai.elementlabs.lmstudio"]),
         KnownAgent(name: "Perplexity", vendor: "Perplexity", bundleIDs: ["ai.perplexity.mac"]),
+        KnownAgent(name: "ZCode", vendor: "Zhipu AI", processNames: ["zcode"]),
     ]
 
     /// Hostname suffix → LLM API provider.
@@ -43,6 +44,11 @@ enum AgentCatalog {
         ("replicate.com", "Replicate"), ("huggingface.co", "Hugging Face"), ("githubcopilot.com", "GitHub Copilot"),
         ("copilot-proxy.githubusercontent.com", "GitHub Copilot"), ("cursor.sh", "Cursor"), ("cursor.com", "Cursor"),
         ("codeium.com", "Codeium"), ("windsurf.com", "Codeium"), ("ollama.com", "Ollama"),
+        ("bigmodel.cn", "Zhipu AI"), ("z.ai", "Zhipu AI"), ("chatglm.cn", "Zhipu AI"),
+        ("moonshot.cn", "Moonshot (Kimi)"), ("moonshot.ai", "Moonshot (Kimi)"), ("kimi.com", "Moonshot (Kimi)"),
+        // Only the DashScope API host: the rest of aliyuncs.com is general Alibaba Cloud (storage included).
+        ("dashscope.aliyuncs.com", "Alibaba Qwen"), ("dashscope-intl.aliyuncs.com", "Alibaba Qwen"),
+        ("minimax.io", "MiniMax"), ("minimaxi.com", "MiniMax"), ("minimax.chat", "MiniMax"),
     ]
 
     /// Network owners (AS names) that only serve AI APIs, for traffic seen without a hostname.
