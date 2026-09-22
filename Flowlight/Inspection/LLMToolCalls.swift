@@ -24,13 +24,6 @@ struct ToolCall: Equatable, Codable, Sendable {
 enum LLMToolCallReader {
     static let inputLimit = 4000
 
-    /// Tool calls in a response body (JSON or server-sent events), or MCP `tools/call` requests in a request body.
-    static func toolCalls(requestBody: Data, responseBody: Data, host: String) -> [ToolCall] {
-        var calls = responseCalls(responseBody)
-        calls += mcpRequestCalls(requestBody, host: host)
-        return calls
-    }
-
     // MARK: Responses
 
     static func responseCalls(_ body: Data) -> [ToolCall] {

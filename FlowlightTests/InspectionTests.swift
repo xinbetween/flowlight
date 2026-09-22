@@ -377,3 +377,69 @@ final class JSONValueTests: XCTestCase {
         guard case .json = BodyContent.classify(Data(#"{"a":1}"#.utf8)) else { return XCTFail() }
     }
 }
+
+final class ToolResultReaderTests: XCTestCase {
+    func testResultsSentBackToTheModel() {
+        let anthropic = #"{"model":"m","messages":[{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"200"}]},{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":"permission denied"}]}]}"#
+        let r = ToolResultReader.results(inRequest: Data(anthropic.utf8))
+        XCTAssertEqual(r.map(\.callID), ["t1", "t2"])
+        XCTAssertEqual(r[0].output, "200")
+        XCTAssertFalse(r[0].isError)
+        XCTAssertTrue(r[1].isError)
+
+        let chat = #"{"messages":[{"role":"tool","tool_call_id":"call_9","content":"Error: file not found"}]}"#
+        let c = ToolResultReader.results(inRequest: Data(chat.utf8))
+        XCTAssertEqual(c.first?.callID, "call_9")
+        XCTAssertEqual(c.first?.isError, true, "error text counts as a failure")
+
+        let responses = #"{"input":[{"type":"function_call_output","call_id":"fc1","output":"ok"}]}"#
+        XCTAssertEqual(ToolResultReader.results(inRequest: Data(responses.utf8)).first?.output, "ok")
+
+        let gemini = #"{"contents":[{"role":"user","parts":[{"functionResponse":{"name":"run_shell_command","response":{"output":"done"}}}]}]}"#
+        XCTAssertEqual(ToolResultReader.results(inRequest: Data(gemini.utf8)).first?.callID, "gemini:run_shell_command")
+    }
+
+    func testProviderRunMCPCallResult() {
+        let body = #"{"object":"response","output":[{"type":"mcp_call","id":"mcp_1","server_label":"stripe","name":"refund","arguments":"{}","output":"refunded","error":null}]}"#
+        let r = ToolResultReader.results(inResponse: Data(body.utf8))
+        XCTAssertEqual(r.first?.callID, "mcp_1")
+        XCTAssertEqual(r.first?.output, "refunded")
+        XCTAssertEqual(r.first?.isError, false)
+    }
+
+    func testMCPJSONRPCOverHTTP() {
+        let initialize = ToolResultReader.mcpActivity(
+            request: Data(#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{}}"#.utf8),
+            response: Data("event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"serverInfo\":{\"name\":\"Linear\",\"version\":\"1.2\"}}}\n\n".utf8),
+            host: "mcp.linear.app", path: "/mcp?x=1", knownName: nil)
+        XCTAssertEqual(initialize.first?.server, "Linear")
+        XCTAssertEqual(initialize.first?.version, "1.2")
+        XCTAssertEqual(initialize.first?.endpoint, "mcp.linear.app/mcp")
+
+        let list = ToolResultReader.mcpActivity(
+            request: Data(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#.utf8),
+            response: Data(#"{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"search_issues"},{"name":"create_issue"}]}}"#.utf8),
+            host: "mcp.linear.app", path: "/mcp", knownName: "Linear")
+        XCTAssertEqual(list.first?.tools, ["search_issues", "create_issue"])
+        XCTAssertEqual(list.first?.server, "Linear")
+
+        let call = ToolResultReader.mcpActivity(
+            request: Data(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_issue","arguments":{"title":"Bug"}}}"#.utf8),
+            response: Data(#"{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Created ENG-1"}],"isError":false}}"#.utf8),
+            host: "mcp.linear.app", path: "/mcp", knownName: "Linear")
+        XCTAssertEqual(call.first?.tool, "create_issue")
+        XCTAssertEqual(call.first?.output, "Created ENG-1")
+        XCTAssertEqual(call.first?.isError, false)
+
+        let failed = ToolResultReader.mcpActivity(
+            request: Data(#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"x"}}"#.utf8),
+            response: Data(#"{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"Unknown tool"}}"#.utf8),
+            host: "h", path: "/", knownName: nil)
+        XCTAssertEqual(failed.first?.isError, true)
+        XCTAssertEqual(failed.first?.output, "Unknown tool")
+
+        XCTAssertTrue(ToolResultReader.mcpActivity(request: Data(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#.utf8),
+                                                   response: Data(), host: "h", path: "/", knownName: nil).isEmpty)
+        XCTAssertTrue(ToolResultReader.mcpActivity(request: Data(#"{"model":"x"}"#.utf8), response: Data(), host: "h", path: "/", knownName: nil).isEmpty)
+    }
+}

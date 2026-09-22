@@ -29,6 +29,10 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     var agentName: String?
     var mcpServer: String?
     var toolCalls: [ToolCall]
+    /// Tool results first seen in this exchange: sent back to the model, or returned by an MCP server.
+    var toolResults: [ToolResult] = []
+    /// JSON-RPC calls to an MCP server over HTTP.
+    var mcp: [MCPActivity] = []
     /// Set when there's no exchange to show, e.g. the app rejected Flowlight's certificate.
     var note: String?
 
@@ -110,7 +114,10 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         var mcpServer: String?
     }
 
-    var bodyLimit = 2 << 20
+    /// Bodies are parsed up to this size (agents resend whole conversations, so LLM requests get large)…
+    var parseLimit = 16 << 20
+    /// …and stored up to this size.
+    var storeLimit = 2 << 20
     var proxyPort: () -> UInt16? = { nil }
     var onExchange: (HTTPExchange) -> Void = { _ in }
 
@@ -120,7 +127,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     private let processes = ProcessLookup()
 
     func flowStarted(_ flow: ProxyFlow) {
-        let state = FlowState(limit: bodyLimit)
+        let state = FlowState(limit: parseLimit)
         let response = state.response
         state.request.onHead = { response.requestMethods.append($0.method) }
         state.request.onMessage = { [weak state] head, body in
@@ -168,18 +175,49 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         emitQueue.async { [self] in
             if state.owner == nil { _ = state.ownerReady.wait(timeout: .now() + 2); state.ownerReady.signal() }
             let owner = state.owner ?? Owner()
-            let calls = LLMToolCallReader.toolCalls(requestBody: request.body.data, responseBody: responseBody.data, host: flow.host)
+            var calls = LLMToolCallReader.responseCalls(responseBody.data)
+            var results = newResults(ToolResultReader.results(inRequest: request.body.data) + ToolResultReader.results(inResponse: responseBody.data))
+            let endpoint = flow.host + (request.head.target.split(separator: "?").first.map(String.init) ?? "")
+            let mcp = ToolResultReader.mcpActivity(request: request.body.data, response: responseBody.data, host: flow.host,
+                                                   path: request.head.target, knownName: mcpNames[endpoint])
+            for activity in mcp {
+                if activity.method == "initialize", activity.server != flow.host { mcpNames[endpoint] = activity.server }
+                guard activity.method == "tools/call", let tool = activity.tool else { continue }
+                // A direct MCP tool call carries its own result; pair them with a shared id.
+                let id = "mcp-\(UUID().uuidString)"
+                calls.append(ToolCall(source: .mcp, callID: id, name: tool, mcpServer: activity.server, input: activity.summary ?? "",
+                                      summary: activity.summary))
+                results.append(ToolResult(callID: id, isError: activity.isError, output: activity.output ?? "",
+                                          outputSize: activity.output?.count ?? 0))
+            }
+            let (requestBody, requestCut) = clip(request.body)
+            let (responseData, responseCut) = clip(responseBody)
             let exchange = HTTPExchange(
                 id: nil, started: request.started, duration: finished.timeIntervalSince(request.started), scheme: flow.scheme,
                 host: flow.host, port: flow.port, method: request.head.method, path: request.head.target, status: responseHead?.status,
-                requestHeaders: HeaderRedaction.redact(request.head.headers), requestBody: request.body.data,
-                requestSize: request.body.wireSize, requestTruncated: request.body.truncated,
-                responseHeaders: HeaderRedaction.redact(responseHead?.headers ?? []), responseBody: responseBody.data,
-                responseSize: responseBody.wireSize, responseTruncated: responseBody.truncated,
+                requestHeaders: HeaderRedaction.redact(request.head.headers), requestBody: requestBody,
+                requestSize: request.body.wireSize, requestTruncated: requestCut,
+                responseHeaders: HeaderRedaction.redact(responseHead?.headers ?? []), responseBody: responseData,
+                responseSize: responseBody.wireSize, responseTruncated: responseCut,
                 contentType: responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
-                agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls, note: note)
+                agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
+                toolResults: results, mcp: mcp, note: note)
             onExchange(exchange)
         }
+    }
+
+    /// MCP endpoint (host + path) → the server's name from its `initialize` response. Used on the emit queue only.
+    private var mcpNames: [String: String] = [:]
+    /// Tool result ids already recorded. Agents resend the whole conversation each turn; keep each result once.
+    private var seenResults: Set<String> = []
+
+    private func newResults(_ results: [ToolResult]) -> [ToolResult] {
+        if seenResults.count > 100_000 { seenResults.removeAll() }
+        return results.filter { seenResults.insert($0.callID).inserted }
+    }
+
+    private func clip(_ body: HTTPBody) -> (Data, Bool) {
+        body.data.count > storeLimit ? (body.data.prefix(storeLimit), true) : (body.data, body.truncated)
     }
 
     private var owners: [UInt16: (owner: Owner, at: Date)] = [:]

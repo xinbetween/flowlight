@@ -220,6 +220,11 @@ final class TrafficDatabase: @unchecked Sendable {
             agent TEXT NOT NULL, agent_name TEXT NOT NULL, mcp_server TEXT NOT NULL, tool_calls TEXT NOT NULL, note TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS http_exchanges_ts ON http_exchanges (ts);
         """)
+        // Added in 0.1.5.
+        let exchangeColumns = Set(try conn.query("PRAGMA table_info(http_exchanges)") { $0.text(1) })
+        for column in ["tool_results", "mcp"] where !exchangeColumns.contains(column) {
+            try conn.execute("ALTER TABLE http_exchanges ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
+        }
     }
 
     // MARK: Ingest
@@ -601,14 +606,15 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("""
             INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                 req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                agent_name, mcp_server, tool_calls, note)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                agent_name, mcp_server, tool_calls, note, tool_results, mcp)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                   .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                   .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
                   .text(json(e.responseHeaders)), .blob(e.responseBody), .int(Int64(e.responseSize)), .int(e.responseTruncated ? 1 : 0),
                   .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
-                  .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? "")])
+                  .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
+                  .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp))])
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
@@ -616,14 +622,16 @@ final class TrafficDatabase: @unchecked Sendable {
         let like = "%\(search)%"
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
-                   resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note
-            FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?)
+                   resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
+                   tool_results, mcp
+            FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
+                                                   OR mcp LIKE ?)
             ORDER BY ts DESC LIMIT ?
-            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like),
+            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
                   .int(Int64(limit))]) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
-            let tools = row.text(22)
+            let tools = row.text(22), results = row.text(24), mcp = row.text(25)
             return HTTPExchange(
                 id: row.int(0), started: Date(timeIntervalSince1970: row.double(1)), duration: row.double(2), scheme: row.text(3),
                 host: row.text(4), port: Int(row.int(5)), method: row.text(6), path: row.text(7),
@@ -632,6 +640,8 @@ final class TrafficDatabase: @unchecked Sendable {
                 responseTruncated: row.int(14) != 0, contentType: row.text(15), pid: Int32(row.int(16)), bundleID: row.text(17),
                 appName: row.text(18), agent: row.text(19).nilIfEmpty, agentName: row.text(20).nilIfEmpty, mcpServer: row.text(21).nilIfEmpty,
                 toolCalls: tools.isEmpty ? [] : ((try? decoder.decode([ToolCall].self, from: Data(tools.utf8))) ?? []),
+                toolResults: results.isEmpty ? [] : ((try? decoder.decode([ToolResult].self, from: Data(results.utf8))) ?? []),
+                mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
                 note: row.text(23).nilIfEmpty)
         }
     }
