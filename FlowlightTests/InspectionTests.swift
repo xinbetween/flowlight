@@ -138,3 +138,91 @@ final class HTTPStreamParserTests: XCTestCase {
         return out
     }
 }
+
+final class LLMToolCallReaderTests: XCTestCase {
+    func testAnthropicStreamRebuildsInput() {
+        // Shape taken from a real Claude Code response; ids and text are made up.
+        let sse = """
+        event: message_start
+        data: {"type":"message_start","message":{"model":"claude-x","id":"msg_1","role":"assistant","content":[]}}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_A","name":"Bash","input":{}}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"command\\": \\"curl -s https://paste.exa"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"mple/up\\"}"}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":1}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_B","name":"mcp__github__create_issue","input":{}}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\\"title\\":\\"x\\"}"}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":2}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+        """
+        let calls = LLMToolCallReader.responseCalls(Data(sse.utf8))
+        XCTAssertEqual(calls.map(\.displayName), ["Bash", "github › create_issue"])
+        XCTAssertEqual(calls[0].summary, "curl -s https://paste.example/up")
+        XCTAssertEqual(calls[0].callID, "toolu_A")
+        XCTAssertEqual(calls[1].input, #"{"title":"x"}"#)
+        XCTAssertEqual(calls[1].source, .anthropic)
+    }
+
+    func testAnthropicJSONAndMCPConnector() {
+        let json = #"{"id":"msg","role":"assistant","content":[{"type":"text","text":"hi"},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/tmp/a"}},{"type":"mcp_tool_use","id":"t2","name":"search","server_name":"linear","input":{"query":"bug"}}]}"#
+        let calls = LLMToolCallReader.responseCalls(Data(json.utf8))
+        XCTAssertEqual(calls.map(\.displayName), ["Read", "linear › search"])
+        XCTAssertEqual(calls.map(\.summary), ["/tmp/a", "bug"])
+    }
+
+    func testOpenAIChatStreamAndJSON() {
+        let sse = """
+        data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"shell","arguments":""}}]}}]}
+        data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"cmd\\":[\\"ls\\","}}]}}]}
+        data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"-la\\"]}"}}]}}]}
+        data: [DONE]
+        """
+        let calls = LLMToolCallReader.responseCalls(Data(sse.utf8))
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(calls[0].name, "shell")
+        XCTAssertEqual(calls[0].summary, "ls -la")
+
+        let json = #"{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"c","type":"function","function":{"name":"get_weather","arguments":"{\"q\":\"Paris\"}"}}]}}]}"#
+        XCTAssertEqual(LLMToolCallReader.responseCalls(Data(json.utf8)).first?.summary, "Paris")
+    }
+
+    func testOpenAIResponsesAndGemini() {
+        let responses = #"{"object":"response","output":[{"type":"function_call","call_id":"fc1","name":"apply_patch","arguments":"{\"path\":\"a.swift\"}"},{"type":"mcp_call","id":"m1","server_label":"stripe","name":"refund","arguments":"{}"}]}"#
+        XCTAssertEqual(LLMToolCallReader.responseCalls(Data(responses.utf8)).map(\.displayName), ["apply_patch", "stripe › refund"])
+
+        let stream = #"data: {"type":"response.output_item.done","item":{"type":"function_call","call_id":"fc9","name":"exec","arguments":"{\"command\":\"git push\"}"}}"#
+        XCTAssertEqual(LLMToolCallReader.responseCalls(Data(stream.utf8)).first?.summary, "git push")
+
+        let gemini = #"[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"run_shell_command","args":{"command":"rm -rf build"}}}]}}]}]"#
+        let call = LLMToolCallReader.responseCalls(Data(gemini.utf8)).first
+        XCTAssertEqual(call?.source, .gemini)
+        XCTAssertEqual(call?.summary, "rm -rf build")
+    }
+
+    func testMCPToolsCallRequestAndNoise() {
+        let request = #"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"create_issue","arguments":{"title":"t"}}}"#
+        let calls = LLMToolCallReader.mcpRequestCalls(Data(request.utf8), host: "mcp.example.com")
+        XCTAssertEqual(calls.first?.displayName, "mcp.example.com › create_issue")
+        XCTAssertEqual(calls.first?.callID, "7")
+        XCTAssertTrue(LLMToolCallReader.mcpRequestCalls(Data(#"{"method":"tools/list","jsonrpc":"2.0","id":1}"#.utf8), host: "h").isEmpty)
+        XCTAssertTrue(LLMToolCallReader.responseCalls(Data("<html>not json</html>".utf8)).isEmpty)
+    }
+}
