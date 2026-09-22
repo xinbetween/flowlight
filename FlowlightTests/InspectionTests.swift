@@ -443,3 +443,48 @@ final class ToolResultReaderTests: XCTestCase {
         XCTAssertTrue(ToolResultReader.mcpActivity(request: Data(#"{"model":"x"}"#.utf8), response: Data(), host: "h", path: "/", knownName: nil).isEmpty)
     }
 }
+
+final class ToolActivityTests: XCTestCase {
+    func testJoinsCallsResultsRequestsAndServers() {
+        func ex(_ id: Int64, _ at: Double, app: String, host: String, calls: [ToolCall] = [], results: [ToolResult] = [],
+                mcp: [MCPActivity] = []) -> HTTPExchange {
+            HTTPExchange(id: id, started: Date(timeIntervalSince1970: at), duration: 0.5, scheme: "https", host: host, port: 443,
+                         method: "GET", path: "/", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0,
+                         requestTruncated: false, responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+                         contentType: "", pid: 1, bundleID: app, appName: app, agent: "claude", agentName: "Claude Code",
+                         mcpServer: nil, toolCalls: calls, toolResults: results, mcp: mcp, note: nil)
+        }
+        let bash = LLMToolCallReader.make(.anthropic, id: "t1", name: "Bash", input: ["command": "curl -s https://httpbin.org/uuid"])
+        let issue = LLMToolCallReader.make(.anthropic, id: "t2", name: "mcp__linear__create_issue", input: ["title": "x"])
+        let rows = [
+            ex(1, 100, app: "claude", host: "api.anthropic.com", calls: [bash, issue]),
+            ex(2, 102, app: "curl", host: "httpbin.org"),
+            ex(3, 105, app: "claude", host: "api.anthropic.com", results: [
+                ToolResult(callID: "t1", isError: false, output: "{\"uuid\":\"1\"}", outputSize: 12),
+                ToolResult(callID: "t2", isError: true, output: "Unauthorized", outputSize: 12),
+            ]),
+            ex(4, 90, app: "claude", host: "mcp.linear.app", mcp: [
+                MCPActivity(server: "linear", endpoint: "mcp.linear.app/mcp", method: "tools/list", tools: ["create_issue", "search"],
+                            version: "2.0", isError: false),
+            ]),
+        ]
+        let activity = ToolActivityBuilder.activities(rows)["claude"] ?? []
+        XCTAssertEqual(activity.count, 2)
+        let b = activity.first { $0.call.name == "Bash" }
+        XCTAssertEqual(b?.outcome, .ok)
+        XCTAssertEqual(b?.requests.map(\.host), ["httpbin.org"])
+        XCTAssertEqual(activity.first { $0.call.name == "create_issue" }?.outcome, .error)
+
+        let servers = ToolActivityBuilder.servers(rows, activities: ["claude": activity], configured: ["claude": ["github"]])["claude"] ?? []
+        let linear = servers.first { $0.name.lowercased() == "linear" }
+        XCTAssertEqual(linear?.calls, 1)
+        XCTAssertEqual(linear?.errors, 1)
+        XCTAssertEqual(linear?.tools, ["create_issue", "search"])
+        XCTAssertEqual(linear?.version, "2.0")
+        XCTAssertTrue(linear?.isRemote ?? false)
+        XCTAssertEqual(servers.first { $0.name == "github" }?.calls, 0)
+
+        let usage = ToolUsage.build(["claude": activity])["claude"] ?? []
+        XCTAssertEqual(usage.first { $0.name == "linear › create_issue" }?.errors, 1)
+    }
+}

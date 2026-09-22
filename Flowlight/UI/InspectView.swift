@@ -14,6 +14,7 @@ private struct InspectContent: View {
     @ObservedObject var inspection: InspectionController
     @State private var exchanges: [HTTPExchange] = []
     @State private var links: [Int64: ToolCallLinks.Link] = [:]
+    @State private var results: [String: ToolResult] = [:]
     @State private var selection: HTTPExchange.ID?
     @State private var search = ""
     @State private var window: AgentWindow = .day
@@ -64,6 +65,9 @@ private struct InspectContent: View {
         // Link with the unfiltered list, so a search for "curl" still shows which tool call started it.
         let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since) }) ?? [])
         links = ToolCallLinks.link(all)
+        var found: [String: ToolResult] = [:]
+        for e in all { for r in e.toolResults where found[r.callID] == nil { found[r.callID] = r } }
+        results = found
     }
 
     private var statusBar: some View {
@@ -139,7 +143,7 @@ private struct InspectContent: View {
 
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
-            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] })
+            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results)
                 .id(selected.id)
         } else {
             ContentUnavailableView("Select a request", systemImage: "doc.text.magnifyingglass")
@@ -293,6 +297,7 @@ private struct ExchangeDetail: View {
     @EnvironmentObject var monitor: TrafficMonitor
     let exchange: HTTPExchange
     var cause: ToolCallLinks.Link?
+    var results: [String: ToolResult] = [:]
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
     @State private var headersOpen: Bool?
@@ -329,10 +334,48 @@ private struct ExchangeDetail: View {
                                     .font(.callout.bold())
                                 Text(call.summary ?? call.input).font(.caption.monospaced()).textSelection(.enabled)
                                     .lineLimit(6).foregroundStyle(.secondary)
+                                if let result = call.callID.flatMap({ results[$0] }) {
+                                    resultView(result)
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .padding(4)
+                }
+            }
+            if !exchange.toolResults.isEmpty {
+                GroupBox("Tool results sent to the model (\(exchange.toolResults.count))") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(exchange.toolResults.prefix(20).enumerated()), id: \.offset) { _, result in
+                            resultView(result)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(4)
+                }
+            }
+            if !exchange.mcp.isEmpty {
+                GroupBox("MCP") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(exchange.mcp.enumerated()), id: \.offset) { _, m in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: m.isError ? "xmark.octagon.fill" : "puzzlepiece.extension")
+                                        .foregroundStyle(m.isError ? TrafficColors.anomaly : .purple)
+                                    Text("\(m.server)\(m.version.map { " \($0)" } ?? "") · \(m.method)\(m.tool.map { " · \($0)" } ?? "")")
+                                        .font(.callout.bold())
+                                }
+                                if let summary = m.summary { Text(summary).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(4) }
+                                if let tools = m.tools { Text("\(tools.count) tools: " + tools.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(4) }
+                                if let output = m.output, !output.isEmpty {
+                                    Text(output).font(.caption.monospaced()).lineLimit(6).textSelection(.enabled)
+                                        .foregroundStyle(m.isError ? TrafficColors.anomaly : .secondary)
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(4)
                 }
             }
@@ -375,6 +418,20 @@ private struct ExchangeDetail: View {
             guard let id = exchange.id else { return }
             bodies = (try? await monitor.read { try $0.exchangeBodies(id: id) }) ?? (Data(), Data())
         }
+    }
+
+    private func resultView(_ result: ToolResult) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Label(result.isError ? "Error" : "Result", systemImage: result.isError ? "xmark.octagon.fill" : "checkmark.circle.fill")
+                .font(.caption.bold()).foregroundStyle(result.isError ? TrafficColors.anomaly : .green)
+            Text(result.output.isEmpty ? "(empty)" : result.output.trimmingCharacters(in: .whitespacesAndNewlines))
+                .font(.caption.monospaced()).lineLimit(6).textSelection(.enabled).foregroundStyle(.secondary)
+            if result.outputSize > result.output.count {
+                Text("\(result.outputSize) characters in total").font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.leading, 8)
+        .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
     }
 
     private var emptyReason: String {

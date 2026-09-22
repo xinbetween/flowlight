@@ -23,6 +23,8 @@ struct AgentsView: View {
     @State private var agentAlerts = 0
     @State private var policies: [String: AgentPolicy] = [:]
     @State private var toolUsage: [String: [ToolUsage]] = [:]
+    @State private var toolActivity: [String: [ToolActivity]] = [:]
+    @State private var mcpServers: [String: [MCPServerSummary]] = [:]
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
@@ -53,6 +55,7 @@ struct AgentsView: View {
                 table.frame(minHeight: 180, maxHeight: max(180, CGFloat(agents.count) * 38 + 44))
                 if let selected {
                     AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
+                                activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
@@ -135,7 +138,12 @@ struct AgentsView: View {
         }
         guard let (rows, alerts, loadedPolicies, exchanges) = result else { return }
         policies = loadedPolicies
-        toolUsage = ToolUsage.build(exchanges)
+        let activity = ToolActivityBuilder.activities(exchanges)
+        toolActivity = activity
+        toolUsage = ToolUsage.build(activity)
+        let configured = Dictionary(grouping: rows.filter { !$0.mcpServer.isEmpty && !$0.parentAgent.isEmpty }) { $0.parentAgent }
+            .mapValues { Array(Set($0.map(\.mcpServer))) }
+        mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -294,36 +302,38 @@ struct AgentDetail: View {
     var agent: AgentSummary
     var window: AgentWindow
     var toolCalls: [ToolUsage] = []
+    var activity: [ToolActivity] = []
+    var servers: [MCPServerSummary] = []
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
+    @State private var tab = Tab.destinations
+
+    enum Tab: Hashable { case destinations, calls, servers }
 
     var body: some View {
         GroupBox {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
-                    if !toolCalls.isEmpty {
-                        Text("Tool calls (from inspected responses)").font(.caption.bold()).foregroundStyle(.secondary)
+                    if !agent.tools.isEmpty || !toolCalls.isEmpty {
+                        Text("Tools & MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
                         ForEach(toolCalls.prefix(6)) { usage in
-                            VStack(alignment: .leading, spacing: 1) {
+                            Button { tab = .calls } label: {
                                 HStack {
                                     Image(systemName: usage.isMCP ? "puzzlepiece.extension" : "wrench.and.screwdriver").foregroundStyle(.purple)
                                         .frame(width: 16)
                                     Text(usage.name).lineLimit(1)
                                     Spacer()
+                                    if usage.errors > 0 {
+                                        Text("\(usage.errors) failed").foregroundStyle(TrafficColors.anomaly)
+                                    }
                                     Text("×\(usage.count)").monospacedDigit().foregroundStyle(.secondary)
                                 }
-                                if let last = usage.lastSummary {
-                                    Text(last).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                                        .padding(.leading, 22)
-                                }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                             .font(.caption)
-                            .help(usage.lastSummary.map { "Most recent: \($0)" } ?? usage.name)
+                            .help(usage.lastSummary.map { "Model asked for \(usage.name) \(usage.count)×. Most recent: \($0)" } ?? usage.name)
                         }
-                        Divider().padding(.vertical, 2)
-                    }
-                    if !agent.tools.isEmpty {
-                        Text("Tools & MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
                         ForEach(agent.tools.prefix(8)) { tool in
                             HStack {
                                 Image(systemName: tool.isMCP ? "puzzlepiece.extension" : "terminal").foregroundStyle(.secondary)
@@ -361,25 +371,55 @@ struct AgentDetail: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Other destinations").font(.caption.bold()).foregroundStyle(.secondary)
+                        if activity.isEmpty && servers.isEmpty {
+                            Text("Other destinations").font(.caption.bold()).foregroundStyle(.secondary)
+                        } else {
+                            Picker("Show", selection: $tab) {
+                                Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
+                                Text("Tool calls (\(activity.count))").tag(Tab.calls)
+                                Text("MCP servers (\(servers.count))").tag(Tab.servers)
+                            }
+                            .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+                        }
                         Spacer()
                         Button("Open in Reports") {
                             nav.showReport(filter: TrafficFilter(bundleID: agent.bundleID), granularity: window.granularity)
                         }
                         .controlSize(.small)
                     }
-                    if agent.otherDestinations.isEmpty {
-                        Text("Only AI providers. Nothing else was contacted.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    ScrollView {
-                        VStack(spacing: 3) {
-                            ForEach(agent.otherDestinations.prefix(50)) { destination in
-                                destinationRow(destination)
+                    switch activity.isEmpty && servers.isEmpty ? .destinations : tab {
+                    case .destinations:
+                        if agent.otherDestinations.isEmpty {
+                            Text("Only AI providers. Nothing else was contacted.").font(.caption).foregroundStyle(.secondary)
+                        }
+                        ScrollView {
+                            VStack(spacing: 3) {
+                                ForEach(agent.otherDestinations.prefix(50)) { destination in
+                                    destinationRow(destination)
+                                }
                             }
                         }
+                    case .calls:
+                        if activity.isEmpty {
+                            Text("No tool calls seen. Start \(agent.name) from an inspected Terminal to see them.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(activity.prefix(300)) { ToolActivityRow(activity: $0) }
+                            }
+                            .padding(.trailing, 6)
+                        }
+                    case .servers:
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 10) {
+                                ForEach(servers) { MCPServerRow(server: $0) }
+                            }
+                            .padding(.trailing, 6)
+                        }
                     }
-                    .frame(maxHeight: 220)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } label: {
             Text("\(agent.name) · \(ByteFormat.string(agent.total.total)) in \(window.title.lowercased())")
@@ -423,24 +463,109 @@ struct ToolUsage: Identifiable, Equatable {
     var name: String
     var isMCP: Bool
     var count: Int
+    var errors: Int
     var lastSummary: String?
     var lastAt: Date
     var id: String { name }
 
     /// Agent id → its tools, most used first.
-    static func build(_ exchanges: [HTTPExchange]) -> [String: [ToolUsage]] {
-        var byAgent: [String: [String: ToolUsage]] = [:]
-        for exchange in exchanges.sorted(by: { $0.started < $1.started }) {
-            guard let agent = exchange.agent else { continue }
-            for call in exchange.toolCalls {
-                var usage = byAgent[agent, default: [:]][call.displayName]
-                    ?? ToolUsage(name: call.displayName, isMCP: call.mcpServer != nil, count: 0, lastSummary: nil, lastAt: exchange.started)
-                usage.count += 1
-                usage.lastAt = exchange.started
-                if let summary = call.summary { usage.lastSummary = summary }
-                byAgent[agent, default: [:]][call.displayName] = usage
+    static func build(_ activities: [String: [ToolActivity]]) -> [String: [ToolUsage]] {
+        activities.mapValues { list in
+            var byName: [String: ToolUsage] = [:]
+            for a in list.reversed() {   // oldest first, so "last" ends up newest
+                var u = byName[a.call.displayName]
+                    ?? ToolUsage(name: a.call.displayName, isMCP: a.call.mcpServer != nil, count: 0, errors: 0, lastSummary: nil, lastAt: a.at)
+                u.count += 1
+                if a.outcome == .error { u.errors += 1 }
+                u.lastAt = a.at
+                if let summary = a.call.summary { u.lastSummary = summary }
+                byName[a.call.displayName] = u
+            }
+            return byName.values.sorted { ($0.count, $0.lastAt) > ($1.count, $1.lastAt) }
+        }
+    }
+}
+
+/// One tool call: what the model asked for, what came back, and the requests its tool made.
+struct ToolActivityRow: View {
+    let activity: ToolActivity
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                outcomeIcon
+                Image(systemName: activity.call.mcpServer == nil ? "wrench.and.screwdriver" : "puzzlepiece.extension")
+                    .foregroundStyle(.purple)
+                Text(activity.call.displayName).bold()
+                Spacer()
+                Text(activity.at, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
+            }
+            if let summary = activity.call.summary ?? (activity.call.input.isEmpty ? nil : activity.call.input) {
+                Text(summary).font(.caption.monospaced()).foregroundStyle(.primary.opacity(0.85))
+                    .lineLimit(expanded ? 12 : 2).textSelection(.enabled)
+            }
+            if let result = activity.result, !result.output.isEmpty {
+                Text(result.output.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.caption.monospaced())
+                    .foregroundStyle(result.isError ? TrafficColors.anomaly : .secondary)
+                    .lineLimit(expanded ? 20 : 2).textSelection(.enabled)
+                    .padding(.leading, 8)
+                    .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+            }
+            if !activity.requests.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(Array(activity.requests.prefix(4).enumerated()), id: \.offset) { _, r in
+                        Text("→ \(r.method) \(r.host)\(r.status.map { " \($0)" } ?? "")")
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(.quaternary, in: Capsule())
+                            .help("\(r.via.map { "\($0): " } ?? "")\(r.method) \(r.host)\(r.path)")
+                    }
+                    if activity.requests.count > 4 { Text("+\(activity.requests.count - 4)").foregroundStyle(.secondary) }
+                }
+                .lineLimit(1)
             }
         }
-        return byAgent.mapValues { $0.values.sorted { ($0.count, $0.lastAt) > ($1.count, $1.lastAt) } }
+        .font(.caption)
+        .contentShape(Rectangle())
+        .onTapGesture { expanded.toggle() }
+        .help(expanded ? "Click to collapse" : "Click to show more of the command and output")
+    }
+
+    @ViewBuilder private var outcomeIcon: some View {
+        switch activity.outcome {
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("Completed")
+        case .error: Image(systemName: "xmark.octagon.fill").foregroundStyle(TrafficColors.anomaly).help("The tool reported an error")
+        case .pending: Image(systemName: "circle.dotted").foregroundStyle(.secondary).help("No result seen yet")
+        }
+    }
+}
+
+/// An MCP server: where it runs, the tools it offers and how they were used.
+struct MCPServerRow: View {
+    let server: MCPServerSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "puzzlepiece.extension").foregroundStyle(.purple)
+                Text(server.name).bold()
+                if let version = server.version { Text(version).foregroundStyle(.secondary) }
+                Text(server.isRemote ? "remote" : "local")
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+                Spacer()
+                if server.errors > 0 { Text("\(server.errors) failed").foregroundStyle(TrafficColors.anomaly) }
+                Text(server.calls == 0 ? "no calls seen" : "\(server.calls) \(server.calls == 1 ? "call" : "calls")").foregroundStyle(.secondary)
+            }
+            if let endpoint = server.endpoint {
+                Text(endpoint).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            if !server.tools.isEmpty {
+                Text(server.tools.prefix(24).joined(separator: " · ") + (server.tools.count > 24 ? " · +\(server.tools.count - 24) more" : ""))
+                    .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(3)
+            }
+        }
+        .font(.caption)
     }
 }
