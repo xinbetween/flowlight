@@ -226,3 +226,40 @@ final class LLMToolCallReaderTests: XCTestCase {
         XCTAssertTrue(LLMToolCallReader.responseCalls(Data("<html>not json</html>".utf8)).isEmpty)
     }
 }
+
+final class InspectionStorageTests: XCTestCase {
+    func testNeverInspectMatchingAndPAC() {
+        XCTAssertTrue(InspectionController.matches(host: "gateway.icloud.com", patterns: ["icloud.com"]))
+        XCTAssertTrue(InspectionController.matches(host: "apple.com", patterns: ["*.apple.com"]))
+        XCTAssertFalse(InspectionController.matches(host: "notapple.com", patterns: ["apple.com"]))
+        let pac = InspectionController.pacScript(port: 8877, never: ["apple.com", "evil\"); alert(1); (\""])
+        XCTAssertTrue(pac.contains("\"apple.com\""))
+        XCTAssertTrue(pac.contains("PROXY 127.0.0.1:8877; DIRECT"))
+        XCTAssertFalse(pac.contains("alert(1)\""))
+    }
+
+    func testExchangeRoundTrip() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("x-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+        let call = ToolCall(source: .anthropic, callID: "t", name: "Bash", mcpServer: nil, input: #"{"command":"ls"}"#, summary: "ls")
+        let exchange = HTTPExchange(
+            id: nil, started: Date(), duration: 1.5, scheme: "https", host: "api.anthropic.com", port: 443, method: "POST",
+            path: "/v1/messages", status: 200, requestHeaders: [HTTPHeader(name: "Content-Type", value: "application/json")],
+            requestBody: Data("{}".utf8), requestSize: 2, requestTruncated: false, responseHeaders: [], responseBody: Data([0, 1, 2]),
+            responseSize: 3, responseTruncated: false, contentType: "text/event-stream", pid: 42, bundleID: "claude", appName: "claude",
+            agent: "claude", agentName: "Claude Code", mcpServer: nil, toolCalls: [call], note: nil)
+        try db.insertExchange(exchange)
+        let rows = try db.exchanges(since: Date().addingTimeInterval(-60))
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0].toolCalls, [call])
+        XCTAssertEqual(rows[0].agentName, "Claude Code")
+        XCTAssertEqual(rows[0].status, 200)
+        XCTAssertEqual(rows[0].url, "https://api.anthropic.com/v1/messages")
+        XCTAssertEqual(try db.exchangeBodies(id: rows[0].id!)?.response, Data([0, 1, 2]))
+        XCTAssertEqual(try db.exchanges(since: .distantPast, search: "Bash").count, 1)
+        XCTAssertEqual(try db.exchanges(since: .distantPast, search: "nothing-matches").count, 0)
+        try db.pruneExchanges(olderThan: Date().addingTimeInterval(60))
+        XCTAssertTrue(try db.exchanges(since: .distantPast).isEmpty)
+    }
+}

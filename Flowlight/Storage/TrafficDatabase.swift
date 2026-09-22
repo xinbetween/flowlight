@@ -212,6 +212,13 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE INDEX IF NOT EXISTS alerts_ts ON alerts(ts);
         CREATE TABLE IF NOT EXISTS ip_owners (ip TEXT PRIMARY KEY, asn INTEGER NOT NULL, owner TEXT NOT NULL, updated INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_policies (agent_id TEXT PRIMARY KEY, policy TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS http_exchanges (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, duration REAL NOT NULL,
+            scheme TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, status INTEGER,
+            req_headers TEXT NOT NULL, req_body BLOB, req_size INTEGER NOT NULL, req_truncated INTEGER NOT NULL,
+            resp_headers TEXT NOT NULL, resp_body BLOB, resp_size INTEGER NOT NULL, resp_truncated INTEGER NOT NULL,
+            content_type TEXT NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+            agent TEXT NOT NULL, agent_name TEXT NOT NULL, mcp_server TEXT NOT NULL, tool_calls TEXT NOT NULL, note TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS http_exchanges_ts ON http_exchanges (ts);
         """)
     }
 
@@ -584,6 +591,61 @@ final class TrafficDatabase: @unchecked Sendable {
             INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
             ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
             """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    // MARK: HTTPS inspection
+
+    func insertExchange(_ e: HTTPExchange) throws {
+        let encoder = JSONEncoder()
+        func json<T: Encodable>(_ v: T) -> String { (try? encoder.encode(v)).map { String(decoding: $0, as: UTF8.self) } ?? "[]" }
+        try conn.run("""
+            INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
+                req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
+                agent_name, mcp_server, tool_calls, note)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
+                  .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
+                  .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
+                  .text(json(e.responseHeaders)), .blob(e.responseBody), .int(Int64(e.responseSize)), .int(e.responseTruncated ? 1 : 0),
+                  .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
+                  .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? "")])
+    }
+
+    /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
+    func exchanges(since: Date, search: String = "", limit: Int = 500) throws -> [HTTPExchange] {
+        let like = "%\(search)%"
+        return try conn.query("""
+            SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
+                   resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note
+            FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?)
+            ORDER BY ts DESC LIMIT ?
+            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like),
+                  .int(Int64(limit))]) { row in
+            let decoder = JSONDecoder()
+            func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
+            let tools = row.text(22)
+            return HTTPExchange(
+                id: row.int(0), started: Date(timeIntervalSince1970: row.double(1)), duration: row.double(2), scheme: row.text(3),
+                host: row.text(4), port: Int(row.int(5)), method: row.text(6), path: row.text(7),
+                status: row.isNull(8) ? nil : Int(row.int(8)), requestHeaders: headers(9), requestBody: Data(), requestSize: Int(row.int(10)),
+                requestTruncated: row.int(11) != 0, responseHeaders: headers(12), responseBody: Data(), responseSize: Int(row.int(13)),
+                responseTruncated: row.int(14) != 0, contentType: row.text(15), pid: Int32(row.int(16)), bundleID: row.text(17),
+                appName: row.text(18), agent: row.text(19).nilIfEmpty, agentName: row.text(20).nilIfEmpty, mcpServer: row.text(21).nilIfEmpty,
+                toolCalls: tools.isEmpty ? [] : ((try? decoder.decode([ToolCall].self, from: Data(tools.utf8))) ?? []),
+                note: row.text(23).nilIfEmpty)
+        }
+    }
+
+    func exchangeBodies(id: Int64) throws -> (request: Data, response: Data)? {
+        try conn.query("SELECT req_body, resp_body FROM http_exchanges WHERE id = ?", [.int(id)]) { ($0.blob(0), $0.blob(1)) }.first
+    }
+
+    func pruneExchanges(olderThan cutoff: Date) throws {
+        try conn.run("DELETE FROM http_exchanges WHERE ts < ?", [.double(cutoff.timeIntervalSince1970)])
+    }
+
+    func deleteAllExchanges() throws {
+        try conn.run("DELETE FROM http_exchanges")
     }
 
     // MARK: IP owners

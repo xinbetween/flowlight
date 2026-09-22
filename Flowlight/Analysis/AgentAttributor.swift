@@ -105,6 +105,11 @@ final class AgentAttributor: @unchecked Sendable {
         }
     }
 
+    /// The agent a process works for, when it's a descendant of one (for connections seen by the inspection proxy).
+    func agentContext(for key: FlowKey) -> AgentContext? {
+        context(for: key, servers: mcpServers)
+    }
+
     private func context(for key: FlowKey, servers: [MCPServerConfig]) -> AgentContext? {
         lock.lock()
         if let hit = cache[key.pid], Date().timeIntervalSince(hit.at) < 30 { lock.unlock(); return hit.context }

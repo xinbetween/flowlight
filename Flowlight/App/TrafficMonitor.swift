@@ -40,6 +40,10 @@ final class TrafficMonitor: ObservableObject {
     @Published var lastError: String?
 
     let db: TrafficDatabase
+    /// Opt-in HTTPS inspection (off by default).
+    let inspection = InspectionController()
+    /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
+    @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
     private let readDB: TrafficDatabase
     let activity = ActivityMonitor()
@@ -97,6 +101,8 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         activity.start()
+        inspection.onRecorded = { [weak self] in self?.inspectionVersion += 1 }
+        inspection.attach(db: db)
         if UserDefaults.standard.bool(forKey: AnomalySettings.Keys.notifications) { Notifier.requestAuthorization() }
         startSource()
         db.async { [engine] db in

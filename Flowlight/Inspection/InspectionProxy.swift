@@ -47,8 +47,9 @@ final class InspectionProxy: @unchecked Sendable {
     private var pinned: [String: Date] = [:]
 
     weak var observer: ProxyObserver?
-    /// Decides per host whether to decrypt. Called on the proxy queue.
-    var shouldInspect: (String) -> Bool = { _ in true }
+    /// Decides whether to decrypt a CONNECT to `host` from the client at `clientPort`. May answer asynchronously
+    /// (it can look up the owning process); the proxy continues on its own queue.
+    var shouldInspect: (_ host: String, _ clientPort: UInt16, _ answer: @escaping (Bool) -> Void) -> Void = { _, _, answer in answer(true) }
     /// Served at http://127.0.0.1:<port>/proxy.pac.
     var pacScript: () -> String = { "function FindProxyForURL(url, host) { return \"DIRECT\"; }" }
     var onStateChange: (String?) -> Void = { _ in }
@@ -123,15 +124,20 @@ final class InspectionProxy: @unchecked Sendable {
         let clientPort = Self.remotePort(client)
         if head.method == "CONNECT" {
             guard let (host, port) = head.authority else { respond(client, status: "400 Bad Request"); return }
-            let inspect = shouldInspect(host) && (pinned[host].map { $0 < Date() } ?? true)
-            client.send(content: Data("HTTP/1.1 200 Connection Established\r\n\r\n".utf8), completion: .contentProcessed { [weak self] error in
-                guard let self, error == nil else { client.cancel(); return }
-                if inspect {
-                    self.bridge(client, host: host, port: port, clientPort: clientPort, early: rest)
-                } else {
-                    self.tunnel(client, host: host, port: port, clientPort: clientPort, early: rest)
+            let notPinned = pinned[host].map { $0 < Date() } ?? true
+            let proceed: (Bool) -> Void = { [weak self] inspect in
+                self?.queue.async {
+                    client.send(content: Data("HTTP/1.1 200 Connection Established\r\n\r\n".utf8), completion: .contentProcessed { error in
+                        guard let self, error == nil else { client.cancel(); return }
+                        if inspect && notPinned {
+                            self.bridge(client, host: host, port: port, clientPort: clientPort, early: rest)
+                        } else {
+                            self.tunnel(client, host: host, port: port, clientPort: clientPort, early: rest)
+                        }
+                    })
                 }
-            })
+            }
+            if notPinned { shouldInspect(host, clientPort, proceed) } else { proceed(false) }
         } else if head.target.hasPrefix("/") {
             if head.target.hasPrefix("/proxy.pac") {
                 let body = Data(pacScript().utf8)

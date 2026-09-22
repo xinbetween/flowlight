@@ -15,7 +15,7 @@ enum SQLiteError: Error, CustomStringConvertible {
 }
 
 enum SQLValue {
-    case int(Int64), double(Double), text(String), null
+    case int(Int64), double(Double), text(String), blob(Data), null
 }
 
 extension SQLValue: ExpressibleByIntegerLiteral, ExpressibleByStringLiteral {
@@ -30,6 +30,11 @@ struct SQLRow {
     func text(_ i: Int32) -> String {
         guard let c = sqlite3_column_text(stmt, i) else { return "" }
         return String(cString: c)
+    }
+    func isNull(_ i: Int32) -> Bool { sqlite3_column_type(stmt, i) == SQLITE_NULL }
+    func blob(_ i: Int32) -> Data {
+        guard let p = sqlite3_column_blob(stmt, i) else { return Data() }
+        return Data(bytes: p, count: Int(sqlite3_column_bytes(stmt, i)))
     }
 }
 
@@ -85,6 +90,7 @@ final class SQLiteConnection {
             case .int(let v): sqlite3_bind_int64(stmt, i, v)
             case .double(let v): sqlite3_bind_double(stmt, i, v)
             case .text(let v): sqlite3_bind_text(stmt, i, v, -1, SQLITE_TRANSIENT)
+            case .blob(let v): _ = v.withUnsafeBytes { sqlite3_bind_blob(stmt, i, $0.baseAddress, Int32($0.count), SQLITE_TRANSIENT) }
             case .null: sqlite3_bind_null(stmt, i)
             }
         }
