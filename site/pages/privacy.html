@@ -14,7 +14,7 @@ nav: privacy
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
-      <a href="#short">In short</a><a href="#records">What it records</a><a href="#packets">Packet capture</a><a href="#local">Read locally</a>
+      <a href="#short">In short</a><a href="#records">What it records</a><a href="#packets">Packet capture</a><a href="#local">Read locally</a><a href="#inspection">HTTPS inspection</a>
       <a href="#requests">Network requests</a><a href="#permissions">Permissions</a><a href="#retention">Retention</a>
       <a href="#website">This website</a><a href="#contact">Contact</a>
     </nav>
@@ -22,7 +22,7 @@ nav: privacy
       <h2 id="short">In short</h2>
       <ul>
         <li>Flowlight records network metadata (which app, which host, which port, how many bytes, when) in a database on your Mac.</li>
-        <li>It never records packet contents and never decrypts traffic.</li>
+        <li>It never records packet contents and never decrypts traffic, unless you turn on the optional HTTPS inspection for apps you route through it.</li>
         <li>Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.</li>
         <li>The app makes a few network requests of its own, listed below, and you can turn off each optional one.</li>
       </ul>
@@ -42,6 +42,14 @@ nav: privacy
         configuration files of the agents it supports (for example <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code> and
         <code>~/.codex/config.toml</code>). It keeps only each server's name, launch command and URL, in memory, and stores only the resulting
         labels ("via curl", "github MCP") with your traffic. Nothing from these files or command lines is sent anywhere.</p>
+
+      <h2 id="inspection">HTTPS inspection</h2>
+      <p>Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
+        <code>~/Library/Application Support/Flowlight/Inspection</code>) and runs a proxy that accepts connections only from this Mac. For apps you
+        route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
+        (Authorization, cookies, API keys) are replaced with their length before anything is stored. Apple services and password managers are
+        never decrypted. Nothing recorded is sent anywhere. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
+        Data</strong> deletes the certificate, its trust setting and every recorded request.</p>
 
       <h2 id="requests">Network requests the app makes</h2>
       <table>

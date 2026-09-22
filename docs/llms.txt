@@ -5,7 +5,7 @@
 - [Download Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)
 - [Source code](https://github.com/xinbetween/flowlight)
 - [About Flowlight](https://flowlight.xinbetween.com/about/): Why Flowlight exists, the principles it's built on, and who makes it.
-- [Flowlight documentation](https://flowlight.xinbetween.com/docs/): Install Flowlight, name your traffic, read the four views, tune the AI agent rules, and uninstall cleanly.
+- [Flowlight documentation](https://flowlight.xinbetween.com/docs/): Install Flowlight, name your traffic, read the views, tune the AI agent rules, and uninstall cleanly.
 - [Flowlight for macOS](https://flowlight.xinbetween.com/): Flowlight is a free, open-source macOS network monitor. See every app's traffic to every domain, and watch AI agents for data leaving your Mac.
 - [Flowlight privacy](https://flowlight.xinbetween.com/privacy/): What Flowlight records, where it stays, and every network request the app makes.
 - [Flowlight releases](https://flowlight.xinbetween.com/releases/): Release notes for every version of Flowlight.

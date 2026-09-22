@@ -64,6 +64,10 @@ and MCP servers did:
   CIDR ranges, or start from a preset (GitHub, npm, PyPI, Homebrew, Docker Hub…). The agent's AI providers and your
   local network are always allowed; anything else raises an alert, and each destination has a one-click **Allow**.
 
+- **Tool calls, from the model itself (optional).** Turn on [HTTPS inspection](#https-inspection-optional) and Flowlight
+  reads every tool call the model asks the agent to run (Anthropic, OpenAI, Gemini, and MCP `tools/call`), then links
+  each tool's request back to the call that caused it: *curl → paste.example ← Bash: curl -s https://paste.example/up*.
+
 These rules watch every agent:
 
 | Rule | Fires when an agent… | Severity |
@@ -76,6 +80,19 @@ These rules watch every agent:
 | **Fast learning** | new destinations are flagged after a 1-hour learning period (24 hours for other apps) | info |
 
 Every threshold is adjustable in Settings.
+
+### HTTPS inspection (optional)
+Off by default. When you turn it on, Flowlight runs a local proxy (`127.0.0.1:8877`) with a certificate authority created
+on your Mac, and decrypts the apps you route through it: headers, bodies, status and timing for every request.
+
+- **AI agents only, by default.** Other apps sent through the proxy pass through encrypted and aren't recorded.
+- **Route an agent** with *Open Inspected Terminal* (or paste the shell setup): proxy variables plus the Flowlight
+  certificate for Node, Python, curl and Git, for that shell only. Optionally trust the certificate and use the system
+  proxy for desktop apps; its PAC file falls back to a direct connection whenever Flowlight isn't running.
+- **Never decrypted:** Apple services, password managers, anything you add, and apps that pin their certificates
+  (detected and passed through automatically).
+- **Credential headers are never stored**, recordings are kept 3 days, and one button removes the certificate, its trust
+  setting and everything recorded.
 
 ### Reports at any zoom
 - Second, minute, hour, day, week, month and year views. Click a bar to zoom in.
@@ -94,7 +111,8 @@ answers and TLS ClientHellos (a kernel filter drops everything else), and **pack
 Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
 Team Cymru's DNS service, and you can turn it off in Capture. The daily update check asks GitHub for the latest release, and you can switch it off in
 Settings. To attribute tools and MCP servers, Flowlight reads process command lines and your agents' MCP config files
-on your Mac; none of it leaves your Mac.
+on your Mac; none of it leaves your Mac. HTTPS inspection is off unless you turn it on, and what it records stays in the
+same local database.
 
 <table>
 <tr>
@@ -171,7 +189,9 @@ so a year of history stays fast.
 - **Per process, not per thread or tool call.** macOS attributes sockets to processes, so Flowlight can say *curl,
   started by Claude Code* or *the github MCP server*, not which individual tool call inside a long-running server opened it.
 - **Allowlists alert; they don't block.** Blocking needs the Network Extension engine and is on the roadmap.
-- **Encrypted payloads stay encrypted.** Flowlight reads metadata (hostnames, ports, byte counts). It never decrypts traffic.
+- **Encrypted payloads stay encrypted by default.** Flowlight reads metadata (hostnames, ports, byte counts). Decryption
+  happens only with HTTPS inspection turned on, only for apps that use its proxy, and never for apps that pin certificates.
+  Inspection speaks HTTP/1.1 to both sides.
 - **Hostname capture follows the primary interface.** Traffic confined to another interface or tunnel may lack names.
 - **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
 - **Release builds aren't notarized yet.** The first launch may need right-click › Open.
@@ -183,10 +203,9 @@ so a year of history stays fast.
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
 - [ ] Block allowlist violations in Network Extension mode
 - [ ] Export to OpenTelemetry / SIEM
-- [ ] Full HTTPS request inspection, as a separate opt-in mode. Seeing whole requests and responses means running a
-  local TLS-intercepting proxy with its own trusted certificate, and apps that pin certificates would still refuse it.
-  That's a different trust model, so Flowlight will stay focused on connection metadata and traffic analytics by default,
-  and only inspect traffic when you explicitly turn it on.
+- [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority; metadata
+  and analytics stay the default)
+- [x] Tool calls read from LLM responses, linked to the requests their tools make
 
 ## Contributing
 
@@ -201,8 +220,9 @@ Flowlight/
   Enrichment/        BPF packet capture, network-owner lookup
   Storage/           SQLite store, rollups, queries
   Analysis/          anomaly engine, AI agent catalog + rules
-  UI/                Live · AI Agents · Reports · Alerts · Capture
-FlowlightTests/      57 unit tests: parsers, BPF filter, rollups, charts, agents, MCP attribution, allowlists
+  Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
+  UI/                Live · AI Agents · Reports · Alerts · Inspect · Capture
+FlowlightTests/      80 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
 docs/                website (GitHub Pages) and developer guide
 ```
 
