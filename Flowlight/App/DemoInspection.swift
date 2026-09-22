@@ -55,8 +55,9 @@ extension DemoData {
             """
         }
         func toolUse(_ id: String, _ name: String, _ input: String, text: String) -> String {
-            let escaped = input.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-            let half = escaped.index(escaped.startIndex, offsetBy: escaped.count / 2)
+            // Split the raw JSON, then escape each half, as the API does (it never cuts through an escape).
+            let esc = { (s: Substring) in s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+            let mid = input.index(input.startIndex, offsetBy: input.count / 2)
             return """
             event: message_start
             data: {"type":"message_start","message":{"id":"msg_demo_\(id)","type":"message","role":"assistant","model":"claude-sonnet-demo","content":[],"usage":{"input_tokens":1840,"output_tokens":1}}}
@@ -74,10 +75,10 @@ extension DemoData {
             data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_demo_\(id)","name":"\(name)","input":{}}}
 
             event: content_block_delta
-            data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\(escaped[..<half])"}}
+            data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\(esc(input[..<mid]))"}}
 
             event: content_block_delta
-            data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\(escaped[half...])"}}
+            data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\(esc(input[mid...]))"}}
 
             event: content_block_stop
             data: {"type":"content_block_stop","index":1}
@@ -99,7 +100,7 @@ extension DemoData {
         }
         let sse = "text/event-stream; charset=utf-8"
         func llm(_ offset: TimeInterval, _ body: String, _ response: String) throws {
-            try record(offset, duration: Double.random(in: 1.4...3.2), pid: claudePID, bundle: "claude", app: "claude",
+            try record(offset, duration: 2.2, pid: claudePID, bundle: "claude", app: "claude",
                        host: "api.anthropic.com", path: "/v1/messages?beta=true", request: body, response: response,
                        contentType: sse, requestHeaders: llmHeaders)
         }
@@ -114,7 +115,7 @@ extension DemoData {
                 toolUse("02", "mcp__docs__search_docs", search, text: "Let me check the release checklist in the team docs."))
         history.append(assistant("02", "mcp__docs__search_docs", search))
         let docsHost = "mcp.docs.example", docsPath = "/mcp"
-        try record(2, duration: 0.3, pid: claudePID, bundle: "claude", app: "claude", host: docsHost, path: docsPath,
+        try record(3, duration: 0.3, pid: claudePID, bundle: "claude", app: "claude", host: docsHost, path: docsPath,
                    request: #"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"claude-code","version":"2.1"}}}"#,
                    response: "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"docs\",\"version\":\"1.4.2\"},\"capabilities\":{\"tools\":{}}}}\n\n",
                    contentType: "text/event-stream")
@@ -139,7 +140,7 @@ extension DemoData {
         try llm(9, messages(result("04", "added 128 packages, and audited 129 packages in 6s\nfound 0 vulnerabilities")),
                 toolUse("05", "Bash", upload, text: "Uploading the summary so it can be shared."))
         history.append(assistant("05", "Bash", upload))
-        try record(1.2, duration: 0.8, pid: curlPID, bundle: "curl", app: "curl", host: "paste.example", path: "/up",
+        try record(3, duration: 0.8, pid: curlPID, bundle: "curl", app: "curl", host: "paste.example", path: "/up",
                    request: "--demo-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"notes.md\"\r\n\r\n# Notes\n- TODO: rotate the staging keys\n--demo-boundary--\r\n",
                    response: #"{"url":"https://paste.example/p/7f3k2","expires":"never","size":1184}"#,
                    requestHeaders: [HTTPHeader(name: "Host", value: "paste.example"), HTTPHeader(name: "User-Agent", value: "curl/8.7.1"),

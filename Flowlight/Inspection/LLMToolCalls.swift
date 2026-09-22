@@ -191,7 +191,7 @@ enum LLMToolCallReader {
 
     static func summary(of input: Any?) -> String? {
         guard let object = input as? [String: Any] else { return (input as? String).map { String($0.prefix(300)) } }
-        for key in ["command", "cmd", "url", "file_path", "path", "query", "pattern", "q", "prompt"] {
+        for key in ["command", "cmd", "url", "file_path", "path", "query", "pattern", "q", "prompt", "title"] {
             if let value = object[key] as? String, !value.isEmpty { return String(value.prefix(300)) }
             if let value = object[key] as? [String], !value.isEmpty { return String(value.joined(separator: " ").prefix(300)) }
         }

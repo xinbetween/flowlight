@@ -126,6 +126,12 @@ same local database.
 <td align="center"><sub>Reports: every granularity, every grouping</sub></td>
 <td align="center"><sub>Alerts: explainable, per app</sub></td>
 </tr>
+<tr>
+<td colspan="2"><img src="docs/assets/screenshots/inspect.png" alt="Inspect view: decrypted Claude Code requests, and curl's upload to paste.example traced to the Bash tool call that ran it"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><sub>Inspect (optional): every request an agent and its tools made, and the tool call behind it</sub></td>
+</tr>
 </table>
 
 ## Install
@@ -139,7 +145,7 @@ same local database.
    for your password once). Network-owner lookups are on by default and can be turned off there or in Capture.
 
 > **Try it without your own data:** `open /Applications/Flowlight.app --args -FLDemo YES` launches with 90 days
-> of synthetic traffic. That's what the screenshots show.
+> of synthetic traffic, including an inspected Claude Code session. That's what the screenshots show.
 
 ### Build from source
 

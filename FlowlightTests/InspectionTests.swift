@@ -500,6 +500,8 @@ final class DemoInspectionTests: XCTestCase {
         XCTAssertEqual(activity.map(\.call.displayName).sorted(),
                        ["Bash", "Bash", "Bash", "Read", "docs › search_docs", "github › create_issue"])
         XCTAssertTrue(activity.allSatisfy { $0.result != nil }, "every call has its result")
+        XCTAssertTrue(activity.allSatisfy { $0.call.input.count > 2 }, "streamed inputs are rebuilt")
+        XCTAssertEqual(activity.first { $0.call.name == "create_issue" }?.call.summary, "Pre-launch TODOs")
         XCTAssertEqual(activity.filter { $0.outcome == .error }.map { $0.call.summary }, ["git push origin main"])
         let upload = activity.first { $0.call.summary?.contains("paste.example") == true }
         XCTAssertEqual(upload?.requests.map(\.host), ["paste.example"])

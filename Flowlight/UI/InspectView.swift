@@ -37,8 +37,8 @@ private struct InspectContent: View {
                     .frame(maxHeight: .infinity)
                 } else {
                     HSplitView {
-                        table.frame(minWidth: 460, maxHeight: .infinity)
-                        detail.padding(.leading, 12).frame(minWidth: 360, idealWidth: 460, maxHeight: .infinity)
+                        table.frame(minWidth: 520, maxHeight: .infinity)
+                        detail.padding(.leading, 12).frame(minWidth: 340, idealWidth: 440, maxWidth: 480, maxHeight: .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -99,7 +99,7 @@ private struct InspectContent: View {
             TableColumn("Time") { e in
                 Text(e.started, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
             }
-            .width(min: 78, ideal: 84)
+            .width(min: 70, ideal: 76)
             TableColumn("App") { e in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(e.agentName ?? e.appName).lineLimit(1)
@@ -108,7 +108,7 @@ private struct InspectContent: View {
                     }
                 }
             }
-            .width(min: 90, ideal: 130)
+            .width(min: 80, ideal: 104)
             TableColumn("Request") { e in
                 VStack(alignment: .leading, spacing: 1) {
                     if e.note != nil {
@@ -119,16 +119,16 @@ private struct InspectContent: View {
                     }
                 }
             }
-            .width(min: 180, ideal: 320)
+            .width(min: 150, ideal: 220)
             TableColumn("Status") { e in
                 Text(e.status.map(String.init) ?? "–").monospacedDigit()
                     .foregroundStyle((e.status ?? 0) >= 400 ? .red : .primary)
             }
-            .width(min: 44, ideal: 50)
+            .width(min: 40, ideal: 46)
             TableColumn("Size") { e in
                 Text(ByteFormat.string(Int64(e.requestSize + e.responseSize))).monospacedDigit().foregroundStyle(.secondary)
             }
-            .width(min: 76, ideal: 84)
+            .width(min: 60, ideal: 68)
             TableColumn("Tool calls") { e in
                 if !e.toolCalls.isEmpty {
                     Text(e.toolCalls.map(\.displayName).joined(separator: ", ")).lineLimit(1).foregroundStyle(.purple)
@@ -137,7 +137,7 @@ private struct InspectContent: View {
                         .help("Made by the tool the model asked for: \(link.call.summary ?? link.call.input)")
                 }
             }
-            .width(min: 80, ideal: 160)
+            .width(min: 80, ideal: 150)
         }
     }
 

