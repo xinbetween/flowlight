@@ -182,6 +182,7 @@ private struct InspectionSetup: View {
                     Text("With AI agents only, other apps sent through the proxy are passed through encrypted and not recorded.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(6)
             }
 
