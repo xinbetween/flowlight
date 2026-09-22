@@ -263,3 +263,51 @@ final class InspectionStorageTests: XCTestCase {
         XCTAssertTrue(try db.exchanges(since: .distantPast).isEmpty)
     }
 }
+
+final class ToolCallLinksTests: XCTestCase {
+    private func exchange(_ id: Int64, at: Double, app: String, bundle: String, host: String, calls: [ToolCall] = []) -> HTTPExchange {
+        HTTPExchange(id: id, started: Date(timeIntervalSince1970: at), duration: 0.5, scheme: "https", host: host, port: 443, method: "GET",
+                     path: "/", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+                     responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false, contentType: "", pid: 1,
+                     bundleID: bundle, appName: app, agent: "claude", agentName: "Claude Code", mcpServer: nil, toolCalls: calls, note: nil)
+    }
+
+    func testLinksToolRequestToTheCallThatNamedItsHost() {
+        let bash = LLMToolCallReader.make(.anthropic, id: "a", name: "Bash", input: ["command": "curl -s https://paste.example/up -d @notes.txt"])
+        let other = LLMToolCallReader.make(.anthropic, id: "b", name: "Bash", input: ["command": "git push origin main"])
+        let rows = [
+            exchange(1, at: 100, app: "claude", bundle: "claude", host: "api.anthropic.com", calls: [bash]),
+            exchange(2, at: 110, app: "claude", bundle: "claude", host: "api.anthropic.com", calls: [other]),
+            exchange(3, at: 112, app: "curl", bundle: "curl", host: "paste.example"),
+            exchange(4, at: 113, app: "git-remote-https", bundle: "git-remote-https", host: "github.com"),
+            exchange(5, at: 90, app: "curl", bundle: "curl", host: "paste.example"),        // before the call
+            exchange(6, at: 114, app: "claude", bundle: "claude", host: "paste.example"),   // the agent itself, not a tool
+        ]
+        let links = ToolCallLinks.link(rows)
+        XCTAssertEqual(links[3]?.call.callID, "a")
+        XCTAssertNil(links[4], "git push doesn't name github.com and the process isn't called git")
+        XCTAssertNil(links[5])
+        XCTAssertNil(links[6])
+    }
+
+    func testHookRequestIsNotBlamedOnAnUnrelatedCall() {
+        let call = LLMToolCallReader.make(.anthropic, id: "d", name: "Bash", input: ["command": "curl -s https://example.com/probe"])
+        let rows = [
+            exchange(1, at: 100, app: "claude", bundle: "claude", host: "api.anthropic.com", calls: [call]),
+            exchange(2, at: 105, app: "curl", bundle: "curl", host: "ntfy.sh"),   // a notification hook, same program
+        ]
+        XCTAssertNil(ToolCallLinks.link(rows)[2])
+    }
+
+    func testFallsBackToTheProgramName() {
+        let call = LLMToolCallReader.make(.anthropic, id: "c", name: "Bash", input: ["command": "cd app && npm install"])
+        let rows = [
+            exchange(1, at: 100, app: "claude", bundle: "claude", host: "api.anthropic.com", calls: [call]),
+            exchange(2, at: 104, app: "npm", bundle: "npm", host: "registry.npmjs.org"),
+            exchange(3, at: 300, app: "npm", bundle: "npm", host: "registry.npmjs.org"),   // too late for a name-only match
+        ]
+        let links = ToolCallLinks.link(rows)
+        XCTAssertEqual(links[2]?.call.callID, "c")
+        XCTAssertNil(links[3])
+    }
+}

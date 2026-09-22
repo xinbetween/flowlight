@@ -38,6 +38,14 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     }
 }
 
+extension HTTPExchange {
+    /// The tool or MCP server that made the request for an agent ("curl", "github MCP"), or nil when the agent itself did.
+    var via: String? {
+        guard let agent, agent != bundleID, !appName.isEmpty else { return nil }
+        return mcpServer.map { "\($0) MCP" } ?? appName
+    }
+}
+
 extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }

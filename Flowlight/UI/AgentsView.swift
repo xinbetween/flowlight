@@ -22,6 +22,7 @@ struct AgentsView: View {
     @State private var agents: [AgentSummary] = []
     @State private var agentAlerts = 0
     @State private var policies: [String: AgentPolicy] = [:]
+    @State private var toolUsage: [String: [ToolUsage]] = [:]
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
@@ -51,7 +52,7 @@ struct AgentsView: View {
                 // Fit the table to its rows so the selected agent's detail gets the rest of the window.
                 table.frame(minHeight: 180, maxHeight: max(180, CGFloat(agents.count) * 38 + 44))
                 if let selected {
-                    AgentDetail(agent: selected, window: window,
+                    AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
@@ -128,11 +129,13 @@ struct AgentsView: View {
 
     private func load() async {
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
-        let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy]) in
-            (try db.breakdown(g, from: from, to: to), try db.alerts(limit: 2000).filter { $0.timestamp >= from }, try db.loadPolicies())
+        let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange]) in
+            (try db.breakdown(g, from: from, to: to), try db.alerts(limit: 2000).filter { $0.timestamp >= from }, try db.loadPolicies(),
+             try db.exchanges(since: from, limit: 5000))
         }
-        guard let (rows, alerts, loadedPolicies) = result else { return }
+        guard let (rows, alerts, loadedPolicies, exchanges) = result else { return }
         policies = loadedPolicies
+        toolUsage = ToolUsage.build(exchanges)
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -290,6 +293,7 @@ struct AgentDetail: View {
     @EnvironmentObject var nav: AppNavigation
     var agent: AgentSummary
     var window: AgentWindow
+    var toolCalls: [ToolUsage] = []
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
 
@@ -297,6 +301,27 @@ struct AgentDetail: View {
         GroupBox {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
+                    if !toolCalls.isEmpty {
+                        Text("Tool calls (from inspected responses)").font(.caption.bold()).foregroundStyle(.secondary)
+                        ForEach(toolCalls.prefix(6)) { usage in
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack {
+                                    Image(systemName: usage.isMCP ? "puzzlepiece.extension" : "wrench.and.screwdriver").foregroundStyle(.purple)
+                                        .frame(width: 16)
+                                    Text(usage.name).lineLimit(1)
+                                    Spacer()
+                                    Text("×\(usage.count)").monospacedDigit().foregroundStyle(.secondary)
+                                }
+                                if let last = usage.lastSummary {
+                                    Text(last).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                        .padding(.leading, 22)
+                                }
+                            }
+                            .font(.caption)
+                            .help(usage.lastSummary.map { "Most recent: \($0)" } ?? usage.name)
+                        }
+                        Divider().padding(.vertical, 2)
+                    }
                     if !agent.tools.isEmpty {
                         Text("Tools & MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
                         ForEach(agent.tools.prefix(8)) { tool in
@@ -390,5 +415,32 @@ struct AgentDetail: View {
             Text("↑ \(ByteFormat.string(d.counters.bytesOut))  ↓ \(ByteFormat.string(d.counters.bytesIn))").monospacedDigit().foregroundStyle(.secondary)
         }
         .font(.caption)
+    }
+}
+
+/// How often the model asked an agent to run each tool, from inspected LLM responses.
+struct ToolUsage: Identifiable, Equatable {
+    var name: String
+    var isMCP: Bool
+    var count: Int
+    var lastSummary: String?
+    var lastAt: Date
+    var id: String { name }
+
+    /// Agent id → its tools, most used first.
+    static func build(_ exchanges: [HTTPExchange]) -> [String: [ToolUsage]] {
+        var byAgent: [String: [String: ToolUsage]] = [:]
+        for exchange in exchanges.sorted(by: { $0.started < $1.started }) {
+            guard let agent = exchange.agent else { continue }
+            for call in exchange.toolCalls {
+                var usage = byAgent[agent, default: [:]][call.displayName]
+                    ?? ToolUsage(name: call.displayName, isMCP: call.mcpServer != nil, count: 0, lastSummary: nil, lastAt: exchange.started)
+                usage.count += 1
+                usage.lastAt = exchange.started
+                if let summary = call.summary { usage.lastSummary = summary }
+                byAgent[agent, default: [:]][call.displayName] = usage
+            }
+        }
+        return byAgent.mapValues { $0.values.sorted { ($0.count, $0.lastAt) > ($1.count, $1.lastAt) } }
     }
 }
