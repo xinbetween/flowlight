@@ -58,31 +58,40 @@ extension String {
 enum SocketOwner {
     /// The pid with a TCP socket whose local port is `clientPort` and remote port is `proxyPort`. Scans the current
     /// user's processes with libproc; typically a few milliseconds.
+    /// True when the connection comes from this process, i.e. the proxy is being asked to proxy itself.
+    static func isOwnConnection(clientPort: UInt16, proxyPort: UInt16) -> Bool {
+        owns(pid: getpid(), clientPort: clientPort, proxyPort: proxyPort)
+    }
+
     static func pid(clientPort: UInt16, proxyPort: UInt16) -> Int32? {
         let count = proc_listallpids(nil, 0)
         guard count > 0 else { return nil }
         var pids = [Int32](repeating: 0, count: Int(count) + 64)
         let filled = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<Int32>.size))
         let me = getpid()
-        for pid in pids.prefix(Int(max(0, filled))) where pid > 0 && pid != me {
-            let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
-            guard bytes > 0 else { continue }
-            let n = Int(bytes) / MemoryLayout<proc_fdinfo>.stride
-            var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: n)
-            let got = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, bytes)
-            guard got > 0 else { continue }
-            for fd in fds.prefix(Int(got) / MemoryLayout<proc_fdinfo>.stride) where fd.proc_fdtype == PROX_FDTYPE_SOCKET {
-                var info = socket_fdinfo()
-                let size = Int32(MemoryLayout<socket_fdinfo>.size)
-                guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &info, size) == size,
-                      info.psi.soi_kind == SOCKINFO_TCP else { continue }
-                let ini = info.psi.soi_proto.pri_tcp.tcpsi_ini
-                let local = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_lport))
-                let remote = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_fport))
-                if local == clientPort && remote == proxyPort { return pid }
-            }
+        return pids.prefix(Int(max(0, filled))).first { pid in
+            pid > 0 && pid != me && owns(pid: pid, clientPort: clientPort, proxyPort: proxyPort)
         }
-        return nil
+    }
+
+    private static func owns(pid: Int32, clientPort: UInt16, proxyPort: UInt16) -> Bool {
+        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard bytes > 0 else { return false }
+        let n = Int(bytes) / MemoryLayout<proc_fdinfo>.stride
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: n)
+        let got = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, bytes)
+        guard got > 0 else { return false }
+        for fd in fds.prefix(Int(got) / MemoryLayout<proc_fdinfo>.stride) where fd.proc_fdtype == PROX_FDTYPE_SOCKET {
+            var info = socket_fdinfo()
+            let size = Int32(MemoryLayout<socket_fdinfo>.size)
+            guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &info, size) == size,
+                  info.psi.soi_kind == SOCKINFO_TCP else { continue }
+            let ini = info.psi.soi_proto.pri_tcp.tcpsi_ini
+            let local = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_lport))
+            let remote = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_fport))
+            if local == clientPort && remote == proxyPort { return true }
+        }
+        return false
     }
 }
 

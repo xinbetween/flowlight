@@ -124,6 +124,11 @@ final class InspectionProxy: @unchecked Sendable {
 
     private func route(_ client: NWConnection, head: ProxyRequestHead, rest: Data) {
         let clientPort = Self.remotePort(client)
+        // Never proxy our own connections (a system proxy pointing at Flowlight would otherwise loop).
+        if !head.target.hasPrefix("/"), let port, SocketOwner.isOwnConnection(clientPort: clientPort, proxyPort: port) {
+            respond(client, status: "508 Loop Detected")
+            return
+        }
         if head.method == "CONNECT" {
             guard let (host, port) = head.authority else { respond(client, status: "400 Bad Request"); return }
             let notPinned = pinned[host].map { $0 < Date() } ?? true
@@ -153,7 +158,7 @@ final class InspectionProxy: @unchecked Sendable {
             let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "http")
             var request = head.originForm()
             request.append(rest)
-            let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: .tcp)
+            let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: Self.direct(.tcp))
             relay(client: client, upstream: upstream, flow: flow, firstClientBytes: request)
         } else {
             respond(client, status: "400 Bad Request")
@@ -172,7 +177,7 @@ final class InspectionProxy: @unchecked Sendable {
 
     private func tunnel(_ client: NWConnection, host: String, port: Int, clientPort: UInt16, early: Data) {
         let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: false, scheme: "https")
-        let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: .tcp)
+        let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: Self.direct(.tcp))
         observer?.flowStarted(flow)
         upstream.stateUpdateHandler = { [weak self] state in
             switch state {
@@ -206,7 +211,7 @@ final class InspectionProxy: @unchecked Sendable {
                 self.tunnel(client, host: host, port: port, clientPort: clientPort, early: early)
                 return
             }
-            let bridge = NWConnection(host: "127.0.0.1", port: .init(integerLiteral: listenerPort), using: .tcp)
+            let bridge = NWConnection(host: "127.0.0.1", port: .init(integerLiteral: listenerPort), using: Self.direct(.tcp))
             let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "https")
             bridge.stateUpdateHandler = { state in
                 switch state {
@@ -277,7 +282,7 @@ final class InspectionProxy: @unchecked Sendable {
                 sec_protocol_options_set_tls_server_name(tls.securityProtocolOptions, flow.host)
                 sec_protocol_options_add_tls_application_protocol(tls.securityProtocolOptions, "http/1.1")
                 let upstream = NWConnection(host: .init(flow.host), port: .init(integerLiteral: UInt16(clamping: flow.port)),
-                                            using: NWParameters(tls: tls, tcp: .init()))
+                                            using: Self.direct(NWParameters(tls: tls, tcp: .init())))
                 self.relay(client: inner, upstream: upstream, flow: flow, firstClientBytes: nil)
             case .failed(let error):
                 // Most often the app pins its certificates or doesn't trust the Flowlight CA. Stop decrypting this
@@ -354,6 +359,14 @@ final class InspectionProxy: @unchecked Sendable {
     static func remotePort(_ conn: NWConnection) -> UInt16 {
         if case .hostPort(_, let port) = conn.endpoint { return port.rawValue }
         return 0
+    }
+
+    /// The proxy's own connections must never go through a proxy. With Flowlight set as the system proxy, macOS would
+    /// otherwise route them back into Flowlight, looping each request through itself dozens of times.
+    static func direct(_ parameters: NWParameters) -> NWParameters {
+        let copy = parameters.copy()
+        copy.preferNoProxies = true
+        return copy
     }
 
     static func remoteIP(_ conn: NWConnection) -> String? {
