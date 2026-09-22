@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.4, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -263,7 +263,7 @@ Free · open source · macOS 15+
 
  Star on GitHub
 
- v0.1.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.1.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -717,8 +717,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.1.3
+ 0.1.4
 September 22, 2026Latest
+
+ HTTPS inspection (optional, off by default). A local proxy with a certificate authority created on your Mac decrypts
+ the apps you route through it: AI agents and their tools by default. See every request and response in the new Inspect view.
+ Credential headers are never stored, Apple services and password managers are never decrypted, and apps that pin certificates pass
+ through untouched.
+
+ Tool calls from the model's own responses. Flowlight reads the tool calls a model asks an agent to run (Anthropic,
+ OpenAI, Gemini, MCP tools/call) and links each tool's request back to the call that caused it. AI Agents lists each
+ agent's tools with counts and the latest command.
+
+ Inspected Terminal. One click opens a shell whose agents (Claude Code, Codex, Gemini CLI, Aider) and tools go through
+ Flowlight, without trusting anything system-wide.
+
+ Downloads and checksums →
+
+ 0.1.3
+September 22, 2026
 
  Quit & Install. Updates download and verify first, then ask before Flowlight quits: Quit & Install
  replaces the app and reopens it, Install Later keeps you working. You no longer have to quit and drag the new version in yourself.
