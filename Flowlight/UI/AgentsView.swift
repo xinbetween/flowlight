@@ -48,7 +48,8 @@ struct AgentsView: View {
                 }
                 .frame(maxHeight: .infinity)
             } else {
-                table.frame(minHeight: 180)
+                // Fit the table to its rows so the selected agent's detail gets the rest of the window.
+                table.frame(minHeight: 180, maxHeight: max(180, CGFloat(agents.count) * 38 + 44))
                 if let selected {
                     AgentDetail(agent: selected, window: window,
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
@@ -248,7 +249,7 @@ struct AllowlistEditor: View {
                         }
                     }
                 }
-                .frame(maxHeight: 90)
+                .frame(minHeight: min(CGFloat(policy.patterns.count) * 18, 72), maxHeight: 90)
             }
             HStack(spacing: 4) {
                 TextField("github.com, 10.0.0.0/8…", text: $draft)

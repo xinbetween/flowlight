@@ -280,6 +280,15 @@ nav: home
     </div>
   </section>
 
+  <section class="band" id="agent-detail" aria-label="Agent detail screenshot">
+    <div class="wrap">
+      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/agent-detail.png" width="1600" height="588" loading="lazy"
+        alt="Claude Code's detail in Flowlight: git, the github MCP server and curl listed under Tools and MCP servers, an allowlist of github.com, npmjs.org and githubusercontent.com, and two destinations marked Not allowed with an Allow button"></div>
+        <figcaption><b>One agent, all its tools.</b> Traffic from the git, curl and MCP servers Claude Code started is counted as Claude Code's,
+          labelled <em>via curl</em> or <em>via github MCP</em>. With an allowlist of GitHub and npm, the SMTP relay and the paste site stand out as <em>Not allowed</em>.</figcaption></figure>
+    </div>
+  </section>
+
   <section class="band" aria-label="More screenshots">
     <div class="wrap screens">
       <figure><div class="frame"><img src="{{root}}assets/screenshots/reports.png" width="1600" height="1075" loading="lazy"
@@ -321,7 +330,7 @@ open Flowlight.app --args -FLDemo YES</pre>
       <div class="section-head"><p class="eyebrow">FAQ</p><h2>Questions</h2></div>
       <div class="faq">
         <details><summary>Does Flowlight block traffic?</summary>
-          <p>No. It observes and alerts. Per-agent allowlists and block rules are on the roadmap for the Network Extension build.</p></details>
+          <p>No. It observes and alerts, including when an agent leaves its allowlist. Blocking allowlist violations is on the roadmap for the Network Extension build.</p></details>
         <details><summary>Can it read my HTTPS traffic?</summary>
           <p>No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
             DNS answers that map names to addresses. Contents stay encrypted.</p></details>

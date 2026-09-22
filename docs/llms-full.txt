@@ -486,6 +486,9 @@ e.g. Wireshark
 
  Opt-in lookupsNaming who owns an address is off by default. The daily update check only asks GitHub for the latest version, and can be turned off.
 
+ One agent, all its tools. Traffic from the git, curl and MCP servers Claude Code started is counted as Claude Code's,
+ labelled via curl or via github MCP. With an allowlist of GitHub and npm, the SMTP relay and the paste site stand out as Not allowed.
+
  Reports. Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.
 
  Alerts. Each one names the app, the destination and the number that tripped it.
@@ -516,7 +519,7 @@ Questions
 
  Does Flowlight block traffic?
 
- No. It observes and alerts. Per-agent allowlists and block rules are on the roadmap for the Network Extension build.
+ No. It observes and alerts, including when an agent leaves its allowlist. Blocking allowlist violations is on the roadmap for the Network Extension build.
 
  Can it read my HTTPS traffic?
 

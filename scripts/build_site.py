@@ -9,7 +9,7 @@ Placeholders: {{root}} (relative path to the site root), {{repo}}, {{dmg}}, {{ve
 {{current:<nav>}} (aria-current on the active nav link). Also writes sitemap.xml, robots.txt,
 llms.txt, llms-full.txt and 404.html, and build/site-preview/index.html (self-contained home page).
 """
-import os, re, sys, html, datetime, pathlib
+import os, re, sys, html, datetime, pathlib, hashlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE, OUT = ROOT / "site", ROOT / "docs"
@@ -31,7 +31,11 @@ def fill(text, root, nav):
     text = re.sub(r"\{\{current:(\w+)\}\}", lambda m: ' aria-current="page"' if m.group(1) == nav else "", text)
     for k, v in {"root": root, "repo": REPO, "dmg": DMG, "version": VERSION, "year": YEAR}.items():
         text = text.replace("{{%s}}" % k, v)
-    return text
+    # Screenshots keep their names across updates; a content hash makes caches fetch the new image.
+    return re.sub(r'(assets/screenshots/[\w-]+\.png)"', lambda m: f'{m.group(1)}?v={asset_hash(m.group(1))}"', text)
+
+def asset_hash(rel):
+    return hashlib.sha256((OUT / rel).read_bytes()).hexdigest()[:8]
 
 def document(meta, body, root, css_href, inline_css=None):
     title, desc, path = meta["title"], meta["description"], meta["path"]

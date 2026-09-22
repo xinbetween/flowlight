@@ -153,6 +153,8 @@
   .screens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   .screens figure { margin: 0; display: grid; gap: 10px; }
   .screens figcaption { color: var(--muted); font-size: 14px; }
+  .detail-shot { margin: 0; display: grid; gap: 12px; }
+  .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 90ch; }
 
   /* Install */
   .install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
