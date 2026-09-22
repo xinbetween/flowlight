@@ -205,7 +205,8 @@ final class TrafficMonitor: ObservableObject {
 
     nonisolated func ingest(_ incoming: [TrafficBatch]) {
         // Tools and MCP servers an agent started are attributed to that agent (demo data carries its own).
-        let batches = DemoData.isEnabled ? incoming : AgentAttributor.shared.enrich(incoming)
+        // Traffic through the HTTPS inspection proxy belongs to the app that sent it, not to Flowlight.
+        let batches = DemoData.isEnabled ? incoming : AgentAttributor.shared.enrich(ProxyAttribution.shared.rewrite(incoming))
         // Anything without a hostname gets at least its network owner.
         for batch in batches {
             for record in batch.records where record.key.domain.isEmpty {

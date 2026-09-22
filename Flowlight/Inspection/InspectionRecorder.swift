@@ -104,6 +104,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         var pid: Int32 = 0
         var bundleID = ""
         var appName = "Unknown app"
+        var appPath = ""
         var agent: String?
         var agentName: String?
         var mcpServer: String?
@@ -135,6 +136,16 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         lookupQueue.async { [weak self] in
             state.owner = self?.owner(clientPort: flow.clientPort, proxyPort: port)
             state.ownerReady.signal()
+        }
+    }
+
+    func flow(_ flow: ProxyFlow, connectedTo remoteIP: String) {
+        guard let state = flows[flow.id] else { return }
+        lookupQueue.async {
+            // The lookup queue is serial, so the owner for this flow is already known.
+            if let owner = state.owner, owner.pid > 0 {
+                ProxyAttribution.shared.record(host: flow.host, ip: remoteIP, owner: owner)
+            }
         }
     }
 
@@ -191,7 +202,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     private func lookupOwner(clientPort: UInt16, proxyPort: UInt16?) -> Owner {
         guard let proxyPort, let pid = SocketOwner.pid(clientPort: clientPort, proxyPort: proxyPort) else { return Owner() }
         let info = processes.info(pid: pid)
-        var owner = Owner(pid: pid, bundleID: info.bundleID, appName: info.name)
+        var owner = Owner(pid: pid, bundleID: info.bundleID, appName: info.name, appPath: info.path)
         let key = FlowKey(pid: pid, bundleID: info.bundleID, appName: info.name, appPath: info.path, remoteIP: "", domain: "",
                           port: 0, transport: .tcp, appProtocol: "")
         if let context = AgentAttributor.shared.agentContext(for: key) {
@@ -206,5 +217,60 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
             owner.agentName = AgentRegistry.shared.name(bundleID: info.bundleID, appName: info.name) ?? info.name
         }
         return owner
+    }
+}
+
+/// Gives traffic that went through the inspection proxy back to the app that made it.
+///
+/// The capture engine sees the proxy's upstream connections as Flowlight's own, and the hop from the app to the proxy
+/// as loopback traffic. `rewrite` relabels the first with the app (and agent) behind each proxied host, and drops the
+/// second so nothing is counted twice.
+final class ProxyAttribution: @unchecked Sendable {
+    static let shared = ProxyAttribution()
+    private let lock = NSLock()
+    private var byHost: [String: (owner: InspectionRecorder.Owner, at: Date)] = [:]
+    private var byIP: [String: (owner: InspectionRecorder.Owner, at: Date)] = [:]
+    private let selfPID = getpid()
+    var proxyPort: UInt16?
+
+    func record(host: String, ip: String, owner: InspectionRecorder.Owner) {
+        lock.lock(); defer { lock.unlock() }
+        if byHost.count > 5000 { byHost.removeAll(); byIP.removeAll() }
+        byHost[host.lowercased()] = (owner, Date())
+        byIP[ip] = (owner, Date())
+    }
+
+    func rewrite(_ batches: [TrafficBatch]) -> [TrafficBatch] {
+        guard let proxyPort else { return batches }
+        return batches.map { batch in
+            var batch = batch
+            batch.records = batch.records.compactMap { record in
+                var record = record
+                let k = record.key
+                let loopback = k.remoteIP.hasPrefix("127.") || k.remoteIP == "::1"
+                // App → proxy, and the proxy's internal loopback legs: already counted on the upstream side.
+                if loopback && (k.port == proxyPort || k.pid == selfPID) { return nil }
+                guard k.pid == selfPID, let owner = owner(domain: k.domain, ip: k.remoteIP) else { return record }
+                record.key.pid = owner.pid
+                record.key.bundleID = owner.bundleID
+                record.key.appName = owner.appName
+                record.key.appPath = owner.appPath
+                if let agent = owner.agent, agent != owner.bundleID {
+                    record.key.parentAgent = agent
+                    record.key.parentAgentName = owner.agentName
+                    record.key.mcpServer = owner.mcpServer
+                }
+                return record
+            }
+            return batch
+        }
+    }
+
+    private func owner(domain: String, ip: String) -> InspectionRecorder.Owner? {
+        lock.lock(); defer { lock.unlock() }
+        let fresh = { (entry: (owner: InspectionRecorder.Owner, at: Date)?) in
+            entry.flatMap { Date().timeIntervalSince($0.at) < 3600 ? $0.owner : nil }
+        }
+        return fresh(byIP[ip]) ?? (domain.isEmpty ? nil : fresh(byHost[domain.lowercased()]))
     }
 }

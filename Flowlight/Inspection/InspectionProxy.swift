@@ -25,6 +25,8 @@ protocol ProxyObserver: AnyObject {
     func flow(_ flow: ProxyFlow, clientSent data: Data)
     func flow(_ flow: ProxyFlow, serverSent data: Data)
     func flowEnded(_ flow: ProxyFlow, note: String?)
+    /// The proxy's own connection to the destination is up, to this address.
+    func flow(_ flow: ProxyFlow, connectedTo remoteIP: String)
 }
 
 /// A local HTTP proxy on 127.0.0.1 that can decrypt HTTPS for inspection.
@@ -175,6 +177,7 @@ final class InspectionProxy: @unchecked Sendable {
         upstream.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
+                if let ip = Self.remoteIP(upstream) { self?.observer?.flow(flow, connectedTo: ip) }
                 if !early.isEmpty { upstream.send(content: early, completion: .idempotent) }
                 var ended = false
                 let finish = {
@@ -306,6 +309,7 @@ final class InspectionProxy: @unchecked Sendable {
             guard let self else { return }
             switch state {
             case .ready:
+                if let ip = Self.remoteIP(upstream) { self.observer?.flow(flow, connectedTo: ip) }
                 if let first = firstClientBytes, !first.isEmpty {
                     self.observer?.flow(flow, clientSent: first)
                     upstream.send(content: first, completion: .idempotent)
@@ -350,6 +354,15 @@ final class InspectionProxy: @unchecked Sendable {
     static func remotePort(_ conn: NWConnection) -> UInt16 {
         if case .hostPort(_, let port) = conn.endpoint { return port.rawValue }
         return 0
+    }
+
+    static func remoteIP(_ conn: NWConnection) -> String? {
+        guard case .hostPort(let host, _)? = conn.currentPath?.remoteEndpoint else { return nil }
+        switch host {
+        case .ipv4(let a): return "\(a)"
+        case .ipv6(let a): return "\(a)".components(separatedBy: "%").first
+        default: return nil
+        }
     }
 
     static func localPort(_ conn: NWConnection) -> UInt16? {

@@ -53,6 +53,7 @@ final class InspectionController: ObservableObject {
             Task { @MainActor in
                 self?.running = proxy.port != nil
                 self?.port = proxy.port
+                ProxyAttribution.shared.proxyPort = proxy.port
                 if let message { self?.lastError = message }
             }
         }

@@ -311,3 +311,30 @@ final class ToolCallLinksTests: XCTestCase {
         XCTAssertNil(links[3])
     }
 }
+
+final class ProxyAttributionTests: XCTestCase {
+    func testProxiedTrafficGoesBackToTheApp() {
+        let attribution = ProxyAttribution()
+        attribution.proxyPort = 8877
+        attribution.record(host: "httpbin.org", ip: "203.0.113.9",
+                           owner: .init(pid: 77, bundleID: "curl", appName: "curl", appPath: "/usr/bin/curl",
+                                        agent: "claude", agentName: "Claude Code", mcpServer: nil))
+        func record(pid: Int32, bundle: String, ip: String, port: UInt16, domain: String = "") -> TrafficRecord {
+            TrafficRecord(key: FlowKey(pid: pid, bundleID: bundle, appName: bundle, appPath: "", remoteIP: ip, domain: domain,
+                                       port: port, transport: .tcp, appProtocol: "https"),
+                          counters: FlowCounters(bytesIn: 100, bytesOut: 10, flows: 1))
+        }
+        let me = getpid()
+        let batch = TrafficBatch(timestamp: 1, records: [
+            record(pid: 77, bundle: "curl", ip: "127.0.0.1", port: 8877),                      // app → proxy: dropped
+            record(pid: me, bundle: "com.flowlight.app", ip: "127.0.0.1", port: 51000),         // proxy loopback leg: dropped
+            record(pid: me, bundle: "com.flowlight.app", ip: "203.0.113.9", port: 443),         // upstream: back to curl
+            record(pid: me, bundle: "com.flowlight.app", ip: "140.82.1.1", port: 443, domain: "api.github.com"), // update check
+        ])
+        let out = attribution.rewrite([batch])[0].records
+        XCTAssertEqual(out.count, 2)
+        XCTAssertEqual(out[0].key.bundleID, "curl")
+        XCTAssertEqual(out[0].key.parentAgent, "claude")
+        XCTAssertEqual(out[1].key.bundleID, "com.flowlight.app")
+    }
+}
