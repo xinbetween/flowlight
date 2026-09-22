@@ -94,7 +94,7 @@ struct CaptureView: View {
 struct HostnameSection: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @AppStorage(AnomalySettings.Keys.packetCapture) private var packetCapture = true
-    @AppStorage(AnomalySettings.Keys.ownerLookup) private var ownerLookup = false
+    @AppStorage(AnomalySettings.Keys.ownerLookup) private var ownerLookup = true
     @State private var working = false
     @State private var message: String?
 
@@ -194,7 +194,7 @@ struct HostnameSection: View {
 /// Shown once on first launch when packet capture has not been set up.
 struct CaptureOnboardingView: View {
     @EnvironmentObject var monitor: TrafficMonitor
-    @AppStorage(AnomalySettings.Keys.ownerLookup) private var ownerLookup = false
+    @AppStorage(AnomalySettings.Keys.ownerLookup) private var ownerLookup = true
     @State private var working = false
     @State private var message: String?
 
@@ -220,7 +220,7 @@ struct CaptureOnboardingView: View {
             Toggle(isOn: $ownerLookup) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Identify network owners when no hostname is available")
-                    Text("Sends public destination IPs to Team Cymru's DNS service. Leave off to keep these lookups on your Mac.")
+                    Text("On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

@@ -49,7 +49,7 @@ struct AnomalySettings: Sendable {
             Keys.agentSensitive: true, Keys.agentUnnamed: true, Keys.agentEgressMB: 100.0, Keys.agentAway: true,
             Keys.agentAwayMinutes: 15.0, Keys.captureMode: CaptureMode.nettop.rawValue,
             Keys.menuBarRates: true,
-            Keys.ownerLookup: false, Keys.packetCapture: true,
+            Keys.ownerLookup: true, Keys.packetCapture: true,
         ])
     }
 

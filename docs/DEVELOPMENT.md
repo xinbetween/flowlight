@@ -52,7 +52,7 @@ nettop only reports IP addresses, so Flowlight fills in names from several sourc
    granting BPF access. Launch with `-FLForceCaptureOnboarding YES` to show the offer again.
 2. **Reverse DNS**, as a last resort.
 3. **Network owner**: the IP's autonomous system (e.g. "Cloudflare, Inc. · AS13335"), from Team Cymru's DNS
-   interface. This lookup is off by default on new installs; enable it during setup or in Capture if you want it.
+   interface. This lookup is on by default and sends only public IPs; turn it off during setup or in Capture.
    Public IPs are sent to that service, while local and reserved addresses stay on the Mac.
 
 Reports group any traffic still without a hostname under its network owner.
