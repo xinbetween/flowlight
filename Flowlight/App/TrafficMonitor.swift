@@ -204,6 +204,11 @@ final class TrafficMonitor: ObservableObject {
     // MARK: Ingest (any thread)
 
     nonisolated func ingest(_ incoming: [TrafficBatch]) {
+        // An empty delivery is the sampler's heartbeat: nothing moved this second, but capture is alive.
+        guard !incoming.isEmpty else {
+            Task { @MainActor in self.lastDataAt = Date() }
+            return
+        }
         // Tools and MCP servers an agent started are attributed to that agent (demo data carries its own).
         // Traffic through the HTTPS inspection proxy belongs to the app that sent it, not to Flowlight.
         let batches = DemoData.isEnabled ? incoming : AgentAttributor.shared.enrich(ProxyAttribution.shared.rewrite(incoming))

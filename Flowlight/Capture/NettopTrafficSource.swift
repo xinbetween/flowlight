@@ -4,7 +4,7 @@ import Foundation
 /// Fallback capture that needs no entitlements: runs `/usr/bin/nettop -L 1` once per second.
 ///
 /// A single long-running `nettop -L 0` would be simpler, but nettop busy-loops (~150% CPU) when
-/// its stdout is a pipe. A one-shot sample costs ~10 ms, so polling keeps the sampler around 1% CPU.
+/// its stdout is a pipe. A one-shot sample takes ~0.3 s of mostly waiting, so polling stays cheap.
 final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
     let displayName = "nettop sampler"
     private let parser = NettopParser()
@@ -12,6 +12,14 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
     private let queue = DispatchQueue(label: "flowlight.nettop", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var consecutiveFailures = 0
+    private var stalls = 0
+    private let watchdog = DispatchQueue(label: "flowlight.nettop.watchdog", qos: .utility)
+    /// A sample normally takes ~0.3 s. nettop occasionally spins forever inside NetworkStatistics (100%+ CPU, never
+    /// exits); without a limit that one hung process would stop sampling for good.
+    var sampleTimeout: TimeInterval = 5
+    /// Overridable for tests.
+    var executable = "/usr/bin/nettop"
+    var arguments = ["-L", "1", "-x", "-n", "-J", "bytes_in,bytes_out"]
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -30,8 +38,8 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
     private func sampleOnce(sink: ([TrafficBatch]) -> Void, status: (String) -> Void) {
         let sampledAt = Date()
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/nettop")
-        process.arguments = ["-L", "1", "-x", "-n", "-J", "bytes_in,bytes_out"]
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
@@ -42,8 +50,22 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
             fail("Failed to launch nettop: \(error.localizedDescription)", status: status)
             return
         }
+        // Terminate a hung sample, then force it; reading below returns once the process is gone.
+        let pid = process.processIdentifier
+        let stall = DispatchWorkItem { [weak process] in
+            guard let process, process.isRunning else { return }
+            process.terminate()
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1) { if process.isRunning { kill(pid, SIGKILL) } }
+        }
+        watchdog.asyncAfter(deadline: .now() + sampleTimeout, execute: stall)
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        stall.cancel()
+        if process.terminationReason == .uncaughtSignal {
+            stalls += 1
+            fail("nettop stopped responding and was restarted (\(stalls)×). Sampling continues.", status: status)
+            return
+        }
         guard process.terminationStatus == 0, !data.isEmpty else {
             fail("nettop exited with status \(process.terminationStatus)", status: status)
             return
@@ -55,7 +77,8 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         let deltas = parser.feedSample(String(decoding: data, as: UTF8.self))
         // The delta covers the second that just ended.
         let batch = makeBatch(deltas, timestamp: Int64(sampledAt.timeIntervalSince1970) - 1)
-        if !batch.records.isEmpty { sink([batch]) }
+        // An empty batch still tells the app the sampler is alive; a quiet second isn't a stalled one.
+        sink(batch.records.isEmpty ? [] : [batch])
     }
 
     private func fail(_ message: String, status: (String) -> Void) {

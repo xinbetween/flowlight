@@ -179,3 +179,35 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(AnomalyEngine.registrableDomain("example.com"), "example.com")
     }
 }
+
+final class NettopWatchdogTests: XCTestCase {
+    /// A sample that never finishes (as nettop sometimes does) is killed, reported, and sampling carries on.
+    func testHungSampleIsKilledAndReported() {
+        let source = NettopTrafficSource()
+        source.executable = "/bin/sleep"
+        source.arguments = ["30"]
+        source.sampleTimeout = 0.5
+        let reported = expectation(description: "stall reported")
+        var messages: [String] = []
+        let lock = NSLock()
+        source.start(sink: { _ in }, status: { message in
+            lock.lock(); messages.append(message); lock.unlock()
+            if message.contains("stopped responding") { reported.fulfill() }
+        })
+        wait(for: [reported], timeout: 5)
+        source.stop()
+        XCTAssertTrue(messages.contains { $0.contains("restarted (1×)") })
+    }
+
+    /// A quiet second still reaches the app, as an empty delivery.
+    func testQuietSampleIsAHeartbeat() {
+        let source = NettopTrafficSource()
+        source.executable = "/bin/echo"
+        source.arguments = ["time,,bytes_in,bytes_out,"]
+        let beat = expectation(description: "heartbeat")
+        beat.assertForOverFulfill = false
+        source.start(sink: { batches in if batches.isEmpty { beat.fulfill() } }, status: { _ in })
+        wait(for: [beat], timeout: 5)
+        source.stop()
+    }
+}
