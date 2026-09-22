@@ -211,6 +211,7 @@ final class TrafficDatabase: @unchecked Sendable {
             acknowledged INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS alerts_ts ON alerts(ts);
         CREATE TABLE IF NOT EXISTS ip_owners (ip TEXT PRIMARY KEY, asn INTEGER NOT NULL, owner TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS agent_policies (agent_id TEXT PRIMARY KEY, policy TEXT NOT NULL, updated INTEGER NOT NULL);
         """)
     }
 
@@ -567,6 +568,22 @@ final class TrafficDatabase: @unchecked Sendable {
             }
             for bundle in apps { try conn.run("INSERT OR IGNORE INTO apps VALUES (?,?)", [.text(bundle), .int(ts)]) }
         }
+    }
+
+    // MARK: Agent allowlists
+
+    func loadPolicies() throws -> [String: AgentPolicy] {
+        let rows = try conn.query("SELECT policy FROM agent_policies") { $0.text(0) }
+        let policies = rows.compactMap { try? JSONDecoder().decode(AgentPolicy.self, from: Data($0.utf8)) }
+        return Dictionary(policies.map { ($0.agentID, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func savePolicy(_ policy: AgentPolicy) throws {
+        let json = String(decoding: try JSONEncoder().encode(policy), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
+            ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
+            """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
     }
 
     // MARK: IP owners
