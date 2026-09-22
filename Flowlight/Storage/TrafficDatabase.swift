@@ -84,6 +84,10 @@ struct BreakdownRow: Sendable {
     /// AS owner of `remoteIP` when known (e.g. "Cloudflare, Inc."), empty otherwise.
     var owner: String = ""
     var asn: Int = 0
+    /// Set when this process works for an AI agent (see `FlowKey.parentAgent`).
+    var parentAgent: String = ""
+    var parentAgentName: String = ""
+    var mcpServer: String = ""
 }
 
 /// Raw keys that make up a chart's leading entities, so trend queries only touch those rows.
@@ -187,6 +191,11 @@ final class TrafficDatabase: @unchecked Sendable {
             CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol);
             CREATE INDEX IF NOT EXISTS \(table)_app ON \(table)(bundle_id, ts);
             """)
+            // v0.1.2: agent attribution columns (process lineage and MCP server). Attributes, not key parts.
+            let columns = Set(try conn.query("PRAGMA table_info(\(table))") { $0.text(1) })
+            for column in ["agent_parent", "agent_parent_name", "mcp_server"] where !columns.contains(column) {
+                try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
+            }
         }
         try conn.execute("""
         CREATE TABLE IF NOT EXISTS rollup_state (tier TEXT PRIMARY KEY, watermark INTEGER NOT NULL);
@@ -209,10 +218,14 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func insert(_ batches: [TrafficBatch]) throws {
         let sql = """
-        INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
+                              agent_parent, agent_parent_name, mcp_server)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
-            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
+            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
+            agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
+            agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
+            mcp_server = CASE WHEN excluded.mcp_server != '' THEN excluded.mcp_server ELSE mcp_server END
         """
         try conn.transaction {
             for batch in batches {
@@ -221,7 +234,8 @@ final class TrafficDatabase: @unchecked Sendable {
                     try conn.run(sql, [.int(batch.timestamp), .int(Int64(k.pid)), .text(k.bundleID), .text(k.appName),
                                        .text(k.appPath), .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)),
                                        .text(k.transport.rawValue), .text(k.appProtocol), .int(r.counters.bytesIn),
-                                       .int(r.counters.bytesOut), .int(r.counters.flows)])
+                                       .int(r.counters.bytesOut), .int(r.counters.flows),
+                                       .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? "")])
                 }
             }
         }
@@ -231,17 +245,22 @@ final class TrafficDatabase: @unchecked Sendable {
     func insertAggregates(_ table: String, _ rows: [(ts: Int64, key: FlowKey, counters: FlowCounters)]) throws {
         precondition(Self.tables.contains(table))
         let sql = """
-        INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
+                              agent_parent, agent_parent_name, mcp_server)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
-            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
+            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
+            agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
+            agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
+            mcp_server = CASE WHEN excluded.mcp_server != '' THEN excluded.mcp_server ELSE mcp_server END
         """
         try conn.transaction {
             for r in rows {
                 let k = r.key
                 try conn.run(sql, [.int(r.ts), .int(Int64(k.pid)), .text(k.bundleID), .text(k.appName), .text(k.appPath),
                                    .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)), .text(k.transport.rawValue),
-                                   .text(k.appProtocol), .int(r.counters.bytesIn), .int(r.counters.bytesOut), .int(r.counters.flows)])
+                                   .text(k.appProtocol), .int(r.counters.bytesIn), .int(r.counters.bytesOut), .int(r.counters.flows),
+                                   .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? "")])
             }
         }
     }
@@ -271,13 +290,17 @@ final class TrafficDatabase: @unchecked Sendable {
 
     private func fold(from source: String, into target: String, bucket: String, lower: Int64, upper: Int64) throws {
         try conn.run("""
-        INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows)
+        INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
+                               agent_parent, agent_parent_name, mcp_server)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
-               SUM(bytes_in), SUM(bytes_out), SUM(flows)
+               SUM(bytes_in), SUM(bytes_out), SUM(flows), MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server)
         FROM \(source) WHERE ts >= ? AND ts < ?
         GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
-            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
+            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
+            agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
+            agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
+            mcp_server = CASE WHEN excluded.mcp_server != '' THEN excluded.mcp_server ELSE mcp_server END
         """, [.int(lower), .int(upper)])
     }
 
@@ -384,7 +407,8 @@ final class TrafficDatabase: @unchecked Sendable {
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
                        GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
-                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows)
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows),
+                       MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server)
                 FROM \(granularity.table) WHERE \(clause)
                 GROUP BY bundle_id, domain, remote_ip
                 ORDER BY bin + bout DESC LIMIT \(limit)
@@ -393,7 +417,8 @@ final class TrafficDatabase: @unchecked Sendable {
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(10), asn: Int(row.int(11)))
+                         owner: row.text(13), asn: Int(row.int(14)),
+                         parentAgent: row.text(10), parentAgentName: row.text(11), mcpServer: row.text(12))
         }
     }
 

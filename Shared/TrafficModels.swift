@@ -16,6 +16,12 @@ struct FlowKey: Hashable, Codable, Sendable {
     var port: UInt16
     var transport: TransportProtocol
     var appProtocol: String
+    /// The AI agent this process works for (it's a descendant of the agent's process), e.g. `curl` run by Claude Code.
+    /// Optional so older batches still decode. Filled in by the app, not by capture sources.
+    var parentAgent: String? = nil
+    var parentAgentName: String? = nil
+    /// The MCP server this process is, when it matches an agent's MCP configuration.
+    var mcpServer: String? = nil
 }
 
 struct FlowCounters: Codable, Sendable, Equatable {

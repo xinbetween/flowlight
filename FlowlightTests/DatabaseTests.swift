@@ -138,6 +138,28 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(BreakdownGrouping.destination.columnTitle, "Destination › App › IP")
     }
 
+    func testAgentAttributionColumnsRoundTripAndMigrate() throws {
+        var k = key("curl", "pastebin.example", ip: "203.0.113.7")
+        k.parentAgent = "claude"; k.parentAgentName = "Claude Code"
+        var m = key("node", "api.github.com", ip: "198.51.100.3")
+        m.parentAgent = "claude"; m.parentAgentName = "Claude Code"; m.mcpServer = "github"
+        let t0: Int64 = 1_700_000_040
+        try db.insert([TrafficBatch(timestamp: t0, records: [TrafficRecord(key: k, counters: FlowCounters(bytesIn: 1, bytesOut: 5, flows: 1)),
+                                                             TrafficRecord(key: m, counters: FlowCounters(bytesIn: 2, bytesOut: 3, flows: 1))])])
+        try db.rollup(now: Date(timeIntervalSince1970: TimeInterval(t0 + 120)), timeZone: TimeZone(identifier: "UTC")!)
+        let rows = try db.breakdown(.hour, from: Date(timeIntervalSince1970: TimeInterval(t0 - 7200)), to: Date(timeIntervalSince1970: TimeInterval(t0 + 7200)))
+        let curl = rows.first { $0.bundleID == "curl" }!
+        XCTAssertEqual(curl.parentAgent, "claude")
+        XCTAssertEqual(curl.parentAgentName, "Claude Code", "attribution survives rollups")
+        XCTAssertEqual(rows.first { $0.bundleID == "node" }?.mcpServer, "github")
+        // Re-opening an existing database runs the migration without error.
+        _ = try TrafficDatabase(url: db.url)
+        // Older batches without the fields still decode.
+        let legacy = #"[{"timestamp":1,"records":[{"key":{"pid":1,"bundleID":"a","appName":"a","appPath":"","remoteIP":"1.1.1.1","domain":"","port":443,"transport":"tcp","appProtocol":"https"},"counters":{"bytesIn":1,"bytesOut":1,"flows":0}}]}]"#
+        let decoded = try JSONDecoder().decode([TrafficBatch].self, from: Data(legacy.utf8))
+        XCTAssertNil(decoded[0].records[0].key.parentAgent)
+    }
+
     func testUnacknowledgedCountAndReadOnlyConnection() throws {
         try db.addAlert(kind: "k", bundleID: "b", appName: "a", detail: "d", severity: 2)
         let second = try db.addAlert(kind: "k", bundleID: "b", appName: "a", detail: "d", severity: 1)
