@@ -134,3 +134,20 @@ traffic and a live synthetic feed. Suspicious destinations use reserved document
 - Byte counts in the extension come from `NEFilterReport` statistics events (`statisticsReportFrequency = .high`).
   Check them against the flows logged on a real device (build order step 2) before relying on them.
 - QUIC SNI isn't decrypted. QUIC flows get their domain from the system hostname or the DNS cache.
+
+## Releasing
+
+```sh
+TEAM_ID=ABCDE12345 \
+DMG_SIGN_IDENTITY="Developer ID Application: Your Name (ABCDE12345)" \
+NOTARY_PROFILE=flowlight-notary scripts/build-dmg.sh      # build/Flowlight.dmg, signed + notarized
+INSTALLER_IDENTITY="Developer ID Installer: Your Name (ABCDE12345)" TEAM_ID=ABCDE12345 scripts/build-pkg.sh
+gh release create v0.1.0 build/Flowlight.dmg build/Flowlight-0.1.0.pkg --title "Flowlight 0.1.0" --generate-notes
+```
+
+- Keep the DMG asset named exactly `Flowlight.dmg`: the website and README link to
+  `releases/latest/download/Flowlight.dmg`.
+- Without `DMG_SIGN_IDENTITY` and `NOTARY_PROFILE` the DMG contains an ad-hoc signed app. That's fine for testing,
+  but Gatekeeper will ask users to right-click › Open.
+- The DMG window layout needs Finder automation permission for the terminal that runs the script. The background
+  art comes from `packaging/dmg/background*.png` (regenerate with `swift scripts/dmg-background.swift`).

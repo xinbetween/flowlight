@@ -10,7 +10,7 @@ A native macOS network monitor that ties each byte to the app that sent it and t
 It watches AI agents for the things you'd never approve: emailing files, opening SSH sessions, or
 uploading your repo while you're away.
 
-[**Download for macOS**](https://github.com/xinbetween/flowlight/releases/latest) ·
+[**Download for macOS**](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg) ·
 [Website](https://flowlight.xinbetween.com) ·
 [Build from source](#build-from-source) ·
 [How it works](#how-it-works)
@@ -95,8 +95,8 @@ Team Cymru's DNS service.
 
 ## Install
 
-1. Download **Flowlight.pkg** from the [latest release](https://github.com/xinbetween/flowlight/releases/latest)
-   and open it. Flowlight installs into `/Applications`.
+1. Download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
+   Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
 3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
    for your password once) and, optionally, network-owner lookups.
@@ -112,6 +112,7 @@ git clone https://github.com/xinbetween/flowlight.git && cd flowlight
 xcodegen generate
 scripts/build-local.sh                  # ad-hoc signed, no Apple account needed
 open build/Build/Products/Release/Flowlight.app
+scripts/build-dmg.sh                    # optional: drag-to-install disk image (build/Flowlight.dmg)
 scripts/build-pkg.sh                    # optional: installer package
 ```
 
