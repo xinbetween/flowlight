@@ -53,10 +53,22 @@ Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf
 Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 25 LLM API providers**, so a
 Python script hitting `api.openai.com` shows up too. Browsers are excluded, because a person chatting isn't an agent.
 
-For each agent you see which AI providers it uses, and **everything else it contacted**. These rules watch it:
+For each agent you see which AI providers it uses, and **everything else it contacted**, including what its tools
+and MCP servers did:
+
+- **Tools & MCP servers.** Flowlight follows the process tree back to the agent that started each process, so the
+  `curl`, `git push` or `npm install` a Claude Code shell tool runs is counted as Claude Code's traffic, labelled
+  *via curl*. MCP servers are named from the agents' own configs (Claude Code, Claude Desktop, Cursor, Windsurf,
+  VS Code, Codex, Zed, Gemini CLI): *via github MCP*.
+- **Allowlists.** "Claude Code may talk to GitHub and npm, nothing else." Add domains (subdomains included), IPs or
+  CIDR ranges, or start from a preset (GitHub, npm, PyPI, Homebrew, Docker Hub…). The agent's AI providers and your
+  local network are always allowed; anything else raises an alert, and each destination has a one-click **Allow**.
+
+These rules watch every agent:
 
 | Rule | Fires when an agent… | Severity |
 |---|---|---|
+| **Allowlist violation** | contacts anything not on its allowlist (when you've set one) | critical |
 | **Sensitive channel** | uses email, file transfer, SSH or remote desktop, a tunnel or proxy, peer-to-peer, or a database connection | critical for email, file transfer, tunnels and P2P |
 | **Possible exfiltration** | uploads more than 100 MB/hour to hosts that aren't AI providers | critical |
 | **Unnamed host** | connects to a raw IP with no hostname on an unusual port | warning |
@@ -81,7 +93,8 @@ No account, no cloud, no telemetry. Everything stays in a local SQLite database.
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
 The one optional network lookup (who owns an IP) is **off by default**. If you turn it on, it sends public IPs to
 Team Cymru's DNS service. The daily update check asks GitHub for the latest release, and you can switch it off in
-Settings.
+Settings. To attribute tools and MCP servers, Flowlight reads process command lines and your agents' MCP config files
+on your Mac; none of it leaves your Mac.
 
 <table>
 <tr>
@@ -154,7 +167,9 @@ so a year of history stays fast.
 ## Honest limitations
 
 - **TCP and UDP only.** That covers essentially all app traffic, but ICMP (ping) and other raw-IP protocols aren't attributed.
-- **Per process, not per thread.** macOS attributes sockets to processes.
+- **Per process, not per thread or tool call.** macOS attributes sockets to processes, so Flowlight can say *curl,
+  started by Claude Code* or *the github MCP server*, not which individual tool call inside a long-running server opened it.
+- **Allowlists alert; they don't block.** Blocking needs the Network Extension engine and is on the roadmap.
 - **Encrypted payloads stay encrypted.** Flowlight reads metadata (hostnames, ports, byte counts). It never decrypts traffic.
 - **Hostname capture follows the primary interface.** Traffic confined to another interface or tunnel may lack names.
 - **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
@@ -163,9 +178,9 @@ so a year of history stays fast.
 ## Roadmap
 
 - [ ] Signed and notarized releases, and a Homebrew cask
-- [ ] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
-- [ ] Block rules in Network Extension mode
-- [ ] MCP server attribution (which tool call opened the socket)
+- [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
+- [x] Tool and MCP server attribution (which process an agent started opened the socket)
+- [ ] Block allowlist violations in Network Extension mode
 - [ ] Export to OpenTelemetry / SIEM
 
 ## Contributing
@@ -182,7 +197,7 @@ Flowlight/
   Storage/           SQLite store, rollups, queries
   Analysis/          anomaly engine, AI agent catalog + rules
   UI/                Live · AI Agents · Reports · Alerts · Capture
-FlowlightTests/      41 unit tests: parsers, BPF filter, rollups, charts, agents, anomalies
+FlowlightTests/      57 unit tests: parsers, BPF filter, rollups, charts, agents, MCP attribution, allowlists
 docs/                website (GitHub Pages) and developer guide
 ```
 

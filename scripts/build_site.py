@@ -101,7 +101,7 @@ def build():
         markup = html.unescape(fill(markup, DOMAIN + "/", ""))
         return re.sub(r"\n\s*\n+", "\n\n", re.sub(r"[ \t]+", " ", markup)).strip()
     llms = [f"# Flowlight\n\n> Free, open-source (GPL-3.0) macOS network monitor. It attributes every TCP/UDP flow to the app that made it and the"
-            f" domain it went to, keeps local history from second to year, and watches AI agents with"
+            f" domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start) with per-agent allowlists and"
             f" rules for data leaving the Mac. Current version: {VERSION}.\n",
             f"- [Download Flowlight.dmg]({DMG})", f"- [Source code](https://github.com/{REPO})"]
     llms += [f"- [{m['title']}]({DOMAIN}{m['path']}): {m['description']}" for m, _ in pages]

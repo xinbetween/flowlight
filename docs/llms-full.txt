@@ -64,7 +64,7 @@ Documentation
 
  On this page
  InstallFirst launchHostnames
- The four viewsAI agent rulesOther alerts
+ The four viewsAI agent rulesTools & MCPAllowlistsOther alerts
  Capture enginesYour dataUpdates
  Demo modeUninstallLimitations
 
@@ -132,6 +132,30 @@ open build/Build/Products/Release/Flowlight.app
  Active while you're awaymoves 1 MB or more in a minute after you stop using the keyboard and mouse15 minutes
 
  Agents get a 1-hour learning period before new-destination alerts start. Change any of this in Settings › Detection.
+
+ Tools & MCP servers
+
+ Agents do much of their work through other processes: a shell tool runs curl, git or npm, and MCP
+ servers run as their own processes. Flowlight follows each process's parents back to the agent that started it, so that traffic is
+ counted as the agent's. In AI Agents, the agent's detail lists these under Tools & MCP servers, and
+ destinations read via curl or via github MCP. In Reports, the process row reads via Claude Code.
+
+ MCP servers are named by matching their command line to the MCP configuration of Claude Code (~/.claude.json), Claude Desktop,
+ Cursor (~/.cursor/mcp.json), Windsurf, VS Code, Codex (~/.codex/config.toml), Zed and Gemini CLI. Remote MCP servers
+ are matched by the hostname in their URL, and unconfigured servers by recognizable package names such as
+ @modelcontextprotocol/server-github.
+
+ Attribution is per process: Flowlight can't tell which individual tool call inside a long-running MCP server opened a connection.
+
+ Allowlists
+
+ Select an agent in AI Agents and use Allowlist in its detail to say where it may connect. Enter domains
+ (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
+ Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
+
+ From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
+ per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. Flowlight doesn't block
+ connections; blocking needs the Network Extension engine and is on the roadmap.
 
  Other alerts
 
@@ -235,7 +259,7 @@ Free · open source · macOS 15+
 
  AI AgentsAn agent is running while you're in a meeting
 
- See every host it touched besides its model provider, and get an alert if it sends email, opens SSH or uploads 100 MB somewhere new.
+ See every host it and its tools touched besides its model provider, and get an alert if it leaves its allowlist, sends email or uploads 100 MB somewhere new.
 
  ReportsYour upload spiked and you don't know why
 
@@ -308,6 +332,20 @@ What looked wrong? Explainable, per-app alerts with the destination and the thre
  OllamaLM StudioChatGPT
  ClaudeZedPerplexityZCode
  + anything that calls an LLM API
+
+ ⚠ Critical
+ Allowlist violation
+
+ "Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset. Anything else raises an alert, with one-click Allow.
+
+ Claude Code › curl contacted paste.example:443, which isn't on Claude Code's allowlist
+
+ ↳ Attribution
+ Tools & MCP servers
+
+ The curl, git or npm an agent's shell tool runs, and the MCP servers it starts, count as the agent's traffic, named from its own MCP config.
+
+ api.github.com · via github MCP  ·  paste.example · via curl
 
  ⚠ Critical
  Sensitive channel
@@ -495,6 +533,18 @@ Questions
  macOS only lets administrators read network packets. The one-time setup gives your account read access, the
  same way Wireshark does. You can remove it any time from the Capture screen.
 
+ Can it tell which MCP server or tool made a request?
+
+ Yes, at the process level. Flowlight follows each process back to the agent that started it, so a shell tool's
+ curl or an MCP server's connections are attributed to that agent, and MCP servers are named from Claude Code, Claude
+ Desktop, Cursor, Windsurf, VS Code, Codex, Zed and Gemini CLI configs. It can't see which individual tool call inside a
+ long-running server opened a connection.
+
+ Does an allowlist block traffic?
+
+ Not yet. A violation raises a critical alert and marks the destination "Not allowed". Blocking needs the Network
+ Extension engine and is on the roadmap.
+
  Which agents does it recognize?
 
  Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
@@ -530,7 +580,7 @@ Privacy
  so you can check the claims against the source.
 
  On this page
- In shortWhat it recordsPacket capture
+ In shortWhat it recordsPacket captureRead locally
  Network requestsPermissionsRetention
  This websiteContact
 
@@ -555,6 +605,13 @@ Privacy
  If you approve the one-time hostname setup, Flowlight reads packets on your primary network interface through a kernel filter that
  passes only two things: DNS responses, and the first message of a TLS connection (the ClientHello). From those it keeps only
  hostnames and the addresses they map to, in memory. Everything else is dropped in the kernel, and no packet is written to disk.
+
+ What it reads on your Mac
+
+ To attribute an agent's tools and MCP servers, Flowlight reads each process's parent and command line from macOS, and the MCP
+ configuration files of the agents it supports (for example ~/.claude.json, ~/.cursor/mcp.json and
+ ~/.codex/config.toml). It keeps only each server's name, launch command and URL, in memory, and stores only the resulting
+ labels ("via curl", "github MCP") with your traffic. Nothing from these files or command lines is sent anywhere.
 
  Network requests the app makes
 
@@ -604,6 +661,12 @@ Releases
 
  Next release
 In development
+
+ Per-agent allowlists. "Claude Code may talk to GitHub and npm, nothing else": domains, IPs, CIDR ranges and presets,
+ with a critical alert and one-click Allow for anything else.
+
+ Tools & MCP server attribution. Processes an agent starts (shell tools, MCP servers) count as the agent's traffic,
+ with MCP servers named from Claude Code, Cursor, Codex, VS Code and other configs.
 
  Update checks. Flowlight looks for new releases daily and offers a download verified against its published SHA-256.
 

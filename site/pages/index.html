@@ -48,7 +48,7 @@ nav: home
 
   <section class="shot" aria-label="Screenshot">
     <div class="wrap">
-      <div class="frame"><img src="{{root}}assets/screenshots/agents.png" width="1600" height="1025"
+      <div class="frame"><img src="{{root}}assets/screenshots/agents.png" width="1600" height="1075"
         alt="Flowlight's AI Agents view. Claude Code, Cursor, Codex and a Python script are listed with their AI providers, traffic sent elsewhere and risk badges for SMTP, SSH, FTP, a large upload and a raw IP."></div>
       <p class="caption">The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.</p>
     </div>
@@ -61,7 +61,7 @@ nav: home
       </div>
       <div class="cases">
         <div class="case"><span class="view">AI Agents</span><h3>An agent is running while you're in a meeting</h3>
-          <p>See every host it touched besides its model provider, and get an alert if it sends email, opens SSH or uploads 100&nbsp;MB somewhere new.</p></div>
+          <p>See every host it and its tools touched besides its model provider, and get an alert if it leaves its allowlist, sends email or uploads 100&nbsp;MB somewhere new.</p></div>
         <div class="case"><span class="view">Reports</span><h3>Your upload spiked and you don't know why</h3>
           <p>Hover the spike to see the app behind it, click to zoom from the hour to the minute, and follow it to the exact domain and IP.</p></div>
         <div class="case"><span class="view">Alerts</span><h3>A new app started phoning home</h3>
@@ -140,6 +140,18 @@ nav: home
         </div>
       </div>
       <div class="rules">
+        <div class="rule">
+          <span class="sev critical">⚠ Critical</span>
+          <div><h3>Allowlist violation</h3>
+            <p>"Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset. Anything else raises an alert, with one-click <b>Allow</b>.</p>
+            <p class="example">Claude Code › curl contacted paste.example:443, which isn't on Claude Code's allowlist</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">↳ Attribution</span>
+          <div><h3>Tools &amp; MCP servers</h3>
+            <p>The curl, git or npm an agent's shell tool runs, and the MCP servers it starts, count as the agent's traffic, named from its own MCP config.</p>
+            <p class="example">api.github.com · via github MCP &nbsp;·&nbsp; paste.example · via curl</p></div>
+        </div>
         <div class="rule">
           <span class="sev critical">⚠ Critical</span>
           <div><h3>Sensitive channel</h3>
@@ -270,10 +282,10 @@ nav: home
 
   <section class="band" aria-label="More screenshots">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="{{root}}assets/screenshots/reports.png" width="1600" height="1025" loading="lazy"
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/reports.png" width="1600" height="1075" loading="lazy"
         alt="Reports view with hourly received and sent bars and donut charts of apps, destinations and protocols"></div>
         <figcaption><b>Reports.</b> Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.</figcaption></figure>
-      <figure><div class="frame"><img src="{{root}}assets/screenshots/alerts.png" width="1600" height="1025" loading="lazy"
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/alerts.png" width="1600" height="1075" loading="lazy"
         alt="Alerts view listing agent exfiltration, email, FTP, while-away and traffic spike alerts"></div>
         <figcaption><b>Alerts.</b> Each one names the app, the destination and the number that tripped it.</figcaption></figure>
     </div>
@@ -319,6 +331,14 @@ open Flowlight.app --args -FLDemo YES</pre>
         <details><summary>Why does it ask for my password?</summary>
           <p>macOS only lets administrators read network packets. The one-time setup gives your account read access, the
             same way Wireshark does. You can remove it any time from the Capture screen.</p></details>
+        <details><summary>Can it tell which MCP server or tool made a request?</summary>
+          <p>Yes, at the process level. Flowlight follows each process back to the agent that started it, so a shell tool's
+            curl or an MCP server's connections are attributed to that agent, and MCP servers are named from Claude Code, Claude
+            Desktop, Cursor, Windsurf, VS Code, Codex, Zed and Gemini CLI configs. It can't see which individual tool call inside a
+            long-running server opened a connection.</p></details>
+        <details><summary>Does an allowlist block traffic?</summary>
+          <p>Not yet. A violation raises a critical alert and marks the destination "Not allowed". Blocking needs the Network
+            Extension engine and is on the roadmap.</p></details>
         <details><summary>Which agents does it recognize?</summary>
           <p>Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
             ChatGPT, Claude, Zed, Perplexity and ZCode, plus any non-browser process that calls a known LLM API. Adding one is a

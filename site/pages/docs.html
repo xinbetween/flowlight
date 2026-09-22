@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The four views</a><a href="#agents">AI agent rules</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The four views</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#limits">Limitations</a>
     </nav>
@@ -67,6 +67,25 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Active while you're away</td><td>moves 1 MB or more in a minute after you stop using the keyboard and mouse</td><td>15 minutes</td></tr>
       </table>
       <p>Agents get a 1-hour learning period before new-destination alerts start. Change any of this in <strong>Settings › Detection</strong>.</p>
+
+      <h2 id="tools">Tools &amp; MCP servers</h2>
+      <p>Agents do much of their work through other processes: a shell tool runs <code>curl</code>, <code>git</code> or <code>npm</code>, and MCP
+        servers run as their own processes. Flowlight follows each process's parents back to the agent that started it, so that traffic is
+        counted as the agent's. In <strong>AI Agents</strong>, the agent's detail lists these under <strong>Tools &amp; MCP servers</strong>, and
+        destinations read <em>via curl</em> or <em>via github MCP</em>. In <strong>Reports</strong>, the process row reads <em>via Claude Code</em>.</p>
+      <p>MCP servers are named by matching their command line to the MCP configuration of Claude Code (<code>~/.claude.json</code>), Claude Desktop,
+        Cursor (<code>~/.cursor/mcp.json</code>), Windsurf, VS Code, Codex (<code>~/.codex/config.toml</code>), Zed and Gemini CLI. Remote MCP servers
+        are matched by the hostname in their URL, and unconfigured servers by recognizable package names such as
+        <code>@modelcontextprotocol/server-github</code>.</p>
+      <p>Attribution is per process: Flowlight can't tell which individual tool call inside a long-running MCP server opened a connection.</p>
+
+      <h2 id="allowlists">Allowlists</h2>
+      <p>Select an agent in <strong>AI Agents</strong> and use <strong>Allowlist</strong> in its detail to say where it may connect. Enter domains
+        (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
+        Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.</p>
+      <p>From then on, anything the agent or its tools contact that isn't listed raises a critical <strong>Allowlist violation</strong> alert (once
+        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. Flowlight doesn't block
+        connections; blocking needs the Network Extension engine and is on the roadmap.</p>
 
       <h2 id="alerts">Other alerts</h2>
       <ul>
