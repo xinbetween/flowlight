@@ -122,6 +122,27 @@ final class AgentTests: XCTestCase {
         XCTAssertTrue(bareFired().contains { $0.kind == AnomalyEngine.Kind.agentExfiltration.rawValue })
     }
 
+    func testToolAndMCPTrafficCountsTowardItsAgent() throws {
+        let (engine, _, fired) = try makeEngine()
+        var curl = key("curl", domain: "smtp.relay.example", ip: "203.0.113.9", port: 587, proto: "smtp-submission")
+        curl.parentAgent = "claude"; curl.parentAgentName = "Claude Code"
+        var mcp = key("node", domain: "uploads.example", ip: "203.0.113.10")
+        mcp.parentAgent = "claude"; mcp.parentAgentName = "Claude Code"; mcp.mcpServer = "filesystem"
+        let now = Date()
+        try engine.observe([TrafficBatch(timestamp: Int64(now.timeIntervalSince1970), records: [
+            TrafficRecord(key: curl, counters: FlowCounters(bytesIn: 10, bytesOut: 40_000, flows: 1)),
+            TrafficRecord(key: mcp, counters: FlowCounters(bytesIn: 10, bytesOut: 120_000_000, flows: 1)),
+        ])])
+        try engine.evaluateAgents(now: now)
+        let channel = fired().first { $0.kind == AnomalyEngine.Kind.agentSensitiveChannel.rawValue }
+        XCTAssertEqual(channel?.bundleID, "claude", "alerts file under the agent")
+        XCTAssertEqual(channel?.appName, "Claude Code › curl")
+        let exfil = fired().first { $0.kind == AnomalyEngine.Kind.agentExfiltration.rawValue }
+        XCTAssertEqual(exfil?.bundleID, "claude")
+        XCTAssertTrue(exfil?.detail.hasPrefix("Claude Code uploaded") == true, exfil?.detail ?? "")
+        XCTAssertNil(engine.agentName(bundleID: "node", appName: "node"), "a tool isn't promoted to an agent of its own")
+    }
+
     func testDiscoveryExfiltrationAndWhileAway() throws {
         let activity = FakeActivity()
         let (engine, _, fired) = try makeEngine(activity)

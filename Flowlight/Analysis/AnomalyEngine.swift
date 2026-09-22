@@ -52,7 +52,10 @@ final class AnomalyEngine: @unchecked Sendable {
         return discoveredAgents.contains(bundleID) ? appName : nil
     }
 
-    func seedDiscoveredAgents(_ bundleIDs: Set<String>) { discoveredAgents.formUnion(bundleIDs) }
+    func seedDiscoveredAgents(_ bundleIDs: Set<String>) {
+        discoveredAgents.formUnion(bundleIDs)
+        AgentRegistry.shared.insert(contentsOf: bundleIDs)
+    }
 
     /// Rate limit: true (and records it) when `token` hasn't alerted within `interval`.
     private func shouldAlert(_ token: String, every interval: TimeInterval, now: Date = Date()) -> Bool {
@@ -107,12 +110,18 @@ final class AnomalyEngine: @unchecked Sendable {
 
                 let owner = k.domain.isEmpty ? (IPOwnerLookup.shared.cached(k.remoteIP)?.name ?? "") : ""
                 let provider = AgentCatalog.provider(domain: k.domain, owner: owner)
-                if provider != nil, !AgentCatalog.isBrowser(k.bundleID), record.counters.total > 0 {
+                if provider != nil, k.parentAgent == nil, !AgentCatalog.isBrowser(k.bundleID), record.counters.total > 0 {
                     discoveredAgents.insert(k.bundleID)
+                    AgentRegistry.shared.insert(k.bundleID)
                 }
-                let agent = agentName(bundleID: k.bundleID, appName: k.appName)
+                // A tool or MCP server an agent started counts as that agent ("Claude Code › github MCP").
+                let agentKey = k.parentAgent ?? k.bundleID
+                let agent: String? = k.parentAgentName.map { parent in
+                    "\(parent) › " + (k.mcpServer.map { "\($0) MCP" } ?? k.appName)
+                } ?? agentName(bundleID: k.bundleID, appName: k.appName)
                 if let agent {
-                    alerts += try observeAgent(k, record.counters, agent: agent, provider: provider, owner: owner, at: now, settings: s)
+                    alerts += try observeAgent(k, record.counters, agent: agent, agentKey: agentKey, provider: provider,
+                                               owner: owner, at: now, settings: s)
                 }
 
                 if appsFirstSeen[k.bundleID] == nil {
@@ -163,36 +172,36 @@ final class AnomalyEngine: @unchecked Sendable {
 
     /// Per-record agent rules: sensitive channels and unnamed hosts; also feeds the per-minute
     /// egress and while-away accounting evaluated in `evaluateIdleTraffic`.
-    private func observeAgent(_ k: FlowKey, _ c: FlowCounters, agent: String, provider: String?, owner: String,
+    private func observeAgent(_ k: FlowKey, _ c: FlowCounters, agent: String, agentKey: String, provider: String?, owner: String,
                               at ts: Int64, settings s: AnomalySettings) throws -> [AlertRecord] {
         var alerts: [AlertRecord] = []
-        agentNames[k.bundleID] = agent
+        agentNames[agentKey] = k.parentAgentName ?? agent
         let local = IPOwnerLookup.isLocalNetwork(k.remoteIP)
         let destination = !k.domain.isEmpty ? k.domain : (!owner.isEmpty ? "\(owner) · \(k.remoteIP)" : k.remoteIP)
 
         // Minute accounting (non-AI uploads count as egress).
         let minute = ts / 60
-        var history = agentMinutes[k.bundleID] ?? []
+        var history = agentMinutes[agentKey] ?? []
         if history.last?.minute != minute { history.append(AgentMinute(minute: minute, egressOut: 0, total: 0, destinations: [:])) }
         history[history.count - 1].total += c.total
         if provider == nil && !local {
             history[history.count - 1].egressOut += c.bytesOut
             history[history.count - 1].destinations[destination, default: 0] += c.bytesOut
         }
-        agentMinutes[k.bundleID] = Array(history.suffix(60))
+        agentMinutes[agentKey] = Array(history.suffix(60))
 
         let category = ProtocolCatalog.category(of: k.appProtocol)
         if s.agentSensitiveChannels, category.isSensitiveEgress, !local, c.total > 0,
-           shouldAlert("channel|\(k.bundleID)|\(k.appProtocol)|\(destination)", every: 6 * 3600) {
+           shouldAlert("channel|\(agentKey)|\(k.appProtocol)|\(destination)", every: 6 * 3600) {
             let severe: Set<ProtocolCategory> = [.mail, .fileTransfer, .tunnel, .peerToPeer]
-            alerts.append(try db.addAlert(kind: Kind.agentSensitiveChannel.rawValue, bundleID: k.bundleID, appName: agent,
+            alerts.append(try db.addAlert(kind: Kind.agentSensitiveChannel.rawValue, bundleID: agentKey, appName: agent,
                                           detail: "\(agent) used \(k.appProtocol.uppercased()) (\(category.title.lowercased())) to \(destination):\(k.port) — \(ByteFormat.string(c.bytesOut)) sent",
                                           severity: severe.contains(category) ? 3 : 2))
         }
         if s.agentUnnamedHosts, k.domain.isEmpty, owner.isEmpty || provider == nil, !local,
            !Self.standardPorts.contains(k.port), c.total > 0,
-           shouldAlert("unnamed|\(k.bundleID)|\(k.remoteIP):\(k.port)", every: 24 * 3600) {
-            alerts.append(try db.addAlert(kind: Kind.agentUnnamedHost.rawValue, bundleID: k.bundleID, appName: agent,
+           shouldAlert("unnamed|\(agentKey)|\(k.remoteIP):\(k.port)", every: 24 * 3600) {
+            alerts.append(try db.addAlert(kind: Kind.agentUnnamedHost.rawValue, bundleID: agentKey, appName: agent,
                                           detail: "\(agent) connected to \(owner.isEmpty ? "" : owner + " ")\(k.remoteIP):\(k.port) (\(k.appProtocol)) with no hostname",
                                           severity: 2))
         }

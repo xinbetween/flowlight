@@ -197,7 +197,9 @@ final class TrafficMonitor: ObservableObject {
 
     // MARK: Ingest (any thread)
 
-    nonisolated func ingest(_ batches: [TrafficBatch]) {
+    nonisolated func ingest(_ incoming: [TrafficBatch]) {
+        // Tools and MCP servers an agent started are attributed to that agent (demo data carries its own).
+        let batches = DemoData.isEnabled ? incoming : AgentAttributor.shared.enrich(incoming)
         // Anything without a hostname gets at least its network owner.
         for batch in batches {
             for record in batch.records where record.key.domain.isEmpty {
