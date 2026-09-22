@@ -72,8 +72,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>macOS only lets administrators read packets, so the <strong>Name Your Traffic</strong> window asks for your password once. It installs
         <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>, which gives the <code>access_bpf</code> group read access to
         <code>/dev/bpf*</code> at each boot, the same approach Wireshark uses. Remove it any time from <strong>Capture › Remove Packet Capture Access</strong>.</p>
-      <p>Optional: <strong>Identify network owners</strong> labels traffic with no hostname by who operates the address
-        (<em>Cloudflare, Inc. · AS13335</em>). It's off by default because it sends public IP addresses to Team Cymru's DNS service.</p>
+      <p><strong>Identify network owners</strong> labels traffic with no hostname by who operates the address
+        (<em>Cloudflare, Inc. · AS13335</em>). It's on by default and sends those public IP addresses (never private ones) to Team Cymru's
+        DNS service. Turn it off in <strong>Capture</strong>.</p>
 
       <h2 id="views">The four views</h2>
       <table>
@@ -137,8 +138,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="updates">Updates</h2>
       <p>Flowlight checks GitHub for a new release on launch and once a day, and <strong>Check for Updates…</strong> is in the app
-        and menu bar menus. <strong>Download &amp; Open</strong> fetches the disk image, checks it against the release's published SHA-256, saves it to
-        Downloads and opens it. Quit Flowlight, then drag the new version into Applications. Turn the check off in <strong>Settings › General</strong>.</p>
+        and menu bar menus. <strong>Download</strong> fetches the disk image to Downloads and checks it against the release's published SHA-256. Nothing is installed
+        until you choose: <strong>Quit &amp; Install</strong> closes Flowlight, replaces it with the new version and reopens it, keeping your history and
+        settings. <strong>Install Later</strong> keeps you working. If Flowlight was installed with the <code>.pkg</code>, macOS asks for an administrator
+        password to replace it. Turn the check off in <strong>Settings › General</strong>.</p>
+      <p>Updating by hand? Quit Flowlight first (menu bar icon › Quit), then drag the new version into Applications. Finder can't replace an
+        app that's still running and says the item is in use.</p>
 
       <h2 id="demo">Demo mode</h2>
       <p><code>open /Applications/Flowlight.app --args -FLDemo YES</code> starts Flowlight with 90 days of synthetic traffic in a separate

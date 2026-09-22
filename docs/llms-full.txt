@@ -99,8 +99,9 @@ open build/Build/Products/Release/Flowlight.app
  /Library/LaunchDaemons/com.flowlight.bpf-access.plist, which gives the access_bpf group read access to
  /dev/bpf* at each boot, the same approach Wireshark uses. Remove it any time from Capture › Remove Packet Capture Access.
 
- Optional: Identify network owners labels traffic with no hostname by who operates the address
- (Cloudflare, Inc. · AS13335). It's off by default because it sends public IP addresses to Team Cymru's DNS service.
+ Identify network owners labels traffic with no hostname by who operates the address
+ (Cloudflare, Inc. · AS13335). It's on by default and sends those public IP addresses (never private ones) to Team Cymru's
+ DNS service. Turn it off in Capture.
 
  The four views
 
@@ -184,8 +185,13 @@ open build/Build/Products/Release/Flowlight.app
  Updates
 
  Flowlight checks GitHub for a new release on launch and once a day, and Check for Updates… is in the app
- and menu bar menus. Download & Open fetches the disk image, checks it against the release's published SHA-256, saves it to
- Downloads and opens it. Quit Flowlight, then drag the new version into Applications. Turn the check off in Settings › General.
+ and menu bar menus. Download fetches the disk image to Downloads and checks it against the release's published SHA-256. Nothing is installed
+ until you choose: Quit & Install closes Flowlight, replaces it with the new version and reopens it, keeping your history and
+ settings. Install Later keeps you working. If Flowlight was installed with the .pkg, macOS asks for an administrator
+ password to replace it. Turn the check off in Settings › General.
+
+ Updating by hand? Quit Flowlight first (menu bar icon › Quit), then drag the new version into Applications. Finder can't replace an
+ app that's still running and says the item is in use.
 
  Demo mode
 
@@ -484,7 +490,7 @@ e.g. Wireshark
 
  Filtered in the kernelCapture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.
 
- Opt-in lookupsNaming who owns an address is off by default. The daily update check only asks GitHub for the latest version, and can be turned off.
+ Lookups you controlNaming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.
 
  One agent, all its tools. Traffic from the git, curl and MCP servers Claude Code started is counted as Claude Code's,
  labelled via curl or via github MCP. With an allowlist of GitHub and npm, the SMTP relay and the paste site stand out as Not allowed.
@@ -524,7 +530,9 @@ Questions
  Can it read my HTTPS traffic?
 
  No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
- DNS answers that map names to addresses. Contents stay encrypted.
+ DNS answers that map names to addresses. Contents stay encrypted. Full request inspection would need a local
+ TLS-intercepting proxy with its own trusted certificate, which is a different trust model, so it's on the roadmap only
+ as a separate mode you'd have to turn on. Some apps pin their certificates and would still refuse it.
 
  How is this different from Little Snitch or LuLu?
 
@@ -626,7 +634,7 @@ Privacy
 
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the default capture mode
 
- Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOff by default. Capture › Identify network owners
+ Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Capture › Identify network owners
 
  Permissions
 

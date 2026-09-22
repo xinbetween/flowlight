@@ -91,8 +91,8 @@ the app, the destination and the number that tripped it.
 ### Private by design
 No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
-The one optional network lookup (who owns an IP) is **off by default**. If you turn it on, it sends public IPs to
-Team Cymru's DNS service. The daily update check asks GitHub for the latest release, and you can switch it off in
+Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
+Team Cymru's DNS service, and you can turn it off in Capture. The daily update check asks GitHub for the latest release, and you can switch it off in
 Settings. To attribute tools and MCP servers, Flowlight reads process command lines and your agents' MCP config files
 on your Mac; none of it leaves your Mac.
 
@@ -112,9 +112,10 @@ on your Mac; none of it leaves your Mac.
 1. Download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
    Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
-   Flowlight checks for new releases daily and offers a verified download (Flowlight › Check for Updates…).
+   Flowlight checks for new releases daily. It downloads and verifies an update, then asks before it quits to install
+   it and reopen (Flowlight › Check for Updates…). Updating by hand? Quit Flowlight before dragging the new version in.
 3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
-   for your password once) and, optionally, network-owner lookups.
+   for your password once). Network-owner lookups are on by default and can be turned off there or in Capture.
 
 > **Try it without your own data:** `open /Applications/Flowlight.app --args -FLDemo YES` launches with 90 days
 > of synthetic traffic. That's what the screenshots show.
@@ -158,7 +159,7 @@ Two capture engines produce the same per-second summaries:
 |---|---|---|
 | Needs | nothing | Apple's `content-filter-provider` entitlement (paid developer account) |
 | Attribution | process → app bundle | audit token → code-signing identity |
-| Hostnames | TLS SNI + DNS from packet capture, reverse DNS, optional network owner | SNI, HTTP `Host`, system hostname, DNS |
+| Hostnames | TLS SNI + DNS from packet capture, reverse DNS, network owner | SNI, HTTP `Host`, system hostname, DNS |
 | Short-lived flows | flows under ~1 s can be missed | every flow |
 
 Storage rolls per-second rows into minute, hour and day tables. Week, month and year views read the daily table,
@@ -182,6 +183,10 @@ so a year of history stays fast.
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
 - [ ] Block allowlist violations in Network Extension mode
 - [ ] Export to OpenTelemetry / SIEM
+- [ ] Full HTTPS request inspection, as a separate opt-in mode. Seeing whole requests and responses means running a
+  local TLS-intercepting proxy with its own trusted certificate, and apps that pin certificates would still refuse it.
+  That's a different trust model, so Flowlight will stay focused on connection metadata and traffic analytics by default,
+  and only inspect traffic when you explicitly turn it on.
 
 ## Contributing
 

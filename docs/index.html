@@ -304,7 +304,7 @@
         <div><strong>Stays on your Mac</strong><p>One local SQLite file. No account, no cloud sync, no telemetry.</p></div>
         <div><strong>Metadata only</strong><p>Hostnames, ports and byte counts. Packet contents are never stored.</p></div>
         <div><strong>Filtered in the kernel</strong><p>Capture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.</p></div>
-        <div><strong>Opt-in lookups</strong><p>Naming who owns an address is off by default. The daily update check only asks GitHub for the latest version, and can be turned off.</p></div>
+        <div><strong>Lookups you control</strong><p>Naming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.</p></div>
       </div>
     </div>
   </section>
@@ -362,7 +362,9 @@ open Flowlight.app --args -FLDemo YES</pre>
           <p>No. It observes and alerts, including when an agent leaves its allowlist. Blocking allowlist violations is on the roadmap for the Network Extension build.</p></details>
         <details><summary>Can it read my HTTPS traffic?</summary>
           <p>No, and it doesn't try. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the
-            DNS answers that map names to addresses. Contents stay encrypted.</p></details>
+            DNS answers that map names to addresses. Contents stay encrypted. Full request inspection would need a local
+            TLS-intercepting proxy with its own trusted certificate, which is a different trust model, so it's on the roadmap only
+            as a separate mode you'd have to turn on. Some apps pin their certificates and would still refuse it.</p></details>
         <details><summary>How is this different from Little Snitch or LuLu?</summary>
           <p>Those are firewalls that ask you to allow connections. Flowlight is an analytics tool: history at any zoom,
             anomaly baselines, and rules built for AI agents. They work well side by side.</p></details>
