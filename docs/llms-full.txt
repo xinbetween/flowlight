@@ -616,6 +616,8 @@ e.g. Wireshark
 
  Mock responsesAnswer a chosen URL with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
 
+ Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
+
  Privacy
 
  A monitor you don't have to monitor

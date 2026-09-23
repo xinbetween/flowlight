@@ -231,6 +231,11 @@ so a year of history stays fast.
 - [ ] **Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status, headers
   and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - [ ] Export to OpenTelemetry / SIEM
+- [ ] **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification,
+  agent rules, MCP and LLM readers). Capture would be rewritten on eBPF or nfnetlink, and process attribution on
+  `/proc`; SwiftUI doesn't exist there.
+- [ ] **Windows.** The same core with capture on WFP or ETW and attribution through `GetExtendedTcpTable`. A bigger
+  commitment than Linux: three capture backends to maintain, and a thinner Swift ecosystem.
 - [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority; metadata
   and analytics stay the default)
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
