@@ -18,10 +18,15 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
     /// exits); without a limit that one hung process would stop sampling for good.
     var sampleTimeout: TimeInterval = 5
     /// Overridable for tests.
-    var executable = "/usr/bin/nettop"
-    var arguments = ["-L", "1", "-x", "-n", "-J", "bytes_in,bytes_out"]
+    var executable = "/usr/bin/perl"
+    /// nettop is run under perl's alarm so the kernel kills it even if Flowlight itself is killed mid-sample: a hung
+    /// nettop reparented to launchd was seen spinning at 150% CPU for hours.
+    var arguments = ["-e", "alarm \(Int(NettopTrafficSource.sampleLimit)); exec @ARGV", "--",
+                     "/usr/bin/nettop", "-L", "1", "-x", "-n", "-J", "bytes_in,bytes_out"]
+    static let sampleLimit: TimeInterval = 8
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
+        Self.killStrayNettops()
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: 1, leeway: .milliseconds(50))
         timer.setEventHandler { [weak self] in self?.sampleOnce(sink: sink, status: status) }
@@ -79,6 +84,29 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         let batch = makeBatch(deltas, timestamp: Int64(sampledAt.timeIntervalSince1970) - 1)
         // An empty batch still tells the app the sampler is alive; a quiet second isn't a stalled one.
         sink(batch.records.isEmpty ? [] : [batch])
+    }
+
+    /// Kills nettop processes left behind by an earlier Flowlight that was force-quit mid-sample. Only processes
+    /// whose arguments match the ones this sampler uses are touched.
+    static func killStrayNettops() {
+        let listing = Process()
+        listing.executableURL = URL(fileURLWithPath: "/bin/ps")
+        listing.arguments = ["-Ao", "pid=,ppid=,command="]
+        let pipe = Pipe()
+        listing.standardOutput = pipe
+        listing.standardError = FileHandle.nullDevice
+        guard (try? listing.run()) != nil else { return }
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        listing.waitUntilExit()
+        let me = getpid()
+        for line in output.split(separator: "\n") {
+            let fields = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard fields.count > 3, let pid = Int32(fields[0]), let parent = Int32(fields[1]),
+                  line.contains("/usr/bin/nettop"), line.contains("bytes_in"),
+                  parent != me, pid != me else { continue }
+            // Only strays: a sample of ours always has Flowlight as its parent.
+            if parent == 1 { kill(pid, SIGKILL) }
+        }
     }
 
     private func fail(_ message: String, status: (String) -> Void) {
