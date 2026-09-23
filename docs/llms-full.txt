@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.7, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -309,7 +309,7 @@ Free · open source · macOS 15+
 
  Star on GitHub
 
- v0.1.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.1.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -816,8 +816,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.1.6
+ 0.1.7
 September 23, 2026Latest
+
+ Setting up HTTPS inspection is one switch. Turning it on creates the certificate, trusts it and routes apps
+ through Flowlight; turning it off undoes all of it. Scope, the never-decrypt list and removal moved under Advanced.
+
+ Fixed: turning inspection on could fail with "the authorization was denied since no user interaction was
+ possible". Trust now goes through the system's own dialog.
+
+ Fixed: in a short window, AI Agents hid its description and time picker behind the title bar. The table and the
+ agent's detail now get the space instead.
+
+ Fixed: processes that exit before Flowlight can read their path showed up as pid 74397, and as agents of
+ their own. They're named from the sampler's own output now.
+
+ Downloads and checksums →
+
+ 0.1.6
+September 23, 2026
 
  Signed and notarized. Releases now carry a Developer ID signature and Apple's notarization, so macOS opens
  Flowlight without the "unverified developer" wall. Check it with spctl -a -vvv /Applications/Flowlight.app.
