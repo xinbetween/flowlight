@@ -203,7 +203,8 @@ so a year of history stays fast.
   Inspection speaks HTTP/1.1 to both sides.
 - **Hostname capture follows the primary interface.** Traffic confined to another interface or tunnel may lack names.
 - **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
-- **Release builds aren't notarized yet.** The first launch may need right-click › Open.
+- **Release builds aren't notarized yet.** macOS 15 blocks the first launch; open **System Settings › Privacy &
+  Security**, scroll to Security and click **Open Anyway** (Control-click › Open no longer works on macOS 15).
 
 ## Roadmap
 

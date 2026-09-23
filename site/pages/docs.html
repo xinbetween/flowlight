@@ -31,9 +31,10 @@ xcodegen generate &amp;&amp; scripts/build-local.sh
 open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="first-launch">First launch</h2>
-      <p>This preview isn't notarized yet, so macOS says it can't verify the developer. Right-click Flowlight in Applications,
-        choose <strong>Open</strong>, then <strong>Open</strong> again. You only do this once. On macOS 15 and later you can also allow it in
-        System Settings › Privacy &amp; Security › <em>Open Anyway</em>.</p>
+      <p>This preview isn't notarized yet, so macOS blocks the first launch and says it can't verify the developer. Open
+        <strong>System Settings › Privacy &amp; Security</strong>, scroll to <em>Security</em>, and click <strong>Open Anyway</strong> next to
+        the message about Flowlight. You only do this once. (Control-clicking the app and choosing Open no longer works: macOS 15 removed
+        that shortcut.)</p>
       <p>Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.</p>
 
       <h2 id="hostnames">Hostnames: the one-time setup</h2>

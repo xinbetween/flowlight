@@ -83,9 +83,10 @@ open build/Build/Products/Release/Flowlight.app
 
  First launch
 
- This preview isn't notarized yet, so macOS says it can't verify the developer. Right-click Flowlight in Applications,
- choose Open, then Open again. You only do this once. On macOS 15 and later you can also allow it in
- System Settings › Privacy & Security › Open Anyway.
+ This preview isn't notarized yet, so macOS blocks the first launch and says it can't verify the developer. Open
+ System Settings › Privacy & Security, scroll to Security, and click Open Anyway next to
+ the message about Flowlight. You only do this once. (Control-clicking the app and choosing Open no longer works: macOS 15 removed
+ that shortcut.)
 
  Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.
 
@@ -569,7 +570,7 @@ e.g. Wireshark
 
  Running in under a minute
 
- Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. The first launch of this preview needs right-click › Open.
+ Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. The first launch of this preview is blocked: open System Settings › Privacy & Security and click Open Anyway.
 
  Launch itTraffic appears within a second, and live ↓↑ rates sit in your menu bar.
 
