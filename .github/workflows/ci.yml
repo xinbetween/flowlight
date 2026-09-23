@@ -17,14 +17,24 @@ concurrency:
 jobs:
   test:
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        # README says Xcode 16 or later, so both ends of that are built. The oldest one earns its place: it is
+        # stricter about expressions the type checker has to explore, and it caught two the newest compiler accepts.
+        xcode: [oldest, newest]
+    name: test (${{ matrix.xcode }} Xcode)
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
-      # The newest Xcode on the image, named in the log so a release says which compiler built it.
       - name: Select Xcode
         run: |
           set -euo pipefail
-          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          if [[ "${{ matrix.xcode }}" == "newest" ]]; then
+            sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          else
+            sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | head -1)"
+          fi
           xcodebuild -version
 
       - name: Install XcodeGen
@@ -48,6 +58,7 @@ jobs:
           grep -E "Executed .* tests|\*\* TEST" "$LOG" | tail -20
 
       - name: Check the site builds and is committed
+        if: ${{ matrix.xcode == 'newest' }}
         run: |
           python3 scripts/build_site.py
           git diff --exit-code -- docs/ || {
