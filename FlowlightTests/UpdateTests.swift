@@ -89,3 +89,19 @@ final class UpdateInstallerTests: XCTestCase {
         try? fm.removeItem(at: root)
     }
 }
+
+final class ReleaseNotesHeadlineTests: XCTestCase {
+    func testTakesTheFirstMeaningfulLine() {
+        let notes = """
+        **Early preview.**
+
+        ### What's new in 0.1.7
+        - Setting up HTTPS inspection is one switch, not three steps.
+        """
+        XCTAssertEqual(ReleaseNotes.headline(notes), "Early preview.")
+        XCTAssertEqual(ReleaseNotes.headline("### Fixes\n- Short windows no longer hide the header behind the title bar."),
+                       "Short windows no longer hide the header behind the title bar.",
+                       "a bare heading like \"Fixes\" is skipped for the line that actually says something")
+        XCTAssertNil(ReleaseNotes.headline("v2\n\n- ok"), "nothing long enough to be useful")
+    }
+}

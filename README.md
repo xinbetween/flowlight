@@ -221,6 +221,9 @@ so a year of history stays fast.
 
 - [x] Signed and notarized releases (Developer ID, from 0.1.6)
 - [ ] A Homebrew cask
+- [ ] **Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes on a
+  tag, so releases don't depend on one Mac. Needs the Developer ID certificates and an App Store Connect key as
+  repository secrets, which puts the signing identity in GitHub — worth weighing for a security tool.
 - [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
 - [ ] **Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with a

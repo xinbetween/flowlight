@@ -118,7 +118,12 @@ final class TrafficMonitor: ObservableObject {
         activity.start()
         inspection.onRecorded = { [weak self] in self?.inspectionVersion += 1 }
         inspection.attach(db: db)
-        if UserDefaults.standard.bool(forKey: AnomalySettings.Keys.notifications) { Notifier.requestAuthorization() }
+        Notifier.configure()
+        // Either kind of notification needs permission: anomaly alerts, or "a new version is available".
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: AnomalySettings.Keys.notifications) || defaults.bool(forKey: UpdateChecker.Keys.automatic) {
+            Notifier.requestAuthorization()
+        }
         startSource()
         db.async { [engine] db in
             IPOwnerLookup.shared.preload(try db.loadOwners())

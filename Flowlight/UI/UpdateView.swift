@@ -133,6 +133,16 @@ struct UpdateView: View {
 }
 
 enum ReleaseNotes {
+    /// The first meaningful line of the notes, for a notification body.
+    static func headline(_ markdown: String) -> String? {
+        for line in readable(markdown).components(separatedBy: "\n") {
+            let text = line.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "•  ", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            if text.count > 12 { return String(text.prefix(160)) }
+        }
+        return nil
+    }
+
     /// Release-note Markdown made readable in a plain text view: headings become bold lines, bullets get "•",
     /// and everything from the checksum section on is dropped (it's for verification, not reading).
     static func readable(_ markdown: String) -> String {

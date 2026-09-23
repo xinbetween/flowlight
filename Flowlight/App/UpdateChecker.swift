@@ -85,6 +85,7 @@ final class UpdateChecker: ObservableObject {
         static let automatic = "updates.automatic"
         static let lastCheck = "updates.lastCheck"
         static let skipped = "updates.skippedVersion"
+        static let notified = "updates.notifiedVersion"
     }
 
     @Published private(set) var state: State = .idle
@@ -166,8 +167,17 @@ final class UpdateChecker: ObservableObject {
             UserDefaults.standard.set(Date(), forKey: Keys.lastCheck)
             if VersionCompare.isNewer(release.version, than: currentVersion) {
                 state = .available(release)
-                // A user-initiated check always shows the window; background checks only for unskipped versions.
-                if userInitiated || pendingUpdate != nil { showWindow = true }
+                if userInitiated {
+                    showWindow = true
+                } else if let pending = pendingUpdate {
+                    // A background check doesn't interrupt what you're doing: it notifies, and the sidebar shows a
+                    // badge. The notification is posted once per version.
+                    let defaults = UserDefaults.standard
+                    if defaults.string(forKey: Keys.notified) != pending.version {
+                        defaults.set(pending.version, forKey: Keys.notified)
+                        Notifier.postUpdate(version: pending.version, summary: ReleaseNotes.headline(pending.notes))
+                    }
+                }
             } else {
                 state = .upToDate
                 if userInitiated { showWindow = true }

@@ -1,9 +1,45 @@
 import Foundation
 import UserNotifications
 
+extension Notification.Name {
+    /// Posted when someone clicks an update notification, so the app can bring up the update window.
+    static let flowlightOpenUpdate = Notification.Name("flowlight.openUpdate")
+}
+
+/// Handles clicks on Flowlight's notifications, and lets them show while the app is in front.
+final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationRouter()
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async
+        -> UNNotificationPresentationOptions { [.banner, .sound] }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard response.notification.request.content.categoryIdentifier == Notifier.updateCategory else { return }
+        await MainActor.run { NotificationCenter.default.post(name: .flowlightOpenUpdate, object: nil) }
+    }
+}
+
 enum Notifier {
+    static let updateCategory = "flowlight.update"
+
+    /// Always registered, so clicking a notification opens the right place even when alerts are switched off.
+    static func configure() {
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+    }
+
     static func requestAuthorization() {
+        configure()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// Tells the person a new version is out. Clicking it opens the update window.
+    static func postUpdate(version: String, summary: String?) {
+        let content = UNMutableNotificationContent()
+        content.title = "Flowlight \(version) is available"
+        content.body = summary ?? "Click to see what's new and install it."
+        content.categoryIdentifier = updateCategory
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "flowlight.update.\(version)", content: content, trigger: nil))
     }
 
     static func post(_ alerts: [AlertRecord]) {
