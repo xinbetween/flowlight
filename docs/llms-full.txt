@@ -70,7 +70,9 @@ Documentation
 
  Install
 
- Download Flowlight.dmg, open it and drag Flowlight into Applications.
+ With Homebrew: brew install --cask xinbetween/tap/flowlight. The same command upgrades it later.
+
+ Or download Flowlight.dmg, open it and drag Flowlight into Applications.
 
  Prefer an installer? Every release also has a .pkg.
 
@@ -256,11 +258,15 @@ open build/Build/Products/Release/Flowlight.app
 
  Uninstall
 
- In Capture, choose Remove Packet Capture Access (asks for your password) if you enabled it.
+ In Capture, choose Remove Packet Capture Access (asks for your password) if you enabled it,
+ uninstall the content filter if you installed it, and turn HTTPS inspection off in Inspect so its certificate
+ leaves your keychain. Only Flowlight itself can withdraw those three.
 
- Quit Flowlight and move it from Applications to the Trash.
+ Quit Flowlight and move it from Applications to the Trash — or, if you installed it with Homebrew,
+ brew uninstall --cask flowlight.
 
- Delete ~/Library/Application Support/Flowlight to remove the recorded history.
+ Delete ~/Library/Application Support/Flowlight to remove the recorded history, or let Homebrew do it with
+ brew uninstall --zap --cask flowlight.
 
  Questions & answers
 
@@ -609,8 +615,6 @@ e.g. Wireshark
  What's coming
 
  Flowlight observes and explains today. This is the order the rest is being built in.
-
- A Homebrew cask 0.2.1brew install --cask flowlight, so installing and updating Flowlight is one command.
 
  Focus mode 0.2.2Pick the apps and domains you care about and ignore everything else, for debugging a single agent without the rest of the Mac's traffic in the way.
 

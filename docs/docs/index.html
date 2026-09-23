@@ -50,7 +50,8 @@
     <article class="prose">
       <h2 id="install">Install</h2>
       <ol>
-        <li>Download <a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Flowlight.dmg</a>, open it and drag Flowlight into Applications.</li>
+        <li>With Homebrew: <code>brew install --cask xinbetween/tap/flowlight</code>. The same command upgrades it later.</li>
+        <li>Or download <a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Flowlight.dmg</a>, open it and drag Flowlight into Applications.</li>
         <li>Prefer an installer? Every <a href="https://github.com/xinbetween/flowlight/releases/latest">release</a> also has a <code>.pkg</code>.</li>
         <li>Building from source needs Xcode 16 or later and <code>xcodegen</code>:</li>
       </ol>
@@ -197,9 +198,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="uninstall">Uninstall</h2>
       <ol>
-        <li>In <strong>Capture</strong>, choose <strong>Remove Packet Capture Access</strong> (asks for your password) if you enabled it.</li>
-        <li>Quit Flowlight and move it from Applications to the Trash.</li>
-        <li>Delete <code>~/Library/Application Support/Flowlight</code> to remove the recorded history.</li>
+        <li>In <strong>Capture</strong>, choose <strong>Remove Packet Capture Access</strong> (asks for your password) if you enabled it,
+          uninstall the content filter if you installed it, and turn HTTPS inspection off in <strong>Inspect</strong> so its certificate
+          leaves your keychain. Only Flowlight itself can withdraw those three.</li>
+        <li>Quit Flowlight and move it from Applications to the Trash — or, if you installed it with Homebrew,
+          <code>brew uninstall --cask flowlight</code>.</li>
+        <li>Delete <code>~/Library/Application Support/Flowlight</code> to remove the recorded history, or let Homebrew do it with
+          <code>brew uninstall --zap --cask flowlight</code>.</li>
       </ol>
 
       <h2 id="faq">Questions &amp; answers</h2>

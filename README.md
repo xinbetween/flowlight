@@ -146,7 +146,13 @@ same local database.
 
 ## Install
 
-1. Download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
+1. With Homebrew:
+
+   ```sh
+   brew install --cask xinbetween/tap/flowlight
+   ```
+
+   Or download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
    Releases are signed and notarized, so it opens straight away.
    Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
@@ -227,10 +233,10 @@ Shipped:
 - [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority;
   metadata and analytics stay the default)
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
+- [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
 
 Planned, in order:
 
-- **0.2.1 — A Homebrew cask.** `brew install --cask flowlight`, so installing and updating is one command.
 - **0.2.2 — Focus mode.** Pick the apps and domains you care about and ignore everything else, for debugging a single
   agent or app without the rest of the Mac's traffic in the way.
 - **0.2.3 — Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes
