@@ -158,6 +158,7 @@ private struct InspectionSetup: View {
     @State private var newPattern = ""
     @State private var confirmRemove = false
     @State private var showAdvanced = false
+    @State private var confirmTurnOn = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -173,7 +174,9 @@ private struct InspectionSetup: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    Toggle(isOn: Binding(get: { inspection.enabled }, set: { inspection.setEnabled($0) })) {
+                    Toggle(isOn: Binding(get: { inspection.enabled }, set: { wanted in
+                        if wanted { confirmTurnOn = true } else { inspection.setEnabled(false) }
+                    })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Turn on HTTPS inspection").font(.headline)
                             Text("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back.")
@@ -267,6 +270,12 @@ private struct InspectionSetup: View {
         }
         .frame(maxWidth: 760, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .confirmationDialog("macOS will ask you twice", isPresented: $confirmTurnOn) {
+            Button("Continue") { inspection.setEnabled(true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both.")
+        }
         .confirmationDialog("Remove HTTPS inspection?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { inspection.removeEverything() }
         } message: {

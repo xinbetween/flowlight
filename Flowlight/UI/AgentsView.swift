@@ -390,14 +390,13 @@ struct AgentDetail: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        if activity.isEmpty && servers.isEmpty && workspaces.isEmpty {
-                            Text("Other destinations").font(.caption.bold()).foregroundStyle(.secondary)
-                        } else {
+                        do {
                             Picker("Show", selection: $tab) {
                                 Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
-                                Text("Tool calls (\(activity.count))").tag(Tab.calls)
-                                if toolCount > 0 { Text("Tools (\(toolCount))").tag(Tab.tools) }
-                                Text("MCP servers (\(servers.count + unusedServers.count))").tag(Tab.servers)
+                                Text(activity.isEmpty ? "Tool calls" : "Tool calls (\(activity.count))").tag(Tab.calls)
+                                Text(toolCount > 0 ? "Tools (\(toolCount))" : "Tools").tag(Tab.tools)
+                                let mcpCount = servers.count + unusedServers.count
+                                Text(mcpCount > 0 ? "MCP servers (\(mcpCount))" : "MCP servers").tag(Tab.servers)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
                         }
@@ -407,7 +406,7 @@ struct AgentDetail: View {
                         }
                         .controlSize(.small)
                     }
-                    switch activity.isEmpty && servers.isEmpty && workspaces.isEmpty ? .destinations : tab {
+                    switch tab {
                     case .destinations:
                         if agent.otherDestinations.isEmpty {
                             Text("Only AI providers. Nothing else was contacted.").font(.caption).foregroundStyle(.secondary)
@@ -420,10 +419,7 @@ struct AgentDetail: View {
                             }
                         }
                     case .calls:
-                        if activity.isEmpty {
-                            Text("No tool calls seen. Start \(agent.name) from an inspected Terminal to see them.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                        if activity.isEmpty { InspectionHint(agent: agent.name, what: "the tool calls its model asks for") }
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 8) {
                                 ForEach(activity.prefix(300)) { ToolActivityRow(activity: $0) }
@@ -466,6 +462,10 @@ struct AgentDetail: View {
                     case .servers:
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 10) {
+                                if servers.isEmpty && unusedServers.isEmpty {
+                                    AgentSetupBar(agent: agent.name)
+                                    InspectionHint(agent: agent.name, what: "the MCP servers it calls over the network")
+                                }
                                 ForEach(servers) { MCPServerRow(server: $0) }
                                 ForEach(unusedServers, id: \.server.name) { entry in
                                     ConfiguredServerRow(server: entry.server, scope: entry.scope)
@@ -919,4 +919,21 @@ enum Help {
     static let faq = URL(string: "https://flowlight.xinbetween.com/docs/#faq")!
     static let privacy = URL(string: "https://flowlight.xinbetween.com/privacy/")!
     static let issues = URL(string: "https://github.com/xinbetween/flowlight/issues")!
+}
+
+/// Shown where inspected data would be, when HTTPS inspection is off.
+struct InspectionHint: View {
+    let agent: String
+    let what: String
+    @EnvironmentObject private var nav: AppNavigation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Flowlight sees \(agent)'s connections, but not what's inside them. Turn on HTTPS inspection to see \(what).")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button("Set up HTTPS inspection") { nav.selection = .inspect }
+                .controlSize(.small)
+        }
+        .padding(.bottom, 4)
+    }
 }

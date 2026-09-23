@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.0, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -312,7 +312,7 @@ Free · open source · macOS 15+
 
  Star on GitHub
 
- v0.1.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -819,8 +819,28 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.1.7
+ 0.2.0
 September 23, 2026Latest
+
+ Opens at the size of your screen. The first launch fills the display instead of a small window, so the
+ timeline, the table and an agent's detail are all readable without resizing first.
+
+ The agent tabs are always there. Tool calls, Tools and MCP servers used to disappear when they had nothing
+ to show, which also hid the button that finds an agent's configuration. Each one now explains what it needs.
+
+ Turning on inspection says what it will ask for. Flowlight tells you about both system prompts before the
+ first one appears, skips either if nothing would change, and undoes the certificate if you cancel the second.
+
+ Fixed: a build that can't use the Network Extension sat on an empty screen. It now falls back to the
+ sampler and says why.
+
+ New versions arrive as a notification from a daily check, instead of a window taking over what you were
+ doing. The check asks GitHub for the latest version and nothing else, and it can be turned off.
+
+ Downloads and checksums →
+
+ 0.1.7
+September 23, 2026
 
  Setting up HTTPS inspection is one switch. Turning it on creates the certificate, trusts it and routes apps
  through Flowlight; turning it off undoes all of it. Scope, the never-decrypt list and removal moved under Advanced.

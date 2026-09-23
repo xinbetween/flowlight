@@ -208,16 +208,27 @@ final class TrafficMonitor: ObservableObject {
     private func startSource() {
         source?.stop()
         let newSource: TrafficSource
-        if DemoData.isEnabled { newSource = DemoTrafficSource() }
-        else if mode == .networkExtension { newSource = ExtensionTrafficSource() }
-        else { newSource = NettopTrafficSource() }
+        // A build without the entitlement can never reach the extension; capture with the sampler rather than
+        // sitting there recording nothing.
+        let canUseExtension = ExtensionManager.isEntitled
+        var fallbackNote: String?
+        if DemoData.isEnabled {
+            newSource = DemoTrafficSource()
+        } else if mode == .networkExtension, canUseExtension {
+            newSource = ExtensionTrafficSource()
+        } else {
+            if mode == .networkExtension {
+                fallbackNote = "This build isn't signed for the Network Extension — sampling with nettop instead."
+            }
+            newSource = NettopTrafficSource()
+        }
         source = newSource
-        status = "Starting \(newSource.displayName)…"
+        status = fallbackNote ?? "Starting \(newSource.displayName)…"
         if started { updatePacketCapture() }
         newSource.start(sink: { [weak self] batches in
             self?.ingest(batches)
         }, status: { [weak self] message in
-            Task { @MainActor in self?.status = message }
+            Task { @MainActor in self?.status = fallbackNote ?? message }
         })
     }
 

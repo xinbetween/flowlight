@@ -82,3 +82,22 @@ enum TrafficColors {
     static let outbound = Color.orange
     static let anomaly = Color.red
 }
+
+/// Opens the first window at the size of the screen, so everything Flowlight shows has room. It runs once: after
+/// that macOS restores whatever size the person chose.
+struct WindowSizer: NSViewRepresentable {
+    private static let key = "window.sizedToScreen"
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            guard !UserDefaults.standard.bool(forKey: Self.key),
+                  let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
+            UserDefaults.standard.set(true, forKey: Self.key)
+            window.setFrame(screen.visibleFrame, display: true, animate: false)
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {}
+}

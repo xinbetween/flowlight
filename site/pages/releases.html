@@ -13,7 +13,23 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.1.7</h2><time datetime="2026-09-23">September 23, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.2.0</h2><time datetime="2026-09-23">September 23, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Opens at the size of your screen.</strong> The first launch fills the display instead of a small window, so the
+            timeline, the table and an agent's detail are all readable without resizing first.</li>
+          <li><strong>The agent tabs are always there.</strong> Tool calls, Tools and MCP servers used to disappear when they had nothing
+            to show, which also hid the button that finds an agent's configuration. Each one now explains what it needs.</li>
+          <li><strong>Turning on inspection says what it will ask for.</strong> Flowlight tells you about both system prompts before the
+            first one appears, skips either if nothing would change, and undoes the certificate if you cancel the second.</li>
+          <li><strong>Fixed:</strong> a build that can't use the Network Extension sat on an empty screen. It now falls back to the
+            sampler and says why.</li>
+          <li><strong>New versions arrive as a notification</strong> from a daily check, instead of a window taking over what you were
+            doing. The check asks GitHub for the latest version and nothing else, and it can be turned off.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.2.0">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.1.7</h2><time datetime="2026-09-23">September 23, 2026</time></header>
         <ul>
           <li><strong>Setting up HTTPS inspection is one switch.</strong> Turning it on creates the certificate, trusts it and routes apps
             through Flowlight; turning it off undoes all of it. Scope, the never-decrypt list and removal moved under <em>Advanced</em>.</li>

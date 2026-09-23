@@ -59,6 +59,7 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .flowlightOpenUpdate)) { _ in openWindow(id: "update") }
+        .background(WindowSizer())
         .onAppear { monitor.windowAppeared() }
         .onDisappear { monitor.windowDisappeared() }
         .onChange(of: updater.showWindow) { _, show in

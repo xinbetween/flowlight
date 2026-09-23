@@ -140,17 +140,26 @@ final class InspectionController: ObservableObject {
         let script = "do shell script " + InspectionShell.appleScriptQuote(commands.joined(separator: " && "))
             + " with administrator privileges"
         let certificate = ca
+        // Skip a prompt that would change nothing: re-enabling with the certificate already trusted asks only for
+        // the proxy, and turning off an untrusted certificate asks only to undo the proxy.
+        let needsTrustChange = certificate.isTrustedAnywhere != on
+        let needsProxyChange = !services.isEmpty
         Task.detached(priority: .userInitiated) {
-            // Trust first: it puts up its own dialog, and there's no point changing the proxy if it's refused.
             var failure: String?
-            do { try certificate.setTrusted(on) } catch { failure = error.localizedDescription }
-            if failure == nil {
+            var trustChanged = false
+            // Trust first: it has its own dialog, and there's no point changing the proxy if it's refused.
+            if needsTrustChange {
+                do { try certificate.setTrusted(on); trustChanged = true } catch { failure = error.localizedDescription }
+            }
+            if failure == nil, needsProxyChange {
                 var error: NSDictionary?
                 NSAppleScript(source: script)?.executeAndReturnError(&error)
                 failure = error.flatMap { e -> String? in
                     (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
                         : (e[NSAppleScript.errorMessage] as? String ?? "authorization failed")
                 }
+                // Don't leave the certificate trusted for a proxy that was never set up.
+                if failure != nil, trustChanged { try? certificate.setTrusted(!on) }
             }
             await MainActor.run { self.finishSetup(on: on, failure: failure) }
         }

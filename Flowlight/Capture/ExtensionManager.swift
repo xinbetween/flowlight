@@ -24,11 +24,13 @@ final class ExtensionManager: NSObject, ObservableObject {
     @Published private(set) var state: State = .unknown
 
     /// Whether this build carries the content-filter entitlement (false for ad-hoc/local builds).
-    let hasEntitlement: Bool = {
+    static let isEntitled: Bool = {
         guard let task = SecTaskCreateFromSelf(nil) else { return false }
         let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.networking.networkextension" as CFString, nil)
         return (value as? [String])?.contains("content-filter-provider-systemextension") == true
     }()
+
+    var hasEntitlement: Bool { Self.isEntitled }
 
     /// macOS only activates system extensions from apps in /Applications.
     var isInApplications: Bool { Bundle.main.bundlePath.hasPrefix("/Applications/") }
