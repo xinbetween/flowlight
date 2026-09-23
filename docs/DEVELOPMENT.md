@@ -93,7 +93,9 @@ The App Group and Mach service names come from `$(TeamIdentifierPrefix)com.flowl
 - Complete minutes fold into `agg_1m` once a minute. Hour and day tiers are folded from the immutable
   minute rows, keyed by a watermark, so re-running a rollup never double counts.
 - Week, month and year reports bucket the daily table with the user's calendar.
-- The database lives in the App Group container for entitled builds, and in `~/Library/Application Support/Flowlight` otherwise.
+- The database always lives in `~/Library/Application Support/Flowlight`, so history survives a build gaining or losing
+  the App Group entitlement and a change of Team ID. The extension never opens it; it only shares the group for its XPC
+  service. A database left in the group container by an older build is moved out on first launch (`resolveURL`).
 
 ## Anomaly detection
 

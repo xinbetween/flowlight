@@ -149,17 +149,32 @@ final class TrafficDatabase: @unchecked Sendable {
     private let conn: SQLiteConnection
     let url: URL
 
-    /// The App Group container when this build is entitled for it (shared with the extension),
-    /// otherwise Application Support. Touching an un-entitled group container can trigger a
-    /// "would like to access data from other apps" privacy prompt on recent macOS.
+    /// Always Application Support, so history survives a build gaining (or losing) the App Group entitlement and
+    /// a change of Team ID. The extension never opens the database; it only shares the group for its XPC service.
+    /// A database left in the group container by an earlier build is adopted once.
     static func defaultURL() -> URL {
         let fm = FileManager.default
+        // Touching an un-entitled group container can trigger a "would like to access data from other apps" prompt.
         let groupURL = hasAppGroupEntitlement
             ? fm.containerURL(forSecurityApplicationGroupIdentifier: FlowlightConstants.appGroupIdentifier) : nil
-        let base = groupURL
-            ?? fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Flowlight")
+        return resolveURL(appSupport: fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0], group: groupURL, fm: fm)
+    }
+
+    /// `<appSupport>/Flowlight/traffic.sqlite`, moving an older database out of `group` if this is the first run
+    /// without one there. Moves the WAL and shared-memory files with it, so no committed data is lost.
+    static func resolveURL(appSupport: URL, group: URL?, fm: FileManager = .default) -> URL {
+        let base = appSupport.appendingPathComponent("Flowlight")
         try? fm.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("traffic.sqlite")
+        let target = base.appendingPathComponent("traffic.sqlite")
+        guard !fm.fileExists(atPath: target.path), let group else { return target }
+        let legacy = group.appendingPathComponent("traffic.sqlite")
+        guard fm.fileExists(atPath: legacy.path) else { return target }
+        for suffix in ["", "-wal", "-shm"] {
+            let from = URL(fileURLWithPath: legacy.path + suffix), to = URL(fileURLWithPath: target.path + suffix)
+            guard fm.fileExists(atPath: from.path) else { continue }
+            do { try fm.moveItem(at: from, to: to) } catch { try? fm.copyItem(at: from, to: to) }
+        }
+        return target
     }
 
     let isReadOnly: Bool

@@ -238,3 +238,41 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(try db.alerts().count, 2)
     }
 }
+
+final class DatabaseLocationTests: XCTestCase {
+    private func makeDir() -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("loc-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func testAlwaysUsesApplicationSupport() {
+        let support = makeDir(), group = makeDir()
+        defer { for d in [support, group] { try? FileManager.default.removeItem(at: d) } }
+        let url = TrafficDatabase.resolveURL(appSupport: support, group: group)
+        XCTAssertEqual(url, support.appendingPathComponent("Flowlight/traffic.sqlite"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: group.appendingPathComponent("traffic.sqlite").path))
+    }
+
+    func testAdoptsADatabaseLeftInTheGroupContainer() throws {
+        let support = makeDir(), group = makeDir()
+        defer { for d in [support, group] { try? FileManager.default.removeItem(at: d) } }
+        for suffix in ["", "-wal"] {
+            try Data("db\(suffix)".utf8).write(to: group.appendingPathComponent("traffic.sqlite\(suffix)"))
+        }
+        let url = TrafficDatabase.resolveURL(appSupport: support, group: group)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "db")
+        XCTAssertEqual(try String(contentsOf: URL(fileURLWithPath: url.path + "-wal"), encoding: .utf8), "db-wal")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: group.appendingPathComponent("traffic.sqlite").path))
+    }
+
+    func testKeepsTheExistingDatabaseWhenBothExist() throws {
+        let support = makeDir(), group = makeDir()
+        defer { for d in [support, group] { try? FileManager.default.removeItem(at: d) } }
+        try FileManager.default.createDirectory(at: support.appendingPathComponent("Flowlight"), withIntermediateDirectories: true)
+        try Data("current".utf8).write(to: support.appendingPathComponent("Flowlight/traffic.sqlite"))
+        try Data("older".utf8).write(to: group.appendingPathComponent("traffic.sqlite"))
+        let url = TrafficDatabase.resolveURL(appSupport: support, group: group)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "current")
+    }
+}
