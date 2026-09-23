@@ -127,8 +127,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
         links each request a tool makes back to the call that caused it: curl's request to <em>paste.example</em> shows
         <em>← Bash: curl -s https://paste.example/up</em>. In <strong>AI Agents</strong>, an agent's detail gets <strong>Tool calls</strong>
         (each call with its command, result or error, and the requests it made) and <strong>MCP servers</strong> (name and version, local or
-        remote, the tools it offers, calls and failures). Bodies open as a collapsible JSON tree in their original key order; event streams
-        show one event at a time.</p>
+        remote or <em>via provider</em>, the tools it offers, calls and failures) and <strong>Tools</strong> (every tool the agent declares to the
+        model, with how often each was used). The agent's header line shows the model, the number of calls and the tokens spent, including
+        cached ones. Bodies open as a collapsible JSON tree in their original key order; event streams show one event at a time.</p>
+      <p>Agents declare their tools on every turn, so an inspected request shows more than the calls themselves: the tools the agent offers,
+        the ones the provider runs on its own servers (web search, code execution), and the MCP servers the provider connects to for the agent
+        (Anthropic's <code>mcp_servers</code>, OpenAI's <code>mcp</code> tool) with their URL, token, approval setting and allowed tools. That
+        last group never appears on your network, because the provider makes those connections, not your Mac.</p>
       <ol>
         <li><strong>Turn it on</strong> in Inspect › Setup. By default only AI agents and the tools they start are decrypted; other apps sent through
           the proxy pass through encrypted and aren't recorded.</li>

