@@ -237,7 +237,7 @@ final class TrafficDatabase: @unchecked Sendable {
         """)
         // Added in 0.1.5.
         let exchangeColumns = Set(try conn.query("PRAGMA table_info(http_exchanges)") { $0.text(1) })
-        for column in ["tool_results", "mcp"] where !exchangeColumns.contains(column) {
+        for column in ["tool_results", "mcp", "llm"] where !exchangeColumns.contains(column) {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
         }
     }
@@ -621,15 +621,16 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("""
             INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                 req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                agent_name, mcp_server, tool_calls, note, tool_results, mcp)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                   .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                   .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
                   .text(json(e.responseHeaders)), .blob(e.responseBody), .int(Int64(e.responseSize)), .int(e.responseTruncated ? 1 : 0),
                   .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
                   .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
-                  .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp))])
+                  .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
+                  .text(e.llm.map(json) ?? "")])
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
@@ -638,7 +639,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
-                   tool_results, mcp
+                   tool_results, mcp, llm
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
                                                    OR mcp LIKE ?)
             ORDER BY ts DESC LIMIT ?
@@ -646,7 +647,7 @@ final class TrafficDatabase: @unchecked Sendable {
                   .int(Int64(limit))]) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
-            let tools = row.text(22), results = row.text(24), mcp = row.text(25)
+            let tools = row.text(22), results = row.text(24), mcp = row.text(25), llm = row.text(26)
             return HTTPExchange(
                 id: row.int(0), started: Date(timeIntervalSince1970: row.double(1)), duration: row.double(2), scheme: row.text(3),
                 host: row.text(4), port: Int(row.int(5)), method: row.text(6), path: row.text(7),
@@ -657,6 +658,7 @@ final class TrafficDatabase: @unchecked Sendable {
                 toolCalls: tools.isEmpty ? [] : ((try? decoder.decode([ToolCall].self, from: Data(tools.utf8))) ?? []),
                 toolResults: results.isEmpty ? [] : ((try? decoder.decode([ToolResult].self, from: Data(results.utf8))) ?? []),
                 mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
+                llm: llm.isEmpty ? nil : try? decoder.decode(LLMFacts.self, from: Data(llm.utf8)),
                 note: row.text(23).nilIfEmpty)
         }
     }

@@ -25,6 +25,7 @@ struct AgentsView: View {
     @State private var toolUsage: [String: [ToolUsage]] = [:]
     @State private var toolActivity: [String: [ToolActivity]] = [:]
     @State private var mcpServers: [String: [MCPServerSummary]] = [:]
+    @State private var profiles: [String: AgentProfile] = [:]
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
@@ -56,6 +57,7 @@ struct AgentsView: View {
                 if let selected {
                     AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
                                 activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
+                                profile: profiles[selected.bundleID],
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
@@ -144,6 +146,7 @@ struct AgentsView: View {
         let configured = Dictionary(grouping: rows.filter { !$0.mcpServer.isEmpty && !$0.parentAgent.isEmpty }) { $0.parentAgent }
             .mapValues { Array(Set($0.map(\.mcpServer))) }
         mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
+        profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -304,11 +307,12 @@ struct AgentDetail: View {
     var toolCalls: [ToolUsage] = []
     var activity: [ToolActivity] = []
     var servers: [MCPServerSummary] = []
+    var profile: AgentProfile?
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
     @State private var tab = Tab.destinations
 
-    enum Tab: Hashable { case destinations, calls, servers }
+    enum Tab: Hashable { case destinations, calls, tools, servers }
 
     var body: some View {
         GroupBox {
@@ -377,6 +381,7 @@ struct AgentDetail: View {
                             Picker("Show", selection: $tab) {
                                 Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
                                 Text("Tool calls (\(activity.count))").tag(Tab.calls)
+                                if let profile, !profile.tools.isEmpty { Text("Tools (\(profile.tools.count))").tag(Tab.tools) }
                                 Text("MCP servers (\(servers.count))").tag(Tab.servers)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
@@ -410,6 +415,18 @@ struct AgentDetail: View {
                             }
                             .padding(.trailing, 6)
                         }
+                    case .tools:
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 6) {
+                                let tools = profile?.tools ?? []
+                                Text("Every tool \(agent.name) offers the model, from its inspected requests. \(tools.filter { $0.used > 0 }.count) of \(tools.count) were used in this window.")
+                                    .font(.caption).foregroundStyle(.secondary).padding(.bottom, 2)
+                                ForEach(Array(tools.enumerated()), id: \.offset) { _, entry in
+                                    DeclaredToolRow(tool: entry.tool, used: entry.used)
+                                }
+                            }
+                            .padding(.trailing, 6)
+                        }
                     case .servers:
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 10) {
@@ -422,7 +439,42 @@ struct AgentDetail: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         } label: {
-            Text("\(agent.name) · \(ByteFormat.string(agent.total.total)) in \(window.title.lowercased())")
+            HStack(spacing: 6) {
+                Text("\(agent.name) · \(ByteFormat.string(agent.total.total)) in \(window.title.lowercased())")
+                if let profile, profile.requests > 0 {
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(modelLine(profile)).foregroundStyle(.secondary)
+                        .help("From inspected calls to \(profile.providerName ?? "the model provider")")
+                    if profile.failures > 0 {
+                        Text("· \(profile.failures) failed").foregroundStyle(TrafficColors.anomaly)
+                    }
+                }
+            }
+            .lineLimit(1)
+        }
+    }
+
+    /// "claude-sonnet · 18 calls · 1.2M in / 24k out" from the agent's inspected requests.
+    private func modelLine(_ profile: AgentProfile) -> String {
+        var parts: [String] = []
+        if let model = profile.models.max(by: { $0.requests < $1.requests })?.name {
+            parts.append(profile.models.count > 1 ? "\(model) +\(profile.models.count - 1)" : model)
+        }
+        parts.append("\(profile.requests) \(profile.requests == 1 ? "call" : "calls")")
+        if !profile.usage.isEmpty {
+            var tokens = "\(Self.count(profile.usage.input)) in / \(Self.count(profile.usage.output)) out"
+            if profile.usage.cacheRead > 0 { tokens += " · \(Self.count(profile.usage.cacheRead)) cached" }
+            parts.append(tokens)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    static func count(_ value: Int) -> String {
+        switch value {
+        case 1_000_000...: return String(format: "%.1fM", Double(value) / 1_000_000)
+        case 10_000...: return "\(value / 1000)k"
+        case 1_000...: return String(format: "%.1fk", Double(value) / 1000)
+        default: return "\(value)"
         }
     }
 
@@ -541,7 +593,46 @@ struct ToolActivityRow: View {
     }
 }
 
-/// An MCP server: where it runs, the tools it offers and how they were used.
+/// One tool an agent declared to the model, and how often the model asked for it.
+struct DeclaredToolRow: View {
+    let tool: DeclaredTool
+    let used: Int
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: icon).foregroundStyle(used > 0 ? .purple : .secondary).frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    Text(tool.name).bold(used > 0)
+                    if tool.kind != .function {
+                        Text(tool.kind == .provider ? "runs at the provider" : "MCP server")
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(.quaternary, in: Capsule())
+                    }
+                }
+                if let detail = tool.detail, !detail.isEmpty {
+                    Text(detail).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(used > 0 ? "×\(used)" : "unused").monospacedDigit()
+                .foregroundStyle(used > 0 ? .primary : .tertiary)
+        }
+        .font(.caption)
+        .opacity(used > 0 ? 1 : 0.75)
+        .help(tool.kind == .provider ? "\(tool.name) runs on the provider's servers, not on this Mac" : (tool.detail ?? tool.name))
+    }
+
+    private var icon: String {
+        switch tool.kind {
+        case .function: return "wrench.and.screwdriver"
+        case .provider: return "cloud"
+        case .mcpToolset: return "puzzlepiece.extension"
+        }
+    }
+}
+
+/// An MCP server: where it runs, what it offers, what was used, and what the agent allowed.
 struct MCPServerRow: View {
     let server: MCPServerSummary
 
@@ -551,9 +642,13 @@ struct MCPServerRow: View {
                 Image(systemName: "puzzlepiece.extension").foregroundStyle(.purple)
                 Text(server.name).bold()
                 if let version = server.version { Text(version).foregroundStyle(.secondary) }
-                Text(server.isRemote ? "remote" : "local")
+                Text(kindLabel)
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(.quaternary, in: Capsule())
+                    .help(kindHelp)
+                if server.authorized {
+                    Image(systemName: "key.fill").foregroundStyle(.secondary).help("The agent sent the provider a token for this server")
+                }
                 Spacer()
                 if server.errors > 0 { Text("\(server.errors) failed").foregroundStyle(TrafficColors.anomaly) }
                 Text(server.calls == 0 ? "no calls seen" : "\(server.calls) \(server.calls == 1 ? "call" : "calls")").foregroundStyle(.secondary)
@@ -561,11 +656,39 @@ struct MCPServerRow: View {
             if let endpoint = server.endpoint {
                 Text(endpoint).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
+            if let approval = server.approval {
+                Text("Approval: \(approval)").foregroundStyle(approval == "never" ? TrafficColors.anomaly : .secondary)
+                    .help(approval == "never" ? "The agent told the provider to run this server's tools without asking" : "")
+            }
+            if let allowed = server.allowedTools, !allowed.isEmpty {
+                Text("Allowed: " + allowed.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(2)
+            }
             if !server.tools.isEmpty {
-                Text(server.tools.prefix(24).joined(separator: " · ") + (server.tools.count > 24 ? " · +\(server.tools.count - 24) more" : ""))
-                    .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(3)
+                Text(toolList).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(3)
+                    .help("Tools this server offers; the ones with a count were called in this window")
             }
         }
         .font(.caption)
+    }
+
+    private var kindLabel: String {
+        switch server.kind {
+        case .local: return "local"
+        case .remote: return "remote"
+        case .provider: return "via provider"
+        }
+    }
+
+    private var kindHelp: String {
+        switch server.kind {
+        case .local: return "Runs as a process on this Mac, started by the agent"
+        case .remote: return "This Mac talks to it over HTTPS"
+        case .provider: return "The provider connects to it for the agent; that traffic never reaches this Mac"
+        }
+    }
+
+    private var toolList: String {
+        let names = server.tools.prefix(24).map { name in server.used[name].map { "\(name) ×\($0)" } ?? name }
+        return names.joined(separator: " · ") + (server.tools.count > 24 ? " · +\(server.tools.count - 24) more" : "")
     }
 }

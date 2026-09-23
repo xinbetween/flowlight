@@ -594,3 +594,42 @@ final class LLMFactsReaderTests: XCTestCase {
         XCTAssertEqual(results.first?.output, "Hello")
     }
 }
+
+final class AgentProfileTests: XCTestCase {
+    func testDemoSessionProfilesAndServerKinds() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("profile-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+        try DemoData.seedInspection(db, now: Date())
+        let exchanges = try db.exchanges(since: Date().addingTimeInterval(-3600))
+        let activities = ToolActivityBuilder.activities(exchanges)
+        let profiles = ToolActivityBuilder.profiles(exchanges, activities: activities)
+
+        let claude = try XCTUnwrap(profiles["claude"])
+        XCTAssertEqual(claude.provider, .anthropic)
+        XCTAssertEqual(claude.models.first?.name, "claude-sonnet-demo")
+        XCTAssertEqual(claude.requests, 7)
+        XCTAssertEqual(claude.tools.map(\.tool.name).sorted(), ["Bash", "Read", "mcp__docs__search_docs", "mcp__github__create_issue"])
+        XCTAssertEqual(claude.tools.first { $0.tool.name == "Bash" }?.used, 3, "three Bash calls in the session")
+        XCTAssertEqual(claude.tools.first { $0.tool.name == "Read" }?.used, 1)
+
+        let codex = try XCTUnwrap(profiles["codex"])
+        XCTAssertEqual(codex.provider, .openAIResponses)
+        XCTAssertEqual(codex.usage.cacheRead, 2048)
+        XCTAssertEqual(codex.usage.reasoning, 96)
+        XCTAssertEqual(codex.tools.first { $0.tool.kind == .provider }?.tool.name, "web_search")
+
+        let claudeServers = ToolActivityBuilder.servers(exchanges, activities: activities, configured: ["claude": ["github"]])["claude"] ?? []
+        XCTAssertEqual(claudeServers.first { $0.name == "docs" }?.kind, .remote)
+        XCTAssertEqual(claudeServers.first { $0.name == "github" }?.kind, .local)
+        XCTAssertEqual(claudeServers.first { $0.name == "docs" }?.used["search_docs"], 1)
+
+        let sentry = try XCTUnwrap(ToolActivityBuilder.servers(exchanges, activities: activities)["codex"]?.first { $0.name == "sentry" })
+        XCTAssertEqual(sentry.kind, .provider, "the provider connects to it, not this Mac")
+        XCTAssertEqual(sentry.approval, "never")
+        XCTAssertEqual(sentry.allowedTools, ["find_errors", "create_issue"])
+        XCTAssertEqual(sentry.tools, ["create_issue", "find_errors", "list_projects"])
+        XCTAssertTrue(sentry.authorized)
+        XCTAssertEqual(sentry.used["find_errors"], 1)
+    }
+}

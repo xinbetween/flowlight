@@ -9,11 +9,12 @@ extension DemoData {
         var clock = start
         var seen = Set<String>()
         var mcpNames: [String: String] = [:]
-        let claudePID: Int32 = 4127, curlPID: Int32 = 4388
+        let claudePID: Int32 = 4127, curlPID: Int32 = 4388, codexPID: Int32 = 4512
 
         func record(_ offset: TimeInterval, duration: Double, pid: Int32, bundle: String, app: String, host: String,
                     method: String = "POST", path: String, status: Int = 200, request: String, response: String,
-                    contentType: String = "application/json", requestHeaders: [HTTPHeader] = [], mcpServer: String? = nil) throws {
+                    contentType: String = "application/json", requestHeaders: [HTTPHeader] = [], mcpServer: String? = nil,
+                    agent: (id: String, name: String) = ("claude", "Claude Code")) throws {
             clock = clock.addingTimeInterval(offset)
             let req = Data(request.utf8), resp = Data(response.utf8)
             var calls = LLMToolCallReader.responseCalls(resp)
@@ -29,6 +30,7 @@ extension DemoData {
                                       summary: activity.summary))
                 results.append(ToolResult(callID: id, isError: activity.isError, output: activity.output ?? "", outputSize: activity.output?.count ?? 0))
             }
+            let llm = LLMFactsReader.facts(request: req, response: resp, host: host)
             let headers = requestHeaders.isEmpty ? [
                 HTTPHeader(name: "Host", value: host), HTTPHeader(name: "Content-Type", value: "application/json"),
                 HTTPHeader(name: "Content-Length", value: "\(req.count)"),
@@ -38,8 +40,8 @@ extension DemoData {
                 status: status, requestHeaders: HeaderRedaction.redact(headers), requestBody: req, requestSize: req.count, requestTruncated: false,
                 responseHeaders: [HTTPHeader(name: "Content-Type", value: contentType), HTTPHeader(name: "Date", value: "demo")],
                 responseBody: resp, responseSize: resp.count, responseTruncated: false, contentType: contentType,
-                pid: pid, bundleID: bundle, appName: app, agent: "claude", agentName: "Claude Code", mcpServer: mcpServer,
-                toolCalls: calls, toolResults: results, mcp: mcp, note: nil))
+                pid: pid, bundleID: bundle, appName: app, agent: agent.id, agentName: agent.name, mcpServer: mcpServer,
+                toolCalls: calls, toolResults: results, mcp: mcp, llm: llm, note: nil))
         }
 
         let llmHeaders = [
@@ -165,5 +167,17 @@ extension DemoData {
                 data: {"type":"message_stop"}
 
                 """)
+
+        // A second agent, using OpenAI's Responses API with a provider-side MCP connector: that server's traffic
+        // never touches this Mac, so the request is the only place it shows up.
+        let codexTools = #"{"model":"gpt-demo","input":[{"role":"user","content":"Check the failing test and open a ticket"}],"tools":[{"type":"function","name":"shell","description":"Run a shell command"},{"type":"web_search"},{"type":"mcp","server_label":"sentry","server_url":"https://mcp.sentry.example/mcp","require_approval":"never","allowed_tools":["find_errors","create_issue"],"authorization":"Bearer demo"}]}"#
+        let codexReply = #"{"object":"response","model":"gpt-demo","output":[{"type":"mcp_list_tools","server_label":"sentry","tools":[{"name":"find_errors"},{"name":"create_issue"},{"name":"list_projects"}]},{"type":"mcp_call","id":"mcp_demo_1","server_label":"sentry","name":"find_errors","arguments":"{\"project\":\"web\"}","output":"2 unresolved errors: TypeError in checkout (142 events), 504 at /api/pay (31 events)","error":null}],"usage":{"input_tokens":3120,"output_tokens":180,"input_tokens_details":{"cached_tokens":2048},"output_tokens_details":{"reasoning_tokens":96}}}"#
+        try record(6, duration: 1.8, pid: codexPID, bundle: "codex", app: "codex", host: "api.openai.com",
+                   path: "/v1/responses", request: codexTools, response: codexReply, agent: ("codex", "Codex"))
+        try record(4, duration: 1.2, pid: codexPID, bundle: "codex", app: "codex", host: "api.openai.com",
+                   path: "/v1/responses",
+                   request: #"{"model":"gpt-demo","input":[{"type":"function_call_output","call_id":"fc_demo_1","output":"1 failed, 42 passed"}],"tools":[{"type":"function","name":"shell","description":"Run a shell command"},{"type":"web_search"}]}"#,
+                   response: #"{"object":"response","model":"gpt-demo","output":[{"type":"function_call","call_id":"fc_demo_2","name":"shell","arguments":"{\"command\":\"pytest tests/test_checkout.py -x\"}"}],"usage":{"input_tokens":3400,"output_tokens":64}}"#,
+                   agent: ("codex", "Codex"))
     }
 }

@@ -33,6 +33,8 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     var toolResults: [ToolResult] = []
     /// JSON-RPC calls to an MCP server over HTTP.
     var mcp: [MCPActivity] = []
+    /// What an LLM API call declared: tools, provider-side MCP servers, model, tokens.
+    var llm: LLMFacts?
     /// Set when there's no exchange to show, e.g. the app rejected Flowlight's certificate.
     var note: String?
 
@@ -199,6 +201,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 results.append(ToolResult(callID: id, isError: activity.isError, output: activity.output ?? "",
                                           outputSize: activity.output?.count ?? 0))
             }
+            let llm = LLMFactsReader.facts(request: request.body.data, response: responseBody.data, host: flow.host)
             let (requestBody, requestCut) = clip(request.body)
             let (responseData, responseCut) = clip(responseBody)
             let exchange = HTTPExchange(
@@ -210,7 +213,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 responseSize: responseBody.wireSize, responseTruncated: responseCut,
                 contentType: responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
-                toolResults: results, mcp: mcp, note: note)
+                toolResults: results, mcp: mcp, llm: llm, note: note)
             onExchange(exchange)
         }
     }
