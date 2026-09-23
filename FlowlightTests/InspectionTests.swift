@@ -511,3 +511,86 @@ final class DemoInspectionTests: XCTestCase {
         XCTAssertFalse(exchanges.flatMap(\.requestHeaders).contains { $0.value.contains("sk-ant") }, "demo keys are redacted too")
     }
 }
+
+final class LLMFactsReaderTests: XCTestCase {
+    func testAnthropicDeclarationsConnectorsAndUsage() throws {
+        // Shapes from the Messages API reference: mcp_servers + mcp_toolset, server tools carry a type, not input_schema.
+        let request = """
+        {"model":"claude-sonnet-x","max_tokens":4096,"system":"You are Claude Code","mcp_servers":[
+          {"type":"url","url":"https://mcp.linear.app/sse","name":"linear","authorization_token":"tok"}],
+         "tools":[{"name":"Bash","description":"Run a command","input_schema":{"type":"object"}},
+                  {"type":"web_search_20250305","name":"web_search","max_uses":5},
+                  {"type":"mcp_toolset","mcp_server_name":"linear","default_config":{"enabled":false},
+                   "configs":{"search_issues":{"enabled":true},"delete_issue":{"enabled":false}}},
+                  {"name":"mcp__github__create_issue","input_schema":{"type":"object"}}],
+         "messages":[]}
+        """
+        let response = """
+        event: message_start
+        data: {"type":"message_start","message":{"model":"claude-sonnet-x-20260101","usage":{"input_tokens":12,"cache_read_input_tokens":9000,"cache_creation_input_tokens":300,"output_tokens":1}}}
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":12,"output_tokens":210}}
+        """
+        let facts = try XCTUnwrap(LLMFactsReader.facts(request: Data(request.utf8), response: Data(response.utf8), host: "api.anthropic.com"))
+        XCTAssertEqual(facts.provider, .anthropic)
+        XCTAssertEqual(facts.model, "claude-sonnet-x-20260101", "the response's model wins over the request's")
+        XCTAssertEqual(facts.declaredTools.filter { $0.kind == .function }.map(\.name), ["Bash", "mcp__github__create_issue"])
+        XCTAssertEqual(facts.declaredTools.first { $0.kind == .provider }?.name, "web_search")
+        XCTAssertEqual(facts.declaredTools.first { $0.kind == .mcpToolset }?.server, "linear")
+        XCTAssertEqual(facts.declaredTools.first { $0.name == "mcp__github__create_issue" }?.server, "github")
+        let linear = try XCTUnwrap(facts.connectors.first)
+        XCTAssertEqual(linear.url, "https://mcp.linear.app/sse")
+        XCTAssertEqual(linear.allowedTools, ["search_issues"], "only tools left enabled")
+        XCTAssertTrue(linear.authorized)
+        XCTAssertEqual(facts.usage, TokenUsage(input: 12, output: 210, cacheRead: 9000, cacheWrite: 300, reasoning: 0))
+        XCTAssertEqual(facts.stopReason, "tool_use")
+    }
+
+    func testOpenAIResponsesMCPToolAndListedTools() throws {
+        let request = #"{"model":"gpt-x","input":[],"tools":[{"type":"mcp","server_label":"stripe","server_url":"https://mcp.stripe.com","require_approval":"never","allowed_tools":["create_refund"]},{"type":"function","name":"shell","description":"Run"},{"type":"web_search"}]}"#
+        let response = #"{"object":"response","output":[{"type":"mcp_list_tools","server_label":"stripe","tools":[{"name":"create_refund"},{"name":"list_charges"}]}],"usage":{"input_tokens":500,"output_tokens":42,"input_tokens_details":{"cached_tokens":400},"output_tokens_details":{"reasoning_tokens":30}}}"#
+        let facts = try XCTUnwrap(LLMFactsReader.facts(request: Data(request.utf8), response: Data(response.utf8), host: "api.openai.com"))
+        XCTAssertEqual(facts.provider, .openAIResponses)
+        let stripe = try XCTUnwrap(facts.connectors.first)
+        XCTAssertEqual(stripe.approval, "never")
+        XCTAssertEqual(stripe.allowedTools, ["create_refund"])
+        XCTAssertEqual(stripe.tools, ["create_refund", "list_charges"], "tools the provider reported")
+        XCTAssertEqual(facts.declaredTools.first { $0.kind == .provider }?.name, "web_search")
+        XCTAssertEqual(facts.usage?.cacheRead, 400)
+        XCTAssertEqual(facts.usage?.reasoning, 30)
+    }
+
+    func testChatCompletionsAndGemini() throws {
+        let chat = #"{"model":"gpt-4.1","messages":[],"tools":[{"type":"function","function":{"name":"get_weather","description":"Weather"}}]}"#
+        let chatResponse = #"{"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":20,"prompt_tokens_details":{"cached_tokens":64}}}"#
+        let chatFacts = try XCTUnwrap(LLMFactsReader.facts(request: Data(chat.utf8), response: Data(chatResponse.utf8), host: "api.openai.com"))
+        XCTAssertEqual(chatFacts.provider, .openAIChat)
+        XCTAssertEqual(chatFacts.declaredTools.map(\.name), ["get_weather"])
+        XCTAssertEqual(chatFacts.usage, TokenUsage(input: 100, output: 20, cacheRead: 64, cacheWrite: 0, reasoning: 0))
+
+        // Gemini REST is camelCase; snake_case is accepted too.
+        let gemini = #"{"contents":[],"tools":[{"functionDeclarations":[{"name":"run_shell_command","description":"Run"}]},{"googleSearch":{}},{"codeExecution":{}}]}"#
+        let geminiResponse = #"{"candidates":[],"usageMetadata":{"promptTokenCount":900,"candidatesTokenCount":80,"cachedContentTokenCount":128,"thoughtsTokenCount":40}}"#
+        let facts = try XCTUnwrap(LLMFactsReader.facts(request: Data(gemini.utf8), response: Data(geminiResponse.utf8), host: "generativelanguage.googleapis.com"))
+        XCTAssertEqual(facts.provider, .gemini)
+        XCTAssertEqual(facts.declaredTools.map(\.name), ["run_shell_command", "google_search", "code_execution"])
+        XCTAssertEqual(facts.usage, TokenUsage(input: 900, output: 80, cacheRead: 128, cacheWrite: 0, reasoning: 40))
+    }
+
+    func testErrorsAndNonLLMBodies() throws {
+        let failed = LLMFactsReader.facts(request: Data(#"{"model":"m","messages":[],"system":"s"}"#.utf8),
+                                          response: Data(#"{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}"#.utf8),
+                                          host: "api.anthropic.com")
+        XCTAssertEqual(failed?.errorType, "rate_limit_error")
+        XCTAssertNil(LLMFactsReader.facts(request: Data(#"{"jsonrpc":"2.0","method":"tools/list"}"#.utf8), response: Data(), host: "mcp.example"))
+        XCTAssertNil(LLMFactsReader.facts(request: Data("not json".utf8), response: Data(), host: "example.com"))
+    }
+
+    func testProviderRunMCPResultsFromAnthropicResponse() {
+        let body = #"{"role":"assistant","content":[{"type":"mcp_tool_use","id":"mcptoolu_1","name":"echo","server_name":"example-mcp","input":{}},{"type":"mcp_tool_result","tool_use_id":"mcptoolu_1","is_error":false,"content":[{"type":"text","text":"Hello"}]}]}"#
+        let results = ToolResultReader.results(inResponse: Data(body.utf8))
+        XCTAssertEqual(results.first?.callID, "mcptoolu_1")
+        XCTAssertEqual(results.first?.output, "Hello")
+    }
+}

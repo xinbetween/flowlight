@@ -69,12 +69,23 @@ enum ToolResultReader {
         return results
     }
 
-    /// Results the provider ran itself and returned in the response (OpenAI Responses mcp_call items).
+    /// Results the provider ran itself and returned in the response: OpenAI Responses mcp_call items, and the
+    /// Anthropic connector's mcp_tool_result blocks (whole message or streamed content_block_start).
     static func results(inResponse body: Data) -> [ToolResult] {
         LLMToolCallReader.jsonObjects(in: body).flatMap { object -> [ToolResult] in
+            var results: [ToolResult] = []
+            var blocks = (object["content"] as? [[String: Any]]) ?? []
+            if let message = object["message"] as? [String: Any], let content = message["content"] as? [[String: Any]] {
+                blocks += content
+            }
+            if let block = object["content_block"] as? [String: Any] { blocks.append(block) }
+            for block in blocks where block["type"] as? String == "mcp_tool_result" {
+                guard let id = block["tool_use_id"] as? String else { continue }
+                results.append(make(id, isError: block["is_error"] as? Bool ?? false, output: text(of: block["content"])))
+            }
             var items = object["output"] as? [[String: Any]] ?? []
             if let item = object["item"] as? [String: Any] { items.append(item) }
-            return items.compactMap { item in
+            return results + items.compactMap { item in
                 guard item["type"] as? String == "mcp_call", let id = item["id"] as? String,
                       item["output"] != nil || item["error"] != nil else { return nil }
                 let error = item["error"].flatMap { $0 is NSNull ? nil : $0 }
