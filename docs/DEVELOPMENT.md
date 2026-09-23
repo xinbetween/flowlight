@@ -143,12 +143,19 @@ traffic and a live synthetic feed. Suspicious destinations use reserved document
 TEAM_ID=ABCDE12345 \
 DMG_SIGN_IDENTITY="Developer ID Application: Your Name (ABCDE12345)" \
 NOTARY_PROFILE=flowlight-notary scripts/build-dmg.sh      # build/Flowlight.dmg, signed + notarized
-INSTALLER_IDENTITY="Developer ID Installer: Your Name (ABCDE12345)" TEAM_ID=ABCDE12345 scripts/build-pkg.sh
+INSTALLER_IDENTITY="Developer ID Installer: Your Name (ABCDE12345)" \
+NOTARY_PROFILE=flowlight-notary TEAM_ID=ABCDE12345 scripts/build-pkg.sh
 gh release create v0.1.0 build/Flowlight.dmg build/Flowlight-0.1.0.pkg --title "Flowlight 0.1.0" --generate-notes
+scripts/update-cask.sh                                    # Homebrew cask → new version + checksum
+git -C "$(brew --repository xinbetween/tap)" push          # publishes it
 ```
 
 - Keep the DMG asset named exactly `Flowlight.dmg`: the website and README link to
-  `releases/latest/download/Flowlight.dmg`.
+  `releases/latest/download/Flowlight.dmg`, and so does the Homebrew cask.
+- `scripts/update-cask.sh` runs after the release exists on GitHub: with no local build it checksums the published
+  DMG. It lints the cask with `brew style` and `brew audit` in the tap, since Homebrew won't lint one outside a tap.
+- `INSTALLER_IDENTITY` is what signs the `.pkg`. Leave it out and `build-pkg.sh` produces an unsigned package that
+  Gatekeeper refuses, without saying so.
 - Without `DMG_SIGN_IDENTITY` and `NOTARY_PROFILE` the DMG contains an ad-hoc signed app. That's fine for testing,
   but Gatekeeper will ask users to right-click › Open.
 - The DMG window layout needs Finder automation permission for the terminal that runs the script. The background
