@@ -30,6 +30,7 @@ struct ContentView: View {
                     .padding(.horizontal, 10)
                     .help("See what's new and download the update")
                 }
+                FocusBar()
                 Button { nav.selection = .capture } label: {
                     HStack(alignment: .top, spacing: 8) {
                         Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8).padding(.top, 4)

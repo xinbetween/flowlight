@@ -113,6 +113,17 @@ on your Mac, and decrypts the apps you route through it: headers, bodies, status
 - Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps.
 - Hover any bucket to see which apps drove it. Export to CSV.
 
+### Focus mode
+Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect,
+plus the menu bar rates. It's for watching one agent work without the rest of the Mac in the way.
+
+- Focus on something from any table's context menu, or from the Focus control at the bottom of the sidebar.
+- ⇧⌘F turns it on and off; the menu bar shows what's focused and can toggle it too.
+- Destinations take their subdomains with them (`example.com` covers `api.example.com`). IP addresses work; ranges don't.
+- **It filters what you see, never what's recorded.** History stays complete and the anomaly baselines keep learning
+  from everything, so turning Focus off shows the traffic it was hiding.
+- Alerts name an app and not a destination, so focusing on destinations alone leaves the alert list alone.
+
 ### Anomaly detection you can explain
 Per-app baselines (EWMA + z-score) for hourly volume and daily destination counts, 99th-percentile upload checks,
 first contact with a new domain, non-standard ports, and uploads from apps you haven't touched. Every alert names
@@ -234,11 +245,10 @@ Shipped:
   metadata and analytics stay the default)
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
+- [x] Focus mode: watch only the apps and destinations you pick (from 0.2.2)
 
 Planned, in order:
 
-- **0.2.2 — Focus mode.** Pick the apps and domains you care about and ignore everything else, for debugging a single
-  agent or app without the rest of the Mac's traffic in the way.
 - **0.2.3 — Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes
   on a tag, so releases don't depend on one Mac. Needs the Developer ID certificates and an App Store Connect key as
   repository secrets, which puts the signing identity in GitHub — worth weighing for a security tool.

@@ -11,6 +11,7 @@ struct InspectView: View {
 
 private struct InspectContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
+    @EnvironmentObject var focus: FocusStore
     @ObservedObject var inspection: InspectionController
     @State private var exchanges: [HTTPExchange] = []
     @State private var links: [Int64: ToolCallLinks.Link] = [:]
@@ -47,20 +48,21 @@ private struct InspectContent: View {
         .padding()
         .navigationTitle("Inspect")
         .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app or tool")
-        .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled)) {
+        .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled,
+                          focus: focus.scope)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
         }
     }
 
-    private struct LoadKey: Equatable { var version: Int; var search: String; var window: AgentWindow; var enabled: Bool }
+    private struct LoadKey: Equatable { var version: Int; var search: String; var window: AgentWindow; var enabled: Bool; var focus: FocusScope }
 
     private func load() async {
-        let since = Date().addingTimeInterval(-window.interval), term = search
-        exchanges = (try? await monitor.read { try $0.exchanges(since: since, search: term) }) ?? []
+        let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
+        exchanges = (try? await monitor.read { try $0.exchanges(since: since, search: term, focus: scope) }) ?? []
         // Link with the unfiltered list, so a search for "curl" still shows which tool call started it.
-        let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since) }) ?? [])
+        let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since, focus: scope) }) ?? [])
         links = ToolCallLinks.link(all)
         var found: [String: ToolResult] = [:]
         for e in all { for r in e.toolResults where found[r.callID] == nil { found[r.callID] = r } }

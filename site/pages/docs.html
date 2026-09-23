@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#focus">Focus mode</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -59,6 +59,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Inspect</td><td>⌘5</td><td>Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them.</td></tr>
       </table>
       <p>In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.</p>
+
+      <h2 id="focus">Focus mode</h2>
+      <p>Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect, and the rates in
+        the menu bar. It's for watching one agent work without the rest of the Mac in the way.</p>
+      <ul>
+        <li>Right-click any row in Live, Reports or AI Agents and choose <strong>Focus on…</strong>, or use the Focus control at the bottom of
+          the sidebar to pick from the apps that have been active and to type destinations.</li>
+        <li><kbd>⇧⌘F</kbd> turns Focus on and off, and so does the menu bar, which also shows what's focused.</li>
+        <li>A destination takes its subdomains with it: <code>example.com</code> covers <code>api.example.com</code>. IP addresses work;
+          ranges like <code>10.0.0.0/8</code> don't.</li>
+        <li>Apps and destinations are a union, not an intersection: focusing on Claude Code <em>and</em> <code>github.com</code> shows
+          everything Claude Code does plus everything that talks to GitHub.</li>
+      </ul>
+      <p><strong>Focus filters what you see, never what's recorded.</strong> Flowlight keeps capturing and storing everything while it's on, and
+        the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
+        names the app that raised it and not where the traffic went, so focusing only on destinations leaves the alert list as it was.</p>
 
       <h2 id="agents">AI agent rules</h2>
       <p>An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,

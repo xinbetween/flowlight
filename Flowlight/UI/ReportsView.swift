@@ -18,6 +18,7 @@ enum SeriesAnomalies {
 struct ReportsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var focus: FocusStore
     @AppStorage("reports.granularity") private var granularity: Granularity = .minute
     @AppStorage(AnomalySettings.Keys.sigma) private var sigma = 3.0
     @State private var endDate = Date()
@@ -93,7 +94,7 @@ struct ReportsView: View {
                 .help("Export the current report as CSV")
             }
         }
-        .task(id: ReloadKey(granularity: granularity, end: followNow ? nil : endDate, filter: filter, version: monitor.dataVersion,
+        .task(id: ReloadKey(granularity: granularity, end: followNow ? nil : endDate, filter: scoped, version: monitor.dataVersion,
                             mode: lowerMode, metric: metric)) {
             await reload()
         }
@@ -111,6 +112,13 @@ struct ReportsView: View {
         .onChange(of: sigma) { flagged = SeriesAnomalies.flagged(series, sigma: sigma) }
         .onChange(of: nav.reportRequest, initial: true) { apply(nav.reportRequest) }
         .task(id: hovered?.date) { await loadContributors(for: hovered) }
+    }
+
+    /// What the screen actually queries: the filter chosen here, narrowed by Focus when it's on.
+    private var scoped: TrafficFilter {
+        var f = filter
+        f.focus = focus.scope
+        return f
     }
 
     private struct ReloadKey: Equatable {
@@ -453,6 +461,9 @@ struct ReportsView: View {
                     Button("Show Only \(node.appName ?? bundleID)") { var f = filter; f.bundleID = bundleID; filter = f }
                 }
                 Divider()
+                FocusMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
+                               host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
+                Divider()
                 Button("Copy \(node.kind == .app ? "Name" : node.kind == .ip ? "IP Address" : "Destination")") { copy(node.title) }
                 if node.kind == .app, let bundleID = node.bundleID { Button("Copy Bundle ID") { copy(bundleID) } }
                 if node.kind == .ip, !node.detail.isEmpty { Button("Copy Hostname") { copy(node.detail) } }
@@ -609,7 +620,7 @@ struct ReportsView: View {
         if followNow { endDate = Date() }
         loading = true
         defer { loading = false }
-        let (g, from, to, f, m) = (granularity, startDate, endDate, filter, metric)
+        let (g, from, to, f, m) = (granularity, startDate, endDate, scoped, metric)
         let wantsCharts = lowerMode == .charts
         do {
             let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?) in
@@ -620,7 +631,7 @@ struct ReportsView: View {
                                                         metric: m, granularity: g, from: from, to: to, filter: f)
                 return (series, breakdown, snapshot)
             }
-            guard g == granularity, f == filter, m == metric else { return } // a newer request superseded this one
+            guard g == granularity, f == scoped, m == metric else { return } // a newer request superseded this one
             if let snapshot = result.2 {
                 for insight in snapshot.dimensions {
                     registries[insight.dimension, default: ColorRegistry()]

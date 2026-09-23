@@ -3,6 +3,7 @@ import SwiftUI
 struct AlertsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var focus: FocusStore
     @State private var alerts: [AlertRecord] = []
     @State private var selection = Set<AlertRecord.ID>()
     @State private var sortOrder = [KeyPathComparator(\AlertRecord.timestamp, order: .reverse)]
@@ -30,6 +31,7 @@ struct AlertsView: View {
         .toolbar { toolbar }
         .task(id: monitor.dataVersion) { await load() }
         .task(id: monitor.unacknowledgedAlerts) { await load() }
+        .task(id: focus.scope) { await load() }
     }
 
     private var table: some View {
@@ -97,6 +99,7 @@ struct AlertsView: View {
     }
 
     private func load() async {
-        alerts = (try? await monitor.read { try $0.alerts() }) ?? []
+        let scope = focus.scope
+        alerts = (try? await monitor.read { try $0.alerts(focus: scope) }) ?? []
     }
 }

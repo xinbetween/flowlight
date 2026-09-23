@@ -37,6 +37,8 @@ final class TrafficMonitor: ObservableObject {
     private static let onboardingKey = "onboarding.captureOffered"
     private var lastDataAt: Date?
     @Published private(set) var dataVersion = 0 // bumps after each rollup so reports can refresh
+    /// Focus mode's scope, mirrored here so the live pipeline can apply it. Set by `applyFocus`.
+    private(set) var focus: FocusScope = .none
     @Published var lastError: String?
 
     let db: TrafficDatabase
@@ -256,12 +258,28 @@ final class TrafficMonitor: ObservableObject {
         Task { @MainActor in self.updateLive(with: batches) }
     }
 
+    /// Focus changed: the live feed is a running total, so it restarts rather than mixing two scopes together.
+    func applyFocus(_ scope: FocusScope) {
+        guard scope != focus else { return }
+        focus = scope
+        perSecond.removeAll()
+        sessionPerApp.removeAll()
+        sessionIn = 0
+        sessionOut = 0
+        talkers = []
+        liveSeries = []
+        refreshAlertCount()
+    }
+
     private func updateLive(with batches: [TrafficBatch]) {
         lastDataAt = Date()
         for batch in batches {
             var bucket = perSecond[batch.timestamp] ?? [:]
             for r in batch.records {
                 let k = r.key
+                // Focus hides traffic from the live feed and the menu bar rates. It is never applied before the
+                // database write above: history and the anomaly baselines always see everything.
+                if !focus.isEmpty, !focus.matches(bundleID: k.bundleID, domain: k.domain, remoteIP: k.remoteIP) { continue }
                 var entry = bucket[k.bundleID] ?? (k.appName, k.appPath, FlowCounters(), "", 0)
                 entry.counters += r.counters
                 // Prefer a real remote host over local unconnected sockets (e.g. mDNS).
@@ -354,8 +372,9 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func refreshAlertCount() {
+        let scope = focus
         db.async { [weak self] db in
-            let count = try db.unacknowledgedAlertCount()
+            let count = try db.unacknowledgedAlertCount(focus: scope)
             Task { @MainActor in self?.unacknowledgedAlerts = count }
         }
     }

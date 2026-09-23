@@ -18,6 +18,7 @@ enum AgentWindow: String, CaseIterable, Identifiable {
 struct AgentsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var focus: FocusStore
     @AppStorage("agents.window") private var window: AgentWindow = .day
     @State private var agents: [AgentSummary] = []
     @State private var agentAlerts = 0
@@ -81,10 +82,10 @@ struct AgentsView: View {
         }
         .padding()
         .navigationTitle("AI Agents")
-        .task(id: LoadKey(window: window, version: monitor.dataVersion)) { await load() }
+        .task(id: LoadKey(window: window, version: monitor.dataVersion, focus: focus.scope)) { await load() }
     }
 
-    private struct LoadKey: Equatable { var window: AgentWindow; var version: Int }
+    private struct LoadKey: Equatable { var window: AgentWindow; var version: Int; var focus: FocusScope }
 
     private var tiles: some View {
         let ai = agents.reduce(FlowCounters()) { var c = $0; c += $1.ai; return c }
@@ -140,6 +141,7 @@ struct AgentsView: View {
         .contextMenu(forSelectionType: AgentSummary.ID.self) { ids in
             if let id = ids.first {
                 Button("Show Traffic in Reports") { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
+                FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
             }
         } primaryAction: { ids in
             if let id = ids.first { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
@@ -148,9 +150,11 @@ struct AgentsView: View {
 
     private func load() async {
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
+        let scope = focus.scope
         let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange]) in
-            (try db.breakdown(g, from: from, to: to), try db.alerts(limit: 2000).filter { $0.timestamp >= from }, try db.loadPolicies(),
-             try db.exchanges(since: from, limit: 5000))
+            (try db.breakdown(g, from: from, to: to, filter: TrafficFilter(focus: scope)),
+             try db.alerts(limit: 2000, focus: scope).filter { $0.timestamp >= from }, try db.loadPolicies(),
+             try db.exchanges(since: from, limit: 5000, focus: scope))
         }
         guard let (rows, alerts, loadedPolicies, exchanges) = result else { return }
         policies = loadedPolicies

@@ -54,8 +54,12 @@ struct TrafficFilter: Equatable, Sendable {
     /// Registrable domain: matches the domain itself and every subdomain (e.g. google.com, *.google.com).
     var domainSuffix: String?
     var appProtocol: String?
+    /// Focus mode, ANDed in as "and one of these": see `FocusScope`. Empty means no restriction.
+    var focus: FocusScope = .none
 
     static let none = TrafficFilter()
+    /// Focus isn't part of this: it's applied to every query rather than chosen on a screen, so a view that asks
+    /// "did the user narrow anything?" should get the same answer whether or not Focus happens to be on.
     var isEmpty: Bool {
         bundleID == nil && domain == nil && remoteIP == nil && owner == nil && domainSuffix == nil && appProtocol == nil
     }
@@ -388,7 +392,34 @@ final class TrafficDatabase: @unchecked Sendable {
             values.append(.text(v)); values.append(.text("%." + v))
         }
         if let v = filter.appProtocol { clauses.append("protocol = ?"); values.append(.text(v)) }
+        if let (clause, focusValues) = Self.focusClause(filter.focus) {
+            clauses.append(clause)
+            values += focusValues
+        }
         return (clauses.joined(separator: " AND "), values)
+    }
+
+    /// Focus as one OR-group over the flow columns: any listed app, or any listed destination.
+    /// Returns nil when nothing is focused, so the caller adds no clause at all.
+    static func focusClause(_ focus: FocusScope, bundleColumn: String = "bundle_id") -> (String, [SQLValue])? {
+        guard !focus.isEmpty else { return nil }
+        var parts: [String] = []
+        var values: [SQLValue] = []
+        if !focus.bundleIDs.isEmpty {
+            parts.append("\(bundleColumn) IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+            values += focus.bundleIDs.map { .text($0) }
+        }
+        for host in focus.hosts {
+            if AgentPolicy.isIPAddress(host) {
+                parts.append("remote_ip = ?")
+                values.append(.text(host))
+            } else {
+                parts.append("(domain = ? OR domain LIKE ?)")
+                values.append(.text(host))
+                values.append(.text("%." + host))
+            }
+        }
+        return ("(" + parts.joined(separator: " OR ") + ")", values)
     }
 
     /// Time series at the requested granularity; empty buckets are filled with zeros.
@@ -634,17 +665,33 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
-    func exchanges(since: Date, search: String = "", limit: Int = 500) throws -> [HTTPExchange] {
+    func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none) throws -> [HTTPExchange] {
         let like = "%\(search)%"
+        // An exchange records the host it went to but not the address behind it, so an IP target can't match here.
+        var focusClause = ""
+        var focusValues: [SQLValue] = []
+        if !focus.isEmpty {
+            var parts: [String] = []
+            if !focus.bundleIDs.isEmpty {
+                parts.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+                focusValues += focus.bundleIDs.map { .text($0) }
+            }
+            for host in focus.hosts where !AgentPolicy.isIPAddress(host) {
+                parts.append("(host = ? OR host LIKE ?)")
+                focusValues.append(.text(host))
+                focusValues.append(.text("%." + host))
+            }
+            focusClause = parts.isEmpty ? " AND 0" : " AND (" + parts.joined(separator: " OR ") + ")"
+        }
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ?)
+                                                   OR mcp LIKE ?)\(focusClause)
             ORDER BY ts DESC LIMIT ?
-            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
-                  .int(Int64(limit))]) { row in
+            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like)]
+                  + focusValues + [.int(Int64(limit))]) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
             let tools = row.text(22), results = row.text(24), mcp = row.text(25), llm = row.text(26)
@@ -735,16 +782,31 @@ final class TrafficDatabase: @unchecked Sendable {
                            severity: severity, acknowledged: false)
     }
 
-    func alerts(limit: Int = 500) throws -> [AlertRecord] {
-        try conn.query("SELECT id, ts, kind, bundle_id, app_name, detail, severity, acknowledged FROM alerts ORDER BY ts DESC, id DESC LIMIT ?",
-                       [.int(Int64(limit))]) { r in
+    /// Alerts newest first. An alert names the app that raised it and nothing about where it went, so Focus can
+    /// only narrow these by app: focusing purely on destinations leaves the list alone rather than emptying it.
+    func alerts(limit: Int = 500, focus: FocusScope = .none) throws -> [AlertRecord] {
+        var clause = ""
+        var values: [SQLValue] = []
+        if !focus.bundleIDs.isEmpty {
+            clause = " WHERE bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))"
+            values = focus.bundleIDs.map { .text($0) }
+        }
+        return try conn.query("SELECT id, ts, kind, bundle_id, app_name, detail, severity, acknowledged FROM alerts\(clause) ORDER BY ts DESC, id DESC LIMIT ?",
+                       values + [.int(Int64(limit))]) { r in
             AlertRecord(id: r.int(0), timestamp: Date(timeIntervalSince1970: TimeInterval(r.int(1))), kind: r.text(2),
                         bundleID: r.text(3), appName: r.text(4), detail: r.text(5), severity: Int(r.int(6)), acknowledged: r.int(7) != 0)
         }
     }
 
-    func unacknowledgedAlertCount() throws -> Int {
-        Int(try conn.query("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0") { $0.int(0) }.first ?? 0)
+    /// Narrowed by Focus the same way `alerts` is, so the sidebar badge matches the list it opens.
+    func unacknowledgedAlertCount(focus: FocusScope = .none) throws -> Int {
+        var clause = ""
+        var values: [SQLValue] = []
+        if !focus.bundleIDs.isEmpty {
+            clause = " AND bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))"
+            values = focus.bundleIDs.map { .text($0) }
+        }
+        return Int(try conn.query("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0\(clause)", values) { $0.int(0) }.first ?? 0)
     }
 
     func acknowledgeAlerts(ids: [Int64]?) throws {

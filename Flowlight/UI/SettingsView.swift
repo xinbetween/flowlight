@@ -104,10 +104,12 @@ struct MenuBarContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
+    @EnvironmentObject var focus: FocusStore
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Text("↓ \(ByteFormat.rate(monitor.currentIn))   ↑ \(ByteFormat.rate(monitor.currentOut))")
+        if focus.isActive { Text("Focus: \(focus.summary)") }
         Divider()
         ForEach(monitor.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
@@ -122,6 +124,9 @@ struct MenuBarContent: View {
             NSApp.activate()
         }
         .keyboardShortcut("o")
+        if !focus.targets.isEmpty {
+            Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
+        }
         if monitor.unacknowledgedAlerts > 0 {
             Button("Review Alerts…") {
                 nav.selection = .alerts

@@ -60,11 +60,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.2, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsAI agent rulesTools & MCPAllowlistsAgent configurationHTTPS inspectionOther alerts
+ The viewsFocus modeAI agent rulesTools & MCPAllowlistsAgent configurationHTTPS inspectionOther alerts
  Capture enginesYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -121,6 +121,26 @@ open build/Build/Products/Release/Flowlight.app
  Inspect⌘5Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them.
 
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
+
+ Focus mode
+
+ Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect, and the rates in
+ the menu bar. It's for watching one agent work without the rest of the Mac in the way.
+
+ Right-click any row in Live, Reports or AI Agents and choose Focus on…, or use the Focus control at the bottom of
+ the sidebar to pick from the apps that have been active and to type destinations.
+
+ ⇧⌘F turns Focus on and off, and so does the menu bar, which also shows what's focused.
+
+ A destination takes its subdomains with it: example.com covers api.example.com. IP addresses work;
+ ranges like 10.0.0.0/8 don't.
+
+ Apps and destinations are a union, not an intersection: focusing on Claude Code and github.com shows
+ everything Claude Code does plus everything that talks to GitHub.
+
+ Focus filters what you see, never what's recorded. Flowlight keeps capturing and storing everything while it's on, and
+ the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
+ names the app that raised it and not where the traffic went, so focusing only on destinations leaves the alert list as it was.
 
  AI agent rules
 
@@ -321,7 +341,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -619,8 +639,6 @@ e.g. Wireshark
 
  Flowlight observes and explains today. This is the order the rest is being built in.
 
- Focus mode 0.2.2Pick the apps and domains you care about and ignore everything else, for debugging a single agent without the rest of the Mac's traffic in the way.
-
  Release from CI 0.2.3A GitHub Actions workflow that builds, tests, signs, notarizes and publishes on a tag, so releases don't depend on one Mac.
 
  Block connections 0.3.0Allowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
@@ -833,8 +851,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.0
+ 0.2.2
 September 23, 2026Latest
+
+ Focus mode. Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts,
+ AI Agents and Inspect, plus the menu bar rates. Right-click a row to focus on it, or use the control at the bottom of the
+ sidebar; ⇧⌘F turns it on and off. It filters what you see and never what's recorded, so turning it off shows
+ everything it was hiding. How it works →
+
+ Install with Homebrew: brew install --cask xinbetween/tap/flowlight. The same command
+ upgrades it later.
+
+ Downloads and checksums →
+
+ 0.2.0
+September 23, 2026
 
  Opens at the size of your screen. The first launch fills the display instead of a small window, so the
  timeline, the table and an agent's detail are all readable without resizing first.

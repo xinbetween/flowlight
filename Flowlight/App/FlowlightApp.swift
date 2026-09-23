@@ -6,6 +6,7 @@ struct FlowlightApp: App {
     @StateObject private var extensionManager = ExtensionManager()
     @StateObject private var nav = AppNavigation()
     @StateObject private var updater = UpdateChecker()
+    @StateObject private var focus = FocusStore()
 
     var body: some Scene {
         WindowGroup("Flowlight", id: "main") {
@@ -14,12 +15,15 @@ struct FlowlightApp: App {
                 .environmentObject(extensionManager)
                 .environmentObject(nav)
                 .environmentObject(updater)
+                .environmentObject(focus)
                 .frame(minWidth: 1000, minHeight: 660)
                 .task {
                     monitor.start()
+                    monitor.applyFocus(focus.scope)
                     extensionManager.refresh()
                     updater.start()
                 }
+                .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
         }
         .windowToolbarStyle(.unified)
         .commands {
@@ -44,6 +48,10 @@ struct FlowlightApp: App {
                 ForEach(SidebarItem.allCases) { item in
                     Button(item.title) { nav.selection = item }.keyboardShortcut(item.shortcut, modifiers: .command)
                 }
+                Divider()
+                Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+                    .disabled(focus.targets.isEmpty && !focus.isOn)
                 Divider()
             }
         }
@@ -70,6 +78,7 @@ struct FlowlightApp: App {
                 .environmentObject(monitor)
                 .environmentObject(nav)
                 .environmentObject(updater)
+                .environmentObject(focus)
         } label: {
             MenuBarLabel().environmentObject(monitor).environmentObject(updater)
         }
