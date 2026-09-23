@@ -211,3 +211,12 @@ final class NettopWatchdogTests: XCTestCase {
         source.stop()
     }
 }
+
+final class NettopNamingTests: XCTestCase {
+    func testUsesNettopNameWhenLookupFails() {
+        XCTAssertEqual(NettopTrafficSource.name(lookedUp: "pid 4244", fromNettop: "codex"), "codex")
+        XCTAssertEqual(NettopTrafficSource.name(lookedUp: "", fromNettop: "mysqld"), "mysqld")
+        XCTAssertNil(NettopTrafficSource.name(lookedUp: "Claude Code", fromNettop: "claude"), "a real name wins")
+        XCTAssertNil(NettopTrafficSource.name(lookedUp: "pid 99", fromNettop: "  "), "nothing useful to fall back to")
+    }
+}

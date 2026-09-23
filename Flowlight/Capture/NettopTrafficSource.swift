@@ -114,10 +114,22 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         if consecutiveFailures == 1 || consecutiveFailures % 30 == 0 { status(message) }
     }
 
+    /// Prefers a real name over the "pid 1234" placeholder a failed lookup produces.
+    static func name(lookedUp: String, fromNettop: String) -> String? {
+        let fallback = fromNettop.trimmingCharacters(in: .whitespaces)
+        guard !fallback.isEmpty, lookedUp.isEmpty || lookedUp.hasPrefix("pid ") else { return nil }
+        return fallback
+    }
+
     private func makeBatch(_ deltas: [NettopParser.Delta], timestamp: Int64) -> TrafficBatch {
         var merged: [FlowKey: FlowCounters] = [:]
         for delta in deltas {
-            let info = processes.info(pid: delta.pid)
+            var info = processes.info(pid: delta.pid)
+            // A short-lived process may be gone before we can read its path; nettop already told us its name.
+            if let better = Self.name(lookedUp: info.name, fromNettop: delta.processName) {
+                if info.bundleID.isEmpty || info.bundleID == info.name { info.bundleID = better }
+                info.name = better
+            }
             let c = delta.connection
             let unconnected = c.remoteIP == "*"
             // Hostname priority: TLS SNI / DNS answers seen on the wire, then reverse DNS as a last resort.

@@ -154,15 +154,33 @@ final class CertificateAuthority: @unchecked Sendable {
         return Insecure.SHA1.hash(data: der).map { String(format: "%02X", $0) }.joined()
     }
 
-    /// Shell commands that trust or untrust the CA for every user on this Mac. They need root, so they're run
-    /// together with the proxy change in a single authorization prompt.
-    func trustCommandAsRoot() -> String {
-        "/usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain "
-            + InspectionShell.quote(caCertificateURL.path)
+    /// Adds the certificate to the login keychain and marks it trusted for TLS, for this user only.
+    ///
+    /// This uses the Security API rather than the `security` tool: changing trust settings needs an authorization the
+    /// system can only grant interactively, which a root shell started from the app cannot provide.
+    func setTrusted(_ trusted: Bool) throws {
+        guard let cert = caCertificate() else { throw InspectionError.trust("The certificate is missing. Turn inspection off and on again.") }
+        if trusted {
+            let add: [String: Any] = [kSecClass as String: kSecClassCertificate, kSecValueRef as String: cert]
+            let added = SecItemAdd(add as CFDictionary, nil)
+            guard added == errSecSuccess || added == errSecDuplicateItem else {
+                throw InspectionError.trust(Self.message(added, fallback: "couldn't add the certificate to your keychain"))
+            }
+            let settings: [String: Any] = [
+                kSecTrustSettingsResult as String: NSNumber(value: SecTrustSettingsResult.trustRoot.rawValue),
+                kSecTrustSettingsPolicy as String: SecPolicyCreateSSL(true, nil),
+            ]
+            let status = SecTrustSettingsSetTrustSettings(cert, .user, [settings] as CFTypeRef)
+            guard status == errSecSuccess else { throw InspectionError.trust(Self.message(status, fallback: "trust wasn't granted")) }
+        } else {
+            _ = SecTrustSettingsRemoveTrustSettings(cert, .user)
+            SecItemDelete([kSecClass as String: kSecClassCertificate, kSecValueRef as String: cert] as CFDictionary)
+        }
     }
 
-    func untrustCommandAsRoot() -> String {
-        "/usr/bin/security remove-trusted-cert -d " + InspectionShell.quote(caCertificateURL.path) + " 2>/dev/null || true"
+    private static func message(_ status: OSStatus, fallback: String) -> String {
+        if status == errSecUserCanceled { return "cancelled" }
+        return (SecCopyErrorMessageString(status, nil) as String?) ?? fallback
     }
 
     /// True when the certificate is trusted for this Mac (admin domain) or just this user.

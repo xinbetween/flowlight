@@ -34,17 +34,29 @@ struct AgentsView: View {
     private var selected: AgentSummary? { agents.first { $0.id == selection } ?? agents.first }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        GeometryReader { geometry in
+            content(height: geometry.size.height)
+        }
+    }
+
+    /// In a short window the summary tiles and the description give way to the table and the agent's detail, which
+    /// are what the view is for. Without this the header is squeezed behind the title bar.
+    private func content(height: CGFloat) -> some View {
+        let roomy = height > 680
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Every AI agent on this Mac, and where it sends data besides its model provider.")
-                    .foregroundStyle(.secondary)
+                if roomy {
+                    Text("Every AI agent on this Mac, and where it sends data besides its model provider.")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Picker("Window", selection: $window) {
                     ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
-            tiles
+            .fixedSize(horizontal: false, vertical: true)
+            if roomy { tiles.fixedSize(horizontal: false, vertical: true) }
             if agents.isEmpty && loaded {
                 ContentUnavailableView {
                     Label("No AI agents seen", systemImage: "sparkles")

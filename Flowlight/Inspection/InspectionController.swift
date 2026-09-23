@@ -129,7 +129,7 @@ final class InspectionController: ObservableObject {
         working = true
         let pac = "http://127.0.0.1:\(port ?? configuredPort)/proxy.pac"
         let services = SystemProxy.services()
-        var commands: [String] = [on ? ca.trustCommandAsRoot() : ca.untrustCommandAsRoot()]
+        var commands: [String] = []
         for service in services {
             let quoted = InspectionShell.quote(service)
             commands += on
@@ -139,12 +139,18 @@ final class InspectionController: ObservableObject {
         }
         let script = "do shell script " + InspectionShell.appleScriptQuote(commands.joined(separator: " && "))
             + " with administrator privileges"
+        let certificate = ca
         Task.detached(priority: .userInitiated) {
-            var error: NSDictionary?
-            NSAppleScript(source: script)?.executeAndReturnError(&error)
-            let failure = error.flatMap { e -> String? in
-                (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
-                    : (e[NSAppleScript.errorMessage] as? String ?? "authorization failed")
+            // Trust first: it puts up its own dialog, and there's no point changing the proxy if it's refused.
+            var failure: String?
+            do { try certificate.setTrusted(on) } catch { failure = error.localizedDescription }
+            if failure == nil {
+                var error: NSDictionary?
+                NSAppleScript(source: script)?.executeAndReturnError(&error)
+                failure = error.flatMap { e -> String? in
+                    (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
+                        : (e[NSAppleScript.errorMessage] as? String ?? "authorization failed")
+                }
             }
             await MainActor.run { self.finishSetup(on: on, failure: failure) }
         }
@@ -153,7 +159,7 @@ final class InspectionController: ObservableObject {
     private func finishSetup(on: Bool, failure: String?) {
         working = false
         if let failure {
-            if failure != "cancelled" { lastError = "Couldn't set Flowlight up: \(failure)" }
+            if !failure.lowercased().contains("cancel") { lastError = "Couldn't set Flowlight up: \(failure)" }
             if on { proxy.stop() }   // leave nothing half-configured
             UserDefaults.standard.set(false, forKey: Keys.enabled)
             UserDefaults.standard.set(false, forKey: Keys.systemProxy)
