@@ -14,9 +14,9 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
-      <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#limits">Limitations</a>
+      <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
     <article class="prose">
       <h2 id="install">Install</h2>
@@ -90,6 +90,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. Flowlight doesn't block
         connections; blocking needs the Network Extension engine and is on the roadmap.</p>
 
+      <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
+      <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
+        <strong>hooks</strong> that run shell commands on events, the permission rules it was given, and the MCP servers it starts. Flowlight
+        reads those files so the <strong>Tools</strong> tab can show what each agent is set up to do, even before it makes a single request.
+        A hook that posts to a webhook, or a rule that allows <code>Bash(curl:*)</code>, explains traffic you'd otherwise have to guess at.</p>
+      <ul>
+        <li><strong>Where it looks by default:</strong> the agent folders in your home folder — <code>~/.claude</code>, <code>~/.codex</code>,
+          <code>~/.cursor</code>, <code>~/.gemini</code>, <code>~/.agents</code> and the like. It does not walk your whole home folder, so macOS
+          doesn't have to ask for access to Desktop, Documents or Downloads.</li>
+        <li><strong>Your projects:</strong> use <em>Add project folder…</em> to point Flowlight at where your code lives. macOS then grants
+          access to that folder only. If the folder sits inside Documents or Desktop, macOS asks first, and that's the one prompt you'll see.</li>
+        <li><strong>Once, not constantly:</strong> the result is remembered. Flowlight rescans only when you click <em>Rescan</em>, and offers
+          one after a couple of weeks in case you've added agents or projects. Nothing is scanned in the background.</li>
+        <li><strong>What it keeps:</strong> names, descriptions, the command a hook runs, and MCP server commands or URLs. It never copies your
+          code, your prompts or your files, and none of it leaves your Mac. <em>Forget what was found</em> clears it.</li>
+      </ul>
+
       <h2 id="inspection">HTTPS inspection (optional)</h2>
       <p>Off by default. When you turn it on in <strong>Inspect</strong>, Flowlight runs a local proxy on <code>127.0.0.1:8877</code> with its own
         certificate authority, created on your Mac. For apps you route through it, it decrypts HTTPS and shows each request and response:
@@ -158,6 +175,27 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li>Quit Flowlight and move it from Applications to the Trash.</li>
         <li>Delete <code>~/Library/Application Support/Flowlight</code> to remove the recorded history.</li>
       </ol>
+
+      <h2 id="faq">Questions &amp; answers</h2>
+      <dl>
+        <dt><strong>Why did macOS ask Flowlight for access to my Desktop or Documents?</strong></dt>
+        <dd>Only because you pointed it at a project folder inside one of them. By default Flowlight reads agent configuration from the folders in
+          your home folder and never touches those three.</dd>
+        <dt><strong>Does Flowlight send anything about me anywhere?</strong></dt>
+        <dd>No. There's no account, no telemetry and no analytics. The only requests it makes are the daily update check, optional network-owner
+          lookups, and reverse DNS — each listed, and each with an off switch, on the <a href="{{root}}privacy/">privacy page</a>.</dd>
+        <dt><strong>Will it slow my Mac down or drain the battery?</strong></dt>
+        <dd>With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
+          costs less than the fallback sampler, which starts a short-lived <code>nettop</code> process every second.</dd>
+        <dt><strong>Can it block connections?</strong></dt>
+        <dd>Not yet. It observes and explains, and allowlists raise alerts. Blocking needs the Network Extension engine and is on the roadmap.</dd>
+        <dt><strong>Do I need the Network Extension?</strong></dt>
+        <dd>No. The sampler needs no entitlement and covers most traffic. The extension adds flows shorter than a second, attribution by code
+          signature, hostnames without the packet-capture setup, and is the path to blocking.</dd>
+        <dt><strong>What happens to my data if I uninstall?</strong></dt>
+        <dd>Everything lives in <code>~/Library/Application Support/Flowlight</code>. Delete that folder and it's gone; see
+          <a href="#uninstall">Uninstall</a> for the packet-capture helper and the inspection certificate.</dd>
+      </dl>
 
       <h2 id="limits">Limitations</h2>
       <ul>

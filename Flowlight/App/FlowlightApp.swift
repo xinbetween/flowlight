@@ -30,6 +30,16 @@ struct FlowlightApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesButton().environmentObject(updater)
             }
+            CommandGroup(replacing: .help) {
+                Button("Flowlight Help") { NSWorkspace.shared.open(Help.base) }
+                    .keyboardShortcut("?", modifiers: .command)
+                Button("Questions & Answers") { NSWorkspace.shared.open(Help.faq) }
+                Divider()
+                Button("What Flowlight Reads on This Mac") { NSWorkspace.shared.open(Help.agentConfiguration) }
+                Button("Privacy") { NSWorkspace.shared.open(Help.privacy) }
+                Divider()
+                Button("Report an Issue") { NSWorkspace.shared.open(Help.issues) }
+            }
             CommandGroup(before: .sidebar) {
                 ForEach(SidebarItem.allCases) { item in
                     Button(item.title) { nav.selection = item }.keyboardShortcut(item.shortcut, modifiers: .command)

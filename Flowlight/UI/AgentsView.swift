@@ -149,7 +149,6 @@ struct AgentsView: View {
             .mapValues { Array(Set($0.map(\.mcpServer))) }
         mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
         profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
-        workspaceStore.refresh()
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -447,9 +446,8 @@ struct AgentDetail: View {
                                         }
                                     }
                                 }
-                                if workspaces.isEmpty && AgentWorkspaceStore.shared.scanning {
-                                    Text("Looking for \(agent.name)'s configuration…").font(.caption).foregroundStyle(.secondary)
-                                }
+                                Divider().padding(.vertical, 2)
+                                AgentSetupBar(agent: agent.name)
                             }
                             .padding(.trailing, 6)
                         }
@@ -837,4 +835,76 @@ struct ConfiguredServerRow: View {
         .font(.caption)
         .opacity(0.85)
     }
+}
+
+/// Explains what Flowlight reads on disk, and puts the person in charge of when and where.
+struct AgentSetupBar: View {
+    let agent: String
+    @ObservedObject private var store = AgentWorkspaceStore.shared
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if store.scanning {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Reading agent configuration…").foregroundStyle(.secondary)
+                }
+            } else if !store.hasScanned {
+                Text("Flowlight can also list what \(agent) is set up with: its skills, subagents, slash commands, hooks and MCP servers. It reads those config files on this Mac and keeps only their names; nothing is sent anywhere.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button("Look for agent configuration") { store.refresh(force: true) }
+                    Button("Why?") { openURL(Help.agentConfiguration) }.buttonStyle(.link)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Text(summary).foregroundStyle(.secondary)
+                    Spacer()
+                    if store.isStale { Text("out of date").foregroundStyle(.orange) }
+                    Button("Rescan") { store.refresh(force: true) }.controlSize(.small)
+                    Button("Add project folder…") { pickFolder() }.controlSize(.small)
+                }
+                if !store.roots.isEmpty {
+                    ForEach(store.roots, id: \.self) { root in
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder").foregroundStyle(.secondary)
+                            Text(root.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))
+                                .lineLimit(1).truncationMode(.middle)
+                            Button { store.removeRoot(root) } label: { Image(systemName: "xmark.circle.fill") }
+                                .buttonStyle(.plain).foregroundStyle(.secondary)
+                                .accessibilityLabel("Stop scanning \(root.lastPathComponent)")
+                        }
+                        .font(.caption2)
+                    }
+                }
+            }
+        }
+        .font(.caption)
+    }
+
+    private var summary: String {
+        let folders = store.workspaces.count
+        let when = store.scannedAt.map { $0.formatted(.relative(presentation: .named)) } ?? "never"
+        return "\(folders) configuration \(folders == 1 ? "folder" : "folders") found · scanned \(when)"
+    }
+
+    /// Project folders are opened through a picker, so macOS grants access to that folder alone.
+    private func pickFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Scan"
+        panel.message = "Pick a folder where your projects live. Flowlight looks for agent configuration inside it."
+        if panel.runModal() == .OK, let url = panel.url { store.addRoot(url) }
+    }
+}
+
+enum Help {
+    static let base = URL(string: "https://flowlight.xinbetween.com/docs/")!
+    static let agentConfiguration = URL(string: "https://flowlight.xinbetween.com/docs/#agent-configuration")!
+    static let faq = URL(string: "https://flowlight.xinbetween.com/docs/#faq")!
+    static let privacy = URL(string: "https://flowlight.xinbetween.com/privacy/")!
+    static let issues = URL(string: "https://github.com/xinbetween/flowlight/issues")!
 }

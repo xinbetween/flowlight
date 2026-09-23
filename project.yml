@@ -24,6 +24,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowlight.app
         PRODUCT_NAME: Flowlight
+        # Set by scripts/build-signed.sh for Developer ID builds; empty for ad-hoc local builds.
+        PROVISIONING_PROFILE_SPECIFIER: $(FL_APP_PROFILE)
         INFOPLIST_FILE: Flowlight/Info.plist
         CODE_SIGN_ENTITLEMENTS: Flowlight/Flowlight.entitlements
         GENERATE_INFOPLIST_FILE: NO
@@ -48,6 +50,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowlight.app.filter
         PRODUCT_NAME: com.flowlight.app.filter
+        PROVISIONING_PROFILE_SPECIFIER: $(FL_EXT_PROFILE)
         INFOPLIST_FILE: FlowlightExtension/Info.plist
         CODE_SIGN_ENTITLEMENTS: FlowlightExtension/FlowlightExtension.entitlements
         GENERATE_INFOPLIST_FILE: NO

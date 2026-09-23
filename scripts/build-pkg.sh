@@ -7,7 +7,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
-APP=build/Build/Products/Release/Flowlight.app
+# Prefer the Developer ID build exported by build-signed.sh; fall back to the ad-hoc local build.
+APP=build/export/Flowlight.app
+[[ -d "$APP" ]] || APP=build/Build/Products/Release/Flowlight.app
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
 WORK=build/pkg
 export COPYFILE_DISABLE=1          # no ._ AppleDouble files in the payload

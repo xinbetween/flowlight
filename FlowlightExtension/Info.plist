@@ -24,6 +24,8 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>FLAppGroupIdentifier</key>
 	<string>$(TeamIdentifierPrefix)com.flowlight.shared</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Flowlight uses a network filter extension to attribute every connection to the app that made it. It records only metadata, never blocks traffic, and nothing leaves your Mac.</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEMachServiceName</key>

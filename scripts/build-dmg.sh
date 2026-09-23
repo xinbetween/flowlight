@@ -15,7 +15,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
-APP=build/Build/Products/Release/Flowlight.app
+# Prefer the Developer ID build exported by build-signed.sh; fall back to the ad-hoc local build.
+APP=build/export/Flowlight.app
+[[ -d "$APP" ]] || APP=build/Build/Products/Release/Flowlight.app
 [[ -d "$APP" ]] || { echo "Build failed: $APP missing" >&2; exit 1; }
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
 VOLUME="Flowlight"

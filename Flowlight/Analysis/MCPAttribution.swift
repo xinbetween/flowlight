@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// An MCP server as an agent's configuration declares it.
-struct MCPServerConfig: Equatable, Sendable {
+struct MCPServerConfig: Equatable, Sendable, Codable {
     var name: String
     var client: String          // "Claude Code", "Cursor", …
     var command: String?

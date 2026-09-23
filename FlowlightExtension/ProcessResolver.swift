@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Security
 
@@ -57,6 +58,12 @@ final class ProcessResolver: @unchecked Sendable {
             }
         }
 
+        // Code signing can't identify every process (plain command-line tools especially). The extension runs as
+        // root, so the executable path is still readable, which gives a name instead of a bare pid.
+        if path.isEmpty {
+            var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+            if proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 { path = String(cString: buffer) }
+        }
         let (bundleID, name) = bundleInfo(path: path, fallbackIdentifier: identifier, pid: pid)
         return ProcessInfoRecord(pid: pid, bundleID: bundleID, name: name, path: path, teamID: teamID)
     }

@@ -1,8 +1,8 @@
 import Foundation
 
 /// Something an agent is set up to do, found in its configuration on this Mac.
-struct AgentCapability: Equatable, Identifiable, Sendable {
-    enum Kind: String, Sendable {
+struct AgentCapability: Equatable, Identifiable, Sendable, Codable {
+    enum Kind: String, Sendable, Codable {
         case skill, subagent, command, hook, plugin, permission, instructions
     }
 
@@ -20,7 +20,7 @@ struct AgentCapability: Equatable, Identifiable, Sendable {
 }
 
 /// One agent's configuration directory (`~/.claude`, a project's `.codex`, …).
-struct AgentWorkspace: Equatable, Sendable {
+struct AgentWorkspace: Equatable, Sendable, Codable {
     /// Matches `AgentCatalog` process names: claude, codex, cursor, gemini…
     var agent: String
     var root: String
@@ -50,14 +50,20 @@ enum AgentWorkspaceScanner {
         "Photos Library.photoslibrary", "venv", ".venv", "vendor", "target", "build", "DerivedData", ".next", "dist",
     ]
 
-    /// Scans `home` for agent configuration. Bounded by depth and by the number of folders visited, so it stays quick
-    /// on a large home folder.
-    static func scan(home rawHome: URL = FileManager.default.homeDirectoryForCurrentUser, maxDepth: Int = 6,
-                     maxVisits: Int = 20_000, fm: FileManager = .default) -> [AgentWorkspace] {
+    /// Folders macOS protects behind a privacy prompt. Flowlight never walks into them on its own; a project folder
+    /// inside one is scanned only if the person picks it themselves.
+    static let protected: Set<String> = ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "iCloud Drive"]
+
+    /// Scans the agent configuration folders in the home folder itself (`~/.claude`, `~/.codex`, …) plus any project
+    /// folders the person added. It deliberately does not walk the whole home folder: that crosses Desktop, Documents
+    /// and Downloads, which makes macOS ask for permission Flowlight doesn't need.
+    static func scan(home rawHome: URL = FileManager.default.homeDirectoryForCurrentUser, extraRoots: [URL] = [],
+                     maxDepth: Int = 4, maxVisits: Int = 4000, fm: FileManager = .default) -> [AgentWorkspace] {
         let home = rawHome.standardizedFileURL
         var workspaces: [AgentWorkspace] = []
         var visits = 0
-        var queue: [(url: URL, depth: Int)] = [(home, 0)]
+        // Depth `maxDepth` is used for folders the person picked; the home folder itself is read one level deep.
+        var queue: [(url: URL, depth: Int)] = [(home, maxDepth)] + extraRoots.map { ($0.standardizedFileURL, 0) }
         while !queue.isEmpty, visits < maxVisits {
             let (directory, depth) = queue.removeFirst()
             visits += 1
@@ -69,7 +75,7 @@ enum AgentWorkspaceScanner {
                 if let agent = directories[name] {
                     let parent = entry.deletingLastPathComponent().standardizedFileURL.path
                     workspaces.append(read(root: entry, agent: agent, isProject: parent != home.path, home: home, fm: fm))
-                } else if depth < maxDepth, !skipped.contains(name), !name.hasPrefix(".") {
+                } else if depth < maxDepth, !skipped.contains(name), !protected.contains(name), !name.hasPrefix(".") {
                     queue.append((entry, depth + 1))
                 }
             }
@@ -211,31 +217,89 @@ enum AgentWorkspaceScanner {
     }
 }
 
-/// Keeps the last scan, so the AI Agents view can show an agent's configuration without waiting for a fresh walk of
-/// the home folder (which takes a few seconds on a busy Mac).
+/// Keeps what the last scan found, so Flowlight doesn't walk the disk again on every launch.
+///
+/// By default it looks only at the agent folders in the home folder itself (`~/.claude`, `~/.codex`, …), which macOS
+/// doesn't gate behind a privacy prompt. Project folders are scanned only when the person adds them, and the result
+/// is remembered until they ask for a rescan.
 @MainActor
 final class AgentWorkspaceStore: ObservableObject {
     static let shared = AgentWorkspaceStore()
 
+    enum Keys {
+        static let workspaces = "agents.workspaces"
+        static let scannedAt = "agents.scannedAt"
+        static let roots = "agents.roots"
+    }
+
     @Published private(set) var workspaces: [AgentWorkspace] = []
     @Published private(set) var scanning = false
     @Published private(set) var scannedAt: Date?
+    /// Extra folders the person picked, usually where their projects live.
+    @Published private(set) var roots: [URL] = []
 
-    private let maxAge: TimeInterval = 600
+    /// After this long, the view offers a rescan in case agents or projects were added.
+    static let staleAfter: TimeInterval = 14 * 86400
 
-    /// Scans in the background unless a recent result is already in hand.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        roots = (defaults.array(forKey: Keys.roots) as? [String] ?? []).map { URL(fileURLWithPath: $0) }
+        scannedAt = defaults.object(forKey: Keys.scannedAt) as? Date
+        if let data = defaults.data(forKey: Keys.workspaces),
+           let stored = try? JSONDecoder().decode([AgentWorkspace].self, from: data) {
+            workspaces = stored
+        }
+    }
+
+    var isStale: Bool {
+        guard let scannedAt else { return true }
+        return Date().timeIntervalSince(scannedAt) > Self.staleAfter
+    }
+
+    var hasScanned: Bool { scannedAt != nil }
+
+    /// Scans in the background. Without `force` it only runs if nothing has been scanned yet, so opening AI Agents
+    /// never kicks off disk work on its own.
     func refresh(force: Bool = false) {
         guard !scanning, !DemoData.isEnabled else { return }
-        if !force, let scannedAt, Date().timeIntervalSince(scannedAt) < maxAge { return }
+        guard force || !hasScanned else { return }
         scanning = true
+        let extraRoots = roots
         Task.detached(priority: .utility) {
-            let found = AgentWorkspaceScanner.scan()
-            await MainActor.run {
-                self.workspaces = found
-                self.scannedAt = Date()
-                self.scanning = false
-            }
+            let found = AgentWorkspaceScanner.scan(extraRoots: extraRoots)
+            await MainActor.run { self.store(found) }
         }
+    }
+
+    func addRoot(_ url: URL) {
+        guard !roots.contains(url) else { return }
+        roots.append(url)
+        defaults.set(roots.map(\.path), forKey: Keys.roots)
+        refresh(force: true)
+    }
+
+    func removeRoot(_ url: URL) {
+        roots.removeAll { $0 == url }
+        defaults.set(roots.map(\.path), forKey: Keys.roots)
+        refresh(force: true)
+    }
+
+    /// Forgets everything found on disk, for someone who would rather Flowlight didn't look at all.
+    func forget() {
+        workspaces = []
+        scannedAt = nil
+        defaults.removeObject(forKey: Keys.workspaces)
+        defaults.removeObject(forKey: Keys.scannedAt)
+    }
+
+    private func store(_ found: [AgentWorkspace]) {
+        workspaces = found
+        scannedAt = Date()
+        scanning = false
+        defaults.set(try? JSONEncoder().encode(found), forKey: Keys.workspaces)
+        defaults.set(scannedAt, forKey: Keys.scannedAt)
     }
 
     /// Workspaces belonging to an agent, its own first, then the projects it's configured in.

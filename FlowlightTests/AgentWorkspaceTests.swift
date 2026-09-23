@@ -31,11 +31,11 @@ final class AgentWorkspaceScannerTests: XCTestCase {
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: home) }
 
-    func testFindsCapabilitiesAndSkipsNoise() {
+    func testScansHomeAgentFoldersOnly() {
         let workspaces = AgentWorkspaceScanner.scan(home: home)
-        XCTAssertEqual(workspaces.count, 2, "the user's ~/.claude and the project's .claude")
-        let user = try! XCTUnwrap(workspaces.first { !$0.isProject })
-        XCTAssertEqual(user.root, "~/.claude")
+        XCTAssertEqual(workspaces.map(\.root), ["~/.claude"], "project folders are not scanned until the person adds one")
+        let user = workspaces[0]
+        XCTAssertFalse(user.isProject)
         XCTAssertEqual(user.of(.skill).map(\.name), ["pdf-tools"], "a folder without SKILL.md front matter is not a skill")
         XCTAssertEqual(user.of(.skill).first?.detail, "Fill and sign PDFs")
         XCTAssertEqual(user.of(.subagent).map(\.name), ["reviewer"])
@@ -43,14 +43,28 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(user.of(.command).map(\.name), ["deploy"])
         XCTAssertEqual(user.of(.plugin).map(\.name), ["security-suite"], "only enabled plugins")
         XCTAssertEqual(user.of(.skill).first?.source, "~/.claude/skills/pdf/SKILL.md")
+    }
 
-        let project = try! XCTUnwrap(workspaces.first { $0.isProject })
-        XCTAssertEqual(project.mcpServers.map(\.name), ["github"], "a project's .mcp.json sits next to .claude")
-        XCTAssertEqual(project.of(.instructions).map(\.name), ["AGENTS.md"])
-
+    func testAddedProjectFolderIsScanned() {
+        let project = home.appendingPathComponent("Projects/app")
+        let workspaces = AgentWorkspaceScanner.scan(home: home, extraRoots: [project])
+        let found = try! XCTUnwrap(workspaces.first { $0.isProject })
+        XCTAssertEqual(found.mcpServers.map(\.name), ["github"], "a project's .mcp.json sits next to .claude")
+        XCTAssertEqual(found.of(.instructions).map(\.name), ["AGENTS.md"])
         let names = workspaces.flatMap(\.capabilities).map(\.name)
         XCTAssertFalse(names.contains("sneaky"), "node_modules is skipped")
-        XCTAssertFalse(names.contains("nope"), "Library is skipped")
+    }
+
+    func testNeverWalksIntoProtectedFolders() throws {
+        // macOS gates Desktop, Documents and Downloads behind a privacy prompt; Flowlight must not trip it.
+        let hidden = home.appendingPathComponent("Documents/work/.claude/skills/secret")
+        try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try "---\nname: secret\n---\n".write(to: hidden.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        let names = AgentWorkspaceScanner.scan(home: home).flatMap(\.capabilities).map(\.name)
+        XCTAssertFalse(names.contains("secret"))
+        // Unless the person picks that folder themselves.
+        let picked = AgentWorkspaceScanner.scan(home: home, extraRoots: [home.appendingPathComponent("Documents/work")])
+        XCTAssertTrue(picked.flatMap(\.capabilities).map(\.name).contains("secret"))
     }
 
     func testHooksAndSensitivePermissions() {
