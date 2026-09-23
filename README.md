@@ -70,6 +70,12 @@ and MCP servers did:
   *curl → paste.example ← Bash: curl -s https://paste.example/up*. For MCP servers reached over HTTP it also records the
   server's name and version and the tools it offers. Each agent's detail has **Tool calls** and **MCP servers** tabs.
 
+- **What each agent is set up to do.** With your say-so, Flowlight reads the agent configuration on this Mac — skills,
+  subagents, slash commands, **hooks** (the shell commands they run on events), permission rules and MCP servers — and
+  lists them per agent. A hook that posts to a webhook explains traffic you'd otherwise have to guess at. It looks only
+  at the agent folders in your home folder, plus project folders you pick, and remembers the result instead of
+  rescanning.
+
 These rules watch every agent:
 
 | Rule | Fires when an agent… | Severity |
@@ -141,6 +147,7 @@ same local database.
 ## Install
 
 1. Download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
+   Releases are signed and notarized, so it opens straight away.
    Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
    Flowlight checks for new releases daily. It downloads and verifies an update, then asks before it quits to install
@@ -188,7 +195,7 @@ Two capture engines produce the same per-second summaries:
 
 | | **nettop sampler** (default) | **Network Extension** |
 |---|---|---|
-| Needs | nothing | Apple's `content-filter-provider` entitlement (paid developer account) |
+| Needs | nothing | The Network Extension entitlement (paid developer account), app in /Applications, your approval |
 | Attribution | process → app bundle | audit token → code-signing identity |
 | Hostnames | TLS SNI + DNS from packet capture, reverse DNS, network owner | SNI, HTTP `Host`, system hostname, DNS |
 | Short-lived flows | flows under ~1 s can be missed | every flow |
@@ -207,15 +214,22 @@ so a year of history stays fast.
   Inspection speaks HTTP/1.1 to both sides.
 - **Hostname capture follows the primary interface.** Traffic confined to another interface or tunnel may lack names.
 - **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
-- **Release builds aren't notarized yet.** macOS 15 blocks the first launch; open **System Settings › Privacy &
-  Security**, scroll to Security and click **Open Anyway** (Control-click › Open no longer works on macOS 15).
+- **The Network Extension needs approval.** Installing the content filter asks you to allow it in System Settings and
+  to confirm the filter. Flowlight works without it on the nettop sampler.
 
 ## Roadmap
 
-- [ ] Signed and notarized releases, and a Homebrew cask
+- [x] Signed and notarized releases (Developer ID, from 0.1.6)
+- [ ] A Homebrew cask
 - [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
-- [ ] Block allowlist violations in Network Extension mode
+- [ ] **Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with a
+  prompt to allow it once or always. Needs the Network Extension engine, which can refuse a flow rather than just
+  report it.
+- [ ] **Focus mode.** Pick the apps and domains you care about and ignore everything else, for debugging a single
+  agent or app without the rest of the Mac's traffic in the way.
+- [ ] **Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status, headers
+  and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - [ ] Export to OpenTelemetry / SIEM
 - [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority; metadata
   and analytics stay the default)
@@ -236,7 +250,7 @@ Flowlight/
   Analysis/          anomaly engine, AI agent catalog + rules
   Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
   UI/                Live · AI Agents · Reports · Alerts · Inspect · Capture
-FlowlightTests/      101 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
+FlowlightTests/      105 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
 docs/                website (GitHub Pages) and developer guide
 ```
 

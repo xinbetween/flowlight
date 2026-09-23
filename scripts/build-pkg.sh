@@ -27,4 +27,10 @@ SIGN=()
 [[ -n "${INSTALLER_IDENTITY:-}" ]] && SIGN=(--sign "$INSTALLER_IDENTITY")
 productbuild --package "$WORK/Flowlight-component.pkg" --identifier com.flowlight.app.installer --version "$VERSION" \
   "${SIGN[@]}" "build/Flowlight-$VERSION.pkg"
+
+# A signed installer still needs notarizing, or macOS refuses to open it.
+if [[ -n "${NOTARY_PROFILE:-}" && ${#SIGN[@]} -gt 0 ]]; then
+  xcrun notarytool submit "build/Flowlight-$VERSION.pkg" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "build/Flowlight-$VERSION.pkg"
+fi
 echo "Built build/Flowlight-$VERSION.pkg"

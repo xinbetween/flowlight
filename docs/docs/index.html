@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.1.5, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.1.6, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -60,10 +60,9 @@ xcodegen generate &amp;&amp; scripts/build-local.sh
 open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="first-launch">First launch</h2>
-      <p>This preview isn't notarized yet, so macOS blocks the first launch and says it can't verify the developer. Open
-        <strong>System Settings › Privacy &amp; Security</strong>, scroll to <em>Security</em>, and click <strong>Open Anyway</strong> next to
-        the message about Flowlight. You only do this once. (Control-clicking the app and choosing Open no longer works: macOS 15 removed
-        that shortcut.)</p>
+      <p>Releases from 0.1.6 are signed with a Developer ID certificate and notarized by Apple, so the first launch just works. You can check
+        it yourself: <code>spctl -a -vvv /Applications/Flowlight.app</code> should answer <em>Notarized Developer ID</em>.
+        Versions up to 0.1.5 were unsigned; those need <strong>System Settings › Privacy &amp; Security › Open Anyway</strong> once.</p>
       <p>Traffic starts appearing within a second. The ↓↑ figures in your menu bar are live download and upload rates.</p>
 
       <h2 id="hostnames">Hostnames: the one-time setup</h2>
@@ -269,7 +268,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.1.5 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.1.6 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

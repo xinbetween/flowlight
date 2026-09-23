@@ -13,7 +13,27 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.1.5</h2><time datetime="2026-09-22">September 22, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.1.6</h2><time datetime="2026-09-23">September 23, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Signed and notarized.</strong> Releases now carry a Developer ID signature and Apple's notarization, so macOS opens
+            Flowlight without the "unverified developer" wall. Check it with <code>spctl -a -vvv /Applications/Flowlight.app</code>.</li>
+          <li><strong>The Network Extension works.</strong> Install the content filter from Capture for per-flow attribution by code signature,
+            flows shorter than a second, and hostnames without the packet-capture setup. It costs less energy than the sampler, which starts a
+            process every second.</li>
+          <li><strong>What each agent is set up to do.</strong> With your say-so, Flowlight lists an agent's skills, subagents, slash commands,
+            hooks, permission rules and MCP servers, read from configuration on this Mac. It looks only at the agent folders in your home
+            folder plus project folders you add, and remembers what it found.</li>
+          <li><strong>Tools, models and tokens</strong> from inspected calls: every tool an agent offers the model and which were used, the model
+            that answered, tokens in, out and cached, and MCP servers labelled local, remote or via provider.</li>
+          <li><strong>JSON tree viewer</strong> for request and response bodies, in their original key order, with a Raw view and Copy.</li>
+          <li><strong>Much lighter when idle.</strong> With no window open Flowlight no longer builds chart data for nobody: 4.3 → 0.9
+            CPU-seconds per minute. A hung <code>nettop</code> can no longer outlive the app and spin in the background.</li>
+          <li><strong>Help menu and a Q&amp;A</strong> covering privacy prompts, battery, blocking and uninstalling.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.1.6">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.1.5</h2><time datetime="2026-09-22">September 22, 2026</time></header>
         <ul>
           <li><strong>Tool results and MCP servers.</strong> With HTTPS inspection on, each tool call shows what came back (output or error),
             and each agent's detail gets <em>Tool calls</em> and <em>MCP servers</em> tabs: server name and version, the tools it offers, calls
