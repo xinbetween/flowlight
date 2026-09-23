@@ -18,12 +18,14 @@ jobs:
   test:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
 
-      - name: Show toolchain
+      # The newest Xcode on the image, named in the log so a release says which compiler built it.
+      - name: Select Xcode
         run: |
+          set -euo pipefail
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
-          swift --version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -34,10 +36,16 @@ jobs:
       # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
       - name: Test
         run: |
-          set -o pipefail
-          xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= \
-            | grep -vE '^\s*$' | tail -40
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/test.log"
+          if ! xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= > "$LOG" 2>&1; then
+            echo "::group::Last 300 lines"; tail -300 "$LOG"; echo "::endgroup::"
+            echo "Why it failed:"
+            grep -E "error:|Testing failed:|XCTAssert.*failed|failed \(" "$LOG" | head -40
+            exit 1
+          fi
+          grep -E "Executed .* tests|\*\* TEST" "$LOG" | tail -20
 
       - name: Check the site builds and is committed
         run: |

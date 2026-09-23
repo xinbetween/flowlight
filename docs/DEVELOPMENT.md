@@ -194,12 +194,28 @@ from generated notes when it doesn't.
 | `DMG_SIGN_IDENTITY`, `INSTALLER_IDENTITY` | the identity names, e.g. `Developer ID Application: Your Name (TEAMID)` |
 | `TAP_TOKEN` | *optional.* Fine-grained token with Contents: write on `xinbetween/homebrew-tap`, so the cask updates itself |
 
-**What this costs.** A signing identity in GitHub Actions is a signing identity outside your Mac. Anyone who can
-run a workflow in the repository can sign software as you, and anyone with admin access can read the secrets;
-a compromise of the account is a compromise of the certificate. For a security tool that's worth weighing properly:
+### What protects it
 
-- Keep releases on a protected tag or an environment with required reviewers, so a push alone can't sign anything.
-- Prefer a fine-grained `TAP_TOKEN` scoped to the one repository over a classic token.
-- The App Store Connect key only notarizes; it can't sign. Revoking it is cheap, so rotate it freely.
-- If any of that is more risk than it's worth, the local recipe above still works and the workflow can stay unused.
+A signing identity in GitHub Actions is a signing identity outside your Mac, so the release path is fenced in four
+ways. Each one is a setting on the repository; they aren't in this file, so this is also the record of what to
+check if the setup is ever rebuilt.
+
+1. **The secrets live in the `release` environment, not the repository.** Only a job that declares
+   `environment: release` can read them. A workflow added to a branch cannot.
+2. **That environment requires a human approval.** A tag push starts the job and then waits. Nothing is signed
+   until someone with access clicks approve, and the approval is recorded on the run.
+3. **The environment only accepts `v*` tags.** Its deployment branch policy is a single tag rule, so a run from a
+   branch — or from a tag with any other name — can't reach the secrets even with approval.
+4. **Release tags can't move.** A ruleset over `refs/tags/v*` blocks deletion, updates and force-pushes, so a
+   published tag always points at the commit that was reviewed. `main` is likewise protected from force-pushes
+   and deletion.
+
+Third-party actions are pinned to a commit SHA rather than a moving tag, so a compromised action release can't
+change what runs here.
+
+**What's still true after all that.** Anyone who can approve a release can sign software as you, and anyone with
+admin access can change who that is — a compromise of the GitHub account is a compromise of the certificate. The
+App Store Connect key only notarizes and can't sign, so rotating it is cheap; the Developer ID certificates are
+the ones that matter, and they're revocable in Apple's developer portal. If that trade is ever the wrong one, the
+local recipe above still works and the workflow can sit unused.
 

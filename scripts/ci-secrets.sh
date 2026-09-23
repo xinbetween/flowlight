@@ -6,19 +6,25 @@
 # It reads the two .p12 certificate exports, the two provisioning profiles and the App Store Connect key you point
 # it at, and uploads each with `gh secret set`. File contents are piped straight to gh and never printed.
 #
-# Read this first: these secrets let anyone who can run a workflow in this repository sign software as you, and
-# anyone with admin access can reach them. Set them only on a repository whose collaborators you'd trust with the
-# certificates themselves, and revoke the identities in Apple's developer portal if that stops being true.
+# They go into the `release` environment, not the repository, so only the release job can read them and only after
+# a human approves the run. Even so: anyone who can approve a release can sign software as you, and anyone with
+# admin access can change who that is. Revoke the identities in Apple's developer portal if that stops being true.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REPO="${REPO:-xinbetween/flowlight}"
+ENVIRONMENT="${ENVIRONMENT:-release}"
 command -v gh >/dev/null || { echo "Install the GitHub CLI first: brew install gh" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "Run: gh auth login" >&2; exit 1; }
 
 ask() { printf '%s' "$1" >&2; read -r REPLY; print -r -- "$REPLY"; }
 
-echo "Setting Actions secrets on $REPO."
+echo "Setting Actions secrets on $REPO, in the $ENVIRONMENT environment."
+gh api "repos/$REPO/environments/$ENVIRONMENT" >/dev/null 2>&1 || {
+  echo "No $ENVIRONMENT environment on $REPO. Create it first (Settings › Environments), with a required reviewer" >&2
+  echo "and a deployment branch policy limited to the tag pattern v*." >&2
+  exit 1
+}
 echo
 
 APP_ID=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
@@ -59,8 +65,8 @@ for path in "$APP_PROFILE_PATH" "$EXT_PROFILE_PATH" "$NOTARY_KEY_PATH"; do
   [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
 done
 
-set_secret() { gh secret set "$1" --repo "$REPO" --body "$2" >/dev/null && echo "  set $1"; }
-set_file()   { base64 < "${2/#\~/$HOME}" | tr -d '\n' | gh secret set "$1" --repo "$REPO" >/dev/null && echo "  set $1"; }
+set_secret() { gh secret set "$1" --repo "$REPO" --env "$ENVIRONMENT" --body "$2" >/dev/null && echo "  set $1"; }
+set_file()   { base64 < "${2/#\~/$HOME}" | tr -d '\n' | gh secret set "$1" --repo "$REPO" --env "$ENVIRONMENT" >/dev/null && echo "  set $1"; }
 
 echo
 echo "Uploading:"
@@ -78,6 +84,8 @@ set_secret INSTALLER_IDENTITY        "$INSTALLER_ID"
 
 echo
 echo "TAP_TOKEN is optional: a fine-grained token with Contents: write on xinbetween/homebrew-tap, which lets the"
-echo "release job update the Homebrew cask. Without it that step is skipped and you run scripts/update-cask.sh."
+echo "release job update the Homebrew cask. Add it to the same environment; without it that step is skipped and"
+echo "you run scripts/update-cask.sh yourself."
 echo
-echo "Try it without tagging anything: gh workflow run Release --repo $REPO --ref <an existing tag>"
+echo "Try it against a tag that already exists: gh workflow run Release --repo $REPO --ref v0.2.2"
+echo "It will wait for your approval before it touches any of this."

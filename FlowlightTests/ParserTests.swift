@@ -33,20 +33,39 @@ final class ParserTests: XCTestCase {
 
     func testDNSResponse() {
         // Response for www.example.com: CNAME → edge.example.net, A 93.184.216.34, AAAA 2606:2800::1
+        //
+        // Every array here is annotated and appended one at a time. Chaining `+` across bare integer literals
+        // reads more compactly but the type checker explores it exponentially: Xcode 16.4 gives up on it.
+        func label(_ s: String) -> [UInt8] { [UInt8(s.utf8.count)] + Array(s.utf8) }
         var b: [UInt8] = [0x12, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00]
-        b += [3] + Array("www".utf8) + [7] + Array("example".utf8) + [3] + Array("com".utf8) + [0]
-        b += [0x00, 0x01, 0x00, 0x01]
-        let cname: [UInt8] = [4] + Array("edge".utf8) + [7] + Array("example".utf8) + [3] + Array("net".utf8) + [0]
-        b += [0xC0, 0x0C, 0x00, 0x05, 0x00, 0x01, 0, 0, 0x0E, 0x10, 0x00, UInt8(cname.count)] + cname
-        b += [0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0, 0, 0x00, 0x3C, 0x00, 0x04, 93, 184, 216, 34]
-        b += [0xC0, 0x0C, 0x00, 0x1C, 0x00, 0x01, 0, 0, 0x00, 0x3C, 0x00, 0x10, 0x26, 0x06, 0x28, 0x00] + [UInt8](repeating: 0, count: 11) + [1]
+        b += label("www")
+        b += label("example")
+        b += label("com")
+        let terminator: [UInt8] = [0]
+        b += terminator
+        let question: [UInt8] = [0x00, 0x01, 0x00, 0x01]
+        b += question
+        var cname: [UInt8] = label("edge")
+        cname += label("example")
+        cname += label("net")
+        cname += terminator
+        let cnameHeader: [UInt8] = [0xC0, 0x0C, 0x00, 0x05, 0x00, 0x01, 0, 0, 0x0E, 0x10, 0x00, UInt8(cname.count)]
+        b += cnameHeader
+        b += cname
+        let aRecord: [UInt8] = [0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0, 0, 0x00, 0x3C, 0x00, 0x04, 93, 184, 216, 34]
+        b += aRecord
+        let aaaaHeader: [UInt8] = [0xC0, 0x0C, 0x00, 0x1C, 0x00, 0x01, 0, 0, 0x00, 0x3C, 0x00, 0x10, 0x26, 0x06, 0x28, 0x00]
+        b += aaaaHeader
+        b += [UInt8](repeating: 0, count: 11)
+        b += [UInt8(1)]
 
         let answer = DNSParser.parseResponse(Data(b))
         XCTAssertEqual(answer?.queriedName, "www.example.com")
         XCTAssertEqual(answer?.addresses, ["93.184.216.34", "2606:2800::1"])
         XCTAssertEqual(answer?.ttl, 60)
 
-        let tcp = DNSParser.parseResponse(Data([0x00, UInt8(b.count)] + b), tcpFraming: true)
+        let framed: [UInt8] = [0x00, UInt8(b.count)] + b
+        let tcp = DNSParser.parseResponse(Data(framed), tcpFraming: true)
         XCTAssertEqual(tcp?.addresses.count, 2)
 
         var query = b; query[2] = 0x01 // QR bit cleared → a query, not a response
@@ -126,7 +145,9 @@ final class ParserTests: XCTestCase {
         }
         XCTAssertTrue(parser.feed(sample(1000, 200)).isEmpty) // header of first sample
         XCTAssertTrue(parser.feed(sample(1500, 260)).isEmpty) // closes baseline sample
-        let deltas = parser.feed(sample(1800, 300, extra: "Safari.900,0,0,\ntcp6 fe80::1%en0.50000<->2606:4700::6810:84e5.443,4000,700,\n") + "\n,bytes_in,bytes_out,\n")
+        let extra = "Safari.900,0,0,\ntcp6 fe80::1%en0.50000<->2606:4700::6810:84e5.443,4000,700,\n"
+        let thirdSample: String = sample(1800, 300, extra: extra) + "\n,bytes_in,bytes_out,\n"
+        let deltas = parser.feed(thirdSample)
         XCTAssertEqual(deltas.count, 2)
         let first = deltas[0]
         let apsd = first.first { $0.pid == 373 }
