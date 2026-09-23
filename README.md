@@ -219,29 +219,37 @@ so a year of history stays fast.
 
 ## Roadmap
 
+Shipped:
+
 - [x] Signed and notarized releases (Developer ID, from 0.1.6)
-- [ ] A Homebrew cask
-- [ ] **Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes on a
-  tag, so releases don't depend on one Mac. Needs the Developer ID certificates and an App Store Connect key as
-  repository secrets, which puts the signing identity in GitHub — worth weighing for a security tool.
 - [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
-- [ ] **Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with a
-  prompt to allow it once or always. Needs the Network Extension engine, which can refuse a flow rather than just
-  report it.
-- [ ] **Focus mode.** Pick the apps and domains you care about and ignore everything else, for debugging a single
-  agent or app without the rest of the Mac's traffic in the way.
-- [ ] **Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status, headers
-  and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
-- [ ] Export to OpenTelemetry / SIEM
-- [ ] **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification,
-  agent rules, MCP and LLM readers). Capture would be rewritten on eBPF or nfnetlink, and process attribution on
-  `/proc`; SwiftUI doesn't exist there.
-- [ ] **Windows.** The same core with capture on WFP or ETW and attribution through `GetExtendedTcpTable`. A bigger
-  commitment than Linux: three capture backends to maintain, and a thinner Swift ecosystem.
-- [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority; metadata
-  and analytics stay the default)
+- [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority;
+  metadata and analytics stay the default)
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
+
+Planned, in order:
+
+- **0.2.1 — A Homebrew cask.** `brew install --cask flowlight`, so installing and updating is one command.
+- **0.2.2 — Focus mode.** Pick the apps and domains you care about and ignore everything else, for debugging a single
+  agent or app without the rest of the Mac's traffic in the way.
+- **0.2.3 — Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes
+  on a tag, so releases don't depend on one Mac. Needs the Developer ID certificates and an App Store Connect key as
+  repository secrets, which puts the signing identity in GitHub — worth weighing for a security tool.
+- **0.3.0 — Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with
+  a prompt to allow it once or always. Needs the Network Extension engine, which can refuse a flow rather than just
+  report it.
+- **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
+  headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
+- **0.3.2 — Export to OpenTelemetry / SIEM.**
+
+Later, no version yet:
+
+- **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification, agent
+  rules, MCP and LLM readers). Capture would be rewritten on eBPF or nfnetlink, and process attribution on `/proc`;
+  SwiftUI doesn't exist there.
+- **Windows.** The same core with capture on WFP or ETW and attribution through `GetExtendedTcpTable`. A bigger
+  commitment than Linux: three capture backends to maintain, and a thinner Swift ecosystem.
 
 ## Contributing
 

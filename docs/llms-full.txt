@@ -608,13 +608,19 @@ e.g. Wireshark
 
  What's coming
 
- Flowlight observes and explains today. These are the three things being built next.
+ Flowlight observes and explains today. This is the order the rest is being built in.
 
- Block connectionsAllowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
+ A Homebrew cask 0.2.1brew install --cask flowlight, so installing and updating Flowlight is one command.
 
- Focus modeWatch one app or domain and ignore the rest, for debugging a single agent without the whole Mac in the way.
+ Focus mode 0.2.2Pick the apps and domains you care about and ignore everything else, for debugging a single agent without the rest of the Mac's traffic in the way.
 
- Mock responsesAnswer a chosen URL with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
+ Release from CI 0.2.3A GitHub Actions workflow that builds, tests, signs, notarizes and publishes on a tag, so releases don't depend on one Mac.
+
+ Block connections 0.3.0Allowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
+
+ Mock responses 0.3.1Answer a chosen domain, path and method with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
+
+ Export to OpenTelemetry / SIEM 0.3.2Send what Flowlight records to the tools the rest of your stack already reports to.
 
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
 
