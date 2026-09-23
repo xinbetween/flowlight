@@ -35,24 +35,42 @@ private func runBPF(_ program: [bpf_insn], _ packet: [UInt8]) -> UInt32 {
 
 private func u16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
 
+/// A DNS label: its length, then its bytes.
+private func label(_ s: String) -> [UInt8] { [UInt8(s.utf8.count)] + Array(s.utf8) }
+
+/// Joins the pieces of a packet. Writing these as one `a + b + c + …` chain of bare integer literals reads more
+/// compactly, but the type checker explores those exponentially and gives up on the longer ones.
+private func bytes(_ parts: [UInt8]...) -> [UInt8] { parts.flatMap { $0 } }
+
 private func dnsResponse() -> [UInt8] {
-    var b: [UInt8] = [0x12, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
-    b += [3] + Array("api".utf8) + [7] + Array("example".utf8) + [3] + Array("com".utf8) + [0] + [0x00, 0x01, 0x00, 0x01]
-    b += [0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0, 0, 0x01, 0x2C, 0x00, 0x04, 93, 184, 216, 34]
-    return b
+    let header: [UInt8] = [0x12, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
+    let terminator: [UInt8] = [0x00]                        // end of the name
+    let typeAndClass: [UInt8] = [0x00, 0x01, 0x00, 0x01]    // type A, class IN
+    let answer: [UInt8] = [0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0, 0, 0x01, 0x2C, 0x00, 0x04, 93, 184, 216, 34]
+    return bytes(header, label("api"), label("example"), label("com"), terminator, typeAndClass, answer)
 }
 
 private func ipv4(proto: UInt8, src: [UInt8], dst: [UInt8], transport: [UInt8], fragment: Int = 0) -> [UInt8] {
-    [0x45, 0x00] + u16(20 + transport.count) + [0x00, 0x01] + u16(fragment) + [64, proto, 0, 0] + src + dst + transport
+    let version: [UInt8] = [0x45, 0x00]
+    let identification: [UInt8] = [0x00, 0x01]
+    let ttlAndProtocol: [UInt8] = [64, proto, 0, 0]
+    return bytes(version, u16(20 + transport.count), identification, u16(fragment), ttlAndProtocol, src, dst, transport)
 }
 
 private func ipv6(next: UInt8, dst: [UInt8], transport: [UInt8]) -> [UInt8] {
-    [0x60, 0, 0, 0] + u16(transport.count) + [next, 64] + [UInt8](repeating: 0x11, count: 16) + dst + transport
+    let version: [UInt8] = [0x60, 0, 0, 0]
+    let nextAndHops: [UInt8] = [next, 64]
+    return bytes(version, u16(transport.count), nextAndHops, [UInt8](repeating: 0x11, count: 16), dst, transport)
 }
 
-private func udp(src: Int, dst: Int, _ payload: [UInt8]) -> [UInt8] { u16(src) + u16(dst) + u16(8 + payload.count) + [0, 0] + payload }
+private func udp(src: Int, dst: Int, _ payload: [UInt8]) -> [UInt8] {
+    bytes(u16(src), u16(dst), u16(8 + payload.count), [0, 0], payload)
+}
 private func tcp(src: Int, dst: Int, _ payload: [UInt8]) -> [UInt8] {
-    u16(src) + u16(dst) + [0, 0, 0, 1, 0, 0, 0, 0] + [0x50, 0x18] + [0xFF, 0xFF, 0, 0, 0, 0] + payload
+    let sequence: [UInt8] = [0, 0, 0, 1, 0, 0, 0, 0]
+    let offsetAndFlags: [UInt8] = [0x50, 0x18]
+    let windowAndChecksum: [UInt8] = [0xFF, 0xFF, 0, 0, 0, 0]
+    return bytes(u16(src), u16(dst), sequence, offsetAndFlags, windowAndChecksum, payload)
 }
 
 private func ethernet(_ type: Int, _ ip: [UInt8]) -> [UInt8] { [UInt8](repeating: 0xAA, count: 12) + u16(type) + ip }

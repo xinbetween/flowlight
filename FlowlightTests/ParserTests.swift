@@ -2,20 +2,33 @@ import XCTest
 @testable import Flowlight
 
 final class ParserTests: XCTestCase {
+    /// Every piece is an annotated [UInt8] joined by `bytes`. A long `a + b + c + …` chain reads more compactly,
+    /// but the type checker explores those exponentially and gives up on the longer ones (Xcode 16.4 does, anyway).
+    static func bytes(_ parts: [UInt8]...) -> [UInt8] { parts.flatMap { $0 } }
+
     static func clientHello(sni: String) -> Data {
         func u16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
-        let name = Array(sni.utf8)
-        let serverNameList: [UInt8] = [0x00] + u16(name.count) + name
-        let sniExt: [UInt8] = u16(0x0000) + u16(serverNameList.count + 2) + u16(serverNameList.count) + serverNameList
-        let otherExt: [UInt8] = u16(0x000A) + u16(4) + u16(2) + u16(0x001D) // supported_groups
-        let extensions = otherExt + sniExt
-        var body: [UInt8] = [0x03, 0x03] + [UInt8](repeating: 0xAB, count: 32)
-        body += [0x20] + [UInt8](repeating: 0x01, count: 32)   // session id
-        body += u16(4) + [0x13, 0x01, 0x13, 0x02]              // cipher suites
-        body += [0x01, 0x00]                                   // compression
-        body += u16(extensions.count) + extensions
-        let handshake: [UInt8] = [0x01, UInt8(body.count >> 16), UInt8(body.count >> 8 & 0xFF), UInt8(body.count & 0xFF)] + body
-        return Data([0x16, 0x03, 0x01] + u16(handshake.count) + handshake)
+        let name: [UInt8] = Array(sni.utf8)
+        let hostNameType: [UInt8] = [0x00]
+        let serverNameList: [UInt8] = bytes(hostNameType, u16(name.count), name)
+        let sniExt: [UInt8] = bytes(u16(0x0000), u16(serverNameList.count + 2), u16(serverNameList.count), serverNameList)
+        let otherExt: [UInt8] = bytes(u16(0x000A), u16(4), u16(2), u16(0x001D))   // supported_groups
+        let extensions: [UInt8] = bytes(otherExt, sniExt)
+
+        let version: [UInt8] = [0x03, 0x03]
+        let sessionID: [UInt8] = [0x20]
+        let cipherSuites: [UInt8] = [0x13, 0x01, 0x13, 0x02]
+        let compression: [UInt8] = [0x01, 0x00]
+        let body: [UInt8] = bytes(version, [UInt8](repeating: 0xAB, count: 32),
+                                  sessionID, [UInt8](repeating: 0x01, count: 32),
+                                  u16(4), cipherSuites,
+                                  compression,
+                                  u16(extensions.count), extensions)
+
+        let handshakeHeader: [UInt8] = [0x01, UInt8(body.count >> 16), UInt8(body.count >> 8 & 0xFF), UInt8(body.count & 0xFF)]
+        let handshake: [UInt8] = bytes(handshakeHeader, body)
+        let recordHeader: [UInt8] = [0x16, 0x03, 0x01]
+        return Data(bytes(recordHeader, u16(handshake.count), handshake))
     }
 
     func testSNI() {
