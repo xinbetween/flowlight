@@ -51,6 +51,21 @@ final class TrafficMonitor: ObservableObject {
     private var source: TrafficSource?
     private var timers: [Timer] = []
 
+    /// How many Flowlight windows are on screen. With none, the menu bar only needs the current rates, so the live
+    /// chart series and the per-app list aren't built at all.
+    private var visibleWindows = 0
+    var uiVisible: Bool { visibleWindows > 0 }
+
+    func windowAppeared() { visibleWindows += 1 }
+
+    func windowDisappeared() {
+        visibleWindows = max(0, visibleWindows - 1)
+        if !uiVisible {
+            liveSeries = []
+            talkers = []
+        }
+    }
+
     private let liveWindow = 120
     private let rateWindow = 5
     private var perSecond: [Int64: [String: (name: String, path: String, counters: FlowCounters, topDest: String, topBytes: Int64)]] = [:]
@@ -254,14 +269,18 @@ final class TrafficMonitor: ObservableObject {
         let now = Int64(Date().timeIntervalSince1970)
         let receiving = lastDataAt.map { Date().timeIntervalSince($0) < 5 } ?? false
         if receiving != isReceiving { isReceiving = receiving }
-        perSecond = perSecond.filter { $0.key > now - Int64(liveWindow) }
+        // Without a window, only the last few seconds are needed for the menu bar rates.
+        let keep = Int64(uiVisible ? liveWindow : rateWindow + 3)
+        perSecond = perSecond.filter { $0.key > now - keep }
 
-        liveSeries = ((now - Int64(liveWindow))..<now).map { ts in
-            let values = perSecond[ts]?.values.map(\.counters) ?? []
-            return SeriesPoint(date: Date(timeIntervalSince1970: TimeInterval(ts)),
-                               bytesIn: values.reduce(0) { $0 + $1.bytesIn },
-                               bytesOut: values.reduce(0) { $0 + $1.bytesOut },
-                               flows: values.reduce(0) { $0 + $1.flows })
+        if uiVisible {
+            liveSeries = ((now - Int64(liveWindow))..<now).map { ts in
+                let values = perSecond[ts]?.values.map(\.counters) ?? []
+                return SeriesPoint(date: Date(timeIntervalSince1970: TimeInterval(ts)),
+                                   bytesIn: values.reduce(0) { $0 + $1.bytesIn },
+                                   bytesOut: values.reduce(0) { $0 + $1.bytesOut },
+                                   flows: values.reduce(0) { $0 + $1.flows })
+            }
         }
 
         // Rates over the most recent complete seconds (sources lag ~1–2 s).
@@ -276,6 +295,12 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         let seconds = Double(rateWindow)
+        guard uiVisible else {
+            // Menu bar only: the totals, without building or publishing the per-app list.
+            setRates(inRate: rates.values.reduce(0.0) { $0 + Double($1.counters.bytesIn) / seconds },
+                     outRate: rates.values.reduce(0.0) { $0 + Double($1.counters.bytesOut) / seconds })
+            return
+        }
         talkers = rates.map { bundle, v in
             LiveTalker(bundleID: bundle, name: v.name, path: v.path, rateIn: Double(v.counters.bytesIn) / seconds,
                        rateOut: Double(v.counters.bytesOut) / seconds, sessionIn: sessionPerApp[bundle]?.bytesIn ?? 0,
@@ -283,8 +308,13 @@ final class TrafficMonitor: ObservableObject {
         }
         .filter { $0.rateIn + $0.rateOut > 0 }
         .sorted { $0.rateIn + $0.rateOut > $1.rateIn + $1.rateOut }
-        currentIn = talkers.reduce(0) { $0 + $1.rateIn }
-        currentOut = talkers.reduce(0) { $0 + $1.rateOut }
+        setRates(inRate: talkers.reduce(0) { $0 + $1.rateIn }, outRate: talkers.reduce(0) { $0 + $1.rateOut })
+    }
+
+    /// Publishes rates only when they actually move, so an idle Mac doesn't redraw the menu bar every second.
+    private func setRates(inRate: Double, outRate: Double) {
+        if abs(inRate - currentIn) > max(64, currentIn * 0.02) { currentIn = inRate }
+        if abs(outRate - currentOut) > max(64, currentOut * 0.02) { currentOut = outRate }
     }
 
     // MARK: Maintenance

@@ -24,6 +24,8 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Flowlight installs a network filter extension so it can attribute every connection to the app that made it. It records only metadata, never blocks traffic, and nothing leaves your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 The Flowlight contributors. Licensed under the GNU GPL v3.</string>
 	<key>NSPrincipalClass</key>

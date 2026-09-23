@@ -26,6 +26,7 @@ struct AgentsView: View {
     @State private var toolActivity: [String: [ToolActivity]] = [:]
     @State private var mcpServers: [String: [MCPServerSummary]] = [:]
     @State private var profiles: [String: AgentProfile] = [:]
+    @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
@@ -58,6 +59,7 @@ struct AgentsView: View {
                     AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
                                 activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
                                 profile: profiles[selected.bundleID],
+                                workspaces: workspaceStore.workspaces(bundleID: selected.bundleID, name: selected.name),
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
@@ -147,6 +149,7 @@ struct AgentsView: View {
             .mapValues { Array(Set($0.map(\.mcpServer))) }
         mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
         profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
+        workspaceStore.refresh()
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -308,6 +311,7 @@ struct AgentDetail: View {
     var activity: [ToolActivity] = []
     var servers: [MCPServerSummary] = []
     var profile: AgentProfile?
+    var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
     @State private var tab = Tab.destinations
@@ -375,14 +379,14 @@ struct AgentDetail: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        if activity.isEmpty && servers.isEmpty {
+                        if activity.isEmpty && servers.isEmpty && workspaces.isEmpty {
                             Text("Other destinations").font(.caption.bold()).foregroundStyle(.secondary)
                         } else {
                             Picker("Show", selection: $tab) {
                                 Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
                                 Text("Tool calls (\(activity.count))").tag(Tab.calls)
-                                if let profile, !profile.tools.isEmpty { Text("Tools (\(profile.tools.count))").tag(Tab.tools) }
-                                Text("MCP servers (\(servers.count))").tag(Tab.servers)
+                                if toolCount > 0 { Text("Tools (\(toolCount))").tag(Tab.tools) }
+                                Text("MCP servers (\(servers.count + unusedServers.count))").tag(Tab.servers)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
                         }
@@ -392,7 +396,7 @@ struct AgentDetail: View {
                         }
                         .controlSize(.small)
                     }
-                    switch activity.isEmpty && servers.isEmpty ? .destinations : tab {
+                    switch activity.isEmpty && servers.isEmpty && workspaces.isEmpty ? .destinations : tab {
                     case .destinations:
                         if agent.otherDestinations.isEmpty {
                             Text("Only AI providers. Nothing else was contacted.").font(.caption).foregroundStyle(.secondary)
@@ -419,10 +423,32 @@ struct AgentDetail: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 6) {
                                 let tools = profile?.tools ?? []
-                                Text("Every tool \(agent.name) offers the model, from its inspected requests. \(tools.filter { $0.used > 0 }.count) of \(tools.count) were used in this window.")
-                                    .font(.caption).foregroundStyle(.secondary).padding(.bottom, 2)
-                                ForEach(Array(tools.enumerated()), id: \.offset) { _, entry in
-                                    DeclaredToolRow(tool: entry.tool, used: entry.used)
+                                if !tools.isEmpty {
+                                    Text("Declared to the model · \(tools.filter { $0.used > 0 }.count) of \(tools.count) used in this window")
+                                        .font(.caption.bold()).foregroundStyle(.secondary)
+                                    ForEach(Array(tools.enumerated()), id: \.offset) { _, entry in
+                                        DeclaredToolRow(tool: entry.tool, used: entry.used)
+                                    }
+                                }
+                                ForEach(AgentCapability.Kind.allCases, id: \.self) { kind in
+                                    let items = capabilities(kind)
+                                    if !items.isEmpty {
+                                        Divider().padding(.vertical, 2)
+                                        HStack {
+                                            Text(Self.sectionTitle(kind, count: items.count)).font(.caption.bold()).foregroundStyle(.secondary)
+                                            Spacer()
+                                            if kind == .permission, let summary = permissionSummary() {
+                                                Text(summary).font(.caption).foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        ForEach(items.prefix(kind == .permission ? 12 : 40)) { CapabilityRow(capability: $0) }
+                                        if items.count > (kind == .permission ? 12 : 40) {
+                                            Text("+\(items.count - (kind == .permission ? 12 : 40)) more").font(.caption).foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                }
+                                if workspaces.isEmpty && AgentWorkspaceStore.shared.scanning {
+                                    Text("Looking for \(agent.name)'s configuration…").font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                             .padding(.trailing, 6)
@@ -431,6 +457,9 @@ struct AgentDetail: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 10) {
                                 ForEach(servers) { MCPServerRow(server: $0) }
+                                ForEach(unusedServers, id: \.server.name) { entry in
+                                    ConfiguredServerRow(server: entry.server, scope: entry.scope)
+                                }
                             }
                             .padding(.trailing, 6)
                         }
@@ -451,6 +480,55 @@ struct AgentDetail: View {
                 }
             }
             .lineLimit(1)
+        }
+    }
+
+    /// Tools declared to the model, plus everything configured on disk.
+    private var toolCount: Int {
+        (profile?.tools.count ?? 0) + workspaces.reduce(0) { $0 + $1.capabilities.filter { $0.kind != .permission }.count }
+    }
+
+    /// Capabilities of one kind, the agent's own configuration before any project's.
+    private func capabilities(_ kind: AgentCapability.Kind) -> [AgentCapability] {
+        let all = workspaces.flatMap { $0.capabilities }.filter { $0.kind == kind }
+        var seen = Set<String>()
+        return all.filter { seen.insert($0.name + ($0.detail ?? "")).inserted }
+            .sorted { a, b in
+                // The agent's own configuration first, then anything sensitive, then by name.
+                if a.isProject != b.isProject { return !a.isProject }
+                if a.isSensitive != b.isSensitive { return a.isSensitive }
+                return a.name < b.name
+            }
+    }
+
+    private func permissionSummary() -> String? {
+        let rules = workspaces.flatMap { $0.capabilities }.filter { $0.kind == .permission }
+        guard !rules.isEmpty else { return nil }
+        let counts = Dictionary(grouping: rules, by: { $0.detail ?? "allow" }).mapValues(\.count)
+        return ["allow", "ask", "deny"].compactMap { decision in
+            counts[decision].map { "\($0) \(decision)" }
+        }.joined(separator: " · ")
+    }
+
+    /// MCP servers configured for this agent that haven't been seen in traffic.
+    private var unusedServers: [(server: MCPServerConfig, scope: String)] {
+        let known = Set(servers.map(\.id))
+        var seen = Set<String>()
+        return workspaces.flatMap { workspace in
+            workspace.mcpServers.map { (server: $0, scope: workspace.root) }
+        }
+        .filter { !known.contains($0.server.name.lowercased()) && seen.insert($0.server.name.lowercased()).inserted }
+    }
+
+    static func sectionTitle(_ kind: AgentCapability.Kind, count: Int) -> String {
+        switch kind {
+        case .skill: return "Skills (\(count))"
+        case .subagent: return "Subagents (\(count))"
+        case .command: return "Slash commands (\(count))"
+        case .hook: return "Hooks (\(count))"
+        case .plugin: return "Plugins (\(count))"
+        case .permission: return "Permission rules (\(count))"
+        case .instructions: return "Instructions (\(count))"
         }
     }
 
@@ -690,5 +768,73 @@ struct MCPServerRow: View {
     private var toolList: String {
         let names = server.tools.prefix(24).map { name in server.used[name].map { "\(name) ×\($0)" } ?? name }
         return names.joined(separator: " · ") + (server.tools.count > 24 ? " · +\(server.tools.count - 24) more" : "")
+    }
+}
+
+extension AgentCapability.Kind: CaseIterable {
+    /// The order sections appear in the Tools tab.
+    public static var allCases: [AgentCapability.Kind] { [.hook, .skill, .subagent, .command, .plugin, .instructions, .permission] }
+}
+
+/// One thing an agent is configured to do, read from its files on this Mac.
+struct CapabilityRow: View {
+    let capability: AgentCapability
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: icon).foregroundStyle(capability.isSensitive ? TrafficColors.anomaly : .secondary).frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    Text(capability.name).bold(capability.kind == .hook)
+                    if capability.isProject {
+                        Text("project").padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
+                    }
+                }
+                if let detail = capability.detail {
+                    Text(detail).font(capability.kind == .hook ? .caption.monospaced() : .caption)
+                        .foregroundStyle(capability.isSensitive ? TrafficColors.anomaly : .secondary)
+                        .lineLimit(2).truncationMode(.middle)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption)
+        .help("\(capability.source)\(capability.kind == .hook ? " — runs automatically when this event fires" : "")")
+    }
+
+    private var icon: String {
+        switch capability.kind {
+        case .skill: return "book.closed"
+        case .subagent: return "person.2"
+        case .command: return "chevron.left.forwardslash.chevron.right"
+        case .hook: return "bolt.horizontal.circle"
+        case .plugin: return "shippingbox"
+        case .permission: return "hand.raised"
+        case .instructions: return "doc.text"
+        }
+    }
+}
+
+/// An MCP server an agent is configured to run, but which hasn't appeared in traffic.
+struct ConfiguredServerRow: View {
+    let server: MCPServerConfig
+    let scope: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary)
+                Text(server.name).bold()
+                Text(server.url == nil ? "local" : "remote")
+                    .padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
+                Spacer()
+                Text("configured, no calls seen").foregroundStyle(.secondary)
+            }
+            Text(server.url?.absoluteString ?? ([server.command].compactMap { $0 } + server.args).joined(separator: " "))
+                .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            Text(scope).font(.caption2).foregroundStyle(.tertiary)
+        }
+        .font(.caption)
+        .opacity(0.85)
     }
 }

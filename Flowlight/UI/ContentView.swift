@@ -58,6 +58,8 @@ struct ContentView: View {
             case .capture: CaptureView()
             }
         }
+        .onAppear { monitor.windowAppeared() }
+        .onDisappear { monitor.windowDisappeared() }
         .onChange(of: updater.showWindow) { _, show in
             if show { openWindow(id: "update"); updater.showWindow = false }
         }
