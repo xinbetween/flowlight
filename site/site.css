@@ -205,6 +205,18 @@
   .meta-row span { display: inline-flex; align-items: center; gap: 6px; }
   .meta-row span + span::before { content: "·"; color: var(--line); margin-right: 8px; }
 
+  /* Install command, offered beside the download button */
+  .brew { display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; padding: 9px 10px 9px 14px;
+          border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-width: 100%; }
+  /* min-width:0 lets the command scroll inside the box instead of widening the page on a phone. */
+  .brew code { color: var(--ink); white-space: nowrap; overflow-x: auto; min-width: 0; }
+  .brew code::before { content: "$ "; color: var(--faint); }
+  .brew button { flex: none; font: 500 12px/1 var(--mono); color: var(--muted); background: var(--surface-2);
+                 border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; cursor: pointer; }
+  .brew button:hover { color: var(--ink); }
+  .brew button[data-copied] { color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 520px) { .brew { width: 100%; } }
+
   /* Use cases */
   .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .case { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 8px; align-content: start; }

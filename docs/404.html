@@ -44,6 +44,7 @@
       </div>
       <div><h4>Product</h4><ul>
         <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="/docs/#install">Install with Homebrew</a></li>
         <li><a href="/releases/">Release notes</a></li>
         <li><a href="/docs/">Documentation</a></li>
       </ul></div>
@@ -70,6 +71,27 @@
     </div>
   </div>
 </footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Copied";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Copy"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+</script>
 
 </body>
 </html>

@@ -70,7 +70,8 @@ Documentation
 
  Install
 
- With Homebrew: brew install --cask xinbetween/tap/flowlight. The same command upgrades it later.
+ With Homebrew — the same command upgrades it later:
+ brew install --cask xinbetween/tap/flowlightCopy
 
  Or download Flowlight.dmg, open it and drag Flowlight into Applications.
 
@@ -317,6 +318,8 @@ Free · open source · macOS 15+
  Download for macOS
 
  Star on GitHub
+
+ brew install --cask xinbetween/tap/flowlightCopy
 
  v0.2.0macOS 15+UniversalGPL-3.0No telemetry
 
@@ -727,6 +730,7 @@ Questions
 
  Download for macOS
  View source
+ brew install --cask xinbetween/tap/flowlightCopy
 
 ---
 
