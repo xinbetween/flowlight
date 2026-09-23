@@ -154,6 +154,25 @@ final class CertificateAuthority: @unchecked Sendable {
         return Insecure.SHA1.hash(data: der).map { String(format: "%02X", $0) }.joined()
     }
 
+    /// Shell commands that trust or untrust the CA for every user on this Mac. They need root, so they're run
+    /// together with the proxy change in a single authorization prompt.
+    func trustCommandAsRoot() -> String {
+        "/usr/bin/security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain "
+            + InspectionShell.quote(caCertificateURL.path)
+    }
+
+    func untrustCommandAsRoot() -> String {
+        "/usr/bin/security remove-trusted-cert -d " + InspectionShell.quote(caCertificateURL.path) + " 2>/dev/null || true"
+    }
+
+    /// True when the certificate is trusted for this Mac (admin domain) or just this user.
+    var isTrustedAnywhere: Bool {
+        guard let cert = caCertificate() else { return false }
+        var settings: CFArray?
+        return SecTrustSettingsCopyTrustSettings(cert, .admin, &settings) == errSecSuccess
+            || SecTrustSettingsCopyTrustSettings(cert, .user, &settings) == errSecSuccess
+    }
+
     /// Adds the CA to the login keychain and trusts it for TLS. macOS asks for the user's password.
     func trust() throws {
         try ensure()

@@ -34,6 +34,8 @@ final class InspectionController: ObservableObject {
     @Published var lastError: String?
     @Published private(set) var recordedCount = 0
     @Published private(set) var systemProxyOn = false
+    /// True while the one-click setup is waiting on the administrator prompt.
+    @Published private(set) var working = false
 
     private let proxy = InspectionProxy()
     private let recorder = InspectionRecorder()
@@ -44,7 +46,7 @@ final class InspectionController: ObservableObject {
 
     init() {
         UserDefaults.standard.register(defaults: [
-            Keys.enabled: false, Keys.port: 8877, Keys.scope: Scope.agents.rawValue,
+            Keys.enabled: false, Keys.port: 8877, Keys.scope: Scope.all.rawValue,
             Keys.neverInspect: Self.defaultNeverInspect, Keys.retentionDays: 3, Keys.systemProxy: false,
         ])
         proxy.observer = recorder
@@ -115,6 +117,55 @@ final class InspectionController: ObservableObject {
         prune()
     }
 
+    /// Everything the simple switch does: create the certificate, trust it, start the proxy and route apps through it.
+    /// Trusting and changing the proxy both need an administrator, so they go in one prompt rather than two.
+    func setEnabled(_ on: Bool) {
+        lastError = nil
+        if on {
+            do { try ca.ensure() } catch { lastError = error.localizedDescription; return }
+            caExists = true
+            proxy.start(port: configuredPort)
+        }
+        working = true
+        let pac = "http://127.0.0.1:\(port ?? configuredPort)/proxy.pac"
+        let services = SystemProxy.services()
+        var commands: [String] = [on ? ca.trustCommandAsRoot() : ca.untrustCommandAsRoot()]
+        for service in services {
+            let quoted = InspectionShell.quote(service)
+            commands += on
+                ? ["/usr/sbin/networksetup -setautoproxyurl \(quoted) \(pac)",
+                   "/usr/sbin/networksetup -setautoproxystate \(quoted) on"]
+                : ["/usr/sbin/networksetup -setautoproxystate \(quoted) off"]
+        }
+        let script = "do shell script " + InspectionShell.appleScriptQuote(commands.joined(separator: " && "))
+            + " with administrator privileges"
+        Task.detached(priority: .userInitiated) {
+            var error: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&error)
+            let failure = error.flatMap { e -> String? in
+                (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
+                    : (e[NSAppleScript.errorMessage] as? String ?? "authorization failed")
+            }
+            await MainActor.run { self.finishSetup(on: on, failure: failure) }
+        }
+    }
+
+    private func finishSetup(on: Bool, failure: String?) {
+        working = false
+        if let failure {
+            if failure != "cancelled" { lastError = "Couldn't set Flowlight up: \(failure)" }
+            if on { proxy.stop() }   // leave nothing half-configured
+            UserDefaults.standard.set(false, forKey: Keys.enabled)
+            UserDefaults.standard.set(false, forKey: Keys.systemProxy)
+        } else {
+            UserDefaults.standard.set(on, forKey: Keys.enabled)
+            UserDefaults.standard.set(on, forKey: Keys.systemProxy)
+            if !on { proxy.stop() }
+        }
+        objectWillChange.send()
+        refreshStatus()
+    }
+
     /// Starts or stops the proxy to match the setting.
     func apply() {
         refreshStatus()
@@ -130,7 +181,7 @@ final class InspectionController: ObservableObject {
 
     func refreshStatus() {
         caExists = ca.exists
-        trusted = caExists && ca.isTrusted
+        trusted = caExists && ca.isTrustedAnywhere
         systemProxyOn = UserDefaults.standard.bool(forKey: Keys.systemProxy)
     }
 

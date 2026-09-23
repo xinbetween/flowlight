@@ -151,12 +151,14 @@ private struct InspectContent: View {
     }
 }
 
-/// Setup: what inspection does, the certificate, how traffic gets routed, and what's never decrypted.
+/// Setup: one switch that does everything, with the details tucked away for people who want them.
 private struct InspectionSetup: View {
     @ObservedObject var inspection: InspectionController
     var done: () -> Void
     @State private var newPattern = ""
     @State private var confirmRemove = false
+    @State private var showAdvanced = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -164,103 +166,107 @@ private struct InspectionSetup: View {
                 Image(systemName: "lock.open.display").font(.system(size: 34)).foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("HTTPS inspection").font(.title2.bold())
-                    Text("See the full requests and responses your AI agents exchange, including every tool call the model asks them to run. Flowlight becomes a local proxy with its own certificate authority, created on this Mac and trusted only if you approve it. It's off by default, stays on your Mac, and only decrypts traffic you route through it.")
+                    Text("See the full requests and responses your apps and AI agents exchange, including every tool call the model asks for. Flowlight becomes a local proxy with its own certificate authority, created on this Mac. It's off by default and everything it records stays here.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle(isOn: Binding(get: { inspection.enabled }, set: { inspection.enabled = $0 })) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(isOn: Binding(get: { inspection.enabled }, set: { inspection.setEnabled($0) })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Turn on HTTPS inspection").font(.headline)
-                            Text("Starts the proxy on 127.0.0.1:\(String(inspection.port ?? inspection.configuredPort)). Nothing is routed to it until you choose below.")
-                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back.")
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .toggleStyle(.switch)
-                    Picker("Decrypt", selection: Binding(get: { inspection.scope }, set: { inspection.scope = $0 })) {
-                        ForEach(InspectionController.Scope.allCases) { Text($0.title).tag($0) }
+                    .disabled(inspection.working)
+
+                    if inspection.working {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Waiting for your password…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if inspection.enabled {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ready("Certificate trusted on this Mac", ok: inspection.trusted)
+                            ready("Apps routed through Flowlight", ok: inspection.systemProxyOn)
+                            ready(inspection.scope == .all ? "Decrypting every app that uses the proxy"
+                                                           : "Decrypting AI agents and their tools", ok: inspection.running)
+                        }
+                        .font(.caption)
+                        HStack {
+                            Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
+                                .help("Command-line agents ignore system proxy settings; start them from this window instead")
+                            Spacer()
+                            Button("Done") { done() }.keyboardShortcut(.defaultAction)
+                        }
                     }
-                    .pickerStyle(.radioGroup)
-                    Text("With AI agents only, other apps sent through the proxy are passed through encrypted and not recorded.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(6)
             }
 
-            step(1, "Trust the Flowlight certificate", done: inspection.trusted) {
-                Text("Apps only accept Flowlight's certificates if you trust its authority. macOS asks for your password. Command-line tools started from an inspected Terminal trust it without this step.")
-                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Button(inspection.trusted ? "Trusted" : "Trust Certificate…") { inspection.trustCertificate() }
-                        .disabled(inspection.trusted || !inspection.enabled)
-                    Button("Show in Finder") { inspection.revealCertificate() }.disabled(!inspection.caExists)
-                }
-            }
-
-            step(2, "Route an agent through Flowlight", done: inspection.recordedCount > 0) {
-                Text("Command-line agents (Claude Code, Codex, Gemini CLI, Aider) and the tools they run follow proxy variables. Start them from an inspected Terminal, or paste the setup into any shell.")
-                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
-                    Button("Copy Shell Setup") { inspection.copyShellSetup() }
-                }
-                .disabled(!inspection.enabled)
-                Toggle(isOn: Binding(get: { inspection.systemProxyOn }, set: { inspection.setSystemProxy($0) })) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Also use it for apps that follow system proxy settings")
-                        Text("Desktop apps such as Cursor, VS Code and Claude go through Flowlight. If Flowlight quits, they connect directly. Asks for an administrator password.")
-                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .disabled(!inspection.enabled || !inspection.running)
-            }
-
-            GroupBox("Never decrypted") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("These hosts and their subdomains are always passed through encrypted. Apps that pin their certificates are detected and passed through automatically.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6, alignment: .leading)], alignment: .leading, spacing: 6) {
-                        ForEach(inspection.neverInspect, id: \.self) { pattern in
-                            HStack(spacing: 4) {
-                                Text(pattern).font(.caption.monospaced())
-                                Button { inspection.neverInspect.removeAll { $0 == pattern } } label: {
-                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Remove \(pattern)")
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(.quaternary.opacity(0.6), in: Capsule())
-                        }
-                    }
-                    HStack {
-                        TextField("bank.example", text: $newPattern).textFieldStyle(.roundedBorder).frame(maxWidth: 260)
-                            .onSubmit(add)
-                        Button("Add", action: add).disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
-                        Spacer()
-                        Button("Restore Defaults") { inspection.neverInspect = InspectionController.defaultNeverInspect }
-                    }
-                }
-                .padding(6)
-            }
-
             if let error = inspection.lastError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack {
-                Button("Remove Certificate & Recorded Data…", role: .destructive) { confirmRemove = true }
-                    .disabled(!inspection.caExists)
-                Spacer()
-                if inspection.enabled { Button("Done") { done() }.keyboardShortcut(.defaultAction) }
+            DisclosureGroup(isExpanded: $showAdvanced) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Picker("Decrypt", selection: Binding(get: { inspection.scope }, set: { inspection.scope = $0 })) {
+                        ForEach(InspectionController.Scope.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.radioGroup)
+                    Text("With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Never decrypted").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text("These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6, alignment: .leading)], alignment: .leading, spacing: 6) {
+                            ForEach(inspection.neverInspect, id: \.self) { pattern in
+                                HStack(spacing: 4) {
+                                    Text(pattern).font(.caption.monospaced())
+                                    Button { inspection.neverInspect.removeAll { $0 == pattern } } label: {
+                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove \(pattern)")
+                                }
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(.quaternary.opacity(0.6), in: Capsule())
+                            }
+                        }
+                        HStack {
+                            TextField("bank.example", text: $newPattern).textFieldStyle(.roundedBorder).frame(maxWidth: 260)
+                                .onSubmit(add)
+                            Button("Add", action: add).disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
+                            Spacer()
+                            Button("Restore Defaults") { inspection.neverInspect = InspectionController.defaultNeverInspect }
+                        }
+                    }
+
+                    HStack {
+                        Button("Copy Shell Setup") { inspection.copyShellSetup() }
+                            .help("Environment variables that send one shell's tools through Flowlight")
+                        Button("Show Certificate in Finder") { inspection.revealCertificate() }.disabled(!inspection.caExists)
+                        Spacer()
+                        Button("Remove Certificate & Recorded Data…", role: .destructive) { confirmRemove = true }
+                            .disabled(!inspection.caExists)
+                    }
+                    Text("Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 10)
+            } label: {
+                Text("Advanced").font(.headline)
             }
-            Text("Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored. Some apps refuse any certificate but their own; those stay encrypted.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: 760, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog("Remove HTTPS inspection?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { inspection.removeEverything() }
         } message: {
@@ -269,26 +275,16 @@ private struct InspectionSetup: View {
         .onAppear { inspection.refreshStatus() }
     }
 
+    private func ready(_ text: String, ok: Bool) -> some View {
+        Label(text, systemImage: ok ? "checkmark.circle.fill" : "circle.dotted")
+            .foregroundStyle(ok ? .green : .secondary)
+    }
+
     private func add() {
         let p = newPattern.trimmingCharacters(in: .whitespaces).lowercased()
         guard !p.isEmpty, !inspection.neverInspect.contains(p) else { return }
         inspection.neverInspect.append(p)
         newPattern = ""
-    }
-
-    private func step<Content: View>(_ n: Int, _ title: String, done: Bool, @ViewBuilder content: () -> Content) -> some View {
-        GroupBox {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: done ? "checkmark.circle.fill" : "\(n).circle")
-                    .font(.title2).foregroundStyle(done ? .green : .secondary)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title).font(.headline)
-                    content()
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(6)
-        }
     }
 }
 

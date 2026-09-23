@@ -121,16 +121,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         the ones the provider runs on its own servers (web search, code execution), and the MCP servers the provider connects to for the agent
         (Anthropic's <code>mcp_servers</code>, OpenAI's <code>mcp</code> tool) with their URL, token, approval setting and allowed tools. That
         last group never appears on your network, because the provider makes those connections, not your Mac.</p>
-      <ol>
-        <li><strong>Turn it on</strong> in Inspect › Setup. By default only AI agents and the tools they start are decrypted; other apps sent through
-          the proxy pass through encrypted and aren't recorded.</li>
-        <li><strong>Route an agent.</strong> Click <strong>Open Inspected Terminal</strong> and start Claude Code, Codex, Gemini CLI or Aider there, or
-          paste <strong>Copy Shell Setup</strong> into any shell. It sets the proxy variables and points Node, Python, curl and Git at the Flowlight
-          certificate, for that shell only.</li>
-        <li><strong>Optional:</strong> trust the certificate (macOS asks for your password) and turn on the system proxy, so desktop apps that
-          follow proxy settings (Cursor, VS Code, Claude) are inspected too. The proxy file falls back to a direct connection whenever Flowlight
-          isn't running.</li>
-      </ol>
+      <p><strong>Setting it up is one switch.</strong> Turn on HTTPS inspection in <strong>Inspect</strong> and Flowlight creates its certificate,
+        asks for your password once, trusts the certificate and routes apps through the proxy. Turning the switch off undoes all of it. The proxy
+        file falls back to a direct connection whenever Flowlight isn't running, so quitting it never cuts your Mac off.</p>
+      <p>Command-line agents ignore system proxy settings, so for Claude Code, Codex, Gemini CLI or Aider use <strong>Open Inspected Terminal</strong>
+        and start them there. Under <strong>Advanced</strong> you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
+        the shell setup for one shell, or remove the certificate and everything recorded.</p>
       <p>Apple services and password managers are never decrypted (edit the list in Setup). Apps that pin their certificates refuse the
         Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
         stored, recorded requests are kept 3 days, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
