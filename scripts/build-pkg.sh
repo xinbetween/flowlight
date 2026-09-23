@@ -3,10 +3,13 @@
 # Packet capture access is offered by the app on first launch.
 #   scripts/build-pkg.sh                 # uses the local ad-hoc build
 #   TEAM_ID=… INSTALLER_IDENTITY="Developer ID Installer: …" scripts/build-pkg.sh   # signed release
+#   REUSE_EXPORT=1 scripts/build-pkg.sh   # package the app build-dmg.sh just exported, without rebuilding it
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
+if [[ -n "${REUSE_EXPORT:-}" && -d build/export/Flowlight.app ]]; then
+  echo "Reusing build/export/Flowlight.app"
+elif [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
 # Prefer the Developer ID build exported by build-signed.sh; fall back to the ad-hoc local build.
 APP=build/export/Flowlight.app
 [[ -d "$APP" ]] || APP=build/Build/Products/Release/Flowlight.app
@@ -29,8 +32,5 @@ productbuild --package "$WORK/Flowlight-component.pkg" --identifier com.flowligh
   "${SIGN[@]}" "build/Flowlight-$VERSION.pkg"
 
 # A signed installer still needs notarizing, or macOS refuses to open it.
-if [[ -n "${NOTARY_PROFILE:-}" && ${#SIGN[@]} -gt 0 ]]; then
-  xcrun notarytool submit "build/Flowlight-$VERSION.pkg" --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple "build/Flowlight-$VERSION.pkg"
-fi
+if [[ ${#SIGN[@]} -gt 0 ]]; then scripts/notarize.sh "build/Flowlight-$VERSION.pkg"; fi
 echo "Built build/Flowlight-$VERSION.pkg"

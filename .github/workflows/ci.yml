@@ -1,0 +1,48 @@
+name: CI
+
+# Builds and tests every push and pull request. No secrets are used here, so it runs for forks too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        run: xcodegen generate
+
+      # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= \
+            | grep -vE '^\s*$' | tail -40
+
+      - name: Check the site builds and is committed
+        run: |
+          python3 scripts/build_site.py
+          git diff --exit-code -- docs/ || {
+            echo "::error::docs/ is out of date — run scripts/build_site.py and commit the result."
+            exit 1
+          }

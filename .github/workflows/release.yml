@@ -1,0 +1,167 @@
+name: Release
+
+# Builds, signs, notarizes and publishes on a version tag:
+#
+#   git tag -a v0.2.3 -m "Flowlight 0.2.3" && git push origin v0.2.3
+#
+# The secrets this needs are listed in docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
+# GitHub. Without them the job fails at the import step rather than publishing something unsigned.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v0.2.3). Leave empty to build the current ref."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      TEAM_ID: ${{ secrets.TEAM_ID }}
+      APP_PROFILE: ${{ vars.APP_PROFILE || 'Flowlight Developer ID' }}
+      EXT_PROFILE: ${{ vars.EXT_PROFILE || 'Flowlight Extension Developer ID' }}
+      # Job-level so the cask step can ask whether it was provided: the secrets context isn't readable from `if`.
+      TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Read the version and check it matches the tag
+        id: version
+        run: |
+          VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" != "v$VERSION" ]]; then
+            echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION in project.yml."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        run: xcodegen generate
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= \
+            | tail -40
+
+      # A keychain of its own, unlocked only for this job, so nothing lands in the runner's login keychain.
+      - name: Import the signing certificates
+        env:
+          APP_CERTIFICATE_P12: ${{ secrets.APP_CERTIFICATE_P12 }}
+          INSTALLER_CERTIFICATE_P12: ${{ secrets.INSTALLER_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/flowlight.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 7200 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          for pair in "APP_CERTIFICATE_P12:app" "INSTALLER_CERTIFICATE_P12:installer"; do
+            var="${pair%%:*}"; name="${pair##*:}"
+            value="${!var:-}"
+            [[ -n "$value" ]] || { echo "::error::Secret $var is not set."; exit 1; }
+            printf '%s' "$value" | base64 --decode > "$RUNNER_TEMP/$name.p12"
+            security import "$RUNNER_TEMP/$name.p12" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" \
+              -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/productbuild
+            rm -f "$RUNNER_TEMP/$name.p12"
+          done
+          # Lets codesign use the keys without a UI prompt the runner could never answer.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Install the provisioning profiles
+        env:
+          APP_PROVISIONING_PROFILE: ${{ secrets.APP_PROVISIONING_PROFILE }}
+          EXT_PROVISIONING_PROFILE: ${{ secrets.EXT_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          # Xcode 16 reads this directory; the older location is written too, in case a tool still looks there.
+          for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            printf '%s' "$APP_PROVISIONING_PROFILE" | base64 --decode > "$dir/flowlight-app.provisionprofile"
+            printf '%s' "$EXT_PROVISIONING_PROFILE" | base64 --decode > "$dir/flowlight-ext.provisionprofile"
+          done
+          security cms -D -i "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/flowlight-app.provisionprofile" \
+            | plutil -extract Name raw -
+
+      - name: Build, sign and notarize
+        env:
+          DMG_SIGN_IDENTITY: ${{ secrets.DMG_SIGN_IDENTITY }}
+          INSTALLER_IDENTITY: ${{ secrets.INSTALLER_IDENTITY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          # Without these the scripts quietly produce an unsigned build, which is worse than failing here.
+          for name in TEAM_ID DMG_SIGN_IDENTITY INSTALLER_IDENTITY NOTARY_KEY_ID NOTARY_ISSUER NOTARY_KEY_P8; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Secret $name is not set."; exit 1; }
+          done
+          export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
+          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY"
+          # build-dmg.sh runs build-signed.sh itself; build-pkg.sh then reuses build/export/Flowlight.app.
+          scripts/build-dmg.sh
+          REUSE_EXPORT=1 scripts/build-pkg.sh
+          rm -f "$NOTARY_KEY"
+
+      - name: Check Gatekeeper accepts what was built
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          spctl -a -vvv -t open --context context:primary-signature build/Flowlight.dmg
+          spctl -a -vvv -t install "build/Flowlight-$VERSION.pkg"
+          hdiutil attach -nobrowse -quiet build/Flowlight.dmg
+          spctl -a -vvv /Volumes/Flowlight/Flowlight.app
+          hdiutil detach /Volumes/Flowlight -quiet
+          shasum -a 256 build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" | tee build/checksums.txt
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          NOTES="packaging/release-notes/$VERSION.md"
+          ARGS=(--title "Flowlight $VERSION")
+          if [[ -f "$NOTES" ]]; then
+            # The checksums belong in the notes, and they're only known once the artifacts exist.
+            { cat "$NOTES"; echo; echo '### Checksums'; echo; echo '```'; sed 's|build/||' build/checksums.txt; echo '```'; } > "$RUNNER_TEMP/notes.md"
+            ARGS+=(--notes-file "$RUNNER_TEMP/notes.md")
+          else
+            echo "::warning::No $NOTES — falling back to generated notes."
+            ARGS+=(--generate-notes)
+          fi
+          gh release create "$TAG" "${ARGS[@]}" build/Flowlight.dmg "build/Flowlight-$VERSION.pkg"
+
+      # The cask points at the release that was just published, so this runs last.
+      - name: Update the Homebrew cask
+        if: ${{ env.TAP_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/xinbetween/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          git -C "$RUNNER_TEMP/tap" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
+          git -C "$RUNNER_TEMP/tap" push

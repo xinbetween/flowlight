@@ -48,16 +48,9 @@ xcodebuild -project Flowlight.xcodeproj -scheme Flowlight -configuration Release
 xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
   -exportOptionsPlist "$OPTIONS"
 
-# Notarize the app itself when credentials are available: macOS only loads a system extension from a notarized app,
-# and a stapled ticket means it validates without a network round trip.
-if [[ -n "${NOTARY_PROFILE:-}" ]]; then
-  ZIP=build/Flowlight-app.zip
-  rm -f "$ZIP"
-  ditto -c -k --keepParent "$EXPORT/Flowlight.app" "$ZIP"
-  xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple "$EXPORT/Flowlight.app"
-  rm -f "$ZIP"
-fi
+# Notarize the app itself: macOS only loads a system extension from a notarized app, and a stapled ticket means it
+# validates without a network round trip. scripts/notarize.sh is a no-op when no credentials are set.
+scripts/notarize.sh "$EXPORT/Flowlight.app"
 
 echo "Built: $EXPORT/Flowlight.app"
 codesign -dv --verbose=2 "$EXPORT/Flowlight.app" 2>&1 | grep -E "Authority|TeamIdentifier|Timestamp" || true

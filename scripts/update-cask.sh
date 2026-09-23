@@ -37,9 +37,11 @@ fi
 mkdir -p "$TAP/Casks"
 cp "$CASK" "$TAP/Casks/flowlight.rb"
 echo "Copied to $TAP/Casks/flowlight.rb"
-if command -v brew >/dev/null; then
+if command -v brew >/dev/null && [[ "$TAP" == "$(brew --repository xinbetween/tap 2>/dev/null)" ]]; then
   brew style --cask xinbetween/tap/flowlight
   brew audit --cask --online xinbetween/tap/flowlight
+else
+  echo "Skipping brew style/audit: $TAP isn't Homebrew's own checkout of the tap."
 fi
 if [[ -d "$TAP/.git" ]]; then
   git -C "$TAP" add Casks/flowlight.rb

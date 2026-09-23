@@ -246,12 +246,11 @@ Shipped:
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
 - [x] Focus mode: watch only the apps and destinations you pick (from 0.2.2)
+- [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
 
-- **0.2.3 — Build and release from CI.** A GitHub Actions workflow that builds, tests, signs, notarizes and publishes
-  on a tag, so releases don't depend on one Mac. Needs the Developer ID certificates and an App Store Connect key as
-  repository secrets, which puts the signing identity in GitHub — worth weighing for a security tool.
 - **0.3.0 — Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with
   a prompt to allow it once or always. Needs the Network Extension engine, which can refuse a flow rather than just
   report it.

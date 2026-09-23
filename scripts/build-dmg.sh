@@ -14,7 +14,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
+if [[ -n "${REUSE_EXPORT:-}" && -d build/export/Flowlight.app ]]; then
+  echo "Reusing build/export/Flowlight.app"
+elif [[ -n "${TEAM_ID:-}" ]]; then scripts/build-signed.sh; else scripts/build-local.sh; fi
 # Prefer the Developer ID build exported by build-signed.sh; fall back to the ad-hoc local build.
 APP=build/export/Flowlight.app
 [[ -d "$APP" ]] || APP=build/Build/Products/Release/Flowlight.app
@@ -78,10 +80,7 @@ hdiutil convert "$WORK/rw.dmg" -format UDZO -imagekey zlib-level=9 -ov -o "$OUT"
 if [[ -n "${DMG_SIGN_IDENTITY:-}" ]]; then
   codesign --force --sign "$DMG_SIGN_IDENTITY" --timestamp "$OUT"
 fi
-if [[ -n "${NOTARY_PROFILE:-}" ]]; then
-  xcrun notarytool submit "$OUT" --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple "$OUT"
-fi
+if [[ -n "${DMG_SIGN_IDENTITY:-}" ]]; then scripts/notarize.sh "$OUT"; fi
 
 hdiutil verify "$OUT" >/dev/null
 echo "Built $OUT (Flowlight $VERSION, $(du -h "$OUT" | cut -f1))"

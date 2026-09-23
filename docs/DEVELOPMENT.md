@@ -159,4 +159,47 @@ git -C "$(brew --repository xinbetween/tap)" push          # publishes it
 - Without `DMG_SIGN_IDENTITY` and `NOTARY_PROFILE` the DMG contains an ad-hoc signed app. That's fine for testing,
   but Gatekeeper will ask users to right-click › Open.
 - The DMG window layout needs Finder automation permission for the terminal that runs the script. The background
-  art comes from `packaging/dmg/background*.png` (regenerate with `swift scripts/dmg-background.swift`).
+  art comes from `packaging/dmg/background*.png` (regenerate with `swift scripts/dmg-background.swift`). On a CI
+  runner the layout step is skipped with a warning and the DMG still works.
+- `scripts/notarize.sh` does the submit-and-staple for all three scripts. It takes either `NOTARY_PROFILE` (a
+  keychain profile, on your own Mac) or `NOTARY_KEY` + `NOTARY_KEY_ID` + `NOTARY_ISSUER` (an App Store Connect key,
+  which is what CI uses). With neither, it prints why it did nothing and exits 0.
+
+## Releasing from CI
+
+`.github/workflows/release.yml` does all of the above on a version tag: it checks the tag matches
+`MARKETING_VERSION`, runs the tests, signs, notarizes, verifies with `spctl`, publishes the release and updates the
+Homebrew cask. `.github/workflows/ci.yml` builds and tests every push and pull request, and fails if `docs/` is out
+of date with `site/`.
+
+```sh
+scripts/ci-secrets.sh                       # upload the secrets once
+git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0
+gh workflow run Release --ref v0.3.0        # or run it by hand against an existing tag
+```
+
+Release notes come from `packaging/release-notes/<version>.md` when that file exists (checksums are appended), and
+from generated notes when it doesn't.
+
+| Secret | What it is |
+|---|---|
+| `APP_CERTIFICATE_P12` | Developer ID **Application** certificate + key, exported from Keychain Access as .p12, base64 |
+| `INSTALLER_CERTIFICATE_P12` | Developer ID **Installer** certificate + key, same treatment |
+| `CERTIFICATE_PASSWORD` | the password protecting both .p12 files |
+| `APP_PROVISIONING_PROFILE` | `Flowlight Developer ID.provisionprofile`, base64 |
+| `EXT_PROVISIONING_PROFILE` | `Flowlight Extension Developer ID.provisionprofile`, base64 |
+| `NOTARY_KEY_P8` | App Store Connect API key (`AuthKey_*.p8`), base64 |
+| `NOTARY_KEY_ID`, `NOTARY_ISSUER` | that key's Key ID and Issuer ID |
+| `TEAM_ID` | e.g. `38RJUJHKZS` |
+| `DMG_SIGN_IDENTITY`, `INSTALLER_IDENTITY` | the identity names, e.g. `Developer ID Application: Your Name (TEAMID)` |
+| `TAP_TOKEN` | *optional.* Fine-grained token with Contents: write on `xinbetween/homebrew-tap`, so the cask updates itself |
+
+**What this costs.** A signing identity in GitHub Actions is a signing identity outside your Mac. Anyone who can
+run a workflow in the repository can sign software as you, and anyone with admin access can read the secrets;
+a compromise of the account is a compromise of the certificate. For a security tool that's worth weighing properly:
+
+- Keep releases on a protected tag or an environment with required reviewers, so a push alone can't sign anything.
+- Prefer a fine-grained `TAP_TOKEN` scoped to the one repository over a classic token.
+- The App Store Connect key only notarizes; it can't sign. Revoking it is cheap, so rotate it freely.
+- If any of that is more risk than it's worth, the local recipe above still works and the workflow can stay unused.
+

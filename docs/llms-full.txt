@@ -639,8 +639,6 @@ e.g. Wireshark
 
  Flowlight observes and explains today. This is the order the rest is being built in.
 
- Release from CI 0.2.3A GitHub Actions workflow that builds, tests, signs, notarizes and publishes on a tag, so releases don't depend on one Mac.
-
  Block connections 0.3.0Allowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
 
  Mock responses 0.3.1Answer a chosen domain, path and method with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
