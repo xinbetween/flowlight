@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.3, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -341,7 +341,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
