@@ -226,6 +226,10 @@
     }
     .nav-links::-webkit-scrollbar { display: none; }
     .nav-links a { white-space: nowrap; padding-block: 6px; }
+    /* The last link sits under the right edge, so it fades rather than ending abruptly — the one hint a row
+       that scrolls sideways gets, since it has no scrollbar. */
+    .nav-links { -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
+                 mask-image: linear-gradient(90deg, #000 92%, transparent); }
   }
 
   @media (max-width: 640px) {
