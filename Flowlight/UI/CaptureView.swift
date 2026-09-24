@@ -17,6 +17,7 @@ struct CaptureView: View {
                     ForEach(CaptureMode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.radioGroup)
+                CaptureWarningBanner()
                 LabeledContent("Status") {
                     HStack(spacing: 6) {
                         Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8)

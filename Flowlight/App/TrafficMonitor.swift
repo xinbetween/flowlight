@@ -37,6 +37,8 @@ final class TrafficMonitor: ObservableObject {
     private static let onboardingKey = "onboarding.captureOffered"
     private var lastDataAt: Date?
     @Published private(set) var dataVersion = 0 // bumps after each rollup so reports can refresh
+    /// Set when the chosen capture source cannot work on this Mac, with an explanation. Nil when it's fine.
+    @Published private(set) var captureWarning: String?
     /// Focus mode's scope, mirrored here so the live pipeline can apply it. Set by `applyFocus`.
     private(set) var focus: FocusScope = .none
     @Published var lastError: String?
@@ -230,6 +232,17 @@ final class TrafficMonitor: ObservableObject {
                 fallbackNote = "This build isn't signed for the Network Extension — sampling with nettop instead."
             }
             newSource = NettopTrafficSource()
+        }
+        // Same idea as FLForceCaptureOnboarding: a way to see this state on a Mac where the filter works.
+        captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
+            ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN "
+              + "or a security agent such as Palo Alto Networks GlobalProtect, CrowdStrike Falcon, Netskope or Zscaler — already has that slot. The "
+              + "extension can't capture anything on this Mac until that changes."
+            : nil
+        if let extensionSource = newSource as? ExtensionTrafficSource {
+            extensionSource.onFilterUnavailable = { [weak self] message in
+                Task { @MainActor in self?.captureWarning = message }
+            }
         }
         source = newSource
         status = fallbackNote ?? "Starting \(newSource.displayName)…"

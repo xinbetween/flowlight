@@ -96,7 +96,12 @@ struct LiveView: View {
                 ContentUnavailableView {
                     Label("Waiting for traffic data", systemImage: "antenna.radiowaves.left.and.right.slash")
                 } description: {
-                    Text(monitor.status)
+                    // The banner explains a source that cannot work here; the status line is for everything else.
+                    if monitor.captureWarning != nil {
+                        CaptureWarningBanner().frame(maxWidth: 520)
+                    } else {
+                        Text(monitor.status)
+                    }
                 } actions: {
                     Button("Open Capture Settings") { nav.selection = .capture }
                 }

@@ -15,6 +15,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// extension is running — not that it is filtering anything, which is a different failure and looks identical.
     private var sawTraffic = false
     private var version = ""
+    /// Called when macOS has the extension running but isn't letting it filter — a state the user can only fix by
+    /// switching source, so it needs to reach the UI as something more than a line of status text.
+    var onFilterUnavailable: ((String) -> Void)?
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         self.sink = sink
@@ -93,10 +96,13 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             guard let self, running == false else { return }
             DispatchQueue.main.async {
                 guard self.connection === connection, !self.sawTraffic else { return }
-                self.status?(detail.isEmpty
-                    ? "Connected to the extension \(version), but macOS hasn't started its filter. Another content "
-                      + "filter (a VPN or security agent) may be using the one slot macOS allows. Use the nettop sampler instead."
-                    : "The filter couldn't start: \(detail)")
+                let message = detail.isEmpty
+                    ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another "
+                      + "one — a VPN or a security agent such as Palo Alto Networks GlobalProtect, CrowdStrike Falcon, Netskope or Zscaler — already "
+                      + "has that slot. The extension can't capture anything on this Mac until that changes."
+                    : "macOS refused to start Flowlight's filter: \(detail)"
+                self.status?(detail.isEmpty ? "Connected to the extension \(version), but it isn't filtering" : "The filter couldn't start")
+                self.onFilterUnavailable?(message)
             }
         }
     }
