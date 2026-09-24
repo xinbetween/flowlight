@@ -61,12 +61,12 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.2, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
  The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingAgent configurationHTTPS inspectionMock responsesOther alerts
- Capture enginesYour dataUpdates
+ Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
  Install
@@ -344,6 +344,30 @@ open build/Build/Products/Release/Flowlight.app
  needs no filter and works alongside them.
  See the developer guide for how it's built.
 
+ Export to OpenTelemetry or a SIEM
+
+ Off until you configure it, and there is no Flowlight service to send to. You name the endpoint — your own
+ collector, your own SIEM — and nothing leaves until you do. Settings › Export.
+
+ OTLP over HTTP with a JSON body: rollups go to /v1/metrics, alerts to /v1/logs,
+ because an alert is an event with a sentence attached and a metric would lose the sentence. Newline-delimited JSON is there
+ for collectors that just want lines.
+
+ Exactly what leaves is listed in the panel, field by field, and a preview shows a real payload
+ built from your own data before anything is sent.
+
+ Never anything from HTTPS inspection. No headers, no bodies, no tool calls — the export can only carry
+ rollups and alerts, so there is nowhere for them to go even by accident.
+
+ Auth headers are kept in your login Keychain, not in preferences. Only their names are ever displayed.
+
+ What Flowlight sends shows up in Flowlight, in Live and Reports, like any other app's traffic — including
+ a collector on 127.0.0.1.
+
+ Two things to expect: rollups are folded about two minutes behind, so an interval under a minute polls more often without data
+ arriving sooner; and Test connection proves the endpoint answers, not that it validated your credentials —
+ the "last successful export" line is the honest signal.
+
  Your data
 
  Everything lives in ~/Library/Application Support/Flowlight/traffic.sqlite. Per-second rows are kept 6 hours
@@ -456,7 +480,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -754,8 +778,6 @@ e.g. Wireshark
 
  Flowlight observes and explains today. This is the order the rest is being built in.
 
- Export to OpenTelemetry / SIEM 0.3.2Send what Flowlight records to the tools the rest of your stack already reports to.
-
  Runs quietly in the background 0.3.3The menu-bar-only mode arrived in 0.2.7; the rest is getting further out of the way — window state across launches and a quieter first run. Deliberately not a background daemon: a second process with full network visibility is the thing Flowlight exists to notice.
 
  Focus on apps or destinations, either alone 0.3.4Focus should be symmetric: several apps, several destinations, or both, with at least one entry and neither side required on its own. Today only destinations can be typed and apps can only be ticked off what was busy in the last day, so a quiet app can't be focused at all.
@@ -763,6 +785,8 @@ e.g. Wireshark
  Rules: block anything, anywhere 0.3.5One rule model behind every screen: block an app, an agent, a domain, an IP range or a single URL, from the table you spotted it in. Forever, until a time, for an hour, or between chosen hours — with one pause switch, and a way out on every refusal. A Rules screen lists them all, what each one has blocked and when, and says plainly which engine can enforce it.
 
  Agent guardrails: MCP servers, tools and resources 0.3.6Block a whole MCP server, one of its tools, or one resource. The strongest lever is the tool list itself: drop a blocked tool before the request reaches the provider and the model is never offered it. For servers reached over HTTP, the call is answered rather than forwarded, the way the protocol says a refusal should read, so the model adapts instead of seeing a broken server. Its own section in AI Agents — and no pretence that it is a sandbox.
+
+ A site that keeps up with the app 0.3.7Eight releases in, some of this page describes a Flowlight that no longer exists. A pass over every page that cuts rather than adds, counts taken from the source at build time, two-column sections that stay balanced instead of leaving a tall empty column, and just enough motion to feel alive — none of it moving the layout, all of it off when you ask for less.
 
  Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
 
@@ -974,8 +998,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.1
+ 0.3.2
 September 24, 2026Latest
+
+ Export to OpenTelemetry or a SIEM. OTLP over HTTP — rollups as metrics, alerts as logs — or
+ newline-delimited JSON, to an endpoint you name. Off until you configure it; there is no Flowlight service to send to.
+
+ You can see what will leave before it does: the panel lists every field and previews a real payload built
+ from your own data. Nothing from HTTPS inspection can be exported — the payload types have nowhere to put a header or body.
+
+ Auth headers live in the Keychain, and what Flowlight sends appears in Live and Reports like any other app's traffic.
+ How it works →
+
+ Downloads and checksums →
+
+ 0.3.1
+September 24, 2026
 
  Mock responses. Answer a chosen host, path and method with your own status, headers, body and delay, and
  watch how an agent copes when an API fails or returns something odd. The request is never sent.

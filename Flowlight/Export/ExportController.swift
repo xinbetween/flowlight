@@ -141,6 +141,13 @@ final class ExportController: ObservableObject {
         let config = configuration
         queue.limit = config.maxBufferedRecords
         queue.batchSize = config.batchSize
+        // Tell the inspection proxy which loopback port is a collector rather than one of its own legs, so an
+        // export to 127.0.0.1 still shows up in Live and Reports. Promising that what Flowlight sends is visible
+        // and then hiding the commonest case would be worse than not promising it.
+        let base = ExportEndpoint.base(config.endpoint)
+        ProxyAttribution.shared.exportPort = base.flatMap { url in
+            url.port.map { UInt16(truncatingIfNeeded: $0) } ?? (url.scheme == "https" ? 443 : 80)
+        }
         guard config.isReady, readRollups != nil else { return }
         // A fixed short tick rather than one at the export interval: it also drives the backoff, and re-arming a
         // timer every time a setting moves is how an export ends up skipping a round.

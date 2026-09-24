@@ -85,19 +85,57 @@ enum TrafficColors {
 
 /// Opens the first window at the size of the screen, so everything Flowlight shows has room. It runs once: after
 /// that macOS restores whatever size the person chose.
+/// Sizes the main window on a first run, then remembers where it was left.
+///
+/// `setFrameAutosaveName` looks like the answer and quietly isn't: SwiftUI's `WindowGroup` owns the window's
+/// restoration, so the name is rejected and nothing is ever written. Watching the window and storing the frame
+/// is a few more lines and actually works.
 struct WindowSizer: NSViewRepresentable {
-    private static let key = "window.sizedToScreen"
+    private static let key = "window.mainFrame"
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
+        let coordinator = context.coordinator
         DispatchQueue.main.async {
-            guard !UserDefaults.standard.bool(forKey: Self.key),
-                  let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
-            UserDefaults.standard.set(true, forKey: Self.key)
-            window.setFrame(screen.visibleFrame, display: true, animate: false)
+            guard let window = view.window else { return }
+            if let saved = UserDefaults.standard.string(forKey: Self.key) {
+                window.setFrame(NSRectFromString(saved), display: true, animate: false)
+                // A screen that has gone away — an unplugged display — would leave the window somewhere
+                // unreachable, so anything off-screen falls back to filling the current one.
+                if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }),
+                   let screen = NSScreen.main {
+                    window.setFrame(screen.visibleFrame, display: true, animate: false)
+                }
+            } else if let screen = window.screen ?? NSScreen.main {
+                // Nothing saved: fill the screen so a first run doesn't hide most of the app in a small window.
+                window.setFrame(screen.visibleFrame, display: true, animate: false)
+            }
+            coordinator.watch(window, key: Self.key)
         }
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {}
+
+    final class Coordinator {
+        private var observers: [NSObjectProtocol] = []
+
+        func watch(_ window: NSWindow, key: String) {
+            guard observers.isEmpty else { return }
+            let save = { [weak window] (_: Notification) in
+                guard let window, window.isVisible else { return }
+                UserDefaults.standard.set(NSStringFromRect(window.frame), forKey: key)
+            }
+            let center = NotificationCenter.default
+            // didResize covers a programmatic change too; didEndLiveResize alone misses everything but a drag.
+            for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification] {
+                observers.append(center.addObserver(forName: name, object: window, queue: .main, using: save))
+            }
+        }
+
+        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
+    }
 }
+

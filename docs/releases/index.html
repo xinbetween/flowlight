@@ -42,7 +42,19 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.3.1</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.3.2</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Export to OpenTelemetry or a SIEM.</strong> OTLP over HTTP — rollups as metrics, alerts as logs — or
+            newline-delimited JSON, to an endpoint you name. Off until you configure it; there is no Flowlight service to send to.</li>
+          <li><strong>You can see what will leave before it does:</strong> the panel lists every field and previews a real payload built
+            from your own data. Nothing from HTTPS inspection can be exported — the payload types have nowhere to put a header or body.</li>
+          <li>Auth headers live in the Keychain, and what Flowlight sends appears in Live and Reports like any other app's traffic.
+            <a href="../docs/#export">How it works →</a></li>
+        </ul>
+        <p><a href="https://github.com/xinbetween/flowlight/releases/tag/v0.3.2">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.3.1</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Mock responses.</strong> Answer a chosen host, path and method with your own status, headers, body and delay, and
             watch how an agent copes when an API fails or returns something odd. The request is never sent.</li>
@@ -305,7 +317,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.2 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

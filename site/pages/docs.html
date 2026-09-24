@@ -15,7 +15,7 @@ nav: docs
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
       <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
-      <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
+      <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
     <article class="prose">
@@ -233,6 +233,25 @@ open build/Build/Products/Release/Flowlight.app</pre>
         machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
         needs no filter and works alongside them.
         See <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">the developer guide</a> for how it's built.</p>
+
+      <h2 id="export">Export to OpenTelemetry or a SIEM</h2>
+      <p><strong>Off until you configure it, and there is no Flowlight service to send to.</strong> You name the endpoint — your own
+        collector, your own SIEM — and nothing leaves until you do. Settings › Export.</p>
+      <ul>
+        <li><strong>OTLP over HTTP</strong> with a JSON body: rollups go to <code>/v1/metrics</code>, alerts to <code>/v1/logs</code>,
+          because an alert is an event with a sentence attached and a metric would lose the sentence. Newline-delimited JSON is there
+          for collectors that just want lines.</li>
+        <li><strong>Exactly what leaves is listed in the panel</strong>, field by field, and a <em>preview</em> shows a real payload
+          built from your own data before anything is sent.</li>
+        <li><strong>Never anything from HTTPS inspection.</strong> No headers, no bodies, no tool calls — the export can only carry
+          rollups and alerts, so there is nowhere for them to go even by accident.</li>
+        <li>Auth headers are kept in your login Keychain, not in preferences. Only their names are ever displayed.</li>
+        <li><strong>What Flowlight sends shows up in Flowlight</strong>, in Live and Reports, like any other app's traffic — including
+          a collector on <code>127.0.0.1</code>.</li>
+      </ul>
+      <p>Two things to expect: rollups are folded about two minutes behind, so an interval under a minute polls more often without data
+        arriving sooner; and <strong>Test connection</strong> proves the endpoint answers, not that it validated your credentials —
+        the "last successful export" line is the honest signal.</p>
 
       <h2 id="data">Your data</h2>
       <p>Everything lives in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Per-second rows are kept 6 hours

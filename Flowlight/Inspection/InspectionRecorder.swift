@@ -290,6 +290,10 @@ final class ProxyAttribution: @unchecked Sendable {
     private var byIP: [String: (owner: InspectionRecorder.Owner, at: Date)] = [:]
     private let selfPID = getpid()
     var proxyPort: UInt16?
+    /// A local collector Flowlight exports to, if one is configured. Its traffic is Flowlight's own and on
+    /// loopback, so the rule below would drop it — and then the app would be sending data off to a collector
+    /// while showing nothing, which is exactly the behaviour it exists to catch someone else doing.
+    var exportPort: UInt16?
 
     func record(host: String, ip: String, owner: InspectionRecorder.Owner) {
         lock.lock(); defer { lock.unlock() }
@@ -306,6 +310,8 @@ final class ProxyAttribution: @unchecked Sendable {
                 var record = record
                 let k = record.key
                 let loopback = k.remoteIP.hasPrefix("127.") || k.remoteIP == "::1"
+                // Flowlight talking to a local collector is real traffic worth showing, not a proxy leg.
+                if loopback, k.pid == selfPID, let exportPort, k.port == exportPort { return record }
                 // App → proxy, and the proxy's internal loopback legs: already counted on the upstream side.
                 if loopback && (k.port == proxyPort || k.pid == selfPID) { return nil }
                 guard k.pid == selfPID, let owner = owner(domain: k.domain, ip: k.remoteIP) else { return record }
