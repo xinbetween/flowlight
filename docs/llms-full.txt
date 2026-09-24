@@ -694,6 +694,8 @@ e.g. Wireshark
 
  Export to OpenTelemetry / SIEM 0.3.2Send what Flowlight records to the tools the rest of your stack already reports to.
 
+ Runs quietly in the background 0.3.3A menu-bar-only mode with no Dock icon. Launch at login and capture with the window closed already work; what's left is getting out of the way. Deliberately not a background daemon — a second process with full network visibility is the thing Flowlight exists to notice.
+
  Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
 
  Ask Flowlight 0.5.0Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.

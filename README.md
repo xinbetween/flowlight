@@ -268,6 +268,21 @@ Planned, in order:
 - **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
   headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - **0.3.2 — Export to OpenTelemetry / SIEM.**
+- **0.3.3 — Runs quietly in the background.** A menu-bar-only mode: no Dock icon, no Cmd-Tab entry, the menu bar as
+  the way back to the window. Most of this already works — launch at login, capture continuing with the window
+  closed, and almost no cost while idle — so what's left is the activation policy and making the choice
+  reversible without a relaunch.
+
+  **Not a background daemon.** In extension mode the filter already runs independently of the app; adding a
+  launch agent so the sampler survives a quit would mean a second signed executable, a second update path, and
+  another process with full network visibility running as you. That is the pattern Flowlight exists to expose,
+  so it isn't one to adopt lightly.
+
+  Two things belong with it and are closer to correctness than features: the extension should deliver the newest
+  second first and backfill history behind it, so its buffer can cover a long gap without leaving the live view
+  empty while it drains; and the app should say plainly that the system extension keeps filtering after Flowlight
+  is quit, because an invisible extension recording traffic after you quit the app is exactly what this tool is
+  for noticing.
 - **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
   the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
   - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and
