@@ -38,11 +38,23 @@ final class FilterDataProvider: NEFilterDataProvider {
     private func startFlushing() {
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
         timer.schedule(deadline: .now() + 1, repeating: 1)
+        var lastReport = Date.distantPast
         timer.setEventHandler { [tracker] in
             let now = Int64(Date().timeIntervalSince1970)
             let batches = tracker.aggregator.drain(before: now)
             if !batches.isEmpty { IPCServer.shared.send(batches) }
             tracker.sweepStale()
+            // A minute's summary, so "the filter is connected but nothing arrives" can be told apart from
+            // "macOS isn't handing this filter any flows at all". Counts only — no hosts, no addresses.
+            if Date().timeIntervalSince(lastReport) >= 60 {
+                lastReport = Date()
+                extensionLog.info("""
+                    last minute: \(tracker.flowsSeen, privacy: .public) flows seen, \
+                    \(tracker.reportsSeen, privacy: .public) statistics reports, \
+                    \(batches.count, privacy: .public) batches sent
+                    """)
+                tracker.resetCounters()
+            }
         }
         timer.resume()
         flushTimer = timer

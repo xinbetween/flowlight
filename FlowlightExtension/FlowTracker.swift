@@ -109,7 +109,16 @@ final class FlowTracker: @unchecked Sendable {
     private var flows: [UUID: FlowState] = [:]
     private let lock = NSLock()
 
+    /// Counters for the once-a-minute log line. Diagnostics only.
+    private(set) var flowsSeen = 0
+    private(set) var reportsSeen = 0
+
+    func resetCounters() {
+        lock.lock(); flowsSeen = 0; reportsSeen = 0; lock.unlock()
+    }
+
     func begin(_ flow: NEFilterSocketFlow) -> FlowState? {
+        lock.lock(); flowsSeen += 1; lock.unlock()
         let transport: TransportProtocol
         switch flow.socketProtocol {
         case IPPROTO_TCP: transport = .tcp
@@ -132,6 +141,7 @@ final class FlowTracker: @unchecked Sendable {
     /// Statistics reports carry cumulative byte counts; convert to deltas and aggregate.
     func account(flow: NEFilterFlow, bytesIn: Int64, bytesOut: Int64, closed: Bool) {
         lock.lock()
+        reportsSeen += 1
         guard let state = flows[flow.identifier] else { lock.unlock(); return }
         let deltaIn = max(0, bytesIn - state.lastBytesIn)
         let deltaOut = max(0, bytesOut - state.lastBytesOut)

@@ -11,6 +11,10 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// so without this the status goes orange on an idle Mac even though the filter is working perfectly.
     private var heartbeatTimer: Timer?
     private var stopped = true
+    /// Set once a batch with actual traffic in it arrives. Until then the connection being up says only that the
+    /// extension is running — not that it is filtering anything, which is a different failure and looks identical.
+    private var sawTraffic = false
+    private var version = ""
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         self.sink = sink
@@ -69,8 +73,11 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             guard let self else { return }
             DispatchQueue.main.async {
                 guard self.connection === connection else { return }   // a reply from a superseded attempt
-                self.status?(ok ? "Connected to filter extension \(version)" : "Extension refused registration")
-                if ok { self.startHeartbeat() }
+                self.version = version
+                guard ok else { self.status?("Extension refused registration"); return }
+                self.status?(self.sawTraffic ? "Connected to filter extension \(version)"
+                                             : "Connected to filter extension \(version) — no traffic from it yet")
+                self.startHeartbeat()
             }
         }
     }
@@ -104,8 +111,14 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     }
 
     func deliver(payload: Data, reply: @escaping () -> Void) {
+        let batches = TrafficCoding.decode(payload)
+        if !batches.isEmpty, !sawTraffic {
+            sawTraffic = true
+            let version = self.version
+            DispatchQueue.main.async { [weak self] in self?.status?("Connected to filter extension \(version)") }
+        }
         // Empty deliveries are passed on too: ingest reads them as "capture is alive, nothing moved".
-        sink?(TrafficCoding.decode(payload))
+        sink?(batches)
         reply()
     }
 }
