@@ -181,6 +181,10 @@ gh workflow run Release --ref v0.3.0        # or run it by hand against an exist
 Release notes come from `packaging/release-notes/<version>.md` when that file exists (checksums are appended), and
 from generated notes when it doesn't.
 
+`scripts/ci-secrets.sh` finds the two provisioning profiles by name in Xcode's folder, so the only things it asks
+for are the certificate exports and how to notarize. Prefer the App Store Connect key where you can: it can only
+notarize, so revoking it breaks nothing else, whereas an app-specific password authenticates as your Apple ID.
+
 | Secret | What it is |
 |---|---|
 | `APP_CERTIFICATE_P12` | Developer ID **Application** certificate + key, exported from Keychain Access as .p12, base64 |
@@ -188,8 +192,9 @@ from generated notes when it doesn't.
 | `CERTIFICATE_PASSWORD` | the password protecting both .p12 files |
 | `APP_PROVISIONING_PROFILE` | `Flowlight Developer ID.provisionprofile`, base64 |
 | `EXT_PROVISIONING_PROFILE` | `Flowlight Extension Developer ID.provisionprofile`, base64 |
-| `NOTARY_KEY_P8` | App Store Connect API key (`AuthKey_*.p8`), base64 |
+| `NOTARY_KEY_P8` | App Store Connect API key (`AuthKey_*.p8`), base64 — *one of two ways to notarize* |
 | `NOTARY_KEY_ID`, `NOTARY_ISSUER` | that key's Key ID and Issuer ID |
+| `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID` | *the other way:* an Apple ID and an app-specific password |
 | `TEAM_ID` | e.g. `38RJUJHKZS` |
 | `DMG_SIGN_IDENTITY`, `INSTALLER_IDENTITY` | the identity names, e.g. `Developer ID Application: Your Name (TEAMID)` |
 | `TAP_TOKEN` | *optional.* Fine-grained token with Contents: write on `xinbetween/homebrew-tap`, so the cask updates itself |

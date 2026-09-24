@@ -55,15 +55,57 @@ for path in "$APP_P12" "$INSTALLER_P12"; do
 done
 echo
 
-APP_PROFILE_PATH=$(ask "Path to the app's .provisionprofile: ")
-EXT_PROFILE_PATH=$(ask "Path to the extension's .provisionprofile: ")
-NOTARY_KEY_PATH=$(ask "Path to the App Store Connect API key (AuthKey_*.p8): ")
-NOTARY_KEY_ID=$(ask "Its Key ID: ")
-NOTARY_ISSUER=$(ask "Its Issuer ID: ")
-for path in "$APP_PROFILE_PATH" "$EXT_PROFILE_PATH" "$NOTARY_KEY_PATH"; do
+# Xcode leaves the downloaded profiles here under opaque UUID names, so they're matched by the name inside.
+find_profile() {
+  local wanted="$1" dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+  [[ -d "$dir" ]] || return 1
+  local f
+  for f in "$dir"/*.provisionprofile(N); do
+    [[ "$(security cms -D -i "$f" 2>/dev/null | plutil -extract Name raw - 2>/dev/null)" == "$wanted" ]] && { print -r -- "$f"; return 0; }
+  done
+  return 1
+}
+
+APP_PROFILE_PATH=$(find_profile "${APP_PROFILE_NAME:-Flowlight Developer ID}" || true)
+EXT_PROFILE_PATH=$(find_profile "${EXT_PROFILE_NAME:-Flowlight Extension Developer ID}" || true)
+if [[ -n "$APP_PROFILE_PATH" ]]; then
+  echo "Found \"Flowlight Developer ID\" at $(basename "$APP_PROFILE_PATH")"
+else
+  APP_PROFILE_PATH=$(ask "Path to the app's .provisionprofile: ")
+fi
+if [[ -n "$EXT_PROFILE_PATH" ]]; then
+  echo "Found \"Flowlight Extension Developer ID\" at $(basename "$EXT_PROFILE_PATH")"
+else
+  EXT_PROFILE_PATH=$(ask "Path to the extension's .provisionprofile: ")
+fi
+for path in "$APP_PROFILE_PATH" "$EXT_PROFILE_PATH"; do
   expanded="${path/#\~/$HOME}"
   [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
 done
+echo
+
+# notarytool takes either. The App Store Connect key is narrower — it can only notarize, and revoking it affects
+# nothing else — but it has to be created first. An app-specific password reuses what you already notarize with.
+echo "How should CI notarize?"
+echo "  1) App Store Connect API key (recommended: only notarizes, revoke it freely)"
+echo "  2) Apple ID + app-specific password (what you already use locally)"
+NOTARY_CHOICE=$(ask "  Choose 1 or 2: ")
+NOTARY_KEY_PATH="" NOTARY_KEY_ID="" NOTARY_ISSUER="" NOTARY_APPLE_ID="" NOTARY_PASSWORD=""
+if [[ "$NOTARY_CHOICE" == "2" ]]; then
+  NOTARY_APPLE_ID=$(ask "  Apple ID: ")
+  printf '  App-specific password (appleid.apple.com › Sign-In and Security): ' >&2
+  read -rs NOTARY_PASSWORD; echo >&2
+  [[ -n "$NOTARY_APPLE_ID" && -n "$NOTARY_PASSWORD" ]] || { echo "Both are needed." >&2; exit 1; }
+else
+  echo "  Create one at appstoreconnect.apple.com › Users and Access › Integrations › App Store Connect API."
+  echo "  A Developer-role team key is enough. The .p8 downloads once and cannot be downloaded again."
+  NOTARY_KEY_PATH=$(ask "  Path to AuthKey_*.p8: ")
+  NOTARY_KEY_ID=$(ask "  Key ID: ")
+  NOTARY_ISSUER=$(ask "  Issuer ID: ")
+  expanded="${NOTARY_KEY_PATH/#\~/$HOME}"
+  [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
+  [[ -n "$NOTARY_KEY_ID" && -n "$NOTARY_ISSUER" ]] || { echo "Key ID and Issuer ID are both needed." >&2; exit 1; }
+fi
 
 set_secret() { gh secret set "$1" --repo "$REPO" --env "$ENVIRONMENT" --body "$2" >/dev/null && echo "  set $1"; }
 set_file()   { base64 < "${2/#\~/$HOME}" | tr -d '\n' | gh secret set "$1" --repo "$REPO" --env "$ENVIRONMENT" >/dev/null && echo "  set $1"; }
@@ -75,9 +117,15 @@ set_file   INSTALLER_CERTIFICATE_P12 "$INSTALLER_P12"
 set_secret CERTIFICATE_PASSWORD      "$P12_PASSWORD"
 set_file   APP_PROVISIONING_PROFILE  "$APP_PROFILE_PATH"
 set_file   EXT_PROVISIONING_PROFILE  "$EXT_PROFILE_PATH"
-set_file   NOTARY_KEY_P8             "$NOTARY_KEY_PATH"
-set_secret NOTARY_KEY_ID             "$NOTARY_KEY_ID"
-set_secret NOTARY_ISSUER             "$NOTARY_ISSUER"
+if [[ -n "$NOTARY_KEY_PATH" ]]; then
+  set_file   NOTARY_KEY_P8           "$NOTARY_KEY_PATH"
+  set_secret NOTARY_KEY_ID           "$NOTARY_KEY_ID"
+  set_secret NOTARY_ISSUER           "$NOTARY_ISSUER"
+else
+  set_secret NOTARY_APPLE_ID         "$NOTARY_APPLE_ID"
+  set_secret NOTARY_PASSWORD         "$NOTARY_PASSWORD"
+  set_secret NOTARY_TEAM_ID          "$TEAM_ID"
+fi
 set_secret TEAM_ID                   "$TEAM_ID"
 set_secret DMG_SIGN_IDENTITY         "$APP_ID"
 set_secret INSTALLER_IDENTITY        "$INSTALLER_ID"

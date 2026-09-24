@@ -128,18 +128,30 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
           set -euo pipefail
           # Without these the scripts quietly produce an unsigned build, which is worse than failing here.
-          for name in TEAM_ID DMG_SIGN_IDENTITY INSTALLER_IDENTITY NOTARY_KEY_ID NOTARY_ISSUER NOTARY_KEY_P8; do
+          for name in TEAM_ID DMG_SIGN_IDENTITY INSTALLER_IDENTITY; do
             [[ -n "${!name:-}" ]] || { echo "::error::Secret $name is not set."; exit 1; }
           done
-          export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
-          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY"
+          # Either notarization credential is fine; having neither is not.
+          if [[ -n "${NOTARY_KEY_P8:-}" && -n "${NOTARY_KEY_ID:-}" && -n "${NOTARY_ISSUER:-}" ]]; then
+            export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
+            printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY"
+            echo "Notarizing with the App Store Connect key."
+          elif [[ -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_TEAM_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
+            echo "Notarizing with an Apple ID and app-specific password."
+          else
+            echo "::error::Set NOTARY_KEY_P8 + NOTARY_KEY_ID + NOTARY_ISSUER, or NOTARY_APPLE_ID + NOTARY_TEAM_ID + NOTARY_PASSWORD."
+            exit 1
+          fi
           # build-dmg.sh runs build-signed.sh itself; build-pkg.sh then reuses build/export/Flowlight.app.
           scripts/build-dmg.sh
           REUSE_EXPORT=1 scripts/build-pkg.sh
-          rm -f "$NOTARY_KEY"
+          rm -f "${NOTARY_KEY:-}"
 
       - name: Check Gatekeeper accepts what was built
         run: |
