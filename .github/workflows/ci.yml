@@ -1,6 +1,10 @@
 name: CI
 
 # Builds and tests every push and pull request. No secrets are used here, so it runs for forks too.
+#
+# The macOS matrix is the expensive part — two Xcode versions, a full test run each — and a change that only
+# touches the website cannot break a Swift build. So the site is checked on every commit (it is seconds of Python)
+# and the app is built only when something outside the site has changed.
 on:
   push:
     branches: [main]
@@ -17,7 +21,64 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # What changed, so the expensive job can be skipped when nothing it covers did.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.what.outputs.app }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - id: what
+        name: Did anything outside the website change?
+        run: |
+          set -euo pipefail
+          # Anything we can't compare against runs the full build. Being wrong in that direction costs ten
+          # minutes; being wrong the other way ships an untested commit.
+          case "${{ github.event_name }}" in
+            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
+            push)         base="${{ github.event.before }}" ;;
+            *)            base="" ;;
+          esac
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "No base to compare against — building everything."
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base" "${{ github.sha }}")
+          echo "::group::Changed files"; echo "$changed"; echo "::endgroup::"
+          # The website and its sources. Everything else — Swift, project.yml, packaging, these workflows —
+          # is the app. project.yml is deliberately *not* here: it carries the version the site prints, but it
+          # also carries the build, and a version bump should be built.
+          rest=$(echo "$changed" | grep -Ev '^(site/|docs/|scripts/build_site\.py$|[^/]*\.md$|LICENSE$)' || true)
+          if [ -z "$rest" ]; then
+            echo "Website-only change — skipping the macOS build."
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Seconds of Python, so it runs on everything: the site is generated from Swift sources and project.yml as well
+  # as from site/, and "docs/ is out of date" should be caught whichever of those moved.
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Check the site builds and is committed
+        run: |
+          python3 scripts/build_site.py
+          git diff --exit-code -- docs/ || {
+            echo "::error::docs/ is out of date — run scripts/build_site.py and commit the result."
+            exit 1
+          }
+
   test:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: macos-15
     strategy:
       fail-fast: false
@@ -96,12 +157,3 @@ jobs:
             grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
             exit 1
           fi
-
-      - name: Check the site builds and is committed
-        if: ${{ matrix.xcode == 'newest' }}
-        run: |
-          python3 scripts/build_site.py
-          git diff --exit-code -- docs/ || {
-            echo "::error::docs/ is out of date — run scripts/build_site.py and commit the result."
-            exit 1
-          }

