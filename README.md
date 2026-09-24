@@ -241,6 +241,9 @@ so a year of history stays fast.
 - **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
 - **The Network Extension needs approval.** Installing the content filter asks you to allow it in System Settings and
   to confirm the filter. Flowlight works without it on the nettop sampler.
+- **Only one content filter runs at a time on macOS.** On a Mac where security software already holds that slot —
+  Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar and similar — Flowlight's filter installs and connects but is never handed
+  any traffic. Capture lists the filters it finds and offers the sampler instead, which needs no filter.
 
 ## Roadmap
 

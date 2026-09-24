@@ -271,6 +271,11 @@ open build/Build/Products/Release/Flowlight.app
  The extension is in the data path instead, so a request lasting five milliseconds is recorded like any other. It isn't magic
  either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
  come from the filter's own statistics rather than from counting packets. It never blocks anything.
+
+ It also can't run at all on some Macs. macOS allows one content filter at a time, and corporate security software
+ normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar and the like. Flowlight's filter will install and connect on those
+ machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
+ needs no filter and works alongside them.
  See the developer guide for how it's built.
 
  Your data
@@ -321,6 +326,23 @@ open build/Build/Products/Release/Flowlight.app
  closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so
  even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the
  extension from Capture. The full comparison is above.
+ I turned on the Network Extension and nothing appears. The sampler works fine.
+ Almost always because another content filter already has the slot. macOS runs one content filter at a time, and
+ corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar, CrowdStrike and similar. Flowlight's
+ filter still installs, activates and connects, so Capture says Connected to filter extension, but macOS never hands it a
+ single connection and the screens stay empty. Capture lists the filters it finds and offers to switch you back to
+ the sampler, which doesn't use a filter and works alongside them. You lose only the very short connections
+ (the comparison); everything else is recorded the same way.
+ The extension stopped working after Flowlight updated.
+ Versions before 0.2.5 had this: macOS keeps running whichever build of the extension was last activated, so after an update the
+ extension was the old version and macOS refuses the connection between a mismatched pair. From 0.2.5 Flowlight checks at launch
+ and re-activates the filter itself. On an older version, press Install & enable filter in Capture once.
+ Something else is wrong with capture and I don't know what.
+ Run this and read what it prints — it reports state and counts only, never anything Flowlight recorded about your traffic:
+ curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zshCopy
+
+ It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded.
+ Paste it into an issue.
  Does Flowlight send anything about me anywhere?
  No. There's no account, no telemetry and no analytics. The only requests it makes are the daily update check, optional network-owner
  lookups, and reverse DNS — each listed, and each with an off switch, on the privacy page.
