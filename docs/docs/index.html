@@ -37,13 +37,13 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.4, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.5, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -176,6 +176,30 @@ open build/Build/Products/Release/Flowlight.app</pre>
         to undo one lives in the app.</p>
       <p>HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
         never refused.</p>
+
+      <h2 id="rules">Rules</h2>
+      <p>An allowlist is one agent's idea of where it may go. A <strong>rule</strong> is the general version: it names a
+        <strong>subject</strong> — an app, an agent, a destination, a URL, or a pairing of two of those — and says <strong>block</strong>
+        or <strong>allow</strong>. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
+        every one of them lands in the same editor on the <strong>Rules</strong> screen, because a rule that took effect out of sight
+        would be a rule you could never find again.</p>
+      <p><strong>Which rule wins.</strong> The most specific match decides, and where two rules are equally narrow the block is the one
+        that stands. So an exception written underneath a broad block works — <code>Cursor may reach api.github.com</code> survives
+        <code>nothing reaches github.com</code> — while an exception broader than what it excepts does not quietly widen it.</p>
+      <p><strong>For how long.</strong> Forever; until a time; until Flowlight quits; or between chosen hours on chosen days. Hours are
+        local and judged at the moment a connection is made, so a Mac that slept through the end of a window finds it closed on waking,
+        and a clock or timezone change moves the window with it. A window closing stops new connections — it doesn't tear down ones
+        already open. There is also one global <strong>Pause Blocking</strong>, because the escape hatch is what makes strict rules
+        liveable.</p>
+      <p><strong>Unblocking is part of blocking.</strong> Every refusal carries its way out: from the alert, allow it once, for an hour,
+        or until Flowlight quits. Each of those is itself a rule with an expiry, so the list can always answer <em>why is this getting
+        through?</em> — including for the relaxation you clicked past a fortnight ago.</p>
+      <p><strong>Where a rule bites, and where it can't.</strong> The Network Extension refuses whole connections: it knows the host, the
+        address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
+        URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
+        refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.</p>
+      <p>The second tab is the <strong>violations feed</strong>: every connection a rule decided, with the app, where it was headed, which
+        rule decided it and whether that was a refusal or an exception letting it through.</p>
 
       <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
       <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
@@ -409,7 +433,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.4 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.5 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

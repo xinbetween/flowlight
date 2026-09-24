@@ -142,6 +142,8 @@ struct AgentsView: View {
             if let id = ids.first {
                 Button("Show Traffic in Reports") { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
                 FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
+                Divider()
+                RuleMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
             }
         } primaryAction: { ids in
             if let id = ids.first { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }

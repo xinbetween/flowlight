@@ -46,6 +46,12 @@ final class InspectionController: ObservableObject {
     private weak var db: TrafficDatabase?
     private var pruneTimer: Timer?
     var onRecorded: () -> Void = {}
+    /// The rules that refuse a request rather than a whole connection — the ones that name a path or a method,
+    /// which only the proxy can see. Read fresh on every connection, so a rule written now applies to the next
+    /// request rather than the next launch.
+    nonisolated(unsafe) var requestRules: @Sendable () -> [Rule] = { [] }
+    /// Called with every request a rule refused, ready to be recorded in the violations feed.
+    nonisolated(unsafe) var onRuleRefusal: @Sendable (RuleEvent) -> Void = { _ in }
 
     init() {
         UserDefaults.standard.register(defaults: [
@@ -71,14 +77,42 @@ final class InspectionController: ObservableObject {
              UserDefaults.standard.stringArray(forKey: Keys.neverInspect) ?? Self.defaultNeverInspect)
         }
         let mockRules = { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
-        proxy.mockRules = { host in MockRules.mocks(mockRules(), host: host) }
+        // A rule refusing a request is answered by the same machinery that gives a mock its canned response, and
+        // it goes first: a block someone wrote has to outrank a mock they left switched on.
+        let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
+            var refusals = (self?.requestRules() ?? []).filter {
+                $0.action == .block && ($0.destination.isEmpty || AgentPolicy.matches($0.destination, host: host, ip: ""))
+            }
+            if refusals.contains(where: { !$0.app.isEmpty }) {
+                // Only then is it worth asking who opened this connection: naming an app is the uncommon case,
+                // and the answer costs a lookup on the proxy's own queue.
+                let owner = recorder.owner(clientPort: clientPort, proxyPort: proxy.port)
+                refusals = refusals.filter {
+                    Rule.appMatches($0.app, bundleID: owner.bundleID, agentKey: owner.agent ?? owner.bundleID)
+                        || Rule.appMatches($0.app, bundleID: owner.appName, agentKey: owner.agentName ?? "")
+                }
+            }
+            return refusals.map { $0.asRefusal(host: host) } + MockRules.mocks(mockRules(), host: host)
+        }
+        proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
+        proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
+            guard rule.blocked, let refused = (self?.requestRules() ?? []).first(where: { $0.id == rule.id }) else { return }
+            let owner = recorder.owner(clientPort: flow.clientPort, proxyPort: proxy.port)
+            let path = head?.target.split(separator: "?").first.map(String.init) ?? refused.path
+            self?.onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: refused.id, action: .block,
+                                          engine: .request, agentKey: owner.agent ?? owner.bundleID,
+                                          agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                                          bundleID: owner.bundleID, host: flow.host, ip: "",
+                                          port: UInt16(clamping: flow.port), path: path,
+                                          method: head?.method ?? refused.method))
+        }
         let decide = DispatchQueue(label: "flowlight.inspect.decide", qos: .userInitiated, attributes: .concurrent)
         proxy.shouldInspect = { [recorder, proxy] host, clientPort, answer in
             let (scope, never) = scopeAndList()
             guard !Self.matches(host: host, patterns: never) else { answer(false); return }
             // A host someone wrote a mock rule for is decrypted whatever the scope says: a rule can only answer a
             // request Flowlight can read, and "my mock didn't fire" is a bad afternoon.
-            guard MockRules.mocks(mockRules(), host: host).isEmpty else { answer(true); return }
+            guard answersFor(host, clientPort).isEmpty else { answer(true); return }
             guard scope == .agents else { answer(true); return }
             decide.async {
                 answer(recorder.owner(clientPort: clientPort, proxyPort: proxy.port).agent != nil)

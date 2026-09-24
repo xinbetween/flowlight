@@ -69,6 +69,9 @@ struct LiveView: View {
                     if let id = ids.first {
                         Button("Show in Reports") { openReport(id) }
                         FocusMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id))
+                        Divider()
+                        RuleMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
+                                      host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
                         Button("Copy Bundle ID") {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(id, forType: .string)

@@ -19,6 +19,12 @@ final class BlockEnforcer: @unchecked Sendable {
     private var appConnected = false
     private var disconnectedAt: Date?
     private var cache: [Int32: (agent: Agent?, at: Date)] = [:]
+    /// The rule list, which is asked before any allowlist: a rule is something someone wrote down about this
+    /// exact connection, and it should not be second-guessed by a policy written about a whole agent.
+    private var ruleSet = RuleSet()
+    /// How many decisions each rule has made this run, for the rules that stop after a set number ("allow once").
+    /// The app is the one that persists them; this is only what is needed to stop applying a spent rule.
+    private var ruleHits: [UUID: Int] = [:]
 
     private struct Agent { var key: String; var name: String }
 
@@ -26,10 +32,13 @@ final class BlockEnforcer: @unchecked Sendable {
     /// be blocked either, because enforcement needs the app connected.
     var report: (BlockEvent) -> Void = { _ in }
 
+    /// Called with every connection a rule decided, refusal and relaxation alike.
+    var reportDecision: (RuleEvent) -> Void = { _ in }
+
     /// Asked before anything else on the data path: with no enforcing policy the filter does no extra work at all.
     var isEnforcing: Bool {
         lock.lock(); defer { lock.unlock() }
-        return !policies.isEmpty
+        return !policies.isEmpty || !ruleSet.rules.isEmpty
     }
 
     /// Replaces the enforcing set. The app sends this on connect and on every change, so it is always the whole
@@ -39,6 +48,15 @@ final class BlockEnforcer: @unchecked Sendable {
         policies = Dictionary(list.filter { $0.enabled && $0.enforce }.map { ($0.agentID, $0) }, uniquingKeysWith: { a, _ in a })
         cache.removeAll()   // a policy change can change which process counts as an agent
         return policies.count
+    }
+
+    /// Replaces the rule list. Like `apply(_:)` above this is always the whole list, and the hit counts the app
+    /// sends with it replace what this run has counted — the app is where they survive a restart.
+    func apply(_ set: RuleSet) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        ruleSet = set
+        ruleHits = Dictionary(set.rules.map { ($0.id, $0.hits) }, uniquingKeysWith: { a, _ in a })
+        return set.rules.filter(\.enabled).count
     }
 
     func appConnectionChanged(connected: Bool) {
@@ -58,12 +76,33 @@ final class BlockEnforcer: @unchecked Sendable {
     /// every packet would put the kernel process table on the data path.
     func refuses(_ state: FlowState) -> Bool {
         guard isEnforcing, !state.judged else { return false }
-        guard let agent = agent(for: state.process), let policy = policy(for: agent.key) else {
+        let agent = agent(for: state.process)
+        let facts = FlowFacts(agentKey: agent?.key ?? state.process.bundleID, bundleID: state.process.bundleID,
+                              host: state.domain, ip: state.remoteIP, port: state.remotePort,
+                              hostSettled: state.inspectionDone)
+
+        // The rules first. They name this connection rather than a whole agent, and an exception written here is
+        // the only way out of an allowlist, so it has to be able to win.
+        let ruled = ruleDecision(facts, process: state.process, agent: agent)
+        switch ruled.verdict {
+        case .undecided:
+            return false
+        case .block:
+            state.judged = true
+            return true
+        case .allow where ruled.rule != nil:
+            // An exception someone wrote, which is the only thing that outranks an allowlist. An allow with no
+            // rule behind it is merely the absence of one, and says nothing about the policy below.
+            state.judged = true
+            return false
+        case .allow:
+            break
+        }
+
+        guard let agent, let policy = policy(for: agent.key) else {
             state.judged = true
             return false
         }
-        let facts = FlowFacts(agentKey: agent.key, bundleID: state.process.bundleID, host: state.domain,
-                              ip: state.remoteIP, port: state.remotePort, hostSettled: state.inspectionDone)
         switch BlockRules.verdict(for: facts, policy: policy, inForce: inForce()) {
         case .undecided:
             return false
@@ -78,6 +117,42 @@ final class BlockEnforcer: @unchecked Sendable {
             report(event)
             return true
         }
+    }
+
+    /// What the rules say, with the refusal or the relaxation already reported. Nothing is refused while the app
+    /// is away, for the same reason an allowlist isn't: a refusal nobody can see, and nobody can undo, is worse
+    /// than the connection it stopped.
+    private func ruleDecision(_ facts: FlowFacts, process: ProcessInfoRecord, agent: Agent?) -> RuleDecision {
+        lock.lock()
+        let set = ruleSet
+        let hits = ruleHits
+        lock.unlock()
+        // The pause stands everything down, allowlists included: it is the one global escape hatch, and an escape
+        // hatch that only half works is worse than none. `.undecided` rather than `.allow`, so the flow is judged
+        // again when the pause ends rather than being waved through for its whole life.
+        if let until = set.pausedUntil, Date() < until { return RuleDecision(verdict: .undecided, rule: nil) }
+        guard !set.rules.isEmpty, inForce() else { return RuleDecision(verdict: .allow, rule: nil) }
+        if BlockRules.isExempt(facts) { return RuleDecision(verdict: .allow, rule: nil) }
+        let rules = set.rules.map { rule -> Rule in
+            var copy = rule
+            copy.hits = hits[rule.id] ?? rule.hits
+            return copy
+        }
+        let decision = RuleBook.decide(facts, rules: rules, session: set.session, pausedUntil: set.pausedUntil)
+        guard let rule = decision.rule else { return decision }
+        lock.lock(); ruleHits[rule.id] = (ruleHits[rule.id] ?? 0) + 1; lock.unlock()
+        let event = RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id, action: rule.action,
+                              engine: .flow, agentKey: facts.agentKey, agentName: agent?.name ?? process.name,
+                              appName: process.name, bundleID: process.bundleID, host: facts.host, ip: facts.ip,
+                              port: facts.port)
+        extensionLog.info("Rule \(rule.action.rawValue, privacy: .public) for \(process.name, privacy: .public)")
+        reportDecision(event)
+        if rule.action == .block {
+            report(BlockEvent(at: event.at, agentKey: facts.agentKey, agentName: agent?.name ?? process.name,
+                              appName: process.name, host: facts.host, ip: facts.ip, port: facts.port,
+                              rule: rule.title))
+        }
+        return decision
     }
 
     private func policy(for key: String) -> AgentPolicy? {

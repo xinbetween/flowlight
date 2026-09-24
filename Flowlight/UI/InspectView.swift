@@ -12,6 +12,7 @@ struct InspectView: View {
 private struct InspectContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var focus: FocusStore
+    @EnvironmentObject var nav: AppNavigation
     @ObservedObject var inspection: InspectionController
     @State private var exchanges: [HTTPExchange] = []
     @State private var links: [Int64: ToolCallLinks.Link] = [:]
@@ -183,6 +184,17 @@ private struct InspectContent: View {
         .contextMenu(forSelectionType: HTTPExchange.ID.self) { ids in
             if !DemoData.isEnabled, let id = ids.first, let e = exchanges.first(where: { $0.id == id }), e.note == nil {
                 Button("Mock This Endpoint…") { mockDraft = MockRule(mocking: e) }
+                Divider()
+                // Inspect is the one screen that can offer a URL rather than a whole host, because it is the one
+                // place the path was ever visible.
+                Button("Block This Endpoint…") {
+                    var rule = RuleStore.block(app: e.bundleID, destination: e.host,
+                                               name: "Block \(e.method) \(e.host)\(e.path.split(separator: "?").first.map(String.init) ?? "")")
+                    rule.path = e.path.split(separator: "?").first.map(String.init) ?? "/"
+                    rule.method = e.method
+                    nav.writeRule(rule)
+                }
+                RuleMenuItems(app: (e.bundleID, e.appName), host: e.host)
             }
         }
     }

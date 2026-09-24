@@ -13,8 +13,9 @@ final class MockGate {
         case forward(Data)
         /// Part of a request Flowlight is answering: recorded, never sent upstream.
         case hold(Data)
-        /// The bytes that complete that request, and the rule that answers it.
-        case answer(MockRule, Data)
+        /// The bytes that complete that request, the rule that answers it, and the request line it answered —
+        /// which a rule refusing a request needs in order to be recorded as having refused something in particular.
+        case answer(MockRule, Data, ProxyRequestHead?)
     }
 
     private enum State {
@@ -33,7 +34,7 @@ final class MockGate {
     private var state = State.head
     private var buffer = Data()
     /// The rule answering the request currently being read, if any.
-    private var answering: MockRule?
+    private var answering: (rule: MockRule, head: ProxyRequestHead?)?
 
     init(host: String, rules: [MockRule]) {
         self.host = host
@@ -63,7 +64,7 @@ final class MockGate {
             }
             let length = buffer.distance(from: buffer.startIndex, to: end.upperBound)
             let head = ProxyRequestHead.parse(buffer[buffer.startIndex..<end.upperBound])
-            answering = head.flatMap { MockRules.match(rules, host: host, method: $0.method, path: $0.target) }
+            answering = head.flatMap { h in MockRules.match(rules, host: host, method: h.method, path: h.target).map { ($0, h) } }
             let next = head.map(Self.bodyState(for:)) ?? .opaque
             let complete = Self.endsMessage(next)
             state = next
@@ -106,13 +107,13 @@ final class MockGate {
     /// Routes settled bytes to the right action. The rule travels with the bytes that *complete* the request, so a
     /// recorder reading the same stream can label the exchange before it finishes parsing it.
     private func push(_ bytes: Data, complete: Bool, into actions: inout [Action]) {
-        guard let rule = answering else {
+        guard let answering else {
             if !bytes.isEmpty { actions.append(.forward(bytes)) }
             return
         }
         if complete {
-            actions.append(.answer(rule, bytes))
-            answering = nil
+            actions.append(.answer(answering.rule, bytes, answering.head))
+            self.answering = nil
         } else if !bytes.isEmpty {
             actions.append(.hold(bytes))
         }

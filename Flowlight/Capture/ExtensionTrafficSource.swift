@@ -23,6 +23,10 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// The enforcing allowlists, kept here so a reconnect re-sends them without the app being asked again. The
     /// extension never persists them: with no app to record a refusal, nothing should be refused.
     private var enforcement: [AgentPolicy] = []
+    /// The rule list, kept for the same reason and re-sent on the same reconnect.
+    private var ruleSet = RuleSet()
+    /// Connections a rule decided, refusals and relaxations alike.
+    var onRuleDecisions: (([RuleEvent]) -> Void)?
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         self.sink = sink
@@ -87,6 +91,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                                              : "Connected to filter extension \(version) — no traffic from it yet")
                 self.startHeartbeat()
                 self.pushEnforcement()
+                self.pushRules()
                 self.checkFilterState(on: connection, version: version)
             }
         }
@@ -156,6 +161,27 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         let payload = enforcement.isEmpty ? Data() : BlockCoding.encode(enforcement)
         let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
         proxy?.setEnforcement(payload: payload) { _ in }
+    }
+
+    func setRules(_ rules: RuleSet) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.ruleSet = rules
+            self.pushRules()
+        }
+    }
+
+    private func pushRules() {
+        guard let connection else { return }
+        let payload = ruleSet.rules.isEmpty && ruleSet.pausedUntil == nil ? Data() : BlockCoding.encode(ruleSet)
+        let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
+        proxy?.setRules(payload: payload) { _ in }
+    }
+
+    func ruleDecisions(payload: Data, reply: @escaping () -> Void) {
+        let events = BlockCoding.decode([RuleEvent].self, from: payload) ?? []
+        if !events.isEmpty { onRuleDecisions?(events) }
+        reply()
     }
 
     func blocked(payload: Data, reply: @escaping () -> Void) {

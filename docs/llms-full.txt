@@ -61,11 +61,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.5, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingAgent configurationHTTPS inspectionMock responsesOther alerts
+ The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesAgent configurationHTTPS inspectionMock responsesOther alerts
  Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -236,6 +236,36 @@ open build/Build/Products/Release/Flowlight.app
 
  HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
  never refused.
+
+ Rules
+
+ An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
+ subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
+ or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
+ every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
+ would be a rule you could never find again.
+
+ Which rule wins. The most specific match decides, and where two rules are equally narrow the block is the one
+ that stands. So an exception written underneath a broad block works — Cursor may reach api.github.com survives
+ nothing reaches github.com — while an exception broader than what it excepts does not quietly widen it.
+
+ For how long. Forever; until a time; until Flowlight quits; or between chosen hours on chosen days. Hours are
+ local and judged at the moment a connection is made, so a Mac that slept through the end of a window finds it closed on waking,
+ and a clock or timezone change moves the window with it. A window closing stops new connections — it doesn't tear down ones
+ already open. There is also one global Pause Blocking, because the escape hatch is what makes strict rules
+ liveable.
+
+ Unblocking is part of blocking. Every refusal carries its way out: from the alert, allow it once, for an hour,
+ or until Flowlight quits. Each of those is itself a rule with an expiry, so the list can always answer why is this getting
+ through? — including for the relaxation you clicked past a fortnight ago.
+
+ Where a rule bites, and where it can't. The Network Extension refuses whole connections: it knows the host, the
+ address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
+ URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
+ refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.
+
+ The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
+ rule decided it and whether that was a refusal or an exception letting it through.
 
  Agent configuration: what Flowlight reads on your Mac
 
@@ -492,7 +522,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1008,8 +1038,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.4
+ 0.3.5
 September 24, 2026Latest
+
+ Rules. One rule model behind every screen: a subject — an app, an agent, a destination, a URL — and
+ block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one.
+
+ For as long as you say — forever, until a time, until Flowlight quits, or between chosen hours on chosen
+ days — plus one global Pause Blocking.
+
+ Unblocking is part of blocking: allow once, for an hour, or until quit, each itself a rule with an
+ expiry. A violations feed records every decision. How rules work →
+
+ Downloads and checksums →
+
+ 0.3.4
+September 24, 2026
 
  Focus is symmetric. One app is a focus; so is one destination. Add an app by typing its name or bundle
  identifier — every application on the Mac is searchable, so one that has been quiet still works, as does a command-line agent

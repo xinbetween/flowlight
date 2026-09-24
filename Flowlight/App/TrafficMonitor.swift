@@ -48,6 +48,8 @@ final class TrafficMonitor: ObservableObject {
     let inspection = InspectionController()
     /// Opt-in export to a collector the user chooses (off by default, and there is no default endpoint).
     let exporter = ExportController()
+    /// Everything Flowlight has been told to block or allow, and what those rules have done.
+    let rules = RuleStore()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
@@ -127,6 +129,13 @@ final class TrafficMonitor: ObservableObject {
         activity.start()
         inspection.onRecorded = { [weak self] in self?.inspectionVersion += 1 }
         inspection.attach(db: db)
+        rules.onChange = { [weak self] set in self?.source?.setRules(set) }
+        rules.attach(db: db)
+        // A rule that names a path is carried out by the proxy, which reads its list fresh on every connection.
+        inspection.requestRules = { [live = rules.live] in live.requestRules() }
+        inspection.onRuleRefusal = { [weak self] event in
+            Task { @MainActor in self?.rules.record([event]) }
+        }
         // Export reads what Reports reads — the same minute rollups, through the same read-only connection — so
         // there is nothing it can send that isn't already on a screen the user can look at.
         exporter.start(rollups: { [weak self] from, to in
@@ -277,6 +286,9 @@ final class TrafficMonitor: ObservableObject {
                 Task { @MainActor in self?.captureWarning = message }
             }
             extensionSource.onBlocked = { [weak self] events in self?.recordBlocked(events) }
+            extensionSource.onRuleDecisions = { [weak self] events in
+                Task { @MainActor in self?.rules.record(events) }
+            }
         }
         source = newSource
         status = fallbackNote ?? "Starting \(newSource.displayName)…"
@@ -287,6 +299,7 @@ final class TrafficMonitor: ObservableObject {
             Task { @MainActor in self?.status = fallbackNote ?? message }
         })
         pushEnforcement()
+        newSource.setRules(rules.ruleSet)
     }
 
     /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has
@@ -308,9 +321,10 @@ final class TrafficMonitor: ObservableObject {
                 let who = event.appName.isEmpty || event.appName == event.agentName
                     ? event.agentName : "\(event.agentName) › \(event.appName)"
                 let pattern = event.host.isEmpty ? event.ip : AnomalyEngine.registrableDomain(event.host)
+                let why = event.rule.isEmpty ? "not on \(event.agentName)'s allowlist" : "the rule \"\(event.rule)\""
                 alerts.append(try db.addAlert(kind: AnomalyEngine.Kind.blockedConnection.rawValue, bundleID: event.agentKey,
                                               appName: event.agentName,
-                                              detail: "Blocked \(who) from connecting to \(event.destination):\(event.port) — not on \(event.agentName)'s allowlist",
+                                              detail: "Blocked \(who) from connecting to \(event.destination):\(event.port) — \(why)",
                                               severity: 3, at: Date(timeIntervalSince1970: TimeInterval(event.at)),
                                               allowPattern: pattern))
             }

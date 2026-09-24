@@ -82,6 +82,9 @@ struct BlockEvent: Codable, Sendable, Equatable {
     var host: String
     var ip: String
     var port: UInt16
+    /// The rule that refused it, when a rule did. Empty when an agent's allowlist did, which is the other way a
+    /// connection gets refused and reads differently in an alert.
+    var rule: String = ""
 
     /// Where the alert points, and what "Allow from now on" would add to the allowlist.
     var destination: String { host.isEmpty ? ip : host }

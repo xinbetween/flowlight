@@ -14,6 +14,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// hour of buffered traffic. Kept small: enforcement lapses when the app is away, so this can't pile up.
     private var blocks: [BlockEvent] = []
     private var blocksInFlight = false
+    /// Connections a rule decided, on the same footing and for the same reason.
+    private var decisions: [RuleEvent] = []
+    private var decisionsInFlight = false
     private let maxPendingBlocks = 500
     private let queue = DispatchQueue(label: "flowlight.ipc")
     /// Seconds of traffic held while no app is connected — the whole time the app is on the nettop sampler, or
@@ -29,6 +32,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
 
     func startListener() {
         BlockEnforcer.shared.report = { [weak self] event in self?.report(event) }
+        BlockEnforcer.shared.reportDecision = { [weak self] event in self?.report(decision: event) }
         let listener = NSXPCListener(machServiceName: machServiceName)
         listener.delegate = self
         listener.resume()
@@ -52,6 +56,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.client = nil
                 self.inFlight = false
                 self.blocksInFlight = false
+                self.decisionsInFlight = false
                 BlockEnforcer.shared.appConnectionChanged(connected: false)
             }
         }
@@ -71,9 +76,11 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.client = connection
             self.inFlight = false
             self.blocksInFlight = false
+            self.decisionsInFlight = false
             BlockEnforcer.shared.appConnectionChanged(connected: true)
             self.flushLocked()
             self.flushBlocksLocked()
+            self.flushDecisionsLocked()
         }
         reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
     }
@@ -82,6 +89,13 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         let policies = payload.isEmpty ? [] : (BlockCoding.decode([AgentPolicy].self, from: payload) ?? [])
         let count = BlockEnforcer.shared.apply(policies)
         extensionLog.info("Enforcing \(count, privacy: .public) allowlists")
+        reply(count)
+    }
+
+    func setRules(payload: Data, withReply reply: @escaping (Int) -> Void) {
+        let set = payload.isEmpty ? RuleSet() : (BlockCoding.decode(RuleSet.self, from: payload) ?? RuleSet())
+        let count = BlockEnforcer.shared.apply(set)
+        extensionLog.info("Carrying out \(count, privacy: .public) rules")
         reply(count)
     }
 
@@ -106,6 +120,36 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.blocks.removeFirst(self.blocks.count - self.maxPendingBlocks)
             }
             self.flushBlocksLocked()
+        }
+    }
+
+    /// A connection a rule decided, refusal or relaxation, on its way to the violations feed.
+    func report(decision event: RuleEvent) {
+        queue.async {
+            self.decisions.append(event)
+            if self.decisions.count > self.maxPendingBlocks {
+                self.decisions.removeFirst(self.decisions.count - self.maxPendingBlocks)
+            }
+            self.flushDecisionsLocked()
+        }
+    }
+
+    private func flushDecisionsLocked() {
+        guard !decisionsInFlight, let client, !decisions.isEmpty else { return }
+        let chunk = decisions
+        let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
+            extensionLog.error("ruleDecisions() failed: \(error.localizedDescription, privacy: .public)")
+            self?.queue.async { self?.decisionsInFlight = false }
+        } as? FlowlightAppXPC
+        guard let proxy else { return }
+        decisionsInFlight = true
+        proxy.ruleDecisions(payload: BlockCoding.encode(chunk)) { [weak self] in
+            self?.queue.async {
+                guard let self else { return }
+                self.decisionsInFlight = false
+                self.decisions.removeFirst(min(chunk.count, self.decisions.count))
+                self.flushDecisionsLocked()
+            }
         }
     }
 

@@ -127,6 +127,23 @@ It needs the Network Extension — refusing a connection means being in its path
 traffic, DNS, Apple services and Flowlight's own connections are never refused, enforcement lapses a few seconds
 after the app stops running, and HTTPS inspection doesn't combine with it.
 
+### Rules
+An allowlist is one agent's idea of where it may go. A **rule** is the general version: it names a subject — an app,
+an agent, a destination, a URL, or a pairing of two of those — and says block or allow. Right-click any row in Live,
+Reports, AI Agents or Inspect to write one about what you're looking at; all of them land in the same editor on the
+**Rules** screen.
+
+- **The most specific match decides**, and a tie goes to the block. An exception written underneath a broad block
+  works; one broader than what it excepts doesn't quietly widen it.
+- **For as long as you say**: forever, until a time, until Flowlight quits, or between chosen hours on chosen days —
+  plus one global **Pause Blocking**, because the escape hatch is what makes strict rules liveable.
+- **Unblocking is part of blocking.** From the alert, allow it once, for an hour, or until Flowlight quits. Each of
+  those is itself a rule with an expiry, so the list can still answer *why is this getting through?* next week.
+- **A rule says where it bites.** The extension refuses whole connections and knows nothing about paths; HTTPS
+  inspection refuses one request and answers with a status the agent can read; the sampler refuses nothing. A rule
+  the current setup can't carry out says so in the list instead of looking enforced.
+- A **violations feed** beside the list: every connection a rule decided, refusals and exceptions alike.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -304,6 +321,7 @@ Shipped:
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
 - [x] Focus mode: watch only the apps and destinations you pick (0.2.2, symmetric from 0.3.4)
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
+- [x] Rules: block anything, anywhere, for as long as you say, with a violations feed (0.3.5)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -312,27 +330,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.3.5 — Rules: block anything, anywhere, for as long as you say.** 0.3.0 taught one allowlist to refuse; this
-  makes refusing a first-class idea with one rule model behind every screen. A rule names a **subject** — an app, an
-  agent, a destination (domain and its subdomains, an IP, a CIDR range), a URL (host + path glob + method), or a
-  pairing of two of those ("Cursor may not reach `raw.githubusercontent.com`") — and an **action**: block, or allow
-  as an exception that outranks a block. Deny is checked before allow, so one narrow exception can't be widened by
-  accident. Every table that shows traffic offers it in place: Live, Reports, AI Agents and Inspect.
-  - **For how long.** Forever; until a time; for a stretch ("an hour", "until I quit Flowlight"); or between chosen
-    hours on chosen days. Plus one global **Pause blocking for 10 minutes**, because the escape hatch is what makes
-    strict rules usable. Schedules have to be honest about sleep, clock and timezone changes, and about the fact
-    that a window closing does not tear down connections already open — it stops new ones.
-  - **Unblocking is part of blocking.** Every refusal carries its way out: allow once, allow for an hour, allow
-    always, or edit the rule — from the alert, the notification, or the list. Relaxations are themselves rules with
-    an expiry, so the list always answers "why is this getting through?"
-  - **A Rules screen**, with every rule, where it came from (typed, a preset, an "allow once" that hasn't expired
-    yet), its schedule, how often it has fired and when it last did — and beside it a **violations feed**: each
-    refusal with the app, the destination, the rule that refused it and the time. Refusals become records of their
-    own, keyed to the rule, rather than only alerts.
-  - **Say where each rule actually bites.** The Network Extension refuses at the flow level, so it knows host, IP
-    and port but nothing about paths, and only in extension mode; the inspection proxy refuses at the request
-    level, so it can match a URL and answer with a chosen status instead of a dead socket; the sampler cannot
-    refuse anything. A rule the current engine can't enforce must say so in the list rather than quietly watching.
 - **0.3.6 — Agent guardrails: block an MCP server, a tool or a resource.** The AI half of the same model, and its
   own section, because "which tools may this agent use" is a different question from "which hosts may it reach".
   There are four places a guardrail can act, and the useful ones need HTTPS inspection on:

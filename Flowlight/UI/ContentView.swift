@@ -55,6 +55,7 @@ struct ContentView: View {
             case .agents: AgentsView()
             case .reports: ReportsView()
             case .alerts: AlertsView()
+            case .rules: RulesView()
             case .inspect: InspectView()
             case .capture: CaptureView()
             }

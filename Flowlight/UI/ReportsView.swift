@@ -483,6 +483,8 @@ struct ReportsView: View {
                 Divider()
                 FocusMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
                                host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
+                RuleMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
+                              host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
                 Divider()
                 Button("Copy \(node.kind == .app ? "Name" : node.kind == .ip ? "IP Address" : "Destination")") { copy(node.title) }
                 if node.kind == .app, let bundleID = node.bundleID { Button("Copy Bundle ID") { copy(bundleID) } }

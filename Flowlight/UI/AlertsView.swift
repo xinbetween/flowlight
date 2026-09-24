@@ -63,6 +63,27 @@ struct AlertsView: View {
                 Button("Allow \(a.allowPattern) for \(a.appName) from Now On") {
                     monitor.allowFromNowOn(pattern: a.allowPattern, agentID: a.bundleID)
                 }
+                // Every refusal carries its way out, and each way out is itself a rule with an expiry — so the
+                // Rules screen can still answer "why is this getting through?" tomorrow morning.
+                Menu("Allow \(a.allowPattern) for \(a.appName)…") {
+                    Button("Just once") {
+                        monitor.rules.save(RuleStore.allow(app: a.bundleID, destination: a.allowPattern,
+                                                           once: true, origin: .allowOnce))
+                    }
+                    Button("For an hour") {
+                        monitor.rules.save(RuleStore.allow(app: a.bundleID, destination: a.allowPattern,
+                                                           forSeconds: 3600))
+                    }
+                    Button("Until Flowlight quits") {
+                        var rule = RuleStore.allow(app: a.bundleID, destination: a.allowPattern)
+                        rule.schedule = .thisSession(RuleStore.session)
+                        monitor.rules.save(rule)
+                    }
+                    Divider()
+                    Button("Edit a rule instead…") {
+                        nav.writeRule(RuleStore.allow(app: a.bundleID, destination: a.allowPattern, origin: .alert))
+                    }
+                }
                 Divider()
             }
             Button("Show Traffic in Reports") { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)

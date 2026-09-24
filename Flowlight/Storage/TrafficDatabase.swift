@@ -161,6 +161,26 @@ struct AlertRecord: Identifiable, Sendable, Hashable {
     var allowPattern: String = ""
 }
 
+/// One decision a rule made, as the violations feed shows it.
+struct RuleEventRecord: Identifiable, Sendable, Hashable {
+    var id: Int64
+    var timestamp: Date
+    var ruleID: UUID
+    var action: Rule.Action
+    var engine: Rule.Engine
+    var bundleID: String
+    var appName: String
+    var agentKey: String
+    var agentName: String
+    var host: String
+    var ip: String
+    var port: UInt16
+    var path: String
+    var method: String
+
+    var destination: String { host.isEmpty ? ip : host }
+}
+
 /// SQLite store (App Group container) with tiered rollups:
 /// flows_1s → agg_1m (complete minutes) → agg_1h / agg_1d (folded from immutable minute rows).
 final class TrafficDatabase: @unchecked Sendable {
@@ -271,6 +291,18 @@ final class TrafficDatabase: @unchecked Sendable {
         if !exchangeColumns.contains("mock_rule") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN mock_rule TEXT NOT NULL DEFAULT ''")
         }
+        // Added with rules: the rule list itself, and every connection a rule decided. The decisions are their own
+        // table rather than only alerts — an alert is a thing that happened once, and a violations feed has to be
+        // answerable by rule ("what has this one refused?") as well as by time.
+        try conn.execute("""
+        CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, rule TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
+            rule_id TEXT NOT NULL, action TEXT NOT NULL, engine TEXT NOT NULL, bundle_id TEXT NOT NULL,
+            app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL, host TEXT NOT NULL,
+            ip TEXT NOT NULL, port INTEGER NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS rule_events_ts ON rule_events(ts);
+        CREATE INDEX IF NOT EXISTS rule_events_rule ON rule_events(rule_id, ts);
+        """)
     }
 
     // MARK: Ingest
@@ -694,6 +726,66 @@ final class TrafficDatabase: @unchecked Sendable {
             INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
             ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
             """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    // MARK: Rules
+
+    func loadRules() throws -> [Rule] {
+        let rows = try conn.query("SELECT rule FROM rules ORDER BY updated") { $0.text(0) }
+        return rows.compactMap { try? JSONDecoder().decode(Rule.self, from: Data($0.utf8)) }
+    }
+
+    func saveRule(_ rule: Rule) throws {
+        let json = String(decoding: try JSONEncoder().encode(rule), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO rules (id, rule, updated) VALUES (?,?,?)
+            ON CONFLICT(id) DO UPDATE SET rule = excluded.rule, updated = excluded.updated
+            """, [.text(rule.id.uuidString), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    func deleteRule(_ id: UUID) throws {
+        try conn.run("DELETE FROM rules WHERE id = ?", [.text(id.uuidString)])
+    }
+
+    func recordRuleEvents(_ events: [RuleEvent]) throws {
+        let sql = """
+        INSERT INTO rule_events (ts, rule_id, action, engine, bundle_id, app_name, agent, agent_name, host, ip, port, path, method)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """
+        for event in events {
+            try conn.run(sql, [.int(event.at), .text(event.ruleID.uuidString), .text(event.action.rawValue),
+                               .text(event.engine.rawValue), .text(event.bundleID), .text(event.appName),
+                               .text(event.agentKey), .text(event.agentName), .text(event.host), .text(event.ip),
+                               .int(Int64(event.port)), .text(event.path), .text(event.method)])
+        }
+    }
+
+    /// The violations feed: every decision, newest first, optionally narrowed to one rule.
+    func ruleEvents(ruleID: UUID? = nil, limit: Int = 500) throws -> [RuleEventRecord] {
+        var sql = """
+        SELECT id, ts, rule_id, action, engine, bundle_id, app_name, agent, agent_name, host, ip, port, path, method
+        FROM rule_events
+        """
+        var bindings: [SQLValue] = []
+        if let ruleID {
+            sql += " WHERE rule_id = ?"
+            bindings.append(.text(ruleID.uuidString))
+        }
+        sql += " ORDER BY ts DESC, id DESC LIMIT \(max(1, limit))"
+        return try conn.query(sql, bindings) { row in
+            RuleEventRecord(id: row.int(0), timestamp: Date(timeIntervalSince1970: TimeInterval(row.int(1))),
+                            ruleID: UUID(uuidString: row.text(2)) ?? UUID(),
+                            action: Rule.Action(rawValue: row.text(3)) ?? .block,
+                            engine: Rule.Engine(rawValue: row.text(4)) ?? .flow,
+                            bundleID: row.text(5), appName: row.text(6), agentKey: row.text(7),
+                            agentName: row.text(8), host: row.text(9), ip: row.text(10),
+                            port: UInt16(clamping: row.int(11)), path: row.text(12), method: row.text(13))
+        }
+    }
+
+    /// Keeps the feed from growing without bound. Called with the same retention sweep as everything else.
+    func pruneRuleEvents(before date: Date) throws {
+        try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
     }
 
     // MARK: HTTPS inspection

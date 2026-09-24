@@ -9,10 +9,14 @@ protocol TrafficSource: AnyObject {
     /// Allowlists this source should refuse connections against. Only the Network Extension sits in the data path,
     /// so every other source ignores them — which is why the UI says so rather than offering a dead switch.
     func setEnforcement(_ policies: [AgentPolicy])
+    /// The rule list this source should carry out. Same story as `setEnforcement`: only the Network Extension is
+    /// in the data path, and the Rules screen says so per rule rather than pretending.
+    func setRules(_ rules: RuleSet)
 }
 
 extension TrafficSource {
     func setEnforcement(_ policies: [AgentPolicy]) {}
+    func setRules(_ rules: RuleSet) {}
 }
 
 enum CaptureMode: String, CaseIterable, Identifiable {

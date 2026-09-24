@@ -24,6 +24,10 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     /// Seconds to wait before answering, so "the API stalls" is testable. The recorded exchange shows the wait as
     /// its duration.
     var delay: Double = 0
+    /// True when this answer is a rule refusing the request rather than a mock standing in for the server. It
+    /// changes only what the answer calls itself — the same machinery gives it, but "Flowlight blocked this" and
+    /// "Flowlight pretended to be the server" are not the same thing to read in a log.
+    var blocked = false
 
     /// Methods offered in the editor. `ANY` is the empty method.
     static let methods = ["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
@@ -43,9 +47,11 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     }
 
     init(id: UUID = UUID(), enabled: Bool = true, name: String = "", host: String = "", path: String = "*",
-         method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "", delay: Double = 0) {
+         method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "", delay: Double = 0,
+         blocked: Bool = false) {
         self.id = id; self.enabled = enabled; self.name = name; self.host = host; self.path = path
         self.method = method; self.status = status; self.headers = headers; self.body = body; self.delay = delay
+        self.blocked = blocked
     }
 }
 
@@ -64,6 +70,7 @@ extension MockRule {
         headers = try c.decodeIfPresent([HTTPHeader].self, forKey: .headers) ?? []
         body = try c.decodeIfPresent(String.self, forKey: .body) ?? ""
         delay = try c.decodeIfPresent(Double.self, forKey: .delay) ?? 0
+        blocked = try c.decodeIfPresent(Bool.self, forKey: .blocked) ?? false
     }
 }
 
@@ -87,55 +94,10 @@ enum MockRules {
         rules.filter { $0.enabled && hostMatches($0.host, host) }
     }
 
-    static func hostMatches(_ pattern: String, _ host: String) -> Bool {
-        let p = pattern.trimmingCharacters(in: .whitespaces).lowercased()
-        let h = host.trimmingCharacters(in: .whitespaces).lowercased()
-        // A half-written rule matches nothing rather than everything: an empty host is a rule in progress, and
-        // answering every request on the Mac from it would be the worst possible surprise.
-        guard !p.isEmpty, !h.isEmpty else { return false }
-        if p.hasPrefix("*.") || p.hasPrefix(".") {
-            let domain = String(p.drop { $0 == "*" || $0 == "." })
-            return !domain.isEmpty && (h == domain || h.hasSuffix("." + domain))
-        }
-        return h == p
-    }
-
-    static func methodMatches(_ pattern: String, _ method: String) -> Bool {
-        let p = pattern.trimmingCharacters(in: .whitespaces).uppercased()
-        return p.isEmpty || p == "ANY" || p == "*" || p == method.trimmingCharacters(in: .whitespaces).uppercased()
-    }
-
-    static func pathMatches(_ pattern: String, _ target: String) -> Bool {
-        var p = pattern.trimmingCharacters(in: .whitespaces)
-        if p.isEmpty { p = "*" }
-        var subject = target
-        // A pattern that says nothing about the query string is matched against the path alone, so `/v1/messages`
-        // still matches `/v1/messages?stream=true`.
-        if !p.contains("?"), let query = subject.firstIndex(of: "?") { subject = String(subject[..<query]) }
-        if !p.hasPrefix("/"), !p.hasPrefix("*") { p = "/" + p }
-        return glob(p, subject)
-    }
-
-    /// `*` matches any run of characters, including `/`; everything else is literal. One wildcard is enough for
-    /// the endpoints people actually mock, and it can't be mistaken for a regular expression.
-    static func glob(_ pattern: String, _ subject: String) -> Bool {
-        let parts = pattern.components(separatedBy: "*")
-        guard parts.count > 1 else { return pattern == subject }
-        var rest = Substring(subject)
-        guard rest.hasPrefix(parts[0]) else { return false }
-        rest = rest.dropFirst(parts[0].count)
-        for (index, part) in parts.enumerated().dropFirst() where !part.isEmpty {
-            if index == parts.count - 1 {
-                // The last literal has to land at the end, and can't overlap what an earlier one already matched.
-                guard rest.count >= part.count, rest.hasSuffix(part) else { return false }
-                rest = rest.dropLast(part.count)
-            } else {
-                guard let found = rest.range(of: part) else { return false }
-                rest = rest[found.upperBound...]
-            }
-        }
-        return true
-    }
+    static func hostMatches(_ pattern: String, _ host: String) -> Bool { GlobMatch.host(pattern, host) }
+    static func methodMatches(_ pattern: String, _ method: String) -> Bool { GlobMatch.method(pattern, method) }
+    static func pathMatches(_ pattern: String, _ target: String) -> Bool { GlobMatch.path(pattern, target) }
+    static func glob(_ pattern: String, _ subject: String) -> Bool { GlobMatch.glob(pattern, subject) }
 }
 
 // MARK: The answer
@@ -162,7 +124,7 @@ extension MockRule {
         if bodyAllowed { text += "Content-Length: \(payload.count)\r\n" }
         // Named in the response as well as in Flowlight, so an app or a log elsewhere on the Mac can also tell that
         // this answer didn't come from the server.
-        text += "X-Flowlight-Mock: \(Self.headerSafe(title))\r\n"
+        text += "\(blocked ? "X-Flowlight-Blocked" : "X-Flowlight-Mock"): \(Self.headerSafe(title))\r\n"
         text += "Connection: close\r\n\r\n"
         var data = Data(text.utf8)
         data.append(payload)
@@ -198,5 +160,23 @@ extension MockRule {
 
     static func headerText(_ headers: [HTTPHeader]) -> String {
         headers.map { "\($0.name): \($0.value)" }.joined(separator: "\n")
+    }
+}
+
+// MARK: A rule, as an answer
+
+extension Rule {
+    /// A request-level block, in the shape the proxy already knows how to answer with.
+    ///
+    /// Refusing a request is not the same as refusing a connection: the agent gets a status it can read and a
+    /// sentence saying what happened, rather than a socket that died for no stated reason. That is the whole
+    /// reason the proxy is worth having in the rule story at all.
+    /// `host` stands in for a rule that names no destination of its own — one written about an app, which
+    /// refuses that app's requests wherever they are headed.
+    func asRefusal(host: String = "") -> MockRule {
+        let body = #"{"error": "blocked by Flowlight", "rule": "\#(MockRule.headerSafe(title).replacingOccurrences(of: "\"", with: "'"))"}"#
+        return MockRule(id: id, enabled: enabled, name: title, host: destination.isEmpty ? host : destination,
+                        path: path.isEmpty ? "*" : path,
+                        method: method, status: status, headers: [], body: body, delay: 0, blocked: true)
     }
 }

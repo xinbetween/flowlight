@@ -148,7 +148,7 @@ final class MockGateTests: XCTestCase {
                 switch action {
                 case .forward(let d): forwarded.append(d); recorded.append(d)
                 case .hold(let d): recorded.append(d)
-                case .answer(let rule, let d): answered.append(rule.title); recorded.append(d)
+                case .answer(let rule, let d, _): answered.append(rule.title); recorded.append(d)
                 }
             }
         }
@@ -297,7 +297,7 @@ final class MockProxyTests: XCTestCase {
     private func startProxy(rules: [MockRule], recorder: InspectionRecorder) throws -> (InspectionProxy, UInt16) {
         let proxy = InspectionProxy()
         proxy.observer = recorder
-        proxy.mockRules = { _ in rules }
+        proxy.mockRules = { _, _ in rules }
         let ready = expectation(description: "proxy ready")
         proxy.onStateChange = { _ in if proxy.port != nil { ready.fulfill() } }
         proxy.start(port: 0)   // any free port: a fixed one would collide with a real Flowlight on this Mac
