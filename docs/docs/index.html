@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.4.2, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.4.3, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -117,7 +117,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.</p>
       <p>Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.</p>
 
-      <h2 id="devices">Devices: Bluetooth</h2>
+      <h2 id="devices">Devices: Bluetooth, USB and external storage</h2>
       <p>A Mac sends and receives over more than TCP and UDP. The <strong>Devices</strong> screen covers the rest, and it is off
         until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
         Mac should be your decision rather than something an update did.</p>
@@ -128,6 +128,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Bluetooth, and the byte-level HCI traces that would give one need Apple's PacketLogger profile, which an ordinary app cannot
         read. The app list is likewise <em>who asked</em> for Bluetooth, not <em>who was granted</em> it: macOS keeps the grants in a
         database an app can't open, and Flowlight would rather name that difference than blur it.</p>
+      <p><strong>USB and external storage</strong> lists what is attached — what it is, who makes it, and a drive's capacity — and
+        records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
+        periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
+        event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.</p>
 
       <h2 id="background">Running in the background</h2>
       <p>Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is
@@ -490,7 +494,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.4.2 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.4.3 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

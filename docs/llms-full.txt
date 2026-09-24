@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.4.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.4.3, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -160,7 +160,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.
 
- Devices: Bluetooth
+ Devices: Bluetooth, USB and external storage
 
  A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, and it is off
  until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
@@ -174,6 +174,11 @@ open build/Build/Products/Release/Flowlight.app
  Bluetooth, and the byte-level HCI traces that would give one need Apple's PacketLogger profile, which an ordinary app cannot
  read. The app list is likewise who asked for Bluetooth, not who was granted it: macOS keeps the grants in a
  database an app can't open, and Flowlight would rather name that difference than blur it.
+
+ USB and external storage lists what is attached — what it is, who makes it, and a drive's capacity — and
+ records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
+ periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
+ event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.
 
  Running in the background
 
@@ -595,7 +600,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.4.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.4.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -920,8 +925,6 @@ e.g. Wireshark
 
  Flowlight watches, explains and refuses today. This is the order the rest is being built in.
 
- Bluetooth, and then USB 0.4.1 · 0.4.2Which apps hold access, which devices are paired and connected, and when that changes — not how much each one sent, because macOS keeps per-app byte counts for these to itself. Each ships behind its own switch, and its permission is only asked for if you turn it on.
-
  Ask Flowlight 0.5.0Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.
 
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
@@ -1130,8 +1133,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.4.2
+ 0.4.3
 September 24, 2026Latest
+
+ USB and external storage. What's attached, what it is, a drive's capacity, and when each one arrived
+ and left — with volumes appearing the moment they mount.
+
+ All three channels are covered now: the network, peer-to-peer Wi-Fi, and attached devices.
+
+ Still no throughput on these channels, because macOS doesn't account for it per app.
+ What Devices can and can't show →
+
+ Downloads and checksums →
+
+ 0.4.2
+September 24, 2026
 
  Bluetooth, on a new Devices screen. Which devices are paired, which are connected, when that changed,
  and which applications are built to use the radio.

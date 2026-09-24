@@ -101,3 +101,77 @@ final class DeviceTests: XCTestCase {
         XCTAssertEqual(InstalledApps.bluetoothUsers(apps).map(\.name), ["Talks"])
     }
 }
+
+/// USB and the volumes that appear. Nothing is plugged into a build machine, so the rules about what counts are
+/// tested against the shapes `system_profiler` and the file system actually produce.
+final class USBTests: XCTestCase {
+
+    private let tree = """
+    {"SPUSBDataType":[
+      {"_name":"USB31Bus","host_controller":"AppleT8122USBXHCI","_items":[
+        {"_name":"USB-C Hub","manufacturer":"Acme","location_id":"0x02100000 / 1","device_speed":"super_speed","_items":[
+          {"_name":"Backup Drive","serial_num":"SN12345","manufacturer":"Seagate",
+           "Media":[{"size_in_bytes":2000000000000,"bsd_name":"disk4"}]},
+          {"_name":"Keyboard","location_id":"0x02110000 / 3","device_speed":"low_speed","vendor_id":"0x05ac  (Apple Inc.)"}]}]},
+      {"_name":"USB30Bus","host_controller":"AppleT8122USBXHCI"}]}
+    """
+
+    func testBusesAreWalkedThroughRatherThanListed() throws {
+        let devices = try XCTUnwrap(USBMonitor.parse(Data(tree.utf8)))
+        XCTAssertFalse(devices.contains { $0.name.hasSuffix("Bus") }, "a controller is not something anyone plugged in")
+        XCTAssertEqual(devices.map(\.name), ["Backup Drive", "Keyboard", "USB-C Hub"])
+    }
+
+    func testAStorageDeviceCarriesItsCapacity() throws {
+        let devices = try XCTUnwrap(USBMonitor.parse(Data(tree.utf8)))
+        let drive = try XCTUnwrap(devices.first { $0.name == "Backup Drive" })
+        XCTAssertEqual(drive.capacity, 2_000_000_000_000)
+        XCTAssertEqual(drive.detail, "Storage")
+        XCTAssertEqual(drive.id, "usb:SN12345", "a serial number is the only stable identity a device has")
+    }
+
+    func testADeviceWithNoSerialIsIdentifiedByWhereItIsPluggedIn() throws {
+        let devices = try XCTUnwrap(USBMonitor.parse(Data(tree.utf8)))
+        let keyboard = try XCTUnwrap(devices.first { $0.name == "Keyboard" })
+        XCTAssertTrue(keyboard.id.contains("0x02110000"))
+        XCTAssertEqual(keyboard.detail, "USB 1.1")
+        XCTAssertEqual(keyboard.vendor, "Apple Inc.", "the name inside the parentheses, not the hex id")
+    }
+
+    func testAMacWithNothingPluggedInIsAnEmptyList() throws {
+        XCTAssertEqual(try XCTUnwrap(USBMonitor.parse(Data(#"{"SPUSBDataType":[]}"#.utf8))).count, 0)
+        XCTAssertNil(USBMonitor.parse(Data("not json".utf8)))
+    }
+
+    func testVendorStringsAreCleanedUpOrLeftOut() {
+        XCTAssertEqual(USBMonitor.vendor("0x05ac  (Apple Inc.)"), "Apple Inc.")
+        XCTAssertEqual(USBMonitor.vendor("Seagate"), "Seagate")
+        XCTAssertEqual(USBMonitor.vendor("0x1234"), "", "a bare hex id names nothing, so it says nothing")
+        XCTAssertEqual(USBMonitor.vendor(nil), "")
+    }
+
+    // MARK: Volumes
+
+    private func volume(_ name: String, removable: Bool, internalDisk: Bool) -> USBMonitor.Volume {
+        USBMonitor.Volume(name: name, path: "/Volumes/\(name)", removable: removable,
+                          internalDisk: internalDisk, capacity: 500_000_000)
+    }
+
+    func testTheBootDiskIsNotNews() {
+        let volumes = [volume("Macintosh HD", removable: false, internalDisk: true),
+                       volume("Backup", removable: true, internalDisk: false)]
+        XCTAssertEqual(USBMonitor.external(volumes).map(\.name), ["Backup"])
+    }
+
+    func testAnExternalDiskThatIsNotRemovableStillCounts() {
+        // A Thunderbolt drive is external but not "removable" in the file system's sense.
+        let devices = USBMonitor.external([volume("Studio Drive", removable: false, internalDisk: false)])
+        XCTAssertEqual(devices.map(\.detail), ["External"])
+        XCTAssertEqual(devices.first?.id, "volume:/Volumes/Studio Drive")
+    }
+
+    func testARemovableInternalCardReaderCounts() {
+        let devices = USBMonitor.external([volume("SD Card", removable: true, internalDisk: true)])
+        XCTAssertEqual(devices.map(\.detail), ["Removable"])
+    }
+}

@@ -186,6 +186,10 @@ to use the radio. No byte counts — macOS keeps no per-app accounting for Bluet
 one need a profile an app can't read. The app list is who *asked* for Bluetooth, not who was *granted* it, and it
 says so.
 
+**USB and external storage**: what is attached, what it is, and a drive's capacity, with the moment each arrived
+and left. Volumes arrive from the workspace the instant one is mounted; USB devices are read periodically. No
+throughput, for the same reason.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -370,6 +374,7 @@ Shipped:
 - [x] Peer-to-peer Wi-Fi named as its own channel: AirDrop, Handoff, AirPlay, Sidecar, Universal Control (0.4.0)
 - [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
 - [x] Bluetooth: which devices are paired and connected, which apps are built to use it (0.4.2)
+- [x] USB and external storage: what is attached, and when each volume arrived and left (0.4.3)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -378,11 +383,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.4.3 — USB and external storage.** Attach and detach events, and which volumes appear — not throughput, for
-  the same reason.
-
-  Both widen what Flowlight watches, so each ships behind its own switch and its permission is only requested if
-  you turn it on.
 - **0.5.0 — Ask Flowlight.** Questions in plain language — *what did Claude Code upload yesterday?*, *which app
   started talking to somewhere new this week?*, *summarise the last hour* — answered from the recorded history,
   with the rows behind each answer one click away.

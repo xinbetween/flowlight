@@ -19,6 +19,7 @@ final class DeviceStore: ObservableObject {
     @Published private(set) var bluetoothApps: [InstalledApps.App] = []
 
     private let bluetoothMonitor = BluetoothMonitor()
+    private let usbMonitor = USBMonitor()
     private weak var db: TrafficDatabase?
 
     init() {
@@ -27,6 +28,12 @@ final class DeviceStore: ObservableObject {
             Task { @MainActor in self?.bluetooth = devices }
         }
         bluetoothMonitor.onEvents = { [weak self] events in
+            Task { @MainActor in self?.record(events) }
+        }
+        usbMonitor.onDevices = { [weak self] devices in
+            Task { @MainActor in self?.usb = devices }
+        }
+        usbMonitor.onEvents = { [weak self] events in
             Task { @MainActor in self?.record(events) }
         }
     }
@@ -62,6 +69,7 @@ final class DeviceStore: ObservableObject {
 
     func refresh() {
         if watchingBluetooth { bluetoothMonitor.refresh() }
+        if watchingUSB { usbMonitor.refresh() }
     }
 
     private func apply() {
@@ -78,7 +86,12 @@ final class DeviceStore: ObservableObject {
             bluetoothMonitor.stop()
             bluetooth = []
         }
-        if !watchingUSB { usb = [] }
+        if watchingUSB {
+            usbMonitor.start()
+        } else {
+            usbMonitor.stop()
+            usb = []
+        }
     }
 
     private func record(_ incoming: [DeviceEvent]) {
