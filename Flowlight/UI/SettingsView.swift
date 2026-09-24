@@ -93,6 +93,9 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .frame(height: 150)
             .tabItem { Label("Storage", systemImage: "internaldrive") }
+
+            ExportSettingsTab()
+                .tabItem { Label("Export", systemImage: "arrow.up.forward.square") }
         }
         .frame(width: 500)
     }

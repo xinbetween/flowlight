@@ -46,6 +46,8 @@ final class TrafficMonitor: ObservableObject {
     let db: TrafficDatabase
     /// Opt-in HTTPS inspection (off by default).
     let inspection = InspectionController()
+    /// Opt-in export to a collector the user chooses (off by default, and there is no default endpoint).
+    let exporter = ExportController()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
@@ -101,7 +103,10 @@ final class TrafficMonitor: ObservableObject {
         }
         engine.onAlert = { [weak self] alerts in
             Notifier.post(alerts)
-            Task { @MainActor in self?.refreshAlertCount() }
+            Task { @MainActor in
+                self?.exporter.record(alerts)
+                self?.refreshAlertCount()
+            }
         }
     }
 
@@ -122,6 +127,16 @@ final class TrafficMonitor: ObservableObject {
         activity.start()
         inspection.onRecorded = { [weak self] in self?.inspectionVersion += 1 }
         inspection.attach(db: db)
+        // Export reads what Reports reads — the same minute rollups, through the same read-only connection — so
+        // there is nothing it can send that isn't already on a screen the user can look at.
+        exporter.start(rollups: { [weak self] from, to in
+            guard let self else { return [] }
+            return try await self.read { try $0.breakdown(.minute, from: from, to: to) }
+                .map { ExportRollup($0, from: from, to: to) }
+        }, recentAlerts: { [weak self] limit in
+            guard let self else { return [] }
+            return try await self.read { try $0.alerts(limit: limit) }.map(ExportAlert.init)
+        })
         Notifier.configure()
         // Either kind of notification needs permission: anomaly alerts, or "a new version is available".
         let defaults = UserDefaults.standard
@@ -138,7 +153,12 @@ final class TrafficMonitor: ObservableObject {
             engine.seedDiscoveredAgents(Set(agents))
         }
         updatePacketCapture()
-        offerCaptureSetupIfNeeded()
+        // Not yet: the first thing someone sees should be their own traffic, not a request for a password.
+        // Hostnames are a refinement, and the offer explains itself better once there are rows on screen to
+        // refine. See `offerCaptureSetupIfNeeded`.
+        timers.append(Timer.scheduledTimer(withTimeInterval: Self.onboardingDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.offerCaptureSetupIfNeeded() }
+        })
         refreshAlertCount()
         timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tickLive() }
@@ -188,6 +208,9 @@ final class TrafficMonitor: ObservableObject {
         captureState = sniffer.state
     }
 
+    /// How long the first run is left alone before hostname setup is offered.
+    static let onboardingDelay: TimeInterval = 45
+
     private func offerCaptureSetupIfNeeded() {
         let defaults = UserDefaults.standard
         // `-FLForceCaptureOnboarding YES` shows the offer regardless (for testing the flow).
@@ -195,6 +218,10 @@ final class TrafficMonitor: ObservableObject {
         guard !defaults.bool(forKey: Self.onboardingKey), mode == .nettop,
               defaults.bool(forKey: AnomalySettings.Keys.packetCapture),
               captureState == .noPermission, !CaptureAccess.isInstalled else { return }
+        // Only while someone is actually looking. Asking for an administrator password over whatever they are
+        // doing, at a window they may not even have open, is how a monitor gets quit instead of set up — and the
+        // offer keeps: it is made again next launch until taken or dismissed.
+        guard uiVisible else { return }
         showCaptureOnboarding = true
     }
 
@@ -289,6 +316,7 @@ final class TrafficMonitor: ObservableObject {
             }
             Notifier.post(alerts)
             Task { @MainActor in
+                self?.exporter.record(alerts)
                 self?.refreshAlertCount()
                 self?.dataVersion += 1
             }

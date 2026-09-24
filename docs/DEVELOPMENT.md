@@ -25,6 +25,7 @@ Flowlight/                  SwiftUI host app
   Enrichment/                 BPF packet capture (DNS + TLS SNI), network-owner (ASN) lookup
   Analysis/                   EWMA/z-score baselines, rule engine, AI agent catalog + rules, UI-activity tracker
   Inspection/                 HTTPS inspection: local CA, decrypting proxy, HTTP parser, recorder, mock rules
+  Export/                     opt-in export to a collector the user chooses: OTLP/NDJSON payloads, queue, Keychain
   UI/                         Live, AI Agents, Reports (charts + three breakdown groupings + CSV), Alerts, Capture
 Shared/Classification/ProtocolCatalog.swift   108 protocols in 13 families, used by both capture engines
 FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent and anomaly tests
@@ -181,6 +182,48 @@ agent can be shown an API that fails, stalls or replies with something odd. Rule
   through the proxy), and the UI says so rather than leaving it to be discovered.
 - The destination is still connected to before the gate runs, so a mock changes the answer, not whether the
   connection can be made: "the API returns 500" works, "the API is entirely down" doesn't.
+
+## Export to OpenTelemetry / SIEM
+
+The first feature that deliberately sends recorded traffic off the Mac, so most of its design is about being
+predictable rather than about throughput. Settings › Export, off by default, and there is no Flowlight-operated
+endpoint to fall back to — the user names one or nothing is sent.
+
+- **Two formats.** OTLP over HTTP with a JSON body (the protobuf's canonical JSON mapping) is the primary one:
+  rollups become **metrics** on `/v1/metrics` and alerts become **logs** on `/v1/logs`, appended to the base
+  endpoint unless it already names a signal. Rollups are delta sums (`aggregationTemporality: 1`) because each one
+  covers one window — a monitor that restarts has no running total to report. 64-bit values go on the wire as
+  strings, which ProtoJSON requires and which a large byte count needs. The alternative is one JSON object per
+  line to a single URL, which is all most SIEM HTTP inputs want.
+- **`ExportField` is the contract.** Every key either format can emit is a case on it, with the sentence Settings
+  shows beside it, and the payload builders take their keys from nowhere else. `ExportTests` walks generated JSON
+  and fails on any key that isn't declared, so the list a user reads can't fall behind what the code sends.
+- **Nothing from inspection, structurally.** `ExportPayload` accepts `ExportRollup` and `ExportAlert` and nothing
+  else, and neither has anywhere to put a header, a body or a tool call. A test mirrors both types and asserts
+  their exact field sets, so adding one is a deliberate change rather than a slip. `appPath` is dropped on the way
+  in: it names the user's home folder and a collector has no use for it.
+- **`ExportQueue` is plain functions over plain data**, like `AgentPolicy.matches` and `BlockRules.verdict`, so
+  batching, the buffer cap and giving up are covered without a network. It holds at most 10,000 records including
+  the batch in flight, drops oldest-first (rollups before alerts) and counts what it dropped; a failing batch is
+  retried as-is, with a capped exponential delay and no jitter — there is one Flowlight talking to one collector,
+  so there is no herd to spread out — and is dropped after five attempts rather than blocking everything behind it.
+  One OTLP batch is two requests, so only the half that failed is retried.
+- **Timing.** Rollups come from `breakdown(.minute, …)`, the same query Reports uses, over the window since the
+  last export; it stops two minutes short of now because a minute only lands in `agg_1m` once maintenance has
+  folded it, and reaches back at most an hour, so a Mac that slept for a week resumes instead of replaying it.
+  Alerts are enqueued as `AnomalyEngine` raises them. Switching export on sets the watermark to that moment:
+  history already in the database is never sent.
+- **The token lives in the Keychain** (`ExportSecrets`, a generic password under `com.flowlight.app.export`), not
+  UserDefaults, and the whole header set goes in rather than a guess at which header is the secret one.
+- **It has to be visible.** The requests leave as the app's own traffic and are never routed through the
+  inspection proxy, even when the system proxy points at it, so they appear in Live and Reports and raise a
+  first-contact alert the first time they go somewhere new. One gap to know about: with HTTPS inspection running,
+  `ProxyAttribution.rewrite` discards Flowlight's own loopback records, so an export to a collector on
+  `127.0.0.1` isn't counted while inspection is on. A remote collector is unaffected either way.
+- **Before anything leaves**, Settings offers a preview built from the reader's own last 15 minutes — the real
+  request, pretty-printed, with header values masked and nothing sent — and a Test Connection that posts the
+  smallest thing the format allows (an OTLP request with an empty record list, or one line marked as a test) and
+  reports the status code it actually got back.
 
 ## Demo mode
 
