@@ -107,6 +107,12 @@ on your Mac, and decrypts the apps you route through it: headers, bodies, status
 - **Credential headers are never stored**, recordings are kept 3 days, and one button removes the certificate, its trust
   setting and everything recorded.
 
+### Mock responses
+Answer a chosen host, path and method with your own status, headers, body and delay, to see how an agent copes when
+an API fails or returns something odd. The request is never sent. Mocked exchanges are recorded and clearly marked,
+so a session read later still shows what was real. Needs HTTPS inspection, since only decrypted traffic can be
+answered — and a mock changes the reply, not whether the connection can be made.
+
 ### Reports at any zoom
 - Second, minute, hour, day, week, month and year views. Click a bar to zoom in.
 - Group the breakdown by **App › Domain › IP**, **Destination › App › IP**, or **IP › App**.
@@ -283,13 +289,12 @@ Shipped:
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
 - [x] Focus mode: watch only the apps and destinations you pick (from 0.2.2)
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
+- [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
 
-- **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
-  headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - **0.3.2 — Export to OpenTelemetry / SIEM.**
 - **0.3.3 — Runs quietly in the background.** The menu-bar-only mode shipped in 0.2.7 (Settings › General › Run in
   the background). What's left for this milestone is the rest of getting out of the way: remembering window state
@@ -314,6 +319,53 @@ Planned, in order:
   with no app) is a complete focus. It also settles the edges that follow from that — Focus on with an empty list
   still reads as off, and alerts, which name an app and not a destination, should say why a destination-only focus
   leaves the alert list alone rather than silently ignoring it.
+- **0.3.5 — Rules: block anything, anywhere, for as long as you say.** 0.3.0 taught one allowlist to refuse; this
+  makes refusing a first-class idea with one rule model behind every screen. A rule names a **subject** — an app, an
+  agent, a destination (domain and its subdomains, an IP, a CIDR range), a URL (host + path glob + method), or a
+  pairing of two of those ("Cursor may not reach `raw.githubusercontent.com`") — and an **action**: block, or allow
+  as an exception that outranks a block. Deny is checked before allow, so one narrow exception can't be widened by
+  accident. Every table that shows traffic offers it in place: Live, Reports, AI Agents and Inspect.
+  - **For how long.** Forever; until a time; for a stretch ("an hour", "until I quit Flowlight"); or between chosen
+    hours on chosen days. Plus one global **Pause blocking for 10 minutes**, because the escape hatch is what makes
+    strict rules usable. Schedules have to be honest about sleep, clock and timezone changes, and about the fact
+    that a window closing does not tear down connections already open — it stops new ones.
+  - **Unblocking is part of blocking.** Every refusal carries its way out: allow once, allow for an hour, allow
+    always, or edit the rule — from the alert, the notification, or the list. Relaxations are themselves rules with
+    an expiry, so the list always answers "why is this getting through?"
+  - **A Rules screen**, with every rule, where it came from (typed, a preset, an "allow once" that hasn't expired
+    yet), its schedule, how often it has fired and when it last did — and beside it a **violations feed**: each
+    refusal with the app, the destination, the rule that refused it and the time. Refusals become records of their
+    own, keyed to the rule, rather than only alerts.
+  - **Say where each rule actually bites.** The Network Extension refuses at the flow level, so it knows host, IP
+    and port but nothing about paths, and only in extension mode; the inspection proxy refuses at the request
+    level, so it can match a URL and answer with a chosen status instead of a dead socket; the sampler cannot
+    refuse anything. A rule the current engine can't enforce must say so in the list rather than quietly watching.
+- **0.3.6 — Agent guardrails: block an MCP server, a tool or a resource.** The AI half of the same model, and its
+  own section, because "which tools may this agent use" is a different question from "which hosts may it reach".
+  There are four places a guardrail can act, and the useful ones need HTTPS inspection on:
+  - **The declaration, before the model ever sees the tool.** Agents re-send their whole tool list on every turn.
+    Dropping a blocked tool from that list means the model is never offered it — no refusal to argue with, no retry
+    loop. This is the strongest lever and the only one that works the same for a local server and a remote one,
+    and it reuses what Flowlight already parses for Anthropic, OpenAI and Gemini.
+  - **The call, for servers reached over HTTP.** The JSON-RPC Flowlight already reads — `tools/call`,
+    `resources/read`, `prompts/get` — can be answered instead of forwarded, per server, per tool, or per resource
+    URI. The protocol has an opinion about how: a blocked `tools/call` should come back as a *result* carrying
+    `isError: true` and a plain sentence, so the model reads the refusal and works around it, rather than a
+    transport error the agent sees as a broken server; `resources/read` has no such result shape, so it gets a
+    JSON-RPC error instead. `tools/list` can be filtered the same way, which is what MCP gateways do.
+  - **The connector, for servers the provider reaches on the agent's behalf.** That traffic never touches this Mac,
+    so the only lever is the request that sets it up: drop the connector, or narrow the allowed tools and approval
+    setting it declares. Flowlight already records all three.
+  - **Local stdio servers speak over pipes, and no proxy can see that.** The honest levers are the server process's
+    own network traffic, which is already attributed to the agent that started it, and the agent's own switch —
+    Claude Code takes `mcp__server__tool` in `permissions.deny`, and its neighbours have equivalents. Flowlight
+    already reads those files, so it can offer to write them, with the restart that implies.
+
+  A **Guardrails** tab in AI Agents holds it: each agent's servers, their tools and resources with a switch on
+  each, presets worth having ("read-only", "no shell", "no writes"), and what was blocked, when, and for whom.
+  It has to be equally plain about what this is not — not a sandbox. A blocked tool stops being offered and stops
+  being answered, but an agent with a shell can still do by hand what the tool would have done. That part Flowlight
+  reports; it doesn't pretend to prevent it.
 - **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
   the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
   - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and

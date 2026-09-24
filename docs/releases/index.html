@@ -42,7 +42,18 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.3.0</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.3.1</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Mock responses.</strong> Answer a chosen host, path and method with your own status, headers, body and delay, and
+            watch how an agent copes when an API fails or returns something odd. The request is never sent.</li>
+          <li><strong>A mocked exchange is unmistakable</strong> — recorded like any other, marked <em>Mocked</em>, and the detail says it
+            was answered by Flowlight rather than the host. Active rules show as a count, so one left on doesn't cost you an afternoon.</li>
+          <li>Needs HTTPS inspection: only decrypted traffic can be answered. <a href="../docs/#mocks">How it works →</a></li>
+        </ul>
+        <p><a href="https://github.com/xinbetween/flowlight/releases/tag/v0.3.1">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.3.0</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>An allowlist can refuse, not only warn.</strong> Turn on <em>Refuse connections outside the list</em> for an agent and
             Flowlight drops what isn't on it, recording each refusal with <strong>Allow … from Now On</strong> to add it in one click.</li>
@@ -294,7 +305,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.0 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.1 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

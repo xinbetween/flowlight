@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -181,6 +181,25 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
         stored, recorded requests are kept 3 days, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
         setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.</p>
+
+      <h2 id="mocks">Mock responses</h2>
+      <p>To see how an agent copes when an API fails, stalls or returns something odd, answer that endpoint yourself. In
+        <strong>Inspect › Mock responses</strong>, a rule names a host, a path and a method, and gives the status, headers, body and an
+        optional delay to reply with. The request is never sent: Flowlight answers it.</p>
+      <ul>
+        <li><strong>Host</strong> is exact — <code>api.example.com</code> — or <code>*.example.com</code> for a domain and its
+          subdomains. Exact by default, because a mock aimed at one endpoint shouldn't quietly answer for a whole domain.</li>
+        <li><strong>Path</strong> takes one <code>*</code> wildcard: <code>/v1/*</code>, <code>/v1/*/items</code>, or an exact path. The
+          query string is ignored unless your pattern has one.</li>
+        <li><strong>Method</strong> matches one verb, or any.</li>
+        <li>Rules are ordered and the first enabled match answers. Each switches on and off on its own.</li>
+      </ul>
+      <p>A mocked exchange is recorded like any other and marked <strong>Mocked</strong> in the list, with the detail pane saying it was
+        answered by Flowlight rather than by the host, and naming the rule. You can always tell later what was real.</p>
+      <p>Two things worth knowing. Only traffic Flowlight decrypts can be mocked, so the endpoint has to be going through HTTPS
+        inspection — a rule for a host makes Flowlight decrypt that host even if your scope is agents only. And the destination is still
+        connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
+        is entirely unreachable" does not.</p>
 
       <h2 id="alerts">Other alerts</h2>
       <ul>
