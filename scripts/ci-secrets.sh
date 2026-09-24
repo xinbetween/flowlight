@@ -52,11 +52,32 @@ for path in "$APP_P12" "$INSTALLER_P12"; do
   expanded="${path/#\~/$HOME}"
   [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
 done
-# Fail here rather than in CI, where the error is "The specified item could not be found in the keychain".
-for path in "$APP_P12" "$INSTALLER_P12"; do
-  openssl pkcs12 -in "${path/#\~/$HOME}" -passin "pass:$P12_PASSWORD" -nokeys -noout 2>/dev/null \
-    || { echo "That password doesn't open ${path}." >&2; exit 1; }
-done
+# Check the password here rather than in CI, where a bad one reads as "The specified item could not be found in
+# the keychain". The check is the same `security import` the release job does, into a keychain thrown away after.
+# The password goes through the environment, never an argument: a `pass:` argument is fragile with $ and \ in it.
+check_password() {
+  local probe="${TMPDIR:-/tmp}/flowlight-probe-$$.keychain-db" probe_password
+  probe_password=$(uuidgen)
+  security create-keychain -p "$probe_password" "$probe" 2>/dev/null || return 2
+  security unlock-keychain -p "$probe_password" "$probe" 2>/dev/null
+  local path result=0 message
+  for path in "$@"; do
+    message=$(security import "${path/#\~/$HOME}" -k "$probe" -P "$P12_PASSWORD" -T /usr/bin/codesign 2>&1) || {
+      echo "  $path: $message" >&2
+      result=1
+    }
+  done
+  security delete-keychain "$probe" 2>/dev/null
+  return $result
+}
+
+if ! check_password "$APP_P12" "$INSTALLER_P12"; then
+  echo >&2
+  echo "That password didn't open one of them. If you're sure it's right, this check may simply be wrong about" >&2
+  echo "your files — the upload itself doesn't depend on it." >&2
+  CONTINUE=$(ask "  Upload anyway? [y/N]: ")
+  [[ "$CONTINUE" == [yY]* ]] || exit 1
+fi
 echo
 
 # Xcode leaves the downloaded profiles here under opaque UUID names, so they're matched by the name inside.
