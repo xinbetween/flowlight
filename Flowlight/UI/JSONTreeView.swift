@@ -5,13 +5,35 @@ import SwiftUI
 struct BodyView: View {
     let data: Data
     var truncated = false
+    /// The search term from the toolbar, highlighted wherever it appears in the body.
+    var highlight: String = ""
     @State private var content: BodyContent = .empty
     @AppStorage("inspect.bodyMode") private var mode = "tree"
+
+    /// Lines of the formatted body that contain the search term. Empty when nothing is being searched.
+    private var matchingLines: [Int] {
+        guard !term.isEmpty else { return [] }
+        return rawText.components(separatedBy: "\n").enumerated()
+            .filter { $0.element.range(of: term, options: .caseInsensitive) != nil }
+            .map(\.offset)
+    }
+
+    private var term: String { highlight.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(summary).font(.caption).foregroundStyle(.secondary)
+                if !term.isEmpty {
+                    let count = matchingLines.count
+                    Text(count == 0 ? "no match" : "\(count) matching \(count == 1 ? "line" : "lines")")
+                        .font(.caption).foregroundStyle(count == 0 ? .secondary : Color.accentColor)
+                    if count > 0, mode == "tree", isStructured {
+                        Button("Show") { mode = "raw" }
+                            .controlSize(.small)
+                            .help("Switch to the raw view, where matches are highlighted")
+                    }
+                }
                 Spacer()
                 if isStructured {
                     Picker("View", selection: $mode) {
@@ -41,8 +63,12 @@ struct BodyView: View {
             case .empty:
                 EmptyView()
             default:
-                Text(rawText).font(.caption.monospaced()).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if term.isEmpty {
+                    Text(rawText).font(.caption.monospaced()).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    highlighted
+                }
             }
             if truncated {
                 Label("Only the first 2 MB were kept.", systemImage: "scissors").font(.caption).foregroundStyle(.secondary)
@@ -52,6 +78,39 @@ struct BodyView: View {
             let data = data
             content = await Task.detached(priority: .userInitiated) { BodyContent.classify(data) }.value
         }
+    }
+
+    /// The body a line at a time, so a line containing the term can be tinted as a whole and the term itself
+    /// marked inside it. Only used while searching: one Text is better for selection when nothing is highlighted.
+    private var highlighted: some View {
+        let lines = rawText.components(separatedBy: "\n")
+        return LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                Text(Self.attributed(line, term: term))
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 1)
+                    .background(line.range(of: term, options: .caseInsensitive) != nil
+                                ? Color.accentColor.opacity(0.10) : Color.clear)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One line with every occurrence of the term marked.
+    static func attributed(_ line: String, term: String) -> AttributedString {
+        var result = AttributedString(line)
+        guard !term.isEmpty else { return result }
+        var searchRange = result.startIndex..<result.endIndex
+        while let found = result[searchRange].range(of: term, options: .caseInsensitive) {
+            result[found].backgroundColor = .yellow.opacity(0.45)
+            result[found].foregroundColor = .black
+            result[found].inlinePresentationIntent = .stronglyEmphasized
+            guard found.upperBound < result.endIndex else { break }
+            searchRange = found.upperBound..<result.endIndex
+        }
+        return result
     }
 
     private var isStructured: Bool {

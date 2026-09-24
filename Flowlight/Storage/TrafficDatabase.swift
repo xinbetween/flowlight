@@ -665,6 +665,7 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
+    /// `search` also looks inside the bodies, so a keyword only present in a request or response still finds it.
     func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         // An exchange records the host it went to but not the address behind it, so an IP target can't match here.
@@ -688,9 +689,10 @@ final class TrafficDatabase: @unchecked Sendable {
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ?)\(focusClause)
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)
             ORDER BY ts DESC LIMIT ?
-            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like)]
+            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
+                  .text(like), .text(like)]
                   + focusValues + [.int(Int64(limit))]) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }

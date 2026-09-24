@@ -59,7 +59,7 @@ private struct InspectContent: View {
         }
         .padding()
         .navigationTitle("Inspect")
-        .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app or tool")
+        .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app, tool or anything in a body")
         .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled,
                           focus: focus.scope)) {
             // Coalesce bursts of new exchanges.
@@ -157,7 +157,7 @@ private struct InspectContent: View {
 
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
-            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results)
+            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results, highlight: search)
                 .id(selected.id)
         } else {
             ContentUnavailableView("Select a request", systemImage: "doc.text.magnifyingglass")
@@ -317,6 +317,8 @@ private struct ExchangeDetail: View {
     let exchange: HTTPExchange
     var cause: ToolCallLinks.Link?
     var results: [String: ToolResult] = [:]
+    /// The toolbar's search term, so matches inside a body are marked where they appear.
+    var highlight: String = ""
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
     @State private var headersOpen: Bool?
@@ -423,7 +425,8 @@ private struct ExchangeDetail: View {
                     }
                     Divider()
                     if let data, !data.isEmpty {
-                        BodyView(data: data, truncated: tab == 0 ? exchange.requestTruncated : exchange.responseTruncated)
+                        BodyView(data: data, truncated: tab == 0 ? exchange.requestTruncated : exchange.responseTruncated,
+                                 highlight: highlight)
                             .id("\(tab)-\(exchange.id ?? 0)")
                     } else {
                         Text(bodies == nil ? "Loading…" : emptyReason).font(.caption).foregroundStyle(.secondary)
