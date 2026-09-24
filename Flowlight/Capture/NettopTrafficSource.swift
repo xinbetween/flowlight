@@ -22,7 +22,7 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
     /// nettop is run under perl's alarm so the kernel kills it even if Flowlight itself is killed mid-sample: a hung
     /// nettop reparented to launchd was seen spinning at 150% CPU for hours.
     var arguments = ["-e", "alarm \(Int(NettopTrafficSource.sampleLimit)); exec @ARGV", "--",
-                     "/usr/bin/nettop", "-L", "1", "-x", "-n", "-J", "bytes_in,bytes_out"]
+                     "/usr/bin/nettop", "-L", "1", "-x", "-n", "-J", "interface,bytes_in,bytes_out"]
     static let sampleLimit: TimeInterval = 8
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
@@ -132,13 +132,25 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
             }
             let c = delta.connection
             let unconnected = c.remoteIP == "*"
-            // Hostname priority: TLS SNI / DNS answers seen on the wire, then reverse DNS as a last resort.
-            let domain = unconnected ? "" : (DNSCache.shared.name(for: c.remoteIP) ?? ReverseDNS.shared.name(for: c.remoteIP) ?? "")
+            let channel = delta.channel
+            // Hostname priority: TLS SNI / DNS answers seen on the wire, then reverse DNS as a last resort. On the
+            // peer-to-peer radio there is nothing to resolve — the address is link-local and the device in the room
+            // has no name this Mac can learn — so the feature that opened the link is the honest answer instead.
+            let domain: String
+            if channel == .peerToPeer {
+                domain = PeerToPeerService.destination(forProcess: info.name)
+            } else if unconnected {
+                domain = ""
+            } else {
+                domain = DNSCache.shared.name(for: c.remoteIP) ?? ReverseDNS.shared.name(for: c.remoteIP) ?? ""
+            }
             let proto = ProtocolClassifier.default.classify(ClassificationInput(
                 remotePort: c.remotePort, transport: c.transport, firstOutbound: nil, firstInbound: nil))
             let key = FlowKey(pid: delta.pid, bundleID: info.bundleID, appName: info.name, appPath: info.path,
                               remoteIP: unconnected ? "(unconnected)" : c.remoteIP, domain: domain,
-                              port: c.remotePort, transport: c.transport, appProtocol: ProtocolCatalog.refine(proto, domain: domain))
+                              port: c.remotePort, transport: c.transport,
+                              appProtocol: ProtocolCatalog.refine(proto, domain: channel == .peerToPeer ? "" : domain),
+                              channel: channel)
             merged[key, default: FlowCounters()] += delta.counters
         }
         return TrafficBatch(timestamp: timestamp, records: merged.map { TrafficRecord(key: $0.key, counters: $0.value) })

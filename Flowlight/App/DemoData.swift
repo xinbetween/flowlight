@@ -26,6 +26,9 @@ enum DemoData {
         var transport: TransportProtocol = .tcp
         var inRate: Double      // bytes per active minute
         var outRate: Double
+        /// Which way it left the Mac. Almost everything is the ordinary network; the peer-to-peer rows are there
+        /// so the demo shows what an AirDrop actually looks like.
+        var channel: NetworkChannel = .ip
     }
 
     struct App {
@@ -40,7 +43,7 @@ enum DemoData {
         func key(_ flow: Flow) -> FlowKey {
             FlowKey(pid: Int32(abs(bundleID.hashValue % 30_000) + 200), bundleID: bundleID, appName: name, appPath: path,
                     remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport, appProtocol: flow.proto,
-                    parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp)
+                    channel: flow.channel, parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp)
         }
     }
 
@@ -112,6 +115,18 @@ enum DemoData {
         App(bundleID: "mDNSResponder", name: "mDNSResponder", path: "/usr/sbin/mDNSResponder", weight: 1.0, flows: [
             Flow(host: "", ip: "192.168.1.1", port: 53, proto: "dns", transport: .udp, inRate: 20_000, outRate: 8_000),
             Flow(host: "dns.google", ip: "198.51.100.140", port: 443, proto: "dns-over-https", inRate: 6_000, outRate: 3_000),
+            Flow(host: PeerToPeerService.destination(forProcess: "mDNSResponder"), ip: "fe80::1c:2d:3e:4f", port: 5353,
+                 proto: "mdns", transport: .udp, inRate: 14_000, outRate: 22_000, channel: .peerToPeer),
+        ]),
+        // An AirDrop: a large transfer straight to a device in the room, which used to look like a few megabytes
+        // to an address with no name.
+        App(bundleID: "sharingd", name: "sharingd", path: "/usr/libexec/sharingd", weight: 0.5, flows: [
+            Flow(host: PeerToPeerService.destination(forProcess: "sharingd"), ip: "fe80::a1:b2:c3:d4", port: 8770,
+                 proto: "airdrop", inRate: 120_000, outRate: 4_800_000, channel: .peerToPeer),
+        ]),
+        App(bundleID: "rapportd", name: "rapportd", path: "/usr/libexec/rapportd", weight: 0.8, flows: [
+            Flow(host: PeerToPeerService.destination(forProcess: "rapportd"), ip: "fe80::e5:f6:07:18", port: 49152,
+                 proto: "continuity", inRate: 26_000, outRate: 31_000, channel: .peerToPeer),
         ]),
         App(bundleID: "apsd", name: "apsd", path: "/System/Library/PrivateFrameworks/ApplePushService.framework/apsd", weight: 1.0, flows: [
             Flow(host: "", ip: "198.51.100.150", port: 5223, proto: "apns", inRate: 3_000, outRate: 1_500),

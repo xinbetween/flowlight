@@ -128,6 +128,9 @@ enum ExportPayload {
         if !rollup.agentID.isEmpty { attributes.append(KeyValue(.agentID, rollup.agentID)) }
         if !rollup.agentName.isEmpty { attributes.append(KeyValue(.agentName, rollup.agentName)) }
         if !rollup.mcpServer.isEmpty { attributes.append(KeyValue(.mcpServer, rollup.mcpServer)) }
+        // Only when it isn't the ordinary case: an attribute saying "this went over the network" on every row
+        // would be noise in whatever the collector charges by.
+        if rollup.channel != .ip { attributes.append(KeyValue(.channel, rollup.channel.rawValue)) }
         return attributes
     }
 
@@ -257,6 +260,7 @@ enum ExportPayload {
         var agentID: String?
         var agentName: String?
         var mcpServer: String?
+        var channel: String?
         var bytesReceived: Int64?
         var bytesSent: Int64?
         var flows: Int64?
@@ -282,6 +286,7 @@ enum ExportPayload {
             case agentID = "flowlight.agent.id"
             case agentName = "flowlight.agent.name"
             case mcpServer = "flowlight.mcp.server"
+            case channel = "flowlight.network.channel"
             case bytesReceived = "bytes_received"
             case bytesSent = "bytes_sent"
             case kind = "flowlight.alert.kind"
@@ -310,6 +315,7 @@ enum ExportPayload {
             agentID = rollup.agentID.nilIfEmpty
             agentName = rollup.agentName.nilIfEmpty
             mcpServer = rollup.mcpServer.nilIfEmpty
+            channel = rollup.channel == .ip ? nil : rollup.channel.rawValue
             bytesReceived = rollup.bytesIn
             bytesSent = rollup.bytesOut
             flows = rollup.flows

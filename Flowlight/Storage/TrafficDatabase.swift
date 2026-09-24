@@ -67,6 +67,8 @@ struct TrafficFilter: Equatable, Sendable {
     /// Registrable domain: matches the domain itself and every subdomain (e.g. google.com, *.google.com).
     var domainSuffix: String?
     var appProtocol: String?
+    /// Narrow to one way out of the Mac — the network, the peer-to-peer radio, this Mac, a tunnel.
+    var channel: NetworkChannel?
     /// Focus mode, ANDed in as "and one of these": see `FocusScope`. Empty means no restriction.
     var focus: FocusScope = .none
 
@@ -75,6 +77,7 @@ struct TrafficFilter: Equatable, Sendable {
     /// "did the user narrow anything?" should get the same answer whether or not Focus happens to be on.
     var isEmpty: Bool {
         bundleID == nil && domain == nil && remoteIP == nil && owner == nil && domainSuffix == nil && appProtocol == nil
+            && channel == nil
     }
     /// True when the filter pins a destination (hostname, domain, owner or IP).
     var pinsDestination: Bool { domain != nil || domainSuffix != nil || owner != nil || remoteIP != nil }
@@ -105,6 +108,8 @@ struct BreakdownRow: Sendable {
     var parentAgent: String = ""
     var parentAgentName: String = ""
     var mcpServer: String = ""
+    /// Which way these bytes left the Mac. Ordinary network traffic unless something said otherwise.
+    var channel: NetworkChannel = .ip
 }
 
 /// Raw keys that make up a chart's leading entities, so trend queries only touch those rows.
@@ -243,7 +248,6 @@ final class TrafficDatabase: @unchecked Sendable {
                 app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
                 transport TEXT NOT NULL, protocol TEXT NOT NULL,
                 bytes_in INTEGER NOT NULL DEFAULT 0, bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0);
-            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol);
             CREATE INDEX IF NOT EXISTS \(table)_app ON \(table)(bundle_id, ts);
             """)
             // v0.1.2: agent attribution columns (process lineage and MCP server). Attributes, not key parts.
@@ -251,6 +255,19 @@ final class TrafficDatabase: @unchecked Sendable {
             for column in ["agent_parent", "agent_parent_name", "mcp_server"] where !columns.contains(column) {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
             }
+            // v0.4.0: which way the bytes left the Mac. It joins the unique key rather than riding along as an
+            // attribute — the same app on the same port over Wi-Fi and over AWDL is two different things, and
+            // merging them is exactly how peer-to-peer traffic stayed invisible. Existing rows default to the
+            // ordinary network, which is what they were.
+            if !columns.contains("channel") {
+                try conn.execute("ALTER TABLE \(table) ADD COLUMN channel TEXT NOT NULL DEFAULT ''")
+            }
+            // The key index is rebuilt under a new name and the old one dropped: SQLite can't alter an index in
+            // place, and a database from an earlier version still carries the eight-column one.
+            try conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key2 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel);
+            DROP INDEX IF EXISTS \(table)_key;
+            """)
         }
         try conn.execute("""
         CREATE TABLE IF NOT EXISTS rollup_state (tier TEXT PRIMARY KEY, watermark INTEGER NOT NULL);
@@ -315,9 +332,9 @@ final class TrafficDatabase: @unchecked Sendable {
     func insert(_ batches: [TrafficBatch]) throws {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -331,7 +348,8 @@ final class TrafficDatabase: @unchecked Sendable {
                                        .text(k.appPath), .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)),
                                        .text(k.transport.rawValue), .text(k.appProtocol), .int(r.counters.bytesIn),
                                        .int(r.counters.bytesOut), .int(r.counters.flows),
-                                       .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? "")])
+                                       .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
+                                       .text(k.channel.rawValue)])
                 }
             }
         }
@@ -387,12 +405,12 @@ final class TrafficDatabase: @unchecked Sendable {
     private func fold(from source: String, into target: String, bucket: String, lower: Int64, upper: Int64) throws {
         try conn.run("""
         INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                               agent_parent, agent_parent_name, mcp_server)
+                               agent_parent, agent_parent_name, mcp_server, channel)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
-               SUM(bytes_in), SUM(bytes_out), SUM(flows), MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server)
+               SUM(bytes_in), SUM(bytes_out), SUM(flows), MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server), channel
         FROM \(source) WHERE ts >= ? AND ts < ?
-        GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
+        GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -456,6 +474,7 @@ final class TrafficDatabase: @unchecked Sendable {
             values.append(.text(v)); values.append(.text("%." + v))
         }
         if let v = filter.appProtocol { clauses.append("protocol = ?"); values.append(.text(v)) }
+        if let v = filter.channel { clauses.append("channel = ?"); values.append(.text(v.rawValue)) }
         if let (clause, focusValues) = Self.focusClause(filter.focus) {
             clauses.append(clause)
             values += focusValues
@@ -531,17 +550,18 @@ final class TrafficDatabase: @unchecked Sendable {
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
                        GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
                        SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows),
-                       MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server)
+                       MAX(agent_parent), MAX(agent_parent_name), MAX(mcp_server), channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip
+                GROUP BY bundle_id, domain, remote_ip, channel
                 ORDER BY bin + bout DESC LIMIT \(limit)
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(13), asn: Int(row.int(14)),
-                         parentAgent: row.text(10), parentAgentName: row.text(11), mcpServer: row.text(12))
+                         owner: row.text(14), asn: Int(row.int(15)),
+                         parentAgent: row.text(10), parentAgentName: row.text(11), mcpServer: row.text(12),
+                         channel: NetworkChannel(rawValue: row.text(13)) ?? .ip)
         }
     }
 

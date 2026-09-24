@@ -1,7 +1,11 @@
 import Foundation
 
-/// Parses `nettop -x -n -J bytes_in,bytes_out` output. Each sample starts with a
-/// `,bytes_in,bytes_out,` header; counters are cumulative per socket, so we emit deltas.
+/// Parses `nettop -x -n -J interface,bytes_in,bytes_out` output. Each sample starts with a header naming its
+/// columns; counters are cumulative per socket, so we emit deltas.
+///
+/// Columns are read from that header rather than counted off by position. nettop's own man page says the ordering
+/// of `-J` "may change in future revisions", and a silent shift by one would turn every byte count into an
+/// interface name.
 ///
 /// Limitations vs. the Network Extension: no SNI/DNS enrichment (reverse DNS only), sockets
 /// that open and close between samples are missed, and protocols come from port heuristics.
@@ -9,6 +13,10 @@ final class NettopParser {
     struct Socket: Hashable {
         var pid: Int32
         var descriptor: String
+        /// Part of the key, not an attribute: the same socket descriptor appears once per interface it is bound
+        /// to. A process doing Bonjour discovery shows `udp6 *.5353<->*.*` on `en0`, `llw0` and `awdl0` at once,
+        /// and those are three different things that happened.
+        var interface: String = ""
     }
 
     struct Connection {
@@ -23,6 +31,9 @@ final class NettopParser {
         var processName: String
         var connection: Connection
         var counters: FlowCounters
+        /// The interface the socket was bound to, empty when nettop didn't say.
+        var interface: String = ""
+        var channel: NetworkChannel { NetworkChannel.of(interface: interface) }
     }
 
     private var previous: [Socket: (Int64, Int64)] = [:]
@@ -31,6 +42,9 @@ final class NettopParser {
     private var currentPid: Int32 = -1
     private var processNames: [Int32: String] = [:]
     private var buffer = ""
+    /// Column name → position in a split data line. Read from each sample's header; the defaults match the
+    /// columns this parser asks for, so a header that never arrives still reads correctly.
+    private var columns: [String: Int] = ["interface": 1, "bytes_in": 2, "bytes_out": 3]
 
     /// Feed raw output; returns deltas for every completed sample.
     func feed(_ chunk: String) -> [[Delta]] {
@@ -45,16 +59,20 @@ final class NettopParser {
     }
 
     private func consume(line: String) -> [Delta]? {
-        if line.hasPrefix(",") { return finishSample() } // header: new sample begins
+        if line.hasPrefix(",") {
+            let sample = finishSample()   // a header means the previous sample is over
+            readHeader(line)
+            return sample
+        }
         let fields = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
         guard fields.count >= 3 else { return nil }
         let name = fields[0]
 
         if let transport = Self.transport(of: name) {
             guard currentPid >= 0, Self.parseConnection(String(name.dropFirst(5)), transport: transport) != nil else { return nil }
-            let bytesIn = Int64(fields[1]) ?? 0
-            let bytesOut = Int64(fields[2]) ?? 0
-            let socket = Socket(pid: currentPid, descriptor: name)
+            let bytesIn = Int64(column("bytes_in", in: fields) ?? "") ?? 0
+            let bytesOut = Int64(column("bytes_out", in: fields) ?? "") ?? 0
+            let socket = Socket(pid: currentPid, descriptor: name, interface: column("interface", in: fields) ?? "")
             // Duplicate descriptors (e.g. several unconnected UDP sockets) are summed.
             let existing = current[socket] ?? (0, 0)
             current[socket] = (existing.0 + bytesIn, existing.1 + bytesOut)
@@ -65,9 +83,27 @@ final class NettopParser {
         return nil
     }
 
+    /// `,interface,bytes_in,bytes_out,` — the names line up with the positions of a data line, because both start
+    /// with the field that holds the process or socket name.
+    private func readHeader(_ line: String) {
+        let names = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        var found: [String: Int] = [:]
+        for (index, name) in names.enumerated() where !name.isEmpty { found[name] = index }
+        guard found["bytes_in"] != nil, found["bytes_out"] != nil else { return }   // not a header we can read
+        columns = found
+    }
+
+    private func column(_ name: String, in fields: [String]) -> String? {
+        guard let index = columns[name], fields.indices.contains(index) else { return nil }
+        return fields[index]
+    }
+
     /// Feeds one complete `nettop -L 1` run and returns its deltas (empty for the baseline sample).
+    ///
+    /// The trailing line is a sentinel that closes the sample, not a real header: `readHeader` ignores it, so the
+    /// column map the run's own header established is kept.
     func feedSample(_ output: String) -> [Delta] {
-        feed(output + "\n,bytes_in,bytes_out,\n").flatMap { $0 }
+        feed(output + "\n,\n").flatMap { $0 }
     }
 
     private func finishSample() -> [Delta]? {
@@ -90,7 +126,8 @@ final class NettopParser {
             if dIn < 0 || dOut < 0 { dIn = value.0; dOut = value.1 } // socket was replaced
             let counters = FlowCounters(bytesIn: max(0, dIn), bytesOut: max(0, dOut), flows: old == nil ? 1 : 0)
             guard !counters.isEmpty else { continue }
-            deltas.append(Delta(pid: socket.pid, processName: processNames[socket.pid] ?? "", connection: conn, counters: counters))
+            deltas.append(Delta(pid: socket.pid, processName: processNames[socket.pid] ?? "", connection: conn,
+                                counters: counters, interface: socket.interface))
         }
         return deltas
     }

@@ -4,7 +4,7 @@ enum TransportProtocol: String, Codable, Sendable {
     case tcp, udp
 }
 
-/// Aggregation key emitted by capture sources: `(pid, bundle id, remote ip, domain, port, protocol)`.
+/// Aggregation key emitted by capture sources: `(pid, bundle id, remote ip, domain, port, protocol, channel)`.
 /// `appName` / `appPath` ride along as attributes; they are fixed for a given pid.
 struct FlowKey: Hashable, Codable, Sendable {
     var pid: Int32
@@ -16,6 +16,10 @@ struct FlowKey: Hashable, Codable, Sendable {
     var port: UInt16
     var transport: TransportProtocol
     var appProtocol: String
+    /// Which way the bytes left the Mac — the network, a peer-to-peer radio link, this Mac, or a tunnel. Part of
+    /// the key rather than an attribute: the same app talking to the same port over Wi-Fi and over AWDL is two
+    /// different things, and merging them is how peer-to-peer traffic stayed invisible.
+    var channel: NetworkChannel = .ip
     /// The AI agent this process works for (it's a descendant of the agent's process), e.g. `curl` run by Claude Code.
     /// Optional so older batches still decode. Filled in by the app, not by capture sources.
     var parentAgent: String? = nil
@@ -87,5 +91,31 @@ final class SecondAggregator: @unchecked Sendable {
             let records = buckets.removeValue(forKey: ts)!.map { TrafficRecord(key: $0.key, counters: $0.value) }
             return TrafficBatch(timestamp: ts, records: records)
         }
+    }
+}
+
+extension FlowKey {
+    /// Written out rather than synthesized, so a batch from a build that didn't know about channels still decodes
+    /// — as ordinary network traffic, which is what it was.
+    ///
+    /// Synthesized decoding ignores property defaults: a missing key throws, and one missing key would throw away
+    /// the whole batch rather than one field of it. The extension and the app ship together and version-match, so
+    /// this should never be needed; it costs a few lines and the alternative is losing a second of history to a
+    /// mismatch nobody noticed.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pid = try c.decode(Int32.self, forKey: .pid)
+        bundleID = try c.decode(String.self, forKey: .bundleID)
+        appName = try c.decode(String.self, forKey: .appName)
+        appPath = try c.decode(String.self, forKey: .appPath)
+        remoteIP = try c.decode(String.self, forKey: .remoteIP)
+        domain = try c.decode(String.self, forKey: .domain)
+        port = try c.decode(UInt16.self, forKey: .port)
+        transport = try c.decode(TransportProtocol.self, forKey: .transport)
+        appProtocol = try c.decode(String.self, forKey: .appProtocol)
+        channel = try c.decodeIfPresent(NetworkChannel.self, forKey: .channel) ?? .ip
+        parentAgent = try c.decodeIfPresent(String.self, forKey: .parentAgent)
+        parentAgentName = try c.decodeIfPresent(String.self, forKey: .parentAgentName)
+        mcpServer = try c.decodeIfPresent(String.self, forKey: .mcpServer)
     }
 }

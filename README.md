@@ -161,6 +161,21 @@ shell*, *no writes*), and a record of what has been taken away.
   answered, but an agent with a shell can still do by hand what the tool would have done. Flowlight records that
   rather than pretending to prevent it.
 
+### Which way the bytes left
+Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a
+device in the room over Apple Wireless Direct Link — no router, no internet, no address anyone else can reach.
+Flowlight was always counting those flows; it had no word for them, so an AirDrop of a 4 GB folder looked like a
+few megabytes to an address with no name.
+
+Every flow now carries a **channel**: the network, peer-to-peer Wi-Fi, this Mac, or a tunnel. Narrow a report to
+one of them from the toolbar, and peer-to-peer rows are named by the feature that opened them — *AirDrop and
+Handoff · nearby device* — because a link-local address tells you nothing and the device has no name this Mac can
+learn.
+
+The sampler reads the interface each socket is bound to, which is exact. The Network Extension is handed sockets
+rather than interfaces, so it judges by the address instead: link-local means peer-to-peer. That is the coarser of
+the two answers, and it says so.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -342,6 +357,7 @@ Shipped:
 - [x] Agent guardrails: block an MCP server, a tool or a resource (0.3.6)
 - [x] A site that keeps up with the app: counts read from source at build time, balanced columns, motion that
   never moves the layout (0.3.7)
+- [x] Peer-to-peer Wi-Fi named as its own channel: AirDrop, Handoff, AirPlay, Sidecar, Universal Control (0.4.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -350,18 +366,15 @@ Shipped:
 
 Planned, in order:
 
-- **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
-  the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
-  - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and
-    `llw0` interfaces, which the sampler already sees — `nettop` reports the interface per flow. Mostly a matter of
-    naming those interfaces and classifying what uses them, rather than new plumbing.
-  - **Bluetooth** has no per-app byte accounting on macOS, so honest scope is which apps hold Bluetooth access,
-    which devices are paired and connected, and when that changes — not how much each app sent. Byte-level HCI
-    traces need Apple's PacketLogger profile, which an app can't read.
-  - **USB and external storage** likewise: attach and detach events, and which volumes appear, not throughput.
+- **0.4.1 — Bluetooth: who has access, and what is connected.** macOS keeps no per-app byte accounting for
+  Bluetooth, so the honest scope is which apps hold Bluetooth access, which devices are paired and connected, and
+  when that changes — not how much each app sent. Byte-level HCI traces need Apple's PacketLogger profile, which an
+  app can't read, and Flowlight will say so rather than implying a number it doesn't have.
+- **0.4.2 — USB and external storage.** Attach and detach events, and which volumes appear — not throughput, for
+  the same reason.
 
-  Worth being clear up front that this widens what Flowlight watches, so each part ships behind its own switch and
-  the Bluetooth and USB permissions are only requested if you turn them on.
+  Both widen what Flowlight watches, so each ships behind its own switch and its permission is only requested if
+  you turn it on.
 - **0.5.0 — Ask Flowlight.** Questions in plain language — *what did Claude Code upload yesterday?*, *which app
   started talking to somewhere new this week?*, *summarise the last hour* — answered from the recorded history,
   with the rows behind each answer one click away.

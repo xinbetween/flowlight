@@ -291,9 +291,9 @@ enum CSVExport {
     /// Flat rows (one per app × destination × IP), independent of how the table is grouped.
     static func breakdown(_ rows: [BreakdownRow], query: String = "") -> String {
         let q = query.trimmingCharacters(in: .whitespaces)
-        var lines = ["app,bundle_id,domain,network_owner,remote_ip,protocols,ports,bytes_in,bytes_out,total,flows"]
+        var lines = ["app,bundle_id,domain,network_owner,remote_ip,protocols,ports,channel,bytes_in,bytes_out,total,flows"]
         for r in TrafficNode.backfilled(rows).sorted(by: { $0.counters.total > $1.counters.total }) {
-            let fields = [r.appName, r.bundleID, r.domain, r.owner, r.remoteIP, r.protocols, r.ports]
+            let fields = [r.appName, r.bundleID, r.domain, r.owner, r.remoteIP, r.protocols, r.ports, r.channel.title]
             if !q.isEmpty && !fields.contains(where: { $0.localizedCaseInsensitiveContains(q) }) { continue }
             lines.append((fields + ["\(r.counters.bytesIn)", "\(r.counters.bytesOut)", "\(r.counters.total)", "\(r.counters.flows)"])
                 .map(escape).joined(separator: ","))

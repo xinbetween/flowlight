@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#channels">Which way the bytes left</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -70,6 +70,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>It is called <em>Worth a look</em> and not <em>Suspicious</em> deliberately. What the data supports is "unusual next to the other
         apps in this report" — a backup tool talks to a lot of places for good reasons, and a quiet Mac produces no findings at all. It
         says nothing about traffic every app shares.</p>
+
+      <h2 id="channels">Which way the bytes left</h2>
+      <p>Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the
+        room over Apple Wireless Direct Link — no router, no internet, and no address anyone else can reach. Flowlight was always
+        counting those flows; it had no word for them, so an AirDrop of a 4&nbsp;GB folder looked like a few megabytes to an address
+        with no name.</p>
+      <p>Every flow now carries a <strong>channel</strong>: <em>Network</em>, <em>Peer-to-peer Wi-Fi</em>, <em>This Mac</em> (loopback,
+        which never left the machine) or <em>Tunnel</em> (inside a VPN; where it went after that isn't visible here). Narrow a report to
+        one of them from the Reports toolbar, and it travels with CSV exports and with anything sent to a collector.</p>
+      <p><strong>Peer-to-peer rows are named by the feature that opened them</strong> — <code>AirDrop and Handoff · nearby device</code>,
+        <code>Continuity · nearby device</code> — because a link-local address tells you nothing and the device in the room has no name
+        this Mac can learn. An app that uses the radio directly keeps its own name, which is the truthful answer for it.</p>
+      <p><strong>The two engines answer differently.</strong> The sampler reads the interface each socket is bound to
+        (<code>awdl0</code>, <code>llw0</code>), which is exact. The Network Extension is handed sockets rather than interfaces, so it
+        judges by the address instead: a link-local address is how peer-to-peer traffic is addressed. That is the coarser of the two —
+        a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.</p>
+      <p>Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.</p>
 
       <h2 id="background">Running in the background</h2>
       <p>Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is

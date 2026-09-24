@@ -108,6 +108,19 @@ struct ReportsView: View {
         .toolbar {
             ToolbarItem {
                 Menu {
+                    Picker("Way out", selection: $filter.channel) {
+                        Text("Every way out").tag(NetworkChannel?.none)
+                        Divider()
+                        ForEach(NetworkChannel.allCases, id: \.self) { channel in
+                            Text(channel.title).tag(NetworkChannel?.some(channel))
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } label: { Label("Way out", systemImage: filter.channel?.icon ?? "point.3.filled.connected.trianglepath.dotted") }
+                .help("Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel")
+            }
+            ToolbarItem {
+                Menu {
                     Button("Time series (CSV)…") { export(csv: CSVExport.series(series, granularity: granularity), name: "flowlight-series") }
                     Button("Breakdown (CSV)…") { export(csv: CSVExport.breakdown(breakdownRows, query: query), name: "flowlight-breakdown") }
                 } label: { Label("Export", systemImage: "square.and.arrow.up") }
@@ -214,7 +227,7 @@ struct ReportsView: View {
     /// What the charts are scoped to, for their titles ("Destinations · claude").
     private var scopeName: String? {
         [filter.bundleID.map(appName(for:)), filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
-         filter.remoteIP, filter.appProtocol].compactMap { $0 }.first
+         filter.remoteIP, filter.appProtocol, filter.channel.map(\.title)].compactMap { $0 }.first
     }
 
     private func narrow(to entity: InsightEntity) {
@@ -262,6 +275,7 @@ struct ReportsView: View {
             if let suffix = filter.domainSuffix { chip("Domain: *.\(suffix)") { filter.domainSuffix = nil; filter.remoteIP = nil } }
             if let ip = filter.remoteIP { chip("IP: \(ip)") { filter.remoteIP = nil } }
             if let proto = filter.appProtocol { chip("Protocol: \(proto)") { filter.appProtocol = nil } }
+            if let channel = filter.channel { chip("Way out: \(channel.title)") { filter.channel = nil } }
             Button("Clear") { filter = .none }.buttonStyle(.link).font(.caption)
         }
     }

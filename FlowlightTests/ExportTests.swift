@@ -165,7 +165,7 @@ final class ExportRedactionTests: XCTestCase {
                                   agentName: "", mcpServer: "", bytesIn: 0, bytesOut: 0, flows: 0)
         XCTAssertEqual(Set(Mirror(reflecting: rollup).children.compactMap(\.label)),
                        ["start", "end", "bundleID", "appName", "domain", "remoteIP", "port", "appProtocol",
-                        "owner", "asn", "agentID", "agentName", "mcpServer", "bytesIn", "bytesOut", "flows"])
+                        "owner", "asn", "agentID", "agentName", "mcpServer", "channel", "bytesIn", "bytesOut", "flows"])
 
         let alert = ExportAlert(id: 0, time: .distantPast, kind: "", bundleID: "", appName: "", detail: "", severity: 0)
         XCTAssertEqual(Set(Mirror(reflecting: alert).children.compactMap(\.label)),

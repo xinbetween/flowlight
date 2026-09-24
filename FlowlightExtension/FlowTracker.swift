@@ -99,10 +99,16 @@ final class FlowState: @unchecked Sendable {
     }
 
     func key() -> FlowKey {
-        let host = domain
+        // A content filter is handed sockets, not interfaces, so the channel has to be read off the address. That
+        // is the coarser of the two answers Flowlight can give — see `NetworkChannel.of(address:)` — and where it
+        // says peer-to-peer, the sampler would have said which radio.
+        let channel = NetworkChannel.of(address: remoteIP)
+        let host = channel == .peerToPeer && domain.isEmpty
+            ? PeerToPeerService.destination(forProcess: process.name) : domain
         return FlowKey(pid: process.pid, bundleID: process.bundleID, appName: process.name, appPath: process.path,
                        remoteIP: remoteIP, domain: host, port: remotePort, transport: transport,
-                       appProtocol: ProtocolCatalog.refine(appProtocol, domain: host))
+                       appProtocol: ProtocolCatalog.refine(appProtocol, domain: channel == .peerToPeer ? "" : host),
+                       channel: channel)
     }
 }
 

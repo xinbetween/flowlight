@@ -62,11 +62,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.4.0, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
+ The viewsWorth a lookWhich way the bytes leftFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
  Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -137,6 +137,28 @@ open build/Build/Products/Release/Flowlight.app
  It is called Worth a look and not Suspicious deliberately. What the data supports is "unusual next to the other
  apps in this report" — a backup tool talks to a lot of places for good reasons, and a quiet Mac produces no findings at all. It
  says nothing about traffic every app shares.
+
+ Which way the bytes left
+
+ Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the
+ room over Apple Wireless Direct Link — no router, no internet, and no address anyone else can reach. Flowlight was always
+ counting those flows; it had no word for them, so an AirDrop of a 4 GB folder looked like a few megabytes to an address
+ with no name.
+
+ Every flow now carries a channel: Network, Peer-to-peer Wi-Fi, This Mac (loopback,
+ which never left the machine) or Tunnel (inside a VPN; where it went after that isn't visible here). Narrow a report to
+ one of them from the Reports toolbar, and it travels with CSV exports and with anything sent to a collector.
+
+ Peer-to-peer rows are named by the feature that opened them — AirDrop and Handoff · nearby device,
+ Continuity · nearby device — because a link-local address tells you nothing and the device in the room has no name
+ this Mac can learn. An app that uses the radio directly keeps its own name, which is the truthful answer for it.
+
+ The two engines answer differently. The sampler reads the interface each socket is bound to
+ (awdl0, llw0), which is exact. The Network Extension is handed sockets rather than interfaces, so it
+ judges by the address instead: a link-local address is how peer-to-peer traffic is addressed. That is the coarser of the two —
+ a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.
+
+ Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.
 
  Running in the background
 
@@ -558,7 +580,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.4.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -883,7 +905,7 @@ e.g. Wireshark
 
  Flowlight watches, explains and refuses today. This is the order the rest is being built in.
 
- Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
+ Bluetooth, and then USB 0.4.1 · 0.4.2Which apps hold access, which devices are paired and connected, and when that changes — not how much each one sent, because macOS keeps per-app byte counts for these to itself. Each ships behind its own switch, and its permission is only asked for if you turn it on.
 
  Ask Flowlight 0.5.0Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.
 
@@ -1093,8 +1115,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.7
+ 0.4.0
 September 24, 2026Latest
+
+ Peer-to-peer Wi-Fi, named at last. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight
+ to a device in the room. Flowlight was always counting them; now it says so.
+
+ Every flow carries a channel — network, peer-to-peer Wi-Fi, this Mac, or a tunnel — filterable from the
+ Reports toolbar and carried into CSV and collector exports.
+
+ Nothing newly recorded, no new permission. The same capture, finally labelled.
+ How channels work →
+
+ Downloads and checksums →
+
+ 0.3.7
+September 24, 2026
 
  This site, brought up to date. Blocking is answered yes where it used to say "observe only";
  Rules and Guardrails have their own sections; the roadmap lists only what hasn't shipped.

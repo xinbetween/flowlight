@@ -52,6 +52,7 @@ enum ExportField: String, CaseIterable, Identifiable, Sendable {
     case agentID = "flowlight.agent.id"
     case agentName = "flowlight.agent.name"
     case mcpServer = "flowlight.mcp.server"
+    case channel = "flowlight.network.channel"
     case eventName = "event.name"
     case alertKind = "flowlight.alert.kind"
     case alertID = "flowlight.alert.id"
@@ -72,7 +73,7 @@ enum ExportField: String, CaseIterable, Identifiable, Sendable {
     static let attributeFields: [ExportField] = [
         .serviceName, .serviceVersion, .hostName, .appBundleID, .appName, .serverAddress, .serverPort,
         .peerAddress, .protocolName, .ioDirection, .destinationOwner, .destinationASN, .agentID, .agentName,
-        .mcpServer, .eventName, .alertKind, .alertID,
+        .mcpServer, .channel, .eventName, .alertKind, .alertID,
     ]
 
     /// What a reader of the Settings tab needs to decide whether they're happy for this to leave the Mac.
@@ -93,6 +94,7 @@ enum ExportField: String, CaseIterable, Identifiable, Sendable {
         case .agentID: return "The AI agent this process works for, when it's one of its tools."
         case .agentName: return "That agent's name, e.g. Claude Code."
         case .mcpServer: return "The MCP server this process is, when Flowlight recognised it."
+        case .channel: return "Which way the bytes left: the network, peer-to-peer Wi-Fi, this Mac, or a tunnel."
         case .eventName: return "flowlight.alert, so alerts can be told apart from everything else."
         case .alertKind: return "Which rule fired, e.g. Possible data exfiltration by agent."
         case .alertID: return "The alert's row id in Flowlight's local database, so a duplicate can be spotted."
@@ -139,6 +141,9 @@ struct ExportRollup: Sendable, Equatable {
     var agentID: String
     var agentName: String
     var mcpServer: String
+    /// Which way the bytes left the Mac. Defaulted so a caller that doesn't care — every test, and every reader
+    /// that predates channels — still builds one.
+    var channel: NetworkChannel = .ip
     var bytesIn: Int64
     var bytesOut: Int64
     var flows: Int64
@@ -274,6 +279,7 @@ extension ExportRollup {
         agentID = row.parentAgent
         agentName = row.parentAgentName
         mcpServer = row.mcpServer
+        channel = row.channel
         bytesIn = row.counters.bytesIn
         bytesOut = row.counters.bytesOut
         flows = row.counters.flows
