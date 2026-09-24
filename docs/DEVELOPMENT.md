@@ -216,8 +216,12 @@ check if the setup is ever rebuilt.
 
 1. **The secrets live in the `release` environment, not the repository.** Only a job that declares
    `environment: release` can read them. A workflow added to a branch cannot.
-2. **That environment requires a human approval.** A tag push starts the job and then waits. Nothing is signed
-   until someone with access clicks approve, and the approval is recorded on the run.
+2. **Only listed accounts can start a release.** The environment no longer waits for a click — a release by the
+   maintainer shouldn't need the maintainer to approve themselves. In its place the job refuses to run unless
+   `github.actor` is in `RELEASE_ACTORS` (a repository variable, `blessdyb` by default), so a tag pushed by
+   anyone else fails instead of producing a signed build. This is weaker than an approval: it trusts the account
+   rather than a person at the keyboard, so it stands on the account's own protection. Put the reviewers back
+   (Settings › Environments › release) if that trade stops being the right one.
 3. **The environment only accepts `v*` tags.** Its deployment branch policy is a single tag rule, so a run from a
    branch — or from a tag with any other name — can't reach the secrets even with approval.
 4. **Release tags can't move.** A ruleset over `refs/tags/v*` blocks deletion, updates and force-pushes, so a

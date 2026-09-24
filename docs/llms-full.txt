@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.8, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -390,7 +390,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -904,8 +904,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.7
+ 0.2.8
 September 24, 2026Latest
+
+ Worth a look, in Reports. Compares the apps in a report with each other and points at the ones whose
+ destinations don't look like the rest — many more places than their peers, addresses that never resolved to a name, hostnames
+ that look generated, far more sent than received, protocols that are a sideline rather than the point. Each finding shows its
+ evidence; clicking one narrows the report to that app.
+
+ It's Worth a look, not Suspicious: the data supports "unusual next to the other apps here", and a backup
+ tool talks to a lot of places for good reasons.
+
+ Downloads and checksums →
+
+ 0.2.7
+September 24, 2026
 
  Run in the background. Settings › General drops the Dock icon and the Cmd-Tab entry; Flowlight keeps
  recording and stays reachable from the menu bar, which gains Show Dock Icon to undo it.

@@ -643,13 +643,15 @@ struct ReportsView: View {
         let (g, from, to, f, m) = (granularity, startDate, endDate, scoped, metric)
         let wantsCharts = lowerMode == .charts
         do {
-            let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?) in
+            let wantsBehaviour = lowerMode == .behaviour
+            let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?, [BreakdownRow]) in
                 let series = try db.series(g, from: from, to: to, filter: f)
                 let breakdown = try db.breakdown(g, from: from, to: to, filter: f)
-                guard wantsCharts else { return (series, breakdown, nil) }
+                let behaviourRows = wantsBehaviour ? try db.appDestinationRows(g, from: from, to: to, filter: f) : []
+                guard wantsCharts else { return (series, breakdown, nil, behaviourRows) }
                 let snapshot = try InsightsBuilder.load(db: db, dimensions: InsightDimension.available(for: f), series: series,
                                                         metric: m, granularity: g, from: from, to: to, filter: f)
-                return (series, breakdown, snapshot)
+                return (series, breakdown, snapshot, behaviourRows)
             }
             guard g == granularity, f == scoped, m == metric else { return } // a newer request superseded this one
             if let snapshot = result.2 {
@@ -664,7 +666,9 @@ struct ReportsView: View {
             contributors = [:]
             breakdownTruncated = result.1.count >= TrafficDatabase.breakdownLimit
             breakdownRows = result.1
-            behaviour = DestinationProfile.analyse(result.1)
+            // Not result.1: those rows stop at breakdownLimit, and an app past the cap would silently never be
+            // considered. This asks for every app's destinations on their own, which is a much smaller result.
+            behaviour = DestinationProfile.analyse(result.3)
             nodes = TrafficNode.tree(from: result.1, grouping: grouping, base: f)
             if hovered != nil { hovered = series.first { $0.date == hovered?.date } }
         } catch {

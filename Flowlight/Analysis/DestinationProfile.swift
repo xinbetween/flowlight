@@ -110,17 +110,23 @@ enum DestinationProfile {
         // By category, not by protocol name: a mail client splits its work across imaps and smtp-submission, and
         // neither alone dominates, but mail plainly is what it does.
         let total = max(1, rows.reduce(Int64(0)) { $0 + $1.counters.total })
-        var bytesByCategory: [ProtocolCategory: Int64] = [:]
+        var bytesByCategory: [ProtocolCategory: Double] = [:]
         var namesByCategory: [ProtocolCategory: Set<String>] = [:]
         for row in rows {
-            for name in row.protocols.split(separator: " ").map(String.init) {
+            let names = row.protocols.split(separator: " ").map(String.init)
+            guard !names.isEmpty else { continue }
+            // A row can list several protocols, and its byte count is the total for all of them. Charging that
+            // total to each one makes the shares add up to more than the app's traffic, which pushes a category
+            // over the "this is what the app does" line it hasn't earned. Split it instead.
+            let perName = Double(row.counters.total) / Double(names.count)
+            for name in names {
                 let category = ProtocolCatalog.category(of: name)
-                bytesByCategory[category, default: 0] += row.counters.total
+                bytesByCategory[category, default: 0] += perName
                 namesByCategory[category, default: []].insert(name)
             }
         }
         let sensitive = Set(bytesByCategory
-            .filter { $0.key.isSensitiveEgress && Double($0.value) / Double(total) < 0.5 }
+            .filter { $0.key.isSensitiveEgress && $0.value / Double(total) < 0.5 }
             .flatMap { namesByCategory[$0.key] ?? [] })
         if !sensitive.isEmpty {
             found.append(BehaviourSignal(kind: .sensitiveProtocol,

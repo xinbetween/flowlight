@@ -6,6 +6,9 @@ name: Release
 #
 # The secrets this needs are listed in docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
 # GitHub. Without them the job fails at the import step rather than publishing something unsigned.
+#
+# It runs without waiting for an approval. What gates it instead: the release environment only accepts v* tags,
+# only the accounts in RELEASE_ACTORS may start one, and a v* tag can't be moved once pushed.
 on:
   push:
     tags: ["v*"]
@@ -44,6 +47,21 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
+
+      # The environment no longer asks for a click, so this is what stands in its place: a release may only be
+      # started by an account on this list. Anyone else pushing a v* tag gets a failed run rather than a signed
+      # build. Set RELEASE_ACTORS (comma-separated) to change who that is.
+      - name: Check who asked for this release
+        env:
+          ALLOWED: ${{ vars.RELEASE_ACTORS || 'blessdyb' }}
+        run: |
+          set -euo pipefail
+          actor="${{ github.actor }}"
+          if ! printf '%s' "$ALLOWED" | tr ',' '\n' | tr -d ' ' | grep -qx "$actor"; then
+            echo "::error::$actor isn't allowed to publish a release. Allowed: $ALLOWED"
+            exit 1
+          fi
+          echo "Release requested by $actor."
 
       - name: Read the version and check it matches the tag
         id: version

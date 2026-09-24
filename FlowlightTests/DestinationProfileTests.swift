@@ -123,3 +123,34 @@ final class DestinationProfileTests: XCTestCase {
         XCTAssertTrue(DestinationProfile.analyse(rows).isEmpty, "one CDN is one destination, not twelve")
     }
 }
+
+/// The two problems found reviewing the first version of this analysis.
+final class DestinationProfileAccountingTests: XCTestCase {
+    private func row(_ app: String, _ domain: String, protocols: String, bytes: Int64) -> BreakdownRow {
+        BreakdownRow(bundleID: app, appName: app, appPath: "", domain: domain, remoteIP: "1.2.3.4",
+                     ports: "", protocols: protocols,
+                     counters: FlowCounters(bytesIn: bytes, bytesOut: bytes, flows: 1))
+    }
+
+    /// A row lists every protocol seen on it and one byte total for all of them. Charging that total to each
+    /// category made an app's shares add up to more than its traffic, which could push a sensitive category over
+    /// the "this is what the app does" line and hide a real finding.
+    func testMultiProtocolRowsDoNotInflateCategoryShare() {
+        // An editor whose traffic is overwhelmingly web, with one small SSH connection alongside it.
+        var rows = (0..<8).map { row("com.editor", "cdn\($0).example.com", protocols: "https quic", bytes: 1_000) }
+        rows.append(row("com.editor", "shell.example.com", protocols: "ssh", bytes: 50))
+        let findings = DestinationProfile.analyse(rows)
+        let editor = findings.first { $0.bundleID == "com.editor" }
+        XCTAssertTrue(editor?.signals.contains { $0.kind == .sensitiveProtocol } == true,
+                      "ssh is a sideline here and should still be reported")
+    }
+
+    /// The counterpart: a mail client's traffic is mail, so mail protocols aren't a finding about it.
+    func testAnAppDoingItsOwnJobIsNotFlagged() {
+        let rows = [row("com.mail", "imap.example.com", protocols: "imaps", bytes: 5_000),
+                    row("com.mail", "smtp.example.com", protocols: "smtp-submission", bytes: 4_000)]
+        let findings = DestinationProfile.analyse(rows)
+        XCTAssertNil(findings.first { $0.bundleID == "com.mail" }?.signals.first { $0.kind == .sensitiveProtocol },
+                     "mail protocols are what a mail client is for")
+    }
+}

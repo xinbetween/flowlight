@@ -494,6 +494,31 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    /// Every app's destinations, with no row cap.
+    ///
+    /// `breakdown` stops at `breakdownLimit` because it feeds a table someone scrolls. Anything judging apps
+    /// against each other has to see them all, or an app past the cap is quietly never considered — and the cap
+    /// is reached exactly on the busy machines where that matters. Grouping by app and destination rather than
+    /// by app, domain and IP keeps this far smaller than the breakdown it replaces.
+    func appDestinationRows(_ granularity: Granularity, from: Date, to: Date,
+                            filter: TrafficFilter = .none) throws -> [BreakdownRow] {
+        let (clause, values) = whereClause(from: from, to: to, filter: filter)
+        return try conn.query("""
+            SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
+                SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
+                       '', GROUP_CONCAT(DISTINCT protocol),
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows)
+                FROM \(granularity.table) WHERE \(clause)
+                GROUP BY bundle_id, domain, remote_ip
+            ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
+            """, values) { row in
+            BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
+                         remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
+                         counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
+                         owner: row.text(10), asn: Int(row.int(11)))
+        }
+    }
+
     /// Per-dimension totals aggregated in SQL (no row cap needed: one row per distinct key).
     /// Destinations come back per (hostname, IP) so hostname-less traffic can fall back to its owner.
     func dimensionTotals(_ dimension: InsightDimension, _ granularity: Granularity, from: Date, to: Date,
