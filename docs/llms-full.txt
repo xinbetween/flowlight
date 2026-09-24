@@ -880,8 +880,27 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.4
+ 0.2.5
 September 24, 2026Latest
+
+ Fixed: the filter stopped working after every app update. macOS keeps running whichever build of the
+ extension was last activated, so after an update it was the previous one — and a mismatched pair can't talk to each other.
+ Capture reported the extension as unreachable while it sat there installed and enabled. Flowlight now checks the installed
+ version at launch and re-activates the filter itself.
+
+ Fixed: a working extension could report itself unreachable indefinitely, because a superseded connection's
+ failure overwrote the status of the one in use.
+
+ Fixed: the status went amber whenever the network was quiet, since the extension only sends when there is
+ traffic.
+
+ Capture explains what each engine can miss — the sampler loses whole short connections, not bytes.
+ The comparison →
+
+ Downloads and checksums →
+
+ 0.2.4
+September 24, 2026
 
  Fixed: switching the capture source froze Flowlight. Choosing the Network Extension while the sampler was
  running could beachball the app for minutes, waiting on the packet-capture device to close. Found from a user's hang report.

@@ -13,7 +13,23 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.2.4</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.2.5</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Fixed: the filter stopped working after every app update.</strong> macOS keeps running whichever build of the
+            extension was last activated, so after an update it was the previous one — and a mismatched pair can't talk to each other.
+            Capture reported the extension as unreachable while it sat there installed and enabled. Flowlight now checks the installed
+            version at launch and re-activates the filter itself.</li>
+          <li><strong>Fixed:</strong> a working extension could report itself unreachable indefinitely, because a superseded connection's
+            failure overwrote the status of the one in use.</li>
+          <li><strong>Fixed:</strong> the status went amber whenever the network was quiet, since the extension only sends when there is
+            traffic.</li>
+          <li><strong>Capture explains what each engine can miss</strong> — the sampler loses whole short connections, not bytes.
+            <a href="{{root}}docs/#engines">The comparison →</a></li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.2.5">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.2.4</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Fixed: switching the capture source froze Flowlight.</strong> Choosing the Network Extension while the sampler was
             running could beachball the app for minutes, waiting on the packet-capture device to close. Found from a user's hang report.</li>
