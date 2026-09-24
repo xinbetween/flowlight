@@ -257,6 +257,18 @@ Planned, in order:
 - **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
   headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - **0.3.2 — Export to OpenTelemetry / SIEM.**
+- **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
+  the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
+  - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and
+    `llw0` interfaces, which the sampler already sees — `nettop` reports the interface per flow. Mostly a matter of
+    naming those interfaces and classifying what uses them, rather than new plumbing.
+  - **Bluetooth** has no per-app byte accounting on macOS, so honest scope is which apps hold Bluetooth access,
+    which devices are paired and connected, and when that changes — not how much each app sent. Byte-level HCI
+    traces need Apple's PacketLogger profile, which an app can't read.
+  - **USB and external storage** likewise: attach and detach events, and which volumes appear, not throughput.
+
+  Worth being clear up front that this widens what Flowlight watches, so each part ships behind its own switch and
+  the Bluetooth and USB permissions are only requested if you turn them on.
 
 Later, no version yet:
 
