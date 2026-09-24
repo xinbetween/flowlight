@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.4, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -341,7 +341,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -853,8 +853,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.2.4
+September 24, 2026Latest
+
+ Fixed: switching the capture source froze Flowlight. Choosing the Network Extension while the sampler was
+ running could beachball the app for minutes, waiting on the packet-capture device to close. Found from a user's hang report.
+
+ Inspect says when it isn't working. Turning inspection on used to report success as soon as the commands ran,
+ so a proxy that never came up looked the same as one that did. Flowlight now checks that it's listening, that your network
+ services point at it, and that its settings file is served — and names whichever isn't true.
+
+ Search inside request and response bodies, with matching lines highlighted. A model name or tool argument that
+ only appears in a payload now finds its exchange.
+
+ Downloads and checksums →
+
  0.2.2
-September 23, 2026Latest
+September 23, 2026
 
  Focus mode. Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts,
  AI Agents and Inspect, plus the menu bar rates. Right-click a row to focus on it, or use the control at the bottom of the
