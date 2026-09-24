@@ -142,6 +142,11 @@ the background** drops the Dock icon and the Cmd-Tab entry; the menu bar keeps t
 Icon** to undo it. Quitting stops the sampler — it does not stop the Network Extension, which runs on its own until
 you disable it in Capture.
 
+### Running in the background, quietly
+The window reopens where and how you left it; a first run fills the screen. Hostname setup is offered a little after
+launch and only while a window is open, rather than meeting a first run with a password prompt — and it returns next
+launch until taken or dismissed.
+
 ### Focus mode
 Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect,
 plus the menu bar rates. It's for watching one agent work without the rest of the Mac in the way.
@@ -298,25 +303,12 @@ Shipped:
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
+- [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
 
-- **0.3.3 — Runs quietly in the background.** The menu-bar-only mode shipped in 0.2.7 (Settings › General › Run in
-  the background). What's left for this milestone is the rest of getting out of the way: remembering window state
-  across launches, a quieter first run, and deciding what the menu bar should show when there's no window at all.
-
-  **Not a background daemon.** In extension mode the filter already runs independently of the app; adding a
-  launch agent so the sampler survives a quit would mean a second signed executable, a second update path, and
-  another process with full network visibility running as you. That is the pattern Flowlight exists to expose,
-  so it isn't one to adopt lightly.
-
-  Two things belong with it and are closer to correctness than features: the extension should deliver the newest
-  second first and backfill history behind it, so its buffer can cover a long gap without leaving the live view
-  empty while it drains; and the app should say plainly that the system extension keeps filtering after Flowlight
-  is quit, because an invisible extension recording traffic after you quit the app is exactly what this tool is
-  for noticing.
 - **0.3.4 — Focus on apps or destinations, either alone.** Focus should be symmetric: a set of apps, a set of
   destinations, or both, with at least one entry required and neither side required on its own. The scope model
   already unions the two, but the editor doesn't read that way — only destinations can be typed, apps can only be

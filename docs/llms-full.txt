@@ -61,7 +61,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.3, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -143,6 +143,11 @@ open build/Build/Products/Release/Flowlight.app
  looking at. Settings › General › Run in the background goes further and drops the Dock icon and the Cmd-Tab entry;
  the menu bar keeps the live rates and gains Show Dock Icon to undo it. Launch at login is in the
  same place.
+
+ The window opens where you left it, at the size you left it. A first run fills the screen instead, so nothing is hidden behind
+ a small default window, and a window whose saved position is off-screen — an unplugged display — comes back on the screen you
+ have. Hostname setup is offered a little after launch and only while a window is open, rather than greeting a first run with a
+ request for your password; the offer returns next launch until you take or dismiss it.
 
  Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
  carries on inspecting connections until you disable or uninstall it in Capture.
@@ -480,7 +485,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -778,8 +783,6 @@ e.g. Wireshark
 
  Flowlight observes and explains today. This is the order the rest is being built in.
 
- Runs quietly in the background 0.3.3The menu-bar-only mode arrived in 0.2.7; the rest is getting further out of the way — window state across launches and a quieter first run. Deliberately not a background daemon: a second process with full network visibility is the thing Flowlight exists to notice.
-
  Focus on apps or destinations, either alone 0.3.4Focus should be symmetric: several apps, several destinations, or both, with at least one entry and neither side required on its own. Today only destinations can be typed and apps can only be ticked off what was busy in the last day, so a quiet app can't be focused at all.
 
  Rules: block anything, anywhere 0.3.5One rule model behind every screen: block an app, an agent, a domain, an IP range or a single URL, from the table you spotted it in. Forever, until a time, for an hour, or between chosen hours — with one pause switch, and a way out on every refusal. A Rules screen lists them all, what each one has blocked and when, and says plainly which engine can enforce it.
@@ -998,8 +1001,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.2
+ 0.3.3
 September 24, 2026Latest
+
+ The window reopens where you left it, at the size you left it — and comes back on a screen you still have
+ if the one it was on has gone.
+
+ A first run no longer opens with a password prompt. Hostname setup is offered a little after launch and
+ only while a window is open; it returns next launch until taken or dismissed.
+
+ Downloads and checksums →
+
+ 0.3.2
+September 24, 2026
 
  Export to OpenTelemetry or a SIEM. OTLP over HTTP — rollups as metrics, alerts as logs — or
  newline-delimited JSON, to an endpoint you name. Off until you configure it; there is no Flowlight service to send to.

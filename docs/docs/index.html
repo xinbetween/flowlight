@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.2, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.3, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -105,6 +105,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         looking at. <strong>Settings › General › Run in the background</strong> goes further and drops the Dock icon and the Cmd-Tab entry;
         the menu bar keeps the live rates and gains <strong>Show Dock Icon</strong> to undo it. <strong>Launch at login</strong> is in the
         same place.</p>
+      <p>The window opens where you left it, at the size you left it. A first run fills the screen instead, so nothing is hidden behind
+        a small default window, and a window whose saved position is off-screen — an unplugged display — comes back on the screen you
+        have. Hostname setup is offered a little after launch and only while a window is open, rather than greeting a first run with a
+        request for your password; the offer returns next launch until you take or dismiss it.</p>
       <p>Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
         carries on inspecting connections until you disable or uninstall it in <strong>Capture</strong>.</p>
 
@@ -400,7 +404,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.2 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.3 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
