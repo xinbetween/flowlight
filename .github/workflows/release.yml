@@ -71,17 +71,28 @@ jobs:
         run: xcodegen generate
 
       - name: Test
+        timeout-minutes: 25
         run: |
           set -euo pipefail
           LOG="$RUNNER_TEMP/test.log"
-          if ! xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= > "$LOG" 2>&1; then
+          # Output is streamed as well as kept: a run that hangs otherwise shows nothing at all, and the last
+          # line printed is what names the test that stopped. Test timeouts turn a hang into a failure with a
+          # backtrace instead of a job that sits until the 90-minute limit.
+          set +e
+          xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 300 \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= 2>&1 \
+            | tee "$LOG" | grep -E "Test Suite|Test Case|error:|Testing failed|\*\* TEST|Executed .* tests"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
             echo "::group::Last 300 lines"; tail -300 "$LOG"; echo "::endgroup::"
             echo "Why it failed:"
-            grep -E "error:|Testing failed:|XCTAssert.*failed|failed \(" "$LOG" | head -40
+            grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
             exit 1
           fi
-          grep -E "Executed .* tests|\*\* TEST" "$LOG" | tail -20
 
       # A keychain of its own, unlocked only for this job, so nothing lands in the runner's login keychain.
       - name: Import the signing certificates
