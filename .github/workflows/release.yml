@@ -14,6 +14,10 @@ on:
       tag:
         description: "Existing tag to build (e.g. v0.2.3). Leave empty to build the current ref."
         required: false
+      dry_run:
+        description: "Build, sign, notarize and verify — but publish nothing."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -165,6 +169,7 @@ jobs:
           shasum -a 256 build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" | tee build/checksums.txt
 
       - name: Publish the release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -185,7 +190,7 @@ jobs:
 
       # The cask points at the release that was just published, so this runs last.
       - name: Update the Homebrew cask
-        if: ${{ env.TAP_TOKEN != '' }}
+        if: ${{ env.TAP_TOKEN != '' && github.event.inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
           git clone "https://x-access-token:$TAP_TOKEN@github.com/xinbetween/homebrew-tap.git" "$RUNNER_TEMP/tap"
@@ -193,3 +198,19 @@ jobs:
           git -C "$RUNNER_TEMP/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
           git -C "$RUNNER_TEMP/tap" push
+
+      - name: Say what a dry run produced
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          {
+            echo "### Dry run: nothing was published"
+            echo
+            echo "Signed, notarized and accepted by Gatekeeper:"
+            echo '```'
+            sed 's|build/||' build/checksums.txt
+            echo '```'
+            echo "Re-run without **dry_run** to publish \`${{ steps.version.outputs.tag }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Dry run complete — Flowlight $VERSION built and verified, nothing published."

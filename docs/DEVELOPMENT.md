@@ -173,10 +173,19 @@ Homebrew cask. `.github/workflows/ci.yml` builds and tests every push and pull r
 of date with `site/`.
 
 ```sh
-scripts/ci-secrets.sh                       # upload the secrets once
+scripts/ci-secrets.sh                                  # upload the secrets once
 git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0
-gh workflow run Release --ref v0.3.0        # or run it by hand against an existing tag
+gh workflow run Release --ref v0.3.0 -f dry_run=true   # build and verify, publish nothing
 ```
+
+`--ref` has to name a tag whose tree *contains* the workflow: `gh` reads the workflow file from the ref you give
+it, so tags older than `.github/workflows/release.yml` fail with "Workflow does not have 'workflow_dispatch'
+trigger". The environment only accepts `v*` tags, so dispatching from a branch is refused at the approval gate —
+which is the point of it.
+
+**dry_run** builds, signs, notarizes and asks Gatekeeper for a verdict, then stops without creating a release or
+touching the cask. It is the safe way to exercise the path the first time, or after changing anything about
+signing.
 
 Release notes come from `packaging/release-notes/<version>.md` when that file exists (checksums are appended), and
 from generated notes when it doesn't.
