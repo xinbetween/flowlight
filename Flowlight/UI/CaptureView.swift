@@ -5,6 +5,7 @@ struct CaptureView: View {
     @EnvironmentObject var extensionManager: ExtensionManager
     @State private var confirmClear = false
     @State private var showExtensionSetup = false
+    @State private var otherFilters: [InstalledSystemExtension] = []
 
     private var extensionDetailsVisible: Bool {
         monitor.mode == .networkExtension || showExtensionSetup
@@ -18,6 +19,7 @@ struct CaptureView: View {
                 }
                 .pickerStyle(.radioGroup)
                 CaptureWarningBanner()
+                if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 LabeledContent("Status") {
                     HStack(spacing: 6) {
                         Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8)
@@ -123,6 +125,8 @@ struct CaptureView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Capture")
+        // Which other content filters exist decides whether ours can work at all, so it's read when the screen opens.
+        .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
         .confirmationDialog("Delete all recorded traffic, baselines and alerts?", isPresented: $confirmClear) {
             Button("Delete everything", role: .destructive) { monitor.clearAllData() }
         }
