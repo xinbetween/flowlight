@@ -47,22 +47,49 @@ jobs:
 
       # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
       - name: Test
-        timeout-minutes: 25
+        timeout-minutes: 40
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          # xcodebuild occasionally never returns here — the same suite passes locally and on most runs, and the
+          # per-test allowance below doesn't always catch it, so the whole invocation gets a watchdog. One retry:
+          # a hang that clears on a second attempt is a flake, and one that repeats is a real failure worth seeing.
+          run_tests() {
+            local log="$1" limit=900
+            xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+              -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 120 \
+              -maximum-test-execution-time-allowance 300 \
+              CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= > "$log" 2>&1 &
+            local pid=$!
+            local waited=0
+            while kill -0 "$pid" 2>/dev/null; do
+              if [ "$waited" -ge "$limit" ]; then
+                echo "::warning::xcodebuild still running after ${limit}s — killing it."
+                kill -9 "$pid" 2>/dev/null
+                pkill -9 -f "xcodebuild|XCTestCore|testmanagerd" 2>/dev/null
+                wait "$pid" 2>/dev/null
+                return 124
+              fi
+              sleep 5
+              waited=$((waited + 5))
+            done
+            wait "$pid"
+          }
+
           LOG="$RUNNER_TEMP/test.log"
-          # Output is streamed as well as kept: a run that hangs otherwise shows nothing at all, and the last
-          # line printed is what names the test that stopped. Test timeouts turn a hang into a failure with a
-          # backtrace instead of a job that sits until the 90-minute limit.
-          set +e
-          xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 120 \
-            -maximum-test-execution-time-allowance 300 \
-            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= 2>&1 \
-            | tee "$LOG" | grep -E "Test Suite|Test Case|error:|Testing failed|\*\* TEST|Executed .* tests"
-          status=${PIPESTATUS[0]}
-          set -e
+          run_tests "$LOG"
+          status=$?
+          grep -E "Test Case .* (passed|failed)|Executed .* tests|\*\* TEST" "$LOG" | tail -25
+
+          if [ "$status" -eq 124 ]; then
+            echo "::group::Where it stopped (last 60 lines before the kill)"; tail -60 "$LOG"; echo "::endgroup::"
+            echo "Retrying once."
+            LOG="$RUNNER_TEMP/test-retry.log"
+            run_tests "$LOG"
+            status=$?
+            grep -E "Executed .* tests|\*\* TEST" "$LOG" | tail -10
+          fi
+
           if [ "$status" -ne 0 ]; then
             echo "::group::Last 300 lines"; tail -300 "$LOG"; echo "::endgroup::"
             echo "Why it failed:"

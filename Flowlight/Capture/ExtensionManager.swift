@@ -44,6 +44,18 @@ final class ExtensionManager: NSObject, ObservableObject {
         return nil
     }
 
+    /// macOS keeps running whichever build of the extension was last activated. After the app updates, that is
+    /// the previous version, and the connection between them is refused — the app looks like it can't reach an
+    /// extension that is plainly running. Asking for the installed version and re-activating on a mismatch is
+    /// what keeps the two in step; a matching version makes this a no-op.
+    func matchExtensionToApp() {
+        guard hasEntitlement, isInApplications else { return }
+        let request = OSSystemExtensionRequest.propertiesRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
+                                                                 queue: .main)
+        request.delegate = self
+        OSSystemExtensionManager.shared.submitRequest(request)
+    }
+
     func refresh() {
         guard hasEntitlement else { state = .notInstalled; return }
         NEFilterManager.shared().loadFromPreferences { [weak self] error in
@@ -106,6 +118,17 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
     nonisolated func request(_ request: OSSystemExtensionRequest, actionForReplacingExtension existing: OSSystemExtensionProperties,
                              withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
         .replace
+    }
+
+    /// The reply to `matchExtensionToApp`: re-activate when what's installed isn't what this app ships.
+    nonisolated func request(_ request: OSSystemExtensionRequest, foundProperties properties: [OSSystemExtensionProperties]) {
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let installed = properties.filter(\.isEnabled).map(\.bundleShortVersion)
+        Task { @MainActor in
+            guard let appVersion, !installed.isEmpty, !installed.contains(appVersion) else { return }
+            self.state = .installing
+            self.activate()
+        }
     }
 
     nonisolated func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {

@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct FlowlightApp: App {
+    /// True while the XCTest bundle is being hosted by this app.
+    static let runningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     @StateObject private var monitor = TrafficMonitor()
     @StateObject private var extensionManager = ExtensionManager()
     @StateObject private var nav = AppNavigation()
@@ -18,9 +21,14 @@ struct FlowlightApp: App {
                 .environmentObject(focus)
                 .frame(minWidth: 1000, minHeight: 660)
                 .task {
+                    // The unit tests are hosted in this app, so every test run launches it for real: capture
+                    // starts, nettop is spawned every second, XPC connects, the update check fires. None of that
+                    // belongs in a test run, and it is where CI intermittently hangs.
+                    guard !FlowlightApp.runningTests else { return }
                     monitor.start()
                     monitor.applyFocus(focus.scope)
                     extensionManager.refresh()
+                    extensionManager.matchExtensionToApp()
                     updater.start()
                 }
                 .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
