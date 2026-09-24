@@ -45,7 +45,13 @@ struct CaptureView: View {
                             .disabled(extensionManager.state != .enabled)
                         Button("Uninstall") { extensionManager.deactivate() }
                             .disabled(!extensionManager.hasEntitlement)
-                        Button("Refresh") { extensionManager.refresh() }
+                        Button("Refresh") {
+                            extensionManager.refresh()
+                            // Also redial the extension: reloading its settings tells you nothing about whether
+                            // the app can actually reach it, which is the part that looked broken.
+                            monitor.reconnectSource()
+                        }
+                        .help("Re-check the filter and reconnect to it")
                     }
                     Text("""
                     The content filter (NEFilterDataProvider) attributes every TCP/UDP flow to its app via the audit token, \

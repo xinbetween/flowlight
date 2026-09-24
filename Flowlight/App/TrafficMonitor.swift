@@ -154,6 +154,13 @@ final class TrafficMonitor: ObservableObject {
         runMaintenance()
     }
 
+    /// Drops the capture source and starts it again. The extension source retries a lost connection every five
+    /// seconds by itself; this is for when someone has just fixed something and doesn't want to wait or relaunch.
+    func reconnectSource() {
+        status = "Reconnecting…"
+        startSource()
+    }
+
     func setMode(_ newMode: CaptureMode) {
         guard newMode != mode else { return }
         mode = newMode
