@@ -62,11 +62,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.4.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.4.2, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookWhich way the bytes leftFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
+ The viewsWorth a lookWhich way the bytes leftDevicesFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
  Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -159,6 +159,21 @@ open build/Build/Products/Release/Flowlight.app
  a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.
 
  Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.
+
+ Devices: Bluetooth
+
+ A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, and it is off
+ until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
+ Mac should be your decision rather than something an update did.
+
+ Bluetooth shows which devices are paired, which are connected, and when that changed, read from the system
+ every half minute. Beside it is the list of applications built to use Bluetooth, taken from each app's own
+ Info.plist.
+
+ What it can't tell you, and says so. There are no byte counts here. macOS keeps no per-app accounting for
+ Bluetooth, and the byte-level HCI traces that would give one need Apple's PacketLogger profile, which an ordinary app cannot
+ read. The app list is likewise who asked for Bluetooth, not who was granted it: macOS keeps the grants in a
+ database an app can't open, and Flowlight would rather name that difference than blur it.
 
  Running in the background
 
@@ -580,7 +595,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.4.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.4.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1115,8 +1130,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.4.1
+ 0.4.2
 September 24, 2026Latest
+
+ Bluetooth, on a new Devices screen. Which devices are paired, which are connected, when that changed,
+ and which applications are built to use the radio.
+
+ Off until you turn it on — it needs no permission Flowlight lacks, but watching more of your Mac
+ should be your decision.
+
+ No byte counts, and it says why. macOS keeps no per-app accounting for Bluetooth.
+ What it can and can't show →
+
+ Downloads and checksums →
+
+ 0.4.1
+September 24, 2026
 
  Fixed: the Rules screen came up blank from 0.3.5 to 0.4.0. The rule engine was working the whole
  time — rules were carried out and refusals recorded — but the screen that lists them wasn't drawing.

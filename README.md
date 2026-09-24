@@ -176,6 +176,16 @@ The sampler reads the interface each socket is bound to, which is exact. The Net
 rather than interfaces, so it judges by the address instead: link-local means peer-to-peer. That is the coarser of
 the two answers, and it says so.
 
+### Devices: channels that aren't the network
+A Mac sends and receives over more than TCP and UDP. The **Devices** screen covers the rest, off until you turn it
+on — not for want of a permission, but because watching more of your Mac should be a decision rather than something
+an update did.
+
+**Bluetooth**: which devices are paired, which are connected, when that changed, and which applications are built
+to use the radio. No byte counts — macOS keeps no per-app accounting for Bluetooth, and the traces that would give
+one need a profile an app can't read. The app list is who *asked* for Bluetooth, not who was *granted* it, and it
+says so.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -359,6 +369,7 @@ Shipped:
   never moves the layout (0.3.7)
 - [x] Peer-to-peer Wi-Fi named as its own channel: AirDrop, Handoff, AirPlay, Sidecar, Universal Control (0.4.0)
 - [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
+- [x] Bluetooth: which devices are paired and connected, which apps are built to use it (0.4.2)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -367,10 +378,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.4.2 — Bluetooth: who has access, and what is connected.** macOS keeps no per-app byte accounting for
-  Bluetooth, so the honest scope is which apps hold Bluetooth access, which devices are paired and connected, and
-  when that changes — not how much each app sent. Byte-level HCI traces need Apple's PacketLogger profile, which an
-  app can't read, and Flowlight will say so rather than implying a number it doesn't have.
 - **0.4.3 — USB and external storage.** Attach and detach events, and which volumes appear — not throughput, for
   the same reason.
 

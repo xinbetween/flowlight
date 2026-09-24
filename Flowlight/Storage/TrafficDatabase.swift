@@ -318,6 +318,11 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.execute("""
         CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, rule TEXT NOT NULL, updated INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS guardrails (id TEXT PRIMARY KEY, guardrail TEXT NOT NULL, updated INTEGER NOT NULL);
+        -- Channels that aren't the network: what connected, what went away, and when. No byte counts, because
+        -- macOS doesn't account for these per app and Flowlight won't invent a number.
+        CREATE TABLE IF NOT EXISTS device_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
+            kind TEXT NOT NULL, device_id TEXT NOT NULL, name TEXT NOT NULL, detail TEXT NOT NULL, change TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS device_events_ts ON device_events(ts);
         CREATE TABLE IF NOT EXISTS rule_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
             rule_id TEXT NOT NULL, action TEXT NOT NULL, engine TEXT NOT NULL, bundle_id TEXT NOT NULL,
             app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL, host TEXT NOT NULL,
@@ -811,6 +816,32 @@ final class TrafficDatabase: @unchecked Sendable {
     /// Keeps the feed from growing without bound. Called with the same retention sweep as everything else.
     func pruneRuleEvents(before date: Date) throws {
         try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
+    }
+
+    // MARK: Devices on other channels
+
+    func recordDeviceEvents(_ events: [DeviceEvent]) throws {
+        for event in events {
+            try conn.run("""
+                INSERT INTO device_events (ts, kind, device_id, name, detail, change) VALUES (?,?,?,?,?,?)
+                """, [.int(Int64(event.at.timeIntervalSince1970)), .text(event.kind.rawValue), .text(event.deviceID),
+                      .text(event.name), .text(event.detail), .text(event.change.rawValue)])
+        }
+    }
+
+    func deviceEvents(limit: Int = 300) throws -> [DeviceEvent] {
+        try conn.query("""
+            SELECT id, ts, kind, device_id, name, detail, change FROM device_events ORDER BY ts DESC, id DESC LIMIT \(max(1, limit))
+            """) { row in
+            DeviceEvent(id: row.int(0), at: Date(timeIntervalSince1970: TimeInterval(row.int(1))),
+                        kind: PeripheralDevice.Kind(rawValue: row.text(2)) ?? .bluetooth, deviceID: row.text(3),
+                        name: row.text(4), detail: row.text(5),
+                        change: DeviceEvent.Change(rawValue: row.text(6)) ?? .appeared)
+        }
+    }
+
+    func pruneDeviceEvents(before date: Date) throws {
+        try conn.run("DELETE FROM device_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
     }
 
     // MARK: Guardrails

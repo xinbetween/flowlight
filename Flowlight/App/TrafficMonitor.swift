@@ -52,6 +52,8 @@ final class TrafficMonitor: ObservableObject {
     let rules = RuleStore()
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
     let guardrails = GuardrailStore()
+    /// Channels that aren't the network: Bluetooth, USB. Both off until switched on.
+    let devices = DeviceStore()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
@@ -139,6 +141,7 @@ final class TrafficMonitor: ObservableObject {
             Task { @MainActor in self?.rules.record([event]) }
         }
         guardrails.attach(db: db)
+        devices.attach(db: db)
         inspection.guardrails = { [live = guardrails.live] in live.all() }
         inspection.onGuardrail = { [weak self] event in
             Task { @MainActor in

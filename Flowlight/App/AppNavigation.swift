@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, inspect, capture
+    case live, agents, reports, alerts, rules, inspect, devices, capture
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .reports: return "Reports"
         case .alerts: return "Alerts"
         case .rules: return "Rules"
+        case .devices: return "Devices"
         case .inspect: return "Inspect"
         case .capture: return "Capture"
         }
@@ -21,6 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .reports: return "chart.bar.xaxis"
         case .alerts: return "exclamationmark.triangle"
         case .rules: return "hand.raised"
+        case .devices: return "dot.radiowaves.left.and.right"
         case .inspect: return "lock.open.display"
         case .capture: return "antenna.radiowaves.left.and.right"
         }

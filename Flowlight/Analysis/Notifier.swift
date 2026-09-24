@@ -42,6 +42,24 @@ enum Notifier {
             UNNotificationRequest(identifier: "flowlight.update.\(version)", content: content, trigger: nil))
     }
 
+    /// Something connected or went away on a channel that isn't the network. Only the arrivals are worth a
+    /// notification — a device disconnecting is usually you walking out of the room — and only when notifications
+    /// are on at all, like every other kind.
+    static func post(devices events: [DeviceEvent]) {
+        guard UserDefaults.standard.bool(forKey: AnomalySettings.Keys.notifications) else { return }
+        let arrivals = events.filter { $0.change == .connected || $0.change == .appeared }
+        guard !arrivals.isEmpty else { return }
+        let content = UNMutableNotificationContent()
+        if arrivals.count == 1, let event = arrivals.first {
+            content.title = "\(event.change.title): \(event.name)"
+            content.body = event.detail.isEmpty ? event.kind.title : "\(event.kind.title) · \(event.detail)"
+        } else {
+            content.title = "\(arrivals.count) devices connected"
+            content.body = arrivals.prefix(3).map(\.name).joined(separator: ", ")
+        }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+    }
+
     static func post(_ alerts: [AlertRecord]) {
         guard UserDefaults.standard.bool(forKey: AnomalySettings.Keys.notifications) else { return }
         let important = alerts.filter { $0.severity >= 2 }

@@ -12,6 +12,9 @@ enum InstalledApps {
         var bundleID: String
         var path: String
         var id: String { bundleID }
+        /// What the app told macOS it wants Bluetooth for, when it declares a use. This is the app saying it is
+        /// built to use the radio — not macOS saying it was granted access, which no ordinary app can read.
+        var bluetoothPurpose: String?
     }
 
     private static let lock = NSLock()
@@ -41,12 +44,23 @@ enum InstalledApps {
                 let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
                     ?? String(entry.dropLast(4))
-                found[id] = App(name: name, bundleID: id, path: path)
+                let purpose = (bundle.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "NSBluetoothPeripheralUsageDescription") as? String)
+                found[id] = App(name: name, bundleID: id, path: path, bluetoothPurpose: purpose)
             }
         }
         let sorted = found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         lock.lock(); cached = sorted; lock.unlock()
         return sorted
+    }
+
+    /// The applications built to use Bluetooth, as they say so themselves in their Info.plist.
+    ///
+    /// macOS records which of them you actually granted access to in a database an app cannot read, so this is the
+    /// nearest honest answer: who asked, not who was allowed. The UI says which of the two it is showing.
+    static func bluetoothUsers(_ apps: [App] = all()) -> [App] {
+        apps.filter { $0.bluetoothPurpose != nil }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// Matches on name or identifier, so "cursor" and "com.todesktop" both find the same app.
