@@ -38,8 +38,12 @@ echo "Team: $TEAM_ID"
 echo
 
 # Keychain Access is the only reliable way to get one identity out: `security export` takes every identity at
-# once and can't be told which. In Keychain Access, right-click each certificate › Export… and save a .p12.
-echo "Export both certificates from Keychain Access (right-click › Export…, format .p12, same password for both)."
+# once and can't be told which, and exporting the lot would put more key material in CI than the release needs.
+echo "Export both certificates from Keychain Access, giving them the same password:"
+echo "  1. Open Keychain Access and click the My Certificates tab — not All Items. Export is only offered there,"
+echo "     because only that view pairs a certificate with its private key."
+echo "  2. Select \"Developer ID Application: …\", then File › Export Items… and save a .p12."
+echo "  3. Do the same for \"Developer ID Installer: …\"."
 APP_P12=$(ask "  Path to the Developer ID Application .p12: ")
 INSTALLER_P12=$(ask "  Path to the Developer ID Installer .p12: ")
 printf '  Password you gave them: ' >&2

@@ -187,7 +187,7 @@ notarize, so revoking it breaks nothing else, whereas an app-specific password a
 
 | Secret | What it is |
 |---|---|
-| `APP_CERTIFICATE_P12` | Developer ID **Application** certificate + key, exported from Keychain Access as .p12, base64 |
+| `APP_CERTIFICATE_P12` | Developer ID **Application** certificate + key as .p12, base64. Export it from Keychain Access's **My Certificates** tab (File › Export Items…) — All Items shows the bare certificate and offers no Export |
 | `INSTALLER_CERTIFICATE_P12` | Developer ID **Installer** certificate + key, same treatment |
 | `CERTIFICATE_PASSWORD` | the password protecting both .p12 files |
 | `APP_PROVISIONING_PROFILE` | `Flowlight Developer ID.provisionprofile`, base64 |
