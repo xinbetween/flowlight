@@ -269,6 +269,29 @@ Planned, in order:
 
   Worth being clear up front that this widens what Flowlight watches, so each part ships behind its own switch and
   the Bluetooth and USB permissions are only requested if you turn them on.
+- **0.5.0 — Ask Flowlight.** Questions in plain language — *what did Claude Code upload yesterday?*, *which app
+  started talking to somewhere new this week?*, *summarise the last hour* — answered from the recorded history,
+  with the rows behind each answer one click away.
+
+  **The model never gets your history.** It gets the schema and a set of read-only queries it may call; Flowlight
+  runs them and hands back aggregates. So what leaves the Mac, if anything does, is one question and the numbers
+  needed to answer it — not the database. Every request is shown before it's sent.
+
+  **Local first.** An on-device model where the OS provides one (Apple's Foundation Models framework, on the macOS
+  versions that have it), or a local server you already run — Ollama, LM Studio, llama.cpp. That path costs nothing,
+  sends nothing, and works offline, which is the only default that fits a tool whose promise is no account and no
+  cloud.
+
+  **Or bring your own key** for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. Your key, your
+  provider, your terms.
+
+  A *hosted* option is the one that sits least comfortably here: it would mean running a service and becoming a
+  processor of other people's traffic metadata, for a tool that today has no account and no server. If it ever
+  happens it is strictly opt-in per question — and it may be better not to do it at all.
+
+  **Flowlight has to hold itself to its own standard.** Whatever this feature sends appears in Live and Reports like
+  any other app's traffic, counts against an allowlist, and is readable in Inspect. A network monitor that quietly
+  phones home to answer questions about phoning home would be worth less than no feature at all.
 
 Later, no version yet:
 
