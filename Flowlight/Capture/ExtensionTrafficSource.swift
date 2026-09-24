@@ -98,7 +98,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 guard self.connection === connection, !self.sawTraffic else { return }
                 let message = detail.isEmpty
                     ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another "
-                      + "one — a VPN or a security agent such as Palo Alto Networks GlobalProtect, CrowdStrike Falcon, Netskope or Zscaler — already "
+                      + "one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already "
                       + "has that slot. The extension can't capture anything on this Mac until that changes."
                     : "macOS refused to start Flowlight's filter: \(detail)"
                 self.status?(detail.isEmpty ? "Connected to the extension \(version), but it isn't filtering" : "The filter couldn't start")

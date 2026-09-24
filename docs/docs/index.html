@@ -207,7 +207,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
         come from the filter's own statistics rather than from counting packets. It never blocks anything.</p>
       <p><strong>It also can't run at all on some Macs.</strong> macOS allows one content filter at a time, and corporate security software
-        normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar and the like. Flowlight's filter will install and connect on those
+        normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
         machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
         needs no filter and works alongside them.
         See <a href="https://github.com/xinbetween/flowlight/blob/main/docs/DEVELOPMENT.md">the developer guide</a> for how it's built.</p>
@@ -256,7 +256,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
           extension from <strong>Capture</strong>. <a href="#engines">The full comparison is above.</a></dd>
         <dt><strong>I turned on the Network Extension and nothing appears. The sampler works fine.</strong></dt>
         <dd>Almost always because another content filter already has the slot. <strong>macOS runs one content filter at a time</strong>, and
-          corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar, CrowdStrike and similar. Flowlight's
+          corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar. Flowlight's
           filter still installs, activates and connects, so Capture says <em>Connected to filter extension</em>, but macOS never hands it a
           single connection and the screens stay empty. <strong>Capture lists the filters it finds</strong> and offers to switch you back to
           the sampler, which doesn't use a filter and works alongside them. You lose only the very short connections

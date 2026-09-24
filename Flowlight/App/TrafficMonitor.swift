@@ -236,7 +236,7 @@ final class TrafficMonitor: ObservableObject {
         // Same idea as FLForceCaptureOnboarding: a way to see this state on a Mac where the filter works.
         captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
             ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN "
-              + "or a security agent such as Palo Alto Networks GlobalProtect, CrowdStrike Falcon, Netskope or Zscaler — already has that slot. The "
+              + "or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The "
               + "extension can't capture anything on this Mac until that changes."
             : nil
         if let extensionSource = newSource as? ExtensionTrafficSource {

@@ -2,8 +2,9 @@ import XCTest
 @testable import Flowlight
 
 final class SystemExtensionScanTests: XCTestCase {
-    /// Real output from a managed Mac where Flowlight's filter never started: Palo Alto Networks GlobalProtect, CrowdStrike Falcon and a data-loss agent
-    /// all hold active network extensions, and macOS runs one content filter at a time.
+    /// The shape of `systemextensionsctl list` on a managed Mac where Flowlight's filter never started: other
+    /// vendors hold active network extensions, and macOS runs one content filter at a time. The identifiers are
+    /// stand-ins — a real user's security stack isn't something to publish in a test.
     private let sample = """
     9 extension(s)
     --- com.apple.system_extension.network_extension (Go to 'System Settings > General > Login Items & Extensions > Network Extensions' to modify these system extension(s))
@@ -14,7 +15,7 @@ final class SystemExtensionScanTests: XCTestCase {
     *\t*\t38RJUJHKZS\tcom.flowlight.app.filter (0.2.5/8)\tFlowlight Filter\t[activated enabled]
     --- com.apple.system_extension.endpoint_security (Go to 'System Settings > General > Login Items & Extensions > Endpoint Security Extensions' to modify these system extension(s))
     enabled\tactive\tteamID\tbundleID (version)\tname\t[state]
-    *\t*\tTEAMTWO456\tcom.example.endpoint.daemon (11.5.2622.12.M/1)\tProtectord\t[activated enabled]
+    *\t*\tTEAMTWO456\tcom.example.endpoint.daemon (11.5.2622.12.M/1)\tExampleEndpointDaemon\t[activated enabled]
     """
 
     func testParsesEveryRowAndSkipsHeaders() {
@@ -24,19 +25,19 @@ final class SystemExtensionScanTests: XCTestCase {
     }
 
     func testReadsNameVersionAndState() {
-        let fortiEDR = SystemExtensionScan.parse(sample).first { $0.bundleID.contains("fortiedr") }
-        XCTAssertEqual(fortiEDR?.name, "ExampleEDRNetworkFilter")
-        XCTAssertEqual(fortiEDR?.version, "6.1.1/1281")
-        XCTAssertEqual(fortiEDR?.state, "activated enabled")
-        XCTAssertEqual(fortiEDR?.teamID, "TEAMONE123")
-        XCTAssertTrue(fortiEDR?.isActive == true)
+        let edr = SystemExtensionScan.parse(sample).first { $0.bundleID.contains("edr") }
+        XCTAssertEqual(edr?.name, "ExampleEDRNetworkFilter")
+        XCTAssertEqual(edr?.version, "6.1.1/1281")
+        XCTAssertEqual(edr?.state, "activated enabled")
+        XCTAssertEqual(edr?.teamID, "TEAMONE123")
+        XCTAssertTrue(edr?.isActive == true)
     }
 
     func testCategoriesAreCarried() {
         let found = SystemExtensionScan.parse(sample)
-        XCTAssertTrue(found.first { $0.bundleID.contains("manageengine") }?.isNetworkExtension == false,
+        XCTAssertTrue(found.first { $0.bundleID.contains("endpoint") }?.isNetworkExtension == false,
                       "an endpoint security extension doesn't take the content-filter slot")
-        XCTAssertTrue(found.first { $0.bundleID.contains("forticlient") }?.isNetworkExtension == true)
+        XCTAssertTrue(found.first { $0.bundleID.contains("security") }?.isNetworkExtension == true)
     }
 
     func testCompetingFiltersExcludeOursAndInactiveOnes() {
