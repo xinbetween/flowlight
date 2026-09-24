@@ -80,26 +80,47 @@ if ! check_password "$APP_P12" "$INSTALLER_P12"; then
 fi
 echo
 
-# Xcode leaves the downloaded profiles here under opaque UUID names, so they're matched by the name inside.
+# Xcode leaves the downloaded profiles under opaque UUID names, so they're matched on the name stored inside.
+# `find` rather than a glob: a glob qualifier depends on shell options this script doesn't control.
+PROFILE_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 find_profile() {
-  local wanted="$1" dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-  [[ -d "$dir" ]] || return 1
-  local f
-  for f in "$dir"/*.provisionprofile(N); do
-    [[ "$(security cms -D -i "$f" 2>/dev/null | plutil -extract Name raw - 2>/dev/null)" == "$wanted" ]] && { print -r -- "$f"; return 0; }
-  done
+  local wanted="$1" f name
+  [[ -d "$PROFILE_DIR" ]] || return 1
+  while IFS= read -r f; do
+    name=$(security cms -D -i "$f" 2>/dev/null | plutil -extract Name raw - 2>/dev/null) || continue
+    if [[ "$name" == "$wanted" ]]; then
+      print -r -- "$f"
+      return 0
+    fi
+  done < <(find "$PROFILE_DIR" -maxdepth 1 -name '*.provisionprofile' -print 2>/dev/null)
   return 1
+}
+
+# What's actually there, so a miss below is explainable rather than mysterious.
+list_profiles() {
+  local f name
+  [[ -d "$PROFILE_DIR" ]] || { echo "  (no $PROFILE_DIR)"; return; }
+  while IFS= read -r f; do
+    name=$(security cms -D -i "$f" 2>/dev/null | plutil -extract Name raw - 2>/dev/null) || name="(unreadable)"
+    echo "  $name"
+  done < <(find "$PROFILE_DIR" -maxdepth 1 -name '*.provisionprofile' -print 2>/dev/null)
 }
 
 APP_PROFILE_PATH=$(find_profile "${APP_PROFILE_NAME:-Flowlight Developer ID}" || true)
 EXT_PROFILE_PATH=$(find_profile "${EXT_PROFILE_NAME:-Flowlight Extension Developer ID}" || true)
+if [[ -z "$APP_PROFILE_PATH" || -z "$EXT_PROFILE_PATH" ]]; then
+  echo "Provisioning profiles Xcode has downloaded:"
+  list_profiles
+  echo "Looking for \"${APP_PROFILE_NAME:-Flowlight Developer ID}\" and \"${EXT_PROFILE_NAME:-Flowlight Extension Developer ID}\"."
+  echo "Missing one? Download it from developer.apple.com, or open Xcode › Settings › Accounts › Download Manual Profiles."
+fi
 if [[ -n "$APP_PROFILE_PATH" ]]; then
-  echo "Found \"Flowlight Developer ID\" at $(basename "$APP_PROFILE_PATH")"
+  echo "Found \"${APP_PROFILE_NAME:-Flowlight Developer ID}\" at $(basename "$APP_PROFILE_PATH")"
 else
   APP_PROFILE_PATH=$(ask "Path to the app's .provisionprofile: ")
 fi
 if [[ -n "$EXT_PROFILE_PATH" ]]; then
-  echo "Found \"Flowlight Extension Developer ID\" at $(basename "$EXT_PROFILE_PATH")"
+  echo "Found \"${EXT_PROFILE_NAME:-Flowlight Extension Developer ID}\" at $(basename "$EXT_PROFILE_PATH")"
 else
   EXT_PROFILE_PATH=$(ask "Path to the extension's .provisionprofile: ")
 fi
