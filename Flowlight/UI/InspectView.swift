@@ -31,11 +31,23 @@ private struct InspectContent: View {
                     ContentUnavailableView {
                         Label("Nothing inspected yet", systemImage: "lock.open.display")
                     } description: {
-                        Text("Start an agent from an inspected Terminal window, or turn on the system proxy in Setup. Its requests appear here.")
+                        VStack(spacing: 10) {
+                            Text("Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. "
+                                 + "Command-line agents don't: they need the environment from an inspected Terminal.")
+                            if let diagnosis = inspection.diagnosis {
+                                Text(diagnosis)
+                                    .font(.callout)
+                                    .foregroundStyle(diagnosis.hasPrefix("Ready") ? .secondary : Color.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: 460)
                     } actions: {
                         Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
+                        Button("Check Setup") { Task { await inspection.checkSetup() } }
                     }
                     .frame(maxHeight: .infinity)
+                    .task { if inspection.diagnosis == nil { await inspection.checkSetup() } }
                 } else {
                     HSplitView {
                         table.frame(minWidth: 520, maxHeight: .infinity)

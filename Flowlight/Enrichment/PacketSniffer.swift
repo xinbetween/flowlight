@@ -112,7 +112,10 @@ final class PacketSniffer: @unchecked Sendable {
         fd = -1
         generation += 1
         lock.unlock()
-        if device >= 0 { close(device) }
+        // close() on a BPF descriptor sleeps in the kernel until a reader blocked in read() lets go, which on a
+        // quiet interface used to mean minutes. Switching capture source calls this from the main thread, so the
+        // whole app hung; the descriptor is closed on another thread and the UI carries on immediately.
+        if device >= 0 { DispatchQueue.global(qos: .utility).async { close(device) } }
         if state != .noPermission { state = .stopped }
     }
 
@@ -137,9 +140,11 @@ final class PacketSniffer: @unchecked Sendable {
             let n = read(fd, buffer, size)
             lock.lock(); let current = generation; lock.unlock()
             guard current == myGeneration else { return }
-            if n <= 0 {
-                if n < 0 && errno == EINTR { continue }
-                state = .failed(n == 0 ? "capture closed" : String(cString: strerror(errno)))
+            // With a read timeout set, 0 means the interval passed with no packets — not that capture ended.
+            if n == 0 { continue }
+            if n < 0 {
+                if errno == EINTR { continue }
+                state = .failed(String(cString: strerror(errno)))
                 return
             }
             var offset = 0
@@ -195,6 +200,9 @@ final class PacketSniffer: @unchecked Sendable {
         }
         var on: UInt32 = 1
         _ = ioctl(fd, BPF.BIOCIMMEDIATE, &on)
+        // Wake the reader once a second even when nothing arrives, so it notices it has been stopped.
+        var timeout = timeval(tv_sec: 1, tv_usec: 0)
+        _ = ioctl(fd, BPF.BIOCSRTIMEOUT, &timeout)
         _ = ioctl(fd, BPF.BIOCSSEESENT, &on) // we need outbound ClientHellos
 
         var linkType: UInt32 = 0

@@ -17,6 +17,9 @@ enum BPF {
     static let BIOCGDLT: UInt = 0x4004_426A
     static let BIOCSETIF: UInt = 0x8020_426C
     static let BIOCIMMEDIATE: UInt = 0x8004_4270
+    /// _IOW('B', 109, struct timeval). Without it a read blocks until a packet arrives, and on a quiet
+    /// interface that is indefinitely — which makes closing the descriptor sleep in the kernel.
+    static let BIOCSRTIMEOUT: UInt = 0x8010_426D
     static let BIOCSSEESENT: UInt = 0x8004_4277
 
     static let DLT_NULL: UInt32 = 0

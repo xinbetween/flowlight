@@ -36,6 +36,8 @@ final class InspectionController: ObservableObject {
     @Published private(set) var systemProxyOn = false
     /// True while the one-click setup is waiting on the administrator prompt.
     @Published private(set) var working = false
+    /// What a setup check found, or nil if it hasn't been run since inspection was turned on.
+    @Published private(set) var diagnosis: String?
 
     private let proxy = InspectionProxy()
     private let recorder = InspectionRecorder()
@@ -144,6 +146,13 @@ final class InspectionController: ObservableObject {
         // the proxy, and turning off an untrusted certificate asks only to undo the proxy.
         let needsTrustChange = certificate.isTrustedAnywhere != on
         let needsProxyChange = !services.isEmpty
+        if on, services.isEmpty {
+            working = false
+            lastError = "No network services to send through the proxy, so nothing would be inspected. "
+                + "Check System Settings › Network."
+            proxy.stop()
+            return
+        }
         Task.detached(priority: .userInitiated) {
             var failure: String?
             var trustChanged = false
@@ -176,6 +185,9 @@ final class InspectionController: ObservableObject {
             UserDefaults.standard.set(on, forKey: Keys.enabled)
             UserDefaults.standard.set(on, forKey: Keys.systemProxy)
             if !on { proxy.stop() }
+            diagnosis = nil
+            // Confirm it actually works rather than assuming the commands took effect.
+            if on { Task { await checkSetup() } }
         }
         objectWillChange.send()
         refreshStatus()
@@ -275,6 +287,44 @@ final class InspectionController: ObservableObject {
 
     /// The proxy auto-config served to apps that follow system proxy settings. It falls back to a direct connection
     /// when Flowlight isn't running, so quitting Flowlight never cuts the Mac off.
+    /// Checks the three things that have to be true for an app's traffic to reach the proxy, and says which
+    /// one isn't. Turning inspection on reports success as soon as the commands run, but a listener that never
+    /// came up or a proxy setting that didn't take leaves the app quietly inspecting nothing.
+    func checkSetup() async {
+        guard UserDefaults.standard.bool(forKey: Keys.enabled) else { diagnosis = nil; return }
+        guard let listening = port else {
+            diagnosis = "The proxy isn't listening. Another program may be using port \(configuredPort) — change it under Advanced."
+            return
+        }
+        let services = SystemProxy.services()
+        let expected = "http://127.0.0.1:\(listening)/proxy.pac"
+        let unset: [String] = await Task.detached(priority: .userInitiated) {
+            services.filter { service in
+                let result = CertificateAuthority.run("/usr/sbin/networksetup", ["-getautoproxyurl", service])
+                return !(result.output.contains(expected) && result.output.contains("Enabled: Yes"))
+            }
+        }.value
+        if !unset.isEmpty {
+            diagnosis = "\(unset.joined(separator: ", ")) isn't set to use Flowlight's proxy. Turn inspection off and on again."
+            return
+        }
+        // The PAC file has to be served, or macOS quietly falls back to connecting directly.
+        var request = URLRequest(url: URL(string: expected)!)
+        request.timeoutInterval = 5
+        do {
+            let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty else {
+                diagnosis = "Flowlight isn't serving its proxy settings file, so macOS is connecting directly."
+                return
+            }
+        } catch {
+            diagnosis = "Couldn't reach Flowlight's proxy settings file: \(error.localizedDescription)"
+            return
+        }
+        let covered = scope == .agents ? "AI agents and their tools" : "every app that uses the proxy"
+        diagnosis = "Ready: \(services.joined(separator: ", ")) routed through 127.0.0.1:\(listening), inspecting \(covered)."
+    }
+
     nonisolated static func pacScript(port: UInt16, never patterns: [String]) -> String {
         let proxy = "PROXY 127.0.0.1:\(port); DIRECT"
         let never = patterns.map { "\"\(Self.jsString($0))\"" }.joined(separator: ", ")
