@@ -268,10 +268,9 @@ Planned, in order:
 - **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
   headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - **0.3.2 — Export to OpenTelemetry / SIEM.**
-- **0.3.3 — Runs quietly in the background.** A menu-bar-only mode: no Dock icon, no Cmd-Tab entry, the menu bar as
-  the way back to the window. Most of this already works — launch at login, capture continuing with the window
-  closed, and almost no cost while idle — so what's left is the activation policy and making the choice
-  reversible without a relaunch.
+- **0.3.3 — Runs quietly in the background.** The menu-bar-only mode shipped in 0.2.7 (Settings › General › Run in
+  the background). What's left for this milestone is the rest of getting out of the way: remembering window state
+  across launches, a quieter first run, and deciding what the menu bar should show when there's no window at all.
 
   **Not a background daemon.** In extension mode the filter already runs independently of the app; adding a
   launch agent so the sampler survives a quit would mean a second signed executable, a second update path, and

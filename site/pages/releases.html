@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.2.6</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.2.7</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Run in the background.</strong> Settings › General drops the Dock icon and the Cmd-Tab entry; Flowlight keeps
+            recording and stays reachable from the menu bar, which gains <em>Show Dock Icon</em> to undo it.</li>
+          <li><strong>Switching to the extension shows current traffic immediately.</strong> It sends the newest second first and
+            backfills history behind it, so a long gap no longer has to drain before anything appears — and it can hold an hour again.</li>
+          <li><strong>Capture says the filter outlives the app.</strong> A system extension runs on its own and keeps inspecting
+            connections after you quit Flowlight, until you disable or uninstall it.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.2.7">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.2.6</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Flowlight says when macOS won't let its filter run.</strong> macOS allows one content filter at a time, and on a
             managed Mac a VPN or security agent usually holds it. Flowlight's filter would install, activate and connect while never being

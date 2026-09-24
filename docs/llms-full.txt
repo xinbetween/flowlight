@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.7, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -390,7 +390,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -694,7 +694,7 @@ e.g. Wireshark
 
  Export to OpenTelemetry / SIEM 0.3.2Send what Flowlight records to the tools the rest of your stack already reports to.
 
- Runs quietly in the background 0.3.3A menu-bar-only mode with no Dock icon. Launch at login and capture with the window closed already work; what's left is getting out of the way. Deliberately not a background daemon — a second process with full network visibility is the thing Flowlight exists to notice.
+ Runs quietly in the background 0.3.3The menu-bar-only mode arrived in 0.2.7; the rest is getting further out of the way — window state across launches and a quieter first run. Deliberately not a background daemon: a second process with full network visibility is the thing Flowlight exists to notice.
 
  Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
 
@@ -904,8 +904,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.6
+ 0.2.7
 September 24, 2026Latest
+
+ Run in the background. Settings › General drops the Dock icon and the Cmd-Tab entry; Flowlight keeps
+ recording and stays reachable from the menu bar, which gains Show Dock Icon to undo it.
+
+ Switching to the extension shows current traffic immediately. It sends the newest second first and
+ backfills history behind it, so a long gap no longer has to drain before anything appears — and it can hold an hour again.
+
+ Capture says the filter outlives the app. A system extension runs on its own and keeps inspecting
+ connections after you quit Flowlight, until you disable or uninstall it.
+
+ Downloads and checksums →
+
+ 0.2.6
+September 24, 2026
 
  Flowlight says when macOS won't let its filter run. macOS allows one content filter at a time, and on a
  managed Mac a VPN or security agent usually holds it. Flowlight's filter would install, activate and connect while never being

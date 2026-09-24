@@ -21,6 +21,8 @@ struct AnomalySettings: Sendable {
     var agentAwayBytes: Int64 = 1_000_000
 
     enum Keys {
+        /// Run without a Dock icon, reachable from the menu bar.
+        static let backgroundOnly = "app.backgroundOnly"
         static let sigma = "anomaly.sigma"
         static let learningHours = "anomaly.learningHours"
         static let minAlertMB = "anomaly.minAlertMB"

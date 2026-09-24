@@ -4,6 +4,15 @@ import SwiftUI
 struct FlowlightApp: App {
     /// True while the XCTest bundle is being hosted by this app.
     static let runningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
+
+    /// `.accessory` drops the Dock icon and the Cmd-Tab entry while leaving the menu bar and every window
+    /// working, so it can be turned on and off without relaunching.
+    private static func applyActivationPolicy(backgroundOnly: Bool) {
+        guard !runningTests else { return }
+        NSApp.setActivationPolicy(backgroundOnly ? .accessory : .regular)
+        if !backgroundOnly { NSApp.activate() }
+    }
 
     @StateObject private var monitor = TrafficMonitor()
     @StateObject private var extensionManager = ExtensionManager()
@@ -32,6 +41,7 @@ struct FlowlightApp: App {
                     updater.start()
                 }
                 .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
+                .onChange(of: backgroundOnly, initial: true) { _, on in Self.applyActivationPolicy(backgroundOnly: on) }
         }
         .windowToolbarStyle(.unified)
         .commands {

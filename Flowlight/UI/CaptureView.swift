@@ -76,6 +76,16 @@ struct CaptureView: View {
                     }
                     Label {
                         Text("""
+                        **It keeps filtering after you quit Flowlight.** A system extension runs on its own, so the \
+                        filter carries on inspecting connections and holding what it sees until you press Disable or \
+                        Uninstall above. Nothing reaches this app while it isn't running, but the filter is still there.
+                        """)
+                        .font(.callout).foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "info.circle").foregroundStyle(.secondary)
+                    }
+                    Label {
+                        Text("""
                         **macOS runs one content filter at a time.** If a VPN or security agent already has that slot — \
                         Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and \
                         connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs.

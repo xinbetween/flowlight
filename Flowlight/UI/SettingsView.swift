@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage(K.agentEgressMB) private var agentEgressMB = 100.0
     @AppStorage(K.agentAway) private var agentAway = true
     @AppStorage(K.agentAwayMinutes) private var agentAwayMinutes = 15.0
+    @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginItemError: String?
 
@@ -27,6 +28,13 @@ struct SettingsView: View {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
+                Toggle(isOn: $backgroundOnly) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Run in the background")
+                        Text("No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Toggle("Show live rates in the menu bar", isOn: $menuBarRates)
                 Toggle("Show notifications for warnings", isOn: $notifications)
                 UpdateSettingsRow()
@@ -101,6 +109,7 @@ struct SettingsView: View {
 }
 
 struct MenuBarContent: View {
+    @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
@@ -124,6 +133,9 @@ struct MenuBarContent: View {
             NSApp.activate()
         }
         .keyboardShortcut("o")
+        if backgroundOnly {
+            Button("Show Dock Icon") { backgroundOnly = false }
+        }
         if !focus.targets.isEmpty {
             Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
         }

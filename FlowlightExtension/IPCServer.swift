@@ -11,11 +11,10 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var nextSeq: UInt64 = 0
     private var inFlight = false
     private let queue = DispatchQueue(label: "flowlight.ipc")
-    /// Seconds of traffic held while no app is connected — which is the whole time the app is using the nettop
-    /// sampler instead. It used to be an hour, and switching back to the extension replayed every second of it
-    /// oldest-first, ahead of anything current: the live view stayed empty for as long as the backlog took to
-    /// drain, and looked broken. Five minutes covers a restart or an extension upgrade and drains at once.
-    private let maxPendingBatches = 300
+    /// Seconds of traffic held while no app is connected — the whole time the app is on the nettop sampler, or
+    /// quit. An hour of it is worth keeping now that the newest second is delivered first (see `flushLocked`);
+    /// when the oldest went first, a backlog this size left the live view empty until it had all drained.
+    private let maxPendingBatches = 3600
     private let chunkSize = 300
 
     private var machServiceName: String {
@@ -82,10 +81,14 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     /// Sends one chunk at a time; batches leave the queue only after the app acknowledges them.
+    ///
+    /// Newest first. An app that has just connected needs the current second before anything else — that is what
+    /// its live view is made of — and the backlog behind it is history, which is just as useful arriving second.
+    /// Sending oldest-first instead meant a long gap had to drain completely before anything current appeared.
     private func flushLocked() {
         guard !inFlight, let client, !pending.isEmpty else { return }
-        let chunk = pending.prefix(chunkSize)
-        let lastSeq = chunk.last!.seq
+        let chunk = Array(pending.suffix(chunkSize))
+        let firstSeq = chunk.first!.seq, lastSeq = chunk.last!.seq
         let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
             extensionLog.error("deliver failed: \(error.localizedDescription, privacy: .public)")
             self?.queue.async { self?.inFlight = false }
@@ -96,7 +99,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self?.queue.async {
                 guard let self else { return }
                 self.inFlight = false
-                self.pending.removeAll { $0.seq <= lastSeq }
+                self.pending.removeAll { $0.seq >= firstSeq && $0.seq <= lastSeq }
                 self.flushLocked()
             }
         }
