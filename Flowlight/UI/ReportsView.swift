@@ -46,11 +46,19 @@ struct ReportsView: View {
     @AppStorage("reports.insightMetric") private var metric: InsightMetric = .total
     @State private var insights = InsightsSnapshot.empty
     @State private var registries: [InsightDimension: ColorRegistry] = [:]
+    /// Apps whose destinations stand out from the rest of this report. Rebuilt from the same breakdown rows.
+    @State private var behaviour: [AppBehaviour] = []
 
     enum LowerMode: String, CaseIterable, Identifiable {
-        case breakdown, charts
+        case breakdown, charts, behaviour
         var id: String { rawValue }
-        var title: String { self == .breakdown ? "Breakdown" : "Charts" }
+        var title: String {
+            switch self {
+            case .breakdown: return "Breakdown"
+            case .charts: return "Charts"
+            case .behaviour: return "Worth a look"
+            }
+        }
     }
 
     /// A snapshot of what is on screen, for the drill-down back stack.
@@ -71,6 +79,18 @@ struct ReportsView: View {
                         InsightsPanel(snapshot: insights, registries: registries, metric: metric, granularity: granularity,
                                       scopeName: scopeName, onSelect: narrow)
                             .overlay { if insights.dimensions.isEmpty && !loading { emptyCharts } }
+                    }
+                    .padding()
+                }
+            } else if lowerMode == .behaviour {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        header
+                        lowerModeBar
+                        BehaviourPanel(findings: behaviour, period: granularity.periodName) { finding in
+                            filter = TrafficFilter(bundleID: finding.bundleID)
+                            lowerMode = .breakdown
+                        }
                     }
                     .padding()
                 }
@@ -156,7 +176,7 @@ struct ReportsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 200)
+            .frame(width: 320)
             if lowerMode == .charts {
                 Spacer()
                 Text("Measure").font(.caption).foregroundStyle(.secondary)
@@ -644,6 +664,7 @@ struct ReportsView: View {
             contributors = [:]
             breakdownTruncated = result.1.count >= TrafficDatabase.breakdownLimit
             breakdownRows = result.1
+            behaviour = DestinationProfile.analyse(result.1)
             nodes = TrafficNode.tree(from: result.1, grouping: grouping, base: f)
             if hovered != nil { hovered = series.first { $0.date == hovered?.date } }
         } catch {

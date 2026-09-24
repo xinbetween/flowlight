@@ -19,6 +19,19 @@ enum Granularity: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// How the window reads in a sentence, e.g. "the last 3 days".
+    var periodName: String {
+        switch self {
+        case .second: return "the last 5 minutes"
+        case .minute: return "the last 3 hours"
+        case .hour: return "the last 3 days"
+        case .day: return "the last 30 days"
+        case .week: return "the last 6 months"
+        case .month: return "the last 2 years"
+        case .year: return "this report"
+        }
+    }
+
     /// Default window shown for the granularity.
     var defaultWindow: TimeInterval {
         switch self {
