@@ -7,6 +7,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private var sink: (([TrafficBatch]) -> Void)?
     private var status: ((String) -> Void)?
     private var retryTimer: Timer?
+    /// Tells the app that capture is alive during a quiet second. The extension only sends when there is traffic,
+    /// so without this the status goes orange on an idle Mac even though the filter is working perfectly.
+    private var heartbeatTimer: Timer?
     private var stopped = true
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
@@ -19,6 +22,8 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     func stop() {
         stopped = true
         retryTimer?.invalidate()
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
         connection?.invalidate()
         connection = nil
     }
@@ -38,7 +43,21 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             self?.scheduleReconnect("Extension unreachable: \(error.localizedDescription)")
         } as? FlowlightProviderXPC
         proxy?.register { [weak self] ok, version in
-            self?.status?(ok ? "Connected to filter extension \(version)" : "Extension refused registration")
+            guard let self else { return }
+            self.status?(ok ? "Connected to filter extension \(version)" : "Extension refused registration")
+            if ok { self.startHeartbeat() }
+        }
+    }
+
+    /// While the connection is up, a quiet second still counts as capture being alive.
+    private func startHeartbeat() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.stopped else { return }
+            self.sink?([])   // green straight away rather than after the first second
+            self.heartbeatTimer?.invalidate()
+            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                self?.sink?([])
+            }
         }
     }
 
@@ -46,6 +65,8 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         status?(message)
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.stopped else { return }
+            self.heartbeatTimer?.invalidate()
+            self.heartbeatTimer = nil
             self.connection = nil
             self.retryTimer?.invalidate()
             self.retryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.connect() }
@@ -53,8 +74,8 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     }
 
     func deliver(payload: Data, reply: @escaping () -> Void) {
-        let batches = TrafficCoding.decode(payload)
-        if !batches.isEmpty { sink?(batches) }
+        // Empty deliveries are passed on too: ingest reads them as "capture is alive, nothing moved".
+        sink?(TrafficCoding.decode(payload))
         reply()
     }
 }
