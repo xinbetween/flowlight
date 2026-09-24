@@ -24,6 +24,7 @@ Flowlight/                  SwiftUI host app
   Storage/                    SQLite (no dependencies): flows_1s → agg_1m → agg_1h / agg_1d rollups
   Enrichment/                 BPF packet capture (DNS + TLS SNI), network-owner (ASN) lookup
   Analysis/                   EWMA/z-score baselines, rule engine, AI agent catalog + rules, UI-activity tracker
+  Inspection/                 HTTPS inspection: local CA, decrypting proxy, HTTP parser, recorder, mock rules
   UI/                         Live, AI Agents, Reports (charts + three breakdown groupings + CSV), Alerts, Capture
 Shared/Classification/ProtocolCatalog.swift   108 protocols in 13 families, used by both capture engines
 FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent and anomaly tests
@@ -151,6 +152,35 @@ sits in the path of a connection, and a switch that did nothing would be worse t
   blocking and inspection don't compose for the same agent.
 - `BlockRules` is plain functions over plain data (like `AgentPolicy.matches`), so `BlockingTests` covers the whole
   decision without a filter installed.
+
+## Mock responses
+
+A rule (`MockRule`) answers a chosen endpoint from Flowlight instead of letting the request reach the server, so an
+agent can be shown an API that fails, stalls or replies with something odd. Rules live in UserDefaults as JSON
+(`inspection.mockRules`), are tried in order, and the first enabled match answers.
+
+- **Matching** is `MockRules`, plain functions over plain data like `AgentPolicy.matches`, so `MockResponseTests`
+  covers precedence and every host, path and method form without a proxy. Host: `api.example.com` is that host
+  exactly, `*.example.com` covers the domain and its subdomains. Path: one glob where `*` is any run of characters,
+  compared against the path alone unless the pattern contains a `?`. Method: empty or `ANY` matches all. An empty
+  host matches nothing — a rule in progress must never answer everything.
+- **In the proxy**, `relay` reads the rules once per flow. A host no rule names keeps the byte-for-byte relay it had
+  before, never framed; otherwise a `MockGate` frames the client's stream and partitions every byte into forward,
+  hold or answer. `pump`'s tap returns what carries on to the destination, so a held request simply isn't written
+  upstream, and the canned response goes back to the client after the rule's delay.
+- **It's still recorded.** The recorder sees the same client bytes either way, plus the canned response as if the
+  server had sent it, so pairing, parsing and storage are unchanged. Flowlight writes `Content-Length`,
+  `Connection: close` and `X-Flowlight-Mock` itself — a mock whose framing disagreed with its body would hang the
+  client rather than test it — and strips CR/LF from rule-supplied headers so a rule can't forge a second response.
+- **A mocked exchange says so**: the rule's name goes in `HTTPExchange.mockRule` (column `mock_rule`, an in-place
+  `ALTER`), not in `note`, which means "nothing was inspected". Inspect badges the row and leads the detail pane
+  with the fact that the request was never sent, and the active rule count sits in the status bar — a mock left on
+  otherwise looks exactly like an agent misbehaving.
+- A host named by a rule is decrypted whatever the scope says: a rule can only answer a request Flowlight can read.
+  Nothing can be mocked on a tunnelled connection (never-inspect list, pinned certificates, traffic that doesn't go
+  through the proxy), and the UI says so rather than leaving it to be discovered.
+- The destination is still connected to before the gate runs, so a mock changes the answer, not whether the
+  connection can be made: "the API returns 500" works, "the API is entirely down" doesn't.
 
 ## Demo mode
 
