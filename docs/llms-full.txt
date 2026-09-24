@@ -60,7 +60,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.2.6, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -390,7 +390,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.2.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -902,8 +902,26 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.5
+ 0.2.6
 September 24, 2026Latest
+
+ Flowlight says when macOS won't let its filter run. macOS allows one content filter at a time, and on a
+ managed Mac a VPN or security agent usually holds it. Flowlight's filter would install, activate and connect while never being
+ handed a single connection — looking healthy and recording nothing. Capture now lists the other filters by name and offers the
+ sampler, which needs no filter.
+
+ Fixed: switching to the extension showed an empty Live panel, because it replayed up to an hour of buffered
+ traffic oldest-first before anything current could get through.
+
+ "Connected" no longer implies "working" — the status distinguishes a live connection from one that is
+ actually being given traffic.
+
+ A diagnostic script for when capture misbehaves, reporting state and counts and nothing about your traffic.
+
+ Downloads and checksums →
+
+ 0.2.5
+September 24, 2026
 
  Fixed: the filter stopped working after every app update. macOS keeps running whichever build of the
  extension was last activated, so after an update it was the previous one — and a mismatched pair can't talk to each other.
