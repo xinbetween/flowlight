@@ -48,8 +48,9 @@ APP_P12=$(ask "  Path to the Developer ID Application .p12: ")
 INSTALLER_P12=$(ask "  Path to the Developer ID Installer .p12: ")
 printf '  Password you gave them: ' >&2
 read -rs P12_PASSWORD; echo >&2
-for path in "$APP_P12" "$INSTALLER_P12"; do
-  expanded="${path/#\~/$HOME}"
+# Not `path`: in zsh that name is tied to PATH, and assigning it empties the command search path.
+for file in "$APP_P12" "$INSTALLER_P12"; do
+  expanded="${file/#\~/$HOME}"
   [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
 done
 # Check the password here rather than in CI, where a bad one reads as "The specified item could not be found in
@@ -60,10 +61,10 @@ check_password() {
   probe_password=$(uuidgen)
   security create-keychain -p "$probe_password" "$probe" 2>/dev/null || return 2
   security unlock-keychain -p "$probe_password" "$probe" 2>/dev/null
-  local path result=0 message
-  for path in "$@"; do
-    message=$(security import "${path/#\~/$HOME}" -k "$probe" -P "$P12_PASSWORD" -T /usr/bin/codesign 2>&1) || {
-      echo "  $path: $message" >&2
+  local file result=0 message
+  for file in "$@"; do
+    message=$(security import "${file/#\~/$HOME}" -k "$probe" -P "$P12_PASSWORD" -T /usr/bin/codesign 2>&1) || {
+      echo "  $file: $message" >&2
       result=1
     }
   done
@@ -124,8 +125,8 @@ if [[ -n "$EXT_PROFILE_PATH" ]]; then
 else
   EXT_PROFILE_PATH=$(ask "Path to the extension's .provisionprofile: ")
 fi
-for path in "$APP_PROFILE_PATH" "$EXT_PROFILE_PATH"; do
-  expanded="${path/#\~/$HOME}"
+for file in "$APP_PROFILE_PATH" "$EXT_PROFILE_PATH"; do
+  expanded="${file/#\~/$HOME}"
   [[ -s "$expanded" ]] || { echo "No file at $expanded" >&2; exit 1; }
 done
 echo
