@@ -21,6 +21,16 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
 
     func stop() {
         stopped = true
+        // async, never sync: stop() is called from the main actor today, and a sync hop from anywhere else
+        // would deadlock. Teardown only touches this instance, so a later hop is harmless.
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { self.teardown() }
+            return
+        }
+        teardown()
+    }
+
+    private func teardown() {
         retryTimer?.invalidate()
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
@@ -28,24 +38,40 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         connection = nil
     }
 
+    /// Always on the main thread: `connection` is read from XPC callbacks, the retry timer and stop(), and
+    /// comparing identities is only meaningful if one thread owns the property.
     private func connect() {
+        guard Thread.isMainThread else { DispatchQueue.main.async { [weak self] in self?.connect() }; return }
         guard !stopped else { return }
+        // Drop the previous attempt before making another. Left alive, its handlers keep firing long after it is
+        // irrelevant — reporting "unreachable" over a working connection and tearing it down to retry.
+        let superseded = connection
+        connection = nil
+        superseded?.invalidate()
+
         let connection = NSXPCConnection(machServiceName: FlowlightConstants.machServiceName, options: [])
         connection.remoteObjectInterface = NSXPCInterface(with: FlowlightProviderXPC.self)
         connection.exportedInterface = NSXPCInterface(with: FlowlightAppXPC.self)
         connection.exportedObject = self
-        connection.invalidationHandler = { [weak self] in self?.scheduleReconnect("Extension connection invalidated") }
-        connection.interruptionHandler = { [weak self] in self?.scheduleReconnect("Extension connection interrupted") }
+        connection.invalidationHandler = { [weak self, weak connection] in
+            self?.scheduleReconnect("Extension connection invalidated", from: connection)
+        }
+        connection.interruptionHandler = { [weak self, weak connection] in
+            self?.scheduleReconnect("Extension connection interrupted", from: connection)
+        }
         connection.resume()
         self.connection = connection
 
-        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self] error in
-            self?.scheduleReconnect("Extension unreachable: \(error.localizedDescription)")
+        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self, weak connection] error in
+            self?.scheduleReconnect("Extension unreachable: \(error.localizedDescription)", from: connection)
         } as? FlowlightProviderXPC
-        proxy?.register { [weak self] ok, version in
+        proxy?.register { [weak self, weak connection] ok, version in
             guard let self else { return }
-            self.status?(ok ? "Connected to filter extension \(version)" : "Extension refused registration")
-            if ok { self.startHeartbeat() }
+            DispatchQueue.main.async {
+                guard self.connection === connection else { return }   // a reply from a superseded attempt
+                self.status?(ok ? "Connected to filter extension \(version)" : "Extension refused registration")
+                if ok { self.startHeartbeat() }
+            }
         }
     }
 
@@ -61,10 +87,14 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         }
     }
 
-    private func scheduleReconnect(_ message: String) {
-        status?(message)
+    /// `connection` identifies the attempt this came from. Anything but the current one is ignored: an old
+    /// connection failing says nothing about the one in use, and acting on it was what made a working extension
+    /// report "Extension unreachable" indefinitely.
+    private func scheduleReconnect(_ message: String, from connection: NSXPCConnection?) {
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.stopped else { return }
+            guard self.connection === connection else { return }
+            self.status?(message)
             self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = nil
             self.connection = nil
