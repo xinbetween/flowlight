@@ -71,20 +71,48 @@ struct AlertsView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        // Two menus rather than four controls of four different shapes. The filter gathers everything that
+        // narrows the list; acknowledging is one verb with two objects, so it reads better as one button.
         ToolbarItemGroup {
-            Picker("Rule", selection: $rule) {
-                Text("All rules").tag("")
-                ForEach(rules, id: \.self) { Text($0).tag($0) }
+            Menu {
+                Picker("Rule", selection: $rule) {
+                    Text("All rules").tag("")
+                    ForEach(rules, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.inline)
+                Divider()
+                Toggle("Show acknowledged", isOn: $showAcknowledged)
+            } label: {
+                Label(filterLabel, systemImage: isFiltered ? "line.3.horizontal.decrease.circle.fill"
+                                                           : "line.3.horizontal.decrease.circle")
             }
-            .help("Filter by rule")
+            .labelStyle(.titleAndIcon)   // icon-only reads as two mystery buttons in the corner
             .disabled(alerts.isEmpty)
-            Toggle("Show acknowledged", isOn: $showAcknowledged).toggleStyle(.checkbox)
-                .disabled(alerts.isEmpty)
-            Button("Acknowledge") { monitor.acknowledgeAlerts(ids: Array(selection)) }
-                .disabled(selection.isEmpty)
-                .help("Acknowledge the selected alerts")
-            Button("Acknowledge All") { monitor.acknowledgeAlerts(ids: nil) }
-                .disabled(monitor.unacknowledgedAlerts == 0)
+            .help("Filter which alerts are listed")
+
+            Menu {
+                Button("Selected (\(selection.count))") { monitor.acknowledgeAlerts(ids: Array(selection)) }
+                    .disabled(selection.isEmpty)
+                Button("All unacknowledged (\(monitor.unacknowledgedAlerts))") { monitor.acknowledgeAlerts(ids: nil) }
+                    .disabled(monitor.unacknowledgedAlerts == 0)
+            } label: {
+                Label("Acknowledge", systemImage: "checkmark.circle")
+            }
+            .labelStyle(.titleAndIcon)
+            .disabled(alerts.isEmpty)
+            .help("Mark alerts as seen")
+        }
+    }
+
+    private var isFiltered: Bool { !rule.isEmpty || showAcknowledged }
+
+    /// Names what the filter is doing, so the toolbar says it without a second control.
+    private var filterLabel: String {
+        switch (rule.isEmpty, showAcknowledged) {
+        case (true, false): return "All rules"
+        case (true, true): return "All rules, including seen"
+        case (false, false): return rule
+        case (false, true): return "\(rule), including seen"
         }
     }
 

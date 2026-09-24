@@ -64,7 +64,7 @@ Documentation
 
  On this page
  InstallFirst launchHostnames
- The viewsFocus modeAI agent rulesTools & MCPAllowlistsAgent configurationHTTPS inspectionOther alerts
+ The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsAgent configurationHTTPS inspectionOther alerts
  Capture enginesYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -114,13 +114,37 @@ open build/Build/Products/Release/Flowlight.app
 
  AI Agents⌘2Which agents are active, which AI providers they use, and what else they contacted.
 
- Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts; export CSV.
+ Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts or Worth a look; export CSV.
 
  Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
 
- Inspect⌘5Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them.
+ Inspect⌘5Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
+
+ Capture⌘6Which engine is recording, the extension's state, hostname learning, and where the database lives.
 
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
+
+ Worth a look
+
+ A third mode in Reports, beside the breakdown and the charts. It compares the apps in the report with each other
+ and points at the ones whose destinations don't look like the rest: many more places than their peers, addresses that never
+ resolved to a name, hostnames that look generated rather than chosen, far more sent than received, and protocols that are a
+ sideline rather than the app's purpose. Each finding carries the evidence behind it, and clicking one narrows the report to that
+ app.
+
+ It is called Worth a look and not Suspicious deliberately. What the data supports is "unusual next to the other
+ apps in this report" — a backup tool talks to a lot of places for good reasons, and a quiet Mac produces no findings at all. It
+ says nothing about traffic every app shares.
+
+ Running in the background
+
+ Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is
+ looking at. Settings › General › Run in the background goes further and drops the Dock icon and the Cmd-Tab entry;
+ the menu bar keeps the live rates and gains Show Dock Icon to undo it. Launch at login is in the
+ same place.
+
+ Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
+ carries on inspecting connections until you disable or uninstall it in Capture.
 
  Focus mode
 
@@ -145,7 +169,7 @@ open build/Build/Products/Release/Flowlight.app
  AI agent rules
 
  An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
- Gemini CLI, Ollama and ZCode) or if it calls one of 25 LLM API providers. Browsers are excluded.
+ Gemini CLI, Ollama and ZCode) or if it calls one of 24 LLM API providers. Browsers are excluded.
 
  RuleFires when an agent…Default
 
@@ -914,6 +938,9 @@ September 24, 2026Latest
 
  It's Worth a look, not Suspicious: the data supports "unusual next to the other apps here", and a backup
  tool talks to a lot of places for good reasons.
+
+ A tidier Alerts toolbar, and documentation that matches the app — Worth a look, background mode,
+ the Capture view and body search are all written up.
 
  Downloads and checksums →
 

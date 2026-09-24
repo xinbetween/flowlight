@@ -50,7 +50,7 @@ Flowlight answers that for every app on your Mac, then goes deeper for AI agents
 
 ### AI Agent Watch
 Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
-Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 25 LLM API providers**, so a
+Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 24 LLM API providers**, so a
 Python script hitting `api.openai.com` shows up too. Browsers are excluded, because a person chatting isn't an agent.
 
 For each agent you see which AI providers it uses, and **everything else it contacted**, including what its tools
@@ -112,6 +112,21 @@ on your Mac, and decrypts the apps you route through it: headers, bodies, status
 - Group the breakdown by **App › Domain › IP**, **Destination › App › IP**, or **IP › App**.
 - Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps.
 - Hover any bucket to see which apps drove it. Export to CSV.
+
+### Worth a look
+A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
+points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
+never resolved to a name, hostnames that look generated, far more sent than received, protocols that are a sideline
+rather than the app's purpose. Each finding shows its evidence; clicking one narrows the report to that app.
+
+It's *Worth a look*, not *Suspicious*: the data supports "unusual next to the other apps here", and a backup tool
+talks to a lot of places for good reasons.
+
+### Running in the background
+Flowlight keeps recording with its window closed and costs almost nothing while idle. **Settings › General › Run in
+the background** drops the Dock icon and the Cmd-Tab entry; the menu bar keeps the rates and offers **Show Dock
+Icon** to undo it. Quitting stops the sampler — it does not stop the Network Extension, which runs on its own until
+you disable it in Capture.
 
 ### Focus mode
 Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect,
