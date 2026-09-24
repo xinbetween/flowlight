@@ -54,6 +54,8 @@ final class TrafficMonitor: ObservableObject {
     let guardrails = GuardrailStore()
     /// Channels that aren't the network: Bluetooth, USB. Both off until switched on.
     let devices = DeviceStore()
+    /// Questions in plain language, answered from the recorded history.
+    let ask = AskController()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
@@ -142,6 +144,7 @@ final class TrafficMonitor: ObservableObject {
         }
         guardrails.attach(db: db)
         devices.attach(db: db)
+        ask.attach(db: readDB)
         inspection.guardrails = { [live = guardrails.live] in live.all() }
         inspection.onGuardrail = { [weak self] event in
             Task { @MainActor in

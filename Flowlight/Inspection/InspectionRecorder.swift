@@ -302,6 +302,9 @@ final class ProxyAttribution: @unchecked Sendable {
     /// loopback, so the rule below would drop it — and then the app would be sending data off to a collector
     /// while showing nothing, which is exactly the behaviour it exists to catch someone else doing.
     var exportPort: UInt16?
+    /// The same for a model server Ask talks to on this Mac. A feature that answers questions about traffic must
+    /// not be the one thing whose own traffic is invisible.
+    var askPort: UInt16?
 
     func record(host: String, ip: String, owner: InspectionRecorder.Owner) {
         lock.lock(); defer { lock.unlock() }
@@ -320,6 +323,7 @@ final class ProxyAttribution: @unchecked Sendable {
                 let loopback = k.remoteIP.hasPrefix("127.") || k.remoteIP == "::1"
                 // Flowlight talking to a local collector is real traffic worth showing, not a proxy leg.
                 if loopback, k.pid == selfPID, let exportPort, k.port == exportPort { return record }
+                if loopback, k.pid == selfPID, let askPort, k.port == askPort { return record }
                 // App → proxy, and the proxy's internal loopback legs: already counted on the upstream side.
                 if loopback && (k.port == proxyPort || k.pid == selfPID) { return nil }
                 guard k.pid == selfPID, let owner = owner(domain: k.domain, ip: k.remoteIP) else { return record }

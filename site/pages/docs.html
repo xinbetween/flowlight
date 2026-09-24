@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#channels">Which way the bytes left</a><a href="#devices">Devices</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#channels">Which way the bytes left</a><a href="#devices">Devices</a><a href="#ask">Ask</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -103,6 +103,27 @@ open build/Build/Products/Release/Flowlight.app</pre>
         records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
         periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
         event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.</p>
+
+      <h2 id="ask">Ask</h2>
+      <p>Ask in plain language — <em>what did Claude Code upload yesterday?</em>, <em>which app started talking to somewhere new
+        this week?</em>, <em>summarise the last hour</em> — and get an answer from the history recorded on this Mac.</p>
+      <p><strong>The model never gets your history.</strong> It is handed a list of seven read-only queries it may call and
+        nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
+        query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
+        whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
+        question and those numbers — never the database.</p>
+      <p><strong>Local first.</strong> Where macOS provides an on-device model, that is the default: it costs nothing, works
+        offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
+        does the same. Both are listed above the hosted options because a tool whose promise is no account and no cloud should
+        not need either to answer a question about itself.</p>
+      <p><strong>Or bring your own key</strong> for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
+        your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
+        before you ask, and <strong>every request is shown in full under the answer</strong>.</p>
+      <p><strong>Every query is listed under the answer, and clicking one opens those rows in Reports.</strong> An answer you
+        can't check is a guess with better grammar.</p>
+      <p><strong>Flowlight holds itself to its own standard.</strong> Whatever this feature sends appears in Live and Reports
+        like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
+        easiest to quietly leave out.</p>
 
       <h2 id="background">Running in the background</h2>
       <p>Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is

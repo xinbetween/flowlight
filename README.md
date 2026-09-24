@@ -190,6 +190,22 @@ says so.
 and left. Volumes arrive from the workspace the instant one is mounted; USB devices are read periodically. No
 throughput, for the same reason.
 
+### Ask
+Ask in plain language and get an answer from what Flowlight recorded. *What did Claude Code upload yesterday?*
+*Which app started talking to somewhere new this week?* *Summarise the last hour.*
+
+**The model never gets your history.** It is handed seven read-only queries it may call — totals, top apps, top
+destinations, new destinations, alerts, agents, a series over time — and nothing else. There is no query that takes
+SQL, and there will not be one. Flowlight runs whichever the model names, locally, and hands back the numbers.
+
+**Local first**: the on-device model where macOS has one, or a server you already run (Ollama, LM Studio,
+llama.cpp). Both send nothing. **Or bring your own key** for Anthropic, OpenAI, Gemini or any OpenAI-compatible
+endpoint — the key lives in your login Keychain, the screen says when a question will leave the Mac, and every
+request is shown in full under the answer.
+
+Every query is listed under the answer, and clicking one opens those rows in Reports. And Ask's own traffic shows
+up in Live like any other app's — including when the model is a server on this same Mac.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -375,6 +391,7 @@ Shipped:
 - [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
 - [x] Bluetooth: which devices are paired and connected, which apps are built to use it (0.4.2)
 - [x] USB and external storage: what is attached, and when each volume arrived and left (0.4.3)
+- [x] Ask Flowlight: questions in plain language, answered from the local history (0.5.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -382,30 +399,6 @@ Shipped:
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
-
-- **0.5.0 — Ask Flowlight.** Questions in plain language — *what did Claude Code upload yesterday?*, *which app
-  started talking to somewhere new this week?*, *summarise the last hour* — answered from the recorded history,
-  with the rows behind each answer one click away.
-
-  **The model never gets your history.** It gets the schema and a set of read-only queries it may call; Flowlight
-  runs them and hands back aggregates. So what leaves the Mac, if anything does, is one question and the numbers
-  needed to answer it — not the database. Every request is shown before it's sent.
-
-  **Local first.** An on-device model where the OS provides one (Apple's Foundation Models framework, on the macOS
-  versions that have it), or a local server you already run — Ollama, LM Studio, llama.cpp. That path costs nothing,
-  sends nothing, and works offline, which is the only default that fits a tool whose promise is no account and no
-  cloud.
-
-  **Or bring your own key** for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. Your key, your
-  provider, your terms.
-
-  A *hosted* option is the one that sits least comfortably here: it would mean running a service and becoming a
-  processor of other people's traffic metadata, for a tool that today has no account and no server. If it ever
-  happens it is strictly opt-in per question — and it may be better not to do it at all.
-
-  **Flowlight has to hold itself to its own standard.** Whatever this feature sends appears in Live and Reports like
-  any other app's traffic, counts against an allowlist, and is readable in Inspect. A network monitor that quietly
-  phones home to answer questions about phoning home would be worth less than no feature at all.
 
 Later, no version yet:
 

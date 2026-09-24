@@ -246,7 +246,7 @@
   .view-card .glyph { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
   .view-card .glyph svg { width: 22px; height: 22px; }
   .glyph.live { background: var(--received); } .glyph.agents { background: var(--accent); }
-  .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.inspect { background: #7a4fd6; }
+  .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.ask { background: #0aa3b5; } .glyph.devices { background: #8a6bd1; } .glyph.inspect { background: #7a4fd6; }
   .view-card p { color: var(--muted); font-size: 14.5px; }
   .view-card .keys { font: 12px var(--mono); color: var(--faint); }
 

@@ -62,11 +62,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.4.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.5.0, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookWhich way the bytes leftDevicesFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
+ The viewsWorth a lookWhich way the bytes leftDevicesAskFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
  Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -179,6 +179,33 @@ open build/Build/Products/Release/Flowlight.app
  records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
  periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
  event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.
+
+ Ask
+
+ Ask in plain language — what did Claude Code upload yesterday?, which app started talking to somewhere new
+ this week?, summarise the last hour — and get an answer from the history recorded on this Mac.
+
+ The model never gets your history. It is handed a list of seven read-only queries it may call and
+ nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
+ query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
+ whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
+ question and those numbers — never the database.
+
+ Local first. Where macOS provides an on-device model, that is the default: it costs nothing, works
+ offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
+ does the same. Both are listed above the hosted options because a tool whose promise is no account and no cloud should
+ not need either to answer a question about itself.
+
+ Or bring your own key for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
+ your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
+ before you ask, and every request is shown in full under the answer.
+
+ Every query is listed under the answer, and clicking one opens those rows in Reports. An answer you
+ can't check is a guess with better grammar.
+
+ Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and Reports
+ like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
+ easiest to quietly leave out.
 
  Running in the background
 
@@ -600,7 +627,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.4.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.5.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -656,7 +683,7 @@ Free · open source · macOS 15+
 
  Inside the app
 
- Six views, one question each
+ Eight views, one question each
 
  Live
 What's moving right now? Per-app rates, the last two minutes, the busiest destination.
@@ -677,6 +704,14 @@ What looked wrong? Explainable, per-app alerts with the destination and the thre
  Rules
 What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
 ⌘5
+
+ Ask
+Questions in plain language, answered from the history — with every query it ran listed underneath.
+⌘7
+
+ Devices
+Bluetooth and USB: what's paired, what's attached, and when that changed. Off until you turn it on.
+⌘8
 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
@@ -925,8 +960,6 @@ e.g. Wireshark
 
  Flowlight watches, explains and refuses today. This is the order the rest is being built in.
 
- Ask Flowlight 0.5.0Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.
-
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
 
  Privacy
@@ -1133,8 +1166,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.4.3
+ 0.5.0
 September 24, 2026Latest
+
+ Ask Flowlight. Questions in plain language, answered from the history on this Mac.
+
+ The model never gets your history — it may call seven read-only queries and nothing else. No query
+ takes SQL, and there won't be one.
+
+ Local first: the on-device model, or a server you already run. Or bring your own key — and every
+ request that leaves the Mac is shown in full under the answer. How Ask works →
+
+ Downloads and checksums →
+
+ 0.4.3
+September 24, 2026
 
  USB and external storage. What's attached, what it is, a drive's capacity, and when each one arrived
  and left — with volumes appearing the moment they mount.

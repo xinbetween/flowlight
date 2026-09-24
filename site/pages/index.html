@@ -81,7 +81,7 @@ nav: home
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Inside the app</p>
-        <h2>Six views, one question each</h2>
+        <h2>Eight views, one question each</h2>
       </div>
       <div class="views">
         <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
@@ -94,6 +94,10 @@ nav: home
           <h3>Alerts</h3><p>What looked wrong? Explainable, per-app alerts with the destination and the threshold.</p><span class="keys">⌘4</span></div>
         <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
           <h3>Rules</h3><p>What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.</p><span class="keys">⌘5</span></div>
+        <div class="view-card"><span class="glyph ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12z"/></svg></span>
+          <h3>Ask</h3><p>Questions in plain language, answered from the history — with every query it ran listed underneath.</p><span class="keys">⌘7</span></div>
+        <div class="view-card"><span class="glyph devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
+          <h3>Devices</h3><p>Bluetooth and USB: what's paired, what's attached, and when that changed. Off until you turn it on.</p><span class="keys">⌘8</span></div>
         <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
           <h3>Inspect</h3><p>Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.</p><span class="keys">⌘6</span></div>
       </div>
@@ -343,7 +347,6 @@ nav: home
         <p class="lede">Flowlight watches, explains and refuses today. This is the order the rest is being built in.</p>
       </div>
       <div class="privacy">
-        <div><strong>Ask Flowlight <span class="tag">0.5.0</span></strong><p>Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.</p></div>
         <div><strong>Linux, then Windows</strong><p>The analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.</p></div>
       </div>
     </div>
