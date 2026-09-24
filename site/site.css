@@ -115,7 +115,10 @@
   .fact .figure small { font: 500 14px var(--body); color: var(--faint); letter-spacing: 0; margin-left: 6px; }
 
   /* Agents */
+  /* The left column is a heading and a paragraph; the right is nine cards. Left to itself that leaves a tall
+     column of nothing, so the intro travels with the cards, the way the docs table of contents already does. */
   .agents { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; align-items: start; }
+  .agents > .section-head, .install > :first-child, .about > :first-child { position: sticky; top: 88px; }
   .agent-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
   .chip { font: 500 12.5px/1 var(--mono); padding: 7px 10px; border-radius: 8px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
   .rules { display: grid; gap: 12px; }
@@ -194,9 +197,22 @@
     .hero { padding-block: 44px 36px; }
     section.band { padding-block: 64px; }
   }
+  /* Motion, sparingly. Everything here is opacity or a transform on the element's own box: a monitoring tool
+     whose site shifts under the pointer would be arguing against itself. */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; will-change: opacity, transform; }
+  .reveal.shown { opacity: 1; transform: none; }
+  .fact, .view-card, .rule, details { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .fact:hover, .view-card:hover, .rule:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+
+  @media (max-width: 900px) {
+    .agents > .section-head, .install > :first-child, .about > :first-child { position: static; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .log li.enter { animation: none; }
     .btn { transition: none; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .fact, .view-card, .rule, details { transition: none; }
+    .fact:hover, .view-card:hover, .rule:hover { transform: none; }
   }
 
   /* ---- Multi-page additions ---- */
@@ -230,7 +246,7 @@
   .view-card .glyph { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
   .view-card .glyph svg { width: 22px; height: 22px; }
   .glyph.live { background: var(--received); } .glyph.agents { background: var(--accent); }
-  .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.inspect { background: #7a4fd6; }
+  .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.inspect { background: #7a4fd6; }
   .view-card p { color: var(--muted); font-size: 14.5px; }
   .view-card .keys { font: 12px var(--mono); color: var(--faint); }
 

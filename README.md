@@ -340,6 +340,8 @@ Shipped:
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
 - [x] Rules: block anything, anywhere, for as long as you say, with a violations feed (0.3.5)
 - [x] Agent guardrails: block an MCP server, a tool or a resource (0.3.6)
+- [x] A site that keeps up with the app: counts read from source at build time, balanced columns, motion that
+  never moves the layout (0.3.7)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -348,26 +350,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.3.7 — The site says what the app now does, and reads like it.** Eight releases have landed since the site was
-  laid out, and it has drifted: the comparison table still answers *Blocks connections* with "No, observe only" two
-  lines below a lede that says Flowlight can refuse; the AI card still ends at "raises an alert" and never mentions
-  that the allowlist can now enforce; the home page claims 25 LLM API providers where [docs](site/pages/docs.html)
-  and this README say 24 and `AgentCatalog.providers` names 23. A pass over every page, cutting what is repeated or
-  no longer true rather than adding beside it, and counts that come from the source at build time — `build_site.py`
-  already substitutes the version, so it can substitute these too and the question stops recurring.
-  - **Balance the two-column sections.** `.agents` is a `.9fr / 1.1fr` grid with `align-items: start`: a heading,
-    a paragraph and a chip list sit beside nine alert cards, so the left column runs out and leaves a tall column
-    of nothing. Either the intro travels with the cards (`position: sticky`, as the docs table of contents already
-    does) or the head goes full width and the cards run in two columns beneath it. `.install` and `.about` are the
-    same shape and want the same answer.
-  - **Motion, sparingly.** Today the only animation is the live log's row slide. Sections that reveal as they come
-    into view, cards that lift under the pointer, numbers that count up once — enough to make the page feel alive,
-    little enough that it never delays reading. Everything new goes inside the existing
-    `prefers-reduced-motion: reduce` block, and none of it may move layout: a monitoring tool whose own site shifts
-    under the cursor argues against itself.
-  - **Weight, not just order.** Nineteen sections at identical visual weight means the screenshots, the agent
-    section and the FAQ all shout equally. Decide what a first-time visitor must see, give the rest less room, and
-    let the docs page carry the detail the home page keeps repeating.
 - **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
   the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
   - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and

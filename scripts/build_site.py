@@ -6,6 +6,7 @@
   site/pages/*.html        pages; a leading <!-- key: value --> block sets title, description, path, nav
 
 Placeholders: {{root}} (relative path to the site root), {{repo}}, {{dmg}}, {{version}}, {{year}},
+{{agents}}, {{providers}}, {{alerts}} (counted from the Swift source, so they can't drift),
 {{current:<nav>}} (aria-current on the active nav link). Also writes sitemap.xml, robots.txt,
 llms.txt, llms-full.txt and 404.html, and build/site-preview/index.html (self-contained home page).
 """
@@ -17,6 +18,26 @@ DOMAIN = "https://flowlight.xinbetween.com"
 REPO = os.environ.get("GITHUB_REPO", "xinbetween/flowlight")
 DMG = f"https://github.com/{REPO}/releases/latest/download/Flowlight.dmg"
 VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', (ROOT / "project.yml").read_text()).group(1)
+
+
+def counts():
+    """Numbers the site quotes, read from the source that defines them.
+
+    They were written by hand once and were wrong within two releases — the home page claimed 25 providers where
+    the docs said 24 and the catalogue named 24. A count nobody has to remember to update can't drift.
+    """
+    catalog = (ROOT / "Shared/AgentCatalog.swift").read_text()
+    providers = re.search(r"static let providers.*?= \[(.*?)\n    \]", catalog, re.S).group(1)
+    engine = (ROOT / "Flowlight/Analysis/AnomalyEngine.swift").read_text()
+    kinds = re.search(r"enum Kind: String.*?\{(.*?)\n    \}", engine, re.S).group(1)
+    return {
+        "agents": str(len(re.findall(r'KnownAgent\(name: "', catalog))),
+        "providers": str(len({name for _, name in re.findall(r'\("([^"]+)",\s*"([^"]+)"\)', providers)})),
+        "alerts": str(len(re.findall(r'case \w+ = "', kinds))),
+    }
+
+
+COUNTS = counts()
 YEAR = str(datetime.date.today().year)
 FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
          '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800'
@@ -29,7 +50,7 @@ def front_matter(text):
 
 def fill(text, root, nav):
     text = re.sub(r"\{\{current:(\w+)\}\}", lambda m: ' aria-current="page"' if m.group(1) == nav else "", text)
-    for k, v in {"root": root, "repo": REPO, "dmg": DMG, "version": VERSION, "year": YEAR}.items():
+    for k, v in {"root": root, "repo": REPO, "dmg": DMG, "version": VERSION, "year": YEAR, **COUNTS}.items():
         text = text.replace("{{%s}}" % k, v)
     # Screenshots keep their names across updates; a content hash makes caches fetch the new image.
     return re.sub(r'(assets/screenshots/[\w-]+\.png)"', lambda m: f'{m.group(1)}?v={asset_hash(m.group(1))}"', text)
@@ -105,8 +126,10 @@ def build():
         markup = html.unescape(fill(markup, DOMAIN + "/", ""))
         return re.sub(r"\n\s*\n+", "\n\n", re.sub(r"[ \t]+", " ", markup)).strip()
     llms = [f"# Flowlight\n\n> Free, open-source (GPL-3.0) macOS network monitor. It attributes every TCP/UDP flow to the app that made it and the"
-            f" domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start) with per-agent allowlists and"
-            f" rules for data leaving the Mac. Current version: {VERSION}.\n",
+            f" domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start)"
+            f" with per-agent allowlists and rules for data leaving the Mac. It can also refuse, once asked: a rule blocks an app, a destination"
+            f" or a URL for as long as you say, and a guardrail takes a tool away from an agent before its model is offered it."
+            f" Current version: {VERSION}.\n",
             f"- [Download Flowlight.dmg]({DMG})", f"- [Source code](https://github.com/{REPO})"]
     llms += [f"- [{m['title']}]({DOMAIN}{m['path']}): {m['description']}" for m, _ in pages]
     llms += [f"- [Full text for LLMs]({DOMAIN}/llms-full.txt)"]

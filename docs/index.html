@@ -52,7 +52,7 @@
             Star on GitHub
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copy</button></p>
-          <p class="meta-row"><span>v0.3.6</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
+          <p class="meta-row"><span>v0.3.7</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
         </div>
       </div>
 
@@ -110,7 +110,7 @@
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Inside the app</p>
-        <h2>Five views, one question each</h2>
+        <h2>Six views, one question each</h2>
       </div>
       <div class="views">
         <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
@@ -121,8 +121,10 @@
           <h3>Reports</h3><p>Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.</p><span class="keys">⌘3</span></div>
         <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
           <h3>Alerts</h3><p>What looked wrong? Explainable, per-app alerts with the destination and the threshold.</p><span class="keys">⌘4</span></div>
+        <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
+          <h3>Rules</h3><p>What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.</p><span class="keys">⌘5</span></div>
         <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
-          <h3>Inspect</h3><p>Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.</p><span class="keys">⌘5</span></div>
+          <h3>Inspect</h3><p>Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.</p><span class="keys">⌘6</span></div>
       </div>
     </div>
   </section>
@@ -159,9 +161,9 @@
       <div class="section-head" style="margin:0">
         <p class="eyebrow">AI Agent Watch</p>
         <h2>Your agents have network access. Now you have oversight.</h2>
-        <p class="lede">Flowlight knows 16 agents by name. It also spots any other process that calls one of 25 LLM API
-          providers, so a Python script talking to <code>api.openai.com</code> is an agent too. Browsers don't count:
-          a person chatting isn't an agent.</p>
+        <p class="lede">Flowlight knows 16 agents by name. It also spots any other process that calls one of
+          24 LLM API providers, so a Python script talking to <code>api.openai.com</code> is an agent too.
+          Browsers don't count: a person chatting isn't an agent.</p>
         <div class="agent-list" aria-label="Recognized agents">
           <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">Cursor</span>
           <span class="chip">Windsurf</span><span class="chip">GitHub Copilot</span><span class="chip">Gemini CLI</span>
@@ -175,8 +177,26 @@
         <div class="rule">
           <span class="sev critical">⚠ Critical</span>
           <div><h3>Allowlist violation</h3>
-            <p>"Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset. Anything else raises an alert, with one-click <b>Allow</b>.</p>
+            <p>"Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset.
+              Anything else raises an alert, with one-click <b>Allow</b> — and, when you ask it to, the Network Extension
+              refuses the connection instead of only reporting it.</p>
             <p class="example">Claude Code › curl contacted paste.example:443, which isn't on Claude Code's allowlist</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ Refuses</span>
+          <div><h3>Rules, for as long as you say</h3>
+            <p>Name an app, an agent, a destination or a single URL and block it — right-click the row you spotted it in.
+              Forever, until a time, until Flowlight quits, or between chosen hours, with one pause switch and a way out on
+              every refusal. The most specific rule wins, and a tie goes to the block.</p>
+            <p class="example">Cursor ⇥ raw.githubusercontent.com · refused 4 times · weekdays 18:00–09:00</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ Refuses</span>
+          <div><h3>Guardrails on an agent's tools</h3>
+            <p>Block an MCP server, one of its tools, or one resource. A refused tool is removed from the list the agent
+              sends its model, so the model is never offered it — no refusal to argue with, no retry loop. It needs HTTPS
+              inspection, and it is not a sandbox: Flowlight says so rather than implying otherwise.</p>
+            <p class="example">Claude Code: no Bash, no write* · 12 tools taken out of today's declarations</p></div>
         </div>
         <div class="rule">
           <span class="sev info">↳ Attribution</span>
@@ -275,7 +295,8 @@
       <div class="section-head">
         <p class="eyebrow">How it compares</p>
         <h2>Built for the question the other tools skip</h2>
-        <p class="lede">Flowlight observes and explains. It can refuse what an agent contacts outside its allowlist, once you ask it to.</p>
+        <p class="lede">Flowlight watches and explains, and — once you ask it to — refuses: a destination, a URL, or a tool an agent
+          should not have.</p>
       </div>
       <div class="table-wrap">
         <table class="compare">
@@ -286,7 +307,8 @@
             <tr><td>History from second to year</td><td class="us yes">Yes</td><td class="no">No</td><td class="part">Varies</td><td class="part">Capture files</td></tr>
             <tr><td>Rules for AI agents</td><td class="us yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
             <tr><td>An agent's tool calls, tied to its traffic</td><td class="us yes">Yes, opt-in</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td>Blocks connections</td><td class="us no">No, observe only</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Blocks connections</td><td class="us yes">Yes, with the Network Extension</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Blocks an agent's tools, not just its traffic</td><td class="us yes">Yes, opt-in</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
             <tr><td>Free and open source</td><td class="us yes">Yes, GPL-3.0</td><td class="part">Built in</td><td class="part">Varies</td><td class="yes">Yes</td></tr>
           </tbody>
         </table>
@@ -347,13 +369,9 @@
       <div class="section-head">
         <p class="eyebrow">Next</p>
         <h2>What's coming</h2>
-        <p class="lede">Flowlight observes and explains today. This is the order the rest is being built in.</p>
+        <p class="lede">Flowlight watches, explains and refuses today. This is the order the rest is being built in.</p>
       </div>
       <div class="privacy">
-        <div><strong>Focus on apps or destinations, either alone <span class="tag">0.3.4</span></strong><p>Focus should be symmetric: several apps, several destinations, or both, with at least one entry and neither side required on its own. Today only destinations can be typed and apps can only be ticked off what was busy in the last day, so a quiet app can't be focused at all.</p></div>
-        <div><strong>Rules: block anything, anywhere <span class="tag">0.3.5</span></strong><p>One rule model behind every screen: block an app, an agent, a domain, an IP range or a single URL, from the table you spotted it in. Forever, until a time, for an hour, or between chosen hours — with one pause switch, and a way out on every refusal. A Rules screen lists them all, what each one has blocked and when, and says plainly which engine can enforce it.</p></div>
-        <div><strong>Agent guardrails: MCP servers, tools and resources <span class="tag">0.3.6</span></strong><p>Block a whole MCP server, one of its tools, or one resource. The strongest lever is the tool list itself: drop a blocked tool before the request reaches the provider and the model is never offered it. For servers reached over HTTP, the call is answered rather than forwarded, the way the protocol says a refusal should read, so the model adapts instead of seeing a broken server. Its own section in AI Agents — and no pretence that it is a sandbox.</p></div>
-        <div><strong>A site that keeps up with the app <span class="tag">0.3.7</span></strong><p>Eight releases in, some of this page describes a Flowlight that no longer exists. A pass over every page that cuts rather than adds, counts taken from the source at build time, two-column sections that stay balanced instead of leaving a tall empty column, and just enough motion to feel alive — none of it moving the layout, all of it off when you ask for less.</p></div>
         <div><strong>Channels besides the network <span class="tag">0.4.0</span></strong><p>AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.</p></div>
         <div><strong>Ask Flowlight <span class="tag">0.5.0</span></strong><p>Ask in plain language what an app or agent has been doing and get a summary, with the rows behind it one click away. The model is given queries to call, never your history — and an on-device model is the default, so the answer can cost nothing and send nothing.</p></div>
         <div><strong>Linux, then Windows</strong><p>The analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.</p></div>
@@ -545,7 +563,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.6 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.7 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
@@ -569,6 +587,27 @@ open Flowlight.app --args -FLDemo YES</pre>
       }
     });
   });
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
 </script>
 
 </body>

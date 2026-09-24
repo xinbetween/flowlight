@@ -27,8 +27,9 @@ About
 
  Principles
 
- Explain first, block only if asked. Flowlight watches and explains by default. An allowlist can refuse
- connections too, but only once you turn that on for an agent — and never for local traffic, DNS or Apple services.
+ Explain first, block only if asked. Flowlight watches and explains by default. It can also refuse — an
+ allowlist, a rule about an app or a destination, a guardrail on an agent's tools — but only once you turn that on, and never
+ for local traffic, DNS or Apple services. Every refusal is recorded, and every refusal carries its way out.
 
  Metadata, not payloads. Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.
 
@@ -61,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.7, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -217,7 +218,7 @@ open build/Build/Products/Release/Flowlight.app
  Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
 
  From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
- per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. Flowlight doesn't block this by default
+ per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. An allowlist warns rather than refuses by default
  connections; blocking needs the Network Extension engine and is on the roadmap.
 
  Refusing connections
@@ -410,7 +411,8 @@ open build/Build/Products/Release/Flowlight.app
 
  The extension is in the data path instead, so a request lasting five milliseconds is recorded like any other. It isn't magic
  either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
- come from the filter's own statistics rather than from counting packets. It never blocks anything.
+ come from the filter's own statistics rather than from counting packets. It refuses a connection only where a rule or an
+ allowlist you wrote says to.
 
  It also can't run at all on some Macs. macOS allows one content filter at a time, and corporate security software
  normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
@@ -514,10 +516,12 @@ open build/Build/Products/Release/Flowlight.app
  With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
  costs less than the fallback sampler, which starts a short-lived nettop process every second.
  Can it block connections?
- Not yet. It observes and explains, and allowlists raise alerts. Blocking needs the Network Extension engine and is on the roadmap.
+ Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a rule can block an app,
+ a destination or a URL for as long as you say, and a guardrail can take a tool away from an agent
+ before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out.
  Do I need the Network Extension?
  No. The sampler needs no entitlement and covers most traffic. The extension adds flows shorter than a second, attribution by code
- signature, hostnames without the packet-capture setup, and is the path to blocking.
+ signature, hostnames without the packet-capture setup, and is the only engine that can refuse a connection.
  What happens to my data if I uninstall?
  Everything lives in ~/Library/Application Support/Flowlight. Delete that folder and it's gone; see
  Uninstall for the packet-capture helper and the inspection certificate.
@@ -554,7 +558,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -610,7 +614,7 @@ Free · open source · macOS 15+
 
  Inside the app
 
- Five views, one question each
+ Six views, one question each
 
  Live
 What's moving right now? Per-app rates, the last two minutes, the busiest destination.
@@ -628,9 +632,13 @@ Where did it all go? Second to year, grouped by app, destination or IP, with cha
 What looked wrong? Explainable, per-app alerts with the destination and the threshold.
 ⌘4
 
+ Rules
+What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
+⌘5
+
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
-⌘5
+⌘6
 
  Capture
 
@@ -653,9 +661,9 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
 
  Your agents have network access. Now you have oversight.
 
- Flowlight knows 16 agents by name. It also spots any other process that calls one of 25 LLM API
- providers, so a Python script talking to api.openai.com is an agent too. Browsers don't count:
- a person chatting isn't an agent.
+ Flowlight knows 16 agents by name. It also spots any other process that calls one of
+ 24 LLM API providers, so a Python script talking to api.openai.com is an agent too.
+ Browsers don't count: a person chatting isn't an agent.
 
  Claude CodeCodexCursor
  WindsurfGitHub CopilotGemini CLI
@@ -667,9 +675,29 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  ⚠ Critical
  Allowlist violation
 
- "Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset. Anything else raises an alert, with one-click Allow.
+ "Claude Code may talk to GitHub and npm, nothing else." Add domains, IPs or ranges, or start from a preset.
+ Anything else raises an alert, with one-click Allow — and, when you ask it to, the Network Extension
+ refuses the connection instead of only reporting it.
 
  Claude Code › curl contacted paste.example:443, which isn't on Claude Code's allowlist
+
+ ⛔ Refuses
+ Rules, for as long as you say
+
+ Name an app, an agent, a destination or a single URL and block it — right-click the row you spotted it in.
+ Forever, until a time, until Flowlight quits, or between chosen hours, with one pause switch and a way out on
+ every refusal. The most specific rule wins, and a tie goes to the block.
+
+ Cursor ⇥ raw.githubusercontent.com · refused 4 times · weekdays 18:00–09:00
+
+ ⛔ Refuses
+ Guardrails on an agent's tools
+
+ Block an MCP server, one of its tools, or one resource. A refused tool is removed from the list the agent
+ sends its model, so the model is never offered it — no refusal to argue with, no retry loop. It needs HTTPS
+ inspection, and it is not a sandbox: Flowlight says so rather than implying otherwise.
+
+ Claude Code: no Bash, no write* · 12 tools taken out of today's declarations
 
  ↳ Attribution
  Tools & MCP servers
@@ -788,7 +816,8 @@ egress channel
 
  Built for the question the other tools skip
 
- Flowlight observes and explains. It can refuse what an agent contacts outside its allowlist, once you ask it to.
+ Flowlight watches and explains, and — once you ask it to — refuses: a destination, a URL, or a tool an agent
+ should not have.
 
  FlowlightActivity MonitorFirewalls
 e.g. Little Snitch, LuLuPacket analyzers
@@ -804,7 +833,9 @@ e.g. Wireshark
 
  An agent's tool calls, tied to its trafficYes, opt-inNoNoNo
 
- Blocks connectionsNo, observe onlyNoYesNo
+ Blocks connectionsYes, with the Network ExtensionNoYesNo
+
+ Blocks an agent's tools, not just its trafficYes, opt-inNoNoNo
 
  Free and open sourceYes, GPL-3.0Built inVariesYes
 
@@ -850,15 +881,7 @@ e.g. Wireshark
 
  What's coming
 
- Flowlight observes and explains today. This is the order the rest is being built in.
-
- Focus on apps or destinations, either alone 0.3.4Focus should be symmetric: several apps, several destinations, or both, with at least one entry and neither side required on its own. Today only destinations can be typed and apps can only be ticked off what was busy in the last day, so a quiet app can't be focused at all.
-
- Rules: block anything, anywhere 0.3.5One rule model behind every screen: block an app, an agent, a domain, an IP range or a single URL, from the table you spotted it in. Forever, until a time, for an hour, or between chosen hours — with one pause switch, and a way out on every refusal. A Rules screen lists them all, what each one has blocked and when, and says plainly which engine can enforce it.
-
- Agent guardrails: MCP servers, tools and resources 0.3.6Block a whole MCP server, one of its tools, or one resource. The strongest lever is the tool list itself: drop a blocked tool before the request reaches the provider and the model is never offered it. For servers reached over HTTP, the call is answered rather than forwarded, the way the protocol says a refusal should read, so the model adapts instead of seeing a broken server. Its own section in AI Agents — and no pretence that it is a sandbox.
-
- A site that keeps up with the app 0.3.7Eight releases in, some of this page describes a Flowlight that no longer exists. A pass over every page that cuts rather than adds, counts taken from the source at build time, two-column sections that stay balanced instead of leaving a tall empty column, and just enough motion to feel alive — none of it moving the layout, all of it off when you ask for less.
+ Flowlight watches, explains and refuses today. This is the order the rest is being built in.
 
  Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
 
@@ -1070,8 +1093,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.6
+ 0.3.7
 September 24, 2026Latest
+
+ This site, brought up to date. Blocking is answered yes where it used to say "observe only";
+ Rules and Guardrails have their own sections; the roadmap lists only what hasn't shipped.
+
+ Counts are read from the source at build time, so the providers, agents and alert kinds quoted here
+ can't drift from the app again.
+
+ Balanced columns and a little motion — opacity and transforms only, nothing that shifts the layout,
+ all of it off under prefers-reduced-motion.
+
+ Downloads and checksums →
+
+ 0.3.6
+September 24, 2026
 
  Agent guardrails. A switch on every tool an agent declares and every MCP server it reaches, with
  presets: read-only, no shell, no writes.

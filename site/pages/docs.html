@@ -106,7 +106,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="agents">AI agent rules</h2>
       <p>An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
-        Gemini CLI, Ollama and ZCode) or if it calls one of 24 LLM API providers. Browsers are excluded.</p>
+        Gemini CLI, Ollama and ZCode) or if it calls one of {{providers}} LLM API providers. Browsers are excluded.</p>
       <table>
         <tr><th>Rule</th><th>Fires when an agent…</th><th>Default</th></tr>
         <tr><td>Sensitive channel</td><td>uses email, file transfer, SSH or remote desktop, a tunnel or proxy, peer-to-peer, or a database connection</td><td>On. Critical for email, file transfer, tunnels and P2P</td></tr>
@@ -132,7 +132,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
         Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.</p>
       <p>From then on, anything the agent or its tools contact that isn't listed raises a critical <strong>Allowlist violation</strong> alert (once
-        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. Flowlight doesn't block this by default
+        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. An allowlist warns rather than refuses by default
         connections; blocking needs the Network Extension engine and is on the roadmap.</p>
 
       <h2 id="blocking">Refusing connections</h2>
@@ -285,7 +285,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         that makes many short requests, that difference matters.</p>
       <p>The extension is in the data path instead, so a request lasting five milliseconds is recorded like any other. It isn't magic
         either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
-        come from the filter's own statistics rather than from counting packets. It never blocks anything.</p>
+        come from the filter's own statistics rather than from counting packets. It refuses a connection only where a rule or an
+        allowlist you wrote says to.</p>
       <p><strong>It also can't run at all on some Macs.</strong> macOS allows one content filter at a time, and corporate security software
         normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
         machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
@@ -376,10 +377,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
           costs less than the fallback sampler, which starts a short-lived <code>nettop</code> process every second.</dd>
         <dt><strong>Can it block connections?</strong></dt>
-        <dd>Not yet. It observes and explains, and allowlists raise alerts. Blocking needs the Network Extension engine and is on the roadmap.</dd>
+        <dd>Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a <a href="#rules">rule</a> can block an app,
+          a destination or a URL for as long as you say, and a <a href="#guardrails">guardrail</a> can take a tool away from an agent
+          before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out.</dd>
         <dt><strong>Do I need the Network Extension?</strong></dt>
         <dd>No. The sampler needs no entitlement and covers most traffic. The extension adds flows shorter than a second, attribution by code
-          signature, hostnames without the packet-capture setup, and is the path to blocking.</dd>
+          signature, hostnames without the packet-capture setup, and is the only engine that can refuse a connection.</dd>
         <dt><strong>What happens to my data if I uninstall?</strong></dt>
         <dd>Everything lives in <code>~/Library/Application Support/Flowlight</code>. Delete that folder and it's gone; see
           <a href="#uninstall">Uninstall</a> for the packet-capture helper and the inspection certificate.</dd>

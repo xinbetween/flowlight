@@ -42,7 +42,19 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.3.6</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.3.7</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>This site, brought up to date.</strong> Blocking is answered <em>yes</em> where it used to say "observe only";
+            Rules and Guardrails have their own sections; the roadmap lists only what hasn't shipped.</li>
+          <li><strong>Counts are read from the source at build time</strong>, so the providers, agents and alert kinds quoted here
+            can't drift from the app again.</li>
+          <li><strong>Balanced columns and a little motion</strong> — opacity and transforms only, nothing that shifts the layout,
+            all of it off under <code>prefers-reduced-motion</code>.</li>
+        </ul>
+        <p><a href="https://github.com/xinbetween/flowlight/releases/tag/v0.3.7">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.3.6</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Agent guardrails.</strong> A switch on every tool an agent declares and every MCP server it reaches, with
             presets: read-only, no shell, no writes.</li>
@@ -362,7 +374,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.6 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.7 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
@@ -386,6 +398,27 @@
       }
     });
   });
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
 </script>
 
 </body>
