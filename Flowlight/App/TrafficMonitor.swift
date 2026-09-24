@@ -280,7 +280,10 @@ final class TrafficMonitor: ObservableObject {
 
     private func updateLive(with batches: [TrafficBatch]) {
         lastDataAt = Date()
-        for batch in batches {
+        // Anything older than the live window is history: it is already on its way to the database, and feeding
+        // it through here only to have tickLive drop it again wastes the work.
+        let oldest = Int64(Date().timeIntervalSince1970) - Int64(liveWindow)
+        for batch in batches where batch.timestamp >= oldest {
             var bucket = perSecond[batch.timestamp] ?? [:]
             for r in batch.records {
                 let k = r.key

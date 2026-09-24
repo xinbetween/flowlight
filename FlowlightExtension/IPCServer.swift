@@ -11,7 +11,11 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var nextSeq: UInt64 = 0
     private var inFlight = false
     private let queue = DispatchQueue(label: "flowlight.ipc")
-    private let maxPendingBatches = 3600 // one hour of seconds while the app is not running
+    /// Seconds of traffic held while no app is connected — which is the whole time the app is using the nettop
+    /// sampler instead. It used to be an hour, and switching back to the extension replayed every second of it
+    /// oldest-first, ahead of anything current: the live view stayed empty for as long as the backlog took to
+    /// drain, and looked broken. Five minutes covers a restart or an extension upgrade and drains at once.
+    private let maxPendingBatches = 300
     private let chunkSize = 300
 
     private var machServiceName: String {
