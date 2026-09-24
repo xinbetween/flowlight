@@ -53,6 +53,11 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         return true
     }
 
+    func filterState(withReply reply: @escaping (Bool, String) -> Void) {
+        let state = FilterDataProvider.filterStarted.withLock { $0 }
+        reply(state.running, state.detail)
+    }
+
     func register(withReply reply: @escaping (Bool, String) -> Void) {
         guard let connection = NSXPCConnection.current() else { reply(false, "no connection"); return }
         queue.async {

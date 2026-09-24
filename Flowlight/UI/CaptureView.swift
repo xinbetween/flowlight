@@ -71,6 +71,16 @@ struct CaptureView: View {
                     } icon: {
                         Image(systemName: "checkmark.seal").foregroundStyle(.green)
                     }
+                    Label {
+                        Text("""
+                        **macOS runs one content filter at a time.** If a VPN or security agent already has that slot — \
+                        Palo Alto Networks GlobalProtect, CrowdStrike Falcon, and similar and similar all use it — Flowlight's filter installs and \
+                        connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs.
+                        """)
+                        .font(.callout).foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                    }
                 }
             } header: {
                 Text("Network Extension")

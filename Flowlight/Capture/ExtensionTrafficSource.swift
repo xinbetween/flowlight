@@ -78,6 +78,25 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 self.status?(self.sawTraffic ? "Connected to filter extension \(version)"
                                              : "Connected to filter extension \(version) — no traffic from it yet")
                 self.startHeartbeat()
+                self.checkFilterState(on: connection, version: version)
+            }
+        }
+    }
+
+    /// Connecting proves the extension is running, not that macOS is letting it filter. macOS runs one content
+    /// filter at a time, so on a Mac where a security product already holds that slot ours is started and then
+    /// never asked for anything — connected, and permanently empty. Worth saying so rather than looking fine.
+    private func checkFilterState(on connection: NSXPCConnection?, version: String) {
+        guard let connection else { return }
+        let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
+        proxy?.filterState { [weak self] running, detail in
+            guard let self, running == false else { return }
+            DispatchQueue.main.async {
+                guard self.connection === connection, !self.sawTraffic else { return }
+                self.status?(detail.isEmpty
+                    ? "Connected to the extension \(version), but macOS hasn't started its filter. Another content "
+                      + "filter (a VPN or security agent) may be using the one slot macOS allows. Use the nettop sampler instead."
+                    : "The filter couldn't start: \(detail)")
             }
         }
     }

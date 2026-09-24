@@ -12,6 +12,9 @@ final class FilterDataProvider: NEFilterDataProvider {
     private let tracker = FlowTracker()
     private var flushTimer: DispatchSourceTimer?
 
+    /// Set once macOS has asked this provider to start and the settings applied.
+    static let filterStarted = OSAllocatedUnfairLock(initialState: (running: false, detail: ""))
+
     override func startFilter(completionHandler: @escaping (Error?) -> Void) {
         let anyNetwork = NENetworkRule(remoteNetworkEndpoint: nil, remotePrefix: 0, localNetworkEndpoint: nil, localPrefix: 0,
                                        protocol: .any, direction: .any)
@@ -20,8 +23,10 @@ final class FilterDataProvider: NEFilterDataProvider {
         apply(settings) { [weak self] error in
             if let error {
                 extensionLog.error("apply(settings) failed: \(error.localizedDescription, privacy: .public)")
+                Self.filterStarted.withLock { $0 = (false, error.localizedDescription) }
             } else {
                 extensionLog.info("Filter started")
+                Self.filterStarted.withLock { $0 = (true, "") }
                 self?.startFlushing()
             }
             completionHandler(error)
