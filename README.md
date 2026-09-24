@@ -151,6 +151,9 @@ launch until taken or dismissed.
 Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect,
 plus the menu bar rates. It's for watching one agent work without the rest of the Mac in the way.
 
+- Add an app by name or bundle identifier — every application on the Mac is searchable, so one that has been quiet
+  still works, as does a command-line agent with no bundle — or pick from what has recently been busy.
+- One app is a focus. So is one destination. Neither needs the other.
 - Focus on something from any table's context menu, or from the Focus control at the bottom of the sidebar.
 - ⇧⌘F turns it on and off; the menu bar shows what's focused and can toggle it too.
 - Destinations take their subdomains with them (`example.com` covers `api.example.com`). IP addresses work; ranges don't.
@@ -299,7 +302,7 @@ Shipped:
   metadata and analytics stay the default)
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
-- [x] Focus mode: watch only the apps and destinations you pick (from 0.2.2)
+- [x] Focus mode: watch only the apps and destinations you pick (0.2.2, symmetric from 0.3.4)
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
@@ -309,15 +312,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.3.4 — Focus on apps or destinations, either alone.** Focus should be symmetric: a set of apps, a set of
-  destinations, or both, with at least one entry required and neither side required on its own. The scope model
-  already unions the two, but the editor doesn't read that way — only destinations can be typed, apps can only be
-  ticked off a list of what happened to be busy in the last 24 hours, so an app that has been quiet can't be
-  focused at all. This milestone makes both sides first-class: search or type an app as well as pick it from
-  recent traffic, add several of each, and say in the editor that one app with no destination (or one destination
-  with no app) is a complete focus. It also settles the edges that follow from that — Focus on with an empty list
-  still reads as off, and alerts, which name an app and not a destination, should say why a destination-only focus
-  leaves the alert list alone rather than silently ignoring it.
 - **0.3.5 — Rules: block anything, anywhere, for as long as you say.** 0.3.0 taught one allowlist to refuse; this
   makes refusing a first-class idea with one rule model behind every screen. A rule names a **subject** — an app, an
   agent, a destination (domain and its subdomains, an IP, a CIDR range), a URL (host + path glob + method), or a

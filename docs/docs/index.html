@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.3, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.4, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -124,6 +124,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li>Apps and destinations are a union, not an intersection: focusing on Claude Code <em>and</em> <code>github.com</code> shows
           everything Claude Code does plus everything that talks to GitHub.</li>
       </ul>
+      <p>An app and a destination are equally a focus, and either alone is enough. Add an app by typing its name or bundle identifier —
+        every application on the Mac is searchable, so one that has been quiet all day can still be focused, as can a command-line agent
+        with no application bundle — or tick one from what has recently been busy. Add a destination the same way.</p>
+      <p>One thing a destination can't narrow: alerts record the app that raised them and nothing about where the traffic went, so a
+        focus made only of destinations leaves the alert list alone. The editor says so rather than letting a screen quietly ignore it.</p>
       <p><strong>Focus filters what you see, never what's recorded.</strong> Flowlight keeps capturing and storing everything while it's on, and
         the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
         names the app that raised it and not where the traffic went, so focusing only on destinations leaves the alert list as it was.</p>
@@ -404,7 +409,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.4 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

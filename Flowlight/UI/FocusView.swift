@@ -36,6 +36,11 @@ struct FocusEditor: View {
     @EnvironmentObject var focus: FocusStore
     @State private var typed = ""
     @State private var candidates: [FocusTarget] = []
+    @State private var installed: [InstalledApps.App] = []
+    @State private var adding: Adding = .app
+
+    /// Which half of a focus is being added. Both are first-class: either alone is a complete focus.
+    private enum Adding { case app, destination }
     @State private var invalid = false
 
     var body: some View {
@@ -53,16 +58,30 @@ struct FocusEditor: View {
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             if focus.targets.isEmpty {
-                Text("Nothing chosen yet.").font(.callout).foregroundStyle(.secondary)
+                // Saying what counts as enough, before anyone wonders whether they need one of each.
+                Text("Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 FlowChips(targets: focus.targets) { focus.remove($0) }
+                if focus.apps.isEmpty {
+                    // Alerts record the app that raised them and nothing about where the traffic went, so a
+                    // destination can't narrow them. Better said here than left as a screen that ignores Focus.
+                    Label("Alerts name an app, not a destination, so this focus leaves the alert list alone.",
+                          systemImage: "info.circle")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Divider()
 
-            Text("Add a destination").font(.caption.bold())
+            Picker("Add", selection: $adding) {
+                Text("App").tag(Adding.app)
+                Text("Destination").tag(Adding.destination)
+            }
+            .pickerStyle(.segmented).labelsHidden()
+
             HStack {
-                TextField("api.example.com", text: $typed)
+                TextField(adding == .app ? "Name or bundle identifier" : "api.example.com", text: $typed)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addTyped)
                 Button("Add", action: addTyped).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -72,29 +91,48 @@ struct FocusEditor: View {
                     .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
 
-            if !candidates.isEmpty {
-                Text("Recently active apps").font(.caption.bold())
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(candidates) { target in
-                            Toggle(isOn: Binding(get: { focus.contains(target) },
-                                                 set: { _ in focus.toggle(target) })) {
-                                Text(target.label).lineLimit(1)
-                            }
-                            .toggleStyle(.checkbox)
-                        }
-                    }
+            if adding == .app {
+                let matches = InstalledApps.search(typed, in: installed)
+                if !matches.isEmpty {
+                    suggestions(matches.prefix(6).map { FocusTarget.app($0.bundleID, name: $0.name) }.compactMap { $0 },
+                                title: "Applications")
+                } else if !candidates.isEmpty {
+                    // What has actually been talking is the fastest way in; searching covers everything else,
+                    // including an app that has been quiet all day and a command-line agent with no bundle.
+                    suggestions(candidates, title: "Recently active")
                 }
-                .frame(maxHeight: 160)
             }
         }
         .padding(16)
         .frame(width: 330)
-        .task { await loadCandidates() }
+        .task {
+            await loadCandidates()
+            installed = await Task.detached(priority: .userInitiated) { InstalledApps.all() }.value
+        }
+    }
+
+    private func suggestions(_ targets: [FocusTarget], title: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption.bold())
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(targets) { target in
+                        Toggle(isOn: Binding(get: { focus.contains(target) }, set: { _ in focus.toggle(target) })) {
+                            Text(target.label).lineLimit(1)
+                        }
+                        .toggleStyle(.checkbox)
+                    }
+                }
+            }
+            // A fixed height, not a maximum: inside a popover that is already tall, a flexible ScrollView gets
+            // squeezed to nothing and the suggestions vanish at the bottom edge.
+            .frame(height: 132)
+        }
     }
 
     private func addTyped() {
-        guard let target = FocusTarget.host(typed) else { invalid = true; return }
+        let target = adding == .app ? InstalledApps.target(forTyped: typed, apps: installed) : FocusTarget.host(typed)
+        guard let target else { invalid = true; return }
         focus.add(target)
         typed = ""
         invalid = false

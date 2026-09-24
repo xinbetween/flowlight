@@ -61,7 +61,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.4, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -167,6 +167,13 @@ open build/Build/Products/Release/Flowlight.app
 
  Apps and destinations are a union, not an intersection: focusing on Claude Code and github.com shows
  everything Claude Code does plus everything that talks to GitHub.
+
+ An app and a destination are equally a focus, and either alone is enough. Add an app by typing its name or bundle identifier —
+ every application on the Mac is searchable, so one that has been quiet all day can still be focused, as can a command-line agent
+ with no application bundle — or tick one from what has recently been busy. Add a destination the same way.
+
+ One thing a destination can't narrow: alerts record the app that raised them and nothing about where the traffic went, so a
+ focus made only of destinations leaves the alert list alone. The editor says so rather than letting a screen quietly ignore it.
 
  Focus filters what you see, never what's recorded. Flowlight keeps capturing and storing everything while it's on, and
  the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
@@ -485,7 +492,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1001,8 +1008,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.3
+ 0.3.4
 September 24, 2026Latest
+
+ Focus is symmetric. One app is a focus; so is one destination. Add an app by typing its name or bundle
+ identifier — every application on the Mac is searchable, so one that has been quiet still works, as does a command-line agent
+ with no bundle.
+
+ Alerts say why a destination-only focus doesn't narrow them — an alert records the app that raised it and
+ nothing about where the traffic went. How Focus works →
+
+ Downloads and checksums →
+
+ 0.3.3
+September 24, 2026
 
  The window reopens where you left it, at the size you left it — and comes back on a screen you still have
  if the one it was on has gone.
