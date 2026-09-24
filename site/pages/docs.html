@@ -12,11 +12,46 @@ nav: docs
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
-      <strong>On this page</strong>
-      <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#channels">Which way the bytes left</a><a href="#devices">Devices</a><a href="#ask">Ask</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
-      <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
-      <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
+      <details class="toc-sheet" open>
+        <summary>On this page</summary>
+        <div class="toc-group">
+          <strong>Getting started</strong>
+          <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
+        </div>
+        <div class="toc-group">
+          <strong>Seeing what happened</strong>
+          <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a>
+          <a href="#channels">Which way the bytes left</a><a href="#devices">Devices</a>
+          <a href="#ask">Ask</a><a href="#background">Background</a><a href="#focus">Focus mode</a>
+        </div>
+        <div class="toc-group">
+          <strong>AI agents</strong>
+          <a href="#agents">Agent rules</a><a href="#tools">Tools &amp; MCP</a>
+          <a href="#agent-configuration">Agent configuration</a>
+        </div>
+        <div class="toc-group">
+          <strong>Refusing things</strong>
+          <a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a>
+          <a href="#rules">Rules</a><a href="#guardrails">Guardrails</a>
+        </div>
+        <div class="toc-group">
+          <strong>HTTPS inspection</strong>
+          <a href="#inspection">Turning it on</a><a href="#mocks">Mock responses</a>
+        </div>
+        <div class="toc-group">
+          <strong>Alerts, capture and export</strong>
+          <a href="#alerts">Other alerts</a><a href="#engines">Capture engines</a><a href="#export">Export</a>
+        </div>
+        <div class="toc-group">
+          <strong>Your data and the app</strong>
+          <a href="#data">Your data</a><a href="#updates">Updates</a>
+          <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a>
+        </div>
+        <div class="toc-group">
+          <strong>Reference</strong>
+          <a href="#faq">Questions &amp; answers</a><a href="#limits">Limitations</a>
+        </div>
+      </details>
     </nav>
     <article class="prose">
       <h2 id="install">Install</h2>
@@ -181,6 +216,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>Attribution is per process: Flowlight can't tell which individual tool call inside a long-running MCP server opened a connection.</p>
 
+      <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
+      <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
+        <strong>hooks</strong> that run shell commands on events, the permission rules it was given, and the MCP servers it starts. Flowlight
+        reads those files so the <strong>Tools</strong> tab can show what each agent is set up to do, even before it makes a single request.
+        A hook that posts to a webhook, or a rule that allows <code>Bash(curl:*)</code>, explains traffic you'd otherwise have to guess at.</p>
+      <ul>
+        <li><strong>Where it looks by default:</strong> the agent folders in your home folder — <code>~/.claude</code>, <code>~/.codex</code>,
+          <code>~/.cursor</code>, <code>~/.gemini</code>, <code>~/.agents</code> and the like. It does not walk your whole home folder, so macOS
+          doesn't have to ask for access to Desktop, Documents or Downloads.</li>
+        <li><strong>Your projects:</strong> use <em>Add project folder…</em> to point Flowlight at where your code lives. macOS then grants
+          access to that folder only. If the folder sits inside Documents or Desktop, macOS asks first, and that's the one prompt you'll see.</li>
+        <li><strong>Once, not constantly:</strong> the result is remembered. Flowlight rescans only when you click <em>Rescan</em>, and offers
+          one after a couple of weeks in case you've added agents or projects. Nothing is scanned in the background.</li>
+        <li><strong>What it keeps:</strong> names, descriptions, the command a hook runs, and MCP server commands or URLs. It never copies your
+          code, your prompts or your files, and none of it leaves your Mac. <em>Forget what was found</em> clears it.</li>
+      </ul>
+
       <h2 id="allowlists">Allowlists</h2>
       <p>Select an agent in <strong>AI Agents</strong> and use <strong>Allowlist</strong> in its detail to say where it may connect. Enter domains
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
@@ -250,23 +302,6 @@ open build/Build/Products/Release/Flowlight.app</pre>
         tab says so rather than looking as though it is working.</p>
       <p><strong>This is not a sandbox.</strong> A refused tool stops being offered and stops being answered. An agent that still has a
         shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.</p>
-
-      <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
-      <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
-        <strong>hooks</strong> that run shell commands on events, the permission rules it was given, and the MCP servers it starts. Flowlight
-        reads those files so the <strong>Tools</strong> tab can show what each agent is set up to do, even before it makes a single request.
-        A hook that posts to a webhook, or a rule that allows <code>Bash(curl:*)</code>, explains traffic you'd otherwise have to guess at.</p>
-      <ul>
-        <li><strong>Where it looks by default:</strong> the agent folders in your home folder — <code>~/.claude</code>, <code>~/.codex</code>,
-          <code>~/.cursor</code>, <code>~/.gemini</code>, <code>~/.agents</code> and the like. It does not walk your whole home folder, so macOS
-          doesn't have to ask for access to Desktop, Documents or Downloads.</li>
-        <li><strong>Your projects:</strong> use <em>Add project folder…</em> to point Flowlight at where your code lives. macOS then grants
-          access to that folder only. If the folder sits inside Documents or Desktop, macOS asks first, and that's the one prompt you'll see.</li>
-        <li><strong>Once, not constantly:</strong> the result is remembered. Flowlight rescans only when you click <em>Rescan</em>, and offers
-          one after a couple of weeks in case you've added agents or projects. Nothing is scanned in the background.</li>
-        <li><strong>What it keeps:</strong> names, descriptions, the command a hook runs, and MCP server commands or URLs. It never copies your
-          code, your prompts or your files, and none of it leaves your Mac. <em>Forget what was found</em> clears it.</li>
-      </ul>
 
       <h2 id="inspection">HTTPS inspection (optional)</h2>
       <p>Off by default. When you turn it on in <strong>Inspect</strong>, Flowlight runs a local proxy on <code>127.0.0.1:8877</code> with its own

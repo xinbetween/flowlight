@@ -93,8 +93,27 @@
   .log li .dest b { font-weight: 500; color: var(--log-ink); }
   .log li .bytes { text-align: right; font-variant-numeric: tabular-nums; }
   .up { color: #f08a5d; } .down { color: #6aa9f0; }
+  /* The kinds of thing a row can be. Each gets its own accent so the log reads as what Flowlight does — watching,
+     refusing, guarding, standing in for a server — rather than as one undifferentiated stream. */
   .log li.flag { background: rgba(236, 106, 98, .12); box-shadow: inset 3px 0 0 #ec6a62; }
-  .log li.flag .note { grid-column: 2 / 4; color: #f19a93; font-size: 11.5px; }
+  .log li.block { background: rgba(236, 106, 98, .18); box-shadow: inset 3px 0 0 #ec6a62; }
+  .log li.block .bytes { color: #f19a93; }
+  .log li.guard { background: rgba(45, 178, 190, .12); box-shadow: inset 3px 0 0 #2db2be; }
+  .log li.guard .bytes { color: #7fd6de; }
+  .log li.mock { background: rgba(163, 123, 226, .13); box-shadow: inset 3px 0 0 #a37be2; }
+  .log li.mock .bytes { color: #c4a9f0; }
+  .log li.p2p { box-shadow: inset 3px 0 0 #6aa9f0; }
+  .log li.ask { background: rgba(42, 168, 186, .10); box-shadow: inset 3px 0 0 #2aa8ba; }
+  /* Events rather than connections: a tool call, a drive arriving. No destination, no byte count. */
+  .log li.tool, .log li.device { grid-template-columns: 7.5em minmax(0, 1fr); }
+  .log li.tool .note, .log li.device .note { grid-column: 2 / 3; }
+  .log li.device { box-shadow: inset 3px 0 0 #8a6bd1; }
+  .log li .note { grid-column: 2 / 4; font-size: 11.5px; color: var(--log-muted); }
+  .log li.flag .note, .log li.block .note { color: #f19a93; }
+  .log li.guard .note { color: #7fd6de; }
+  .log li.mock .note { color: #c4a9f0; }
+  .log li.ask .note { color: #7fd6de; }
+  .log li.device .note { color: #bda6ec; }
   .log li.enter { animation: slide .5s ease both; }
   @keyframes slide { from { opacity: 0; transform: translateY(-8px); } }
 
@@ -188,14 +207,58 @@
     .hero .wrap, .agents, .install { grid-template-columns: minmax(0, 1fr); gap: 36px; }
     .pair, .screens { grid-template-columns: minmax(0, 1fr); }
     .privacy { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .nav-links { display: none; }
+
+    /* The links used to be hidden outright below this width, which left Docs, Releases, Privacy and About
+       unreachable from a phone — the pages someone on a phone is most likely to want. They wrap onto a second
+       row that scrolls sideways instead. */
+    .nav .wrap { flex-wrap: wrap; gap: 12px 16px; padding-block: 10px; }
     .nav .btn { margin-left: auto; }
+    .nav-links {
+      order: 3; width: 100%; margin-left: 0; gap: 18px; overflow-x: auto; scrollbar-width: none;
+      -webkit-overflow-scrolling: touch; padding-bottom: 2px;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+    .nav-links a { white-space: nowrap; padding-block: 6px; }
   }
+
+  @media (max-width: 640px) {
+    .wrap { padding-inline: 16px; }
+    .hero h1 { font-size: clamp(32px, 9vw, 46px); }
+    .lede { font-size: 16.5px; }
+    .cta { gap: 10px; margin-top: 24px; }
+    .cta .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+    .brew { width: 100%; }
+    .meta-row { gap: 6px 12px; font-size: 11.5px; }
+    /* A table this wide can only scroll; say so rather than letting it look cut off. */
+    .table-wrap { position: relative; }
+    .table-wrap::after {
+      content: "Scroll to compare \2192"; display: block; font-size: 12px; color: var(--faint);
+      padding: 8px 16px; border-top: 1px solid var(--line); position: sticky; left: 0;
+    }
+    .section-head { margin-bottom: 28px; }
+    .fact, .view-card, .rule { padding: 18px; }
+    .families { grid-template-columns: minmax(0, 1fr); }
+  }
+
   @media (max-width: 520px) {
     .privacy { grid-template-columns: minmax(0, 1fr); }
-    .log li { grid-template-columns: 6em minmax(0, 1fr) 5.4em; font-size: 11.5px; padding-inline: 10px; }
+    .log li { grid-template-columns: 5.6em minmax(0, 1fr) 5.2em; font-size: 11px; padding-inline: 10px; gap: 8px; }
+    .log li.tool, .log li.device { grid-template-columns: 5.6em minmax(0, 1fr); }
+    .log ol { height: 300px; }
     .hero { padding-block: 44px 36px; }
-    section.band { padding-block: 64px; }
+    section.band { padding-block: 56px; }
+    .final { padding-block: 64px; }
+    /* Thumbs, not cursors. */
+    .btn, .chip, summary { min-height: 44px; display: inline-flex; align-items: center; }
+    .chip { padding-inline: 12px; }
+    details summary { min-height: 0; }
+  }
+
+  @media (max-width: 380px) {
+    .log li { grid-template-columns: minmax(0, 1fr) 5.2em; }
+    .log li .app { grid-column: 1 / -1; }
+    .log li .note { grid-column: 1 / -1; }
+    .log li.tool, .log li.device { grid-template-columns: minmax(0, 1fr); }
   }
   /* Motion, sparingly. Everything here is opacity or a transform on the element's own box: a monitoring tool
      whose site shifts under the pointer would be arguing against itself. */
@@ -265,16 +328,31 @@
   .page-head h1 { font-size: clamp(36px, 5vw, 56px); font-weight: 800; }
   .page-head .lede { margin-top: 16px; }
   .prose-wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding-block: 8px 96px; align-items: start; }
-  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); display: grid; gap: 8px; font-size: 14px; }
+  /* The table of contents, in sections. Twenty-eight links in one column is a list nobody reads to the end of;
+     eight labelled groups is something you can scan. */
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 14px; }
+  /* It is a <details>, so it would otherwise pick up the FAQ card — border, background and all — on every page
+     that has a table of contents. It only wants that treatment on a phone, where it folds up. */
+  .toc-sheet { display: grid; gap: 18px; border: 0; background: none; padding: 0; border-radius: 0; }
+  .toc-sheet > summary { display: none; }
+  .toc-group { display: grid; gap: 7px; }
   .toc a { color: var(--muted); text-decoration: none; }
   .toc a:hover { color: var(--ink); }
-  .toc strong { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
-  .prose { max-width: 72ch; display: grid; gap: 16px; }
+  .toc strong, .toc-sheet > summary { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .prose { max-width: 72ch; display: grid; gap: 16px; overflow-wrap: break-word; }
+  /* A grid item won't shrink below its min-content width unless told to, and the min-content width of a <pre>
+     holding a git clone URL is the whole URL. Without this the docs page laid out about 1000px wide on a phone
+     and every line of text ran off the right edge. */
+  .prose > * { min-width: 0; }
+  .prose :not(pre) > code { overflow-wrap: anywhere; }
   .prose h2 { font-size: 28px; margin-top: 28px; scroll-margin-top: 90px; }
   .prose h3 { font-size: 19px; margin-top: 10px; }
   .prose p, .prose li { color: var(--muted); }
   .prose strong { color: var(--ink); }
+  /* Lists are grids too, so their items need the same permission to shrink — otherwise a list item holding the
+     brew command lays out at its full width and takes the page with it. */
   .prose ul, .prose ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  .prose li { min-width: 0; }
   .prose code { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
   .prose pre code { background: none; padding: 0; }
   .prose table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
@@ -313,7 +391,20 @@
     .cases { grid-template-columns: minmax(0, 1fr); }
     .views { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .prose-wrap, .about { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .toc { position: static; grid-auto-flow: column; overflow-x: auto; }
+
+    /* Twenty-eight links above the text is not a table of contents on a phone, it's a wall — so it folds up.
+       These rules have to come after the desktop ones: a media query adds no specificity, only order. */
+    .toc { position: static; }
+    .toc-sheet { gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+    .toc-sheet > summary {
+      display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none;
+      font-size: 12px; min-height: 32px;
+    }
+    .toc-sheet > summary::-webkit-details-marker { display: none; }
+    .toc-sheet > summary::after { content: "+"; font: 500 18px/1 var(--mono); color: var(--faint); }
+    .toc-sheet[open] > summary::after { content: "\2013"; }
+    .toc-sheet:not([open]) { gap: 0; }
+    .toc-group a { padding-block: 3px; }
     .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .footer-brand { grid-column: 1 / -1; }
   }

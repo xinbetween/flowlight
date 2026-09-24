@@ -55,6 +55,13 @@
     });
   });
 
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
   // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
   // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
   // exactly the same.
