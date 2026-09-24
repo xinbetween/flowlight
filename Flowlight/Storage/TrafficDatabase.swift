@@ -266,6 +266,11 @@ final class TrafficDatabase: @unchecked Sendable {
         for column in ["tool_results", "mcp", "llm"] where !exchangeColumns.contains(column) {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
         }
+        // Added with mock responses: which rule answered, empty when the host itself did. Its own column rather
+        // than a flag in `note`, so an older recording stays what it was — everything in it really happened.
+        if !exchangeColumns.contains("mock_rule") {
+            try conn.execute("ALTER TABLE http_exchanges ADD COLUMN mock_rule TEXT NOT NULL DEFAULT ''")
+        }
     }
 
     // MARK: Ingest
@@ -699,8 +704,8 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("""
             INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                 req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                   .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                   .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
@@ -708,7 +713,7 @@ final class TrafficDatabase: @unchecked Sendable {
                   .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
                   .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
                   .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
-                  .text(e.llm.map(json) ?? "")])
+                  .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? "")])
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
@@ -734,7 +739,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
-                   tool_results, mcp, llm
+                   tool_results, mcp, llm, mock_rule
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
                                                    OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)
             ORDER BY ts DESC LIMIT ?
@@ -755,7 +760,7 @@ final class TrafficDatabase: @unchecked Sendable {
                 toolResults: results.isEmpty ? [] : ((try? decoder.decode([ToolResult].self, from: Data(results.utf8))) ?? []),
                 mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
                 llm: llm.isEmpty ? nil : try? decoder.decode(LLMFacts.self, from: Data(llm.utf8)),
-                note: row.text(23).nilIfEmpty)
+                note: row.text(23).nilIfEmpty, mockRule: row.text(27).nilIfEmpty)
         }
     }
 

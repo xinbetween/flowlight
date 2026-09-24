@@ -20,11 +20,18 @@ private struct InspectContent: View {
     @State private var search = ""
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
+    /// A rule prefilled from a recorded exchange, waiting in the editor.
+    @State private var mockDraft: MockRule?
+    /// Setup was opened to look at the mock rules, so it opens on them.
+    @State private var openMocks = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
-                ScrollView { InspectionSetup(inspection: inspection, done: { showSetup = false }).padding(.bottom, 20) }
+                ScrollView {
+                    InspectionSetup(inspection: inspection, openMocks: openMocks, done: { showSetup = false })
+                        .padding(.bottom, 20)
+                }
             } else {
                 statusBar
                 if exchanges.isEmpty {
@@ -60,6 +67,9 @@ private struct InspectContent: View {
         .padding()
         .navigationTitle("Inspect")
         .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app, tool or anything in a body")
+        .sheet(item: $mockDraft) { draft in
+            MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
+        }
         .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled,
                           focus: focus.scope)) {
             // Coalesce bursts of new exchanges.
@@ -85,6 +95,16 @@ private struct InspectContent: View {
         HStack(spacing: 10) {
             Circle().fill(DemoData.isEnabled || inspection.running && inspection.trusted ? Color.green : Color.orange).frame(width: 8, height: 8)
             Text(statusText).font(.callout)
+            // A mock left on looks exactly like an agent misbehaving, so it says so on every screen that shows
+            // inspected traffic, not only in the setup page where it was switched on.
+            if !DemoData.isEnabled, inspection.activeMockRules > 0 {
+                Button { openMocks = true; showSetup = true } label: {
+                    Label(inspection.activeMockRules == 1 ? "1 mock rule on" : "\(inspection.activeMockRules) mock rules on",
+                          systemImage: "wand.and.stars")
+                }
+                .buttonStyle(.plain).font(.callout.bold()).foregroundStyle(.purple)
+                .help("Flowlight is answering some requests itself instead of forwarding them. Click to review the rules.")
+            }
             Spacer()
             Picker("Window", selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
@@ -93,7 +113,7 @@ private struct InspectContent: View {
             if !DemoData.isEnabled {
                 Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
                     .help("A Terminal window whose agents and tools go through Flowlight")
-                Button("Setup…") { showSetup = true }
+                Button("Setup…") { openMocks = false; showSetup = true }
             }
         }
     }
@@ -128,7 +148,14 @@ private struct InspectContent: View {
                     if e.note != nil {
                         Label("Not inspected: \(e.host)", systemImage: "lock").foregroundStyle(.orange).lineLimit(1)
                     } else {
-                        Text("\(e.method) \(e.host)").lineLimit(1)
+                        HStack(spacing: 5) {
+                            Text("\(e.method) \(e.host)").lineLimit(1)
+                            if e.mockRule != nil {
+                                Label("Mocked", systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(.purple)
+                                    .labelStyle(.titleAndIcon)
+                                    .help("Flowlight answered this itself; the request never reached \(e.host)")
+                            }
+                        }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                 }
@@ -153,11 +180,17 @@ private struct InspectContent: View {
             }
             .width(min: 80, ideal: 150)
         }
+        .contextMenu(forSelectionType: HTTPExchange.ID.self) { ids in
+            if !DemoData.isEnabled, let id = ids.first, let e = exchanges.first(where: { $0.id == id }), e.note == nil {
+                Button("Mock This Endpoint…") { mockDraft = MockRule(mocking: e) }
+            }
+        }
     }
 
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
-            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results, highlight: search)
+            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results, highlight: search,
+                           mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) })
                 .id(selected.id)
         } else {
             ContentUnavailableView("Select a request", systemImage: "doc.text.magnifyingglass")
@@ -168,10 +201,12 @@ private struct InspectContent: View {
 /// Setup: one switch that does everything, with the details tucked away for people who want them.
 private struct InspectionSetup: View {
     @ObservedObject var inspection: InspectionController
+    var openMocks = false
     var done: () -> Void
     @State private var newPattern = ""
     @State private var confirmRemove = false
     @State private var showAdvanced = false
+    @State private var showMocks = false
     @State private var confirmTurnOn = false
     @Environment(\.openURL) private var openURL
 
@@ -281,6 +316,18 @@ private struct InspectionSetup: View {
             } label: {
                 Text("Advanced").font(.headline)
             }
+
+            DisclosureGroup(isExpanded: $showMocks) {
+                MockRulesSection(inspection: inspection).padding(.top, 10)
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Mock responses").font(.headline)
+                    if inspection.activeMockRules > 0 {
+                        Label(inspection.activeMockRules == 1 ? "1 on" : "\(inspection.activeMockRules) on", systemImage: "wand.and.stars")
+                            .font(.caption.bold()).foregroundStyle(.purple)
+                    }
+                }
+            }
         }
         .frame(maxWidth: 760, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -295,7 +342,7 @@ private struct InspectionSetup: View {
         } message: {
             Text("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request.")
         }
-        .onAppear { inspection.refreshStatus() }
+        .onAppear { inspection.refreshStatus(); showMocks = showMocks || openMocks }
     }
 
     private func ready(_ text: String, ok: Bool) -> some View {
@@ -319,6 +366,8 @@ private struct ExchangeDetail: View {
     var results: [String: ToolResult] = [:]
     /// The toolbar's search term, so matches inside a body are marked where they appear.
     var highlight: String = ""
+    /// Starts a mock rule from this request, when mocking is available (it isn't in demo mode).
+    var mockThis: (() -> Void)?
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
     @State private var headersOpen: Bool?
@@ -328,10 +377,22 @@ private struct ExchangeDetail: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(exchange.note == nil ? "\(exchange.method) \(exchange.url)" : exchange.host)
                     .font(.headline).textSelection(.enabled).lineLimit(3)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    if let mockThis, exchange.note == nil, exchange.mockRule == nil {
+                        Button("Mock This…", action: mockThis).buttonStyle(.link).font(.caption)
+                            .help("Answer this endpoint from Flowlight instead of letting the request through")
+                    }
+                }
             }
             if let note = exchange.note {
                 Label(note, systemImage: "lock").foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            if let mock = exchange.mockRule {
+                // The whole point of the feature is that this answer is a fiction; say so before anything below is read.
+                Label("Answered by Flowlight, not by \(exchange.host) — mock rule “\(mock)”. The request was never sent.",
+                      systemImage: "wand.and.stars")
+                    .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
             }
             if let cause {
                 GroupBox("Made by a tool call") {

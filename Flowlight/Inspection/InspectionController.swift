@@ -18,6 +18,7 @@ final class InspectionController: ObservableObject {
         static let neverInspect = "inspection.neverInspect"
         static let retentionDays = "inspection.retentionDays"
         static let systemProxy = "inspection.systemProxy"
+        static let mockRules = "inspection.mockRules"
     }
 
     /// Hosts that are never decrypted, even when routed through the proxy: Apple services (many pin certificates and
@@ -69,10 +70,15 @@ final class InspectionController: ObservableObject {
             (Scope(rawValue: UserDefaults.standard.string(forKey: Keys.scope) ?? "") ?? .agents,
              UserDefaults.standard.stringArray(forKey: Keys.neverInspect) ?? Self.defaultNeverInspect)
         }
+        let mockRules = { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
+        proxy.mockRules = { host in MockRules.mocks(mockRules(), host: host) }
         let decide = DispatchQueue(label: "flowlight.inspect.decide", qos: .userInitiated, attributes: .concurrent)
         proxy.shouldInspect = { [recorder, proxy] host, clientPort, answer in
             let (scope, never) = scopeAndList()
             guard !Self.matches(host: host, patterns: never) else { answer(false); return }
+            // A host someone wrote a mock rule for is decrypted whatever the scope says: a rule can only answer a
+            // request Flowlight can read, and "my mock didn't fire" is a bad afternoon.
+            guard MockRules.mocks(mockRules(), host: host).isEmpty else { answer(true); return }
             guard scope == .agents else { answer(true); return }
             decide.async {
                 answer(recorder.owner(clientPort: clientPort, proxyPort: proxy.port).agent != nil)
@@ -81,7 +87,8 @@ final class InspectionController: ObservableObject {
         recorder.onExchange = { [weak self] exchange in
             // Plain-HTTP requests reach the recorder regardless of scope; keep only what the scope allows.
             let (scope, _) = scopeAndList()
-            guard scope == .all || exchange.agent != nil || exchange.note != nil else { return }
+            // A mocked exchange is always kept: an answer Flowlight invented has to be visible wherever it lands.
+            guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil else { return }
             guard let self else { return }
             Task { @MainActor in
                 self.db?.async { try $0.insertExchange(exchange) }
@@ -105,6 +112,26 @@ final class InspectionController: ObservableObject {
     var neverInspect: [String] {
         get { UserDefaults.standard.stringArray(forKey: Keys.neverInspect) ?? Self.defaultNeverInspect }
         set { UserDefaults.standard.set(newValue, forKey: Keys.neverInspect); objectWillChange.send() }
+    }
+
+    /// Canned answers for chosen endpoints, in the order they're tried. Kept in UserDefaults as JSON like
+    /// `neverInspect`: they're settings rather than history, the proxy reads them before the database is open, and
+    /// "remove everything Flowlight recorded" mustn't quietly throw away a rule someone wrote.
+    var mockRules: [MockRule] {
+        get { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
+        set {
+            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Keys.mockRules)
+            objectWillChange.send()
+        }
+    }
+
+    /// How many rules would answer something right now. Shown wherever inspection is, because a mock left on is
+    /// otherwise indistinguishable from an agent behaving strangely.
+    var activeMockRules: Int { mockRules.filter(\.enabled).count }
+
+    nonisolated static func decodeMockRules(_ data: Data?) -> [MockRule] {
+        guard let data else { return [] }
+        return (try? JSONDecoder().decode([MockRule].self, from: data)) ?? []
     }
 
     var configuredPort: UInt16 { UInt16(clamping: max(1024, UserDefaults.standard.integer(forKey: Keys.port))) }

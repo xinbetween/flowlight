@@ -27,6 +27,8 @@ protocol ProxyObserver: AnyObject {
     func flowEnded(_ flow: ProxyFlow, note: String?)
     /// The proxy's own connection to the destination is up, to this address.
     func flow(_ flow: ProxyFlow, connectedTo remoteIP: String)
+    /// The request whose bytes come next was answered by Flowlight itself, not by the server.
+    func flow(_ flow: ProxyFlow, mockedBy rule: String)
 }
 
 /// A local HTTP proxy on 127.0.0.1 that can decrypt HTTPS for inspection.
@@ -52,6 +54,8 @@ final class InspectionProxy: @unchecked Sendable {
     /// Decides whether to decrypt a CONNECT to `host` from the client at `clientPort`. May answer asynchronously
     /// (it can look up the owning process); the proxy continues on its own queue.
     var shouldInspect: (_ host: String, _ clientPort: UInt16, _ answer: @escaping (Bool) -> Void) -> Void = { _, _, answer in answer(true) }
+    /// The enabled mock rules that could answer for a host. Asked once per inspected flow, before any framing.
+    var mockRules: (_ host: String) -> [MockRule] = { _ in [] }
     /// Served at http://127.0.0.1:<port>/proxy.pac.
     var pacScript: () -> String = { "function FindProxyForURL(url, host) { return \"DIRECT\"; }" }
     var onStateChange: (String?) -> Void = { _ in }
@@ -303,6 +307,14 @@ final class InspectionProxy: @unchecked Sendable {
 
     private func relay(client: NWConnection, upstream: NWConnection, flow: ProxyFlow, firstClientBytes: Data?) {
         observer?.flowStarted(flow)
+        // Read once per flow: a host no enabled rule names gets the plain relay, with its requests never framed.
+        let mocks = mockRules(flow.host)
+        let gate = mocks.isEmpty ? nil : MockGate(host: flow.host, rules: mocks)
+        let fromClient: (Data) -> Data = { [weak self] data in
+            guard let self else { return data }
+            guard let gate else { self.observer?.flow(flow, clientSent: data); return data }
+            return self.apply(gate.clientSent(data), flow: flow, client: client)
+        }
         var ended = false
         let finish: (String?) -> Void = { [weak self] note in
             guard !ended else { return }
@@ -316,11 +328,11 @@ final class InspectionProxy: @unchecked Sendable {
             case .ready:
                 if let ip = Self.remoteIP(upstream) { self.observer?.flow(flow, connectedTo: ip) }
                 if let first = firstClientBytes, !first.isEmpty {
-                    self.observer?.flow(flow, clientSent: first)
-                    upstream.send(content: first, completion: .idempotent)
+                    let onward = fromClient(first)
+                    if !onward.isEmpty { upstream.send(content: onward, completion: .idempotent) }
                 }
-                self.pump(client, into: upstream, tap: { self.observer?.flow(flow, clientSent: $0) }) { finish(nil) }
-                self.pump(upstream, into: client, tap: { self.observer?.flow(flow, serverSent: $0) }) { finish(nil) }
+                self.pump(client, into: upstream, tap: fromClient) { finish(nil) }
+                self.pump(upstream, into: client, tap: { self.observer?.flow(flow, serverSent: $0); return $0 }) { finish(nil) }
             case .failed(let error):
                 finish("Couldn't reach \(flow.host): \(error.localizedDescription)")
             case .waiting(let error):
@@ -331,12 +343,65 @@ final class InspectionProxy: @unchecked Sendable {
         upstream.start(queue: queue)
     }
 
+    // MARK: Mock responses
+
+    /// Performs what the gate decided, and returns the bytes that still go upstream.
+    private func apply(_ actions: [MockGate.Action], flow: ProxyFlow, client: NWConnection) -> Data {
+        var onward = Data()
+        for action in actions {
+            switch action {
+            case .forward(let bytes):
+                observer?.flow(flow, clientSent: bytes)
+                onward.append(bytes)
+            case .hold(let bytes):
+                // Recorded like any other request byte: what the agent sent is exactly what it would have sent.
+                observer?.flow(flow, clientSent: bytes)
+            case .answer(let rule, let bytes):
+                // Mark before the bytes that complete the request, so the recorder can label the exchange it is
+                // about to parse rather than having to match it up afterwards.
+                observer?.flow(flow, mockedBy: rule.title)
+                observer?.flow(flow, clientSent: bytes)
+                answer(rule, to: client, flow: flow)
+            }
+        }
+        return onward
+    }
+
+    /// Writes a rule's canned response to the client, after its delay. The observer sees it as if the server had
+    /// sent it, which is what puts a mocked exchange in Inspect beside the real ones.
+    private func answer(_ rule: MockRule, to client: NWConnection, flow: ProxyFlow) {
+        let bytes = rule.responseBytes()
+        let send = { [weak self] in
+            self?.observer?.flow(flow, serverSent: bytes)
+            client.send(content: bytes, completion: .idempotent)
+        }
+        if rule.delay > 0 {
+            queue.asyncAfter(deadline: .now() + rule.delay, execute: send)
+        } else {
+            send()
+        }
+    }
+
+    // MARK: Copying
+
     /// Copies bytes from `source` to `destination` until `source` closes, waiting for each write before reading more.
-    private func pump(_ source: NWConnection, into destination: NWConnection, tap: ((Data) -> Void)?, closed: @escaping () -> Void) {
+    /// `tap` sees every byte and returns what carries on to `destination` — all of it, except for a request that a
+    /// mock rule answered, which is recorded but never relayed.
+    private func pump(_ source: NWConnection, into destination: NWConnection, tap: ((Data) -> Data)?, closed: @escaping () -> Void) {
         source.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, complete, error in
             if let data, !data.isEmpty {
-                tap?(data)
-                destination.send(content: data, completion: .contentProcessed { sendError in
+                let onward = tap.map { $0(data) } ?? data
+                guard !onward.isEmpty else {
+                    // Everything in this read was answered locally; there's nothing to write upstream.
+                    if complete || error != nil {
+                        destination.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
+                        closed()
+                    } else {
+                        self?.pump(source, into: destination, tap: tap, closed: closed)
+                    }
+                    return
+                }
+                destination.send(content: onward, completion: .contentProcessed { sendError in
                     if sendError != nil { closed(); return }
                     if complete || error != nil {
                         destination.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
