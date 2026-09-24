@@ -101,13 +101,13 @@ struct WindowSizer: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             if let saved = UserDefaults.standard.string(forKey: Self.key) {
-                window.setFrame(NSRectFromString(saved), display: true, animate: false)
+                let frame = NSRectFromString(saved)
                 // A screen that has gone away — an unplugged display — would leave the window somewhere
-                // unreachable, so anything off-screen falls back to filling the current one.
-                if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }),
-                   let screen = NSScreen.main {
-                    window.setFrame(screen.visibleFrame, display: true, animate: false)
-                }
+                // unreachable. So would a frame saved on a larger display, or one that was nudged off the right
+                // edge: it still overlaps the screen, so a bare intersection test keeps it, and the window comes
+                // back half outside the visible area. Fit it instead of asking whether it is hopeless.
+                let screen = NSScreen.screens.first { $0.visibleFrame.intersects(frame) } ?? NSScreen.main
+                window.setFrame(screen.map { Self.fit(frame, in: $0.visibleFrame) } ?? frame, display: true, animate: false)
             } else if let screen = window.screen ?? NSScreen.main {
                 // Nothing saved: fill the screen so a first run doesn't hide most of the app in a small window.
                 window.setFrame(screen.visibleFrame, display: true, animate: false)
@@ -118,6 +118,17 @@ struct WindowSizer: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSView, context: Context) {}
+
+    /// A saved frame, brought back inside the screen that will show it: no larger than the visible area, and moved
+    /// rather than resized when it only needs moving, so a window someone sized deliberately keeps its size.
+    static func fit(_ frame: NSRect, in visible: NSRect) -> NSRect {
+        var fitted = frame
+        fitted.size.width = min(fitted.width, visible.width)
+        fitted.size.height = min(fitted.height, visible.height)
+        fitted.origin.x = min(max(fitted.minX, visible.minX), visible.maxX - fitted.width)
+        fitted.origin.y = min(max(fitted.minY, visible.minY), visible.maxY - fitted.height)
+        return fitted
+    }
 
     final class Coordinator {
         private var observers: [NSObjectProtocol] = []

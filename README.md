@@ -358,6 +358,7 @@ Shipped:
 - [x] A site that keeps up with the app: counts read from source at build time, balanced columns, motion that
   never moves the layout (0.3.7)
 - [x] Peer-to-peer Wi-Fi named as its own channel: AirDrop, Handoff, AirPlay, Sidecar, Universal Control (0.4.0)
+- [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -366,11 +367,11 @@ Shipped:
 
 Planned, in order:
 
-- **0.4.1 — Bluetooth: who has access, and what is connected.** macOS keeps no per-app byte accounting for
+- **0.4.2 — Bluetooth: who has access, and what is connected.** macOS keeps no per-app byte accounting for
   Bluetooth, so the honest scope is which apps hold Bluetooth access, which devices are paired and connected, and
   when that changes — not how much each app sent. Byte-level HCI traces need Apple's PacketLogger profile, which an
   app can't read, and Flowlight will say so rather than implying a number it doesn't have.
-- **0.4.2 — USB and external storage.** Attach and detach events, and which volumes appear — not throughput, for
+- **0.4.3 — USB and external storage.** Attach and detach events, and which volumes appear — not throughput, for
   the same reason.
 
   Both widen what Flowlight watches, so each ships behind its own switch and its permission is only requested if

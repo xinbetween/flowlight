@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.4.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.4.1, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
@@ -580,7 +580,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.4.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.4.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1115,8 +1115,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.4.0
+ 0.4.1
 September 24, 2026Latest
+
+ Fixed: the Rules screen came up blank from 0.3.5 to 0.4.0. The rule engine was working the whole
+ time — rules were carried out and refusals recorded — but the screen that lists them wasn't drawing.
+
+ Fixed: a window nudged off the edge of the screen came back that way on every launch, instead of
+ being fitted back inside the visible area.
+
+ Downloads and checksums →
+
+ 0.4.0
+September 24, 2026
 
  Peer-to-peer Wi-Fi, named at last. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight
  to a device in the room. Flowlight was always counting them; now it says so.

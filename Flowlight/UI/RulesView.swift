@@ -22,19 +22,15 @@ struct RulesView: View {
     private var store: RuleStore { monitor.rules }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.title).tag($0) }
+        Group {
+            if tab == .rules {
+                if store.rules.isEmpty { empty } else { ruleList }
+            } else {
+                activityFeed
             }
-            .pickerStyle(.segmented).labelsHidden()
-            .frame(width: 260)
-            .padding(.horizontal, 16).padding(.top, 12)
-
-            if tab == .rules { ruleList } else { activityFeed }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .navigationTitle("Rules")
+        .toolbar { toolbar }
         .sheet(item: $editing) { rule in
             RuleEditor(rule: rule, isNew: isNew) { store.save($0) }
         }
@@ -50,59 +46,55 @@ struct RulesView: View {
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
     }
 
-    // MARK: Header
+    // MARK: Toolbar
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Rules").font(.title2.bold())
-                    Text("Block anything, anywhere, for as long as you say — and write down the way back out.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                pauseControl
-                Button("Add Rule…") { editing = Rule(); isNew = true }
-                    .keyboardShortcut("n", modifiers: .command)
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.title).tag($0) }
             }
-            if let warning = engineWarning {
-                Label(warning, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-            }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 220)
         }
-        .padding(16)
+        ToolbarItemGroup {
+            pauseControl
+            Button {
+                editing = Rule()
+                isNew = true
+            } label: {
+                Label("Add Rule", systemImage: "plus")
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .help("Write a rule: an app, an agent, a destination or a URL, blocked or allowed")
+        }
     }
 
     /// The escape hatch. A strict rule is only liveable if there is an obvious way to stand it down for a minute,
     /// and an escape hatch that has to be found in Settings isn't one.
+    @ViewBuilder
     private var pauseControl: some View {
-        Group {
-            if store.isPaused, let until = store.pausedUntil {
-                Button {
-                    store.resume()
-                } label: {
-                    Label("Paused until \(until.formatted(date: .omitted, time: .shortened)) — Resume",
-                          systemImage: "play.circle.fill")
-                }
-                .tint(.orange)
-                .help("Nothing is being refused. Click to start again now.")
-            } else {
-                Menu {
-                    Button("10 minutes") { store.pause(for: 600) }
-                    Button("1 hour") { store.pause(for: 3600) }
-                    Button("Until I resume") { store.pause(for: 60 * 60 * 24 * 365) }
-                } label: {
-                    Label("Pause Blocking", systemImage: "pause.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help("Stand every rule down for a while, without deleting anything")
+        if store.isPaused, let until = store.pausedUntil {
+            Button {
+                store.resume()
+            } label: {
+                Label("Paused until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "play.circle.fill")
             }
+            .tint(.orange)
+            .help("Nothing is being refused. Click to start again now.")
+        } else {
+            Menu {
+                Button("10 minutes") { store.pause(for: 600) }
+                Button("1 hour") { store.pause(for: 3600) }
+                Button("Until I resume") { store.pause(for: 60 * 60 * 24 * 365) }
+            } label: {
+                Label("Pause Blocking", systemImage: "pause.circle")
+            }
+            .help("Stand every rule down for a while, without deleting anything")
         }
     }
 
     /// What the rules as a set can't do here. Per-rule limitations sit on the rows; this is the one worth saying
-    /// once, loudly, because it applies to almost everything in the list.
+    /// once, because it applies to almost everything in the list.
     private var engineWarning: String? {
         let blind = RuleBook.unenforceable(store.rules, extensionRunning: monitor.mode == .networkExtension,
                                            inspecting: monitor.inspection.enabled)
@@ -119,44 +111,93 @@ struct RulesView: View {
     // MARK: The list
 
     private var ruleList: some View {
-        Group {
-            if store.rules.isEmpty {
-                empty
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(store.rules) { rule in
-                            RuleRow(rule: rule, store: store, now: now,
-                                    extensionRunning: monitor.mode == .networkExtension,
-                                    inspecting: monitor.inspection.enabled,
-                                    events: store.events(for: rule).count) {
-                                editing = rule; isNew = false
-                            }
-                            Divider()
-                        }
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(store.rules) { rule in
+                    RuleRow(rule: rule, store: store, now: now,
+                            extensionRunning: monitor.mode == .networkExtension,
+                            inspecting: monitor.inspection.enabled,
+                            events: store.events(for: rule).count) {
+                        editing = rule; isNew = false
                     }
-                    .padding(.horizontal, 16).padding(.top, 8)
+                    Divider()
                 }
+            }
+            .padding(.horizontal, 16).padding(.top, 8)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let warning = engineWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.bar)
             }
         }
     }
 
     private var empty: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("No rules yet.").font(.callout).foregroundStyle(.secondary)
+        ContentUnavailableView {
+            Label("No rules yet", systemImage: "hand.raised")
+        } description: {
             Text("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. "
                  + "Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, "
-                 + "or start from a preset below.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                ForEach(RuleEditor.presets, id: \.name) { preset in
-                    Button(preset.name) { editing = preset.rule(); isNew = true }
-                }
+                 + "or start from a preset.")
+        } actions: {
+            ForEach(RuleEditor.presets, id: \.name) { preset in
+                Button(preset.name) { editing = preset.rule(); isNew = true }
             }
-            .padding(.top, 4)
         }
-        .frame(maxWidth: 560, alignment: .leading)
-        .padding(16)
+    }
+
+    // MARK: The violations feed
+
+    private var activityFeed: some View {
+        Group {
+            if store.events.isEmpty {
+                ContentUnavailableView {
+                    Label("Nothing yet", systemImage: "list.bullet.rectangle")
+                } description: {
+                    Text("Every connection a rule decides lands here — the refusals, and the exceptions that let "
+                         + "something through. The second half is how \"why is this getting through?\" stays answerable.")
+                }
+            } else {
+                feedTable
+            }
+        }
+    }
+
+    private var feedTable: some View {
+        Table(store.events) {
+            TableColumn("When") { Text($0.timestamp.formatted(date: .omitted, time: .standard)).font(.caption.monospaced()) }
+                .width(80)
+            TableColumn("") { event in
+                Image(systemName: event.action == .block ? "hand.raised.fill" : "checkmark.shield")
+                    .foregroundStyle(event.action == .block ? Color.red : Color.green)
+                    .help(event.action == .block ? "Refused" : "Allowed by an exception")
+            }
+            .width(20)
+            TableColumn("App") { event in
+                Text(event.agentName.isEmpty || event.agentName == event.appName
+                     ? event.appName : "\(event.agentName) › \(event.appName)").lineLimit(1)
+            }
+            TableColumn("Destination") { event in
+                Text(event.path.isEmpty ? "\(event.destination):\(event.port)"
+                                        : "\(event.method) \(event.destination)\(event.path)")
+                    .font(.caption.monospaced()).lineLimit(1)
+            }
+            TableColumn("Rule") { event in
+                Text(name(of: event)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            TableColumn("Where") { event in
+                Text(event.engine == .flow ? "Connection" : "Request")
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .help(event.engine == .flow
+                          ? "Refused by the Network Extension, before the connection was made"
+                          : "Refused by HTTPS inspection, which answered the request itself")
+            }
+            .width(80)
+        }
     }
 
     /// A decision can come from a network rule or from a guardrail — the same question asked about a destination
@@ -165,55 +206,6 @@ struct RulesView: View {
         if let rule = store.rules.first(where: { $0.id == event.ruleID }) { return rule.title }
         if let guardrail = monitor.guardrails.guardrails.first(where: { $0.id == event.ruleID }) { return guardrail.title }
         return "A rule since deleted"
-    }
-
-    // MARK: The violations feed
-
-    private var activityFeed: some View {
-        Group {
-            if store.events.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Nothing yet.").font(.callout).foregroundStyle(.secondary)
-                    Text("Every connection a rule decides lands here — the refusals, and the exceptions that let "
-                         + "something through. The second half is how \"why is this getting through?\" stays answerable.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: 560, alignment: .leading)
-                .padding(16)
-            } else {
-                Table(store.events) {
-                    TableColumn("When") { Text($0.timestamp.formatted(date: .omitted, time: .standard)).font(.caption.monospaced()) }
-                        .width(80)
-                    TableColumn("") { event in
-                        Image(systemName: event.action == .block ? "hand.raised.fill" : "checkmark.shield")
-                            .foregroundStyle(event.action == .block ? Color.red : Color.green)
-                            .help(event.action == .block ? "Refused" : "Allowed by an exception")
-                    }
-                    .width(20)
-                    TableColumn("App") { event in
-                        Text(event.agentName.isEmpty || event.agentName == event.appName
-                             ? event.appName : "\(event.agentName) › \(event.appName)").lineLimit(1)
-                    }
-                    TableColumn("Destination") { event in
-                        Text(event.path.isEmpty ? "\(event.destination):\(event.port)"
-                                                : "\(event.method) \(event.destination)\(event.path)")
-                            .font(.caption.monospaced()).lineLimit(1)
-                    }
-                    TableColumn("Rule") { event in
-                        Text(name(of: event)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    TableColumn("Where") { event in
-                        Text(event.engine == .flow ? "Connection" : "Request")
-                            .font(.caption).foregroundStyle(.tertiary)
-                            .help(event.engine == .flow
-                                  ? "Refused by the Network Extension, before the connection was made"
-                                  : "Refused by HTTPS inspection, which answered the request itself")
-                    }
-                    .width(80)
-                }
-                .padding(.horizontal, 8).padding(.top, 8)
-            }
-        }
     }
 }
 

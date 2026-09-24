@@ -165,3 +165,34 @@ final class ChannelExportTests: XCTestCase {
         XCTAssertFalse(lines.contains("flowlight.network.channel"))
     }
 }
+
+/// Restoring a window where someone can actually reach it.
+///
+/// The first version asked whether the saved frame overlapped a screen at all, which is true of a window hanging
+/// most of the way off the right edge — so it came back that way, and stayed that way on every relaunch.
+final class WindowFrameTests: XCTestCase {
+    private let screen = NSRect(x: 0, y: 0, width: 1728, height: 1050)
+
+    func testAFrameThatFitsIsLeftAlone() {
+        let frame = NSRect(x: 100, y: 60, width: 1200, height: 800)
+        XCTAssertEqual(WindowSizer.fit(frame, in: screen), frame)
+    }
+
+    func testAFrameHangingOffTheEdgeIsMovedBackIn() {
+        let fitted = WindowSizer.fit(NSRect(x: 100, y: 63, width: 1700, height: 994), in: screen)
+        XCTAssertEqual(fitted.width, 1700, "it needed moving, not shrinking")
+        XCTAssertEqual(fitted.minX, 28)
+        XCTAssertLessThanOrEqual(fitted.maxX, screen.maxX)
+    }
+
+    func testAFrameFromALargerDisplayIsShrunkToFit() {
+        let fitted = WindowSizer.fit(NSRect(x: 2000, y: 1200, width: 3000, height: 1800), in: screen)
+        XCTAssertEqual(fitted, screen)
+    }
+
+    func testAFrameFromAScreenThatIsGoneComesHome() {
+        let fitted = WindowSizer.fit(NSRect(x: -4000, y: -2000, width: 800, height: 600), in: screen)
+        XCTAssertEqual(fitted.origin, NSPoint(x: 0, y: 0))
+        XCTAssertEqual(fitted.size, NSSize(width: 800, height: 600))
+    }
+}
