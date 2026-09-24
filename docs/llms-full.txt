@@ -61,11 +61,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.3.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.6, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesAgent configurationHTTPS inspectionMock responsesOther alerts
+ The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingRulesGuardrailsAgent configurationHTTPS inspectionMock responsesOther alerts
  Capture enginesExportYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -266,6 +266,38 @@ open build/Build/Products/Release/Flowlight.app
 
  The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
  rule decided it and whether that was a refusal or an exception letting it through.
+
+ Agent guardrails: block a tool, a server or a resource
+
+ Which tools may this agent use is a different question from which hosts may it reach, so it has its own
+ section: a Guardrails tab beside each agent in AI Agents, with a switch on every tool it declares and every
+ MCP server it reaches, presets worth having (read-only, no shell, no writes), and a record of what
+ has been taken away.
+
+ The strongest lever is the declaration. Agents re-send their whole tool list on every turn. Flowlight removes
+ a refused tool from that list before the request leaves, so the model is never offered it: no refusal to argue with, no retry
+ loop. It works the same for a tool the agent runs itself and one behind a remote MCP server, and it reads the same shapes
+ Flowlight already parses for Anthropic, OpenAI and Gemini.
+
+ A refused call is answered properly. For MCP servers reached over HTTP, a blocked tools/call
+ comes back as a result carrying isError: true and a plain sentence, because that is what the protocol says
+ a failing tool looks like — the model reads it and works around it, where a transport error would look like a broken server.
+ resources/read and prompts/get have no such shape, so they get a JSON-RPC error instead.
+
+ Connectors are narrowed, not intercepted. When the provider reaches an MCP server on the agent's behalf, that
+ traffic never touches this Mac. The only lever is the request that sets it up, so Flowlight narrows the tools the connector is
+ allowed to call, or drops the connector entirely.
+
+ Local stdio servers speak over pipes, and no proxy can see that. What Flowlight can do there is watch the
+ server process's own network traffic, which is already attributed to the agent that started it, and hand you the deny list to
+ paste into the agent's own settings — Claude Code takes mcp__server__tool in permissions.deny, and its
+ neighbours have equivalents. That takes effect when the agent restarts.
+
+ Guardrails need HTTPS inspection, because the tool list lives inside a request body. With inspection off the
+ tab says so rather than looking as though it is working.
+
+ This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
+ shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
 
  Agent configuration: what Flowlight reads on your Mac
 
@@ -522,7 +554,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.3.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1038,8 +1070,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.3.5
+ 0.3.6
 September 24, 2026Latest
+
+ Agent guardrails. A switch on every tool an agent declares and every MCP server it reaches, with
+ presets: read-only, no shell, no writes.
+
+ The model is never offered a refused tool — it is removed from the declaration before the request
+ leaves, so there is no refusal to argue with and no retry loop.
+
+ A refused MCP call over HTTP comes back as a result with isError and a sentence, which
+ is the protocol's own shape for a tool that failed. How guardrails work →
+
+ Downloads and checksums →
+
+ 0.3.5
+September 24, 2026
 
  Rules. One rule model behind every screen: a subject — an app, an agent, a destination, a URL — and
  block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one.

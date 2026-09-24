@@ -50,6 +50,8 @@ final class TrafficMonitor: ObservableObject {
     let exporter = ExportController()
     /// Everything Flowlight has been told to block or allow, and what those rules have done.
     let rules = RuleStore()
+    /// Which tools each agent may use, which is a different question from which hosts it may reach.
+    let guardrails = GuardrailStore()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
     /// Read-only connection for UI queries.
@@ -135,6 +137,14 @@ final class TrafficMonitor: ObservableObject {
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
         inspection.onRuleRefusal = { [weak self] event in
             Task { @MainActor in self?.rules.record([event]) }
+        }
+        guardrails.attach(db: db)
+        inspection.guardrails = { [live = guardrails.live] in live.all() }
+        inspection.onGuardrail = { [weak self] event in
+            Task { @MainActor in
+                self?.guardrails.record([event])
+                self?.rules.record([event])
+            }
         }
         // Export reads what Reports reads — the same minute rollups, through the same read-only connection — so
         // there is nothing it can send that isn't already on a screen the user can look at.

@@ -291,11 +291,16 @@ final class TrafficDatabase: @unchecked Sendable {
         if !exchangeColumns.contains("mock_rule") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN mock_rule TEXT NOT NULL DEFAULT ''")
         }
+        // Added with guardrails: what was taken out of this request before it left.
+        if !exchangeColumns.contains("guardrail") {
+            try conn.execute("ALTER TABLE http_exchanges ADD COLUMN guardrail TEXT NOT NULL DEFAULT ''")
+        }
         // Added with rules: the rule list itself, and every connection a rule decided. The decisions are their own
         // table rather than only alerts — an alert is a thing that happened once, and a violations feed has to be
         // answerable by rule ("what has this one refused?") as well as by time.
         try conn.execute("""
         CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, rule TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS guardrails (id TEXT PRIMARY KEY, guardrail TEXT NOT NULL, updated INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS rule_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL,
             rule_id TEXT NOT NULL, action TEXT NOT NULL, engine TEXT NOT NULL, bundle_id TEXT NOT NULL,
             app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL, host TEXT NOT NULL,
@@ -788,6 +793,25 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
     }
 
+    // MARK: Guardrails
+
+    func loadGuardrails() throws -> [Guardrail] {
+        let rows = try conn.query("SELECT guardrail FROM guardrails ORDER BY updated") { $0.text(0) }
+        return rows.compactMap { try? JSONDecoder().decode(Guardrail.self, from: Data($0.utf8)) }
+    }
+
+    func saveGuardrail(_ guardrail: Guardrail) throws {
+        let json = String(decoding: try JSONEncoder().encode(guardrail), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO guardrails (id, guardrail, updated) VALUES (?,?,?)
+            ON CONFLICT(id) DO UPDATE SET guardrail = excluded.guardrail, updated = excluded.updated
+            """, [.text(guardrail.id.uuidString), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    func deleteGuardrail(_ id: UUID) throws {
+        try conn.run("DELETE FROM guardrails WHERE id = ?", [.text(id.uuidString)])
+    }
+
     // MARK: HTTPS inspection
 
     func insertExchange(_ e: HTTPExchange) throws {
@@ -796,8 +820,8 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("""
             INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                 req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                   .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                   .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
@@ -805,7 +829,7 @@ final class TrafficDatabase: @unchecked Sendable {
                   .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
                   .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
                   .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
-                  .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? "")])
+                  .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? "")])
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
@@ -831,7 +855,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
-                   tool_results, mcp, llm, mock_rule
+                   tool_results, mcp, llm, mock_rule, guardrail
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
                                                    OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)
             ORDER BY ts DESC LIMIT ?
@@ -852,7 +876,7 @@ final class TrafficDatabase: @unchecked Sendable {
                 toolResults: results.isEmpty ? [] : ((try? decoder.decode([ToolResult].self, from: Data(results.utf8))) ?? []),
                 mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
                 llm: llm.isEmpty ? nil : try? decoder.decode(LLMFacts.self, from: Data(llm.utf8)),
-                note: row.text(23).nilIfEmpty, mockRule: row.text(27).nilIfEmpty)
+                note: row.text(23).nilIfEmpty, mockRule: row.text(27).nilIfEmpty, guardrail: row.text(28).nilIfEmpty)
         }
     }
 

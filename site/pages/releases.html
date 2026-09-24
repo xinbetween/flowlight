@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.3.5</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.3.6</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Agent guardrails.</strong> A switch on every tool an agent declares and every MCP server it reaches, with
+            presets: read-only, no shell, no writes.</li>
+          <li><strong>The model is never offered a refused tool</strong> — it is removed from the declaration before the request
+            leaves, so there is no refusal to argue with and no retry loop.</li>
+          <li><strong>A refused MCP call over HTTP</strong> comes back as a result with <code>isError</code> and a sentence, which
+            is the protocol's own shape for a tool that failed. <a href="{{root}}docs/#guardrails">How guardrails work →</a></li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.3.6">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.3.5</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Rules.</strong> One rule model behind every screen: a subject — an app, an agent, a destination, a URL — and
             block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one.</li>

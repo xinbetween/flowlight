@@ -16,6 +16,17 @@ final class MockGate {
         /// The bytes that complete that request, the rule that answers it, and the request line it answered —
         /// which a rule refusing a request needs in order to be recorded as having refused something in particular.
         case answer(MockRule, Data, ProxyRequestHead?)
+        /// A whole request, changed on its way out: the bytes to send and record, and what to call the change.
+        /// The original is not recorded, because it is not what the server was sent.
+        case rewritten(Data, String)
+    }
+
+    /// What to do with a whole request once its body has arrived.
+    enum Intervention: Equatable {
+        /// Send and record these bytes instead.
+        case replace(Data, note: String)
+        /// Answer it here; nothing goes upstream.
+        case answer(MockRule)
     }
 
     private enum State {
@@ -35,6 +46,14 @@ final class MockGate {
     private var buffer = Data()
     /// The rule answering the request currently being read, if any.
     private var answering: (rule: MockRule, head: ProxyRequestHead?)?
+    /// Asked once per request, with its head and its whole body, when one is worth reading. Set only when
+    /// something might actually change: a request nobody has an opinion about is never held.
+    var intervene: ((ProxyRequestHead, Data) -> Intervention?)?
+    /// Whether this request is worth holding until it is complete, and what has been held so far.
+    private var holding: (head: ProxyRequestHead, bytes: Data)?
+    /// Above this, a request is forwarded as it streams rather than held. A tool declaration is tens of kilobytes;
+    /// anything of this size is an upload, and holding it would be felt.
+    static let holdLimit = 4 * 1024 * 1024
 
     init(host: String, rules: [MockRule]) {
         self.host = host
@@ -68,6 +87,13 @@ final class MockGate {
             let next = head.map(Self.bodyState(for:)) ?? .opaque
             let complete = Self.endsMessage(next)
             state = next
+            // A request worth reading whole is held until it is: a declaration can only be changed once all of it
+            // has arrived. Nothing else is ever held, and a rule answering this request takes precedence.
+            if answering == nil, let head, intervene != nil, Self.holdable(next) {
+                holding = (head, take(length))
+                if complete { finishHeld(&actions) }
+                return true
+            }
             push(take(length), complete: complete, into: &actions)
             return true
         case .fixed(let remaining):
@@ -104,9 +130,38 @@ final class MockGate {
         }
     }
 
+    /// Whether a request with this body shape can be held until complete. A body of a length nobody stated, or one
+    /// too large to be a declaration, streams as it always did.
+    private static func holdable(_ state: State) -> Bool {
+        switch state {
+        case .head: return true                       // no body at all
+        case .fixed(let remaining): return remaining <= holdLimit
+        default: return false
+        }
+    }
+
+    /// The held request is complete: ask what should happen to it, and account for every byte either way.
+    private func finishHeld(_ actions: inout [Action]) {
+        guard let held = holding else { return }
+        holding = nil
+        switch intervene?(held.head, held.bytes) {
+        case .replace(let bytes, let note):
+            actions.append(.rewritten(bytes, note))
+        case .answer(let rule):
+            actions.append(.answer(rule, held.bytes, held.head))
+        case nil:
+            actions.append(.forward(held.bytes))
+        }
+    }
+
     /// Routes settled bytes to the right action. The rule travels with the bytes that *complete* the request, so a
     /// recorder reading the same stream can label the exchange before it finishes parsing it.
     private func push(_ bytes: Data, complete: Bool, into actions: inout [Action]) {
+        if holding != nil {
+            holding?.bytes.append(bytes)
+            if complete { finishHeld(&actions) }
+            return
+        }
         guard let answering else {
             if !bytes.isEmpty { actions.append(.forward(bytes)) }
             return

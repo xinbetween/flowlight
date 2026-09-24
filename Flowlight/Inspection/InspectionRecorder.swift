@@ -41,6 +41,9 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     /// rather than a `note`: a note means "nothing was inspected", and a mocked exchange is fully inspected — it
     /// just didn't come from the host it names, which anyone reading a recorded session has to be able to tell.
     var mockRule: String?
+    /// What a guardrail took out of this request before it left. Its own field for the same reason: the exchange
+    /// is real and was really sent, but it is not quite what the agent wrote, and that has to be readable.
+    var guardrail: String?
 
     var url: String {
         let defaultPort = (scheme == "https" && port == 443) || (scheme == "http" && port == 80)
@@ -105,7 +108,7 @@ enum SocketOwner {
 /// them to the process (and agent) behind the connection, reads tool calls, redacts credentials, and hands each
 /// finished exchange to `onExchange`.
 final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
-    private struct Pending { var head: HTTPHead; var body: HTTPBody; var started: Date; var mock: String? }
+    private struct Pending { var head: HTTPHead; var body: HTTPBody; var started: Date; var mock: String?; var guardrail: String? }
 
     private final class FlowState {
         let request: HTTPStreamParser
@@ -113,6 +116,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         var queue: [Pending] = []
         /// Set by the proxy just before the bytes that complete a request it answers itself.
         var nextMock: String?
+        var nextGuardrail: String?
         var owner: Owner?
         let ownerReady = DispatchSemaphore(value: 0)
         init(limit: Int) {
@@ -148,8 +152,10 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         let response = state.response
         state.request.onHead = { response.requestMethods.append($0.method) }
         state.request.onMessage = { [weak state] head, body in
-            state?.queue.append(Pending(head: head, body: body, started: Date(), mock: state?.nextMock))
+            state?.queue.append(Pending(head: head, body: body, started: Date(), mock: state?.nextMock,
+                                        guardrail: state?.nextGuardrail))
             state?.nextMock = nil
+            state?.nextGuardrail = nil
         }
         state.response.onMessage = { [weak self, weak state] head, body in
             guard let self, let state, !state.queue.isEmpty else { return }
@@ -177,6 +183,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     func flow(_ flow: ProxyFlow, clientSent data: Data) { flows[flow.id]?.request.feed(data) }
     func flow(_ flow: ProxyFlow, serverSent data: Data) { flows[flow.id]?.response.feed(data) }
     func flow(_ flow: ProxyFlow, mockedBy rule: String) { flows[flow.id]?.nextMock = rule }
+    func flow(_ flow: ProxyFlow, guardedBy note: String) { flows[flow.id]?.nextGuardrail = note }
 
     func flowEnded(_ flow: ProxyFlow, note: String?) {
         guard let state = flows.removeValue(forKey: flow.id) else { return }
@@ -184,7 +191,8 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         if let note {
             // Nothing was decrypted; record why, so the user sees which app and host were passed through.
             let head = HTTPHead(startLine: "CONNECT \(flow.host):\(flow.port) HTTP/1.1", headers: [])
-            emit(flow: flow, state: state, request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil),
+            emit(flow: flow, state: state,
+                 request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil, guardrail: nil),
                  responseHead: nil, responseBody: HTTPBody(), note: note)
         }
     }
@@ -221,7 +229,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 responseSize: responseBody.wireSize, responseTruncated: responseCut,
                 contentType: responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
-                toolResults: results, mcp: mcp, llm: llm, note: note, mockRule: request.mock)
+                toolResults: results, mcp: mcp, llm: llm, note: note, mockRule: request.mock, guardrail: request.guardrail)
             onExchange(exchange)
         }
     }

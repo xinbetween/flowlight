@@ -37,13 +37,13 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.5, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.3.6, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#rules">Rules</a><a href="#guardrails">Guardrails</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#mocks">Mock responses</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#export">Export</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -200,6 +200,31 @@ open build/Build/Products/Release/Flowlight.app</pre>
         refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.</p>
       <p>The second tab is the <strong>violations feed</strong>: every connection a rule decided, with the app, where it was headed, which
         rule decided it and whether that was a refusal or an exception letting it through.</p>
+
+      <h2 id="guardrails">Agent guardrails: block a tool, a server or a resource</h2>
+      <p><em>Which tools may this agent use</em> is a different question from <em>which hosts may it reach</em>, so it has its own
+        section: a <strong>Guardrails</strong> tab beside each agent in AI Agents, with a switch on every tool it declares and every
+        MCP server it reaches, presets worth having (<em>read-only</em>, <em>no shell</em>, <em>no writes</em>), and a record of what
+        has been taken away.</p>
+      <p><strong>The strongest lever is the declaration.</strong> Agents re-send their whole tool list on every turn. Flowlight removes
+        a refused tool from that list before the request leaves, so the model is never offered it: no refusal to argue with, no retry
+        loop. It works the same for a tool the agent runs itself and one behind a remote MCP server, and it reads the same shapes
+        Flowlight already parses for Anthropic, OpenAI and Gemini.</p>
+      <p><strong>A refused call is answered properly.</strong> For MCP servers reached over HTTP, a blocked <code>tools/call</code>
+        comes back as a <em>result</em> carrying <code>isError: true</code> and a plain sentence, because that is what the protocol says
+        a failing tool looks like — the model reads it and works around it, where a transport error would look like a broken server.
+        <code>resources/read</code> and <code>prompts/get</code> have no such shape, so they get a JSON-RPC error instead.</p>
+      <p><strong>Connectors are narrowed, not intercepted.</strong> When the provider reaches an MCP server on the agent's behalf, that
+        traffic never touches this Mac. The only lever is the request that sets it up, so Flowlight narrows the tools the connector is
+        allowed to call, or drops the connector entirely.</p>
+      <p><strong>Local stdio servers speak over pipes, and no proxy can see that.</strong> What Flowlight can do there is watch the
+        server process's own network traffic, which is already attributed to the agent that started it, and hand you the deny list to
+        paste into the agent's own settings — Claude Code takes <code>mcp__server__tool</code> in <code>permissions.deny</code>, and its
+        neighbours have equivalents. That takes effect when the agent restarts.</p>
+      <p><strong>Guardrails need HTTPS inspection</strong>, because the tool list lives inside a request body. With inspection off the
+        tab says so rather than looking as though it is working.</p>
+      <p><strong>This is not a sandbox.</strong> A refused tool stops being offered and stops being answered. An agent that still has a
+        shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.</p>
 
       <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
       <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
@@ -433,7 +458,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.3.5 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.3.6 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

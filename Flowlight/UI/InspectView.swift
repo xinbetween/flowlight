@@ -156,6 +156,11 @@ private struct InspectContent: View {
                                     .labelStyle(.titleAndIcon)
                                     .help("Flowlight answered this itself; the request never reached \(e.host)")
                             }
+                            if let guardrail = e.guardrail {
+                                Label("Guarded", systemImage: "shield.lefthalf.filled").font(.caption2.bold())
+                                    .foregroundStyle(.teal).labelStyle(.titleAndIcon)
+                                    .help("A guardrail changed this request before it left: \(guardrail)")
+                            }
                         }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
@@ -405,6 +410,13 @@ private struct ExchangeDetail: View {
                 Label("Answered by Flowlight, not by \(exchange.host) — mock rule “\(mock)”. The request was never sent.",
                       systemImage: "wand.and.stars")
                     .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
+            }
+            if let guardrail = exchange.guardrail {
+                // The exchange really happened and really was sent — but not quite as the agent wrote it, and
+                // anyone reading it has to be told which part Flowlight took out.
+                Label("A guardrail changed this request before it left: \(guardrail). Everything below is what \(exchange.host) "
+                      + "was actually sent.", systemImage: "shield.lefthalf.filled")
+                    .foregroundStyle(.teal).fixedSize(horizontal: false, vertical: true)
             }
             if let cause {
                 GroupBox("Made by a tool call") {

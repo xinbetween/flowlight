@@ -149,6 +149,7 @@ final class MockGateTests: XCTestCase {
                 case .forward(let d): forwarded.append(d); recorded.append(d)
                 case .hold(let d): recorded.append(d)
                 case .answer(let rule, let d, _): answered.append(rule.title); recorded.append(d)
+                case .rewritten(let d, _): recorded.append(d)
                 }
             }
         }

@@ -52,6 +52,10 @@ final class InspectionController: ObservableObject {
     nonisolated(unsafe) var requestRules: @Sendable () -> [Rule] = { [] }
     /// Called with every request a rule refused, ready to be recorded in the violations feed.
     nonisolated(unsafe) var onRuleRefusal: @Sendable (RuleEvent) -> Void = { _ in }
+    /// The guardrails in force, read fresh per connection like the rules.
+    nonisolated(unsafe) var guardrails: @Sendable () -> [Guardrail] = { [] }
+    /// Called with every tool a guardrail took away, and every call it refused.
+    nonisolated(unsafe) var onGuardrail: @Sendable (RuleEvent) -> Void = { _ in }
 
     init() {
         UserDefaults.standard.register(defaults: [
@@ -95,6 +99,37 @@ final class InspectionController: ObservableObject {
             return refusals.map { $0.asRefusal(host: host) } + MockRules.mocks(mockRules(), host: host)
         }
         proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
+        // Guardrails read and change whole requests, which is a different job from matching a URL, so they get
+        // their own hook rather than being squeezed into the answer machinery.
+        proxy.interventions = { [weak self, recorder, proxy] host, clientPort in
+            guard let self else { return nil }
+            let guardrails = self.guardrails()
+            guard !guardrails.isEmpty else { return nil }
+            let owner = recorder.owner(clientPort: clientPort, proxyPort: proxy.port)
+            let agent = owner.agent ?? owner.bundleID
+            guard GuardrailBook.any(guardrails, agent: agent) else { return nil }
+            return { [weak self] head, bytes in
+                guard let self, let body = Self.body(of: bytes) else { return nil }
+                let server = owner.mcpServer
+                // A call to an MCP server over HTTP, answered here rather than forwarded.
+                if let refusal = GuardrailEngine.refuse(jsonrpc: body, guardrails: guardrails, agent: agent, server: server) {
+                    self.report(refusal.guardrail, subject: refusal.subject, owner: owner, host: host,
+                                port: UInt16(clamping: 443), method: head.method, engine: .request)
+                    let answer = MockRule(id: refusal.guardrail.id, name: refusal.guardrail.title, host: host,
+                                          path: "*", status: 200, body: refusal.body, blocked: true)
+                    return .answer(answer)
+                }
+                // The declaration, which is the lever that means the model is never offered the tool at all.
+                guard let filtered = GuardrailEngine.filter(request: body, guardrails: guardrails, agent: agent) else {
+                    return nil
+                }
+                self.report(guardrails.first { g in filtered.removed.contains { g.refuses(agent: agent, server: server, tool: $0) } },
+                            subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
+                            port: UInt16(clamping: 443), method: head.method, engine: .request)
+                return .replace(Self.reframe(bytes, body: filtered.body),
+                                note: "Removed \(filtered.removed.joined(separator: ", "))")
+            }
+        }
         proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
             guard rule.blocked, let refused = (self?.requestRules() ?? []).first(where: { $0.id == rule.id }) else { return }
             let owner = recorder.owner(clientPort: flow.clientPort, proxyPort: proxy.port)
@@ -131,6 +166,39 @@ final class InspectionController: ObservableObject {
             }
         }
         refreshStatus()
+    }
+
+    /// One decision a guardrail made, on its way to the same feed the network rules use — it is the same
+    /// question, asked about a tool instead of a destination.
+    nonisolated private func report(_ guardrail: Guardrail?, subject: String, owner: InspectionRecorder.Owner,
+                                    host: String, port: UInt16, method: String, engine: Rule.Engine) {
+        guard let guardrail else { return }
+        onGuardrail(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: guardrail.id, action: .block,
+                              engine: engine, agentKey: owner.agent ?? owner.bundleID,
+                              agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                              bundleID: owner.bundleID, host: host, ip: "", port: port, path: subject, method: method))
+    }
+
+    /// The body of a framed request, or nil when there isn't one to read.
+    nonisolated static func body(of request: Data) -> Data? {
+        guard let end = request.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+        let body = request[end.upperBound...]
+        return body.isEmpty ? nil : Data(body)
+    }
+
+    /// The same request with a new body, and a `Content-Length` that agrees with it. A length that disagreed
+    /// would hang the connection rather than change the request.
+    nonisolated static func reframe(_ request: Data, body: Data) -> Data {
+        guard let end = request.range(of: Data("\r\n\r\n".utf8)) else { return request }
+        let head = String(decoding: request[request.startIndex..<end.lowerBound], as: UTF8.self)
+        var lines = head.components(separatedBy: "\r\n").filter {
+            !$0.lowercased().hasPrefix("content-length:")
+        }
+        lines.append("Content-Length: \(body.count)")
+        var out = Data(lines.joined(separator: "\r\n").utf8)
+        out.append(Data("\r\n\r\n".utf8))
+        out.append(body)
+        return out
     }
 
     var enabled: Bool {

@@ -358,6 +358,7 @@ struct AllowlistEditor: View {
 
 struct AgentDetail: View {
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var monitor: TrafficMonitor
     var agent: AgentSummary
     var window: AgentWindow
     var toolCalls: [ToolUsage] = []
@@ -369,7 +370,7 @@ struct AgentDetail: View {
     var save: (AgentPolicy) -> Void
     @State private var tab = Tab.destinations
 
-    enum Tab: Hashable { case destinations, calls, tools, servers }
+    enum Tab: Hashable { case destinations, calls, tools, servers, guardrails }
 
     var body: some View {
         GroupBox {
@@ -439,6 +440,7 @@ struct AgentDetail: View {
                                 Text(toolCount > 0 ? "Tools (\(toolCount))" : "Tools").tag(Tab.tools)
                                 let mcpCount = servers.count + unusedServers.count
                                 Text(mcpCount > 0 ? "MCP servers (\(mcpCount))" : "MCP servers").tag(Tab.servers)
+                                Text("Guardrails").tag(Tab.guardrails)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
                         }
@@ -515,6 +517,10 @@ struct AgentDetail: View {
                             }
                             .padding(.trailing, 6)
                         }
+                    case .guardrails:
+                        GuardrailsPane(store: monitor.guardrails, agentKey: agent.bundleID, agentName: agent.name,
+                                       declared: profile?.tools.map(\.tool) ?? [],
+                                       servers: Array(Set(servers.map(\.name) + unusedServers.map(\.server.name))).sorted())
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

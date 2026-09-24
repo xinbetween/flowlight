@@ -29,6 +29,9 @@ protocol ProxyObserver: AnyObject {
     func flow(_ flow: ProxyFlow, connectedTo remoteIP: String)
     /// The request whose bytes come next was answered by Flowlight itself, not by the server.
     func flow(_ flow: ProxyFlow, mockedBy rule: String)
+    /// The request whose bytes come next left with something taken out of it — a guardrail removing tools an
+    /// agent is not allowed to use. What is recorded is what the server was sent, which is what happened.
+    func flow(_ flow: ProxyFlow, guardedBy note: String)
 }
 
 /// A local HTTP proxy on 127.0.0.1 that can decrypt HTTPS for inspection.
@@ -59,6 +62,9 @@ final class InspectionProxy: @unchecked Sendable {
     /// Called with every request Flowlight answered itself, and the flow it arrived on. A rule refusing a request
     /// has to be recordable as a refusal, not only as an exchange with an odd status.
     var onAnswered: (_ rule: MockRule, _ flow: ProxyFlow, _ head: ProxyRequestHead?) -> Void = { _, _, _ in }
+    /// Asked once per connection: is there anything that would want to read, change or answer whole requests on
+    /// it? Nil means every request on this connection streams untouched, which is what almost all of them do.
+    var interventions: (_ host: String, _ clientPort: UInt16) -> ((ProxyRequestHead, Data) -> MockGate.Intervention?)? = { _, _ in nil }
     /// Served at http://127.0.0.1:<port>/proxy.pac.
     var pacScript: () -> String = { "function FindProxyForURL(url, host) { return \"DIRECT\"; }" }
     var onStateChange: (String?) -> Void = { _ in }
@@ -312,7 +318,9 @@ final class InspectionProxy: @unchecked Sendable {
         observer?.flowStarted(flow)
         // Read once per flow: a host no enabled rule names gets the plain relay, with its requests never framed.
         let mocks = mockRules(flow.host, flow.clientPort)
-        let gate = mocks.isEmpty ? nil : MockGate(host: flow.host, rules: mocks)
+        let intervene = interventions(flow.host, flow.clientPort)
+        let gate = mocks.isEmpty && intervene == nil ? nil : MockGate(host: flow.host, rules: mocks)
+        gate?.intervene = intervene
         let fromClient: (Data) -> Data = { [weak self] data in
             guard let self else { return data }
             guard let gate else { self.observer?.flow(flow, clientSent: data); return data }
@@ -359,6 +367,11 @@ final class InspectionProxy: @unchecked Sendable {
             case .hold(let bytes):
                 // Recorded like any other request byte: what the agent sent is exactly what it would have sent.
                 observer?.flow(flow, clientSent: bytes)
+            case .rewritten(let bytes, let note):
+                // Recorded as what left, not as what arrived: Inspect shows the request the server was sent.
+                observer?.flow(flow, guardedBy: note)
+                observer?.flow(flow, clientSent: bytes)
+                onward.append(bytes)
             case .answer(let rule, let bytes, let head):
                 // Mark before the bytes that complete the request, so the recorder can label the exchange it is
                 // about to parse rather than having to match it up afterwards.

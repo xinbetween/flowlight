@@ -144,6 +144,23 @@ Reports, AI Agents or Inspect to write one about what you're looking at; all of 
   the current setup can't carry out says so in the list instead of looking enforced.
 - A **violations feed** beside the list: every connection a rule decided, refusals and exceptions alike.
 
+### Agent guardrails
+*Which tools may this agent use* is a different question from *which hosts may it reach*, so it gets its own tab in
+AI Agents: a switch on every tool the agent declares and every MCP server it reaches, presets (*read-only*, *no
+shell*, *no writes*), and a record of what has been taken away.
+
+- **The declaration is the strongest lever.** Agents re-send their whole tool list every turn; Flowlight removes a
+  refused tool from it before the request leaves, so the model is never offered it — no refusal to argue with, no
+  retry loop. Anthropic, OpenAI and Gemini shapes alike.
+- **A refused MCP call over HTTP** comes back as a result with `isError: true` and a sentence, which is the
+  protocol's own shape for a tool that failed. `resources/read` gets a JSON-RPC error, which is its.
+- **Connectors are narrowed**, since the provider reaches those servers and that traffic never touches this Mac.
+- **Local stdio servers speak over pipes.** Flowlight watches the server process's own traffic and hands you the
+  deny list to paste into the agent's settings, which takes effect when it restarts.
+- It needs HTTPS inspection, and **it is not a sandbox**: a refused tool stops being offered and stops being
+  answered, but an agent with a shell can still do by hand what the tool would have done. Flowlight records that
+  rather than pretending to prevent it.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -322,6 +339,7 @@ Shipped:
 - [x] Focus mode: watch only the apps and destinations you pick (0.2.2, symmetric from 0.3.4)
 - [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
 - [x] Rules: block anything, anywhere, for as long as you say, with a violations feed (0.3.5)
+- [x] Agent guardrails: block an MCP server, a tool or a resource (0.3.6)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
@@ -330,32 +348,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.3.6 — Agent guardrails: block an MCP server, a tool or a resource.** The AI half of the same model, and its
-  own section, because "which tools may this agent use" is a different question from "which hosts may it reach".
-  There are four places a guardrail can act, and the useful ones need HTTPS inspection on:
-  - **The declaration, before the model ever sees the tool.** Agents re-send their whole tool list on every turn.
-    Dropping a blocked tool from that list means the model is never offered it — no refusal to argue with, no retry
-    loop. This is the strongest lever and the only one that works the same for a local server and a remote one,
-    and it reuses what Flowlight already parses for Anthropic, OpenAI and Gemini.
-  - **The call, for servers reached over HTTP.** The JSON-RPC Flowlight already reads — `tools/call`,
-    `resources/read`, `prompts/get` — can be answered instead of forwarded, per server, per tool, or per resource
-    URI. The protocol has an opinion about how: a blocked `tools/call` should come back as a *result* carrying
-    `isError: true` and a plain sentence, so the model reads the refusal and works around it, rather than a
-    transport error the agent sees as a broken server; `resources/read` has no such result shape, so it gets a
-    JSON-RPC error instead. `tools/list` can be filtered the same way, which is what MCP gateways do.
-  - **The connector, for servers the provider reaches on the agent's behalf.** That traffic never touches this Mac,
-    so the only lever is the request that sets it up: drop the connector, or narrow the allowed tools and approval
-    setting it declares. Flowlight already records all three.
-  - **Local stdio servers speak over pipes, and no proxy can see that.** The honest levers are the server process's
-    own network traffic, which is already attributed to the agent that started it, and the agent's own switch —
-    Claude Code takes `mcp__server__tool` in `permissions.deny`, and its neighbours have equivalents. Flowlight
-    already reads those files, so it can offer to write them, with the restart that implies.
-
-  A **Guardrails** tab in AI Agents holds it: each agent's servers, their tools and resources with a switch on
-  each, presets worth having ("read-only", "no shell", "no writes"), and what was blocked, when, and for whom.
-  It has to be equally plain about what this is not — not a sandbox. A blocked tool stops being offered and stops
-  being answered, but an agent with a shell can still do by hand what the tool would have done. That part Flowlight
-  reports; it doesn't pretend to prevent it.
 - **0.3.7 — The site says what the app now does, and reads like it.** Eight releases have landed since the site was
   laid out, and it has drifted: the comparison table still answers *Blocks connections* with "No, observe only" two
   lines below a lede that says Flowlight can refuse; the AI card still ends at "raises an alert" and never mentions

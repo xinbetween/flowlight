@@ -159,6 +159,14 @@ struct RulesView: View {
         .padding(16)
     }
 
+    /// A decision can come from a network rule or from a guardrail — the same question asked about a destination
+    /// or about a tool — so the feed looks in both lists before giving up on it.
+    private func name(of event: RuleEventRecord) -> String {
+        if let rule = store.rules.first(where: { $0.id == event.ruleID }) { return rule.title }
+        if let guardrail = monitor.guardrails.guardrails.first(where: { $0.id == event.ruleID }) { return guardrail.title }
+        return "A rule since deleted"
+    }
+
     // MARK: The violations feed
 
     private var activityFeed: some View {
@@ -192,8 +200,7 @@ struct RulesView: View {
                             .font(.caption.monospaced()).lineLimit(1)
                     }
                     TableColumn("Rule") { event in
-                        Text(store.rules.first { $0.id == event.ruleID }?.title ?? "A rule since deleted")
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(name(of: event)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     TableColumn("Where") { event in
                         Text(event.engine == .flow ? "Connection" : "Request")
