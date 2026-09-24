@@ -54,6 +54,17 @@ struct CaptureView: View {
                     developer team, and the app must be in the Applications folder. It never blocks traffic.
                     """)
                     .font(.callout).foregroundStyle(.secondary)
+                    Label {
+                        Text("""
+                        **Nothing short-lived escapes it.** macOS calls the filter as each connection is made, so a request \
+                        that lasts five milliseconds is recorded like any other. It also costs less energy than sampling, \
+                        which starts a process every second. Traffic from before you enable it isn't there, some system \
+                        traffic is exempt from content filters, and byte counts come from the filter's own statistics.
+                        """)
+                        .font(.callout).foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "checkmark.seal").foregroundStyle(.green)
+                    }
                 }
             } header: {
                 Text("Network Extension")
@@ -63,11 +74,22 @@ struct CaptureView: View {
 
             Section {
                 Text("""
-                Without the extension, Flowlight samples /usr/bin/nettop once per second. You get per-process, \
-                per-connection byte counts with no entitlements. Protocols come from port heuristics, \
-                and connections shorter than a second can be missed.
+                Without the extension, Flowlight reads /usr/bin/nettop once per second. You get per-process, \
+                per-connection byte counts with no entitlements, and protocols from port heuristics.
                 """)
                 .font(.callout).foregroundStyle(.secondary)
+                Label {
+                    Text("""
+                    **What it misses is whole connections, not bytes.** nettop reports running totals, and Flowlight \
+                    records the difference between one second and the next — so a long transfer is counted exactly, \
+                    however bursty it was. What never appears is anything that starts *and* finishes between two \
+                    readings: a quick DNS lookup, a fast API call, a script that runs curl and exits. The extension \
+                    sees those.
+                    """)
+                    .font(.callout).foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                }
             } header: {
                 Text("Fallback sampler")
             }

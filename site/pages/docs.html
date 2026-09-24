@@ -160,9 +160,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
 
       <h2 id="engines">Capture engines</h2>
-      <p>The default engine samples macOS's <code>nettop</code> once a second, which needs no special permission. Connections shorter than
-        about a second can be missed. A Network Extension engine (a content filter that sees every flow) is included in the source for
-        builds signed with Apple's content-filter entitlement; see <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">the developer guide</a>.</p>
+      <p>Flowlight records traffic one of two ways, chosen in <strong>Capture</strong>. They differ in what they can miss, which is worth
+        understanding before you rely on either.</p>
+      <table>
+        <tr><th></th><th>nettop sampler (default)</th><th>Network Extension</th></tr>
+        <tr><td>Needs</td><td>Nothing</td><td>Installing a system extension, and your approval</td></tr>
+        <tr><td>How it sees traffic</td><td>Reads running totals once a second and records the difference</td><td>macOS calls it as each connection is made</td></tr>
+        <tr><td>Long transfers</td><td>Counted exactly, however bursty</td><td>Counted</td></tr>
+        <tr><td>Short connections</td><td><strong>Can be missed entirely</strong></td><td>Recorded, however brief</td></tr>
+        <tr><td>Energy</td><td>Starts a process every second</td><td>Lower — no polling</td></tr>
+      </table>
+      <p><strong>What the sampler misses is whole connections, not bytes.</strong> Because it compares running totals, nothing that lasts
+        across two readings is lost, no matter how much arrives in between. What never appears is anything that starts <em>and</em>
+        finishes between them — a quick DNS lookup, a fast API call, a script that runs <code>curl</code> and exits. For watching an agent
+        that makes many short requests, that difference matters.</p>
+      <p>The extension is in the data path instead, so a request lasting five milliseconds is recorded like any other. It isn't magic
+        either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
+        come from the filter's own statistics rather than from counting packets. It never blocks anything.
+        See <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">the developer guide</a> for how it's built.</p>
 
       <h2 id="data">Your data</h2>
       <p>Everything lives in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Per-second rows are kept 6 hours
@@ -200,6 +215,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dt><strong>Why did macOS ask Flowlight for access to my Desktop or Documents?</strong></dt>
         <dd>Only because you pointed it at a project folder inside one of them. By default Flowlight reads agent configuration from the folders in
           your home folder and never touches those three.</dd>
+        <dt><strong>Does Flowlight see all my traffic, or does it miss some?</strong></dt>
+        <dd>It depends which capture engine you use, and the difference is not subtle. The default sampler reads macOS's running
+          byte counters once a second and records the change, so a long transfer is counted exactly — but a connection that opens and
+          closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so
+          even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the
+          extension from <strong>Capture</strong>. <a href="#engines">The full comparison is above.</a></dd>
         <dt><strong>Does Flowlight send anything about me anywhere?</strong></dt>
         <dd>No. There's no account, no telemetry and no analytics. The only requests it makes are the daily update check, optional network-owner
           lookups, and reverse DNS — each listed, and each with an off switch, on the <a href="{{root}}privacy/">privacy page</a>.</dd>

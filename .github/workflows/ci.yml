@@ -12,7 +12,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede a pull request's earlier run, but let a push to main finish. Cancelling those meant a string of
+  # quick commits left no completed run at all, and the result everyone was waiting on never existed.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -25,7 +27,7 @@ jobs:
         xcode: [oldest, newest]
     name: test (${{ matrix.xcode }} Xcode)
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Select Xcode
         run: |

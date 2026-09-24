@@ -248,9 +248,30 @@ open build/Build/Products/Release/Flowlight.app
 
  Capture engines
 
- The default engine samples macOS's nettop once a second, which needs no special permission. Connections shorter than
- about a second can be missed. A Network Extension engine (a content filter that sees every flow) is included in the source for
- builds signed with Apple's content-filter entitlement; see the developer guide.
+ Flowlight records traffic one of two ways, chosen in Capture. They differ in what they can miss, which is worth
+ understanding before you rely on either.
+
+ nettop sampler (default)Network Extension
+
+ NeedsNothingInstalling a system extension, and your approval
+
+ How it sees trafficReads running totals once a second and records the differencemacOS calls it as each connection is made
+
+ Long transfersCounted exactly, however burstyCounted
+
+ Short connectionsCan be missed entirelyRecorded, however brief
+
+ EnergyStarts a process every secondLower — no polling
+
+ What the sampler misses is whole connections, not bytes. Because it compares running totals, nothing that lasts
+ across two readings is lost, no matter how much arrives in between. What never appears is anything that starts and
+ finishes between them — a quick DNS lookup, a fast API call, a script that runs curl and exits. For watching an agent
+ that makes many short requests, that difference matters.
+
+ The extension is in the data path instead, so a request lasting five milliseconds is recorded like any other. It isn't magic
+ either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
+ come from the filter's own statistics rather than from counting packets. It never blocks anything.
+ See the developer guide for how it's built.
 
  Your data
 
@@ -294,6 +315,12 @@ open build/Build/Products/Release/Flowlight.app
  Why did macOS ask Flowlight for access to my Desktop or Documents?
  Only because you pointed it at a project folder inside one of them. By default Flowlight reads agent configuration from the folders in
  your home folder and never touches those three.
+ Does Flowlight see all my traffic, or does it miss some?
+ It depends which capture engine you use, and the difference is not subtle. The default sampler reads macOS's running
+ byte counters once a second and records the change, so a long transfer is counted exactly — but a connection that opens and
+ closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so
+ even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the
+ extension from Capture. The full comparison is above.
  Does Flowlight send anything about me anywhere?
  No. There's no account, no telemetry and no analytics. The only requests it makes are the daily update check, optional network-owner
  lookups, and reverse DNS — each listed, and each with an off switch, on the privacy page.

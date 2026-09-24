@@ -215,7 +215,15 @@ Two capture engines produce the same per-second summaries:
 | Needs | nothing | The Network Extension entitlement (paid developer account), app in /Applications, your approval |
 | Attribution | process → app bundle | audit token → code-signing identity |
 | Hostnames | TLS SNI + DNS from packet capture, reverse DNS, network owner | SNI, HTTP `Host`, system hostname, DNS |
-| Short-lived flows | flows under ~1 s can be missed | every flow |
+| Short-lived flows | a connection that opens *and* closes between two readings is missed entirely | every flow, however brief |
+| Byte counts | exact for anything alive across two readings — it compares running totals, so bursts aren't lost | from the filter's own statistics |
+| Energy | starts a process every second | no polling |
+
+**What the sampler misses is whole connections, not bytes.** It reads macOS's running counters once a second and records the
+difference, so a long transfer is counted exactly however bursty it was. What never appears is anything that starts and finishes
+between two readings — a quick DNS lookup, a fast API call, a script that runs `curl` and exits. For an agent that makes many short
+requests, that is the difference between the two engines. The extension is called as each connection is made, so it sees those;
+in exchange, traffic from before you enabled it isn't there and some system traffic is exempt from content filters.
 
 Storage rolls per-second rows into minute, hour and day tables. Week, month and year views read the daily table,
 so a year of history stays fast.
