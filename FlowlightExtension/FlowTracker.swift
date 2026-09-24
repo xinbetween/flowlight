@@ -24,6 +24,9 @@ final class FlowState: @unchecked Sendable {
     var lastBytesOut: Int64 = 0
     var counted = false
     var lastActivity = Date()
+    /// Set once the block rules have ruled on this flow. Touched only from the data path, which macOS serializes
+    /// per flow, so it needs no more protection than `counted` does.
+    var judged = false
 
     let outboundPeek: Int
     let inboundPeek: Int

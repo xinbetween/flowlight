@@ -2,7 +2,8 @@ import Darwin
 import Foundation
 
 /// "Claude Code may talk to GitHub and npm, nothing else." An allowlist for one agent (its tools and MCP
-/// servers included). Flowlight observes rather than blocks, so a violation raises an alert.
+/// servers included). A violation always raises an alert; with `enforce` on, the Network Extension also refuses
+/// the connection.
 struct AgentPolicy: Codable, Equatable, Sendable {
     var agentID: String
     var enabled: Bool = true
@@ -10,6 +11,9 @@ struct AgentPolicy: Codable, Equatable, Sendable {
     var allowAIProviders: Bool = true
     /// Domains (subdomains included), IP addresses and CIDR ranges.
     var patterns: [String] = []
+    /// Refuse unlisted destinations instead of only reporting them. Off unless the user turns it on: an allowlist
+    /// written while Flowlight could only watch must never start blocking because the app updated underneath it.
+    var enforce: Bool = false
 
     struct Preset: Identifiable, Sendable {
         var name: String
@@ -30,7 +34,7 @@ struct AgentPolicy: Codable, Equatable, Sendable {
 
     /// Whether this destination is allowed. Local-network traffic always is.
     func allows(host: String, ip: String, isAIProvider: Bool) -> Bool {
-        if IPOwnerLookup.isLocalNetwork(ip) { return true }
+        if NetworkScope.isLocalNetwork(ip) { return true }
         if isAIProvider && allowAIProviders { return true }
         return patterns.contains { Self.matches($0, host: host, ip: ip) }
     }
@@ -85,5 +89,18 @@ struct AgentPolicy: Codable, Equatable, Sendable {
         var v6 = in6_addr()
         if inet_pton(AF_INET6, ip, &v6) == 1 { return withUnsafeBytes(of: &v6) { Array($0) } }
         return nil
+    }
+}
+
+extension AgentPolicy {
+    /// Written out rather than synthesized so that a policy stored before blocking existed still decodes — and
+    /// decodes as "report, don't block". Synthesized decoding ignores the property defaults above.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        agentID = try container.decode(String.self, forKey: .agentID)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        allowAIProviders = try container.decodeIfPresent(Bool.self, forKey: .allowAIProviders) ?? true
+        patterns = try container.decodeIfPresent([String].self, forKey: .patterns) ?? []
+        enforce = try container.decodeIfPresent(Bool.self, forKey: .enforce) ?? false
     }
 }

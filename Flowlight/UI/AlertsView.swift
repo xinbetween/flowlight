@@ -58,6 +58,13 @@ struct AlertsView: View {
             }
         }
         .contextMenu(forSelectionType: AlertRecord.ID.self) { ids in
+            // The way out of a connection Flowlight refused: the agent will try again, and next time it gets through.
+            if let a = alert(ids.first), !a.allowPattern.isEmpty {
+                Button("Allow \(a.allowPattern) for \(a.appName) from Now On") {
+                    monitor.allowFromNowOn(pattern: a.allowPattern, agentID: a.bundleID)
+                }
+                Divider()
+            }
             Button("Show Traffic in Reports") { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)
             Button("Acknowledge") { monitor.acknowledgeAlerts(ids: Array(ids)) }
             Button("Copy Detail") {

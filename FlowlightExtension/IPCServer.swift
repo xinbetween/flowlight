@@ -10,6 +10,11 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var pending: [(seq: UInt64, batch: TrafficBatch)] = []
     private var nextSeq: UInt64 = 0
     private var inFlight = false
+    /// Refused connections waiting to be recorded by the app, on their own queue so they never wait behind an
+    /// hour of buffered traffic. Kept small: enforcement lapses when the app is away, so this can't pile up.
+    private var blocks: [BlockEvent] = []
+    private var blocksInFlight = false
+    private let maxPendingBlocks = 500
     private let queue = DispatchQueue(label: "flowlight.ipc")
     /// Seconds of traffic held while no app is connected — the whole time the app is on the nettop sampler, or
     /// quit. An hour of it is worth keeping now that the newest second is delivered first (see `flushLocked`);
@@ -23,6 +28,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func startListener() {
+        BlockEnforcer.shared.report = { [weak self] event in self?.report(event) }
         let listener = NSXPCListener(machServiceName: machServiceName)
         listener.delegate = self
         listener.resume()
@@ -45,6 +51,8 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 guard let self, self.client === connection else { return }
                 self.client = nil
                 self.inFlight = false
+                self.blocksInFlight = false
+                BlockEnforcer.shared.appConnectionChanged(connected: false)
             }
         }
         connection.interruptionHandler = connection.invalidationHandler
@@ -62,9 +70,19 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         queue.async {
             self.client = connection
             self.inFlight = false
+            self.blocksInFlight = false
+            BlockEnforcer.shared.appConnectionChanged(connected: true)
             self.flushLocked()
+            self.flushBlocksLocked()
         }
         reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+    }
+
+    func setEnforcement(payload: Data, withReply reply: @escaping (Int) -> Void) {
+        let policies = payload.isEmpty ? [] : (BlockCoding.decode([AgentPolicy].self, from: payload) ?? [])
+        let count = BlockEnforcer.shared.apply(policies)
+        extensionLog.info("Enforcing \(count, privacy: .public) allowlists")
+        reply(count)
     }
 
     func send(_ batches: [TrafficBatch]) {
@@ -77,6 +95,36 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.pending.removeFirst(self.pending.count - self.maxPendingBatches)
             }
             self.flushLocked()
+        }
+    }
+
+    /// A connection the filter refused, on its way to being recorded as an alert.
+    func report(_ event: BlockEvent) {
+        queue.async {
+            self.blocks.append(event)
+            if self.blocks.count > self.maxPendingBlocks {
+                self.blocks.removeFirst(self.blocks.count - self.maxPendingBlocks)
+            }
+            self.flushBlocksLocked()
+        }
+    }
+
+    private func flushBlocksLocked() {
+        guard !blocksInFlight, let client, !blocks.isEmpty else { return }
+        let chunk = blocks
+        let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
+            extensionLog.error("blocked() failed: \(error.localizedDescription, privacy: .public)")
+            self?.queue.async { self?.blocksInFlight = false }
+        } as? FlowlightAppXPC
+        guard let proxy else { return }
+        blocksInFlight = true
+        proxy.blocked(payload: BlockCoding.encode(chunk)) { [weak self] in
+            self?.queue.async {
+                guard let self else { return }
+                self.blocksInFlight = false
+                self.blocks.removeFirst(min(chunk.count, self.blocks.count))
+                self.flushBlocksLocked()
+            }
         }
     }
 

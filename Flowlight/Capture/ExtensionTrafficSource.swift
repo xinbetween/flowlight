@@ -18,6 +18,11 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// Called when macOS has the extension running but isn't letting it filter — a state the user can only fix by
     /// switching source, so it needs to reach the UI as something more than a line of status text.
     var onFilterUnavailable: ((String) -> Void)?
+    /// Connections the filter refused, on their way to being recorded as alerts.
+    var onBlocked: (([BlockEvent]) -> Void)?
+    /// The enforcing allowlists, kept here so a reconnect re-sends them without the app being asked again. The
+    /// extension never persists them: with no app to record a refusal, nothing should be refused.
+    private var enforcement: [AgentPolicy] = []
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         self.sink = sink
@@ -81,6 +86,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 self.status?(self.sawTraffic ? "Connected to filter extension \(version)"
                                              : "Connected to filter extension \(version) — no traffic from it yet")
                 self.startHeartbeat()
+                self.pushEnforcement()
                 self.checkFilterState(on: connection, version: version)
             }
         }
@@ -133,6 +139,29 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             self.retryTimer?.invalidate()
             self.retryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.connect() }
         }
+    }
+
+    func setEnforcement(_ policies: [AgentPolicy]) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.enforcement = policies
+            self.pushEnforcement()
+        }
+    }
+
+    /// Always on the main thread, like `connect()`, and always the whole list: the extension holds no state of its
+    /// own about this, so one message either describes the current rules completely or turns blocking off.
+    private func pushEnforcement() {
+        guard let connection else { return }
+        let payload = enforcement.isEmpty ? Data() : BlockCoding.encode(enforcement)
+        let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
+        proxy?.setEnforcement(payload: payload) { _ in }
+    }
+
+    func blocked(payload: Data, reply: @escaping () -> Void) {
+        let events = BlockCoding.decode([BlockEvent].self, from: payload) ?? []
+        if !events.isEmpty { onBlocked?(events) }
+        reply()
     }
 
     func deliver(payload: Data, reply: @escaping () -> Void) {

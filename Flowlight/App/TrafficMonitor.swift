@@ -170,6 +170,12 @@ final class TrafficMonitor: ObservableObject {
         startSource()
     }
 
+    /// Whether the current capture source can actually refuse a connection. Only the Network Extension sits in the
+    /// data path: the nettop sampler reads counters after the traffic has already left, and demo mode invents it.
+    var canBlock: Bool {
+        mode == .networkExtension && ExtensionManager.isEntitled && captureWarning == nil && !DemoData.isEnabled
+    }
+
     /// Passive hostname capture is only needed for the nettop source; the extension sees payloads itself.
     func updatePacketCapture() {
         let wanted = !DemoData.isEnabled && mode == .nettop && UserDefaults.standard.bool(forKey: AnomalySettings.Keys.packetCapture)
@@ -243,6 +249,7 @@ final class TrafficMonitor: ObservableObject {
             extensionSource.onFilterUnavailable = { [weak self] message in
                 Task { @MainActor in self?.captureWarning = message }
             }
+            extensionSource.onBlocked = { [weak self] events in self?.recordBlocked(events) }
         }
         source = newSource
         status = fallbackNote ?? "Starting \(newSource.displayName)…"
@@ -252,6 +259,40 @@ final class TrafficMonitor: ObservableObject {
         }, status: { [weak self] message in
             Task { @MainActor in self?.status = fallbackNote ?? message }
         })
+        pushEnforcement()
+    }
+
+    /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has
+    /// switched to blocking travel: everything else stays a matter for alerts, and a source that can't block
+    /// ignores them.
+    private func pushEnforcement() {
+        db.async { [weak self] db in
+            let enforcing = try db.loadPolicies().values.filter { $0.enabled && $0.enforce }
+            Task { @MainActor in self?.source?.setEnforcement(Array(enforcing)) }
+        }
+    }
+
+    /// Connections the filter refused. Each one becomes an alert naming the agent, where it was headed and the
+    /// fact that it didn't get there — a refusal nobody can see would be worse than not refusing at all.
+    nonisolated func recordBlocked(_ events: [BlockEvent]) {
+        db.async { [weak self] db in
+            var alerts: [AlertRecord] = []
+            for event in events {
+                let who = event.appName.isEmpty || event.appName == event.agentName
+                    ? event.agentName : "\(event.agentName) › \(event.appName)"
+                let pattern = event.host.isEmpty ? event.ip : AnomalyEngine.registrableDomain(event.host)
+                alerts.append(try db.addAlert(kind: AnomalyEngine.Kind.blockedConnection.rawValue, bundleID: event.agentKey,
+                                              appName: event.agentName,
+                                              detail: "Blocked \(who) from connecting to \(event.destination):\(event.port) — not on \(event.agentName)'s allowlist",
+                                              severity: 3, at: Date(timeIntervalSince1970: TimeInterval(event.at)),
+                                              allowPattern: pattern))
+            }
+            Notifier.post(alerts)
+            Task { @MainActor in
+                self?.refreshAlertCount()
+                self?.dataVersion += 1
+            }
+        }
     }
 
     // MARK: Ingest (any thread)
@@ -425,12 +466,31 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
-    /// Saves an agent's allowlist and applies it to new traffic right away.
+    /// Saves an agent's allowlist and applies it to new traffic right away — to the alerts, and to what the filter
+    /// refuses.
     func savePolicy(_ policy: AgentPolicy) {
         db.async { [engine, weak self] db in
             try db.savePolicy(policy)
             try engine.reloadPolicies()
-            Task { @MainActor in self?.dataVersion += 1 }
+            Task { @MainActor in
+                self?.dataVersion += 1
+                self?.pushEnforcement()
+            }
+        }
+    }
+
+    /// "Allow from now on", from the alert about a connection that was refused.
+    func allowFromNowOn(pattern: String, agentID: String) {
+        db.async { [engine, weak self] db in
+            var policy = try db.loadPolicies()[agentID] ?? AgentPolicy(agentID: agentID)
+            guard !policy.patterns.contains(pattern) else { return }
+            policy.patterns.append(pattern)
+            try db.savePolicy(policy)
+            try engine.reloadPolicies()
+            Task { @MainActor in
+                self?.dataVersion += 1
+                self?.pushEnforcement()
+            }
         }
     }
 

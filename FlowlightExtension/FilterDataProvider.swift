@@ -5,9 +5,12 @@ import os.log
 
 let extensionLog = Logger(subsystem: FlowlightConstants.extensionBundleIdentifier, category: "filter")
 
-/// Observes every TCP/UDP socket flow. It never blocks traffic: it peeks at the first bytes for
-/// classification / domain extraction, then lets the flow pass and relies on statistics reports
-/// for byte counts, which keeps the hot path cheap.
+/// Observes every TCP/UDP socket flow: it peeks at the first bytes for classification / domain extraction, then
+/// lets the flow pass and relies on statistics reports for byte counts, which keeps the hot path cheap.
+///
+/// It refuses a connection only when the user has switched an agent's allowlist to blocking, and only from
+/// `handleOutboundData` — `flow.remoteHostname` is usually nil when a flow starts, and TLS SNI arrives in the
+/// first outbound bytes. Everything else passes exactly as it did before.
 final class FilterDataProvider: NEFilterDataProvider {
     private let tracker = FlowTracker()
     private var flushTimer: DispatchSourceTimer?
@@ -81,6 +84,8 @@ final class FilterDataProvider: NEFilterDataProvider {
     override func handleOutboundData(from flow: NEFilterFlow, readBytesStartOffset offset: Int, readBytes: Data) -> NEFilterDataVerdict {
         guard let state = tracker.state(for: flow) else { return .allow() }
         state.observeOutbound(readBytes)
+        // The host is known by now, or never will be — either way this is where the flow can still be refused.
+        if BlockEnforcer.shared.refuses(state) { return .drop() }
         return verdict(for: state, passing: readBytes.count, peek: state.outboundPeek)
     }
 

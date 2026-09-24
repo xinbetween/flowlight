@@ -156,6 +156,9 @@ struct AlertRecord: Identifiable, Sendable, Hashable {
     var detail: String
     var severity: Int
     var acknowledged: Bool
+    /// What "Allow from now on" would add to `bundleID`'s allowlist, for alerts that come from one. Empty for
+    /// every other kind, which is what hides the offer.
+    var allowPattern: String = ""
 }
 
 /// SQLite store (App Group container) with tiered rollups:
@@ -252,6 +255,12 @@ final class TrafficDatabase: @unchecked Sendable {
             agent TEXT NOT NULL, agent_name TEXT NOT NULL, mcp_server TEXT NOT NULL, tool_calls TEXT NOT NULL, note TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS http_exchanges_ts ON http_exchanges (ts);
         """)
+        // Added with blocking: the destination a refused connection was headed for, so its alert can offer to
+        // allow it without parsing the sentence back out of `detail`.
+        let alertColumns = Set(try conn.query("PRAGMA table_info(alerts)") { $0.text(1) })
+        if !alertColumns.contains("allow_pattern") {
+            try conn.execute("ALTER TABLE alerts ADD COLUMN allow_pattern TEXT NOT NULL DEFAULT ''")
+        }
         // Added in 0.1.5.
         let exchangeColumns = Set(try conn.query("PRAGMA table_info(http_exchanges)") { $0.text(1) })
         for column in ["tool_results", "mcp", "llm"] where !exchangeColumns.contains(column) {
@@ -813,13 +822,15 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Alerts
 
     @discardableResult
-    func addAlert(kind: String, bundleID: String, appName: String, detail: String, severity: Int, at date: Date = Date()) throws -> AlertRecord {
+    func addAlert(kind: String, bundleID: String, appName: String, detail: String, severity: Int, at date: Date = Date(),
+                  allowPattern: String = "") throws -> AlertRecord {
         let ts = Int64(date.timeIntervalSince1970)
-        try conn.run("INSERT INTO alerts (ts, kind, bundle_id, app_name, detail, severity) VALUES (?,?,?,?,?,?)",
-                     [.int(ts), .text(kind), .text(bundleID), .text(appName), .text(detail), .int(Int64(severity))])
+        try conn.run("INSERT INTO alerts (ts, kind, bundle_id, app_name, detail, severity, allow_pattern) VALUES (?,?,?,?,?,?,?)",
+                     [.int(ts), .text(kind), .text(bundleID), .text(appName), .text(detail), .int(Int64(severity)),
+                      .text(allowPattern)])
         let id = try conn.query("SELECT last_insert_rowid()") { $0.int(0) }.first ?? 0
         return AlertRecord(id: id, timestamp: date, kind: kind, bundleID: bundleID, appName: appName, detail: detail,
-                           severity: severity, acknowledged: false)
+                           severity: severity, acknowledged: false, allowPattern: allowPattern)
     }
 
     /// Alerts newest first. An alert names the app that raised it and nothing about where it went, so Focus can
@@ -831,10 +842,13 @@ final class TrafficDatabase: @unchecked Sendable {
             clause = " WHERE bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))"
             values = focus.bundleIDs.map { .text($0) }
         }
-        return try conn.query("SELECT id, ts, kind, bundle_id, app_name, detail, severity, acknowledged FROM alerts\(clause) ORDER BY ts DESC, id DESC LIMIT ?",
-                       values + [.int(Int64(limit))]) { r in
+        return try conn.query("""
+            SELECT id, ts, kind, bundle_id, app_name, detail, severity, acknowledged, allow_pattern FROM alerts\(clause) \
+            ORDER BY ts DESC, id DESC LIMIT ?
+            """, values + [.int(Int64(limit))]) { r in
             AlertRecord(id: r.int(0), timestamp: Date(timeIntervalSince1970: TimeInterval(r.int(1))), kind: r.text(2),
-                        bundleID: r.text(3), appName: r.text(4), detail: r.text(5), severity: Int(r.int(6)), acknowledged: r.int(7) != 0)
+                        bundleID: r.text(3), appName: r.text(4), detail: r.text(5), severity: Int(r.int(6)),
+                        acknowledged: r.int(7) != 0, allowPattern: r.text(8))
         }
     }
 

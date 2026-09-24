@@ -30,6 +30,41 @@ struct CaptureWarningBanner: View {
     }
 }
 
+/// Stands in for the "block connections" switch when the chosen capture source can't refuse anything. Offering
+/// the switch and then not blocking would be a promise Flowlight can't keep, so the reason takes its place.
+struct BlockingUnavailableNotice: View {
+    @EnvironmentObject var monitor: TrafficMonitor
+    /// True when this agent's allowlist is set to block: the rule is saved, it just can't act here.
+    var enforcing: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(enforcing ? "Blocking is on, but not in effect here" : "Blocking needs the Network Extension",
+                  systemImage: "shield.slash")
+                .font(.caption.bold()).foregroundStyle(.orange)
+            Text(reason)
+                .font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if ExtensionManager.isEntitled, monitor.mode != .networkExtension {
+                Button("Use the Network Extension") { monitor.setMode(.networkExtension) }
+                    .controlSize(.mini)
+            }
+        }
+    }
+
+    private var reason: String {
+        if !ExtensionManager.isEntitled {
+            return "This build isn't signed for the Network Extension, so nothing sits in the path of a connection "
+                + "to refuse it. Allowlists still raise alerts."
+        }
+        if monitor.mode != .networkExtension {
+            return "The nettop sampler counts traffic after it has left the Mac — it can't refuse a connection. "
+                + "Allowlists still raise alerts."
+        }
+        return "macOS isn't letting Flowlight's filter run, so it can't refuse anything. Allowlists still raise alerts."
+    }
+}
+
 /// The other content filters installed on this Mac. macOS runs one at a time, so these are the reason Flowlight's
 /// own filter may never be asked to do anything — naming them turns a puzzling silence into something actionable.
 struct OtherFiltersNotice: View {

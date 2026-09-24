@@ -16,8 +16,10 @@ final class AnomalyEngine: @unchecked Sendable {
         case agentUnnamedHost = "Agent contacted an unnamed host"
         case agentWhileAway = "Agent active while you were away"
         case allowlistViolation = "Allowlist violation"
+        case blockedConnection = "Connection blocked"
 
-        static let agentKinds: Set<String> = [Kind.agentSensitiveChannel, .agentExfiltration, .agentUnnamedHost, .agentWhileAway, .allowlistViolation]
+        static let agentKinds: Set<String> = [Kind.agentSensitiveChannel, .agentExfiltration, .agentUnnamedHost, .agentWhileAway,
+                                              .allowlistViolation, .blockedConnection]
             .reduce(into: Set<String>()) { $0.insert($1.rawValue) }
     }
 

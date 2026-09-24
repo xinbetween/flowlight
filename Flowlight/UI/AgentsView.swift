@@ -236,11 +236,17 @@ struct AllowlistStatus: View {
     var body: some View {
         if let policy, policy.enabled {
             let violations = agent.otherDestinations.filter { !$0.isAllowed(by: policy) }.count
-            if violations > 0 {
-                Label("\(violations) not allowed", systemImage: "xmark.octagon.fill")
-                    .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
-            } else {
-                Label("All allowed", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
+            HStack(spacing: 4) {
+                if violations > 0 {
+                    Label("\(violations) not allowed", systemImage: "xmark.octagon.fill")
+                        .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
+                } else {
+                    Label("All allowed", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
+                }
+                if policy.enforce {
+                    Image(systemName: "shield.lefthalf.filled").font(.caption2).foregroundStyle(.orange)
+                        .help("Unlisted destinations are refused, not only reported")
+                }
             }
         } else {
             Text("Off").font(.caption).foregroundStyle(.secondary)
@@ -248,13 +254,15 @@ struct AllowlistStatus: View {
     }
 }
 
-/// Edits one agent's allowlist: on/off, AI providers, patterns, presets.
+/// Edits one agent's allowlist: on/off, AI providers, blocking, patterns, presets.
 struct AllowlistEditor: View {
+    @EnvironmentObject var monitor: TrafficMonitor
     var agentName: String
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
     @State private var draft = ""
     @State private var invalid = false
+    @State private var confirmBlocking = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -264,6 +272,29 @@ struct AllowlistEditor: View {
             Toggle("Always allow its AI providers", isOn: Binding(get: { policy.allowAIProviders }, set: { var p = policy; p.allowAIProviders = $0; save(p) }))
                 .font(.caption)
                 .disabled(!policy.enabled)
+            if monitor.canBlock {
+                // Turning this on is asked about; turning it off is not. Blocking is the change that can break
+                // the agent, and it is never what an existing allowlist did before the user said so here.
+                Toggle("Block connections that aren't allowed", isOn: Binding(
+                    get: { policy.enforce },
+                    set: { on in
+                        if on { confirmBlocking = true } else { var p = policy; p.enforce = false; save(p) }
+                    }))
+                    .font(.caption)
+                    .disabled(!policy.enabled)
+                    .confirmationDialog("Let Flowlight block \(agentName)'s connections?", isPresented: $confirmBlocking) {
+                        Button("Block Unlisted Destinations") { var p = policy; p.enforce = true; save(p) }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("""
+                        Until now this allowlist only raised alerts. From here on, anything \(agentName) or its tools \
+                        contact that isn't listed will be refused, which can stop the agent from working. Local network, \
+                        Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts.
+                        """)
+                    }
+            } else if policy.enabled {
+                BlockingUnavailableNotice(enforcing: policy.enforce)
+            }
             if !policy.patterns.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
@@ -296,11 +327,16 @@ struct AllowlistEditor: View {
                 .controlSize(.small)
                 .fixedSize()
             }
-            Text(invalid ? "Enter a domain, IP address or CIDR range." :
-                    "Anything else \(agentName) or its tools contact raises an alert. Flowlight doesn't block connections.")
+            Text(invalid ? "Enter a domain, IP address or CIDR range." : footer)
                 .font(.caption2).foregroundStyle(invalid ? TrafficColors.anomaly : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var footer: String {
+        policy.enforce && monitor.canBlock
+            ? "Anything else \(agentName) or its tools contact is refused, and the refusal is listed in Alerts."
+            : "Anything else \(agentName) or its tools contact raises an alert. Flowlight doesn't block connections."
     }
 
     private func add() {

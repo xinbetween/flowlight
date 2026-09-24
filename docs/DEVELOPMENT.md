@@ -9,11 +9,15 @@ project.yml                 XcodeGen spec (run `xcodegen generate` to regenerate
 Shared/                     Compiled into both targets
   TrafficModels.swift         FlowKey (pid, bundle, ip, domain, port, protocol) → bytes in/out, flows
   IPCProtocol.swift           XPC contract between the extension and the app
+  AgentPolicy.swift           Per-agent allowlist: patterns, AI providers, whether it blocks
+  AgentCatalog.swift          Known agents and LLM API providers
+  BlockRules.swift            Whether a flow is refused — pure functions over plain data
   Classification/             Pluggable protocol classifier, TLS SNI, HTTP Host, DNS parsers, DNS cache
 FlowlightExtension/         System extension (NEFilterDataProvider)
-  FilterDataProvider.swift    Peeks at the first bytes, never blocks, counts bytes from statistics reports
+  FilterDataProvider.swift    Peeks at the first bytes, counts bytes from statistics reports, drops refused flows
   FlowTracker.swift           Per-flow state, domain priority (SNI > Host > system hostname > DNS cache)
   ProcessResolver.swift       Audit token → pid, code signature, path, bundle ID
+  BlockEnforcer.swift         Holds the enforcing allowlists, resolves a flow's agent, reports every refusal
   IPCServer.swift             Mach service; pushes 1-second batches to the app (buffers up to 1 h)
 Flowlight/                  SwiftUI host app
   Capture/                    Extension installer, XPC client, nettop fallback sampler
@@ -123,6 +127,30 @@ calling an LLM API provider (`AgentCatalog.providers`, matched by hostname suffi
 - **Active while away**: `CGEventSource` reports no input for N minutes (default 15) and the agent moved ≥ 1 MB in
   the last minute.
 - Agents use a 1-hour learning period for first-contact alerts.
+
+## Blocking
+
+An allowlist reports by default. Turning on **Block connections that aren't allowed** for one agent (AI Agents ›
+its allowlist) sets `AgentPolicy.enforce`, and from then on the content filter refuses what the list doesn't cover.
+The switch only appears when the Network Extension is the capture source and is actually filtering: nothing else
+sits in the path of a connection, and a switch that did nothing would be worse than the explanation that replaces it.
+
+- The app sends the enforcing policies to the extension over XPC (`setEnforcement`) on every connection and every
+  change. The extension keeps no copy on disk, so a policy can never outlive the app that owns it.
+- The decision happens in `handleOutboundData`, not `handleNewFlow`: `flow.remoteHostname` is usually nil when a
+  flow starts and TLS SNI arrives in the first outbound bytes. `BlockRules.verdict` returns `.undecided` until the
+  flow has a hostname or can no longer produce one, and a flow that never names itself is judged on its IP alone.
+- Never refused, whatever a list says: the local network, Apple's services, anything from a `com.apple.*` process
+  or from Flowlight itself, and DNS. Where the rules are unsure they allow and record.
+- Enforcement lapses a few seconds after the app disconnects (`BlockRules.inForce`). A refusal that can't be
+  recorded is worse than no refusal, and "allow this from now on" lives in the app.
+- Every refusal travels back as a `BlockEvent` and becomes a **Connection blocked** alert naming the agent, the
+  process, the destination and the fact that it didn't get there. That alert's context menu offers *Allow … from
+  Now On*, which adds the destination to the agent's list and pushes the change straight back to the filter.
+- A flow through the HTTPS inspection proxy leaves the Mac as Flowlight's own traffic, which is never refused, so
+  blocking and inspection don't compose for the same agent.
+- `BlockRules` is plain functions over plain data (like `AgentPolicy.matches`), so `BlockingTests` covers the whole
+  decision without a filter installed.
 
 ## Demo mode
 
