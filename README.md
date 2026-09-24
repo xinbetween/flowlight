@@ -113,6 +113,14 @@ on your Mac, and decrypts the apps you route through it: headers, bodies, status
 - Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps.
 - Hover any bucket to see which apps drove it. Export to CSV.
 
+### Blocking what an agent shouldn't reach
+An allowlist warns by default. Turn on **Refuse connections outside the list** for an agent and Flowlight drops those
+connections as well, recording each one as an alert with **Allow … from Now On** to add it to the list in a click.
+
+It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
+traffic, DNS, Apple services and Flowlight's own connections are never refused, enforcement lapses a few seconds
+after the app stops running, and HTTPS inspection doesn't combine with it.
+
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
@@ -248,7 +256,9 @@ so a year of history stays fast.
 - **TCP and UDP only.** That covers essentially all app traffic, but ICMP (ping) and other raw-IP protocols aren't attributed.
 - **Per process, not per thread or tool call.** macOS attributes sockets to processes, so Flowlight can say *curl,
   started by Claude Code* or *the github MCP server*, not which individual tool call inside a long-running server opened it.
-- **Allowlists alert; they don't block.** Blocking needs the Network Extension engine and is on the roadmap.
+- **Allowlists only block when you ask them to.** Every allowlist warns; turning on *Refuse connections outside the
+  list*, per agent, makes it refuse as well. That needs the Network Extension engine — the sampler can only watch —
+  and it never refuses local traffic, DNS, Apple services or Flowlight's own.
 - **Encrypted payloads stay encrypted by default.** Flowlight reads metadata (hostnames, ports, byte counts). Decryption
   happens only with HTTPS inspection turned on, only for apps that use its proxy, and never for apps that pin certificates.
   Inspection speaks HTTP/1.1 to both sides.
@@ -272,14 +282,12 @@ Shipped:
 - [x] Tool calls read from LLM responses, linked to the requests their tools make
 - [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
 - [x] Focus mode: watch only the apps and destinations you pick (from 0.2.2)
+- [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
 
-- **0.3.0 — Block connections.** Turn allowlists into enforcement: drop what an agent contacts outside its list, with
-  a prompt to allow it once or always. Needs the Network Extension engine, which can refuse a flow rather than just
-  report it.
 - **0.3.1 — Mock responses.** In HTTPS inspection, answer a chosen domain, path and method with a canned status,
   headers and body, so you can see how an agent behaves when an API fails, stalls or returns something unexpected.
 - **0.3.2 — Export to OpenTelemetry / SIEM.**
@@ -297,6 +305,15 @@ Planned, in order:
   empty while it drains; and the app should say plainly that the system extension keeps filtering after Flowlight
   is quit, because an invisible extension recording traffic after you quit the app is exactly what this tool is
   for noticing.
+- **0.3.4 — Focus on apps or destinations, either alone.** Focus should be symmetric: a set of apps, a set of
+  destinations, or both, with at least one entry required and neither side required on its own. The scope model
+  already unions the two, but the editor doesn't read that way — only destinations can be typed, apps can only be
+  ticked off a list of what happened to be busy in the last 24 hours, so an app that has been quiet can't be
+  focused at all. This milestone makes both sides first-class: search or type an app as well as pick it from
+  recent traffic, add several of each, and say in the editor that one app with no destination (or one destination
+  with no app) is a complete focus. It also settles the edges that follow from that — Focus on with an empty list
+  still reads as off, and alerts, which name an app and not a destination, should say why a destination-only focus
+  leaves the alert list alone rather than silently ignoring it.
 - **0.4.0 — Channels besides the network.** A Mac sends data over more than TCP and UDP, and Flowlight is blind to
   the rest. The three parts differ a lot in how far they can go, so this is deliberately staged:
   - **Peer-to-peer Wi-Fi (AirDrop, Continuity, AirPlay)** is the reachable one: it flows over the `awdl0` and

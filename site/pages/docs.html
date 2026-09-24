@@ -14,7 +14,7 @@ nav: docs
     <nav class="toc" aria-label="On this page">
       <strong>On this page</strong>
       <a href="#install">Install</a><a href="#first-launch">First launch</a><a href="#hostnames">Hostnames</a>
-      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
+      <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a><a href="#focus">Focus mode</a><a href="#background">Background</a><a href="#agents">AI agent rules</a><a href="#tools">Tools &amp; MCP</a><a href="#allowlists">Allowlists</a><a href="#blocking">Blocking</a><a href="#agent-configuration">Agent configuration</a><a href="#inspection">HTTPS inspection</a><a href="#alerts">Other alerts</a>
       <a href="#engines">Capture engines</a><a href="#data">Your data</a><a href="#updates">Updates</a>
       <a href="#demo">Demo mode</a><a href="#uninstall">Uninstall</a><a href="#faq">Q&amp;A</a><a href="#limits">Limitations</a>
     </nav>
@@ -123,8 +123,21 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
         Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.</p>
       <p>From then on, anything the agent or its tools contact that isn't listed raises a critical <strong>Allowlist violation</strong> alert (once
-        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. Flowlight doesn't block
+        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. Flowlight doesn't block this by default
         connections; blocking needs the Network Extension engine and is on the roadmap.</p>
+
+      <h2 id="blocking">Refusing connections</h2>
+      <p>An allowlist warns by default. Turn on <strong>Refuse connections outside the list</strong> for an agent and it will also
+        refuse them: the connection is dropped and an alert records what was refused, with <strong>Allow … from Now On</strong> to add it
+        to the list in one click. The agent's next attempt goes through.</p>
+      <p><strong>It needs the Network Extension.</strong> Refusing a connection means sitting in its path, which the nettop sampler
+        cannot do — Capture will say so rather than offer a switch that does nothing.</p>
+      <p>Some things are never refused, whatever a list says: your local network, DNS, Apple's own services, and Flowlight's own
+        traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
+        Enforcement also lapses a few seconds after Flowlight stops running — a refusal nobody can see is worse than none, and the way
+        to undo one lives in the app.</p>
+      <p>HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
+        never refused.</p>
 
       <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
       <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the

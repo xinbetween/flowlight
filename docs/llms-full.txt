@@ -27,7 +27,8 @@ About
 
  Principles
 
- Observe, don't block. Flowlight never breaks your network. It shows and explains; firewalls decide.
+ Explain first, block only if asked. Flowlight watches and explains by default. An allowlist can refuse
+ connections too, but only once you turn that on for an agent — and never for local traffic, DNS or Apple services.
 
  Metadata, not payloads. Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.
 
@@ -60,11 +61,11 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.2.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.3.0, macOS 15 or later.
 
  On this page
  InstallFirst launchHostnames
- The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsAgent configurationHTTPS inspectionOther alerts
+ The viewsWorth a lookFocus modeBackgroundAI agent rulesTools & MCPAllowlistsBlockingAgent configurationHTTPS inspectionOther alerts
  Capture enginesYour dataUpdates
  Demo modeUninstallQ&ALimitations
 
@@ -204,8 +205,25 @@ open build/Build/Products/Release/Flowlight.app
  Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
 
  From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
- per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. Flowlight doesn't block
+ per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. Flowlight doesn't block this by default
  connections; blocking needs the Network Extension engine and is on the roadmap.
+
+ Refusing connections
+
+ An allowlist warns by default. Turn on Refuse connections outside the list for an agent and it will also
+ refuse them: the connection is dropped and an alert records what was refused, with Allow … from Now On to add it
+ to the list in one click. The agent's next attempt goes through.
+
+ It needs the Network Extension. Refusing a connection means sitting in its path, which the nettop sampler
+ cannot do — Capture will say so rather than offer a switch that does nothing.
+
+ Some things are never refused, whatever a list says: your local network, DNS, Apple's own services, and Flowlight's own
+ traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
+ Enforcement also lapses a few seconds after Flowlight stops running — a refusal nobody can see is worse than none, and the way
+ to undo one lives in the app.
+
+ HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
+ never refused.
 
  Agent configuration: what Flowlight reads on your Mac
 
@@ -414,7 +432,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.2.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.3.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -648,7 +666,7 @@ egress channel
 
  Built for the question the other tools skip
 
- Flowlight observes and explains; it doesn't block. It pairs well with a firewall.
+ Flowlight observes and explains. It can refuse what an agent contacts outside its allowlist, once you ask it to.
 
  FlowlightActivity MonitorFirewalls
 e.g. Little Snitch, LuLuPacket analyzers
@@ -712,13 +730,13 @@ e.g. Wireshark
 
  Flowlight observes and explains today. This is the order the rest is being built in.
 
- Block connections 0.3.0Allowlists that enforce rather than warn: refuse what an agent contacts outside its list, with a prompt to allow it once or always.
-
  Mock responses 0.3.1Answer a chosen domain, path and method with your own status, headers and body, to see how an agent copes when an API fails or returns something odd.
 
  Export to OpenTelemetry / SIEM 0.3.2Send what Flowlight records to the tools the rest of your stack already reports to.
 
  Runs quietly in the background 0.3.3The menu-bar-only mode arrived in 0.2.7; the rest is getting further out of the way — window state across launches and a quieter first run. Deliberately not a background daemon: a second process with full network visibility is the thing Flowlight exists to notice.
+
+ Focus on apps or destinations, either alone 0.3.4Focus should be symmetric: several apps, several destinations, or both, with at least one entry and neither side required on its own. Today only destinations can be typed and apps can only be ticked off what was busy in the last day, so a quiet app can't be focused at all.
 
  Channels besides the network 0.4.0AirDrop and Continuity already flow over interfaces Flowlight can see. Bluetooth and USB can show which apps have access and what connects, though macOS keeps per-app byte counts to itself.
 
@@ -772,7 +790,9 @@ Questions
 
  Does Flowlight block traffic?
 
- No. It observes and alerts, including when an agent leaves its allowlist. Blocking allowlist violations is on the roadmap for the Network Extension build.
+ By default it watches and alerts, including when an agent leaves its allowlist. It can also refuse those connections,
+ but only for an agent you have turned that on for, and only with the Network Extension engine installed — the sampler can
+ only watch. Local traffic, DNS, Apple services and Flowlight's own connections are never refused.
 
  Can it read my HTTPS traffic?
 
@@ -928,8 +948,24 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.2.8
+ 0.3.0
 September 24, 2026Latest
+
+ An allowlist can refuse, not only warn. Turn on Refuse connections outside the list for an agent and
+ Flowlight drops what isn't on it, recording each refusal with Allow … from Now On to add it in one click.
+
+ Off for lists you already have. A tool you leave running shouldn't change what it does to your network
+ because you installed an update.
+
+ Never refused: your local network, DNS, Apple's services and Flowlight's own traffic — and enforcement
+ lapses a few seconds after Flowlight stops running, because a refusal nobody can see is worse than none.
+
+ Needs the Network Extension; the sampler can only watch. How it works →
+
+ Downloads and checksums →
+
+ 0.2.8
+September 24, 2026
 
  Worth a look, in Reports. Compares the apps in a report with each other and points at the ones whose
  destinations don't look like the rest — many more places than their peers, addresses that never resolved to a name, hostnames
