@@ -57,7 +57,7 @@
   p { margin: 0; }
   /* Not `balance`: it evens the lines by making all of them short, which left every section description
      hanging in the left third of the band. Ledes fill the measure and `pretty` keeps the last line company. */
-  .lede { color: var(--muted); font-size: 18px; max-width: 62ch; }
+  .lede { color: var(--muted); font-size: 18px; max-width: 80ch; }
   .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
   code, .mono { font-family: var(--mono); font-size: .92em; }
 
@@ -197,7 +197,7 @@
   .screens figure { margin: 0; display: grid; gap: 10px; }
   .screens figcaption { color: var(--muted); font-size: 14px; }
   .detail-shot { margin: 0; display: grid; gap: 12px; }
-  .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 90ch; }
+  .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 108ch; }
 
   /* Install */
   .install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }

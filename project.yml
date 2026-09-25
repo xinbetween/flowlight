@@ -11,8 +11,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.7.2"
-    CURRENT_PROJECT_VERSION: "15"
+    MARKETING_VERSION: "0.7.3"
+    CURRENT_PROJECT_VERSION: "16"
 targets:
   Flowlight:
     type: application

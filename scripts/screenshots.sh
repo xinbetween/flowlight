@@ -45,6 +45,10 @@ capture() {
   open -n "$APP" --args -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
     -FLWindow "${w}x${h}" -FLInspectSelect paste.example
   sleep "${FL_WAIT:-14}"   # seeding 90 days of synthetic history, then the rollups it reads
+  # A window that isn't key draws its close/minimise/zoom buttons grey, which is how every published
+  # screenshot lost them. Bring it forward and let the redraw land before the shutter.
+  osascript -e 'tell application "Flowlight" to activate' >/dev/null 2>&1 || true
+  sleep 2
   local id
   id=$(scripts/window-id.swift 2>/dev/null || true)
   if [ -z "$id" ]; then echo "    couldn't find the window"; osascript -e 'quit app "Flowlight"'; return 1; fi

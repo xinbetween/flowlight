@@ -12,8 +12,6 @@ struct CaptureView: View {
     @State private var confirmClear = false
     @State private var showExtensionSetup = false
     @State private var otherFilters: [InstalledSystemExtension] = []
-    @State private var showFilterNotes = false
-    @State private var showSamplerNotes = false
 
     /// The dot beside the status line. Three states, because there are three: nothing arriving, arriving from the
     /// source that was chosen, and arriving from the one that stepped in when that source gave up.
@@ -29,10 +27,12 @@ struct CaptureView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
+                statusCard
+                CaptureWarningBanner()
+                if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 sourceSection
                 extensionSection
                 if monitor.mode == .nettop { HostnameSection() }
-                samplerSection
                 storageSection
             }
             // A settings panel is read, not scanned, and a line of prose stretched across a maximised window is
@@ -65,14 +65,13 @@ struct CaptureView: View {
             CaptureHeading("Source")
             VStack(spacing: 0) {
                 sourceRow(.networkExtension)
+                filterNotes
                 Divider().padding(.leading, 50)
                 sourceRow(.nettop)
+                samplerNotes
             }
             .background(.quaternary.opacity(0.35))
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            statusCard
-            CaptureWarningBanner()
-            if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
         }
     }
 
@@ -231,68 +230,52 @@ struct CaptureView: View {
     /// What the filter is and what it costs, folded away. Every word of it matters the first time and none of it
     /// matters the twentieth, which is exactly what a disclosure is for.
     private var filterNotes: some View {
-        DisclosureGroup(isExpanded: $showFilterNotes) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("""
-                The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, \
-                extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It \
-                requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid \
-                developer team, and the app must be in the Applications folder. It never blocks traffic.
-                """)
-                .font(.caption).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                CaptureFact(icon: "checkmark.seal", tint: .green, title: "Captures short-lived eligible flows",
-                            detail: "macOS calls the filter when an eligible connection opens, providing better "
-                            + "coverage of short requests than periodic sampling. Traffic from before activation is "
-                            + "not available, some system traffic is exempt from content filters, and byte counts "
-                            + "come from the filter's statistics reports.")
-                CaptureFact(icon: "info.circle", tint: .secondary, title: "It keeps filtering after you quit Flowlight",
-                            detail: "The system extension runs independently and remains active until you select "
-                            + "Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by "
-                            + "the extension for later delivery, subject to its retention limit.")
-                CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
-                            title: "macOS runs one content filter at a time",
-                            detail: "If a VPN or security agent already has that slot — Palo Alto Networks "
-                            + "GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs "
-                            + "and connects but is never asked to filter anything, so nothing appears. Use the sampler "
-                            + "on those Macs.")
-            }
-            .padding(.top, 10)
-        } label: {
-            Text("How the content filter works")
-                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("""
+            The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, \
+            extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It \
+            requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid \
+            developer team, and the app must be in the Applications folder. It never blocks traffic.
+            """)
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            CaptureFact(icon: "checkmark.seal", tint: .green, title: "Captures short-lived eligible flows",
+                        detail: "macOS calls the filter when an eligible connection opens, providing better "
+                        + "coverage of short requests than periodic sampling. Traffic from before activation is "
+                        + "not available, some system traffic is exempt from content filters, and byte counts "
+                        + "come from the filter's statistics reports.")
+            CaptureFact(icon: "info.circle", tint: .secondary, title: "It keeps filtering after you quit Flowlight",
+                        detail: "The system extension runs independently and remains active until you select "
+                        + "Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by "
+                        + "the extension for later delivery, subject to its retention limit.")
+            CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
+                        title: "macOS runs one content filter at a time",
+                        detail: "If a VPN or security agent already has that slot — Palo Alto Networks "
+                        + "GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs "
+                        + "and connects but is never asked to filter anything, so nothing appears. Use the sampler "
+                        + "on those Macs.")
         }
-        .captureCard()
+        .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
     }
 
-    // MARK: Fallback sampler
-
-    private var samplerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading("Fallback sampler")
-            VStack(alignment: .leading, spacing: 10) {
-                (Text("Without the extension, Flowlight reads ").font(.callout)
-                 + Text("/usr/bin/nettop").font(.callout.monospaced())
-                 + Text(" once per second. You get per-process, per-connection byte counts with no entitlements, "
-                        + "and protocols from port heuristics.").font(.callout))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                DisclosureGroup(isExpanded: $showSamplerNotes) {
-                    CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
-                                title: "What it misses is whole connections, not bytes",
-                                detail: "nettop reports running totals, and Flowlight records the difference between "
-                                + "one second and the next — so a long transfer is counted exactly, however bursty it "
-                                + "was. What never appears is anything that starts and finishes between two readings: "
-                                + "a quick DNS lookup, a fast API call, a script that runs curl and exits. The "
-                                + "extension sees those.")
-                        .padding(.top, 10)
-                } label: {
-                    Text("What it can't see")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }
-            }
-            .captureCard()
+    /// What the sampler costs, under the sampler.
+    private var samplerNotes: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            (Text("Flowlight reads ").font(.caption)
+             + Text("/usr/bin/nettop").font(.caption.monospaced())
+             + Text(" once per second. You get per-process, per-connection byte counts with no entitlements, and "
+                    + "protocols from port heuristics.").font(.caption))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
+                        title: "What it misses is whole connections, not bytes",
+                        detail: "nettop reports running totals, and Flowlight records the difference between "
+                        + "one second and the next — so a long transfer is counted exactly, however bursty it "
+                        + "was. What never appears is anything that starts and finishes between two readings: "
+                        + "a quick DNS lookup, a fast API call, a script that runs curl and exits. The "
+                        + "extension sees those.")
         }
+        .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
     }
 
     // MARK: Storage

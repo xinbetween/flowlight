@@ -1,6 +1,6 @@
 # Flowlight
 
-> Free, open-source (GPL-3.0) application-aware network monitor for macOS, with focused visibility into AI agents. It attributes observed TCP and UDP activity to the application that made it and records the destination, protocol and byte counts, keeping local history from second to year. Recognized AI agents are listed by name along with the tools and MCP servers they start, under per-agent allowlists. It can also refuse, once asked: a rule blocks an application, a destination or a URL for as long as you specify, and a guardrail withholds a tool from an agent before its model is offered it. Runs on macOS 15 or later; capture is by a sampler or a Network Extension. Current version: 0.7.2.
+> Free, open-source (GPL-3.0) application-aware network monitor for macOS, with focused visibility into AI agents. It attributes observed TCP and UDP activity to the application that made it and records the destination, protocol and byte counts, keeping local history from second to year. Recognized AI agents are listed by name along with the tools and MCP servers they start, under per-agent allowlists. It can also refuse, once asked: a rule blocks an application, a destination or a URL for as long as you specify, and a guardrail withholds a tool from an agent before its model is offered it. Runs on macOS 15 or later; capture is by a sampler or a Network Extension. Current version: 0.7.3.
 
 - [Download Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)
 - [Source code](https://github.com/xinbetween/flowlight)
