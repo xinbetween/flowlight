@@ -1,0 +1,34 @@
+/* Flowlight — de. The key is the English text, so an untranslated string shows correct English. */
+
+"Traffic" = "Datenverkehr";
+"Investigate" = "Untersuchen";
+"Control" = "Steuerung";
+"Sources" = "Quellen";
+"Live" = "Live";
+"AI Agents" = "KI-Agenten";
+"Reports" = "Berichte";
+"Alerts" = "Warnungen";
+"Rules" = "Regeln";
+"Ask" = "Fragen";
+"Inspect" = "Inspizieren";
+"Devices" = "Geräte";
+"Capture" = "Erfassung";
+"Cancel" = "Abbrechen";
+"Done" = "Fertig";
+"Save" = "Sichern";
+"Add" = "Hinzufügen";
+"Edit" = "Bearbeiten";
+"Delete" = "Löschen";
+"Refresh" = "Aktualisieren";
+"Clear" = "Löschen";
+"Copy" = "Kopieren";
+"Off" = "Aus";
+"On" = "Ein";
+"Settings" = "Einstellungen";
+"General" = "Allgemein";
+"Detection" = "Erkennung";
+"Export" = "Export";
+"Language" = "Sprache";
+"System" = "System";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "Bei „System“ folgt die Oberfläche der Sprache deines Mac und fällt auf Englisch zurück, wenn Flowlight nicht in diese Sprache übersetzt ist.";
+"Now showing %@" = "Aktuell: %@";

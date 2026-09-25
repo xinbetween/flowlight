@@ -31,7 +31,7 @@ struct FeatureGuide: Equatable, Sendable, Identifiable {
     /// The whole of it, as the model receives it.
     var asDictionary: [String: String] {
         var out = ["feature": title, "what": summary, "how": steps.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: " ")]
-        if let screen { out["where"] = screen.title }
+        if let screen { out["where"] = screen.englishTitle }
         if !caveats.isEmpty { out["limits"] = caveats.joined(separator: " ") }
         return out
     }

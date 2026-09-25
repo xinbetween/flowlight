@@ -3,7 +3,9 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case live, agents, reports, alerts, rules, ask, inspect, devices, capture
     var id: String { rawValue }
-    var title: String {
+    /// The English name, for the places that aren't the interface: the feature guide the Ask panel reads, and
+    /// anything else that runs off the main actor where the localized title can't be reached.
+    nonisolated var englishTitle: String {
         switch self {
         case .live: return "Live"
         case .agents: return "AI Agents"
@@ -11,9 +13,23 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .alerts: return "Alerts"
         case .rules: return "Rules"
         case .ask: return "Ask"
-        case .devices: return "Devices"
         case .inspect: return "Inspect"
+        case .devices: return "Devices"
         case .capture: return "Capture"
+        }
+    }
+
+    @MainActor var title: String {
+        switch self {
+        case .live: return L("Live")
+        case .agents: return L("AI Agents")
+        case .reports: return L("Reports")
+        case .alerts: return L("Alerts")
+        case .rules: return L("Rules")
+        case .ask: return L("Ask")
+        case .devices: return L("Devices")
+        case .inspect: return L("Inspect")
+        case .capture: return L("Capture")
         }
     }
     var icon: String {
@@ -51,12 +67,12 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    @MainActor var title: String {
         switch self {
-        case .traffic: return "Traffic"
-        case .investigate: return "Investigate"
-        case .control: return "Control"
-        case .sources: return "Sources"
+        case .traffic: return L("Traffic")
+        case .investigate: return L("Investigate")
+        case .control: return L("Control")
+        case .sources: return L("Sources")
         }
     }
 

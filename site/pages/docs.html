@@ -22,7 +22,7 @@ nav: docs
           <strong>Seeing what happened</strong>
           <a href="#views">The views</a><a href="#worth-a-look">Worth a look</a>
           <a href="#channels">Which way the bytes left</a><a href="#devices">Devices</a>
-          <a href="#ask">Ask</a><a href="#background">Background</a><a href="#focus">Focus mode</a>
+          <a href="#ask">Ask</a><a href="#language">Language</a><a href="#background">Background</a><a href="#focus">Focus mode</a>
         </div>
         <div class="toc-group">
           <strong>AI agents</strong>
@@ -167,6 +167,17 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Flowlight holds itself to its own standard.</strong> Whatever this feature sends appears in Live and Reports
         like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
         easiest to quietly leave out.</p>
+
+      <h2 id="language">Language</h2>
+      <p>Flowlight is translated into English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español and
+        Português. By default it follows your Mac: if your preferred languages include one Flowlight speaks, that is what it
+        uses — and for Chinese it tells Simplified from Traditional by script and region, so a Mac set to zh-TW gets Traditional.
+        Anything it hasn't been translated into falls back to English.</p>
+      <p>Pick a language explicitly in <strong>Settings ⌘,</strong> under General. It changes immediately rather than on next
+        launch. When the choice is <em>System</em>, the row says underneath which language that turned out to be.</p>
+      <p>Translation is arriving screen by screen: navigation, settings and the common controls are done, and the longer
+        explanatory passages are still English for now — a key with no translation shows correct English rather than a blank
+        or an identifier.</p>
 
       <h2 id="background">Running in the background</h2>
       <p>Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is

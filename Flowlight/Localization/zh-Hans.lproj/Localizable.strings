@@ -1,0 +1,34 @@
+/* Flowlight — zh-Hans. The key is the English text, so an untranslated string shows correct English. */
+
+"Traffic" = "流量";
+"Investigate" = "调查";
+"Control" = "管控";
+"Sources" = "来源";
+"Live" = "实时";
+"AI Agents" = "AI 代理";
+"Reports" = "报告";
+"Alerts" = "警报";
+"Rules" = "规则";
+"Ask" = "提问";
+"Inspect" = "检查";
+"Devices" = "设备";
+"Capture" = "捕获";
+"Cancel" = "取消";
+"Done" = "完成";
+"Save" = "保存";
+"Add" = "添加";
+"Edit" = "编辑";
+"Delete" = "删除";
+"Refresh" = "刷新";
+"Clear" = "清除";
+"Copy" = "拷贝";
+"Off" = "关闭";
+"On" = "开启";
+"Settings" = "设置";
+"General" = "通用";
+"Detection" = "检测";
+"Export" = "导出";
+"Language" = "语言";
+"System" = "跟随系统";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "设为“跟随系统”时，界面语言与您的 Mac 保持一致；若 Flowlight 尚未翻译成该语言，则回退为英文。";
+"Now showing %@" = "当前显示：%@";

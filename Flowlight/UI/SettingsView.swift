@@ -25,6 +25,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             Form {
+                LanguageRow()
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
@@ -40,8 +41,8 @@ struct SettingsView: View {
                 UpdateSettingsRow()
             }
             .formStyle(.grouped)
-            .frame(height: 290)
-            .tabItem { Label("General", systemImage: "gearshape") }
+            .frame(height: 340)
+            .tabItem { Label(L("General"), systemImage: "gearshape") }
 
             Form {
                 Section {
@@ -198,5 +199,32 @@ struct UpdateSettingsRow: View {
         case .idle:
             return updater.lastCheck.map { "Checked \($0.formatted(.relative(presentation: .named)))" } ?? "Not checked yet"
         }
+    }
+}
+
+/// Choosing the interface language.
+///
+/// "System" is the default and the honest one, but it leaves someone guessing which language that turned out to
+/// be — so when it is chosen the row says underneath what is actually being shown.
+private struct LanguageRow: View {
+    @ObservedObject private var localization = Localization.shared
+
+    var body: some View {
+        Picker(L("Language"), selection: Binding(get: { localization.language },
+                                                 set: { localization.language = $0 })) {
+            Text(L("System")).tag(AppLanguage.system)
+            Divider()
+            ForEach(AppLanguage.translated) { language in
+                // Each written in its own language: someone looking for theirs is not reading the others.
+                Text(language.title).tag(language)
+            }
+        }
+        if localization.language == .system {
+            Text(L("Now showing %@", localization.effective.title))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Text(L("The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into."))
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

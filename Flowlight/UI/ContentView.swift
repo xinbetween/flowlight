@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @ObservedObject private var localization = Localization.shared
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
@@ -69,6 +70,7 @@ struct ContentView: View {
             case .capture: CaptureView()
             }
         }
+        .id(localization.revision)
         .onReceive(NotificationCenter.default.publisher(for: .flowlightOpenUpdate)) { _ in openWindow(id: "update") }
         .background(WindowSizer())
         .onAppear { monitor.windowAppeared() }

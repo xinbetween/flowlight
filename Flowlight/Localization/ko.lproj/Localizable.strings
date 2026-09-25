@@ -1,0 +1,34 @@
+/* Flowlight — ko. The key is the English text, so an untranslated string shows correct English. */
+
+"Traffic" = "트래픽";
+"Investigate" = "분석";
+"Control" = "제어";
+"Sources" = "소스";
+"Live" = "실시간";
+"AI Agents" = "AI 에이전트";
+"Reports" = "보고서";
+"Alerts" = "알림";
+"Rules" = "규칙";
+"Ask" = "질문";
+"Inspect" = "검사";
+"Devices" = "기기";
+"Capture" = "캡처";
+"Cancel" = "취소";
+"Done" = "완료";
+"Save" = "저장";
+"Add" = "추가";
+"Edit" = "편집";
+"Delete" = "삭제";
+"Refresh" = "새로 고침";
+"Clear" = "지우기";
+"Copy" = "복사";
+"Off" = "끔";
+"On" = "켬";
+"Settings" = "설정";
+"General" = "일반";
+"Detection" = "탐지";
+"Export" = "내보내기";
+"Language" = "언어";
+"System" = "시스템 설정";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "'시스템 설정'을 선택하면 인터페이스가 Mac의 언어를 따릅니다. Flowlight가 번역되지 않은 언어라면 영어로 표시됩니다.";
+"Now showing %@" = "현재 표시: %@";

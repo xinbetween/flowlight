@@ -1,0 +1,34 @@
+/* Flowlight — zh-Hant. The key is the English text, so an untranslated string shows correct English. */
+
+"Traffic" = "流量";
+"Investigate" = "調查";
+"Control" = "管控";
+"Sources" = "來源";
+"Live" = "即時";
+"AI Agents" = "AI 代理";
+"Reports" = "報告";
+"Alerts" = "警示";
+"Rules" = "規則";
+"Ask" = "提問";
+"Inspect" = "檢查";
+"Devices" = "裝置";
+"Capture" = "擷取";
+"Cancel" = "取消";
+"Done" = "完成";
+"Save" = "儲存";
+"Add" = "加入";
+"Edit" = "編輯";
+"Delete" = "刪除";
+"Refresh" = "重新整理";
+"Clear" = "清除";
+"Copy" = "拷貝";
+"Off" = "關閉";
+"On" = "開啟";
+"Settings" = "設定";
+"General" = "一般";
+"Detection" = "偵測";
+"Export" = "匯出";
+"Language" = "語言";
+"System" = "跟隨系統";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "設為「跟隨系統」時，介面語言會與您的 Mac 一致；若 Flowlight 尚未翻譯成該語言，則會退回英文。";
+"Now showing %@" = "目前顯示：%@";
