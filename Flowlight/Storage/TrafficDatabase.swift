@@ -361,13 +361,17 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     /// Writes pre-aggregated rows straight into a tier (demo data and imports). Callers own consistency.
+    ///
+    /// `channel` joined the unique key in 0.4.0 and the eight-column index was dropped, but this statement kept
+    /// naming it — so it couldn't be prepared at all, and every seeded row was silently lost. Demo mode had no
+    /// history from that release on, which is also why the published screenshots stopped being reproducible.
     func insertAggregates(_ table: String, _ rows: [(ts: Int64, key: FlowKey, counters: FlowCounters)]) throws {
         precondition(Self.tables.contains(table))
         let sql = """
         INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -379,7 +383,8 @@ final class TrafficDatabase: @unchecked Sendable {
                 try conn.run(sql, [.int(r.ts), .int(Int64(k.pid)), .text(k.bundleID), .text(k.appName), .text(k.appPath),
                                    .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)), .text(k.transport.rawValue),
                                    .text(k.appProtocol), .int(r.counters.bytesIn), .int(r.counters.bytesOut), .int(r.counters.flows),
-                                   .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? "")])
+                                   .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
+                                   .text(k.channel.rawValue)])
             }
         }
     }

@@ -47,9 +47,16 @@
   a { color: inherit; }
   a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
   h1, h2, h3 { font-family: var(--display); line-height: 1.05; margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
+  /* Headings are balanced above; everything that reads as a paragraph gets `pretty`, which is the same idea
+     applied to the last line only — no single word left alone under a full-width line. */
+  p, li, dd, dt, figcaption, blockquote { text-wrap: pretty; }
+  /* Card titles are <strong>, not headings, so they need saying separately or they break mid-phrase. */
+  .view-card strong, .privacy strong, .card strong, .release li strong { text-wrap: balance; }
   h2 { font-size: clamp(30px, 4vw, 46px); font-weight: 800; }
   h3 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   p { margin: 0; }
+  /* Not `balance`: it evens the lines by making all of them short, which left every section description
+     hanging in the left third of the band. Ledes fill the measure and `pretty` keeps the last line company. */
   .lede { color: var(--muted); font-size: 18px; max-width: 62ch; }
   .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
   code, .mono { font-family: var(--mono); font-size: .92em; }
@@ -73,22 +80,26 @@
 
   /* Hero */
   .hero { padding-block: 72px 56px; }
-  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: center; }
-  .hero h1 { font-size: clamp(42px, 6.2vw, 76px); font-weight: 800; }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: stretch; }
+  .hero h1 { font-size: clamp(40px, 4.8vw, 58px); font-weight: 800; }
   .hero h1 .flow { color: var(--accent); }
   .hero .lede { margin-top: 20px; }
   .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
   .cta-note { font-size: 13px; color: var(--faint); width: 100%; }
 
   .log { background: var(--log-bg); color: var(--log-ink); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden;
-         font: 12.5px/1.5 var(--mono); border: 1px solid var(--log-line); }
+         font: 12.5px/1.5 var(--mono); border: 1px solid var(--log-line); display: flex; flex-direction: column; }
   .log-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--log-line); color: var(--log-muted); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f52; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f52; box-shadow: inset 0 0 0 1px rgba(0,0,0,.16); }
+  .log-head .dot:nth-child(1) { background: #ff5f57; }
+  .log-head .dot:nth-child(2) { background: #febc2e; }
+  .log-head .dot:nth-child(3) { background: #28c840; }
   .log-head .live { margin-left: auto; display: flex; gap: 6px; align-items: center; }
   .pulse { width: 7px; height: 7px; border-radius: 50%; background: #2fbf71; }
   /* Rows vary in height — a flagged one carries a second line — so the list can't be an exact number of them.
      The last row is faded out instead of chopped in half, which reads as "there's more" rather than as a bug. */
-  .log ol { list-style: none; margin: 0; padding: 6px 0; height: 356px; overflow: hidden;
+  .log ol { list-style: none; margin: 0; padding: 6px 0; flex: 1 1 auto; min-height: 356px; height: auto; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: space-between;
             -webkit-mask-image: linear-gradient(#000 88%, transparent); mask-image: linear-gradient(#000 88%, transparent); }
   /* The first column holds an agent and the tool it ran — "claude › curl" — which is the whole point of the
      attribution, so it gets the room to say so instead of ellipsing at the interesting part. */
@@ -175,6 +186,9 @@
   /* Privacy */
   .privacy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
   .privacy div { display: grid; gap: 6px; align-content: start; }
+  /* One item shouldn't be squeezed into a quarter-width column with three empty ones beside it. It takes the
+     whole row and keeps a readable measure instead. */
+  .privacy > div:only-child { grid-column: 1 / -1; max-width: 62ch; }
   .privacy strong { font: 700 18px var(--display); }
   .privacy p { color: var(--muted); font-size: 15px; }
 
@@ -315,11 +329,11 @@
   .case .view { font: 500 12px/1 var(--mono); color: var(--accent); }
 
   /* The four views */
-  .views { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+  .views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .view-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 10px; align-content: start; }
   .view-card .glyph { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
   .view-card .glyph svg { width: 22px; height: 22px; }
-  .glyph.live { background: var(--received); } .glyph.agents { background: var(--accent); }
+  .glyph.live { background: var(--received); } .glyph.ai-agents { background: var(--accent); }
   .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.ask { background: #0aa3b5; } .glyph.devices { background: #8a6bd1; } .glyph.inspect { background: #7a4fd6; }
   .view-card p { color: var(--muted); font-size: 14.5px; }
   .view-card .keys { font: 12px var(--mono); color: var(--faint); }

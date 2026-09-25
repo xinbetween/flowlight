@@ -10,7 +10,7 @@ Placeholders: {{root}} (relative path to the site root), {{repo}}, {{dmg}}, {{ve
 {{current:<nav>}} (aria-current on the active nav link). Also writes sitemap.xml, robots.txt,
 llms.txt, llms-full.txt and 404.html, and build/site-preview/index.html (self-contained home page).
 """
-import os, re, sys, html, datetime, pathlib, hashlib
+import os, re, sys, html, json, datetime, pathlib, hashlib, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE, OUT = ROOT / "site", ROOT / "docs"
@@ -55,12 +55,82 @@ def fill(text, root, nav):
     # Screenshots keep their names across updates; a content hash makes caches fetch the new image.
     return re.sub(r'(assets/screenshots/[\w-]+\.png)"', lambda m: f'{m.group(1)}?v={asset_hash(m.group(1))}"', text)
 
+def last_changed(path):
+    """The date of the commit that last touched a file, falling back to its mtime outside a checkout."""
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", str(path)],
+                             cwd=ROOT, capture_output=True, text=True, timeout=10)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return datetime.date.fromtimestamp(pathlib.Path(path).stat().st_mtime).isoformat()
+
 def asset_hash(rel):
     return hashlib.sha256((OUT / rel).read_bytes()).hexdigest()[:8]
 
-def document(meta, body, root, css_href, inline_css=None):
+def structured_data(meta, body):
+    """JSON-LD for one page.
+
+    Only things that are true: no ratings, no review counts, no author names the repository can't back up.
+    Invented structured data is both a Google penalty and a lie told in a machine-readable format.
+    """
+    path, title, desc = meta["path"], meta["title"], meta["description"]
+    site = {"@type": "WebSite", "@id": f"{DOMAIN}/#website", "url": f"{DOMAIN}/", "name": "Flowlight",
+            "inLanguage": "en", "publisher": {"@id": f"{DOMAIN}/#publisher"}}
+    publisher = {"@type": "Organization", "@id": f"{DOMAIN}/#publisher", "name": "xinbetween",
+                 "url": f"{DOMAIN}/", "logo": f"{DOMAIN}/assets/icon.png",
+                 "sameAs": [f"https://github.com/{REPO}"]}
+    graph = [site, publisher]
+
+    if path == "/":
+        graph.append({
+            "@type": "SoftwareApplication", "@id": f"{DOMAIN}/#app", "name": "Flowlight",
+            "description": desc, "url": f"{DOMAIN}/", "applicationCategory": "SecurityApplication",
+            "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later",
+            "softwareVersion": VERSION, "downloadUrl": DMG, "installUrl": f"{DOMAIN}/docs/#install",
+            "image": f"{DOMAIN}/assets/social-card.png", "screenshot": f"{DOMAIN}/assets/screenshots/agents.png",
+            "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+            "isAccessibleForFree": True, "publisher": {"@id": f"{DOMAIN}/#publisher"},
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD",
+                       "availability": "https://schema.org/InStock"},
+        })
+    else:
+        graph.append({"@type": "BreadcrumbList", "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Flowlight", "item": f"{DOMAIN}/"},
+            {"@type": "ListItem", "position": 2, "name": title, "item": f"{DOMAIN}{path}"}]})
+
+    faq = faq_entries(body)
+    if faq:
+        graph.append({"@type": "FAQPage", "@id": f"{DOMAIN}{path}#faq", "mainEntity": [
+            {"@type": "Question", "name": q,
+             "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in faq]})
+
+    return ('<script type="application/ld+json">'
+            + json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+            + "</script>")
+
+def faq_entries(markup):
+    """The questions and answers already on the page, read back out of its own markup.
+
+    Written from the page rather than kept in a second list, because a second list is a list that goes stale.
+    """
+    block = re.search(r'<h2 id="faq".*?<dl>(.*?)</dl>', markup, re.S)
+    if not block:
+        return []
+    pairs = re.findall(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", block.group(1), re.S)
+    return [(plain(q), plain(a)) for q, a in pairs]
+
+def plain(markup):
+    text = re.sub(r"<[^>]+>", "", markup)
+    return html.unescape(re.sub(r"\s+", " ", text)).strip()
+
+def document(meta, body, root, css_href, inline_css=None, index=True):
     title, desc, path = meta["title"], meta["description"], meta["path"]
     style = f"<style>{inline_css}</style>" if inline_css else f'<link rel="stylesheet" href="{css_href}">'
+    # A page that isn't a destination shouldn't be one in search results either.
+    robots = "" if index else '<meta name="robots" content="noindex, follow">\n'
+    canonical = f'<link rel="canonical" href="{DOMAIN}{path}">\n' if index else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -68,17 +138,24 @@ def document(meta, body, root, css_href, inline_css=None):
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{html.escape(title)}</title>
 <meta name="description" content="{html.escape(desc)}">
-<link rel="canonical" href="{DOMAIN}{path}">
+{robots}{canonical}<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="en">
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="{DOMAIN}{path}">
 <meta property="og:image" content="{DOMAIN}/assets/social-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="{root}assets/icon.png">
+<link rel="apple-touch-icon" href="{root}assets/apple-touch-icon.png">
 {FONTS}
 {style}
+{structured_data(meta, body)}
 </head>
 <body>
 {body}
@@ -94,6 +171,7 @@ def build():
     pages = []
     for src in sorted((SITE / "pages").glob("*.html")):
         meta, body = front_matter(src.read_text())
+        meta["source"] = src
         depth = meta["path"].strip("/").count("/") + (1 if meta["path"].strip("/") else 0)
         root = "../" * depth if depth else ""
         full = fill(header + body + footer, root, meta.get("nav", ""))
@@ -113,11 +191,15 @@ def build():
     nf_body = fill(header + """<main id="main"><section class="page-head"><div class="wrap"><p class="eyebrow">404</p>
 <h1>That page isn't here</h1><p class="lede">Try the <a href="/">home page</a>, the <a href="/docs/">docs</a> or the
 <a href="/releases/">release notes</a>.</p></div></section></main>""" + footer, "/", "")
-    (OUT / "404.html").write_text(document(notfound, nf_body, "/", "/assets/site.css"))
+    (OUT / "404.html").write_text(document(notfound, nf_body, "/", "/assets/site.css", index=False))
 
-    urls = [DOMAIN + m["path"] for m, _ in pages]
+    # lastmod comes from the commit that last touched each page's source, so it says something true even when
+    # a rebuild touches every file. Google reads lastmod and ignores changefreq and priority, so neither is here.
+    entries = "".join(
+        f"  <url><loc>{DOMAIN}{m['path']}</loc><lastmod>{last_changed(m['source'])}</lastmod></url>\n"
+        for m, _ in pages)
     (OUT / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "".join(f"  <url><loc>{u}</loc></url>\n" for u in urls) + "</urlset>\n")
+        + entries + "</urlset>\n")
     (OUT / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {DOMAIN}/sitemap.xml\n")
 
     # llms.txt: a short map; llms-full.txt: every page as plain text.
@@ -127,11 +209,12 @@ def build():
         markup = re.sub(r"<[^>]+>", "", markup)
         markup = html.unescape(fill(markup, DOMAIN + "/", ""))
         return re.sub(r"\n\s*\n+", "\n\n", re.sub(r"[ \t]+", " ", markup)).strip()
-    llms = [f"# Flowlight\n\n> Free, open-source (GPL-3.0) macOS network monitor. It attributes every TCP/UDP flow to the app that made it and the"
-            f" domain it went to, keeps local history from second to year, and watches AI agents (including the tools and MCP servers they start)"
-            f" with per-agent allowlists and rules for data leaving the Mac. It can also refuse, once asked: a rule blocks an app, a destination"
-            f" or a URL for as long as you say, and a guardrail takes a tool away from an agent before its model is offered it."
-            f" Current version: {VERSION}.\n",
+    llms = [f"# Flowlight\n\n> Free, open-source (GPL-3.0) application-aware network monitor for macOS, with focused visibility into"
+            f" AI agents. It attributes observed TCP and UDP activity to the application that made it and records the destination, protocol and"
+            f" byte counts, keeping local history from second to year. Recognized AI agents are listed by name along with the tools and MCP"
+            f" servers they start, under per-agent allowlists. It can also refuse, once asked: a rule blocks an application, a destination or a"
+            f" URL for as long as you specify, and a guardrail withholds a tool from an agent before its model is offered it. Runs on macOS 15"
+            f" or later; capture is by a sampler or a Network Extension. Current version: {VERSION}.\n",
             f"- [Download Flowlight.dmg]({DMG})", f"- [Source code](https://github.com/{REPO})"]
     llms += [f"- [{m['title']}]({DOMAIN}{m['path']}): {m['description']}" for m, _ in pages]
     llms += [f"- [Full text for LLMs]({DOMAIN}/llms-full.txt)"]

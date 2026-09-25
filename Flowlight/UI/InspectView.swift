@@ -89,6 +89,11 @@ private struct InspectContent: View {
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
         exchanges = (try? await monitor.read { try $0.exchanges(since: since, search: term, focus: scope) }) ?? []
+        // `-FLInspectSelect paste.example`, so the published screenshot always shows the same request rather
+        // than whichever one a click happened to land on.
+        if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
+            selection = exchanges.first { $0.host.localizedCaseInsensitiveContains(wanted) }?.id
+        }
         // Link with the unfiltered list, so a search for "curl" still shows which tool call started it.
         let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since, focus: scope) }) ?? [])
         links = ToolCallLinks.link(all)

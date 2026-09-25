@@ -368,9 +368,22 @@ struct AgentDetail: View {
     var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
-    @State private var tab = Tab.destinations
+    @State private var tab = Tab.fromLaunchArgument
 
-    enum Tab: Hashable { case destinations, calls, tools, servers, guardrails }
+    enum Tab: Hashable {
+        case destinations, calls, tools, servers, guardrails
+
+        /// `-FLAgentTab tools`, for the screenshots. The default is what someone actually opens on.
+        static var fromLaunchArgument: Tab {
+            switch UserDefaults.standard.string(forKey: "FLAgentTab") {
+            case "calls": return .calls
+            case "tools": return .tools
+            case "servers": return .servers
+            case "guardrails": return .guardrails
+            default: return .destinations
+            }
+        }
+    }
 
     var body: some View {
         GroupBox {

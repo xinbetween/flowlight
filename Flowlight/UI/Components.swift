@@ -102,7 +102,15 @@ struct WindowSizer: NSViewRepresentable {
         let coordinator = context.coordinator
         DispatchQueue.main.async {
             guard let window = view.window else { return }
-            if let saved = UserDefaults.standard.string(forKey: Self.key) {
+            // `-FLWindow 1440x900`: a fixed frame for the screenshots, so every one is the same size whatever
+            // display made it and whatever frame was last saved.
+            if let size = UserDefaults.standard.string(forKey: "FLWindow"),
+               case let parts = size.lowercased().split(separator: "x"), parts.count == 2,
+               let w = Double(parts[0]), let h = Double(parts[1]) {
+                let screen = (window.screen ?? NSScreen.main)?.visibleFrame ?? .zero
+                window.setFrame(NSRect(x: screen.midX - w/2, y: screen.midY - h/2, width: w, height: h),
+                                display: true, animate: false)
+            } else if let saved = UserDefaults.standard.string(forKey: Self.key) {
                 let frame = NSRectFromString(saved)
                 // A screen that has gone away — an unplugged display — would leave the window somewhere
                 // unreachable. So would a frame saved on a larger display, or one that was nudged off the right

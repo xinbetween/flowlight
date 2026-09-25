@@ -116,7 +116,7 @@ struct ReportRequest: Equatable {
 /// Shared navigation state so screens can link to each other (Live/Alerts → Reports).
 @MainActor
 final class AppNavigation: ObservableObject {
-    @Published var selection: SidebarItem = .live
+    @Published var selection: SidebarItem = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
     @Published var reportRequest: ReportRequest?
     @Published var ruleRequest: RuleRequest?
 

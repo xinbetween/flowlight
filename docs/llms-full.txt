@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.1, macOS 15 or later.
 
  On this page
 
@@ -678,13 +678,13 @@ open build/Build/Products/Release/Flowlight.app
 # Flowlight for macOS
 URL: https://flowlight.xinbetween.com/
 
-Free · open source · macOS 15+
+Application-aware network intelligence · macOS 15+
 
- Know which apps connect. Understand where data goes.
+ See your apps' network activity.
+Understand your AI agents.
 
- Flowlight records observed network activity by application, destination and protocol, with byte counts and historical analysis.
- It highlights unusual AI agent activity, including sensitive protocols and large uploads. Optional HTTPS inspection can show
- request details and model tool calls for applications explicitly routed through Flowlight.
+ Flowlight shows which applications connect, where they go and how much data they move. For AI agents, it traces tools,
+ MCP servers and destinations—so unfamiliar hosts, sensitive channels and unusual uploads stand out.
 
  Download for macOS
 
@@ -692,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1238,8 +1238,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.0
+ 0.7.1
 September 25, 2026Latest
+
+ Demo mode has its history back. Since 0.4.0 the statement that writes seeded and imported
+ rollups still named an index that release had replaced, so it could not run at all and every seeded row was
+ lost in silence. Demo mode showed live traffic and nothing else.
+
+ Every screenshot on this site is new, taken from demo data by a script rather than by hand,
+ so they can be regenerated whenever the app changes.
+
+ Search and sharing metadata — structured data describing the application, a designed link
+ preview instead of a raw screenshot, and a sitemap that says when each page last changed.
+
+ Downloads and checksums →
+
+ 0.7.0
+September 25, 2026
 
  A new icon. A prism: one stream in, separated into what it is actually made of, with the
  point of observation marked. The waveform and its two arrows said “bandwidth meter” and competed with each

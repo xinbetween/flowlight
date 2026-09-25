@@ -1,6 +1,6 @@
 <!--
 title: Flowlight for macOS
-description: Flowlight is a free, open-source macOS network monitor for investigating application traffic and AI agent activity.
+description: Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.
 path: /
 nav: home
 -->
@@ -8,11 +8,10 @@ nav: home
   <section class="hero">
     <div class="wrap">
       <div>
-        <p class="eyebrow">Free · open source · macOS 15+</p>
-        <h1 style="margin-top:16px">Know which apps connect. <span class="flow">Understand where data goes.</span></h1>
-        <p class="lede">Flowlight records observed network activity by application, destination and protocol, with byte counts and historical analysis.
-          It highlights unusual AI agent activity, including sensitive protocols and large uploads. Optional HTTPS inspection can show
-          request details and model tool calls for applications explicitly routed through Flowlight.</p>
+        <p class="eyebrow">Application-aware network intelligence · macOS 15+</p>
+        <h1 style="margin-top:16px">See your apps' network activity.<br><span class="flow">Understand your AI agents.</span></h1>
+        <p class="lede">Flowlight shows which applications connect, where they go and how much data they move. For AI agents, it traces tools,
+          MCP servers and destinations—so unfamiliar hosts, sensitive channels and unusual uploads stand out.</p>
         <div class="cta">
           <a class="btn btn-primary" href="{{dmg}}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
@@ -90,7 +89,7 @@ nav: home
       <div class="views">
         <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
           <h3>Live</h3><p>What's moving right now? Per-app rates, the last two minutes, the busiest destination.</p><span class="keys">⌘1</span></div>
-        <div class="view-card"><span class="glyph agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/></svg></span>
+        <div class="view-card"><span class="glyph ai-agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 4.5l1.7 4.8L17 11l-4.8 1.7-1.7 4.8-1.7-4.8L4 11l4.8-1.7z"/><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
           <h3>AI Agents</h3><p>What are my agents doing besides calling their model? Providers, other hosts, risk badges.</p><span class="keys">⌘2</span></div>
         <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
           <h3>Reports</h3><p>Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.</p><span class="keys">⌘3</span></div>
