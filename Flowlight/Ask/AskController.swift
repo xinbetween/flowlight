@@ -18,6 +18,9 @@ final class AskController: ObservableObject {
     @Published private(set) var status = ""
 
     private weak var db: TrafficDatabase?
+    /// A snapshot of how Flowlight is set up, taken on the main actor when a question starts. Set by
+    /// `TrafficMonitor`, which is the only thing that can see all of it at once.
+    var environment: () -> AskEnvironment = { .empty }
 
     init() {
         UserDefaults.standard.register(defaults: [
@@ -106,6 +109,8 @@ final class AskController: ObservableObject {
 
         let request = AskRequest(question: trimmed, instructions: AskPrompt.instructions(queries: AskQuery.allCases),
                                  queries: AskQuery.allCases)
+        // Read once, here, while we are on the main actor. The queries that use it run off it.
+        let snapshot = environment()
         let turnID = turn.id
         let recorder = CallRecorder()
 
@@ -113,8 +118,9 @@ final class AskController: ObservableObject {
             let runner: @Sendable (AskCall) async -> String = { call in
                 await recorder.record(call)
                 do {
-                    let result = try await Self.run(call, db: db)
-                    await recorder.finish(call, summary: result.summary, filter: result.filter, from: result.from, to: result.to)
+                    let result = try await Self.run(call, db: db, environment: snapshot)
+                    await recorder.finish(call, summary: result.summary, filter: result.filter, from: result.from,
+                                          to: result.to, chart: result.chart, screen: result.screen)
                     return result.json
                 } catch {
                     let message = (error as? AskQueryRunner.Failure)?.description ?? error.localizedDescription
@@ -149,10 +155,11 @@ final class AskController: ObservableObject {
     }
 
     /// Runs one query off the main actor. The database work is the same work Reports does.
-    private nonisolated static func run(_ call: AskCall, db: TrafficDatabase) async throws -> AskQueryRunner.Result {
+    private nonisolated static func run(_ call: AskCall, db: TrafficDatabase,
+                                        environment: AskEnvironment) async throws -> AskQueryRunner.Result {
         try await withCheckedThrowingContinuation { continuation in
             db.queue.async {
-                do { continuation.resume(returning: try AskQueryRunner.run(call, db: db)) }
+                do { continuation.resume(returning: try AskQueryRunner.run(call, db: db, environment: environment)) }
                 catch { continuation.resume(throwing: error) }
             }
         }
@@ -177,13 +184,15 @@ private actor CallRecorder {
     }
 
     func finish(_ call: AskCall, summary: String, failed: Bool = false, filter: TrafficFilter? = nil,
-                from: Date? = nil, to: Date? = nil) {
+                from: Date? = nil, to: Date? = nil, chart: AskChart? = nil, screen: SidebarItem? = nil) {
         guard let index = calls.lastIndex(where: { $0.call.id == call.id }) else { return }
         calls[index].summary = summary
         calls[index].failed = failed
         calls[index].filter = filter
         calls[index].from = from
         calls[index].to = to
+        calls[index].chart = chart.flatMap { $0.isEmpty ? nil : $0 }
+        calls[index].screen = screen
     }
 
     func sent(_ body: String) { bodies.append(body) }

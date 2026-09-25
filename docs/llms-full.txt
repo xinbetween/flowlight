@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.5.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.0, macOS 15 or later.
 
  On this page
 
@@ -224,6 +224,16 @@ open build/Build/Products/Release/Flowlight.app
  Or bring your own key for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
  your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
  before you ask, and every request is shown in full under the answer.
+
+ It answers questions about Flowlight itself, too. How do I turn on HTTPS inspection?,
+ how do I stop an agent using its shell tool?, why am I not seeing any traffic? — those are answered from
+ the app's own written-down guide to every feature, and from a snapshot of how this Mac is currently set up. Never from the
+ model's memory: menu paths differ between versions, and an invented one is worse than no answer. When the answer needs a
+ switch changed it says where the switch is and offers to open that screen, which is a click you make.
+
+ Charts when the shape matters. Change over time comes back as a line, a comparison as bars, a split of one
+ whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
+ and the model can ask for a different shape or for none at all.
 
  Every query is listed under the answer, and clicking one opens those rows in Reports. An answer you
  can't check is a guess with better grammar.
@@ -659,7 +669,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.5.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1203,8 +1213,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.5.1
+ 0.6.0
 September 25, 2026Latest
+
+ Ask answers questions about Flowlight itself — how to turn a feature on, why nothing is showing —
+ from the app's own guide rather than the model's memory.
+
+ Charts. A line for change over time, bars to compare, a pie for a split, drawn from the same rows
+ the query returned.
+
+ Rules is redesigned: grouped by whether each rule is in force, and a rule the engine can't carry
+ out now says so instead of looking like it refuses things.
+ How Ask works →
+
+ Downloads and checksums →
+
+ 0.5.1
+September 25, 2026
 
  Recovers when the filter extension stops answering. Redial, then check whether macOS is running a
  different build and reinstall it, then fall back to the sampler so there is still data — saying which rung it is on.

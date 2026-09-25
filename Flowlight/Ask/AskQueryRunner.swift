@@ -18,6 +18,10 @@ enum AskQueryRunner {
         var filter: TrafficFilter?
         var from: Date?
         var to: Date?
+        /// Drawn under the answer when the shape of the result says more than its numbers.
+        var chart: AskChart?
+        /// Where the answer points for a question about the app rather than about traffic.
+        var screen: SidebarItem?
     }
 
     enum Failure: Error, CustomStringConvertible {
@@ -34,7 +38,16 @@ enum AskQueryRunner {
 
     /// Runs one call. Throwing is how a bad argument gets back to the model — as a sentence it can correct, not as
     /// a silent empty result that it will read as "nothing happened".
-    static func run(_ call: AskCall, db: TrafficDatabase, now: Date = Date()) throws -> Result {
+    static func run(_ call: AskCall, db: TrafficDatabase, now: Date = Date(),
+                    environment: AskEnvironment = .empty) throws -> Result {
+        // The questions about Flowlight itself need no window: they are about how it is set up, not about when.
+        switch call.query {
+        case .settings: return settings(environment)
+        case .howTo: return howTo(call.arguments["topic"] ?? "")
+        case .rules: return list(environment.rules, what: "rule", screen: .rules)
+        case .guardrails: return list(environment.guardrails, what: "guardrail", screen: .agents)
+        default: break
+        }
         guard let from = call.arguments["from"], let window = AskWindow.resolve(from: from, to: call.arguments["to"], now: now)
         else { throw Failure.badWindow(call.arguments["from"] ?? "(missing)") }
         let limit = try rowLimit(call.arguments["limit"])
@@ -43,11 +56,11 @@ enum AskQueryRunner {
 
         switch call.query {
         case .trafficTotals:
-            return try totals(db: db, window: window, app: app, grain: grain)
+            return try totals(db: db, window: window, app: app, grain: grain, chart: call.arguments["chart"])
         case .topApps:
-            return try topApps(db: db, window: window, limit: limit, grain: grain)
+            return try topApps(db: db, window: window, limit: limit, grain: grain, chart: call.arguments["chart"])
         case .topDestinations:
-            return try topDestinations(db: db, window: window, app: app, limit: limit, grain: grain)
+            return try topDestinations(db: db, window: window, app: app, limit: limit, grain: grain, chart: call.arguments["chart"])
         case .newDestinations:
             return try newDestinations(db: db, window: window, app: app, limit: limit, grain: grain)
         case .alerts:
@@ -55,28 +68,81 @@ enum AskQueryRunner {
         case .agents:
             return try agents(db: db, window: window, grain: grain)
         case .overTime:
-            return try overTime(db: db, window: window, app: app, grain: grain)
+            return try overTime(db: db, window: window, app: app, grain: grain, chart: call.arguments["chart"])
+        case .settings, .howTo, .rules, .guardrails:
+            // Handled above, before a window was required.
+            throw Failure.badArgument("that query takes no time window")
         }
+    }
+
+    // MARK: About Flowlight rather than about traffic
+
+    private static func settings(_ environment: AskEnvironment) -> Result {
+        var fields: [String: String] = [
+            "version": environment.appVersion,
+            "captureSource": environment.captureSource,
+            "captureStatus": environment.captureStatus,
+            "receivingTraffic": environment.receiving ? "yes" : "no",
+            "networkExtension": environment.extensionState,
+            "canRefuseConnections": environment.canBlock ? "yes" : "no",
+            "httpsInspection": environment.inspecting ? "on (\(environment.inspectionScope))" : "off",
+            "export": environment.exportEnabled ? "on" : (environment.exportConfigured ? "configured but off" : "not set up"),
+            "focus": environment.focus.isEmpty ? "off" : environment.focus,
+            "runsInBackground": environment.backgroundOnly ? "yes" : "no",
+            "watchingBluetooth": environment.watchingBluetooth ? "yes" : "no",
+            "watchingUSB": environment.watchingUSB ? "yes" : "no",
+            "rules": "\(environment.rules.count)",
+            "guardrails": "\(environment.guardrails.count)",
+            "agentAllowlists": "\(environment.agentAllowlists)",
+            "answeringQuestions": environment.askProvider,
+        ]
+        if environment.fellBackToSampler {
+            fields["note"] = "The filter extension stopped answering, so the nettop sampler is standing in. Blocking is off while it does."
+        }
+        return Result(json: encode(fields),
+                      summary: "\(environment.captureSource), inspection \(environment.inspecting ? "on" : "off"), \(environment.rules.count) rules",
+                      screen: .capture)
+    }
+
+    private static func howTo(_ topic: String) -> Result {
+        let matches = FeatureGuide.search(topic)
+        guard !matches.isEmpty else {
+            return Result(json: encode(["features": FeatureGuide.all.map(\.title).joined(separator: ", ")]),
+                          summary: "nothing matched '\(topic)'")
+        }
+        return Result(json: encode(matches.map(\.asDictionary)),
+                      summary: matches.map(\.title).joined(separator: ", "),
+                      screen: matches.first?.screen)
+    }
+
+    private static func list(_ items: [String], what: String, screen: SidebarItem) -> Result {
+        Result(json: encode(items.map { [what: $0] }),
+               summary: items.isEmpty ? "no \(what)s" : "\(items.count) \(what)\(items.count == 1 ? "" : "s")",
+               screen: screen)
     }
 
     // MARK: The queries
 
     private static func totals(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,
-                               grain: Granularity) throws -> Result {
+                               grain: Granularity, chart: String?) throws -> Result {
         let rows = try Self.rows(db: db, window: window, grain: grain)
         let matching = rows.filter { matches(app, row: $0) }
         let counters = matching.reduce(into: FlowCounters()) { $0 += $1.counters }
         let who = app.map { " for \(name(of: $0, in: rows))" } ?? ""
+        let kind = AskChart.kind(requested: chart, natural: counters.total > 0 ? .pie : .none)
         return Result(json: encode(["received": counters.bytesIn, "sent": counters.bytesOut,
                                     "connections": counters.flows,
                                     "apps": Int64(Set(matching.map(\.bundleID)).count)]),
                       summary: "\(ByteFormat.string(counters.bytesIn)) in, \(ByteFormat.string(counters.bytesOut)) out\(who)",
                       filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
-                      from: window.from, to: window.to)
+                      from: window.from, to: window.to,
+                      chart: AskChart(kind: kind, title: "Received and sent\(who)", unit: .bytes,
+                                      points: [AskChart.Point(label: "Received", value: Double(counters.bytesIn)),
+                                               AskChart.Point(label: "Sent", value: Double(counters.bytesOut))]))
     }
 
     private static func topApps(db: TrafficDatabase, window: (from: Date, to: Date), limit: Int,
-                                grain: Granularity) throws -> Result {
+                                grain: Granularity, chart: String?) throws -> Result {
         let rows = try Self.rows(db: db, window: window, grain: grain)
         var byApp: [String: (name: String, counters: FlowCounters)] = [:]
         for row in rows {
@@ -87,13 +153,18 @@ enum AskQueryRunner {
         let top = byApp.sorted { $0.value.counters.total > $1.value.counters.total }.prefix(limit)
         let payload = top.map { ["app": $0.value.name, "bundleID": $0.key,
                                  "received": "\($0.value.counters.bytesIn)", "sent": "\($0.value.counters.bytesOut)"] }
+        let points = top.map { AskChart.Point(label: $0.value.name, value: Double($0.value.counters.bytesOut),
+                                              secondary: Double($0.value.counters.bytesIn)) }
         return Result(json: encode(payload),
                       summary: top.isEmpty ? "nothing moved" : top.map { "\($0.value.name) \(ByteFormat.string($0.value.counters.total))" }.joined(separator: ", "),
-                      filter: .none, from: window.from, to: window.to)
+                      filter: .none, from: window.from, to: window.to,
+                      chart: AskChart(kind: AskChart.kind(requested: chart, natural: points.isEmpty ? .none : .bar),
+                                      title: "Busiest apps", unit: .bytes,
+                                      points: AskChart.trimmed(points, kind: .bar)))
     }
 
     private static func topDestinations(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,
-                                        limit: Int, grain: Granularity) throws -> Result {
+                                        limit: Int, grain: Granularity, chart: String?) throws -> Result {
         let rows = try Self.rows(db: db, window: window, grain: grain).filter { matches(app, row: $0) }
         var byDestination: [String: (owner: String, counters: FlowCounters)] = [:]
         for row in rows {
@@ -109,10 +180,14 @@ enum AskQueryRunner {
             ["destination": entry.key, "network": entry.value.owner,
              "received": "\(entry.value.counters.bytesIn)", "sent": "\(entry.value.counters.bytesOut)"]
         }
+        let kind = AskChart.kind(requested: chart, natural: top.isEmpty ? .none : .bar)
+        let points = top.map { AskChart.Point(label: $0.key, value: Double($0.value.counters.total)) }
         return Result(json: encode(payload),
                       summary: top.isEmpty ? "no destinations" : top.prefix(3).map(\.key).joined(separator: ", "),
                       filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
-                      from: window.from, to: window.to)
+                      from: window.from, to: window.to,
+                      chart: AskChart(kind: kind, title: "Busiest destinations", unit: .bytes,
+                                      points: AskChart.trimmed(points, kind: kind), primaryName: "Total"))
     }
 
     /// Destinations reached in this window that had never been reached before it — the question that actually
@@ -183,7 +258,7 @@ enum AskQueryRunner {
     }
 
     private static func overTime(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,
-                                 grain: Granularity) throws -> Result {
+                                 grain: Granularity, chart: String?) throws -> Result {
         var filter = TrafficFilter.none
         if let app {
             filter.bundleID = bundleID(of: app, in: try Self.rows(db: db, window: window, grain: grain))
@@ -199,10 +274,14 @@ enum AskQueryRunner {
             ["at": iso.string(from: point.date), "received": "\(point.bytesIn)", "sent": "\(point.bytesOut)"]
         }
         let peak = series.max { $0.total < $1.total }
+        let points = series.map { AskChart.Point(label: "", date: $0.date, value: Double($0.bytesOut),
+                                                 secondary: Double($0.bytesIn)) }
         return Result(json: encode(payload),
                       summary: peak.map { "busiest \(grain.rawValue) \($0.date.formatted(date: .abbreviated, time: .shortened)) at \(ByteFormat.string($0.total))" }
                         ?? "nothing in this window",
-                      filter: filter, from: window.from, to: window.to)
+                      filter: filter, from: window.from, to: window.to,
+                      chart: AskChart(kind: AskChart.kind(requested: chart, natural: points.isEmpty ? .none : .line),
+                                      title: "Over time, by \(grain.rawValue)", unit: .bytes, points: points))
     }
 
     /// The breakdown for a window, falling back to a finer tier when the coarse one has nothing.

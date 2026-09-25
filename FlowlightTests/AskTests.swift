@@ -47,11 +47,18 @@ final class AskTests: XCTestCase {
     func testEveryQueryIsAFixedNameWithNoRoomForSQL() {
         // If a case ever appears that takes free text and runs it, this is the test that should fail.
         XCTAssertEqual(Set(AskQuery.allCases.map(\.rawValue)),
-                       ["trafficTotals", "topApps", "topDestinations", "newDestinations", "alerts", "agents", "overTime"])
+                       ["trafficTotals", "topApps", "topDestinations", "newDestinations", "alerts", "agents",
+                        "overTime", "settings", "howTo", "rules", "guardrails"])
+        // Every argument a model may fill in, listed once. A new name here should be a deliberate decision taken
+        // in the open, which is what this assertion is for — not a thing that slipped in with a feature.
         for query in AskQuery.allCases {
             let names = Set(query.parameters.map(\.name))
-            XCTAssertTrue(names.isSubset(of: ["from", "to", "app", "limit", "granularity"]),
+            XCTAssertTrue(names.isSubset(of: ["from", "to", "app", "limit", "granularity", "chart", "topic"]),
                           "\(query.rawValue) takes an argument nobody vetted: \(names)")
+        }
+        // The queries about the app take no window: they describe how it is set up, not when.
+        for query in [AskQuery.settings, .rules, .guardrails] {
+            XCTAssertTrue(query.parameters.isEmpty, "\(query.rawValue) should need no arguments")
         }
     }
 

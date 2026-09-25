@@ -149,6 +149,7 @@ final class TrafficMonitor: ObservableObject {
         guardrails.attach(db: db)
         devices.attach(db: db)
         ask.attach(db: readDB)
+        ask.environment = { [weak self] in self?.askEnvironment() ?? .empty }
         inspection.guardrails = { [live = guardrails.live] in live.all() }
         inspection.onGuardrail = { [weak self] event in
             Task { @MainActor in
@@ -571,6 +572,38 @@ final class TrafficMonitor: ObservableObject {
                 continuation.resume(with: Result { try body(readDB) })
             }
         }
+    }
+
+    /// How Flowlight is set up, for the Ask panel to answer questions about the app rather than about traffic.
+    ///
+    /// Read on the main actor and handed to the query that needs it, so nothing reaches across threads for it.
+    /// Settings only: no keys, no export headers, no endpoint. Those live in the Keychain and have no business
+    /// travelling to a model to answer "is export on?".
+    func askEnvironment() -> AskEnvironment {
+        AskEnvironment(
+            appVersion: ExtensionManager.appVersion,
+            captureSource: DemoData.isEnabled ? "demo data"
+                : (mode == .networkExtension && !extensionFellBack ? "Network Extension" : "nettop sampler"),
+            captureStatus: status,
+            receiving: isReceiving,
+            extensionState: ExtensionManager.current?.state.label ?? "unknown",
+            fellBackToSampler: extensionFellBack,
+            canBlock: canBlock,
+            inspecting: inspection.enabled && inspection.running,
+            inspectionScope: inspection.scope.title,
+            exportEnabled: exporter.configuration.isReady,
+            exportConfigured: exporter.configuration.endpointURL != nil,
+            focus: focus.isEmpty ? "" : "\(focus.bundleIDs.count) apps, \(focus.hosts.count) destinations",
+            backgroundOnly: UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly),
+            watchingBluetooth: devices.watchingBluetooth,
+            watchingUSB: devices.watchingUSB,
+            rules: rules.rules.map { rule in
+                "\(rule.title) — \(rule.enabled ? "on" : "off"), \(rule.schedule.describe(session: RuleStore.session)), fired \(rule.hits)×"
+            },
+            guardrails: guardrails.guardrails.map { "\($0.title) — \($0.enabled ? "on" : "off"), \($0.hits)×" },
+            agentAllowlists: engine.policies.values.filter(\.enabled).count,
+            askProvider: ask.provider.title,
+            askSendsOffDevice: ask.sendsOffDevice)
     }
 
     /// Saves an agent's allowlist and applies it to new traffic right away — to the alerts, and to what the filter

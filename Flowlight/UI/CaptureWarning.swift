@@ -1,5 +1,88 @@
 import SwiftUI
 
+// The shapes the Capture panel is drawn from. They live beside the warnings rather than in Components because
+// the warnings are the reason the vocabulary exists: a card for something you can act on, a glyph for the state
+// it is in, and a tinted strip for the one thing that is wrong.
+
+extension View {
+    /// A card. Everything on Capture sits in one, so nothing on the screen floats.
+    func captureCard() -> some View {
+        padding(12).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// The heading above a group of cards: quiet enough to skip past, loud enough to navigate by.
+struct CaptureHeading: View {
+    private let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .textCase(.uppercase)
+            .padding(.leading, 2)
+    }
+}
+
+/// The state mark a row is read by — what the eye lands on before any of the words.
+struct CaptureGlyph: View {
+    var symbol: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .frame(width: 26, height: 26)
+            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// Something wrong, or a limit worth knowing, inset inside the card it belongs to. Tinted rather than framed:
+/// a border around every caveat turns a panel into a warning label and nothing stands out any more.
+struct CaptureNote: View {
+    var text: String
+    var icon = "exclamationmark.triangle.fill"
+    var tint = Color.orange
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon).font(.caption)
+            Text(text).font(.caption)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// One fact about a capture source: the claim in a line, the reasoning under it. These are what the explanations
+/// collapse into — a paragraph nobody reads becomes a heading somebody can scan.
+struct CaptureFact: View {
+    var icon: String
+    var tint: Color
+    var title: String
+    var detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption.weight(.semibold))
+                Text(detail)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
 /// Shown when the chosen capture source can't work on this Mac. It always offers the way out, because the only
 /// fix is switching source and the explanation alone leaves people stuck.
 struct CaptureWarningBanner: View {
@@ -8,24 +91,24 @@ struct CaptureWarningBanner: View {
 
     var body: some View {
         if let warning = monitor.captureWarning {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("The Network Extension can't capture on this Mac").font(.callout.bold())
+            HStack(alignment: .top, spacing: 12) {
+                CaptureGlyph(symbol: "exclamationmark.triangle.fill", tint: .orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("The Network Extension can't capture on this Mac")
+                        .font(.body.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(warning)
-                        .font(.callout).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if showSwitch, monitor.mode == .networkExtension {
-                        Button("Use the nettop sampler") { monitor.setMode(.nettop) }
+                        Button("Use the nettop Sampler") { monitor.setMode(.nettop) }
                             .controlSize(.small)
+                            .padding(.top, 2)
                     }
                 }
-                Spacer(minLength: 0)
             }
             .padding(12)
             .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.orange.opacity(0.35)))
         }
     }
 }
@@ -38,18 +121,23 @@ struct BlockingUnavailableNotice: View {
     var enforcing: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(enforcing ? "Blocking is on, but not in effect here" : "Blocking needs the Network Extension",
-                  systemImage: "shield.slash")
-                .font(.caption.bold()).foregroundStyle(.orange)
-            Text(reason)
-                .font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if ExtensionManager.isEntitled, monitor.mode != .networkExtension {
-                Button("Use the Network Extension") { monitor.setMode(.networkExtension) }
-                    .controlSize(.mini)
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "shield.slash").font(.caption).foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(enforcing ? "Blocking is on, but not in effect here" : "Blocking needs the Network Extension")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(reason)
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if ExtensionManager.isEntitled, monitor.mode != .networkExtension {
+                    Button("Use the Network Extension") { monitor.setMode(.networkExtension) }
+                        .controlSize(.mini)
+                }
             }
         }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var reason: String {
@@ -72,34 +160,39 @@ struct OtherFiltersNotice: View {
     var filters: [InstalledSystemExtension]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Another content filter is active on this Mac", systemImage: "shield.lefthalf.filled")
-                .font(.callout.bold())
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(filters) { filter in
-                    HStack(spacing: 6) {
-                        Text(filter.name).font(.callout)
-                        Text(filter.bundleID).font(.caption.monospaced()).foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
+        HStack(alignment: .top, spacing: 12) {
+            CaptureGlyph(symbol: "shield.lefthalf.filled", tint: .orange)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(filters.count == 1 ? "Another content filter is active on this Mac"
+                                        : "\(filters.count) other content filters are active on this Mac")
+                    .font(.body.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(filters) { filter in
+                        HStack(spacing: 6) {
+                            Text(filter.name).font(.caption)
+                            Text("·").font(.caption).foregroundStyle(.quaternary)
+                            Text(filter.bundleID)
+                                .font(.caption.monospaced()).foregroundStyle(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
                     }
                 }
-            }
-            Text("""
-            macOS runs one content filter at a time. While \(filters.count == 1 ? "this one is" : "these are") active, \
-            Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension \
-            source will stay empty. The nettop sampler doesn't use a filter and works alongside \
-            \(filters.count == 1 ? "it" : "them").
-            """)
-            .font(.callout).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            if monitor.mode == .networkExtension {
-                Button("Use the nettop sampler") { monitor.setMode(.nettop) }
-                    .controlSize(.small)
+                Text("""
+                macOS runs one content filter at a time. While \(filters.count == 1 ? "this one is" : "these are") active, \
+                Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension \
+                source will stay empty. The nettop sampler doesn't use a filter and works alongside \
+                \(filters.count == 1 ? "it" : "them").
+                """)
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if monitor.mode == .networkExtension {
+                    Button("Use the nettop Sampler") { monitor.setMode(.nettop) }
+                        .controlSize(.small)
+                }
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.orange.opacity(0.3)))
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
     }
 }

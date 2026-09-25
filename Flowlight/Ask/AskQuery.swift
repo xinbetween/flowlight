@@ -24,6 +24,14 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
     case agents
     /// A series over time, for "when did it happen" rather than "how much".
     case overTime
+    /// What Flowlight is currently set to do — which capture source, what is switched on, what is configured.
+    case settings
+    /// What a feature of Flowlight is and how to turn it on, from the app's own written-down guide.
+    case howTo
+    /// The block and allow rules that have been written.
+    case rules
+    /// The guardrails on agents' tools.
+    case guardrails
 
     var summary: String {
         switch self {
@@ -34,6 +42,10 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
         case .alerts: return "Alerts raised in a window: which rule fired, for which app, and the sentence explaining it."
         case .agents: return "AI agents active in a window, their model providers, and where else they went."
         case .overTime: return "Bytes per second, minute, hour or day across a window, for spotting when something happened."
+        case .settings: return "How Flowlight is set up right now: capture source, what is switched on, how many rules and guardrails exist. Use this for questions about the app rather than about traffic."
+        case .howTo: return "What a Flowlight feature does and the steps to turn it on, from the app's own guide. Use this for \"how do I…\" and \"can Flowlight…\" questions, and never answer those from memory."
+        case .rules: return "The block and allow rules that exist, what each one names, when it applies and how often it has fired."
+        case .guardrails: return "The guardrails on agents' tools: which tool or server is refused, for which agent, and how often."
         }
     }
 
@@ -48,16 +60,23 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
                             detail: "Restrict to one app, by bundle identifier or by the name shown in Flowlight.")
         let limit = Parameter(name: "limit", kind: .integer, required: false,
                               detail: "How many rows to return, 1–50. Defaults to 10.")
+        let chart = Parameter(name: "chart", kind: .string, required: false,
+                              detail: "Draw the result: line, bar, pie, or none. Leave empty for whatever suits the query. Ask for one when the shape of the answer matters more than the numbers.")
         switch self {
-        case .trafficTotals: return window + [app]
-        case .topApps: return window + [limit]
-        case .topDestinations: return window + [app, limit]
-        case .newDestinations: return window + [app, limit]
+        case .trafficTotals: return window + [app, chart]
+        case .topApps: return window + [limit, chart]
+        case .topDestinations: return window + [app, limit, chart]
+        case .newDestinations: return window + [app, limit, chart]
         case .alerts: return window + [limit]
-        case .agents: return window
+        case .agents: return window + [chart]
         case .overTime:
-            return window + [app, Parameter(name: "granularity", kind: .string, required: false,
-                                            detail: "second, minute, hour, day, week, month or year. Defaults to a sensible fit for the window.")]
+            return window + [app, chart, Parameter(name: "granularity", kind: .string, required: false,
+                                                   detail: "second, minute, hour, day, week, month or year. Defaults to a sensible fit for the window.")]
+        case .settings, .rules, .guardrails:
+            return []
+        case .howTo:
+            return [Parameter(name: "topic", kind: .string, required: true,
+                              detail: "What the person asked about, in their own words — \"turn on https inspection\", \"block an app\", \"why is nothing showing\".")]
         }
     }
 
@@ -85,10 +104,18 @@ struct AskCall: Equatable, Sendable, Identifiable {
     static let placeholders: Set<String> = ["", "none", "null", "nil", "default", "all", "any", "n/a", "na",
                                             "unspecified", "undefined", "empty", "-", "string"]
 
+    /// Arguments where a placeholder word is a real value rather than a blank. "none" means *don't draw one* to
+    /// `chart`, and dropping it would quietly give back the chart the model just declined.
+    static let literalArguments: Set<String> = ["chart"]
+
     static func cleaned(_ arguments: [String: String]) -> [String: String] {
-        arguments.compactMapValues { value in
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            return placeholders.contains(trimmed.lowercased()) ? nil : trimmed
+        arguments.reduce(into: [:]) { out, entry in
+            let trimmed = entry.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if literalArguments.contains(entry.key) {
+                if !trimmed.isEmpty { out[entry.key] = trimmed }
+            } else if !placeholders.contains(trimmed.lowercased()) {
+                out[entry.key] = trimmed
+            }
         }
     }
 

@@ -39,7 +39,8 @@ struct ContentView: View {
                 FocusBar()
                 Button { nav.selection = .capture } label: {
                     HStack(alignment: .top, spacing: 8) {
-                        Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8).padding(.top, 4)
+                        LiveDot(color: monitor.isReceiving ? .green : .orange, active: monitor.isReceiving)
+                            .padding(.top, 4)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(DemoData.isEnabled ? "Demo data" : monitor.mode == .networkExtension ? "Network Extension" : "nettop sampler")
                                 .font(.caption.bold())

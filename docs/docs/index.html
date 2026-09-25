@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.5.1, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.6.0, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -183,6 +183,14 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Or bring your own key</strong> for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
         your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
         before you ask, and <strong>every request is shown in full under the answer</strong>.</p>
+      <p><strong>It answers questions about Flowlight itself, too.</strong> <em>How do I turn on HTTPS inspection?</em>,
+        <em>how do I stop an agent using its shell tool?</em>, <em>why am I not seeing any traffic?</em> — those are answered from
+        the app's own written-down guide to every feature, and from a snapshot of how this Mac is currently set up. Never from the
+        model's memory: menu paths differ between versions, and an invented one is worse than no answer. When the answer needs a
+        switch changed it says where the switch is and offers to open that screen, which is a click you make.</p>
+      <p><strong>Charts when the shape matters.</strong> Change over time comes back as a line, a comparison as bars, a split of one
+        whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
+        and the model can ask for a different shape or for none at all.</p>
       <p><strong>Every query is listed under the answer, and clicking one opens those rows in Reports.</strong> An answer you
         can't check is a guess with better grammar.</p>
       <p><strong>Flowlight holds itself to its own standard.</strong> Whatever this feature sends appears in Live and Reports
@@ -556,7 +564,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.5.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.6.0 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

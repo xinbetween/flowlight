@@ -209,6 +209,12 @@ Ask in plain language and get an answer from what Flowlight recorded. *What did 
 destinations, new destinations, alerts, agents, a series over time — and nothing else. There is no query that takes
 SQL, and there will not be one. Flowlight runs whichever the model names, locally, and hands back the numbers.
 
+It answers questions about **Flowlight itself** as well — *how do I turn on HTTPS inspection?*, *why am I not
+seeing any traffic?* — from the app's own guide to every feature and a snapshot of how this Mac is set up, never
+from the model's memory. And it **draws a chart** when the shape of the answer matters more than the numbers:
+a line for change over time, bars to compare, a pie for a split. Flowlight draws it from the rows the query
+returned, so the picture and the sentence come from one source.
+
 **Local first**: the on-device model where macOS has one, or a server you already run (Ollama, LM Studio,
 llama.cpp). Both send nothing. **Or bring your own key** for Anthropic, OpenAI, Gemini or any OpenAI-compatible
 endpoint — the key lives in your login Keychain, the screen says when a question will leave the Mac, and every

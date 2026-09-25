@@ -70,6 +70,8 @@ struct StatTile: View {
             Label(title, systemImage: systemImage).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title2.monospacedDigit().weight(.semibold)).foregroundStyle(tint)
                 .lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .motion(Motion.value, value: value)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

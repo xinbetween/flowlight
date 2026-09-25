@@ -126,29 +126,79 @@ struct RulesView: View {
 
     // MARK: The list
 
+    /// Rules that would decide something if a connection arrived this second, and the ones that wouldn't. A rule
+    /// outside its hours, switched off, expired or already spent is still a rule someone wrote — it belongs on the
+    /// screen, just not among the ones doing the work. The global pause deliberately doesn't move anything: it is
+    /// said once in the banner, and shuffling the whole list for ten minutes would lose people's place.
+    private var inForce: [Rule] {
+        store.rules.filter { $0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: RuleStore.session) }
+    }
+
+    private var resting: [Rule] {
+        store.rules.filter { !($0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: RuleStore.session)) }
+    }
+
     private var ruleList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(store.rules) { rule in
-                    RuleRow(rule: rule, store: store, now: now,
-                            extensionRunning: monitor.mode == .networkExtension,
-                            inspecting: monitor.inspection.enabled,
-                            events: store.events(for: rule).count) {
-                        editing = rule; isNew = false
-                    }
-                    Divider()
+            LazyVStack(alignment: .leading, spacing: 8) {
+                if !resting.isEmpty && !inForce.isEmpty { heading("In force") }
+                ForEach(inForce) { rule in row(rule) }
+                if !resting.isEmpty {
+                    heading("Not in force").padding(.top, inForce.isEmpty ? 0 : 12)
+                    ForEach(resting) { rule in row(rule) }
                 }
             }
-            .padding(.horizontal, 16).padding(.top, 8)
+            .frame(maxWidth: 860, alignment: .leading)
+            .padding(16)
+            .frame(maxWidth: .infinity)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let warning = engineWarning {
-                Label(warning, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(.bar)
+        .safeAreaInset(edge: .top, spacing: 0) { banner }
+    }
+
+    private func row(_ rule: Rule) -> some View {
+        RuleRow(rule: rule, store: store, now: now,
+                extensionRunning: monitor.mode == .networkExtension,
+                inspecting: monitor.inspection.enabled,
+                events: store.events(for: rule).count) {
+            editing = rule; isNew = false
+        }
+        // A rule that has just been written, or has just crossed between in force and not, is a change of state
+        // worth marking. Nothing moves that hasn't changed.
+        .entrance()
+    }
+
+    private func heading(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .textCase(.uppercase)
+            .padding(.leading, 2)
+    }
+
+    /// The one thing that outranks every row: everything is standing down, or most of it isn't being carried out.
+    /// The pause comes first because it explains the rest.
+    @ViewBuilder
+    private var banner: some View {
+        if store.isPaused, let until = store.pausedUntil {
+            HStack(spacing: 8) {
+                Image(systemName: "pause.circle.fill").foregroundStyle(.orange)
+                Text("Nothing is being refused until \(until.formatted(date: .omitted, time: .shortened)).")
+                    .font(.callout)
+                Spacer(minLength: 8)
+                Button("Resume now") { store.resume() }.buttonStyle(.link)
             }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
+        } else if let warning = engineWarning {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "eye").foregroundStyle(.orange)
+                Text(warning).font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
         }
     }
 
@@ -178,41 +228,55 @@ struct RulesView: View {
                          + "something through. The second half is how \"why is this getting through?\" stays answerable.")
                 }
             } else {
-                feedTable
+                feed
             }
         }
     }
 
-    private var feedTable: some View {
-        Table(store.events) {
-            TableColumn("When") { Text($0.timestamp.formatted(date: .omitted, time: .standard)).font(.caption.monospaced()) }
-                .width(80)
-            TableColumn("") { event in
-                Image(systemName: event.action == .block ? "hand.raised.fill" : "checkmark.shield")
-                    .foregroundStyle(event.action == .block ? Color.red : Color.green)
-                    .help(event.action == .block ? "Refused" : "Allowed by an exception")
+    /// The decisions, as the rest of the app reads: a day at a time, newest first. A table would sort and resize,
+    /// neither of which anybody asked of a feed — what is asked is "what happened, and which rule did it".
+    private var feed: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                ForEach(feedDays) { day in
+                    VStack(alignment: .leading, spacing: 6) {
+                        heading(day.title)
+                        VStack(spacing: 0) {
+                            ForEach(Array(day.events.enumerated()), id: \.element.id) { index, event in
+                                if index > 0 { Divider().padding(.leading, 34) }
+                                EventRow(event: event, rule: name(of: event)) {
+                                    if let rule = store.rules.first(where: { $0.id == event.ruleID }) {
+                                        editing = rule; isNew = false
+                                    }
+                                }
+                            }
+                        }
+                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .entrance()
+                }
             }
-            .width(20)
-            TableColumn("App") { event in
-                Text(event.agentName.isEmpty || event.agentName == event.appName
-                     ? event.appName : "\(event.agentName) › \(event.appName)").lineLimit(1)
-            }
-            TableColumn("Destination") { event in
-                Text(event.path.isEmpty ? "\(event.destination):\(event.port)"
-                                        : "\(event.method) \(event.destination)\(event.path)")
-                    .font(.caption.monospaced()).lineLimit(1)
-            }
-            TableColumn("Rule") { event in
-                Text(name(of: event)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            TableColumn("Where") { event in
-                Text(event.engine == .flow ? "Connection" : "Request")
-                    .font(.caption).foregroundStyle(.tertiary)
-                    .help(event.engine == .flow
-                          ? "Refused by the Network Extension, before the connection was made"
-                          : "Refused by HTTPS inspection, which answered the request itself")
-            }
-            .width(80)
+            .frame(maxWidth: 860, alignment: .leading)
+            .padding(16)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private struct FeedDay: Identifiable {
+        let id: Date
+        let title: String
+        let events: [RuleEventRecord]
+    }
+
+    private var feedDays: [FeedDay] {
+        let calendar = Calendar.current
+        let byDay = Dictionary(grouping: store.events) { calendar.startOfDay(for: $0.timestamp) }
+        return byDay.keys.sorted(by: >).map { day in
+            let title = calendar.isDateInToday(day) ? "Today"
+                : calendar.isDateInYesterday(day) ? "Yesterday"
+                : day.formatted(date: .abbreviated, time: .omitted)
+            return FeedDay(id: day, title: title,
+                           events: (byDay[day] ?? []).sorted { $0.timestamp > $1.timestamp })
         }
     }
 
@@ -226,6 +290,10 @@ struct RulesView: View {
 }
 
 /// One rule in the list: what it says, when it applies, what it has done, and what it can't do here.
+///
+/// The row is read top down and the type sizes say so — the subject and the verb first, the technical form of it
+/// underneath in monospace, and the bookkeeping last. Everything a rule can't do here is the exception to that:
+/// it gets its own strip, because a rule that isn't biting is the thing someone came to the screen to find out.
 private struct RuleRow: View {
     let rule: Rule
     let store: RuleStore
@@ -235,55 +303,63 @@ private struct RuleRow: View {
     let events: Int
     let edit: () -> Void
 
+    private var limitation: String? {
+        guard rule.enabled else { return nil }
+        return rule.limitation(extensionRunning: extensionRunning, inspecting: inspecting)
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Toggle("", isOn: Binding(get: { rule.enabled }, set: { store.setEnabled(rule, $0) }))
-                .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                .accessibilityLabel("Enable \(rule.title)")
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Image(systemName: rule.action == .block ? "hand.raised.fill" : "checkmark.shield")
-                        .foregroundStyle(rule.action == .block ? Color.red : Color.green)
-                        .font(.caption)
-                    Text(rule.title).font(.callout)
-                    if rule.origin != .typed {
-                        Text(originLabel).font(.caption2)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                HStack(spacing: 8) {
-                    Label(schedule, systemImage: "clock").font(.caption).foregroundStyle(.secondary)
-                    if rule.hits > 0 {
-                        Text("· \(rule.hits) \(rule.hits == 1 ? "time" : "times")")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if let last = rule.lastHit {
-                            Text("· last \(last.formatted(.relative(presentation: .named)))")
-                                .font(.caption).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                glyph
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        headline.lineLimit(2)
+                        if rule.origin != .typed {
+                            Text(originLabel).font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(.quaternary, in: Capsule())
+                                .foregroundStyle(.secondary)
                         }
-                    } else if rule.enabled {
-                        Text("· never yet").font(.caption).foregroundStyle(.tertiary)
+                        Spacer(minLength: 0)
                     }
+                    // Only worth a line of its own where the headline is a name someone chose, which hides it.
+                    if !rule.name.isEmpty {
+                        Text(subject).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    meta
                 }
-                if let limitation = rule.limitation(extensionRunning: extensionRunning, inspecting: inspecting), rule.enabled {
-                    Label(limitation, systemImage: "eye")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(get: { rule.enabled }, set: { store.setEnabled(rule, $0) }))
+                    .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                    .accessibilityLabel("Enable \(rule.title)")
+                    .padding(.top, 2)
+                Menu {
+                    Button("Edit…", action: edit)
+                    if rule.hits > 0 { Button("Reset Count") { store.resetHits(rule) } }
+                    Divider()
+                    Button("Delete", role: .destructive) { store.delete(rule) }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
-                if !rule.isUsable {
-                    Label("Used up — a one-off allowance, already spent.", systemImage: "checkmark.circle")
-                        .font(.caption).foregroundStyle(.tertiary)
-                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 16)
+                .accessibilityLabel("More for \(rule.title)")
             }
-            .opacity(rule.enabled ? 1 : 0.5)
-            Spacer(minLength: 8)
-            Button(action: edit) { Image(systemName: "pencil") }
-                .buttonStyle(.borderless).accessibilityLabel("Edit \(rule.title)")
-            Button(role: .destructive) { store.delete(rule) } label: { Image(systemName: "trash") }
-                .buttonStyle(.borderless).accessibilityLabel("Delete \(rule.title)")
+            if let limitation {
+                note(limitation, icon: "eye", tint: .orange)
+            }
+            if !rule.isUsable {
+                note("Used up — a one-off allowance, already spent.", icon: "checkmark.circle", tint: .secondary)
+            }
         }
-        .padding(.vertical, 8)
+        .opacity(rule.enabled ? 1 : 0.55)
+        .padding(12)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: edit)
         .contextMenu {
             Button("Edit…", action: edit)
             if rule.hits > 0 { Button("Reset Count") { store.resetHits(rule) } }
@@ -292,8 +368,80 @@ private struct RuleRow: View {
         }
     }
 
-    private var schedule: String {
-        rule.schedule.describe(at: now, session: RuleStore.session)
+    /// The verb, as a symbol. A rule that is only being watched says so here as well as in the strip below, because
+    /// this is the mark the eye lands on first and a red hand over a rule that refuses nothing would be a lie.
+    private var glyph: some View {
+        let tint: Color = !rule.enabled ? .secondary
+            : limitation != nil ? .orange
+            : rule.action == .block ? .red : .green
+        let symbol = limitation != nil && rule.enabled ? "eye.fill"
+            : rule.action == .block ? "hand.raised.fill" : "checkmark.shield.fill"
+        return Image(systemName: symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .frame(width: 26, height: 26)
+            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+            .accessibilityLabel(rule.action == .block ? "Blocks" : "Allows")
+    }
+
+    /// The name if there is one, otherwise the rule read back as a sentence with the parts it names set in
+    /// monospace — the same shape the editor shows while it is being written.
+    private var headline: Text {
+        if !rule.name.isEmpty { return Text(rule.name).font(.body.weight(.medium)) }
+        let verb = rule.action == .block ? "Block " : "Allow "
+        return Text(verb).font(.body.weight(.medium))
+            + code(rule.app.isEmpty ? "any app" : rule.app)
+            + Text(" reaching ").font(.body.weight(.medium))
+            + code(target)
+    }
+
+    private func code(_ string: String) -> Text {
+        Text(string).font(.body.weight(.medium).monospaced())
+    }
+
+    private var target: String {
+        var text = rule.destination.isEmpty ? "anywhere" : rule.destination
+        if !rule.path.isEmpty { text += rule.path }
+        if !rule.method.isEmpty { text = "\(rule.method.uppercased()) \(text)" }
+        return text
+    }
+
+    private var subject: String {
+        "\(rule.app.isEmpty ? "any app" : rule.app) → \(target)"
+    }
+
+    private var meta: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock").font(.caption2).foregroundStyle(.tertiary)
+            Text(rule.schedule.describe(at: now, session: RuleStore.session))
+                .font(.caption).foregroundStyle(.secondary)
+            if rule.hits > 0 {
+                Text("·").font(.caption).foregroundStyle(.quaternary)
+                Text("\(rule.hits) \(rule.hits == 1 ? "time" : "times")")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .help(events == 1 ? "1 decision kept in the feed" : "\(events) decisions kept in the feed")
+                if let last = rule.lastHit {
+                    Text("·").font(.caption).foregroundStyle(.quaternary)
+                    Text("last \(last.formatted(.relative(presentation: .named)))")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+            } else if rule.enabled {
+                Text("·").font(.caption).foregroundStyle(.quaternary)
+                Text("never yet").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func note(_ text: String, icon: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: icon).font(.caption)
+            Text(text).font(.caption)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+        .padding(.leading, 38)
     }
 
     private var originLabel: String {
@@ -303,6 +451,65 @@ private struct RuleRow: View {
         case .alert: return "from an alert"
         case .allowOnce: return "allowed once"
         }
+    }
+}
+
+/// One decision, in the feed. The destination is what someone scans for, so it leads and it is set in monospace;
+/// who asked and which rule answered sit under it, and the clock sits where a clock belongs.
+private struct EventRow: View {
+    let event: RuleEventRecord
+    let rule: String
+    let showRule: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: event.action == .block ? "hand.raised.fill" : "checkmark.shield.fill")
+                .font(.caption)
+                .foregroundStyle(event.action == .block ? Color.red : Color.green)
+                .frame(width: 14)
+                .padding(.top, 2)
+                .help(event.action == .block ? "Refused" : "Allowed by an exception")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(destination).font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
+                HStack(spacing: 6) {
+                    Text(who).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text("·").font(.caption).foregroundStyle(.quaternary)
+                    Text(rule).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(event.timestamp.formatted(date: .omitted, time: .standard))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                Text(event.engine == .flow ? "Connection" : "Request")
+                    .font(.caption2).foregroundStyle(.tertiary)
+                    .help(event.engine == .flow
+                          ? "Refused by the Network Extension, before the connection was made"
+                          : "Refused by HTTPS inspection, which answered the request itself")
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Show the Rule…", action: showRule)
+            Button("Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(
+                    "\(event.timestamp.formatted(date: .abbreviated, time: .standard))  "
+                    + "\(event.action == .block ? "blocked" : "allowed")  \(who)  \(destination)  \(rule)",
+                    forType: .string)
+            }
+        }
+    }
+
+    private var destination: String {
+        event.path.isEmpty ? "\(event.destination):\(event.port)"
+                           : "\(event.method) \(event.destination)\(event.path)"
+    }
+
+    private var who: String {
+        event.agentName.isEmpty || event.agentName == event.appName
+            ? event.appName : "\(event.agentName) › \(event.appName)"
     }
 }
 

@@ -86,6 +86,10 @@ struct AskRecordedCall: Identifiable, Equatable, Sendable {
     var filter: TrafficFilter?
     var from: Date?
     var to: Date?
+    /// Drawn under the answer when the result has a shape worth seeing.
+    var chart: AskChart?
+    /// Where an answer about the app itself points.
+    var screen: SidebarItem?
 }
 
 /// What a provider needs to answer. The conversation is only ever the question and the results of queries
@@ -125,7 +129,9 @@ enum AskPrompt {
         - Leave an argument empty when you don't mean to narrow by it. Never write 'default', 'none' or 'all' into         one: those are read as values, not as blanks.
         - Bytes come back as whole numbers; convert them to human units in your answer (KB, MB, GB).
         - Prefer one precise query to several vague ones.
-        - If the question is not about this Mac's network activity, say so plainly instead of answering it.
+        - Questions about Flowlight itself — how to do something, what a feature is, whether something is switched         on, why nothing is showing — are yours to answer too. Call `howTo` for how a feature works and `settings`         for how this Mac is configured. Never answer those from memory: the steps differ between versions, and a         made-up menu path is worse than no answer.
+        - Ask for a chart when the shape of the answer matters more than the numbers: `chart: "line"` for change         over time, `"bar"` to compare things, `"pie"` for a split of one whole. Don't ask for one when a sentence         is enough — most questions don't need a picture.
+        - If the question is about neither this Mac's activity nor Flowlight, say so plainly instead of answering it.
 
         Queries you may call:
 
