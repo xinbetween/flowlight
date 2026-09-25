@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.5.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.5.1, macOS 15 or later.
 
  On this page
 
@@ -508,6 +508,13 @@ open build/Build/Products/Release/Flowlight.app
  come from the filter's own statistics rather than from counting packets. It refuses a connection only where a rule or an
  allowlist you wrote says to.
 
+ When the extension stops answering. macOS runs whichever build of the extension was activated last, so
+ after an app update the two can disagree — and when they do, macOS refuses the connection between them. System Settings says
+ the filter is enabled, Flowlight says the connection was invalidated, and neither changes its mind. Flowlight now climbs out
+ of that by itself: it redials a couple of times, then asks macOS which build it is running and reinstalls the extension if it
+ isn't this app's, and if none of that works it captures with the nettop sampler so there is still data — saying so plainly,
+ and leaving your chosen source alone. Try the extension again under Network Extension starts over.
+
  It also can't run at all on some Macs. macOS allows one content filter at a time, and corporate security software
  normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
  machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
@@ -652,7 +659,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.5.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.5.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1196,8 +1203,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.5.1
+September 25, 2026Latest
+
+ Recovers when the filter extension stops answering. Redial, then check whether macOS is running a
+ different build and reinstall it, then fall back to the sampler so there is still data — saying which rung it is on.
+
+ Blocking switches off while the sampler stands in, because it can't refuse connections and Rules
+ shouldn't imply otherwise.
+
+ The sidebar is grouped, and five screens carry the state that used to need a trip to find.
+ What happens when the extension fails →
+
+ Downloads and checksums →
+
  0.5.0
-September 24, 2026Latest
+September 24, 2026
 
  Ask Flowlight. Questions in plain language, answered from the history on this Mac.
 

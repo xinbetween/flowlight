@@ -28,6 +28,11 @@ struct AlertsView: View {
             }
         }
         .navigationTitle("Alerts")
+        // The sidebar badge counts what is unread; this says how much there is to read at all, which is the
+        // difference between "quiet" and "already dealt with".
+        .navigationSubtitle(alerts.isEmpty ? ""
+                            : monitor.unacknowledgedAlerts == 0 ? "\(alerts.count) alerts, all acknowledged"
+                            : "\(monitor.unacknowledgedAlerts) to review of \(alerts.count)")
         .toolbar { toolbar }
         .task(id: monitor.dataVersion) { await load() }
         .task(id: monitor.unacknowledgedAlerts) { await load() }

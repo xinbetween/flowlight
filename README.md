@@ -176,6 +176,17 @@ The sampler reads the interface each socket is bound to, which is exact. The Net
 rather than interfaces, so it judges by the address instead: link-local means peer-to-peer. That is the coarser of
 the two answers, and it says so.
 
+### When the extension stops answering
+macOS runs whichever build of the content filter was activated last, so after an app update the app and the
+extension can disagree — and then macOS refuses the connection between them. System Settings says *Filter enabled*,
+Flowlight says *Extension connection invalidated*, and neither changes its mind.
+
+Flowlight climbs out of that on its own: redial twice, then ask macOS which build it has and reinstall the
+extension if it isn't this app's, then redial again — and if none of it works, capture with the nettop sampler so
+there is still data. It says which rung it is on and how long until the next one. Your chosen source isn't
+rewritten, blocking is switched off while the sampler stands in (the sampler can't refuse anything, and Rules
+shouldn't claim otherwise), and **Try the extension again** starts over.
+
 ### Devices: channels that aren't the network
 A Mac sends and receives over more than TCP and UDP. The **Devices** screen covers the rest, off until you turn it
 on — not for want of a permission, but because watching more of your Mac should be a decision rather than something

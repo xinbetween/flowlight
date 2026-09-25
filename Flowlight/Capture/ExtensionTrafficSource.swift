@@ -27,6 +27,14 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private var ruleSet = RuleSet()
     /// Connections a rule decided, refusals and relaxations alike.
     var onRuleDecisions: (([RuleEvent]) -> Void)?
+    /// The escalation ladder for a connection that keeps failing. Only touched on the main thread, like
+    /// `connection`, because a decision made from two queues at once is no decision at all.
+    private var recovery = ExtensionRecovery()
+    /// Asked when redialling has stopped being worth it and the two builds should be compared. The source can't
+    /// do that itself — submitting system extension requests belongs to `ExtensionManager`.
+    var onRepairRequested: (() -> Void)?
+    /// The extension isn't going to answer. Whoever owns the source should capture some other way and say so.
+    var onGaveUp: ((String) -> Void)?
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         self.sink = sink
@@ -84,9 +92,13 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         proxy?.register { [weak self, weak connection] ok, version in
             guard let self else { return }
             DispatchQueue.main.async {
-                guard self.connection === connection else { return }   // a reply from a superseded attempt
+                // A reply from a superseded attempt, or from one already torn down — two nils compare identical.
+                guard let connection, self.connection === connection else { return }
                 self.version = version
-                guard ok else { self.status?("Extension refused registration"); return }
+                // A refusal used to end here, with a line of status text and no timer: connected, registered at
+                // nothing, and never going to try again. It is a failure like any other, so it goes on the ladder.
+                guard ok else { self.scheduleReconnect("Extension refused registration", from: connection); return }
+                self.recovery.succeeded()
                 self.status?(self.sawTraffic ? "Connected to filter extension \(version)"
                                              : "Connected to filter extension \(version) — no traffic from it yet")
                 self.startHeartbeat()
@@ -133,16 +145,49 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// `connection` identifies the attempt this came from. Anything but the current one is ignored: an old
     /// connection failing says nothing about the one in use, and acting on it was what made a working extension
     /// report "Extension unreachable" indefinitely.
+    ///
+    /// What happens next comes from `recovery` rather than from a fixed five-second timer. Some invalidations are
+    /// permanent — a stale extension left behind by an app update is the usual one — and redialling those every
+    /// five seconds until the app is quit is how a Mac ends up showing an enabled filter and no traffic all day.
     private func scheduleReconnect(_ message: String, from connection: NSXPCConnection?) {
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.stopped else { return }
-            guard self.connection === connection else { return }
-            self.status?(message)
+            // `let connection` as well as the identity, because two nils are identical and a late error handler
+            // for an attempt that has already been cleaned up would otherwise count as a fresh failure.
+            guard let connection, self.connection === connection else { return }
             self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = nil
             self.connection = nil
+            // Let go of it properly rather than just dropping the reference: a connection whose registration was
+            // refused is still live, and the extension goes on holding a client it will never hear from again.
+            connection.invalidate()
             self.retryTimer?.invalidate()
-            self.retryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in self?.connect() }
+            self.retryTimer = nil
+
+            let step = self.recovery.next()
+            self.status?(ExtensionRecovery.statusLine(message, step: step, attempt: self.recovery.attempts))
+            switch step {
+            case .fallBack:
+                self.onGaveUp?(message)
+            case .repairVersion(let after):
+                self.onRepairRequested?()
+                self.retry(after: after)
+            case .redial(let after):
+                self.retry(after: after)
+            }
+        }
+    }
+
+    private func retry(after delay: TimeInterval) {
+        retryTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in self?.connect() }
+    }
+
+    /// A stale extension is being replaced. Told about it, the ladder can be patient again: the fault it was
+    /// escalating towards is the one now being fixed, and the redial after a repair deserves the full run.
+    func versionRepairStarted() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.stopped else { return }
+            self.recovery.repairStarted()
         }
     }
 

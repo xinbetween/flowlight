@@ -39,6 +39,10 @@ final class TrafficMonitor: ObservableObject {
     @Published private(set) var dataVersion = 0 // bumps after each rollup so reports can refresh
     /// Set when the chosen capture source cannot work on this Mac, with an explanation. Nil when it's fine.
     @Published private(set) var captureWarning: String?
+    /// Set once the extension source has exhausted its recovery ladder and the sampler has taken over. The chosen
+    /// source is still the extension — this is not a preference being rewritten behind someone's back — so it
+    /// lasts until they press Refresh, switch source, or relaunch.
+    @Published private(set) var extensionFellBack = false
     /// Focus mode's scope, mirrored here so the live pipeline can apply it. Set by `applyFocus`.
     private(set) var focus: FocusScope = .none
     @Published var lastError: String?
@@ -201,9 +205,13 @@ final class TrafficMonitor: ObservableObject {
         runMaintenance()
     }
 
-    /// Drops the capture source and starts it again. The extension source retries a lost connection every five
-    /// seconds by itself; this is for when someone has just fixed something and doesn't want to wait or relaunch.
+    /// Drops the capture source and starts it again. The extension source recovers a lost connection by itself
+    /// and says so as it goes; this is for when someone has just fixed something and doesn't want to wait for it,
+    /// and for starting over after it has given up and handed capture to the sampler.
     func reconnectSource() {
+        // Someone asking for this has usually just fixed something, so the extension gets a clean run at it
+        // again even if it had given up earlier in this session.
+        extensionFellBack = false
         status = "Reconnecting…"
         startSource()
     }
@@ -211,19 +219,24 @@ final class TrafficMonitor: ObservableObject {
     func setMode(_ newMode: CaptureMode) {
         guard newMode != mode else { return }
         mode = newMode
+        extensionFellBack = false
         UserDefaults.standard.set(newMode.rawValue, forKey: AnomalySettings.Keys.captureMode)
         startSource()
     }
 
     /// Whether the current capture source can actually refuse a connection. Only the Network Extension sits in the
     /// data path: the nettop sampler reads counters after the traffic has already left, and demo mode invents it.
+    /// A fallback counts as not being on the extension, or the Rules screen would promise enforcement that the
+    /// sampler running in its place cannot carry out.
     var canBlock: Bool {
-        mode == .networkExtension && ExtensionManager.isEntitled && captureWarning == nil && !DemoData.isEnabled
+        mode == .networkExtension && !extensionFellBack && ExtensionManager.isEntitled
+            && captureWarning == nil && !DemoData.isEnabled
     }
 
     /// Passive hostname capture is only needed for the nettop source; the extension sees payloads itself.
     func updatePacketCapture() {
-        let wanted = !DemoData.isEnabled && mode == .nettop && UserDefaults.standard.bool(forKey: AnomalySettings.Keys.packetCapture)
+        let onSampler = mode == .nettop || extensionFellBack
+        let wanted = !DemoData.isEnabled && onSampler && UserDefaults.standard.bool(forKey: AnomalySettings.Keys.packetCapture)
         if wanted {
             if case .running = captureState { return }
             sniffer.start()
@@ -283,11 +296,14 @@ final class TrafficMonitor: ObservableObject {
         var fallbackNote: String?
         if DemoData.isEnabled {
             newSource = DemoTrafficSource()
-        } else if mode == .networkExtension, canUseExtension {
+        } else if mode == .networkExtension, canUseExtension, !extensionFellBack {
             newSource = ExtensionTrafficSource()
         } else {
             if mode == .networkExtension {
-                fallbackNote = "This build isn't signed for the Network Extension — sampling with nettop instead."
+                fallbackNote = extensionFellBack
+                    ? "Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under "
+                      + "Network Extension to try the extension again."
+                    : "This build isn't signed for the Network Extension — sampling with nettop instead."
             }
             newSource = NettopTrafficSource()
         }
@@ -305,6 +321,12 @@ final class TrafficMonitor: ObservableObject {
             extensionSource.onRuleDecisions = { [weak self] events in
                 Task { @MainActor in self?.rules.record(events) }
             }
+            extensionSource.onRepairRequested = { [weak self] in
+                Task { @MainActor in self?.repairExtensionVersion() }
+            }
+            extensionSource.onGaveUp = { [weak self] _ in
+                Task { @MainActor in self?.fallBackToSampler() }
+            }
         }
         source = newSource
         status = fallbackNote ?? "Starting \(newSource.displayName)…"
@@ -316,6 +338,33 @@ final class TrafficMonitor: ObservableObject {
         })
         pushEnforcement()
         newSource.setRules(rules.ruleSet)
+    }
+
+    /// The extension source has been refused often enough that plain redialling isn't the answer. Ask macOS which
+    /// build of the extension it is running: if it isn't this app's, re-activating replaces it, and that is the
+    /// one fault behind "the filter is enabled but the app can't reach it" that the app can repair by itself.
+    ///
+    /// Asked for once per source, by the ladder in `ExtensionRecovery`, because it can end in a System Settings
+    /// prompt. A matching version costs nothing and changes nothing.
+    private func repairExtensionVersion() {
+        guard let manager = ExtensionManager.current else { return }
+        manager.matchExtensionToApp { [weak self] check in
+            Task { @MainActor in
+                guard let self, check.repairing else { return }
+                self.status = "The installed filter extension is version \(check.installedDescription) and this app "
+                    + "is \(check.appVersion) — reinstalling the extension, then reconnecting."
+                (self.source as? ExtensionTrafficSource)?.versionRepairStarted()
+            }
+        }
+    }
+
+    /// The extension has stopped answering for good. Rather than leave someone with an orange dot and no data,
+    /// capture with the sampler and say plainly that this is what happened — their chosen source is still the
+    /// extension, and the status line says how to go back to it.
+    private func fallBackToSampler() {
+        guard mode == .networkExtension, !extensionFellBack else { return }
+        extensionFellBack = true
+        startSource()
     }
 
     /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has

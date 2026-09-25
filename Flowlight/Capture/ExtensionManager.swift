@@ -21,7 +21,38 @@ final class ExtensionManager: NSObject, ObservableObject {
         }
     }
 
+    /// What a version check found. `installed` holds the versions macOS reports for the enabled copies of the
+    /// extension — usually one, occasionally two while a replacement is pending.
+    struct VersionCheck: Equatable {
+        var installed: [String] = []
+        var appVersion: String = ""
+        /// Whether a re-activation was started to put the two back in step.
+        var repairing = false
+        var installedDescription: String { installed.isEmpty ? "unknown" : installed.joined(separator: ", ") }
+    }
+
     @Published private(set) var state: State = .unknown
+
+    /// The instance the app owns. Capture has to be able to ask for a version repair when the connection to the
+    /// extension keeps being refused, and it doesn't sit in the view tree where this manager is handed around.
+    /// One app, one manager — nothing makes a second, and a test process makes none at all.
+    private(set) static weak var current: ExtensionManager?
+
+    override init() {
+        super.init()
+        Self.current = self
+    }
+
+    /// The properties request in flight, if any. The delegate callbacks are shared with installation requests
+    /// and a version check is otherwise indistinguishable from one.
+    private var versionCheck: OSSystemExtensionRequest?
+    private var versionCheckResult = VersionCheck()
+    private var versionCheckCompletion: ((VersionCheck) -> Void)?
+
+    /// This app's version — the one the extension it ships was built alongside.
+    static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
 
     /// Whether this build carries the content-filter entitlement (false for ad-hoc/local builds).
     static let isEntitled: Bool = {
@@ -48,12 +79,29 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// the previous version, and the connection between them is refused — the app looks like it can't reach an
     /// extension that is plainly running. Asking for the installed version and re-activating on a mismatch is
     /// what keeps the two in step; a matching version makes this a no-op.
-    func matchExtensionToApp() {
-        guard hasEntitlement, isInApplications else { return }
+    ///
+    /// `completion` is called once, when macOS has finished answering, with what it said. Capture uses it to
+    /// report a repair it has just asked for rather than going quiet for another thirty seconds.
+    func matchExtensionToApp(completion: ((VersionCheck) -> Void)? = nil) {
+        guard hasEntitlement, isInApplications else { completion?(VersionCheck(appVersion: Self.appVersion)); return }
+        // One at a time. The ladder in ExtensionRecovery asks for this once per session, but a user pressing
+        // Refresh while it is in flight shouldn't start a second conversation with the same delegate.
+        guard versionCheck == nil else { completion?(VersionCheck(appVersion: Self.appVersion)); return }
+        versionCheckResult = VersionCheck(appVersion: Self.appVersion)
+        versionCheckCompletion = completion
         let request = OSSystemExtensionRequest.propertiesRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                  queue: .main)
         request.delegate = self
+        versionCheck = request
         OSSystemExtensionManager.shared.submitRequest(request)
+    }
+
+    /// Ends the version check, whichever way it went, and hands the answer back exactly once.
+    private func finishVersionCheck() {
+        versionCheck = nil
+        let completion = versionCheckCompletion
+        versionCheckCompletion = nil
+        completion?(versionCheckResult)
     }
 
     func refresh() {
@@ -122,10 +170,14 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
 
     /// The reply to `matchExtensionToApp`: re-activate when what's installed isn't what this app ships.
     nonisolated func request(_ request: OSSystemExtensionRequest, foundProperties properties: [OSSystemExtensionProperties]) {
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        // Only the enabled copies count. A disabled one holds nothing and replacing it would quietly switch the
+        // filter back on for someone who turned it off on purpose.
         let installed = properties.filter(\.isEnabled).map(\.bundleShortVersion)
         Task { @MainActor in
-            guard let appVersion, !installed.isEmpty, !installed.contains(appVersion) else { return }
+            let appVersion = Self.appVersion
+            self.versionCheckResult = VersionCheck(installed: installed, appVersion: appVersion)
+            guard ExtensionVersion.isStale(installed: installed, appVersion: appVersion) else { return }
+            self.versionCheckResult.repairing = true
             self.state = .installing
             self.activate()
         }
@@ -137,12 +189,21 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
         Task { @MainActor in
+            // A version check finishing is a question having been answered, not an installation having landed.
+            // Treating the two alike switched the filter on off the back of a background lookup, and did it
+            // before the replacement it had just asked for was anywhere near installed.
+            if self.versionCheck === request { self.finishVersionCheck(); return }
             if self.state == .installing || self.state == .awaitingApproval { self.setFilterEnabled(true) }
             else { self.refresh() }
         }
     }
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        Task { @MainActor in self.state = .failed(error.localizedDescription) }
+        Task { @MainActor in
+            // Same again: a properties request that fails says nothing about whether the filter is installed and
+            // enabled. Reporting it as a failed installation replaced a true "Filter enabled" with a false one.
+            if self.versionCheck === request { self.finishVersionCheck(); return }
+            self.state = .failed(error.localizedDescription)
+        }
     }
 }

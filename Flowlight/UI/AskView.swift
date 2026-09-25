@@ -26,6 +26,8 @@ private struct AskContent: View {
         }
         .safeAreaInset(edge: .bottom) { composer }
         .navigationTitle("Ask")
+        // Who answers is the one fact worth seeing before the question is typed, not after.
+        .navigationSubtitle(ask.sendsOffDevice ? "\(ask.provider.title) · leaves this Mac" : "Answered on this Mac")
         .toolbar { toolbar }
         .sheet(isPresented: $showingSettings) { AskSettingsSheet(ask: ask) }
     }

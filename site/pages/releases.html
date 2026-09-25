@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.5.0</h2><time datetime="2026-09-24">September 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.5.1</h2><time datetime="2026-09-25">September 25, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Recovers when the filter extension stops answering.</strong> Redial, then check whether macOS is running a
+            different build and reinstall it, then fall back to the sampler so there is still data — saying which rung it is on.</li>
+          <li><strong>Blocking switches off while the sampler stands in</strong>, because it can't refuse connections and Rules
+            shouldn't imply otherwise.</li>
+          <li><strong>The sidebar is grouped</strong>, and five screens carry the state that used to need a trip to find.
+            <a href="{{root}}docs/#engines">What happens when the extension fails →</a></li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.5.1">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.5.0</h2><time datetime="2026-09-24">September 24, 2026</time></header>
         <ul>
           <li><strong>Ask Flowlight.</strong> Questions in plain language, answered from the history on this Mac.</li>
           <li><strong>The model never gets your history</strong> — it may call seven read-only queries and nothing else. No query

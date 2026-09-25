@@ -37,7 +37,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.5.0, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.5.1, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -405,6 +405,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         either: traffic from before you enabled it isn't there, some system traffic is exempt from content filters, and its byte counts
         come from the filter's own statistics rather than from counting packets. It refuses a connection only where a rule or an
         allowlist you wrote says to.</p>
+      <p><strong>When the extension stops answering.</strong> macOS runs whichever build of the extension was activated last, so
+        after an app update the two can disagree — and when they do, macOS refuses the connection between them. System Settings says
+        the filter is enabled, Flowlight says the connection was invalidated, and neither changes its mind. Flowlight now climbs out
+        of that by itself: it redials a couple of times, then asks macOS which build it is running and reinstalls the extension if it
+        isn't this app's, and if none of that works it captures with the nettop sampler so there is still data — saying so plainly,
+        and leaving your chosen source alone. <em>Try the extension again</em> under Network Extension starts over.</p>
       <p><strong>It also can't run at all on some Macs.</strong> macOS allows one content filter at a time, and corporate security software
         normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
         machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
@@ -550,7 +556,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.5.0 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.5.1 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

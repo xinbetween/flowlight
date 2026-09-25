@@ -7,6 +7,13 @@ struct CaptureView: View {
     @State private var showExtensionSetup = false
     @State private var otherFilters: [InstalledSystemExtension] = []
 
+    /// The dot beside the status line. Three states, because there are three: nothing arriving, arriving from the
+    /// source that was chosen, and arriving from the one that stepped in when that source gave up.
+    private var statusColor: Color {
+        if monitor.extensionFellBack { return .yellow }
+        return monitor.isReceiving ? .green : .orange
+    }
+
     private var extensionDetailsVisible: Bool {
         monitor.mode == .networkExtension || showExtensionSetup
     }
@@ -22,7 +29,10 @@ struct CaptureView: View {
                 if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 LabeledContent("Status") {
                     HStack(spacing: 6) {
-                        Circle().fill(monitor.isReceiving ? Color.green : Color.orange).frame(width: 8, height: 8)
+                        // Green means "data is arriving from the source you chose". After a fallback the sampler
+                        // is genuinely receiving, so a plain green dot beside a line explaining that the extension
+                        // failed would contradict itself. Yellow is that third state: working, but not as asked.
+                        Circle().fill(statusColor).frame(width: 8, height: 8)
                         Text(monitor.status)
                     }
                 }
@@ -55,6 +65,16 @@ struct CaptureView: View {
                             monitor.reconnectSource()
                         }
                         .help("Re-check the filter and reconnect to it")
+                        if monitor.extensionFellBack {
+                            Button("Try the extension again") { monitor.reconnectSource() }
+                                .help("Stop sampling with nettop and reconnect to the filter extension")
+                        }
+                    }
+                    if monitor.extensionFellBack {
+                        Text("Flowlight couldn't reach the filter extension and is sampling with nettop so you still "
+                             + "get data. Your chosen source is still the extension.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Text("""
                     The content filter (NEFilterDataProvider) attributes every TCP/UDP flow to its app via the audit token, \

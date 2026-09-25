@@ -30,6 +30,9 @@ struct RulesView: View {
             }
         }
         .navigationTitle("Rules")
+        // The title bar carries the state that would otherwise need a trip to the screen to discover: how many
+        // rules are live, and whether they are standing down.
+        .navigationSubtitle(subtitle)
         .toolbar { toolbar }
         .sheet(item: $editing) { rule in
             RuleEditor(rule: rule, isNew: isNew) { store.save($0) }
@@ -46,15 +49,28 @@ struct RulesView: View {
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
     }
 
+    private var subtitle: String {
+        if store.isPaused, let until = store.pausedUntil {
+            return "Paused until \(until.formatted(date: .omitted, time: .shortened))"
+        }
+        let live = store.liveRules.count
+        guard !store.rules.isEmpty else { return "" }
+        return live == store.rules.count
+            ? "\(live) in force" : "\(live) of \(store.rules.count) in force"
+    }
+
     // MARK: Toolbar
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.title).tag($0) }
+        // Nothing to switch between until there is something in one of them.
+        if !store.rules.isEmpty || !store.events.isEmpty {
+            ToolbarItem(placement: .principal) {
+                Picker("", selection: $tab) {
+                    ForEach(Tab.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
             }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 220)
         }
         ToolbarItemGroup {
             pauseControl

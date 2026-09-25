@@ -9,10 +9,16 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: Binding(get: { nav.selection }, set: { if let v = $0 { nav.selection = v } })) { item in
-                Label(item.title, systemImage: item.icon)
-                    .badge(item == .alerts ? monitor.unacknowledgedAlerts : 0)
-                    .tag(item)
+            List(selection: Binding(get: { nav.selection }, set: { if let v = $0 { nav.selection = v } })) {
+                ForEach(SidebarSection.allCases) { section in
+                    Section(section.title) {
+                        ForEach(section.items) { item in
+                            Label(item.title, systemImage: item.icon)
+                                .badge(item == .alerts ? monitor.unacknowledgedAlerts : 0)
+                                .tag(item)
+                        }
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
             .safeAreaInset(edge: .bottom) {

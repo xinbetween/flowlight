@@ -26,7 +26,17 @@ private struct DevicesContent: View {
             }
         }
         .navigationTitle("Devices")
+        .navigationSubtitle(subtitle)
         .toolbar { toolbar }
+    }
+
+    /// Which channels are on. Both are off by default, so "nothing here" and "not watching" look the same on the
+    /// screen — the title bar is where that difference can be stated once.
+    private var subtitle: String {
+        var on: [String] = []
+        if store.watchingBluetooth { on.append("Bluetooth") }
+        if store.watchingUSB { on.append("USB") }
+        return on.isEmpty ? "Not watching" : on.joined(separator: " · ")
     }
 
     @ToolbarContentBuilder
@@ -34,7 +44,8 @@ private struct DevicesContent: View {
         ToolbarItemGroup {
             if store.isWatchingAnything {
                 Button { store.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    .help("Read the device list again now")
+                    .keyboardShortcut("r", modifiers: .command)
+                    .help("Read the device list again now (⌘R)")
             }
             Menu {
                 Toggle("Watch Bluetooth", isOn: Binding(get: { store.watchingBluetooth },

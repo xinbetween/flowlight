@@ -67,6 +67,11 @@ private struct InspectContent: View {
         }
         .padding()
         .navigationTitle("Inspect")
+        // Inspection is off by default, so an empty list means either "nothing happened" or "nothing is being
+        // decrypted". Only one of those is worth acting on.
+        .navigationSubtitle(inspection.enabled ? (inspection.running ? "Decrypting · \(exchanges.count) shown"
+                                                                    : "Starting…")
+                                               : "Off")
         .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app, tool or anything in a body")
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }

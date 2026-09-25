@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, inspect, ask, devices, capture
+    case live, agents, reports, alerts, rules, ask, inspect, devices, capture
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -30,6 +30,37 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         }
     }
     var shortcut: KeyEquivalent { KeyEquivalent(Character(String((Self.allCases.firstIndex(of: self) ?? 0) + 1))) }
+
+    var section: SidebarSection {
+        switch self {
+        case .live, .agents, .reports, .alerts: return .traffic
+        case .ask, .inspect: return .investigate
+        case .rules: return .control
+        case .devices, .capture: return .sources
+        }
+    }
+}
+
+/// The sidebar in groups rather than one column of nine.
+///
+/// Nine is where a flat list stops being scannable: the eye has to read every label to find the one it wants.
+/// The grouping is by what someone is trying to do — see what happened, look closer at it, refuse something, or
+/// change where the data comes from — rather than by which part of the app the code lives in.
+enum SidebarSection: String, CaseIterable, Identifiable {
+    case traffic, investigate, control, sources
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .traffic: return "Traffic"
+        case .investigate: return "Investigate"
+        case .control: return "Control"
+        case .sources: return "Sources"
+        }
+    }
+
+    var items: [SidebarItem] { SidebarItem.allCases.filter { $0.section == self } }
 }
 
 /// A rule the user started writing somewhere else — a table row, an alert — waiting for the Rules screen to open
