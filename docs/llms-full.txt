@@ -62,33 +62,31 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.5, macOS 15 or later.
 
  On this page
 
  Getting started
- InstallFirst launchHostnames
+ InstallFirst launch
+ HostnamesLanguage
 
- Seeing what happened
- The viewsWorth a look
- Which way the bytes leftDevices
- AskLanguageBackgroundFocus mode
+ Traffic
+ The viewsAI agentsTools & MCP
+ Agent configurationWorth a look
+ Which way the bytes leftAlerts
 
- AI agents
- Agent rulesTools & MCP
- Agent configuration
+ Investigate
+ AskHTTPS inspectionMock responses
 
- Refusing things
- AllowlistsBlocking
- RulesGuardrails
+ Control
+ RulesAllowlists
+ BlockingGuardrails
 
- HTTPS inspection
- Turning it onMock responses
+ Sources
+ CaptureDevices
 
- Alerts, capture and export
- Other alertsCapture enginesExport
-
- Your data and the app
+ Settings and data
+ Focus modeBackgroundExport
  Your dataUpdates
  Demo modeUninstall
 
@@ -133,6 +131,20 @@ open build/Build/Products/Release/Flowlight.app
  (Cloudflare, Inc. · AS13335). It's on by default and sends those public IP addresses (never private ones) to Team Cymru's
  DNS service. Turn it off in Capture.
 
+ Language
+
+ Flowlight is translated into English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español and
+ Português. By default it follows your Mac: if your preferred languages include one Flowlight speaks, that is what it
+ uses — and for Chinese it tells Simplified from Traditional by script and region, so a Mac set to zh-TW gets Traditional.
+ Anything it hasn't been translated into falls back to English.
+
+ Pick a language explicitly in Settings ⌘, under General. It changes immediately rather than on next
+ launch. When the choice is System, the row says underneath which language that turned out to be.
+
+ Translation is arriving screen by screen: navigation, settings and the common controls are done, and the longer
+ explanatory passages are still English for now — a key with no translation shows correct English rather than a blank
+ or an identifier.
+
  The views
 
  ViewShortcutWhat it answers
@@ -150,153 +162,6 @@ open build/Build/Products/Release/Flowlight.app
  Capture⌘6Which engine is recording, the extension's state, hostname learning, and where the database lives.
 
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
-
- Worth a look
-
- A third mode in Reports, beside the breakdown and the charts. It compares the apps in the report with each other
- and points at the ones whose destinations don't look like the rest: many more places than their peers, addresses that never
- resolved to a name, hostnames that look generated rather than chosen, far more sent than received, and protocols that are a
- sideline rather than the app's purpose. Each finding carries the evidence behind it, and clicking one narrows the report to that
- app.
-
- It is called Worth a look and not Suspicious deliberately. What the data supports is "unusual next to the other
- apps in this report" — a backup tool talks to a lot of places for good reasons, and a quiet Mac produces no findings at all. It
- says nothing about traffic every app shares.
-
- Which way the bytes left
-
- Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the
- room over Apple Wireless Direct Link — no router, no internet, and no address anyone else can reach. Flowlight was always
- counting those flows; it had no word for them, so an AirDrop of a 4 GB folder looked like a few megabytes to an address
- with no name.
-
- Every flow now carries a channel: Network, Peer-to-peer Wi-Fi, This Mac (loopback,
- which never left the machine) or Tunnel (inside a VPN; where it went after that isn't visible here). Narrow a report to
- one of them from the Reports toolbar, and it travels with CSV exports and with anything sent to a collector.
-
- Peer-to-peer rows are named by the feature that opened them — AirDrop and Handoff · nearby device,
- Continuity · nearby device — because a link-local address tells you nothing and the device in the room has no name
- this Mac can learn. An app that uses the radio directly keeps its own name, which is the truthful answer for it.
-
- The two engines answer differently. The sampler reads the interface each socket is bound to
- (awdl0, llw0), which is exact. The Network Extension is handed sockets rather than interfaces, so it
- judges by the address instead: a link-local address is how peer-to-peer traffic is addressed. That is the coarser of the two —
- a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.
-
- Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.
-
- Devices: Bluetooth, USB and external storage
-
- A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, and it is off
- until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
- Mac should be your decision rather than something an update did.
-
- Bluetooth shows which devices are paired, which are connected, and when that changed, read from the system
- every half minute. Beside it is the list of applications built to use Bluetooth, taken from each app's own
- Info.plist.
-
- What it can't tell you, and says so. There are no byte counts here. macOS keeps no per-app accounting for
- Bluetooth, and the byte-level HCI traces that would give one need Apple's PacketLogger profile, which an ordinary app cannot
- read. The app list is likewise who asked for Bluetooth, not who was granted it: macOS keeps the grants in a
- database an app can't open, and Flowlight would rather name that difference than blur it.
-
- USB and external storage lists what is attached — what it is, who makes it, and a drive's capacity — and
- records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
- periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
- event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.
-
- Ask
-
- Ask in plain language — what did Claude Code upload yesterday?, which app started talking to somewhere new
- this week?, summarise the last hour — and get an answer from the history recorded on this Mac.
-
- The model never gets your history. It is handed a list of seven read-only queries it may call and
- nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
- query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
- whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
- question and those numbers — never the database.
-
- Local first. Where macOS provides an on-device model, that is the default: it costs nothing, works
- offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
- does the same. Both are listed above the hosted options because a tool whose promise is no account and no cloud should
- not need either to answer a question about itself.
-
- Or bring your own key for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
- your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
- before you ask, and every request is shown in full under the answer.
-
- It answers questions about Flowlight itself, too. How do I turn on HTTPS inspection?,
- how do I stop an agent using its shell tool?, why am I not seeing any traffic? — those are answered from
- the app's own written-down guide to every feature, and from a snapshot of how this Mac is currently set up. Never from the
- model's memory: menu paths differ between versions, and an invented one is worse than no answer. When the answer needs a
- switch changed it says where the switch is and offers to open that screen, which is a click you make.
-
- Charts when the shape matters. Change over time comes back as a line, a comparison as bars, a split of one
- whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
- and the model can ask for a different shape or for none at all.
-
- Every query is listed under the answer, and clicking one opens those rows in Reports. An answer you
- can't check is a guess with better grammar.
-
- Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and Reports
- like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
- easiest to quietly leave out.
-
- Language
-
- Flowlight is translated into English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español and
- Português. By default it follows your Mac: if your preferred languages include one Flowlight speaks, that is what it
- uses — and for Chinese it tells Simplified from Traditional by script and region, so a Mac set to zh-TW gets Traditional.
- Anything it hasn't been translated into falls back to English.
-
- Pick a language explicitly in Settings ⌘, under General. It changes immediately rather than on next
- launch. When the choice is System, the row says underneath which language that turned out to be.
-
- Translation is arriving screen by screen: navigation, settings and the common controls are done, and the longer
- explanatory passages are still English for now — a key with no translation shows correct English rather than a blank
- or an identifier.
-
- Running in the background
-
- Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is
- looking at. Settings › General › Run in the background goes further and drops the Dock icon and the Cmd-Tab entry;
- the menu bar keeps the live rates and gains Show Dock Icon to undo it. Launch at login is in the
- same place.
-
- The window opens where you left it, at the size you left it. A first run fills the screen instead, so nothing is hidden behind
- a small default window, and a window whose saved position is off-screen — an unplugged display — comes back on the screen you
- have. Hostname setup is offered a little after launch and only while a window is open, rather than greeting a first run with a
- request for your password; the offer returns next launch until you take or dismiss it.
-
- Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
- carries on inspecting connections until you disable or uninstall it in Capture.
-
- Focus mode
-
- Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect, and the rates in
- the menu bar. It's for watching one agent work without the rest of the Mac in the way.
-
- Right-click any row in Live, Reports or AI Agents and choose Focus on…, or use the Focus control at the bottom of
- the sidebar to pick from the apps that have been active and to type destinations.
-
- ⇧⌘F turns Focus on and off, and so does the menu bar, which also shows what's focused.
-
- A destination takes its subdomains with it: example.com covers api.example.com. IP addresses work;
- ranges like 10.0.0.0/8 don't.
-
- Apps and destinations are a union, not an intersection: focusing on Claude Code and github.com shows
- everything Claude Code does plus everything that talks to GitHub.
-
- An app and a destination are equally a focus, and either alone is enough. Add an app by typing its name or bundle identifier —
- every application on the Mac is searchable, so one that has been quiet all day can still be focused, as can a command-line agent
- with no application bundle — or tick one from what has recently been busy. Add a destination the same way.
-
- One thing a destination can't narrow: alerts record the app that raised them and nothing about where the traffic went, so a
- focus made only of destinations leaves the alert list alone. The editor says so rather than letting a screen quietly ignore it.
-
- Focus filters what you see, never what's recorded. Flowlight keeps capturing and storing everything while it's on, and
- the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
- names the app that raised it and not where the traffic went, so focusing only on destinations leaves the alert list as it was.
 
  AI agent rules
 
@@ -349,105 +214,88 @@ open build/Build/Products/Release/Flowlight.app
  What it keeps: names, descriptions, the command a hook runs, and MCP server commands or URLs. It never copies your
  code, your prompts or your files, and none of it leaves your Mac. Forget what was found clears it.
 
- Allowlists
+ Worth a look
 
- Select an agent in AI Agents and use Allowlist in its detail to say where it may connect. Enter domains
- (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
- Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
+ A third mode in Reports, beside the breakdown and the charts. It compares the apps in the report with each other
+ and points at the ones whose destinations don't look like the rest: many more places than their peers, addresses that never
+ resolved to a name, hostnames that look generated rather than chosen, far more sent than received, and protocols that are a
+ sideline rather than the app's purpose. Each finding carries the evidence behind it, and clicking one narrows the report to that
+ app.
 
- From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
- per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. An allowlist warns rather than refuses by default
- connections; blocking needs the Network Extension engine and is on the roadmap.
+ It is called Worth a look and not Suspicious deliberately. What the data supports is "unusual next to the other
+ apps in this report" — a backup tool talks to a lot of places for good reasons, and a quiet Mac produces no findings at all. It
+ says nothing about traffic every app shares.
 
- Refusing connections
+ Which way the bytes left
 
- An allowlist warns by default. Turn on Refuse connections outside the list for an agent and it will also
- refuse them: the connection is dropped and an alert records what was refused, with Allow … from Now On to add it
- to the list in one click. The agent's next attempt goes through.
+ Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the
+ room over Apple Wireless Direct Link — no router, no internet, and no address anyone else can reach. Flowlight was always
+ counting those flows; it had no word for them, so an AirDrop of a 4 GB folder looked like a few megabytes to an address
+ with no name.
 
- It needs the Network Extension. Refusing a connection means sitting in its path, which the nettop sampler
- cannot do — Capture will say so rather than offer a switch that does nothing.
+ Every flow now carries a channel: Network, Peer-to-peer Wi-Fi, This Mac (loopback,
+ which never left the machine) or Tunnel (inside a VPN; where it went after that isn't visible here). Narrow a report to
+ one of them from the Reports toolbar, and it travels with CSV exports and with anything sent to a collector.
 
- Some things are never refused, whatever a list says: your local network, DNS, Apple's own services, and Flowlight's own
- traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
- Enforcement also lapses a few seconds after Flowlight stops running — a refusal nobody can see is worse than none, and the way
- to undo one lives in the app.
+ Peer-to-peer rows are named by the feature that opened them — AirDrop and Handoff · nearby device,
+ Continuity · nearby device — because a link-local address tells you nothing and the device in the room has no name
+ this Mac can learn. An app that uses the radio directly keeps its own name, which is the truthful answer for it.
 
- HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
- never refused.
+ The two engines answer differently. The sampler reads the interface each socket is bound to
+ (awdl0, llw0), which is exact. The Network Extension is handed sockets rather than interfaces, so it
+ judges by the address instead: a link-local address is how peer-to-peer traffic is addressed. That is the coarser of the two —
+ a printer reached over Ethernet can be addressed the same way — and Flowlight would rather say so than round it off.
 
- Rules
+ Nothing here is newly recorded, and no new permission is involved. It is the same capture, finally labelled.
 
- An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
- subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
- or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
- every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
- would be a rule you could never find again.
+ Other alerts
 
- Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
- model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
- HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
- what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, Reports, AI Agents or Inspect and
- apply one to what you're looking at.
+ Traffic spike: an hour at least 3σ above the app's rolling baseline (after 24 hours of history, above 1 MB).
 
- Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
- host and schedule; anything permanent opens the editor pre-filled; and only rules that undo themselves — an
- hour, or this run of Flowlight — are ever applied without being shown first. Each carries its caveats too, including which
- engine it needs: a template that only works with HTTPS inspection says so.
+ Unusual number of destinations in a day, against the app's baseline.
 
- Which rule wins. The most specific match decides, and where two rules are equally narrow the block is the one
- that stands. So an exception written underneath a broad block works — Cursor may reach api.github.com survives
- nothing reaches github.com — while an exception broader than what it excepts does not quietly widen it.
+ Upload above 99th percentile of the app's hourly uploads over 30 days.
 
- For how long. Forever; until a time; until Flowlight quits; or between chosen hours on chosen days. Hours are
- local and judged at the moment a connection is made, so a Mac that slept through the end of a window finds it closed on waking,
- and a clock or timezone change moves the window with it. A window closing stops new connections — it doesn't tear down ones
- already open. There is also one global Pause Blocking, because the escape hatch is what makes strict rules
- liveable.
+ First contact with a new domain, and non-standard ports, after a 24-hour learning period per app.
 
- Unblocking is part of blocking. Every refusal carries its way out: from the alert, allow it once, for an hour,
- or until Flowlight quits. Each of those is itself a rule with an expiry, so the list can always answer why is this getting
- through? — including for the relaxation you clicked past a fortnight ago.
+ Traffic without UI activity: a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.
 
- Where a rule bites, and where it can't. The Network Extension refuses whole connections: it knows the host, the
- address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
- URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
- refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.
+ Ask
 
- The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
- rule decided it and whether that was a refusal or an exception letting it through.
+ Ask in plain language — what did Claude Code upload yesterday?, which app started talking to somewhere new
+ this week?, summarise the last hour — and get an answer from the history recorded on this Mac.
 
- Agent guardrails: block a tool, a server or a resource
+ The model never gets your history. It is handed a list of seven read-only queries it may call and
+ nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
+ query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
+ whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
+ question and those numbers — never the database.
 
- Which tools may this agent use is a different question from which hosts may it reach, so it has its own
- section: a Guardrails tab beside each agent in AI Agents, with a switch on every tool it declares and every
- MCP server it reaches, presets worth having (read-only, no shell, no writes), and a record of what
- has been taken away.
+ Local first. Where macOS provides an on-device model, that is the default: it costs nothing, works
+ offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
+ does the same. Both are listed above the hosted options because a tool whose promise is no account and no cloud should
+ not need either to answer a question about itself.
 
- The strongest lever is the declaration. Agents re-send their whole tool list on every turn. Flowlight removes
- a refused tool from that list before the request leaves, so the model is never offered it: no refusal to argue with, no retry
- loop. It works the same for a tool the agent runs itself and one behind a remote MCP server, and it reads the same shapes
- Flowlight already parses for Anthropic, OpenAI and Gemini.
+ Or bring your own key for Anthropic, OpenAI, Gemini or any OpenAI-compatible endpoint. The key goes to
+ your login Keychain, not to Flowlight's preferences. When a provider sends anything off the Mac, the screen says so
+ before you ask, and every request is shown in full under the answer.
 
- A refused call is answered properly. For MCP servers reached over HTTP, a blocked tools/call
- comes back as a result carrying isError: true and a plain sentence, because that is what the protocol says
- a failing tool looks like — the model reads it and works around it, where a transport error would look like a broken server.
- resources/read and prompts/get have no such shape, so they get a JSON-RPC error instead.
+ It answers questions about Flowlight itself, too. How do I turn on HTTPS inspection?,
+ how do I stop an agent using its shell tool?, why am I not seeing any traffic? — those are answered from
+ the app's own written-down guide to every feature, and from a snapshot of how this Mac is currently set up. Never from the
+ model's memory: menu paths differ between versions, and an invented one is worse than no answer. When the answer needs a
+ switch changed it says where the switch is and offers to open that screen, which is a click you make.
 
- Connectors are narrowed, not intercepted. When the provider reaches an MCP server on the agent's behalf, that
- traffic never touches this Mac. The only lever is the request that sets it up, so Flowlight narrows the tools the connector is
- allowed to call, or drops the connector entirely.
+ Charts when the shape matters. Change over time comes back as a line, a comparison as bars, a split of one
+ whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
+ and the model can ask for a different shape or for none at all.
 
- Local stdio servers speak over pipes, and no proxy can see that. What Flowlight can do there is watch the
- server process's own network traffic, which is already attributed to the agent that started it, and hand you the deny list to
- paste into the agent's own settings — Claude Code takes mcp__server__tool in permissions.deny, and its
- neighbours have equivalents. That takes effect when the agent restarts.
+ Every query is listed under the answer, and clicking one opens those rows in Reports. An answer you
+ can't check is a guess with better grammar.
 
- Guardrails need HTTPS inspection, because the tool list lives inside a request body. With inspection off the
- tab says so rather than looking as though it is working.
-
- This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
- shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
+ Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and Reports
+ like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
+ easiest to quietly leave out.
 
  HTTPS inspection (optional)
 
@@ -504,19 +352,107 @@ open build/Build/Products/Release/Flowlight.app
  connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
  is entirely unreachable" does not.
 
- Other alerts
+ Rules
 
- Traffic spike: an hour at least 3σ above the app's rolling baseline (after 24 hours of history, above 1 MB).
+ An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
+ subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
+ or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
+ every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
+ would be a rule you could never find again.
 
- Unusual number of destinations in a day, against the app's baseline.
+ Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
+ model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
+ HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
+ what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, Reports, AI Agents or Inspect and
+ apply one to what you're looking at.
 
- Upload above 99th percentile of the app's hourly uploads over 30 days.
+ Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
+ host and schedule; anything permanent opens the editor pre-filled; and only rules that undo themselves — an
+ hour, or this run of Flowlight — are ever applied without being shown first. Each carries its caveats too, including which
+ engine it needs: a template that only works with HTTPS inspection says so.
 
- First contact with a new domain, and non-standard ports, after a 24-hour learning period per app.
+ Which rule wins. The most specific match decides, and where two rules are equally narrow the block is the one
+ that stands. So an exception written underneath a broad block works — Cursor may reach api.github.com survives
+ nothing reaches github.com — while an exception broader than what it excepts does not quietly widen it.
 
- Traffic without UI activity: a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.
+ For how long. Forever; until a time; until Flowlight quits; or between chosen hours on chosen days. Hours are
+ local and judged at the moment a connection is made, so a Mac that slept through the end of a window finds it closed on waking,
+ and a clock or timezone change moves the window with it. A window closing stops new connections — it doesn't tear down ones
+ already open. There is also one global Pause Blocking, because the escape hatch is what makes strict rules
+ liveable.
 
- Capture engines
+ Unblocking is part of blocking. Every refusal carries its way out: from the alert, allow it once, for an hour,
+ or until Flowlight quits. Each of those is itself a rule with an expiry, so the list can always answer why is this getting
+ through? — including for the relaxation you clicked past a fortnight ago.
+
+ Where a rule bites, and where it can't. The Network Extension refuses whole connections: it knows the host, the
+ address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
+ URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
+ refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.
+
+ The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
+ rule decided it and whether that was a refusal or an exception letting it through.
+
+ Allowlists
+
+ Select an agent in AI Agents and use Allowlist in its detail to say where it may connect. Enter domains
+ (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
+ Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
+
+ From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
+ per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. An allowlist warns rather than refuses by default
+ connections; blocking needs the Network Extension engine and is on the roadmap.
+
+ Refusing connections
+
+ An allowlist warns by default. Turn on Refuse connections outside the list for an agent and it will also
+ refuse them: the connection is dropped and an alert records what was refused, with Allow … from Now On to add it
+ to the list in one click. The agent's next attempt goes through.
+
+ It needs the Network Extension. Refusing a connection means sitting in its path, which the nettop sampler
+ cannot do — Capture will say so rather than offer a switch that does nothing.
+
+ Some things are never refused, whatever a list says: your local network, DNS, Apple's own services, and Flowlight's own
+ traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
+ Enforcement also lapses a few seconds after Flowlight stops running — a refusal nobody can see is worse than none, and the way
+ to undo one lives in the app.
+
+ HTTPS inspection and blocking don't combine: traffic routed through Flowlight's proxy leaves as Flowlight's own, which is
+ never refused.
+
+ Agent guardrails: block a tool, a server or a resource
+
+ Which tools may this agent use is a different question from which hosts may it reach, so it has its own
+ section: a Guardrails tab beside each agent in AI Agents, with a switch on every tool it declares and every
+ MCP server it reaches, presets worth having (read-only, no shell, no writes), and a record of what
+ has been taken away.
+
+ The strongest lever is the declaration. Agents re-send their whole tool list on every turn. Flowlight removes
+ a refused tool from that list before the request leaves, so the model is never offered it: no refusal to argue with, no retry
+ loop. It works the same for a tool the agent runs itself and one behind a remote MCP server, and it reads the same shapes
+ Flowlight already parses for Anthropic, OpenAI and Gemini.
+
+ A refused call is answered properly. For MCP servers reached over HTTP, a blocked tools/call
+ comes back as a result carrying isError: true and a plain sentence, because that is what the protocol says
+ a failing tool looks like — the model reads it and works around it, where a transport error would look like a broken server.
+ resources/read and prompts/get have no such shape, so they get a JSON-RPC error instead.
+
+ Connectors are narrowed, not intercepted. When the provider reaches an MCP server on the agent's behalf, that
+ traffic never touches this Mac. The only lever is the request that sets it up, so Flowlight narrows the tools the connector is
+ allowed to call, or drops the connector entirely.
+
+ Local stdio servers speak over pipes, and no proxy can see that. What Flowlight can do there is watch the
+ server process's own network traffic, which is already attributed to the agent that started it, and hand you the deny list to
+ paste into the agent's own settings — Claude Code takes mcp__server__tool in permissions.deny, and its
+ neighbours have equivalents. That takes effect when the agent restarts.
+
+ Guardrails need HTTPS inspection, because the tool list lives inside a request body. With inspection off the
+ tab says so rather than looking as though it is working.
+
+ This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
+ shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
+
+ Capture: engines and sources
 
  Flowlight records traffic one of two ways, chosen in Capture. They differ in what they can miss, which is worth
  understanding before you rely on either.
@@ -555,6 +491,68 @@ open build/Build/Products/Release/Flowlight.app
  machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
  needs no filter and works alongside them.
  See the developer guide for how it's built.
+
+ Devices: Bluetooth, USB and external storage
+
+ A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, and it is off
+ until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
+ Mac should be your decision rather than something an update did.
+
+ Bluetooth shows which devices are paired, which are connected, and when that changed, read from the system
+ every half minute. Beside it is the list of applications built to use Bluetooth, taken from each app's own
+ Info.plist.
+
+ What it can't tell you, and says so. There are no byte counts here. macOS keeps no per-app accounting for
+ Bluetooth, and the byte-level HCI traces that would give one need Apple's PacketLogger profile, which an ordinary app cannot
+ read. The app list is likewise who asked for Bluetooth, not who was granted it: macOS keeps the grants in a
+ database an app can't open, and Flowlight would rather name that difference than blur it.
+
+ USB and external storage lists what is attached — what it is, who makes it, and a drive's capacity — and
+ records when each one arrived and left. The two halves work differently on purpose: USB devices are read from the system
+ periodically, while volumes come from the workspace the moment one is mounted or ejected, because a drive appearing is the
+ event people actually care about. Throughput isn't here either, for the same reason it isn't under Bluetooth.
+
+ Focus mode
+
+ Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect, and the rates in
+ the menu bar. It's for watching one agent work without the rest of the Mac in the way.
+
+ Right-click any row in Live, Reports or AI Agents and choose Focus on…, or use the Focus control at the bottom of
+ the sidebar to pick from the apps that have been active and to type destinations.
+
+ ⇧⌘F turns Focus on and off, and so does the menu bar, which also shows what's focused.
+
+ A destination takes its subdomains with it: example.com covers api.example.com. IP addresses work;
+ ranges like 10.0.0.0/8 don't.
+
+ Apps and destinations are a union, not an intersection: focusing on Claude Code and github.com shows
+ everything Claude Code does plus everything that talks to GitHub.
+
+ An app and a destination are equally a focus, and either alone is enough. Add an app by typing its name or bundle identifier —
+ every application on the Mac is searchable, so one that has been quiet all day can still be focused, as can a command-line agent
+ with no application bundle — or tick one from what has recently been busy. Add a destination the same way.
+
+ One thing a destination can't narrow: alerts record the app that raised them and nothing about where the traffic went, so a
+ focus made only of destinations leaves the alert list alone. The editor says so rather than letting a screen quietly ignore it.
+
+ Focus filters what you see, never what's recorded. Flowlight keeps capturing and storing everything while it's on, and
+ the anomaly baselines keep learning from all of it, so turning Focus off shows the traffic it was hiding. One consequence: an alert
+ names the app that raised it and not where the traffic went, so focusing only on destinations leaves the alert list as it was.
+
+ Running in the background
+
+ Flowlight keeps recording with its window closed, and costs almost nothing while idle — it stops building charts nobody is
+ looking at. Settings › General › Run in the background goes further and drops the Dock icon and the Cmd-Tab entry;
+ the menu bar keeps the live rates and gains Show Dock Icon to undo it. Launch at login is in the
+ same place.
+
+ The window opens where you left it, at the size you left it. A first run fills the screen instead, so nothing is hidden behind
+ a small default window, and a window whose saved position is off-screen — an unplugged display — comes back on the screen you
+ have. Hostname setup is offered a little after launch and only while a window is open, rather than greeting a first run with a
+ request for your password; the offer returns next launch until you take or dismiss it.
+
+ Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
+ carries on inspecting connections until you disable or uninstall it in Capture.
 
  Export to OpenTelemetry or a SIEM
 
@@ -694,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1238,8 +1236,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.4
+ 0.6.5
 September 25, 2026Latest
+
+ Help opens the page about the screen you're on. A question mark in the toolbar, and
+ ⌘? in the Help menu, go straight to the section for Live, Rules, Ask or wherever you are.
+
+ The documentation is grouped the way the app is — Traffic, Investigate, Control, Sources —
+ so the contents list reads like the sidebar rather than the order the features were written in.
+ Read the documentation →
+
+ Old links still work. Every anchor that existed before still lands where it did.
+
+ Downloads and checksums →
+
+ 0.6.4
+September 25, 2026
 
  Meta's AI is recognised — Muse, Meta AI and Llama, which all answer from Meta's own network.
 

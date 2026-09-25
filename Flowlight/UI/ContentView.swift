@@ -58,16 +58,29 @@ struct ContentView: View {
               }
             }
         } detail: {
-            switch nav.selection {
-            case .live: LiveView()
-            case .agents: AgentsView()
-            case .reports: ReportsView()
-            case .alerts: AlertsView()
-            case .rules: RulesView()
-            case .inspect: InspectView()
-            case .ask: AskView()
-            case .devices: DevicesView()
-            case .capture: CaptureView()
+            Group {
+                switch nav.selection {
+                case .live: LiveView()
+                case .agents: AgentsView()
+                case .reports: ReportsView()
+                case .alerts: AlertsView()
+                case .rules: RulesView()
+                case .inspect: InspectView()
+                case .ask: AskView()
+                case .devices: DevicesView()
+                case .capture: CaptureView()
+                }
+            }
+            // One help button for all nine screens, because the documentation is grouped the way this sidebar
+            // is: whatever is on screen, the button opens the section about it rather than the top of the page.
+            .toolbar {
+                ToolbarItem {
+                    Button { NSWorkspace.shared.open(Help.forScreen(nav.selection)) } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    .help(L("Open the documentation for %@", nav.selection.title))
+                    .accessibilityLabel(L("Help"))
+                }
             }
         }
         .id(localization.revision)

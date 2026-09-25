@@ -53,8 +53,11 @@ struct FlowlightApp: App {
                 CheckForUpdatesButton().environmentObject(updater)
             }
             CommandGroup(replacing: .help) {
-                Button("Flowlight Help") { NSWorkspace.shared.open(Help.base) }
+                // Help for wherever you are, first: someone who presses ⌘? on the Rules screen wants the part
+                // about rules, not the top of a page they then have to search.
+                Button(L("Help for %@", nav.selection.title)) { NSWorkspace.shared.open(Help.forScreen(nav.selection)) }
                     .keyboardShortcut("?", modifiers: .command)
+                Button("Flowlight Help") { NSWorkspace.shared.open(Help.base) }
                 Button("Questions & Answers") { NSWorkspace.shared.open(Help.faq) }
                 Divider()
                 Button("What Flowlight Reads on This Mac") { NSWorkspace.shared.open(Help.agentConfiguration) }

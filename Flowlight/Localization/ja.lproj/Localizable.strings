@@ -32,3 +32,8 @@
 "System" = "システムに合わせる";
 "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "「システムに合わせる」にすると、インターフェイスは Mac の言語に従います。Flowlight が未翻訳の言語の場合は英語に戻ります。";
 "Now showing %@" = "現在の表示：%@";
+
+/* Help that follows the screen you are on. */
+"Help" = "ヘルプ";
+"Help for %@" = "%@ のヘルプ";
+"Open the documentation for %@" = "%@ のドキュメントを開く";

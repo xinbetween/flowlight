@@ -32,3 +32,8 @@
 "System" = "Sistema";
 "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "Con «Sistema» l'interfaccia segue la lingua del Mac e torna all'inglese per le lingue in cui Flowlight non è tradotto.";
 "Now showing %@" = "In uso: %@";
+
+/* Help that follows the screen you are on. */
+"Help" = "Aiuto";
+"Help for %@" = "Aiuto per %@";
+"Open the documentation for %@" = "Apri la documentazione di %@";

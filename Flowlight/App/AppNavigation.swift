@@ -3,6 +3,25 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case live, agents, reports, alerts, rules, ask, inspect, devices, capture
     var id: String { rawValue }
+    /// The part of the documentation that explains this screen.
+    ///
+    /// The docs are laid out in the sidebar's own groups — Traffic, Investigate, Control, Sources — so help
+    /// asked for from a screen lands on the section about that screen rather than at the top of a long page
+    /// someone then has to search.
+    nonisolated var helpAnchor: String {
+        switch self {
+        case .live: return "views"
+        case .agents: return "agents"
+        case .reports: return "worth-a-look"
+        case .alerts: return "alerts"
+        case .rules: return "rules"
+        case .ask: return "ask"
+        case .inspect: return "inspection"
+        case .devices: return "devices"
+        case .capture: return "capture"
+        }
+    }
+
     /// The English name, for the places that aren't the interface: the feature guide the Ask panel reads, and
     /// anything else that runs off the main actor where the localized title can't be reached.
     nonisolated var englishTitle: String {

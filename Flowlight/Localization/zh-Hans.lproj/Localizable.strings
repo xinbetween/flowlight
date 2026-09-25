@@ -32,3 +32,8 @@
 "System" = "跟随系统";
 "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "设为“跟随系统”时，界面语言与您的 Mac 保持一致；若 Flowlight 尚未翻译成该语言，则回退为英文。";
 "Now showing %@" = "当前显示：%@";
+
+/* Help that follows the screen you are on. */
+"Help" = "帮助";
+"Help for %@" = "%@ 帮助";
+"Open the documentation for %@" = "打开“%@”的文档";

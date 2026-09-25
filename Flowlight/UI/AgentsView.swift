@@ -963,6 +963,12 @@ struct AgentSetupBar: View {
 
 enum Help {
     static let base = URL(string: "https://flowlight.xinbetween.com/docs/")!
+
+    /// The documentation for one screen. The docs page is grouped the way the sidebar is, so this is a real
+    /// mapping rather than a guess: each screen has a section named after it.
+    static func forScreen(_ item: SidebarItem) -> URL {
+        URL(string: "https://flowlight.xinbetween.com/docs/#\(item.helpAnchor)") ?? base
+    }
     static let agentConfiguration = URL(string: "https://flowlight.xinbetween.com/docs/#agent-configuration")!
     static let faq = URL(string: "https://flowlight.xinbetween.com/docs/#faq")!
     static let privacy = URL(string: "https://flowlight.xinbetween.com/privacy/")!

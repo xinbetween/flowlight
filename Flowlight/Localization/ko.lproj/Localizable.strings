@@ -32,3 +32,8 @@
 "System" = "시스템 설정";
 "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "'시스템 설정'을 선택하면 인터페이스가 Mac의 언어를 따릅니다. Flowlight가 번역되지 않은 언어라면 영어로 표시됩니다.";
 "Now showing %@" = "현재 표시: %@";
+
+/* Help that follows the screen you are on. */
+"Help" = "도움말";
+"Help for %@" = "%@ 도움말";
+"Open the documentation for %@" = "%@ 문서 열기";
