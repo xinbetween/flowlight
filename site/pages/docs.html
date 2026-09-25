@@ -279,6 +279,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
         or <strong>allow</strong>. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
         every one of them lands in the same editor on the <strong>Rules</strong> screen, because a rule that took effect out of sight
         would be a rule you could never find again.</p>
+      <p><strong>Templates.</strong> Twenty-two of them, in five groups — stopping an agent reaching package registries or other
+        model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
+        HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
+        what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, Reports, AI Agents or Inspect and
+        apply one to what you're looking at.</p>
+      <p>Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
+        host and schedule; anything permanent opens the editor pre-filled; and <strong>only rules that undo themselves</strong> — an
+        hour, or this run of Flowlight — are ever applied without being shown first. Each carries its caveats too, including which
+        engine it needs: a template that only works with HTTPS inspection says so.</p>
       <p><strong>Which rule wins.</strong> The most specific match decides, and where two rules are equally narrow the block is the one
         that stands. So an exception written underneath a broad block works — <code>Cursor may reach api.github.com</code> survives
         <code>nothing reaches github.com</code> — while an exception broader than what it excepts does not quietly widen it.</p>

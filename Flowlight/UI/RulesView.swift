@@ -8,10 +8,24 @@ import SwiftUI
 struct RulesView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
-    @State private var editing: Rule?
-    @State private var isNew = false
+    @ObservedObject private var templates = RuleTemplateRequests.shared
+    @State private var sheet: Sheet?
     @State private var tab = Tab.rules
     @State private var now = Date()
+
+    /// One sheet at a time, named rather than implied by two booleans — the editor and the library are alternatives
+    /// and the type should say so.
+    private enum Sheet: Identifiable {
+        case editor(Rule, isNew: Bool)
+        case library(RuleTemplate.ID?, RuleTemplate.Subject)
+
+        var id: String {
+            switch self {
+            case .editor(let rule, _): return "editor-\(rule.id)"
+            case .library(let focus, _): return "library-\(focus ?? "all")"
+            }
+        }
+    }
 
     private enum Tab: String, CaseIterable, Identifiable {
         case rules, activity
@@ -34,19 +48,41 @@ struct RulesView: View {
         // rules are live, and whether they are standing down.
         .navigationSubtitle(subtitle)
         .toolbar { toolbar }
-        .sheet(item: $editing) { rule in
-            RuleEditor(rule: rule, isNew: isNew) { store.save($0) }
+        .sheet(item: $sheet) { which in
+            switch which {
+            case .editor(let rule, let isNew):
+                RuleEditor(rule: rule, isNew: isNew) { store.save($0) }
+            case .library(let focus, let subject):
+                // The library doesn't hand off to the editor: a card already shows every rule it would write and
+                // the caveat that goes with it, so the look has happened. Anything that wants adjusting is one
+                // click away in the list afterwards.
+                RuleTemplateLibrary(focus: focus, subject: subject) { rules in
+                    for rule in rules { store.save(rule) }
+                }
+            }
         }
         .onChange(of: nav.ruleRequest) { _, request in
             guard let request else { return }
-            editing = request.rule
-            isNew = true
+            sheet = .editor(request.rule, isNew: true)
             nav.ruleRequest = nil
         }
+        .onChange(of: templates.pending?.id) { _, _ in takeTemplateRequest() }
         .onAppear {
-            if let request = nav.ruleRequest { editing = request.rule; isNew = true; nav.ruleRequest = nil }
+            if let request = nav.ruleRequest {
+                sheet = .editor(request.rule, isNew: true)
+                nav.ruleRequest = nil
+            }
+            takeTemplateRequest()
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
+    }
+
+    /// A template chosen from a table row on another screen. It arrives as a request rather than as saved rules so
+    /// that what lands is what was looked at.
+    private func takeTemplateRequest() {
+        guard let pending = templates.pending else { return }
+        sheet = .library(pending.template.id, pending.subject)
+        templates.pending = nil
     }
 
     private var subtitle: String {
@@ -75,8 +111,13 @@ struct RulesView: View {
         ToolbarItemGroup {
             pauseControl
             Button {
-                editing = Rule()
-                isNew = true
+                sheet = .library(nil, RuleTemplate.Subject())
+            } label: {
+                Label("Templates", systemImage: "square.grid.2x2")
+            }
+            .help("Rules worth having, grouped by what they are for, with the hosts already written out")
+            Button {
+                sheet = .editor(Rule(), isNew: true)
             } label: {
                 Label("Add Rule", systemImage: "plus")
             }
@@ -159,7 +200,7 @@ struct RulesView: View {
                 extensionRunning: monitor.mode == .networkExtension,
                 inspecting: monitor.inspection.enabled,
                 events: store.events(for: rule).count) {
-            editing = rule; isNew = false
+            sheet = .editor(rule, isNew: false)
         }
         // A rule that has just been written, or has just crossed between in force and not, is a change of state
         // worth marking. Nothing moves that hasn't changed.
@@ -206,12 +247,12 @@ struct RulesView: View {
             Label("No rules yet", systemImage: "hand.raised")
         } description: {
             Text("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. "
-                 + "Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, "
-                 + "or start from a preset.")
+                 + "Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're "
+                 + "looking at, or start from the library — it already knows which hosts a package install "
+                 + "reaches, and which ones a file leaves by.")
         } actions: {
-            ForEach(RuleEditor.presets, id: \.name) { preset in
-                Button(preset.name) { editing = preset.rule(); isNew = true }
-            }
+            Button("Browse Templates…") { sheet = .library(nil, RuleTemplate.Subject()) }
+            Button("Write One…") { sheet = .editor(Rule(), isNew: true) }
         }
     }
 
@@ -245,7 +286,7 @@ struct RulesView: View {
                                 if index > 0 { Divider().padding(.leading, 34) }
                                 EventRow(event: event, rule: name(of: event)) {
                                     if let rule = store.rules.first(where: { $0.id == event.ruleID }) {
-                                        editing = rule; isNew = false
+                                        sheet = .editor(rule, isNew: false)
                                     }
                                 }
                             }
@@ -513,10 +554,19 @@ private struct EventRow: View {
 
 /// "Block this", wherever traffic is shown. Every table offers it, and every one of them writes the same rule and
 /// lands in the same editor — a rule that took effect out of sight would be a rule nobody could find again.
+///
+/// The template submenu keeps the same promise three different ways, because a template can be bigger than one
+/// rule and the editor only holds one. Which way is used is decided by the template and said in the menu before
+/// the click, in the section heading and again in the macOS ellipsis.
 struct RuleMenuItems: View {
     @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var monitor: TrafficMonitor
     var app: (bundleID: String, name: String)?
     var host: String?
+
+    private var subject: RuleTemplate.Subject {
+        RuleTemplate.Subject(app: app?.bundleID ?? "", appName: app?.name ?? "", destination: host ?? "")
+    }
 
     var body: some View {
         if let app, !app.bundleID.isEmpty {
@@ -547,7 +597,291 @@ struct RuleMenuItems: View {
                 }
             }
         }
+        templateMenu
+    }
+
+    /// The library, filtered down to what this row can fill in, grouped the way the library groups it. Each
+    /// heading says what clicking will do, because a menu that changes the machine and a menu that opens a window
+    /// look identical until afterwards.
+    @ViewBuilder
+    private var templateMenu: some View {
+        let applicable = RuleTemplate.applicable(to: subject)
+        if !applicable.isEmpty {
+            Menu("Apply a Template") {
+                ForEach(RuleTemplate.Category.allCases) { category in
+                    let found = applicable.filter { $0.category == category }
+                    if !found.isEmpty {
+                        Section(heading(category, for: found)) {
+                            ForEach(found) { template in
+                                let now = template.arrival(for: subject) == .now
+                                Button(now ? template.title : "\(template.title)…") { apply(template) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func heading(_ category: RuleTemplate.Category, for found: [RuleTemplate]) -> String {
+        let immediate = found.filter { $0.arrival(for: subject) == .now }.count
+        if immediate == found.count { return "\(category.title) · in force at once" }
+        if immediate == 0 { return "\(category.title) · shown first" }
+        return category.title
+    }
+
+    private func apply(_ template: RuleTemplate) {
+        switch template.arrival(for: subject) {
+        case .now:
+            // The one place a rule is saved without being read back first. It is allowed here because the menu
+            // said so, because it is a single rule, and because it undoes itself — and the screen deliberately
+            // stays where it is, since the reason to block a destination for an hour is to keep watching the
+            // table you are already looking at.
+            for rule in template.rules(for: subject) { monitor.rules.save(rule) }
+        case .editor:
+            if let rule = template.rules(for: subject).first { nav.writeRule(rule) }
+        case .list:
+            RuleTemplateRequests.shared.open(template, for: subject)
+            nav.selection = .rules
+        }
     }
 
     private func write(_ rule: Rule) { nav.writeRule(rule) }
+}
+
+/// The rule library, as a sheet.
+///
+/// The screen is a list of offers, and an offer nobody can check is an offer nobody should accept — so a card
+/// opens onto the whole of what it would write: every host, every schedule, and the sentence about what it costs.
+/// Nothing is added from a closed card.
+struct RuleTemplateLibrary: View {
+    /// A template to open on, when the sheet was raised from a table row rather than from the toolbar.
+    var focus: RuleTemplate.ID?
+    var subject: RuleTemplate.Subject
+    let add: ([Rule]) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var open: RuleTemplate.ID?
+    @State private var app = ""
+    @State private var destination = ""
+    @State private var added: Set<RuleTemplate.ID> = []
+
+    /// The subject as the cards see it. The readable name is looked up rather than stored, so typing over the app
+    /// can't leave a rule named after the one that was there before.
+    private var filled: RuleTemplate.Subject {
+        RuleTemplate.Subject(app: app, appName: name(of: app), destination: destination)
+    }
+
+    private func name(of bundleID: String) -> String {
+        if bundleID.caseInsensitiveCompare(subject.app) == .orderedSame, !subject.appName.isEmpty {
+            return subject.appName
+        }
+        return InstalledApps.all().first { $0.bundleID.caseInsensitiveCompare(bundleID) == .orderedSame }?.name
+            ?? bundleID
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            ScrollViewReader { scroll in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        ForEach(RuleTemplate.Category.allCases) { category in
+                            section(category)
+                        }
+                    }
+                    .padding(Measure.gutter)
+                }
+                .onAppear {
+                    open = focus
+                    app = subject.app
+                    destination = subject.destination
+                    if let focus { scroll.scrollTo(focus, anchor: .top) }
+                }
+            }
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            .padding(Measure.gutter)
+        }
+        .frame(width: Measure.prose)
+        .frame(minHeight: 560)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Templates").font(.title3.weight(.semibold))
+            Text("Each one writes ordinary rules into the list, where they can be read, switched off or deleted "
+                 + "like anything else. Refusing a connection is the Network Extension's job, so with the nettop "
+                 + "sampler selected in Capture these are watched rather than carried out.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Measure.gutter)
+    }
+
+    private func section(_ category: RuleTemplate.Category) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: category.symbol).font(.caption).foregroundStyle(.tertiary)
+                Text(category.title).font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+            }
+            Text(category.summary).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(RuleTemplate.inCategory(category)) { template in
+                card(template).id(template.id)
+            }
+        }
+    }
+
+    private func card(_ template: RuleTemplate) -> some View {
+        let isOpen = open == template.id
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                open = isOpen ? nil : template.id
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(template.title).font(.body.weight(.medium))
+                        Text(template.summary).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(countLabel(template)).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isOpen { openCard(template) }
+        }
+        .padding(12)
+        .background(.quaternary.opacity(isOpen ? 0.5 : 0.3), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// What an open card shows: the blank it still needs, the cost of switching it on, and the rules themselves.
+    @ViewBuilder
+    private func openCard(_ template: RuleTemplate) -> some View {
+        let rules = template.rules(for: filled)
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
+            if template.needs == .app || template.needs == .both {
+                appField
+            } else if template.scopesToApp {
+                appField
+                Text("Optional. Left empty this applies to everything on the Mac; naming an app narrows it to "
+                     + "that app and the tools it started.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if template.needs == .destination || template.needs == .both {
+                TextField("Destination", text: $destination,
+                          prompt: Text("A domain, an IP address, or a range"))
+                    .textFieldStyle(.roundedBorder)
+            }
+            if template.engines(for: filled).contains(.request) {
+                note("These name an HTTP method, so only HTTPS inspection can carry them out. With it off they "
+                     + "sit in the list watching.", icon: "eye", tint: .orange)
+            }
+            if let caveat = template.caveat {
+                note(caveat, icon: "exclamationmark.circle", tint: .secondary)
+            }
+            if rules.isEmpty {
+                Text(template.needs == .destination ? "Name a destination to see what this would write."
+                     : "Name an app to see what this would write.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ruleList(rules)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                if added.contains(template.id) {
+                    Label("Added", systemImage: "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(.green)
+                }
+                Button(rules.count > 1 ? "Add \(rules.count) Rules" : "Add Rule") {
+                    add(rules)
+                    added.insert(template.id)
+                }
+                .disabled(rules.isEmpty)
+            }
+        }
+    }
+
+    private var appField: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextField("App", text: $app, prompt: Text("A name, or a bundle identifier"))
+                .textFieldStyle(.roundedBorder)
+            ForEach(suggestions) { found in
+                Button {
+                    app = found.bundleID
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(found.name).font(.callout)
+                        Text(found.bundleID).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var suggestions: [InstalledApps.App] {
+        let all = InstalledApps.all()
+        guard !app.isEmpty, !all.contains(where: { $0.bundleID.caseInsensitiveCompare(app) == .orderedSame })
+        else { return [] }
+        return Array(InstalledApps.search(app, in: all).prefix(4))
+    }
+
+    /// Every rule, written out. Long lists are the whole point of a template, so they aren't truncated — an
+    /// abbreviated blocklist is one nobody checked.
+    private func ruleList(_ rules: [Rule]) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(rules) { rule in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "hand.raised.fill").font(.caption2).foregroundStyle(.red.opacity(0.8))
+                    Text(subjectLine(rule)).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    if rule.schedule.kind != .always {
+                        Text(rule.schedule.describe(at: Date(), session: RuleStore.session))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func subjectLine(_ rule: Rule) -> String {
+        var target = rule.destination.isEmpty ? "anywhere" : rule.destination
+        if !rule.method.isEmpty { target = "\(rule.method) \(target)" }
+        return "\(rule.app.isEmpty ? "any app" : rule.app) → \(target)"
+    }
+
+    private func countLabel(_ template: RuleTemplate) -> String {
+        let count = template.ruleCount(for: filled)
+        return count == 1 ? "1 rule" : "\(count) rules"
+    }
+
+    private func note(_ text: String, icon: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: icon).font(.caption)
+            Text(text).font(.caption).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+    }
 }

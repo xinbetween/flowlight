@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.3, macOS 15 or later.
 
  On this page
 
@@ -384,6 +384,17 @@ open build/Build/Products/Release/Flowlight.app
  every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
  would be a rule you could never find again.
 
+ Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
+ model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
+ HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
+ what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, Reports, AI Agents or Inspect and
+ apply one to what you're looking at.
+
+ Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
+ host and schedule; anything permanent opens the editor pre-filled; and only rules that undo themselves — an
+ hour, or this run of Flowlight — are ever applied without being shown first. Each carries its caveats too, including which
+ engine it needs: a template that only works with HTTPS inspection says so.
+
  Which rule wins. The most specific match decides, and where two rules are equally narrow the block is the one
  that stands. So an exception written underneath a broad block works — Cursor may reach api.github.com survives
  nothing reaches github.com — while an exception broader than what it excepts does not quietly widen it.
@@ -683,7 +694,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1227,8 +1238,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.2
+ 0.6.3
 September 25, 2026Latest
+
+ Twenty-two rule templates — agents, the ways data leaves, telemetry, working hours, and one-off
+ investigation — applied from any row in Live, Reports, AI Agents or Inspect.
+
+ Nothing permanent happens unseen. Only rules that undo themselves apply straight away; the rest
+ show you every host and schedule first.
+
+ The domains were checked, not copied from lists that still carry dead entries.
+ How rules work →
+
+ Downloads and checksums →
+
+ 0.6.2
+September 25, 2026
 
  Ten languages. English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español,
  Português — following your Mac by default, or chosen in Settings.

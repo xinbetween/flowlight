@@ -254,28 +254,3 @@ struct RuleEditor: View {
             }), displayedComponents: .hourAndMinute)
     }
 }
-
-extension RuleEditor {
-    /// Rules worth having before anything has gone wrong. Each is a starting point in the editor, never something
-    /// switched on behind someone's back.
-    struct Preset {
-        var name: String
-        var rule: () -> Rule
-    }
-
-    static let presets: [Preset] = [
-        Preset(name: "An agent, after hours") {
-            var rule = Rule(action: .block, app: "claude", origin: .preset)
-            rule.name = "Claude Code reaches nothing after hours"
-            rule.schedule = Rule.Schedule(kind: .window, days: [], start: 18 * 60, end: 9 * 60)
-            return rule
-        },
-        Preset(name: "One destination, for everything") {
-            Rule(action: .block, destination: "example.com", origin: .preset, name: "Nothing reaches example.com")
-        },
-        Preset(name: "No package installs from an agent") {
-            Rule(action: .block, app: "claude", destination: "registry.npmjs.org", origin: .preset,
-                 name: "Claude Code installs no packages")
-        },
-    ]
-}
