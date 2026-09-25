@@ -37,3 +37,5 @@
 "Help" = "Hilfe";
 "Help for %@" = "Hilfe zu %@";
 "Open the documentation for %@" = "Dokumentation zu %@ öffnen";
+"Documentation" = "Dokumentation";
+"Open %@" = "%@ öffnen";

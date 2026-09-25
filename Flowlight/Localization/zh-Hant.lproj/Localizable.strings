@@ -37,3 +37,5 @@
 "Help" = "輔助說明";
 "Help for %@" = "%@ 輔助說明";
 "Open the documentation for %@" = "開啟「%@」的說明文件";
+"Documentation" = "說明文件";
+"Open %@" = "開啟%@";

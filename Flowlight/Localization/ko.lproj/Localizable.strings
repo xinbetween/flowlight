@@ -37,3 +37,5 @@
 "Help" = "도움말";
 "Help for %@" = "%@ 도움말";
 "Open the documentation for %@" = "%@ 문서 열기";
+"Documentation" = "문서";
+"Open %@" = "%@ 열기";

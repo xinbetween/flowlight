@@ -37,3 +37,5 @@
 "Help" = "ヘルプ";
 "Help for %@" = "%@ のヘルプ";
 "Open the documentation for %@" = "%@ のドキュメントを開く";
+"Documentation" = "ドキュメント";
+"Open %@" = "%@ を開く";

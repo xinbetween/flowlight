@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.6, macOS 15 or later.
 
  On this page
 
@@ -692,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1236,8 +1236,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.5
+ 0.6.6
 September 25, 2026Latest
+
+ Ask points at the documentation too. An answer about how a feature works now offers the
+ section that explains it, next to the button that opens the screen.
+
+ Downloads and checksums →
+
+ 0.6.5
+September 25, 2026
 
  Help opens the page about the screen you're on. A question mark in the toolbar, and
  ⌘? in the Help menu, go straight to the section for Live, Rules, Ask or wherever you are.

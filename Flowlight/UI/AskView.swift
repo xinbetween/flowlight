@@ -214,10 +214,14 @@ private struct AskTurnView: View {
             }
             if let screen = turn.calls.compactMap(\.screen).first {
                 // An answer about the app should end somewhere you can act on it — but the app moves when you
-                // click, not when the model decides to.
-                Button("Open \(screen.title)") { go(screen) }
-                    .buttonStyle(.link)
-                    .font(.callout)
+                // click, not when the model decides to. The documentation sits beside it for the longer version,
+                // opened at the section about that same screen.
+                HStack(spacing: 14) {
+                    Button(L("Open %@", screen.title)) { go(screen) }
+                    Button(L("Documentation")) { NSWorkspace.shared.open(Help.forScreen(screen)) }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
             }
             if !turn.calls.isEmpty { evidence }
             footer
