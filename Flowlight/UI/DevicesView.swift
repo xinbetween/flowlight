@@ -89,9 +89,8 @@ private struct DevicesContent: View {
                 if store.watchingUSB { usbSection }
                 if !store.events.isEmpty { historySection }
             }
-            .frame(maxWidth: 860, alignment: .leading)
-            .padding(16)
-            .frame(maxWidth: .infinity)
+            .padding(Measure.gutter)
+            .measured()
         }
     }
 

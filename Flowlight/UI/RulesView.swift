@@ -148,9 +148,8 @@ struct RulesView: View {
                     ForEach(resting) { rule in row(rule) }
                 }
             }
-            .frame(maxWidth: 860, alignment: .leading)
-            .padding(16)
-            .frame(maxWidth: .infinity)
+            .padding(Measure.gutter)
+            .measured()
         }
         .safeAreaInset(edge: .top, spacing: 0) { banner }
     }
@@ -256,9 +255,8 @@ struct RulesView: View {
                     .entrance()
                 }
             }
-            .frame(maxWidth: 860, alignment: .leading)
-            .padding(16)
-            .frame(maxWidth: .infinity)
+            .padding(Measure.gutter)
+            .measured()
         }
     }
 

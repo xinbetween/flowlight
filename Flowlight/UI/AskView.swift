@@ -22,9 +22,6 @@ private struct AskContent: View {
     @State private var showingSettings = false
     @FocusState private var typing: Bool
 
-    /// A comfortable measure for prose. Answers are two or three sentences and the window is often very wide;
-    /// text running the full width of a 1700-point window is not readable, it is just long.
-    private static let column: CGFloat = 720
 
     var body: some View {
         VStack(spacing: 0) {
@@ -84,9 +81,8 @@ private struct AskContent: View {
                     if turn.id != ask.turns.last?.id { Divider() }
                 }
             }
-            .frame(maxWidth: Self.column, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, 24)
+            .measured(Measure.prose)
+            .padding(.horizontal, Measure.gutter)
             .padding(.vertical, 24)
         }
     }
@@ -151,9 +147,8 @@ private struct AskContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(maxWidth: Self.column)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
+        .measured(Measure.prose)
+        .padding(.horizontal, Measure.gutter)
         .padding(.vertical, 12)
         .background(.bar)
     }

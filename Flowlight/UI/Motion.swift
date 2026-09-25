@@ -117,3 +117,31 @@ struct CountingNumber: View, Animatable {
             .contentTransition(.numericText())
     }
 }
+
+/// How wide content is allowed to get, and where it sits when the window is wider than that.
+///
+/// Five screens had grown five different answers to this — 860, 860, 820, 760 and 720 points — and three of them
+/// centred the result while two left-aligned it. On a wide display that put the Rules list in the middle of the
+/// window while the Capture form started at the left margin, which reads as two apps rather than one.
+///
+/// The rule: content is capped so a line of text never runs the full width of a large display, and it is always
+/// **left-aligned**, because everything else in the app starts at the same left margin — tables, titles, the
+/// sidebar. Centring a column inside a left-aligned app is the thing that looked wrong.
+enum Measure {
+    /// Prose someone reads a paragraph of: an answer, an explanation. Roughly eighty characters at the body size,
+    /// which is about where a line stops being comfortable to track back from.
+    static let prose: CGFloat = 720
+    /// Cards, forms and rows with a control at each end. Wider, because the eye isn't reading these left to right
+    /// so much as scanning down them — but not unbounded, or the control ends up an inch from the thing it acts on.
+    static let panel: CGFloat = 860
+    /// The gutter between content and the window edge, the same on every screen.
+    static let gutter: CGFloat = 16
+}
+
+extension View {
+    /// Caps the width and keeps the content against the left margin, which is where the rest of the app starts.
+    func measured(_ width: CGFloat = Measure.panel) -> some View {
+        frame(maxWidth: width, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}

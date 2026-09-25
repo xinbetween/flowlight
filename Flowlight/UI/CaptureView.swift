@@ -38,9 +38,8 @@ struct CaptureView: View {
             // A settings panel is read, not scanned, and a line of prose stretched across a maximised window is
             // unreadable. The column stops at a comfortable measure and stays against the sidebar rather than
             // floating in the middle of the window.
-            .frame(maxWidth: 820, alignment: .leading)
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Measure.gutter)
+            .measured()
         }
         .navigationTitle("Capture")
         // The one thing worth a trip to this screen to find out — what is feeding the app right now — said in the

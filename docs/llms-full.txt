@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.1, macOS 15 or later.
 
  On this page
 
@@ -669,7 +669,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1213,8 +1213,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.0
+ 0.6.1
 September 25, 2026Latest
+
+ One answer to how wide content is. Five screens had five different measures and three of them
+ centred the result; everything is capped and left-aligned now, like the rest of the app.
+
+ Downloads and checksums →
+
+ 0.6.0
+September 25, 2026
 
  Ask answers questions about Flowlight itself — how to turn a feature on, why nothing is showing —
  from the app's own guide rather than the model's memory.

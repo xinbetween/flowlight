@@ -351,8 +351,7 @@ private struct InspectionSetup: View {
                 }
             }
         }
-        .frame(maxWidth: 760, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .measured(Measure.prose)
         .confirmationDialog("macOS will ask you twice", isPresented: $confirmTurnOn) {
             Button("Continue") { inspection.setEnabled(true) }
             Button("Cancel", role: .cancel) {}
