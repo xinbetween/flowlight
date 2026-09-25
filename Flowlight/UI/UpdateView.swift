@@ -17,10 +17,23 @@ struct UpdateView: View {
 
             if let release = shownRelease {
                 ScrollView {
-                    Text(notes(release))
+                    // A release whose notes are only a link to a comparison view has nothing to read here, and an
+                    // empty panel reads as a bug rather than as an absence.
+                    if ReleaseNotes.isEmpty(release.notes) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("No release notes were published for \(release.version).")
+                            Button("See what changed on GitHub") { NSWorkspace.shared.open(release.pageURL) }
+                                .buttonStyle(.link)
+                        }
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
                         .padding(12)
+                    } else {
+                        Text(notes(release))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .padding(12)
+                    }
                 }
                 .frame(height: 230)
                 .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
@@ -138,9 +151,21 @@ enum ReleaseNotes {
         for line in readable(markdown).components(separatedBy: "\n") {
             let text = line.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "•  ", with: "")
                 .trimmingCharacters(in: .whitespaces)
+            // A generated changelog link is long enough to pass for a headline and says nothing; a notification
+            // reading "Full Changelog: https://…" is worse than one with no detail at all.
+            if text.lowercased().hasPrefix("full changelog") { continue }
             if text.count > 12 { return String(text.prefix(160)) }
         }
         return nil
+    }
+
+    /// Whether there is anything worth reading, as opposed to GitHub's generated "Full Changelog" line and the
+    /// checksums. Both are links and numbers; neither tells anyone what changed.
+    static func isEmpty(_ markdown: String) -> Bool {
+        readable(markdown)
+            .components(separatedBy: "\n")
+            .map { $0.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespaces) }
+            .allSatisfy { $0.isEmpty || $0.lowercased().hasPrefix("full changelog") }
     }
 
     /// Release-note Markdown made readable in a plain text view: headings become bold lines, bullets get "•",

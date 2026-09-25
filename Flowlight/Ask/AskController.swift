@@ -132,8 +132,10 @@ final class AskController: ObservableObject {
                 Task { await recorder.sent(body) }
             }
             do {
-                let answer = try await provider.answer(request, run: runner, sending: sender)
-                await self?.finish(turnID, answer: answer, recorder: recorder)
+                let raw = try await provider.answer(request, run: runner, sending: sender)
+                let answer = AnswerText.cleaned(raw)
+                await self?.finish(turnID, answer: answer.isEmpty ? AnswerText.brokenReply : answer,
+                                   recorder: recorder)
             } catch {
                 let message = (error as? RemoteProvider.Failure)?.description ?? error.localizedDescription
                 await self?.finish(turnID, answer: "", error: message, recorder: recorder)

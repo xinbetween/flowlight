@@ -234,13 +234,19 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           NOTES="packaging/release-notes/$VERSION.md"
           ARGS=(--title "Flowlight $VERSION")
+          # A hand-written file wins; otherwise the notes are built from the entry already written on the
+          # releases page. Falling through to --generate-notes produces one "Full Changelog" link, which is what
+          # the Software Update window showed for every release from 0.6.5 to 0.7.1.
+          if [[ ! -f "$NOTES" ]] && python3 scripts/release_notes.py "$VERSION" > "$RUNNER_TEMP/from-site.md"; then
+            NOTES="$RUNNER_TEMP/from-site.md"
+          fi
           if [[ -f "$NOTES" ]]; then
             # The checksums belong in the notes, and they're only known once the artifacts exist.
             { cat "$NOTES"; echo; echo '### Checksums'; echo; echo '```'; sed 's|build/||' build/checksums.txt; echo '```'; } > "$RUNNER_TEMP/notes.md"
             ARGS+=(--notes-file "$RUNNER_TEMP/notes.md")
           else
-            echo "::warning::No $NOTES — falling back to generated notes."
-            ARGS+=(--generate-notes)
+            echo "::error::No notes for $VERSION — neither $NOTES nor an entry on the releases page."
+            exit 1
           fi
           gh release create "$TAG" "${ARGS[@]}" build/Flowlight.dmg "build/Flowlight-$VERSION.pkg"
 

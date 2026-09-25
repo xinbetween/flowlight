@@ -105,3 +105,24 @@ final class ReleaseNotesHeadlineTests: XCTestCase {
         XCTAssertNil(ReleaseNotes.headline("v2\n\n- ok"), "nothing long enough to be useful")
     }
 }
+
+/// What the Software Update window is willing to show.
+extension UpdateTests {
+
+    func testGeneratedNotesAreRecognisedAsHavingNothingToRead() {
+        // Exactly what GitHub writes when no notes file is supplied — and what shipped from 0.6.5 to 0.7.1.
+        let generated = "**Full Changelog**: https://github.com/xinbetween/flowlight/compare/v0.6.8...v0.7.1"
+        XCTAssertTrue(ReleaseNotes.isEmpty(generated))
+        XCTAssertNil(ReleaseNotes.headline(generated), "a changelog link is not a headline")
+    }
+
+    func testChecksumsAloneAreNotReleaseNotes() {
+        XCTAssertTrue(ReleaseNotes.isEmpty("### Checksums\n\n```\nabc123  Flowlight.dmg\n```"))
+    }
+
+    func testRealNotesAreShown() {
+        let notes = "### What's new in 0.7.1\n\n- **Demo mode has its history back.** Seeded rollups are written again."
+        XCTAssertFalse(ReleaseNotes.isEmpty(notes))
+        XCTAssertEqual(ReleaseNotes.headline(notes), "What's new in 0.7.1")
+    }
+}

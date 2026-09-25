@@ -186,3 +186,47 @@ enum AskSecrets {
         SecItemDelete(query(kind) as CFDictionary)
     }
 }
+
+/// Cleaning up after a model that answers with its own plumbing.
+///
+/// A small model sometimes prints the tool call it meant to make instead of making it — `system tools: {"name":
+/// "runQuery", …}` followed by a fence and an end-of-turn marker. That is not an answer, and showing it teaches
+/// people that the panel is broken rather than that one reply went wrong.
+enum AnswerText {
+    /// Markers the model is supposed to consume rather than emit.
+    private static let scaffolding = [
+        "<executable_end>", "<executable_start>", "<|eot_id|>", "<|end|>", "<end_of_turn>",
+    ]
+
+    static func cleaned(_ raw: String) -> String {
+        var text = raw
+        for marker in scaffolding {
+            text = text.replacingOccurrences(of: marker, with: "")
+        }
+        var lines: [String] = []
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") { continue }
+            if isToolCall(trimmed) { continue }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+            .replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether a line is the model narrating a call rather than answering.
+    private static func isToolCall(_ line: String) -> Bool {
+        let lowered = line.lowercased()
+        guard lowered.contains("\"name\"") || lowered.hasPrefix("system tools") || lowered.hasPrefix("tool_call") else {
+            return false
+        }
+        return lowered.contains("\"arguments\"") || lowered.hasPrefix("system tools") || lowered.hasPrefix("tool_call")
+    }
+
+    /// What to say when cleaning leaves nothing. The queries still ran and are listed under the answer, so this
+    /// points at them rather than pretending the turn produced nothing at all.
+    static let brokenReply = "The model replied with a tool call instead of an answer. The queries it ran are "
+        + "listed below — ask again, or word the question a little differently."
+}
+

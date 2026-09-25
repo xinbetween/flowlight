@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.2, macOS 15 or later.
 
  On this page
 
@@ -692,7 +692,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1238,8 +1238,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.1
+ 0.7.2
 September 25, 2026Latest
+
+ Software Update shows what changed. The notes are built from this page when a release is
+ published, so the window has something to read instead of a single link. Releases from 0.6.5 on have been
+ filled in.
+
+ Ask no longer prints the model's plumbing. A small model sometimes writes out the query it
+ meant to run instead of running it; that is stripped, and a reply left with nothing says so.
+
+ Downloads and checksums →
+
+ 0.7.1
+September 25, 2026
 
  Demo mode has its history back. Since 0.4.0 the statement that writes seeded and imported
  rollups still named an index that release had replaced, so it could not run at all and every seeded row was
@@ -1250,11 +1262,6 @@ September 25, 2026Latest
 
  Search and sharing metadata — structured data describing the application, a designed link
  preview instead of a raw screenshot, and a sitemap that says when each page last changed.
-
- Downloads and checksums →
-
- 0.7.0
-September 25, 2026
 
  A new icon. A prism: one stream in, separated into what it is actually made of, with the
  point of observation marked. The waveform and its two arrows said “bandwidth meter” and competed with each
