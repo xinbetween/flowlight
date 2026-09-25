@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.7, macOS 15 or later.
 
  On this page
 
@@ -692,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1236,8 +1236,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.6
+ 0.6.7
 September 25, 2026Latest
+
+ “Show 25 more” in Reports takes one click. It was written and coloured as a link but
+ quietly wanted a double-click, so clicking it once looked like nothing happened.
+
+ Downloads and checksums →
+
+ 0.6.6
+September 25, 2026
 
  Ask points at the documentation too. An answer about how a feature works now offers the
  section that explains it, next to the button that opens the screen.

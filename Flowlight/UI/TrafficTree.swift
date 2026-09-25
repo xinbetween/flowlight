@@ -245,6 +245,22 @@ struct TrafficNode: Identifiable, Hashable {
     static let pageSize = 25
     static let rootPageSize = 100
     static let moreSuffix = "|__more__"
+    static let rootID = "__root__"
+
+    /// The parent whose child list a "Show more" row stands at the end of, or nil if that isn't one.
+    static func parent(ofMoreRow id: String) -> String? {
+        id.hasSuffix(moreSuffix) ? String(id.dropLast(moreSuffix.count)) : nil
+    }
+
+    /// One more page under that parent. Kept here rather than in the view so it can be tested without clicking:
+    /// the limit has to be raised from the parent's *current* limit, not from the page size, or the second
+    /// "Show more" undoes the first.
+    static func showingMore(_ limits: [String: Int], after moreRowID: String) -> [String: Int] {
+        guard let parent = parent(ofMoreRow: moreRowID) else { return limits }
+        var out = limits
+        out[parent] = (limits[parent] ?? (parent == rootID ? rootPageSize : pageSize)) + pageSize
+        return out
+    }
 
     /// Collapses long child lists to the first `limit` (per parent, grown by "Show more") plus one
     /// summary row, so a node with hundreds of children doesn't bury everything else.

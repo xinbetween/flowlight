@@ -440,34 +440,54 @@ struct ReportsView: View {
         }
     }
 
+    /// The name column for a real row: icon, title, and the hostname beside an IP when there's room for it.
+    @ViewBuilder private func nameCell(_ node: TrafficNode) -> some View {
+        HStack(spacing: 6) {
+            switch node.kind {
+            case .app: AppIconView(path: node.appPath)
+            case .domain: Image(systemName: "globe").foregroundStyle(.secondary)
+            case .owner: Image(systemName: "building.2").foregroundStyle(.secondary)
+            case .unknown: Image(systemName: "questionmark.circle").foregroundStyle(.secondary)
+            case .ip: Image(systemName: "number").foregroundStyle(.secondary)
+            case .more: EmptyView()
+            }
+            let title = Text(node.title).lineLimit(1).truncationMode(.middle)
+                .foregroundStyle(node.kind == .owner ? Color.secondary : Color.primary)
+            if node.detail.isEmpty {
+                title
+            } else {
+                // Hostname beside an IP only when it fits; otherwise it's in the tooltip.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) {
+                        title.fixedSize()
+                        Text(node.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                    }
+                    title
+                }
+            }
+        }
+        .help(help(for: node))
+    }
+
     private var table: some View {
         Table(displayed, children: \.children, selection: $selection, sortOrder: $sortOrder) {
             TableColumn(grouping.columnTitle, value: \.title) { node in
-                HStack(spacing: 6) {
-                    switch node.kind {
-                    case .more: Image(systemName: "ellipsis.circle").foregroundStyle(Color.accentColor)
-                    case .app: AppIconView(path: node.appPath)
-                    case .domain: Image(systemName: "globe").foregroundStyle(.secondary)
-                    case .owner: Image(systemName: "building.2").foregroundStyle(.secondary)
-                    case .unknown: Image(systemName: "questionmark.circle").foregroundStyle(.secondary)
-                    case .ip: Image(systemName: "number").foregroundStyle(.secondary)
-                    }
-                    let title = Text(node.title).lineLimit(1).truncationMode(.middle)
-                        .foregroundStyle(node.kind == .more ? Color.accentColor : node.kind == .owner ? .secondary : .primary)
-                    if node.detail.isEmpty {
-                        title
-                    } else {
-                        // Hostname beside an IP only when it fits; otherwise it's in the tooltip.
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 6) {
-                                title.fixedSize()
-                                Text(node.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                            }
-                            title
+                if node.kind == .more {
+                    // It is written as a link and coloured as one, so it takes a single click. Leaving it to the
+                    // table's double-click made a row that says "Show 25 more" look broken to anyone who clicked it
+                    // once and watched nothing happen.
+                    Button { showMore(node) } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "ellipsis.circle")
+                            Text(node.title).lineLimit(1)
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.link)
+                    .help(help(for: node))
+                } else {
+                    nameCell(node)
                 }
-                .help(help(for: node))
             }
             .width(min: 140)
             TableColumn("Share", value: \.total) { node in
@@ -575,7 +595,7 @@ struct ReportsView: View {
         switch node.kind {
         case .app: return [node.bundleID, node.appPath].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
         case .owner: return "No hostname was seen for this traffic. \(node.title) operates these addresses."
-        case .more: return "Double-click to show more"
+        case .more: return "Show the next \(TrafficNode.pageSize) rows"
         default: return node.detail.isEmpty ? node.title : "\(node.title) · \(node.detail)"
         }
     }
@@ -641,15 +661,13 @@ struct ReportsView: View {
     }
 
     private func showMore(_ node: TrafficNode) {
-        let parent = String(node.id.dropLast(TrafficNode.moreSuffix.count))
-        let current = childLimits[parent] ?? (parent == "__root__" ? TrafficNode.rootPageSize : TrafficNode.pageSize)
-        childLimits[parent] = current + TrafficNode.pageSize
+        childLimits = TrafficNode.showingMore(childLimits, after: node.id)
         selection = nil
     }
 
     private func recompute() {
         let sorted = TrafficNode.filter(nodes, query: query).sorted(using: sortOrder).map { $0.sorted(using: sortOrder) }
-        displayed = TrafficNode.capped(sorted, parentID: "__root__", parent: nil, limits: childLimits, levels: grouping.levels)
+        displayed = TrafficNode.capped(sorted, parentID: TrafficNode.rootID, parent: nil, limits: childLimits, levels: grouping.levels)
     }
 
     private func reload() async {
