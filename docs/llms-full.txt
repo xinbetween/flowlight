@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.4, macOS 15 or later.
 
  On this page
 
@@ -692,7 +692,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1238,8 +1238,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.3
+ 0.7.4
 September 25, 2026Latest
+
+ The icon fills its tile on macOS 26. Tahoe draws its own container behind a legacy icon and
+ masks the artwork to it, so a tile drawn to Apple's older grid sat nested inside with a ring of that
+ container showing. The artwork now fills the canvas and lets the system decide the shape.
+
+ Descriptions across the site run to the width they have rather than stopping at half the
+ band — the section ledes, the figure captions, the footnotes and the roadmap.
+
+ Downloads and checksums →
+
+ 0.7.3
+September 25, 2026
 
  Capture reads top to bottom. What is arriving right now comes first, and each source is
  followed by what it can and cannot see — open, rather than behind a disclosure you have to expand twice

@@ -183,14 +183,14 @@
   .family.egress { border-color: color-mix(in srgb, var(--critical) 35%, var(--line)); }
   .family.egress header { flex-direction: column; align-items: flex-start; gap: 6px; }
   .family.egress .tag { font: 600 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--critical); }
-  .footnote { margin-top: 20px; color: var(--faint); font-size: 14px; max-width: 80ch; }
+  .footnote { margin-top: 20px; color: var(--faint); font-size: 14px; max-width: 124ch; }
 
   /* Privacy */
   .privacy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
   .privacy div { display: grid; gap: 6px; align-content: start; }
   /* One item shouldn't be squeezed into a quarter-width column with three empty ones beside it. It takes the
      whole row and keeps a readable measure instead. */
-  .privacy > div:only-child { grid-column: 1 / -1; max-width: 62ch; }
+  .privacy > div:only-child { grid-column: 1 / -1; max-width: 104ch; }
   .privacy strong { font: 700 18px var(--display); }
   .privacy p { color: var(--muted); font-size: 15px; }
 
@@ -199,7 +199,7 @@
   .screens figure { margin: 0; display: grid; gap: 10px; }
   .screens figcaption { color: var(--muted); font-size: 14px; }
   .detail-shot { margin: 0; display: grid; gap: 12px; }
-  .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 108ch; }
+  .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 132ch; }
 
   /* Install */
   /* The steps carry sentences and the column beside them carries two short lines, so an even split broke the
