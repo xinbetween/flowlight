@@ -57,6 +57,47 @@ final class FlowJudgementTests: XCTestCase {
         XCTAssertEqual(RuleBook.decide(facts(host: "", settled: true), rules: [rule]).verdict, .allow)
     }
 
+    // MARK: The name that arrives in the second segment
+
+    func testAClientHelloSplitAcrossSegmentsOnlyNamesItselfOnceItIsWholeAgain() {
+        // The shape that caused this: a ClientHello around 2 KB, where server_name sits after a key_share too
+        // big for one TCP segment. Reading only the first segment finds nothing — which used to be read as
+        // "this connection has no name" rather than "not yet".
+        let hello = clientHello(host: "www.google-analytics.com", paddingBefore: 1600)
+        XCTAssertGreaterThan(hello.count, 1460, "the point of this test is a hello that doesn't fit one segment")
+
+        let firstSegment = hello.prefix(1460)
+        XCTAssertNil(TLSSNIParser.serverName(in: firstSegment), "the name isn't in the first segment")
+        XCTAssertEqual(TLSSNIParser.serverName(in: hello), "www.google-analytics.com")
+    }
+
+    func testAHelloThatFitsOneSegmentIsStillReadStraightAway() {
+        let hello = clientHello(host: "api.github.com", paddingBefore: 0)
+        XCTAssertEqual(TLSSNIParser.serverName(in: hello), "api.github.com")
+    }
+
+    /// A ClientHello with `paddingBefore` bytes of some other extension ahead of server_name.
+    private func clientHello(host: String, paddingBefore: Int) -> Data {
+        func u16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
+        let name = Array(host.utf8)
+
+        var extensions: [UInt8] = []
+        if paddingBefore > 0 {
+            extensions += u16(0x0033) + u16(paddingBefore) + [UInt8](repeating: 0, count: paddingBefore)
+        }
+        extensions += u16(0x0000) + u16(name.count + 5) + u16(name.count + 3) + [0] + u16(name.count) + name
+
+        var body: [UInt8] = [0x03, 0x03] + [UInt8](repeating: 0xAB, count: 32)   // version + random
+        body += [0]                                                              // no session id
+        body += u16(2) + [0x13, 0x01]                                            // one cipher suite
+        body += [1, 0]                                                           // one compression method
+        body += u16(extensions.count) + extensions
+
+        let handshake: [UInt8] = [0x01, UInt8(body.count >> 16 & 0xFF), UInt8(body.count >> 8 & 0xFF),
+                                  UInt8(body.count & 0xFF)] + body
+        return Data([0x16, 0x03, 0x01] + u16(handshake.count) + handshake)
+    }
+
     private func facts(host: String, settled: Bool = true) -> FlowFacts {
         FlowFacts(agentKey: "com.google.Chrome.helper", bundleID: "com.google.Chrome.helper",
                   host: host, ip: "2607:f8b0:4002:c10::64", port: 443, hostSettled: settled)

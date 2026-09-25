@@ -18,6 +18,7 @@ nav: releases
           <li><strong>Rules that name a host now fire.</strong> A connection was judged on its first bytes, which is
             before TLS hands over the name it is going to — a large ClientHello carries it in the second segment, and
             a DNS answer can land just after. The rule saw no destination, and a connection is judged once.</li>
+          <li><strong>The later segments are kept</strong> and read together, instead of being dropped on the floor.</li>
           <li><strong>The wait is bounded</strong>, so a connection straight to an address is still decided promptly, and
             a name that arrives late is still acted on. <a href="{{root}}docs/#rules">How rules work →</a></li>
         </ul>

@@ -1243,6 +1243,8 @@ September 25, 2026Latest
  before TLS hands over the name it is going to — a large ClientHello carries it in the second segment, and
  a DNS answer can land just after. The rule saw no destination, and a connection is judged once.
 
+ The later segments are kept and read together, instead of being dropped on the floor.
+
  The wait is bounded, so a connection straight to an address is still decided promptly, and
  a name that arrives late is still acted on. How rules work →
 

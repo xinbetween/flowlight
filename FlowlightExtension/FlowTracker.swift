@@ -45,20 +45,38 @@ final class FlowState: @unchecked Sendable {
     private var isDNS: Bool { remotePort == 53 }
     private var isFTPControl: Bool { remotePort == 21 }
 
+    /// The largest stitched-together opening the tracker will hold. A ClientHello beyond this is pathological,
+    /// and the buffer is per open flow.
+    private static let maxOpeningBytes = 8192
+
     func observeOutbound(_ data: Data) {
         lock.lock(); defer { lock.unlock() }
         outboundCallbacks += 1
         if firstOutbound == nil {
             firstOutbound = data
-            if remotePort == 443 || data.first == 0x16 {
-                sniOrHost = TLSSNIParser.serverName(in: data)
-            } else if sniOrHost == nil {
-                sniOrHost = HTTPHostParser.host(in: data)
-            }
+            readName()
         } else if isFTPControl, let current = firstOutbound, current.count < 4096 {
             firstOutbound = current + data // keep looking for AUTH TLS
+        } else if sniOrHost == nil, let current = firstOutbound,
+                  current.count < Self.maxOpeningBytes, nameMayStillArrive {
+            // A ClientHello larger than one segment carries its server_name in the second. Without this the
+            // later segments were dropped on the floor and the connection was decided as if it had no name —
+            // which is how a rule naming a host let that host through.
+            firstOutbound = current + data
+            readName()
         }
         updateDone()
+    }
+
+    /// The destination as the connection's own opening bytes give it: TLS SNI, or an HTTP Host header. Only ever
+    /// fills a name in, never clears one, so a re-read of a longer opening can't undo what a shorter one found.
+    private func readName() {
+        guard sniOrHost == nil, let data = firstOutbound else { return }
+        if remotePort == 443 || data.first == 0x16 {
+            sniOrHost = TLSSNIParser.serverName(in: data)
+        } else {
+            sniOrHost = HTTPHostParser.host(in: data)
+        }
     }
 
     func observeInbound(_ data: Data) {
