@@ -38,7 +38,7 @@ final class AnomalyEngine: @unchecked Sendable {
     private var appsFirstSeen: [String: Int64] = [:]
     private var loaded = false
 
-    private var minuteUploads: [String: (name: String, bytes: Int64)] = [:]
+    private var minuteUploads: [String: (name: String, path: String, bytes: Int64)] = [:]
     private var lastIdleAlert: [String: Date] = [:]
 
     // AI agent state
@@ -113,7 +113,7 @@ final class AnomalyEngine: @unchecked Sendable {
             for record in batch.records {
                 let k = record.key
                 let now = batch.timestamp
-                minuteUploads[k.bundleID, default: (k.appName, 0)].bytes += record.counters.bytesOut
+                minuteUploads[k.bundleID, default: (k.appName, k.appPath, 0)].bytes += record.counters.bytesOut
 
                 let owner = k.domain.isEmpty ? (IPOwnerLookup.shared.cached(k.remoteIP)?.name ?? "") : ""
                 let provider = AgentCatalog.provider(domain: k.domain, owner: owner)
@@ -131,11 +131,14 @@ final class AnomalyEngine: @unchecked Sendable {
                                                owner: owner, at: now, settings: s)
                 }
 
+                // Apple's own software is kept out of the list, not out of the data.
+                let quiet = s.ignoreAppleApps && AppleSystemApps.contains(bundleID: k.bundleID, path: k.appPath)
+
                 if appsFirstSeen[k.bundleID] == nil {
                     appsFirstSeen[k.bundleID] = now
                     newApps.append(k.bundleID)
                     // Only interesting once Flowlight itself has finished learning.
-                    if let oldest = appsFirstSeen.values.min(), now - oldest > Int64(s.learningPeriod) {
+                    if !quiet, let oldest = appsFirstSeen.values.min(), now - oldest > Int64(s.learningPeriod) {
                         alerts.append(try db.addAlert(kind: Kind.newApp.rawValue, bundleID: k.bundleID, appName: k.appName,
                                                       detail: "\(k.appName) made its first observed connection (\(k.domain.isEmpty ? k.remoteIP : k.domain))",
                                                       severity: 1))
@@ -150,7 +153,7 @@ final class AnomalyEngine: @unchecked Sendable {
                     let token = k.bundleID + "|" + dest
                     if seenDestinations.insert(token).inserted {
                         newDestinations.append((k.bundleID, dest))
-                        if appLearned && s.alertFirstContact {
+                        if !quiet && appLearned && s.alertFirstContact {
                             alerts.append(try db.addAlert(kind: Kind.firstContact.rawValue, bundleID: k.bundleID, appName: k.appName,
                                                           detail: "\(k.appName) contacted \(k.domain) (\(k.remoteIP):\(k.port)) for the first time",
                                                           severity: 1))
@@ -162,7 +165,7 @@ final class AnomalyEngine: @unchecked Sendable {
                     let token = k.bundleID + "|" + String(k.port)
                     if seenPorts.insert(token).inserted {
                         newPorts.append((k.bundleID, k.port))
-                        if appLearned && s.alertNonStandardPorts {
+                        if !quiet && appLearned && s.alertNonStandardPorts {
                             alerts.append(try db.addAlert(kind: Kind.nonStandardPort.rawValue, bundleID: k.bundleID, appName: k.appName,
                                                           detail: "\(k.appName) → \(k.domain.isEmpty ? k.remoteIP : k.domain) on \(k.transport.rawValue.uppercased()) port \(k.port) (\(k.appProtocol))",
                                                           severity: 2))
@@ -265,6 +268,9 @@ final class AnomalyEngine: @unchecked Sendable {
         minuteUploads.removeAll()
         var alerts: [AlertRecord] = []
         for (bundleID, entry) in uploads where entry.bytes >= s.idleUploadBytesPerMinute {
+            // Backups, photo sync and Software Update all upload while nobody is touching them; that is what
+            // they are for, and reporting it is how this alert stops being read.
+            if s.ignoreAppleApps && AppleSystemApps.contains(bundleID: bundleID, path: entry.path) { continue }
             guard let idle = activity.idleDuration(bundleID: bundleID), idle >= s.idleMinutes * 60 else { continue }
             if let last = lastIdleAlert[bundleID], now.timeIntervalSince(last) < 3600 { continue }
             lastIdleAlert[bundleID] = now

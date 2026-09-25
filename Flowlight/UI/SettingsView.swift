@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage(K.idleUploadMB) private var idleUploadMB = 5.0
     @AppStorage(K.firstContact) private var firstContact = true
     @AppStorage(K.nonStandardPorts) private var nonStandardPorts = true
+    @AppStorage(K.ignoreAppleApps) private var ignoreAppleApps = true
     @AppStorage(K.notifications) private var notifications = true
     @AppStorage(K.retentionHours) private var retentionHours = 6.0
     @AppStorage(K.menuBarRates) private var menuBarRates = true
@@ -56,6 +57,11 @@ struct SettingsView: View {
                 Section("Rules") {
                     Toggle("First contact with a new domain", isOn: $firstContact)
                     Toggle("Connections to non-standard ports", isOn: $nonStandardPorts)
+                    Toggle("Ignore Apple's own apps", isOn: $ignoreAppleApps)
+                    Text("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it "
+                         + "buries the one line that matters. Their traffic is still recorded, still shown in Live "
+                         + "and Reports, and still subject to every rule and guardrail.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
                     Toggle("Agent uses email, file transfer, SSH, tunnels or databases", isOn: $agentSensitive)

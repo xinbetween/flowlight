@@ -179,6 +179,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li><strong>First contact</strong> with a new domain, and <strong>non-standard ports</strong>, after a 24-hour learning period per app.</li>
         <li><strong>Traffic without UI activity:</strong> a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.</li>
       </ul>
+      <p><strong>Apple's own apps are left out by default.</strong> macOS contacts Apple constantly — Software Update, iCloud,
+      push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
+      line worth reading. Turn it off in <strong>Settings › Alerts</strong> if you want them. Either way the traffic is still
+      recorded, still appears in Live, Reports and Ask, and is still subject to every rule, guardrail and allowlist: the setting
+      decides what is listed, never what is allowed.</p>
 
       <h2 id="ask">Ask</h2>
       <p>Ask in plain language — <em>what did Claude Code upload yesterday?</em>, <em>which app started talking to somewhere new

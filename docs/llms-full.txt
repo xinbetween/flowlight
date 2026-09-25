@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.5, macOS 15 or later.
 
  On this page
 
@@ -259,6 +259,12 @@ open build/Build/Products/Release/Flowlight.app
  First contact with a new domain, and non-standard ports, after a 24-hour learning period per app.
 
  Traffic without UI activity: a windowed app you haven't used for 10 minutes uploads more than 5 MB a minute.
+
+ Apple's own apps are left out by default. macOS contacts Apple constantly — Software Update, iCloud,
+ push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
+ line worth reading. Turn it off in Settings › Alerts if you want them. Either way the traffic is still
+ recorded, still appears in Live, Reports and Ask, and is still subject to every rule, guardrail and allowlist: the setting
+ decides what is listed, never what is allowed.
 
  Ask
 
@@ -692,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1238,8 +1244,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.4
+ 0.7.5
 September 25, 2026Latest
+
+ Apple's own apps are left out of Alerts by default. macOS contacts Apple constantly — updates,
+ iCloud, push, time — on hosts and ports that are new the first time they appear, and listing all of it buried
+ the one line worth reading. Settings › Alerts turns it back on.
+
+ It decides what is listed, not what is allowed. The traffic is still recorded, still shown in
+ Live, Reports and Ask, and still subject to every rule, guardrail and allowlist.
+
+ Downloads and checksums →
+
+ 0.7.4
+September 25, 2026
 
  The icon fills its tile on macOS 26. Tahoe draws its own container behind a legacy icon and
  masks the artwork to it, so a tile drawn to Apple's older grid sat nested inside with a ring of that
