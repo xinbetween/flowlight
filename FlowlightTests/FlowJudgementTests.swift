@@ -77,26 +77,46 @@ final class FlowJudgementTests: XCTestCase {
     }
 
     /// A ClientHello with `paddingBefore` bytes of some other extension ahead of server_name.
+    ///
+    /// Written as one `append` per field rather than as concatenated array literals: the chained version was a
+    /// single expression the Swift type checker gave up on, which fails the build rather than the test.
     private func clientHello(host: String, paddingBefore: Int) -> Data {
-        func u16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
-        let name = Array(host.utf8)
+        let name: [UInt8] = Array(host.utf8)
 
         var extensions: [UInt8] = []
         if paddingBefore > 0 {
-            extensions += u16(0x0033) + u16(paddingBefore) + [UInt8](repeating: 0, count: paddingBefore)
+            extensions.append(contentsOf: u16(0x0033))
+            extensions.append(contentsOf: u16(paddingBefore))
+            extensions.append(contentsOf: [UInt8](repeating: 0, count: paddingBefore))
         }
-        extensions += u16(0x0000) + u16(name.count + 5) + u16(name.count + 3) + [0] + u16(name.count) + name
+        extensions.append(contentsOf: u16(0x0000))          // server_name
+        extensions.append(contentsOf: u16(name.count + 5))  // extension length
+        extensions.append(contentsOf: u16(name.count + 3))  // name list length
+        extensions.append(0)                                // host_name
+        extensions.append(contentsOf: u16(name.count))
+        extensions.append(contentsOf: name)
 
-        var body: [UInt8] = [0x03, 0x03] + [UInt8](repeating: 0xAB, count: 32)   // version + random
-        body += [0]                                                              // no session id
-        body += u16(2) + [0x13, 0x01]                                            // one cipher suite
-        body += [1, 0]                                                           // one compression method
-        body += u16(extensions.count) + extensions
+        var body: [UInt8] = [0x03, 0x03]
+        body.append(contentsOf: [UInt8](repeating: 0xAB, count: 32))   // random
+        body.append(0)                                                 // no session id
+        body.append(contentsOf: u16(2))
+        body.append(contentsOf: [0x13, 0x01] as [UInt8])               // one cipher suite
+        body.append(contentsOf: [1, 0] as [UInt8])                     // one compression method
+        body.append(contentsOf: u16(extensions.count))
+        body.append(contentsOf: extensions)
 
-        let handshake: [UInt8] = [0x01, UInt8(body.count >> 16 & 0xFF), UInt8(body.count >> 8 & 0xFF),
-                                  UInt8(body.count & 0xFF)] + body
-        return Data([0x16, 0x03, 0x01] + u16(handshake.count) + handshake)
+        var handshake: [UInt8] = [0x01]
+        handshake.append(contentsOf: u24(body.count))
+        handshake.append(contentsOf: body)
+
+        var record: [UInt8] = [0x16, 0x03, 0x01]
+        record.append(contentsOf: u16(handshake.count))
+        record.append(contentsOf: handshake)
+        return Data(record)
     }
+
+    private func u16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
+    private func u24(_ v: Int) -> [UInt8] { [UInt8(v >> 16 & 0xFF), UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
 
     private func facts(host: String, settled: Bool = true) -> FlowFacts {
         FlowFacts(agentKey: "com.google.Chrome.helper", bundleID: "com.google.Chrome.helper",
