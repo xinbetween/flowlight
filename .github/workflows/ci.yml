@@ -110,6 +110,11 @@ jobs:
       - name: Test
         timeout-minutes: 40
         run: |
+          # GitHub runs this step under `bash -e`, so the first failing command ends it. That killed the whole
+          # point of the reporting below: a failing test exited 65 with no output at all, and the log saying
+          # which test failed was thrown away with the runner. `set +e` has to be explicit — the `set` line
+          # below can't clear a flag the shell was started with.
+          set +e
           set -uo pipefail
           # xcodebuild occasionally never returns here — the same suite passes locally and on most runs, and the
           # per-test allowance below doesn't always catch it, so the whole invocation gets a watchdog. One retry:
@@ -153,7 +158,8 @@ jobs:
 
           if [ "$status" -ne 0 ]; then
             echo "::group::Last 300 lines"; tail -300 "$LOG"; echo "::endgroup::"
-            echo "Why it failed:"
+            echo "Why it failed (status $status):"
+            # Outside the group, so it is the first thing visible on a failed run.
             grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
             exit 1
           fi
