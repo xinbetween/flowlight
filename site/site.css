@@ -57,7 +57,9 @@
   p { margin: 0; }
   /* Not `balance`: it evens the lines by making all of them short, which left every section description
      hanging in the left third of the band. Ledes fill the measure and `pretty` keeps the last line company. */
-  .lede { color: var(--muted); font-size: 18px; max-width: 80ch; }
+  /* The band is 1160px and 80ch was about 700 of it, so every description stopped at roughly three fifths of
+     the width with the rest empty — which reads as a broken line rather than as a measure. */
+  .lede { color: var(--muted); font-size: 18px; max-width: 100ch; }
   .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
   code, .mono { font-family: var(--mono); font-size: .92em; }
 
@@ -200,7 +202,9 @@
   .detail-shot figcaption { color: var(--muted); font-size: 15px; max-width: 108ch; }
 
   /* Install */
-  .install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+  /* The steps carry sentences and the column beside them carries two short lines, so an even split broke the
+     steps early and left the other side half empty. */
+  .install { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; align-items: start; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: step; }
   .steps li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 14px; counter-increment: step; }
   .steps li::before { content: counter(step); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
