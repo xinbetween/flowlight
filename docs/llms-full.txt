@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.4, macOS 15 or later.
 
  On this page
 
@@ -301,7 +301,7 @@ open build/Build/Products/Release/Flowlight.app
  AI agent rules
 
  An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
- Gemini CLI, Ollama and ZCode) or if it calls one of 24 LLM API providers. Browsers are excluded.
+ Gemini CLI, Ollama and ZCode) or if it calls one of 27 LLM API providers. Browsers are excluded.
 
  RuleFires when an agent…Default
 
@@ -694,7 +694,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -811,7 +811,7 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  Your agents have network access. Now you have oversight.
 
  Flowlight knows 16 agents by name. It also spots any other process that calls one of
- 24 LLM API providers, so a Python script talking to api.openai.com is an agent too.
+ 27 LLM API providers, so a Python script talking to api.openai.com is an agent too.
  Browsers don't count: a person chatting isn't an agent.
 
  Claude CodeCodexCursor
@@ -1238,8 +1238,18 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.3
+ 0.6.4
 September 25, 2026Latest
+
+ Meta's AI is recognised — Muse, Meta AI and Llama, which all answer from Meta's own network.
+
+ Facebook, Instagram and WhatsApp are deliberately excluded, because filing a scroll through
+ Instagram as AI traffic would make the whole column untrustworthy.
+
+ Downloads and checksums →
+
+ 0.6.3
+September 25, 2026
 
  Twenty-two rule templates — agents, the ways data leaves, telemetry, working hours, and one-off
  investigation — applied from any row in Live, Reports, AI Agents or Inspect.

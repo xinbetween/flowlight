@@ -50,7 +50,7 @@ Flowlight answers that for every app on your Mac, then goes deeper for AI agents
 
 ### AI Agent Watch
 Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
-Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 24 LLM API providers**, so a
+Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 27 LLM API providers**, so a
 Python script hitting `api.openai.com` shows up too. Browsers are excluded, because a person chatting isn't an agent.
 
 For each agent you see which AI providers it uses, and **everything else it contacted**, including what its tools

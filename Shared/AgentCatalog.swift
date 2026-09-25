@@ -49,9 +49,19 @@ enum AgentCatalog {
         // Only the DashScope API host: the rest of aliyuncs.com is general Alibaba Cloud (storage included).
         ("dashscope.aliyuncs.com", "Alibaba Qwen"), ("dashscope-intl.aliyuncs.com", "Alibaba Qwen"),
         ("minimax.io", "MiniMax"), ("minimaxi.com", "MiniMax"), ("minimax.chat", "MiniMax"),
+        // Meta's AI, named host by host. muse.ai, ai.meta.com and api.llama.com all answer from Meta's own
+        // network, so this is one ecosystem rather than three vendors — but meta.com, facebook.com and
+        // fbcdn.net stay out of it deliberately: they carry Facebook, Instagram and WhatsApp, and labelling a
+        // scroll through Instagram as AI traffic would make the whole column untrustworthy.
+        ("muse.ai", "Meta Muse"), ("meta.ai", "Meta AI"), ("ai.meta.com", "Meta AI"),
+        ("llama.com", "Meta Llama"), ("llama.developer.meta.com", "Meta Llama"),
     ]
 
     /// Network owners (AS names) that only serve AI APIs, for traffic seen without a hostname.
+    ///
+    /// Meta is deliberately absent. Its network carries Facebook, Instagram and WhatsApp as well as its AI, so
+    /// matching on the owner would call every one of those an AI provider — which is the opposite of useful on a
+    /// screen whose job is telling an agent's traffic from everything else.
     static let providerOwners: [(fragment: String, name: String)] = [("Anthropic", "Anthropic"), ("OpenAI", "OpenAI")]
 
     static let browsers: Set<String> = [

@@ -187,3 +187,43 @@ final class AgentTests: XCTestCase {
         XCTAssertFalse(exfil.detail.contains("api.openai.com"), "AI provider traffic is not egress")
     }
 }
+
+/// Meta's AI, which is one ecosystem answering from one network rather than three separate vendors.
+final class MetaAIDetectionTests: XCTestCase {
+
+    func testMetasAIHostsAreRecognised() {
+        // muse.ai, ai.meta.com and api.llama.com all resolve into Meta's own network — Muse is Meta's agent,
+        // not the video platform the name used to belong to.
+        XCTAssertEqual(AgentCatalog.provider(domain: "muse.ai"), "Meta Muse")
+        XCTAssertEqual(AgentCatalog.provider(domain: "api.muse.ai"), "Meta Muse")
+        XCTAssertEqual(AgentCatalog.provider(domain: "meta.ai"), "Meta AI")
+        XCTAssertEqual(AgentCatalog.provider(domain: "ai.meta.com"), "Meta AI")
+        XCTAssertEqual(AgentCatalog.provider(domain: "llama.com"), "Meta Llama")
+        XCTAssertEqual(AgentCatalog.provider(domain: "api.llama.com"), "Meta Llama")
+        XCTAssertEqual(AgentCatalog.provider(domain: "llama.developer.meta.com"), "Meta Llama")
+    }
+
+    func testTheRestOfMetaIsNotCalledAI() {
+        // The whole point of the column is separating an agent's traffic from everything else. If scrolling
+        // Instagram counted as an AI provider, nobody could trust a single row of it.
+        for host in ["facebook.com", "www.facebook.com", "instagram.com", "graph.facebook.com",
+                     "web.whatsapp.com", "fbcdn.net", "scontent.xx.fbcdn.net", "meta.com", "about.meta.com"] {
+            XCTAssertNil(AgentCatalog.provider(domain: host), "\(host) should not count as an AI provider")
+        }
+    }
+
+    func testMetasNetworkIsNotMatchedByOwner() {
+        // Traffic with no hostname is matched on the network's owner, which works for Anthropic and OpenAI
+        // because they serve nothing else. Meta serves most of the consumer internet.
+        XCTAssertNil(AgentCatalog.provider(domain: "", owner: "Facebook, Inc."))
+        XCTAssertNil(AgentCatalog.provider(domain: "", owner: "Meta Platforms, Inc."))
+        XCTAssertEqual(AgentCatalog.provider(domain: "", owner: "Anthropic, PBC"), "Anthropic")
+    }
+
+    func testTalkingToMetasAIMakesAProcessAnAgent() {
+        // The catalogue's rule: an app counts as an agent when it talks to an LLM API provider. That is what
+        // makes "track muse.ai as an AI agent" work without inventing a bundle identifier for it.
+        XCTAssertNotNil(AgentCatalog.provider(domain: "muse.ai"))
+        XCTAssertFalse(AgentCatalog.isBrowser("com.example.SomeTool"))
+    }
+}
