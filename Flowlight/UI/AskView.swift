@@ -92,30 +92,32 @@ private struct AskContent: View {
     private var composer: some View {
         VStack(spacing: 10) {
             // Suggestions sit with the field rather than in the empty state: this is where someone is looking
-            // when they don't know what to type, and they survive the first question instead of vanishing.
-            if ask.turns.isEmpty && ask.blockedReason == nil {
-                // A dozen chips is wider than any window, so they scroll. No scrollbar: it would be the only
-                // one on the screen and it draws more attention than the thing it scrolls.
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Self.suggestions, id: \.self) { suggestion in
-                            SuggestionChip(text: suggestion) { askNow(suggestion) }
-                        }
+            // when they don't know what to type, and they stay after the first question instead of vanishing.
+            // They wrap rather than scroll — a chip half off the edge is a chip nobody knows about.
+            if ask.blockedReason == nil {
+                FlowLayout(spacing: 8, lineSpacing: 8) {
+                    ForEach(Self.suggestions, id: \.self) { suggestion in
+                        SuggestionChip(text: suggestion) { askNow(suggestion) }
                     }
-                    .padding(.vertical, 1)
                 }
-                .frame(height: 30)
-                .mask(LinearGradient(stops: [.init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
-                                     startPoint: .leading, endPoint: .trailing))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            HStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.tertiary)
-                    TextField("Ask about this Mac's network activity", text: $question)
+            HStack(alignment: .bottom, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.tertiary).padding(.top, 2)
+                    // Three lines of room, because the questions worth asking are sentences rather than keywords
+                    // and a one-line field makes them look wrong before they are finished.
+                    TextField("Ask about this Mac's network activity", text: $question, axis: .vertical)
+                        .lineLimit(3, reservesSpace: true)
                         .textFieldStyle(.plain)
                         .focused($typing)
-                        .onSubmit { askNow(question) }
+                        .onKeyPress(keys: [.return]) { press in
+                            // Return asks. Shift- or Option-Return starts a new line, as every other composer does.
+                            guard press.modifiers.isEmpty else { return .ignored }
+                            askNow(question)
+                            return .handled
+                        }
                         .disabled(ask.thinking || ask.blockedReason != nil)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 8)
@@ -147,7 +149,7 @@ private struct AskContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .measured(Measure.prose)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Measure.gutter)
         .padding(.vertical, 12)
         .background(.bar)

@@ -47,7 +47,7 @@ struct AgentsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 if roomy {
-                    Text("Every AI agent on this Mac, and where it sends data besides its model provider.")
+                    Text("Observed AI agent activity, including destinations outside each agent's model provider.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -62,7 +62,7 @@ struct AgentsView: View {
                 ContentUnavailableView {
                     Label("No AI agents seen", systemImage: "sparkles")
                 } description: {
-                    Text("Flowlight recognizes agents such as Claude Code, Codex, Cursor and Ollama, and any other app that calls an LLM API (Anthropic, OpenAI, Gemini, Mistral, OpenRouter and more).")
+                    Text("Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider.")
                 }
                 .frame(maxHeight: .infinity)
             } else {

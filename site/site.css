@@ -342,14 +342,28 @@
   /* The table of contents, in sections. Twenty-eight links in one column is a list nobody reads to the end of;
      eight labelled groups is something you can scan. */
   .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 14px; }
+  .toc-sheet { --toc-group-gap: 10px; }
   /* It is a <details>, so it would otherwise pick up the FAQ card — border, background and all — on every page
      that has a table of contents. It only wants that treatment on a phone, where it folds up. */
-  .toc-sheet { display: grid; gap: 18px; border: 0; background: none; padding: 0; border-radius: 0; }
+  .toc-sheet { display: grid; gap: var(--toc-group-gap, 26px); border: 0; background: none; padding: 0; border-radius: 0; }
   .toc-sheet > summary { display: none; }
-  .toc-group { display: grid; gap: 7px; }
-  .toc a { color: var(--muted); text-decoration: none; }
-  .toc a:hover { color: var(--ink); }
-  .toc strong, .toc-sheet > summary { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .toc-group { display: grid; gap: 1px; }
+  /* The group headings used to sit closer to the item above them than to the items below, so the list read as
+     one run of 29 links with stray labels in it. Each group now opens with a ruled heading and its links are
+     indented under it, which is the whole hierarchy stated twice — by space and by alignment. */
+  .toc-group > strong {
+    margin: 0 0 7px; padding-top: 17px; border-top: 1px solid var(--line);
+    font: 600 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink);
+  }
+  /* The rule belongs above the heading. Below it, it separated a heading from its own links and left the
+     heading hanging off the group before it — the opposite of what it was there to say. The first group keeps
+     its rule too, which caps the list against the text above it. */
+  .toc-group > a {
+    color: var(--muted); text-decoration: none;
+    padding: 4px 0 4px 12px; border-left: 2px solid transparent; border-radius: 0 4px 4px 0;
+  }
+  .toc-group > a:hover { color: var(--ink); border-left-color: var(--accent); background: var(--surface); }
+  .toc-sheet > summary { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
   .prose { max-width: 72ch; display: grid; gap: 16px; overflow-wrap: break-word; }
   /* A grid item won't shrink below its min-content width unless told to, and the min-content width of a <pre>
      holding a git clone URL is the whole URL. Without this the docs page laid out about 1000px wide on a phone
@@ -415,7 +429,8 @@
     .toc-sheet > summary::after { content: "+"; font: 500 18px/1 var(--mono); color: var(--faint); }
     .toc-sheet[open] > summary::after { content: "\2013"; }
     .toc-sheet:not([open]) { gap: 0; }
-    .toc-group a { padding-block: 3px; }
+    .toc-sheet { --toc-group-gap: 6px; }
+    .toc-group > a { padding-block: 3px; }
     .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .footer-brand { grid-column: 1 / -1; }
   }

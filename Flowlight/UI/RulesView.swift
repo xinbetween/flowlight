@@ -159,7 +159,7 @@ struct RulesView: View {
         if monitor.mode != .networkExtension && blind.contains(where: { $0.engine == .flow }) {
             return "\(blind.count == 1 ? "One rule is" : "\(blind.count) rules are") being watched but not carried out. "
                 + "Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler "
-                + "counts traffic after the fact. Switch source in Capture to make these bite."
+                + "counts traffic after the fact. Select the Network Extension in Capture to enforce these rules."
         }
         return "\(blind.count == 1 ? "One rule is" : "\(blind.count) rules are") being watched but not carried out — "
             + "a rule that names a path can only be matched by HTTPS inspection, and it is off."

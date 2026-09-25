@@ -4,11 +4,11 @@
 
 # Flowlight
 
-**See every connection your Mac makes, and every move your AI agents make.**
+**Application-aware network monitoring for macOS, with focused visibility into AI agents.**
 
-A native macOS network monitor that ties each byte to the app that sent it and the domain it went to.
-It watches AI agents for the things you'd never approve: emailing files, opening SSH sessions, or
-uploading your repo while you're away.
+A native macOS network monitor that attributes observed traffic to applications and destinations.
+It highlights AI agent activity such as sensitive protocols, unfamiliar destinations, and large
+uploads, with local history and explainable alerts.
 
 [**Download for macOS**](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg) ·
 [Website](https://flowlight.xinbetween.com) ·
@@ -34,13 +34,14 @@ is. A firewall asks you to allow *each* connection. Neither answers the question
 
 > **What are my agents talking to, besides their model provider?**
 
-Flowlight answers that for every app on your Mac, then goes deeper for AI agents.
+Flowlight answers that for observed application traffic, then provides additional context for recognized AI agents.
 
 ## Features
 
-### Every app × every domain × every protocol
-- **Per-app attribution** for every TCP and UDP flow, including CLI tools and background daemons, not just windows.
-- **Real hostnames, not bare IPs.** Taken from TLS server names and DNS answers seen on the wire, with an optional
+### Applications × destinations × protocols
+- **Per-app attribution** for observed TCP and UDP activity, including CLI tools and background services. Coverage
+  depends on the selected capture source; the nettop sampler can miss short-lived connections.
+- **Resolved hostnames where available.** Learned from observed TLS server names and DNS responses, with an optional
   fallback to the network owner (*Cloudflare, Inc. · AS13335*).
 - **108 protocols in 13 families**, recognized by port and by content:
   web (HTTP/1–3, QUIC, WebSocket) · email (SMTP, submission, IMAP, POP3 and their TLS variants) · file transfer
@@ -50,8 +51,8 @@ Flowlight answers that for every app on your Mac, then goes deeper for AI agents
 
 ### AI Agent Watch
 Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
-Aider, Goose, Ollama, ZCode and more). It also finds **any other process that calls one of 27 LLM API providers**, so a
-Python script hitting `api.openai.com` shows up too. Browsers are excluded, because a person chatting isn't an agent.
+Aider, Goose, Ollama, ZCode and more). It also classifies non-browser processes that contact one of 27 known LLM API
+providers. Provider contact is a classification signal, not proof that a process is autonomous or malicious.
 
 For each agent you see which AI providers it uses, and **everything else it contacted**, including what its tools
 and MCP servers did:
@@ -90,15 +91,15 @@ These rules watch every agent:
 Every threshold is adjustable in Settings.
 
 ### HTTPS inspection (optional)
-Off by default. When you turn it on, Flowlight runs a local proxy (`127.0.0.1:8877`) with a certificate authority created
-on your Mac, and decrypts the apps you route through it: headers, bodies, status and timing for every request.
+Off by default. When enabled, Flowlight runs a local proxy (`127.0.0.1:8877`) with a certificate authority created
+on your Mac. For supported HTTP traffic routed through the proxy, it records headers, bodies, status and timing.
 
 - **AI agents only, by default.** Other apps sent through the proxy pass through encrypted and aren't recorded.
 - **Route an agent** with *Open Inspected Terminal* (or paste the shell setup): proxy variables plus the Flowlight
   certificate for Node, Python, curl and Git, for that shell only. Optionally trust the certificate and use the system
   proxy for desktop apps; its PAC file falls back to a direct connection whenever Flowlight isn't running.
-- **Never decrypted:** Apple services, password managers, anything you add, and apps that pin their certificates
-  (detected and passed through automatically).
+- **Excluded by default:** Flowlight's built-in list of Apple services and password managers, plus any destination
+  you add. Applications that pin certificates may reject interception and are passed through when detected.
 - **What each agent declares.** Tools it offers the model (and which the model actually used), the provider's own tools
   (web search, code execution), the model, the number of calls and tokens in/out/cached.
 - **MCP servers, all three kinds:** local processes, servers this Mac calls over HTTPS, and servers the *provider*

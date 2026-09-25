@@ -13,7 +13,22 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.6.8</h2><time datetime="2026-09-25">September 25, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.7.0</h2><time datetime="2026-09-25">September 25, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>A new icon.</strong> A prism: one stream in, separated into what it is actually made of, with the
+            point of observation marked. The waveform and its two arrows said “bandwidth meter” and competed with each
+            other at Dock and menu sizes; the sizes below 64px are now drawn separately rather than shrunk.</li>
+          <li><strong>Plainer language throughout</strong> the app, the README and the site — what Flowlight observes and
+            records, stated without overclaiming.</li>
+          <li><strong>Ask keeps its suggestions.</strong> They wrap onto as many rows as they need instead of scrolling
+            out of sight, stay put after the first question, and the field is three lines tall.
+            <a href="{{root}}docs/#ask">About Ask →</a></li>
+          <li><strong>The documentation contents reads as groups</strong> rather than as one run of twenty-nine links.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.7.0">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.6.8</h2><time datetime="2026-09-25">September 25, 2026</time></header>
         <ul>
           <li><strong>Rules that name a host now fire.</strong> A connection was judged on its first bytes, which is
             before TLS hands over the name it is going to — a large ClientHello carries it in the second segment, and

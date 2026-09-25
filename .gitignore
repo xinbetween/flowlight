@@ -22,3 +22,6 @@ certs/
 
 # macOS
 .DS_Store
+
+# Working directory for design proofs and one-off scripts.
+scratchpad/

@@ -111,10 +111,10 @@ struct CaptureView: View {
 
     private func sourceBlurb(_ mode: CaptureMode) -> String {
         mode == .networkExtension
-            ? "A content filter in the path of every connection. Nothing short-lived escapes it, and it needs the "
-              + "entitlement and your approval."
-            : "Reads nettop once a second. No entitlement, no approval, and no trace of a connection that starts "
-              + "and finishes between two readings."
+            ? "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and "
+              + "your approval."
+            : "Samples nettop once per second without a separate entitlement. Connections that begin and end "
+              + "between samples may not be recorded."
     }
 
     /// Whether anything is actually arriving. The source rows say what was asked for; this says what happened.
@@ -234,23 +234,22 @@ struct CaptureView: View {
         DisclosureGroup(isExpanded: $showFilterNotes) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("""
-                The content filter (NEFilterDataProvider) attributes every TCP/UDP flow to its app via the audit token, \
+                The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, \
                 extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It \
                 requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid \
                 developer team, and the app must be in the Applications folder. It never blocks traffic.
                 """)
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                CaptureFact(icon: "checkmark.seal", tint: .green, title: "Nothing short-lived escapes it",
-                            detail: "macOS calls the filter as each connection is made, so a request that lasts five "
-                            + "milliseconds is recorded like any other. It also costs less energy than sampling, which "
-                            + "starts a process every second. Traffic from before you enable it isn't there, some "
-                            + "system traffic is exempt from content filters, and byte counts come from the filter's "
-                            + "own statistics.")
+                CaptureFact(icon: "checkmark.seal", tint: .green, title: "Captures short-lived eligible flows",
+                            detail: "macOS calls the filter when an eligible connection opens, providing better "
+                            + "coverage of short requests than periodic sampling. Traffic from before activation is "
+                            + "not available, some system traffic is exempt from content filters, and byte counts "
+                            + "come from the filter's statistics reports.")
                 CaptureFact(icon: "info.circle", tint: .secondary, title: "It keeps filtering after you quit Flowlight",
-                            detail: "A system extension runs on its own, so the filter carries on inspecting "
-                            + "connections and holding what it sees until you press Disable or Uninstall above. "
-                            + "Nothing reaches this app while it isn't running, but the filter is still there.")
+                            detail: "The system extension runs independently and remains active until you select "
+                            + "Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by "
+                            + "the extension for later delivery, subject to its retention limit.")
                 CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
                             title: "macOS runs one content filter at a time",
                             detail: "If a VPN or security agent already has that slot — Palo Alto Networks "

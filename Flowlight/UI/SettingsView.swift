@@ -71,7 +71,7 @@ struct SettingsView: View {
                 } header: {
                     Text("AI agents")
                 } footer: {
-                    Text("Agents are known tools (Claude Code, Codex, Cursor…) and any app that calls an LLM API. They get a 1-hour learning period instead of 24 hours.")
+                    Text("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Traffic without UI activity") {

@@ -238,7 +238,7 @@ private struct InspectionSetup: View {
                 Image(systemName: "lock.open.display").font(.system(size: 34)).foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("HTTPS inspection").font(.title2.bold())
-                    Text("See the full requests and responses your apps and AI agents exchange, including every tool call the model asks for. Flowlight becomes a local proxy with its own certificate authority, created on this Mac. It's off by default and everything it records stays here.")
+                    Text("Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

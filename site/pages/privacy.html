@@ -1,15 +1,15 @@
 <!--
 title: Flowlight privacy
-description: What Flowlight records, where it stays, and every network request the app makes.
+description: What Flowlight records, where it is stored, and which external services the app contacts.
 path: /privacy/
 nav: privacy
 -->
 <main id="main">
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Privacy</p>
-    <h1>Your traffic stays on your Mac</h1>
-    <p class="lede">Flowlight has no account, no server and no analytics. This page lists everything it records and every request it makes,
-      so you can check the claims against the <a href="https://github.com/{{repo}}">source</a>.</p>
+    <h1>Local by default, with documented exceptions</h1>
+    <p class="lede">Flowlight requires no account and includes no product analytics. Traffic records are stored locally. This page documents
+      what the app records, the optional features that contact external services, and how to verify these claims in the <a href="https://github.com/{{repo}}">source code</a>.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -23,8 +23,8 @@ nav: privacy
       <ul>
         <li>Flowlight records network metadata (which app, which host, which port, how many bytes, when) in a database on your Mac.</li>
         <li>It never records packet contents and never decrypts traffic, unless you turn on the optional HTTPS inspection for apps you route through it.</li>
-        <li>Nothing you record is ever sent anywhere. There is no telemetry, crash reporting or analytics.</li>
-        <li>The app makes a few network requests of its own, listed below, and you can turn off each optional one.</li>
+        <li>Flowlight does not upload its traffic database and includes no telemetry, crash reporting or product analytics.</li>
+        <li>The app's own external requests and user-configured export paths are documented below.</li>
       </ul>
 
       <h2 id="records">What it records</h2>
@@ -47,8 +47,7 @@ nav: privacy
       <p>Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
         <code>~/Library/Application Support/Flowlight/Inspection</code>) and runs a proxy that accepts connections only from this Mac. For apps you
         route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
-        (Authorization, cookies, API keys) are replaced with their length before anything is stored. Apple services and password managers are
-        never decrypted. Nothing recorded is sent anywhere. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
+        (Authorization, cookies, API keys) are replaced with their length before anything is stored. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
         Data</strong> deletes the certificate, its trust setting and every recorded request.</p>
 
       <h2 id="requests">Network requests the app makes</h2>
@@ -58,6 +57,9 @@ nav: privacy
         <tr><td>Update download</td><td><code>github.com</code></td><td>The disk image and its checksum file</td><td>Only when you click Download &amp; Open</td></tr>
         <tr><td>Reverse DNS</td><td>Your configured DNS resolver</td><td>A lookup of an IP address's registered name, when no hostname was seen</td><td>As needed, in the default capture mode</td></tr>
         <tr><td>Network owner lookup</td><td>Team Cymru, over DNS</td><td>Public IP addresses with no known hostname. Private and reserved addresses never leave your Mac</td><td>On by default. Off switch in Capture › Identify network owners</td></tr>
+        <tr><td>Ask with a hosted model</td><td>The provider you select: Anthropic, OpenAI, Google Gemini or a compatible endpoint</td><td>Your question and the results returned by the read-only Flowlight queries selected by the model. The traffic database itself is not uploaded</td><td>Only when you select a hosted provider and submit a question. The Ask screen shows the transmitted requests</td></tr>
+        <tr><td>Collector export</td><td>The OpenTelemetry or HTTP endpoint you configure</td><td>The fields shown in Settings › Export, such as traffic rollups and alerts. Authentication headers are stored in Keychain</td><td>Only after you configure an endpoint and enable export</td></tr>
+        <tr><td>Inspected application traffic</td><td>The original destination requested by the inspected application</td><td>The application's request, forwarded through Flowlight's local proxy after decryption</td><td>Only while HTTPS inspection is enabled and the application is routed through the proxy</td></tr>
       </table>
 
       <h2 id="permissions">Permissions</h2>

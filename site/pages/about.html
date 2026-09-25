@@ -25,7 +25,7 @@ nav: about
         apologized, disabled the feature and open-sourced the app. But the discovery came from a disk-usage mystery, not from any tool
         built to notice.</p>
       <p>The uploads were encrypted. The part that mattered wasn't: <strong>which app, which host, how many megabytes, and when.</strong> macOS
-        already knows those facts for every connection. Flowlight exists to put them on screen, keep the history, and tell you when an app,
+        exposes those facts for supported network flows. Flowlight puts them on screen, keeps the history, and alerts when an app,
         especially an agent, does something that doesn't look like its usual self.</p>
 
       <h2 id="principles">Principles</h2>
@@ -33,9 +33,9 @@ nav: about
         <li><strong>Explain first, block only if asked.</strong> Flowlight watches and explains by default. It can also refuse — an
           allowlist, a rule about an app or a destination, a guardrail on an agent's tools — but only once you turn that on, and never
           for local traffic, DNS or Apple services. Every refusal is recorded, and every refusal carries its way out.</li>
-        <li><strong>Metadata, not payloads.</strong> Hostnames, ports and byte counts are enough to catch what matters. Contents stay encrypted and unread.</li>
+        <li><strong>Metadata by default.</strong> Standard monitoring records hostnames, ports and byte counts while payloads remain encrypted. Optional HTTPS inspection is explicit, scoped and locally stored.</li>
         <li><strong>Local first.</strong> Your history is a file on your Mac. No account, no cloud, no telemetry.</li>
-        <li><strong>Explainable alerts.</strong> Every alert names the app, the destination and the number that tripped it. No black-box scores.</li>
+        <li><strong>Explainable alerts.</strong> Alerts include the app, relevant destination and evidence that triggered the rule. Flowlight does not use an opaque risk model.</li>
         <li><strong>Open source.</strong> A tool that watches your traffic should be one you can read. Flowlight is GPL-3.0.</li>
       </ul>
 

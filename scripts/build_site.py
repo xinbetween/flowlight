@@ -72,7 +72,9 @@ def document(meta, body, root, css_href, inline_css=None):
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="{DOMAIN}{path}">
-<meta property="og:image" content="{DOMAIN}/assets/screenshots/agents.png">
+<meta property="og:image" content="{DOMAIN}/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="{root}assets/icon.png">
 {FONTS}

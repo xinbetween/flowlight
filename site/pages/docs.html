@@ -230,7 +230,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Command-line agents ignore system proxy settings, so for Claude Code, Codex, Gemini CLI or Aider use <strong>Open Inspected Terminal</strong>
         and start them there. Under <strong>Advanced</strong> you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
         the shell setup for one shell, or remove the certificate and everything recorded.</p>
-      <p>Apple services and password managers are never decrypted (edit the list in Setup). Apps that pin their certificates refuse the
+      <p>Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
         Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
         stored, recorded requests are kept 3 days, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
         setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.</p>
