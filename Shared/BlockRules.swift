@@ -59,6 +59,23 @@ enum BlockRules {
     }
 
     /// Traffic that is never refused, before the allowlist is even consulted.
+    /// Whether a flow could still name its destination, and so shouldn't be judged yet.
+    ///
+    /// A flow is judged once — re-walking the process tree per packet would put the kernel process table on the
+    /// data path — so judging it a moment too early judges a connection that has no hostname yet, and a rule that
+    /// names a host then quietly fails to fire. Two things arrive late: a TLS ClientHello too big for one segment
+    /// carries its server_name in the second (Chrome's post-quantum hellos are around 2 KB), and a passive DNS
+    /// answer for the address can land just after the connection opens.
+    ///
+    /// The wait is bounded on both counters. A connection straight to an address will never name itself, and
+    /// holding it unjudged would mean peeking at every byte of it for nothing.
+    static func nameMayStillArrive(port: UInt16, looksLikeTLS: Bool, named: Bool,
+                                   outboundCallbacks: Int, inboundCallbacks: Int) -> Bool {
+        guard !named else { return false }
+        guard port == 443 || port == 80 || looksLikeTLS else { return false }
+        return outboundCallbacks < 4 && outboundCallbacks + inboundCallbacks < 8
+    }
+
     static func isExempt(_ facts: FlowFacts) -> Bool {
         if NetworkScope.isLocalNetwork(facts.ip) { return true }
         // Flowlight's own traffic, including anything relayed by its HTTPS inspection proxy.

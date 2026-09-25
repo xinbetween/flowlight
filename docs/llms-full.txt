@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.6.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.6.8, macOS 15 or later.
 
  On this page
 
@@ -692,7 +692,7 @@ Free · open source · macOS 15+
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.6.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.6.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1236,8 +1236,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.6.7
+ 0.6.8
 September 25, 2026Latest
+
+ Rules that name a host now fire. A connection was judged on its first bytes, which is
+ before TLS hands over the name it is going to — a large ClientHello carries it in the second segment, and
+ a DNS answer can land just after. The rule saw no destination, and a connection is judged once.
+
+ The wait is bounded, so a connection straight to an address is still decided promptly, and
+ a name that arrives late is still acted on. How rules work →
+
+ Downloads and checksums →
+
+ 0.6.7
+September 25, 2026
 
  “Show 25 more” in Reports takes one click. It was written and coloured as a link but
  quietly wanted a double-click, so clicking it once looked like nothing happened.

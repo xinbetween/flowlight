@@ -79,9 +79,20 @@ final class FlowState: @unchecked Sendable {
             inspectionDone = outboundCallbacks >= 8
         } else {
             // Client-first protocols need outbound bytes; server-first protocols (FTP/SSH/SMTP banners) inbound.
-            inspectionDone = firstOutbound != nil || inboundCallbacks >= 1
+            inspectionDone = (firstOutbound != nil || inboundCallbacks >= 1) && !nameMayStillArrive
         }
         if outboundCallbacks + inboundCallbacks >= 32 { inspectionDone = true }
+    }
+
+    /// Whether the destination could still be named. Asked with the lock already held, which is the same order
+    /// `domain` takes it in, so the DNS cache is always reached second.
+    private var nameMayStillArrive: Bool {
+        let named = !(sniOrHost ?? "").isEmpty
+            || !(systemHostname ?? "").isEmpty
+            || DNSCache.shared.name(for: remoteIP) != nil
+        return BlockRules.nameMayStillArrive(port: remotePort, looksLikeTLS: firstOutbound?.first == 0x16,
+                                             named: named, outboundCallbacks: outboundCallbacks,
+                                             inboundCallbacks: inboundCallbacks)
     }
 
     /// Domain priority: SNI / Host header, system-provided hostname, passive DNS cache.

@@ -92,6 +92,9 @@ final class FilterDataProvider: NEFilterDataProvider {
     override func handleInboundData(from flow: NEFilterFlow, readBytesStartOffset offset: Int, readBytes: Data) -> NEFilterDataVerdict {
         guard let state = tracker.state(for: flow) else { return .allow() }
         state.observeInbound(readBytes)
+        // The last place an unjudged flow can still be refused: the name may have arrived from passive DNS after
+        // the connection opened, in which case the outbound side never got a second chance to ask.
+        if BlockEnforcer.shared.refuses(state) { return .drop() }
         return verdict(for: state, passing: readBytes.count, peek: state.inboundPeek)
     }
 
