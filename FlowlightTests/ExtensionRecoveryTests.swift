@@ -8,22 +8,22 @@ final class ExtensionRecoveryTests: XCTestCase {
         (0..<failures).map { _ in recovery.next() }
     }
 
-    /// The first drop is nearly always a blip — the extension restarting, the Mac waking. Reaching for a repair
-    /// there would put a System Settings prompt on screen for something that fixes itself in five seconds.
-    func testTheFirstFailuresJustRedial() {
+    /// The commonest reason the extension stops answering is an app update: macOS keeps running the build it
+    /// activated, so the installed filter is the previous one and no number of redials will ever reach it. The
+    /// check is free when the versions match — it only asks for an activation when they differ — so it goes
+    /// first rather than after half a minute of redials that cannot work.
+    func testTheFirstFailureChecksTheVersion() {
         var recovery = ExtensionRecovery()
-        XCTAssertEqual(recovery.next(), .redial(after: 5))
-        XCTAssertEqual(recovery.next(), .redial(after: 10))
-        XCTAssertFalse(recovery.versionChecked, "nothing has been asked of macOS yet")
+        XCTAssertEqual(recovery.next(), .repairVersion(after: 5))
+        XCTAssertTrue(recovery.versionChecked)
     }
 
-    /// Two redials having failed is the signal that this isn't a blip. The version check is the one fault the
-    /// app can repair by itself, so it comes before giving up, not after.
-    func testTheThirdFailureChecksTheVersion() {
+    /// Having asked once, the rest of the ladder is redials: the answer to a mismatch is already in flight, and
+    /// anything else is the kind of blip that fixes itself.
+    func testTheFailuresAfterThatRedial() {
         var recovery = ExtensionRecovery()
         let steps = ladder(&recovery, failures: 3)
-        XCTAssertEqual(steps.last, .repairVersion(after: 15))
-        XCTAssertTrue(recovery.versionChecked)
+        XCTAssertEqual(steps.dropFirst(), [.redial(after: 10), .redial(after: 15)])
     }
 
     /// The check can end in an activation request, and an activation request can end in a prompt. Once is a

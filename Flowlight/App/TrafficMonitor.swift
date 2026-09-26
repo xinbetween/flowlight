@@ -212,14 +212,45 @@ final class TrafficMonitor: ObservableObject {
     func reconnectSource() {
         // Someone asking for this has usually just fixed something, so the extension gets a clean run at it
         // again even if it had given up earlier in this session.
+        extensionRetry?.cancel()
+        extensionRetryAttempt = 0
         extensionFellBack = false
         status = L("Reconnecting…")
         startSource()
     }
 
+    /// How long to wait before trying the extension again after falling back to the sampler.
+    ///
+    /// An app update is the common case: macOS keeps running the extension it activated, so for a minute or two
+    /// after an upgrade the installed filter is the previous build and the app cannot reach it. Capture is
+    /// already safe — the sampler took over — so the only thing missing was going back, and until now that took
+    /// a button press. The gaps grow because a Mac where the filter can never run (another content filter owns
+    /// the slot) should settle into checking every few minutes rather than redialling forever.
+    private static let extensionRetryDelays: [TimeInterval] = [20, 60, 180, 600]
+    private var extensionRetryAttempt = 0
+    private var extensionRetry: Task<Void, Never>?
+
+    private func scheduleExtensionRetry() {
+        extensionRetry?.cancel()
+        let delay = Self.extensionRetryDelays[min(extensionRetryAttempt, Self.extensionRetryDelays.count - 1)]
+        extensionRetryAttempt += 1
+        extensionRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.mode == .networkExtension, self.extensionFellBack else { return }
+                self.extensionFellBack = false
+                self.status = L("Trying the filter extension again…")
+                self.startSource()
+            }
+        }
+    }
+
     func setMode(_ newMode: CaptureMode) {
         guard newMode != mode else { return }
         mode = newMode
+        extensionRetry?.cancel()
+        extensionRetryAttempt = 0
         extensionFellBack = false
         UserDefaults.standard.set(newMode.rawValue, forKey: AnomalySettings.Keys.captureMode)
         startSource()
@@ -302,7 +333,9 @@ final class TrafficMonitor: ObservableObject {
         } else {
             if mode == .networkExtension {
                 fallbackNote = extensionFellBack
-                    ? L("Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again.")
+                    // Names the button that is on screen. It used to say "under Network Extension", which was
+                    // where these controls lived until the filter got a section of its own.
+                    ? L("Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter.")
                     : L("This build isn't signed for the Network Extension — sampling with nettop instead.")
             }
             newSource = NettopTrafficSource()
@@ -352,6 +385,10 @@ final class TrafficMonitor: ObservableObject {
                    check.installedDescription, check.appVersion)
         if let extensionSource = source as? ExtensionTrafficSource {
             extensionSource.versionRepairStarted()
+            // Replacing a system extension is macOS's business and takes as long as it takes. Sampling in the
+            // meantime is the difference between a minute of history and a minute of nothing; the retry ladder
+            // brings the extension back once the replacement lands.
+            fallBackToSampler()
         } else if mode == .networkExtension, extensionFellBack {
             // Already on the sampler because the stale extension never answered. The repair is the answer, so
             // go back to the extension rather than leaving someone to find Refresh on the Capture screen.
@@ -379,6 +416,7 @@ final class TrafficMonitor: ObservableObject {
         guard mode == .networkExtension, !extensionFellBack else { return }
         extensionFellBack = true
         startSource()
+        scheduleExtensionRetry()
     }
 
     /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has

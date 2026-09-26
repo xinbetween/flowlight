@@ -90,8 +90,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          site=$(grep -m1 -o '<h2>[0-9][^<]*</h2>' site/pages/releases.html | tr -dc '0-9.')
-          released=$(gh api "repos/${{ github.repository }}/releases/latest" -q .tag_name | tr -dc '0-9.')
+          # sed, not `tr -dc '0-9.'`: that kept the 2 from <h2> on both ends and turned 0.7.8 into 20.7.82.
+          site=$(sed -n 's|.*<h2>\([0-9][0-9.]*\)</h2>.*|\1|p' site/pages/releases.html | head -1)
+          released=$(gh api "repos/${{ github.repository }}/releases/latest" -q .tag_name | sed 's/^v//')
           echo "site announces $site · latest release is $released"
           if [ "$site" != "$released" ] && [ "$(printf '%s\n%s\n' "$site" "$released" | sort -V | tail -1)" = "$site" ]; then
             echo "::error::The site announces $site but the newest release is $released. Tag and publish the"

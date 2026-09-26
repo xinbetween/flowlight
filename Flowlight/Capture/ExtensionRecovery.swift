@@ -21,9 +21,14 @@ struct ExtensionRecovery {
         case fallBack
     }
 
-    /// Redials before the version check is worth doing. Two rides out a restart without reaching for a repair
-    /// that can put a System Settings prompt on screen.
-    static let attemptsBeforeVersionCheck = 2
+    /// Redials before the version check is worth doing.
+    ///
+    /// None. It used to be two, to ride out a restart before reaching for a repair that can put a System
+    /// Settings prompt on screen — but the commonest reason the extension stops answering is an app update,
+    /// where the installed filter is the previous build and no amount of redialling will reach it. Asking
+    /// costs nothing when the versions match, and the check only requests an activation when they differ, so
+    /// there is no prompt to ride out. Waiting merely spent half a minute on redials that could not work.
+    static let attemptsBeforeVersionCheck = 0
     /// Consecutive failures before the sampler takes over. Six, at the delays below, is a little over a minute
     /// of trying: long enough for anything transient, short enough that nobody sits watching an orange dot.
     static let maxAttempts = 6
@@ -58,7 +63,7 @@ struct ExtensionRecovery {
             return .fallBack
         }
         let after = Self.delay(forAttempt: attempts)
-        if attempts > Self.attemptsBeforeVersionCheck, !versionChecked {
+        if attempts >= Self.attemptsBeforeVersionCheck, !versionChecked {
             versionChecked = true
             return .repairVersion(after: after)
         }
