@@ -31,7 +31,7 @@ nav: docs
         <div class="toc-group">
           <strong>Control</strong>
           <a href="#rules">Reglas</a><a href="#allowlists">Listas de permitidos</a>
-          <a href="#blocking">Bloqueo</a><a href="#guardrails">Salvaguardas</a>
+          <a href="#blocking">Rechazar conexiones</a><a href="#guardrails">Salvaguardas</a>
         </div>
         <div class="toc-group">
           <strong>Fuentes</strong>
@@ -296,8 +296,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (subdominios incluidos), direcciones IP o rangos CIDR, o elige un preajuste: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o
         Apple. Los proveedores de IA del agente (salvo que lo desactives) y tu red local están siempre permitidos.</p>
       <p>Desde entonces, todo aquello con lo que el agente o sus herramientas contacten y no esté en la lista genera una alerta crítica de <strong>Incumplimiento de la lista de permitidos</strong> (una
-        por dominio cada 6 horas) y se marca como <em>No permitido</em>, con un botón <strong>Permitir</strong> que lo añade. Por defecto, una lista de permitidos avisa en lugar de rechazar
-        las conexiones; bloquear necesita el motor de extensión de red y está en la hoja de ruta.</p>
+        por dominio cada 6 horas) y se marca como <em>No permitido</em>, con un botón <strong>Permitir</strong> que lo añade. Una lista de permitidos solo avisa hasta que
+        le digas lo contrario: consulta <a href="#blocking">Rechazar conexiones</a>.</p>
 
       <h2 id="blocking">Rechazar conexiones</h2>
       <p>Por defecto, una lista de permitidos avisa. Activa <strong>Rechazar las conexiones fuera de la lista</strong> en un agente y además las

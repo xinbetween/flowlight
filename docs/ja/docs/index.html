@@ -86,7 +86,7 @@
         <div class="toc-group">
           <strong>制御</strong>
           <a href="#rules">ルール</a><a href="#allowlists">許可リスト</a>
-          <a href="#blocking">ブロック</a><a href="#guardrails">ガードレール</a>
+          <a href="#blocking">接続を拒否する</a><a href="#guardrails">ガードレール</a>
         </div>
         <div class="toc-group">
           <strong>ソース</strong>
@@ -335,8 +335,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         IP アドレス、CIDR 範囲を入力するか、プリセットを選びます。GitHub、npm、PyPI、Homebrew、Docker Hub、Rust crates、Go modules、Apple があります。
         そのエージェントの AI プロバイダ（オフにしない限り）とローカルネットワークは、常に許可されます。</p>
       <p>それ以降、エージェントやそのツールがリストにないものに接続すると、重大な<strong>許可リスト違反</strong>アラートが上がり（同じドメインについては 6 時間に 1 回）、
-        <em>許可されていません</em>と印が付き、それを追加する<strong>許可</strong>ボタンが表示されます。許可リストはデフォルトでは接続を拒否するのではなく警告します。
-        ブロックにはネットワーク機能拡張エンジンが必要で、ロードマップに載っています。</p>
+        <em>許可されていません</em>と印が付き、それを追加する<strong>許可</strong>ボタンが表示されます。許可リストは、そうしないよう指示するまでは警告するだけです。
+        <a href="#blocking">接続を拒否する</a>を参照してください。</p>
 
       <h2 id="blocking">接続を拒否する</h2>
       <p>許可リストはデフォルトでは警告します。エージェントに対して<strong>リスト外の接続を拒否</strong>をオンにすると、実際に拒否もするようになります。接続は切られ、

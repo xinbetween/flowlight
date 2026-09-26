@@ -357,6 +357,10 @@
 "only %lld tools enabled" = "有効なツールは %lld 件のみ";
 "per tool" = "ツールごと";
 
+/* Inspection/ProxyRelaunch.swift */
+"%@ wouldn't quit. Quit it yourself and try again." = "%@ が終了しませんでした。自分で終了してから、もう一度お試しください。";
+"Flowlight is inspecting %@'s HTTPS from this window." = "Flowlight はこのウインドウから %@ の HTTPS をインスペクトしています。";
+
 /* Storage/TrafficDatabase.swift */
 "Second" = "秒";
 "Minute" = "分";
@@ -499,7 +503,11 @@
 "Scan" = "スキャン";
 "Pick a folder where your projects live. Flowlight looks for agent configuration inside it." = "プロジェクトを置いているフォルダを選びます。Flowlight はその中からエージェントの設定を探します。";
 "Set up HTTPS inspection" = "HTTPS インスペクションを設定";
-"Route %@ Through the Proxy" = "%@ をプロキシ経由にする";
+"Relaunch Through the Proxy" = "プロキシ経由で再起動";
+"Open Inspected Terminal" = "インスペクト用のターミナルを開く";
+"Quit %@ and start it again through the proxy?" = "%@ を終了して、プロキシ経由で起動し直しますか？";
+"Quit and Relaunch" = "終了して再起動";
+"A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight." = "プログラムはプロキシ設定を起動時に一度だけ読み込むため、すでに実行中のものをプロキシ経由にする方法はありません。%@ に終了を求め（保存していない書類があると終了は拒否され、何も失われません）、HTTPS を Flowlight に向けた状態で起動し直します。";
 "Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@." = "Flowlight には %@ の接続は見えますが、その中身は見えません。%@ を見るには HTTPS インスペクションをオンにしてください。";
 "HTTPS inspection is on, but nothing of %@'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal." = "HTTPS インスペクションはオンですが、この期間に %@ の通信はそこを通っていません。コマンドラインのエージェントは、自分のシェルにプロキシを設定した状態で起動する必要があります（インスペクト › インスペクト用のターミナルを開く）。";
 "%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there." = "%1$@ は %2$@ にプロキシを通さず直接接続したため、読み取れるものがありませんでした。ツール呼び出しはモデル自身の応答から取り出しますが、その応答は暗号化されたまま届きました。コマンドラインのエージェントは、自分のシェルにプロキシを設定して起動した場合にだけプロキシを使います。インスペクト › インスペクト用のターミナルを開く を選び、そこから %1$@ を実行してください。";
@@ -777,7 +785,6 @@
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "まだ何もインスペクトしていません";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "システムのプロキシ設定に従うアプリ（ブラウザや多くの Mac アプリ）は、自動的にここに現れます。コマンドラインのエージェントは現れません。インスペクト用のターミナルの環境変数が必要です。";
-"Open Inspected Terminal" = "インスペクト用のターミナルを開く";
 "Check Setup" = "設定を確認";
 "Decrypting · %lld shown" = "復号中 · %lld 件を表示";
 "Host, path, app, tool or anything in a body" = "ホスト、パス、アプリ、ツール、本文の内容";

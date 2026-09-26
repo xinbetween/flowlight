@@ -144,6 +144,17 @@ extension View {
         frame(maxWidth: width, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// Caps a paragraph, not the layout around it.
+    ///
+    /// Capping whole screens is what made Capture, Devices and Rules stop at 860 points while Live, Reports and
+    /// Inspect filled the window — three screens that looked like a different app. The thing that actually
+    /// needs a limit is a line of text: a sentence running the width of a large display is unreadable, while a
+    /// row with a control at each end is better for having the room. So the cards stretch and the prose inside
+    /// them doesn't.
+    func prose(_ width: CGFloat = Measure.prose) -> some View {
+        frame(maxWidth: width, alignment: .leading)
+    }
 }
 
 /// Items that wrap onto as many rows as they need.

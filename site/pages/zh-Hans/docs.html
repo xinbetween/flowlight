@@ -287,8 +287,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         （含子域名）、IP 地址或 CIDR 地址段，或者选一个预设：GitHub、npm、PyPI、Homebrew、Docker Hub、Rust crates、Go modules 或
         Apple。该代理的 AI 提供方（除非你关掉这一项）和你的本地网络始终被允许。</p>
       <p>从此以后，代理或它的工具联系任何未列出的目标，都会触发一条严重级别的<strong>违反允许列表</strong>警报
-        （每个域名每 6 小时一次），并被标为<em>不允许</em>，旁边有一个<strong>允许</strong>按钮可以把它加进去。允许列表默认只警告，
-        不拒绝连接；阻止需要网络扩展引擎，已列入路线图。</p>
+        （每个域名每 6 小时一次），并被标为<em>不允许</em>，旁边有一个<strong>允许</strong>按钮可以把它加进去。在你另行指定之前，
+        允许列表只警告：见<a href="#blocking">拒绝连接</a>。</p>
 
       <h2 id="blocking">拒绝连接</h2>
       <p>允许列表默认只警告。为某个代理打开<strong>拒绝列表之外的连接</strong>，它就会真的

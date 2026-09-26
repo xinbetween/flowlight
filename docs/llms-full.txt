@@ -80,7 +80,7 @@ Documentation
 
  Control
  RulesAllowlists
- BlockingGuardrails
+ Refusing connectionsGuardrails
 
  Sources
  CaptureDevices
@@ -406,8 +406,8 @@ open build/Build/Products/Release/Flowlight.app
  Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.
 
  From then on, anything the agent or its tools contact that isn't listed raises a critical Allowlist violation alert (once
- per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. An allowlist warns rather than refuses by default
- connections; blocking needs the Network Extension engine and is on the roadmap.
+ per domain every 6 hours) and is marked Not allowed, with an Allow button that adds it. An allowlist only warns
+ until you tell it not to: see Refusing connections.
 
  Refusing connections
 

@@ -357,6 +357,10 @@
 "only %lld tools enabled" = "只啟用了 %lld 個工具";
 "per tool" = "依個別工具";
 
+/* Inspection/ProxyRelaunch.swift */
+"%@ wouldn't quit. Quit it yourself and try again." = "%@ 沒有結束。請自行結束它，然後再試一次。";
+"Flowlight is inspecting %@'s HTTPS from this window." = "Flowlight 正在檢查這個視窗中 %@ 發出的 HTTPS。";
+
 /* Storage/TrafficDatabase.swift */
 "Second" = "秒";
 "Minute" = "分鐘";
@@ -499,7 +503,11 @@
 "Scan" = "掃描";
 "Pick a folder where your projects live. Flowlight looks for agent configuration inside it." = "選擇一個存放你專案的檔案夾。Flowlight 會在裡面尋找代理設定。";
 "Set up HTTPS inspection" = "設定 HTTPS 檢查";
-"Route %@ Through the Proxy" = "讓 %@ 經過代理伺服器";
+"Relaunch Through the Proxy" = "經過代理伺服器重新啟動";
+"Open Inspected Terminal" = "開啟受檢查的「終端機」";
+"Quit %@ and start it again through the proxy?" = "結束 %@ 並經過代理伺服器重新啟動？";
+"Quit and Relaunch" = "結束並重新啟動";
+"A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight." = "程式只在啟動時讀取一次代理伺服器設定，所以沒辦法讓已經在執行的程式改走代理伺服器。Flowlight 會要求 %@ 結束 — 有未儲存的文件時它會拒絕結束，不會丟掉任何內容 — 再把它的 HTTPS 指向 Flowlight 重新啟動。";
 "Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@." = "Flowlight 看得到 %@ 的連線，但看不到連線裡面的內容。開啟 HTTPS 檢查就能看到 %@。";
 "HTTPS inspection is on, but nothing of %@'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal." = "HTTPS 檢查已開啟，但此時間範圍內沒有任何 %@ 的流量經過它。命令列代理必須在自己的 shell 中設好代理伺服器後才啟動 — 「檢查」›「開啟受檢查的『終端機』」。";
 "%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there." = "%1$@ 是直接連線 %2$@ 的，沒有經過代理伺服器，所以沒有內容可讀。工具呼叫是從模型自己的回覆中取得的，而那些回覆是加密送達的。命令列代理只有在自己的 shell 中設好代理伺服器後啟動，才會使用代理伺服器 — 「檢查」›「開啟受檢查的『終端機』」，然後從那裡執行 %1$@。";
@@ -777,7 +785,6 @@
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "尚未檢查任何內容";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "會遵循系統代理伺服器設定的 App — 瀏覽器、大多數 Mac App — 會自己出現在這裡。命令列代理不會：它們需要從受檢查的「終端機」取得環境變數。";
-"Open Inspected Terminal" = "開啟受檢查的「終端機」";
 "Check Setup" = "檢查設定狀態";
 "Decrypting · %lld shown" = "正在解密 · 顯示 %lld 筆";
 "Host, path, app, tool or anything in a body" = "主機、路徑、App、工具，或內文中的任何內容";

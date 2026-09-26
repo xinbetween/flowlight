@@ -380,15 +380,41 @@ final class InspectionController: ObservableObject {
 
     /// Environment variables that route command-line agents (Claude Code, Codex, Gemini CLI, Aider…) and their tools
     /// through the proxy and make them trust the Flowlight CA. Nothing else on the Mac is affected.
-    var shellSetup: String {
-        let proxyURL = "http://127.0.0.1:\(port ?? configuredPort)"
+    /// The proxy address as a program would be told it.
+    var proxyURL: String { "http://127.0.0.1:\(port ?? configuredPort)" }
+
+    /// Everything a process needs to send its HTTPS through Flowlight and still trust what comes back, as
+    /// variables rather than as a shell snippet.
+    ///
+    /// One source of truth, because there are now two ways to apply it: pasting it into a shell, and launching
+    /// a program with it. The two disagreeing would mean a terminal that is inspected and an app that silently
+    /// isn't, which is the failure this whole feature exists to remove.
+    var proxyEnvironment: [String: String] {
         let bundle = ca.bundleURL.path, caPath = ca.caCertificateURL.path
+        return [
+            "HTTPS_PROXY": proxyURL, "HTTP_PROXY": proxyURL, "https_proxy": proxyURL, "http_proxy": proxyURL,
+            "NO_PROXY": "localhost,127.0.0.1,::1", "no_proxy": "localhost,127.0.0.1,::1",
+            // Node reads the proxy variables only when told to, and trusts its own CA list unless given another.
+            "NODE_USE_ENV_PROXY": "1", "NODE_EXTRA_CA_CERTS": caPath,
+            // curl, Python, Git and anything else that takes a bundle from the environment.
+            "SSL_CERT_FILE": bundle, "REQUESTS_CA_BUNDLE": bundle,
+            "CURL_CA_BUNDLE": bundle, "GIT_SSL_CAINFO": bundle,
+        ]
+    }
+
+    var shellSetup: String {
+        // Grouped the way they were written out by hand before, so the snippet someone pastes still reads as
+        // four lines about four things rather than a dozen unordered exports.
+        let env = proxyEnvironment
+        func line(_ keys: [String], quoted: Bool = false) -> String {
+            "export " + keys.map { quoted ? "\($0)=\"\(env[$0] ?? "")\"" : "\($0)=\(env[$0] ?? "")" }.joined(separator: " ")
+        }
         return """
         # Flowlight HTTPS inspection: route this shell's tools through Flowlight
-        export HTTPS_PROXY=\(proxyURL) HTTP_PROXY=\(proxyURL) https_proxy=\(proxyURL) http_proxy=\(proxyURL)
-        export NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1
-        export NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS="\(caPath)"
-        export SSL_CERT_FILE="\(bundle)" REQUESTS_CA_BUNDLE="\(bundle)" CURL_CA_BUNDLE="\(bundle)" GIT_SSL_CAINFO="\(bundle)"
+        \(line(["HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"]))
+        \(line(["NO_PROXY", "no_proxy"]))
+        \(line(["NODE_USE_ENV_PROXY"])) \(line(["NODE_EXTRA_CA_CERTS"], quoted: true).dropFirst(7))
+        \(line(["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO"], quoted: true))
         """
     }
 

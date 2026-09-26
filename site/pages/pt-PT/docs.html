@@ -31,7 +31,7 @@ nav: docs
         <div class="toc-group">
           <strong>Controlo</strong>
           <a href="#rules">Regras</a><a href="#allowlists">Listas de permissões</a>
-          <a href="#blocking">Bloqueio</a><a href="#guardrails">Proteções</a>
+          <a href="#blocking">Recusar ligações</a><a href="#guardrails">Proteções</a>
         </div>
         <div class="toc-group">
           <strong>Origens</strong>
@@ -296,8 +296,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (subdomínios incluídos), endereços IP ou intervalos CIDR, ou escolha uma predefinição: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, módulos de Go ou
         Apple. Os fornecedores de IA do agente (a não ser que desative isso) e a sua rede local são sempre permitidos.</p>
       <p>A partir daí, tudo o que o agente ou as suas ferramentas contactem e não conste da lista gera um alerta crítico de <strong>Violação da lista de permissões</strong> (uma vez
-        por domínio a cada 6 horas) e é marcado como <em>Não permitido</em>, com um botão <strong>Permitir</strong> que o adiciona. Por predefinição, uma lista de permissões avisa em vez de recusar
-        ligações; o bloqueio exige o motor da extensão de rede e está no plano de trabalho.</p>
+        por domínio a cada 6 horas) e é marcado como <em>Não permitido</em>, com um botão <strong>Permitir</strong> que o adiciona. Uma lista de permissões só avisa até lhe
+        dizer o contrário: consulte <a href="#blocking">Recusar ligações</a>.</p>
 
       <h2 id="blocking">Recusar ligações</h2>
       <p>Por predefinição, uma lista de permissões avisa. Ative <strong>Recusar as ligações fora da lista</strong> num agente e ele também as

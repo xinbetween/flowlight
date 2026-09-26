@@ -86,7 +86,6 @@ private struct DevicesContent: View {
                 if !store.events.isEmpty { historySection }
             }
             .padding(Measure.gutter)
-            .measured()
         }
     }
 

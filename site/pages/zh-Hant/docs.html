@@ -31,7 +31,7 @@ nav: docs
         <div class="toc-group">
           <strong>管控</strong>
           <a href="#rules">規則</a><a href="#allowlists">允許清單</a>
-          <a href="#blocking">封鎖</a><a href="#guardrails">防護機制</a>
+          <a href="#blocking">拒絕連線</a><a href="#guardrails">防護機制</a>
         </div>
         <div class="toc-group">
           <strong>來源</strong>
@@ -293,8 +293,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         （含子網域）、IP 位址或 CIDR 範圍，或挑一個預設組合：GitHub、npm、PyPI、Homebrew、Docker Hub、Rust crates、Go modules 或
         Apple。該代理的 AI 供應商（除非你把這項關掉）和你的本機網路一律允許。</p>
       <p>從那之後，代理或它的工具連到任何未列出的目標，都會發出嚴重的<strong>「違反允許清單」</strong>警示（每個網域每
-        6 小時一次），並標示為<em>「未允許」</em>，旁邊有一個<strong>「允許」</strong>按鈕可以把它加進清單。允許清單預設是警示而不是
-        拒絕連線；封鎖需要網路延伸功能引擎，列在開發藍圖上。</p>
+        6 小時一次），並標示為<em>「未允許」</em>，旁邊有一個<strong>「允許」</strong>按鈕可以把它加進清單。在你另行指定之前，
+        允許清單只警示：見<a href="#blocking">拒絕連線</a>。</p>
 
       <h2 id="blocking">拒絕連線</h2>
       <p>允許清單預設只警示。為某個代理開啟<strong>「拒絕清單外的連線」</strong>，它就會連帶

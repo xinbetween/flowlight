@@ -357,6 +357,10 @@
 "only %lld tools enabled" = "도구 %lld개만 활성화됨";
 "per tool" = "도구별";
 
+/* Inspection/ProxyRelaunch.swift */
+"%@ wouldn't quit. Quit it yourself and try again." = "%@가 종료되지 않았습니다. 직접 종료한 뒤 다시 시도하세요.";
+"Flowlight is inspecting %@'s HTTPS from this window." = "Flowlight가 이 창에서 %@의 HTTPS를 검사합니다.";
+
 /* Storage/TrafficDatabase.swift */
 "Second" = "초";
 "Minute" = "분";
@@ -499,7 +503,11 @@
 "Scan" = "스캔";
 "Pick a folder where your projects live. Flowlight looks for agent configuration inside it." = "프로젝트가 있는 폴더를 선택하세요. Flowlight가 그 안에서 에이전트 설정을 찾습니다.";
 "Set up HTTPS inspection" = "HTTPS 검사 설정";
-"Route %@ Through the Proxy" = "%@ 트래픽을 프록시로 보내기";
+"Relaunch Through the Proxy" = "프록시 경유로 다시 실행";
+"Open Inspected Terminal" = "검사용 터미널 열기";
+"Quit %@ and start it again through the proxy?" = "%@를 종료하고 프록시 경유로 다시 실행할까요?";
+"Quit and Relaunch" = "종료 후 다시 실행";
+"A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight." = "프로그램은 프록시 설정을 시작할 때 한 번만 읽기 때문에, 이미 실행 중인 프로그램을 프록시로 보낼 방법은 없습니다. %@에 종료를 요청하고 — 저장하지 않은 문서가 있으면 종료를 거부하며, 아무것도 사라지지 않습니다 — HTTPS가 Flowlight를 향하도록 설정해 다시 실행합니다.";
 "Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@." = "Flowlight는 %@의 연결은 보지만 그 안의 내용은 보지 못합니다. HTTPS 검사를 켜면 %@까지 볼 수 있습니다.";
 "HTTPS inspection is on, but nothing of %@'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal." = "HTTPS 검사는 켜져 있지만, 이 기간에 %@의 트래픽은 검사를 거치지 않았습니다. 명령줄 에이전트는 자기 셸에 프록시가 설정된 상태로 실행해야 합니다 — 검사 › 검사용 터미널 열기.";
 "%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there." = "%1$@에서 프록시를 거치지 않고 %2$@에 직접 연결했기 때문에 읽을 내용이 없었습니다. 도구 호출은 모델의 응답에서 얻는데, 그 응답은 암호화된 상태로 도착했습니다. 명령줄 에이전트는 자기 셸에 프록시가 설정된 상태로 실행했을 때만 프록시를 사용합니다. 검사 › 검사용 터미널 열기를 선택한 뒤, 그 창에서 %1$@ 명령을 실행하세요.";
@@ -777,7 +785,6 @@
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "아직 검사된 요청이 없습니다";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "시스템 프록시를 따르는 앱(브라우저와 대부분의 Mac 앱)은 별도 설정 없이 여기에 나타납니다. 명령줄 에이전트는 그렇지 않습니다. 검사용 터미널의 환경 변수가 필요합니다.";
-"Open Inspected Terminal" = "검사용 터미널 열기";
 "Check Setup" = "설정 확인";
 "Decrypting · %lld shown" = "복호화 중 · %lld건 표시";
 "Host, path, app, tool or anything in a body" = "호스트, 경로, 앱, 도구 또는 본문 내용";

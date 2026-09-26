@@ -31,7 +31,7 @@ nav: docs
         <div class="toc-group">
           <strong>Contrôle</strong>
           <a href="#rules">Règles</a><a href="#allowlists">Listes d’autorisation</a>
-          <a href="#blocking">Blocage</a><a href="#guardrails">Garde-fous</a>
+          <a href="#blocking">Refuser des connexions</a><a href="#guardrails">Garde-fous</a>
         </div>
         <div class="toc-group">
           <strong>Sources</strong>
@@ -296,8 +296,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (sous-domaines inclus), des adresses IP ou des plages CIDR, ou choisissez un préréglage&nbsp;: GitHub, npm, PyPI, Homebrew, Docker Hub, crates Rust, modules Go ou
         Apple. Les fournisseurs d’IA de l’agent (sauf si vous le désactivez) et votre réseau local sont toujours autorisés.</p>
       <p>Dès lors, tout ce que l’agent ou ses outils contactent sans être listé déclenche une alerte critique <strong>Violation de la liste d’autorisation</strong> (une fois
-        par domaine toutes les 6 heures) et est marqué <em>Non autorisé</em>, avec un bouton <strong>Autoriser</strong> qui l’ajoute. Par défaut, une liste d’autorisation avertit plutôt
-        qu’elle ne refuse les connexions&nbsp;; le blocage nécessite le moteur d’extension réseau et figure à la feuille de route.</p>
+        par domaine toutes les 6 heures) et est marqué <em>Non autorisé</em>, avec un bouton <strong>Autoriser</strong> qui l’ajoute. Une liste d’autorisation ne fait qu’avertir
+        jusqu’à ce que vous lui disiez le contraire&nbsp;: voyez <a href="#blocking">Refuser des connexions</a>.</p>
 
       <h2 id="blocking">Refuser des connexions</h2>
       <p>Une liste d’autorisation avertit par défaut. Activez <strong>Refuser les connexions hors de la liste</strong> pour un agent et elle les

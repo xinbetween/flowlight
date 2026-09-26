@@ -86,7 +86,7 @@
         <div class="toc-group">
           <strong>Controllo</strong>
           <a href="#rules">Regole</a><a href="#allowlists">Elenchi consentiti</a>
-          <a href="#blocking">Blocco</a><a href="#guardrails">Protezioni</a>
+          <a href="#blocking">Rifiutare le connessioni</a><a href="#guardrails">Protezioni</a>
         </div>
         <div class="toc-group">
           <strong>Origini</strong>
@@ -350,8 +350,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (sottodomini compresi), indirizzi IP o intervalli CIDR, oppure scegli una preimpostazione: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o
         Apple. I provider IA dell'agente (a meno che non lo disattivi) e la tua rete locale sono sempre consentiti.</p>
       <p>Da quel momento, tutto ciò che l'agente o i suoi strumenti contattano e che non è elencato genera un avviso critico di <strong>Violazione dell'elenco consentiti</strong> (una volta
-        per dominio ogni 6 ore) e viene contrassegnato come <em>Non consentito</em>, con un pulsante <strong>Consenti</strong> che lo aggiunge. Per impostazione predefinita un elenco consentiti avvisa anziché rifiutare
-        le connessioni; il blocco richiede il motore dell'estensione di rete ed è in programma.</p>
+        per dominio ogni 6 ore) e viene contrassegnato come <em>Non consentito</em>, con un pulsante <strong>Consenti</strong> che lo aggiunge. Un elenco consentiti si limita ad avvisare
+        finché non gli dici il contrario: vedi <a href="#blocking">Rifiutare le connessioni</a>.</p>
 
       <h2 id="blocking">Rifiutare le connessioni</h2>
       <p>Per impostazione predefinita un elenco consentiti avvisa. Attiva <strong>Rifiuta le connessioni fuori dall'elenco</strong> per un agente e le

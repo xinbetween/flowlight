@@ -274,10 +274,27 @@ that cannot be downloaded yet — for however long signing and notarization take
 `site/` in the same commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump
 and the rebuilt site cannot be separated. The way out is to keep both off `main` until the release exists:
 
+Every release goes **branch → merge request → release → merge**, in that order:
+
 ```sh
-git switch -c release/0.7.8                                # version bump, release notes, rebuilt docs/
-git tag -a v0.7.8 -m "Flowlight 0.7.8" && git push origin v0.7.8   # release.yml signs, notarizes, publishes
-git switch main && git merge --no-ff release/0.7.8 && git push     # the site now catches up
+git switch -c release/0.8.0                       # version bump, release notes and rebuilt docs/, one commit
+git push -u origin release/0.8.0
+gh pr create --base main --title "Flowlight 0.8.0"   # its checks run while the release builds
+
+git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0   # release.yml signs, notarizes, publishes
+gh pr merge --merge --delete-branch                                 # last: the site now catches up
+```
+
+The merge request comes before the tag so the branch is reviewed and its checks are green before anything is
+signed, and the merge comes after the release so the site never announces a download that doesn't exist.
+
+A tag push starts `release.yml` on its own. To dry-run first — build, sign, notarize and verify without
+publishing — cancel that run and dispatch it explicitly, then dispatch again without the flag:
+
+```sh
+gh run cancel <id>
+gh workflow run Release --ref v0.8.0 -f dry_run=true
+gh workflow run Release --ref v0.8.0
 ```
 
 `release.yml` triggers on the tag, not the branch, so nothing else has to change. CI enforces the ordering:

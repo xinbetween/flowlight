@@ -194,7 +194,6 @@ struct RulesView: View {
                 }
             }
             .padding(Measure.gutter)
-            .measured()
         }
         .safeAreaInset(edge: .top, spacing: 0) { banner }
     }
@@ -297,7 +296,6 @@ struct RulesView: View {
                 }
             }
             .padding(Measure.gutter)
-            .measured()
         }
     }
 

@@ -39,7 +39,6 @@ struct CaptureView: View {
             // unreadable. The column stops at a comfortable measure and stays against the sidebar rather than
             // floating in the middle of the window.
             .padding(Measure.gutter)
-            .measured()
         }
         .navigationTitle(L("Capture"))
         // The one thing worth a trip to this screen to find out — what is feeding the app right now — said in the
@@ -105,6 +104,7 @@ struct CaptureView: View {
                     Text(sourceName(mode)).font(.body.weight(.medium))
                     Text(sourceBlurb(mode))
                         .font(.caption).foregroundStyle(.secondary)
+                        .prose()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -238,6 +238,7 @@ struct CaptureView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L("The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else."))
             .font(.caption).foregroundStyle(.secondary)
+            .prose()
             .frame(maxWidth: .infinity, alignment: .leading)
             CaptureFact(icon: "checkmark.seal", tint: .green, title: L("Captures short-lived eligible flows"),
                         detail: L("macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports."))
@@ -257,6 +258,7 @@ struct CaptureView: View {
             // path — and three keys is how a sentence ends up half translated.
             Text(L("Flowlight reads /usr/bin/nettop once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.")).font(.caption)
                 .foregroundStyle(.secondary)
+                .prose()
                 .frame(maxWidth: .infinity, alignment: .leading)
             CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
                         title: L("What it misses is whole connections, not bytes"),

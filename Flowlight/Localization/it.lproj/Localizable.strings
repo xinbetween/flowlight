@@ -357,6 +357,10 @@
 "only %lld tools enabled" = "solo %lld strumenti attivi";
 "per tool" = "per strumento";
 
+/* Inspection/ProxyRelaunch.swift */
+"%@ wouldn't quit. Quit it yourself and try again." = "%@ non si è chiuso. Chiudilo tu e riprova.";
+"Flowlight is inspecting %@'s HTTPS from this window." = "Flowlight sta ispezionando l'HTTPS di %@ da questa finestra.";
+
 /* Storage/TrafficDatabase.swift */
 "Second" = "Secondo";
 "Minute" = "Minuto";
@@ -499,7 +503,11 @@
 "Scan" = "Esamina";
 "Pick a folder where your projects live. Flowlight looks for agent configuration inside it." = "Scegli una cartella in cui si trovano i tuoi progetti. Flowlight vi cerca la configurazione degli agenti.";
 "Set up HTTPS inspection" = "Configura l'ispezione HTTPS";
-"Route %@ Through the Proxy" = "Instrada %@ attraverso il proxy";
+"Relaunch Through the Proxy" = "Riavvia attraverso il proxy";
+"Open Inspected Terminal" = "Apri Terminale ispezionato";
+"Quit %@ and start it again through the proxy?" = "Uscire da %@ e riavviarlo attraverso il proxy?";
+"Quit and Relaunch" = "Esci e riavvia";
+"A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight." = "Un programma legge le impostazioni proxy una sola volta, all'avvio: non c'è modo di instradare un programma già in esecuzione. A %@ viene chiesto di uscire — un documento non salvato rifiuta, e non si perde nulla — e poi viene riavviato con il suo HTTPS puntato su Flowlight.";
 "Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@." = "Flowlight vede le connessioni di %@, ma non il loro contenuto. Attiva l'ispezione HTTPS per vedere %@.";
 "HTTPS inspection is on, but nothing of %@'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal." = "L'ispezione HTTPS è attiva, ma in questo intervallo non vi è passato nulla di %@. Un agente a riga di comando va avviato con il proxy impostato nella propria shell — Ispeziona › Apri Terminale ispezionato.";
 "%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there." = "%1$@ ha raggiunto %2$@ direttamente, non attraverso il proxy, quindi non c'era nulla da leggere. Le chiamate agli strumenti si ricavano dalle risposte del modello, e queste sono arrivate cifrate. Un agente a riga di comando usa il proxy solo se è stato avviato con il proxy impostato nella propria shell — Ispeziona › Apri Terminale ispezionato, poi esegui %1$@ da lì.";
@@ -777,7 +785,6 @@
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "Ancora nessuna richiesta ispezionata";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "Le app che seguono il proxy di sistema — i browser, la maggior parte delle app Mac — compaiono qui da sole. Gli agenti a riga di comando no: hanno bisogno dell'ambiente di un Terminale ispezionato.";
-"Open Inspected Terminal" = "Apri Terminale ispezionato";
 "Check Setup" = "Verifica la configurazione";
 "Decrypting · %lld shown" = "Decifratura · %lld mostrate";
 "Host, path, app, tool or anything in a body" = "Host, percorso, app, strumento o qualsiasi cosa in un corpo";

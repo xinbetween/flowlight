@@ -482,7 +482,8 @@ struct AgentDetail: View {
                         if activity.isEmpty {
                             InspectionHint(inspection: monitor.inspection, agent: agent.name,
                                            what: L("the tool calls its model asks for"), subject: L("tool calls"),
-                                           seen: inspected, reaching: agent.providers.first?.name)
+                                           seen: inspected, reaching: agent.providers.first?.name,
+                                           bundleID: agent.bundleID, appPath: agent.appPath)
                         }
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 8) {
@@ -533,7 +534,8 @@ struct AgentDetail: View {
                                     InspectionHint(inspection: monitor.inspection, agent: agent.name,
                                                    what: L("the MCP servers it calls over the network"),
                                                    subject: L("MCP servers reached over the network"),
-                                                   seen: inspected, reaching: agent.providers.first?.name)
+                                                   seen: inspected, reaching: agent.providers.first?.name,
+                                                   bundleID: agent.bundleID, appPath: agent.appPath)
                                 }
                                 ForEach(servers) { MCPServerRow(server: $0) }
                                 ForEach(unusedServers, id: \.server.name) { entry in
@@ -1028,6 +1030,11 @@ struct InspectionHint: View {
     /// The model provider it has been talking to, when it has. Naming it turns "nothing arrived" into the
     /// actual finding: the agent reached its provider directly, past the proxy.
     var reaching: String?
+    /// What to start again, and what to quit first.
+    var bundleID: String = ""
+    var appPath: String = ""
+    @State private var confirmingRelaunch = false
+    @State private var relaunchError: String?
     @EnvironmentObject private var nav: AppNavigation
 
     private var inspecting: Bool { inspection.enabled && inspection.running }
@@ -1040,11 +1047,45 @@ struct InspectionHint: View {
                 Button(L("Set up HTTPS inspection")) { nav.selection = .inspect }
                     .controlSize(.small)
             } else if !seen {
-                Button(L("Route %@ Through the Proxy", agent)) { nav.selection = .inspect }
-                    .controlSize(.small)
+                HStack(spacing: 8) {
+                    if relaunchTarget != nil {
+                        Button(L("Relaunch Through the Proxy")) { confirmingRelaunch = true }
+                            .controlSize(.small)
+                    }
+                    Button(L("Open Inspected Terminal")) { nav.selection = .inspect }
+                        .controlSize(.small)
+                }
+                if let relaunchError {
+                    Text(relaunchError).font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .padding(.bottom, 4)
+        .confirmationDialog(L("Quit %@ and start it again through the proxy?", agent),
+                            isPresented: $confirmingRelaunch, titleVisibility: .visible) {
+            Button(L("Quit and Relaunch")) { relaunch() }
+            Button(L("Cancel"), role: .cancel) { confirmingRelaunch = false }
+        } message: {
+            // The honest description of what this does, because it closes someone else's editor.
+            Text(L("A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight.", agent))
+        }
+    }
+
+    /// What starting this agent again would mean, if anything. An agent Flowlight only ever saw as traffic —
+    /// no path, no name it recognises — has nothing to relaunch, and the terminal is the way in.
+    private var relaunchTarget: ProxyRelaunch.Target? {
+        ProxyRelaunch.target(bundleID: bundleID, name: agent, appPath: appPath)
+    }
+
+    private func relaunch() {
+        confirmingRelaunch = false
+        relaunchError = nil
+        guard let relaunchTarget else { return }
+        ProxyRelaunch.relaunch(relaunchTarget, bundleID: bundleID, name: agent,
+                               environment: inspection.proxyEnvironment, proxyURL: inspection.proxyURL) { error in
+            Task { @MainActor in relaunchError = error?.localizedDescription }
+        }
     }
 
     private var message: String {

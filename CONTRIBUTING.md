@@ -41,6 +41,33 @@ Internals are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - **Don't commit real traffic.** Screenshots and fixtures come from demo mode or synthetic data only.
 - Match the surrounding code style. Keep PRs focused, with tests for behavior changes.
 
+## Releasing
+
+Every release goes **branch → merge request → release → merge**, in that order, whatever the size of the
+change:
+
+```sh
+git switch -c release/0.8.0                          # version bump, release notes and rebuilt docs/, one commit
+git push -u origin release/0.8.0
+gh pr create --base main --title "Flowlight 0.8.0"   # its checks run while the release builds
+git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0   # signs, notarizes, publishes
+gh pr merge --merge --delete-branch                                # last: the site catches up
+```
+
+The order is not a convention, it is what keeps the website honest. `docs/` is served from `main` and its
+Download button points at `releases/latest/download/Flowlight.dmg`, so a version that reaches `main` before
+the release exists sends people to the previous DMG while announcing a newer one. The bump can't simply land
+later either: CI requires `docs/` to match `site/`, and the site build reads `MARKETING_VERSION`, so the
+version and the rebuilt site travel in the same commit. The release branch is what holds both back until the
+download is real.
+
+CI enforces it rather than trusting anyone to remember: on `main` it fails when the newest version on the
+releases page is ahead of the newest published release. It does not run that check on a release branch, since
+carrying the next version is that branch's job.
+
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) has the rest: the dry run, the signing secrets and
+what the release workflow does.
+
 ## License
 
 Flowlight is licensed under the [GNU GPL v3.0](LICENSE). By contributing, you agree that your contributions are

@@ -31,7 +31,7 @@ nav: docs
         <div class="toc-group">
           <strong>Steuerung</strong>
           <a href="#rules">Regeln</a><a href="#allowlists">Erlaubnislisten</a>
-          <a href="#blocking">Blockieren</a><a href="#guardrails">Schutzregeln</a>
+          <a href="#blocking">Verbindungen verweigern</a><a href="#guardrails">Schutzregeln</a>
         </div>
         <div class="toc-group">
           <strong>Quellen</strong>
@@ -296,8 +296,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (Subdomains inklusive), IP-Adressen oder CIDR-Bereiche ein oder nimm eine Vorlage: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go-Module oder
         Apple. Die KI-Anbieter des Agenten (sofern du das nicht abschaltest) und dein lokales Netzwerk sind immer erlaubt.</p>
       <p>Von da an löst alles, was der Agent oder seine Tools kontaktieren und was nicht gelistet ist, eine kritische Warnung <strong>Verstoß gegen die Erlaubnisliste</strong> aus (einmal
-        pro Domain alle 6 Stunden) und wird als <em>Nicht erlaubt</em> markiert, mit einem Knopf <strong>Erlauben</strong>, der es hinzufügt. Eine Erlaubnisliste warnt standardmäßig,
-        statt Verbindungen zu verweigern; Blockieren braucht die Engine mit Netzwerkerweiterung und steht auf der Roadmap.</p>
+        pro Domain alle 6 Stunden) und wird als <em>Nicht erlaubt</em> markiert, mit einem Knopf <strong>Erlauben</strong>, der es hinzufügt. Eine Erlaubnisliste warnt nur,
+        solange du ihr nichts anderes sagst: siehe <a href="#blocking">Verbindungen verweigern</a>.</p>
 
       <h2 id="blocking">Verbindungen verweigern</h2>
       <p>Eine Erlaubnisliste warnt standardmäßig. Schalte für einen Agenten <strong>Verbindungen außerhalb der Liste verweigern</strong> ein, und sie werden auch

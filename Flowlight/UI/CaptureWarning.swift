@@ -50,7 +50,7 @@ struct CaptureNote: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon).font(.caption)
-            Text(text).font(.caption)
+            Text(text).font(.caption).prose()
             Spacer(minLength: 0)
         }
         .foregroundStyle(tint)
@@ -77,6 +77,7 @@ struct CaptureFact: View {
                 Text(title).font(.caption.weight(.semibold))
                 Text(detail)
                     .font(.caption).foregroundStyle(.secondary)
+                    .prose()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }

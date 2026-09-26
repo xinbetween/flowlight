@@ -86,7 +86,7 @@
         <div class="toc-group">
           <strong>제어</strong>
           <a href="#rules">규칙</a><a href="#allowlists">허용 목록</a>
-          <a href="#blocking">차단</a><a href="#guardrails">가드레일</a>
+          <a href="#blocking">연결 거부</a><a href="#guardrails">가드레일</a>
         </div>
         <div class="toc-group">
           <strong>소스</strong>
@@ -350,8 +350,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         도메인(서브도메인 포함)이나 IP 주소, CIDR 범위를 입력하거나 사전 설정을 고르면 됩니다. GitHub, npm, PyPI, Homebrew, Docker Hub,
         Rust crates, Go modules, Apple이 있습니다. 에이전트의 AI 제공업체(직접 끄지 않는 한)와 로컬 네트워크는 항상 허용됩니다.</p>
       <p>그때부터 에이전트나 그 도구가 목록에 없는 곳에 접속하면 심각 등급의 <strong>허용 목록 위반</strong> 알림이 뜨고(도메인마다 6시간에
-        한 번) <em>허용되지 않음</em>으로 표시되며, 목록에 추가하는 <strong>허용</strong> 버튼이 함께 붙습니다. 허용 목록은 기본적으로
-        연결을 거부하지 않고 경고합니다. 차단에는 네트워크 확장 엔진이 필요하며 계획에 올라 있습니다.</p>
+        한 번) <em>허용되지 않음</em>으로 표시되며, 목록에 추가하는 <strong>허용</strong> 버튼이 함께 붙습니다. 허용 목록은 그러지 말라고
+        할 때까지는 경고만 합니다. <a href="#blocking">연결 거부</a>를 참고하세요.</p>
 
       <h2 id="blocking">연결 거부</h2>
       <p>허용 목록은 기본적으로 경고만 합니다. 어떤 에이전트에 <strong>목록 밖 연결 거부</strong>를 켜면 거부까지 합니다. 연결이 끊기고

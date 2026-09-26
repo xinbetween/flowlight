@@ -86,7 +86,7 @@
         <div class="toc-group">
           <strong>Control</strong>
           <a href="#rules">Rules</a><a href="#allowlists">Allowlists</a>
-          <a href="#blocking">Blocking</a><a href="#guardrails">Guardrails</a>
+          <a href="#blocking">Refusing connections</a><a href="#guardrails">Guardrails</a>
         </div>
         <div class="toc-group">
           <strong>Sources</strong>
@@ -351,8 +351,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
         Apple. The agent's AI providers (unless you turn that off) and your local network are always allowed.</p>
       <p>From then on, anything the agent or its tools contact that isn't listed raises a critical <strong>Allowlist violation</strong> alert (once
-        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. An allowlist warns rather than refuses by default
-        connections; blocking needs the Network Extension engine and is on the roadmap.</p>
+        per domain every 6 hours) and is marked <em>Not allowed</em>, with an <strong>Allow</strong> button that adds it. An allowlist only warns
+        until you tell it not to: see <a href="#blocking">Refusing connections</a>.</p>
 
       <h2 id="blocking">Refusing connections</h2>
       <p>An allowlist warns by default. Turn on <strong>Refuse connections outside the list</strong> for an agent and it will also
