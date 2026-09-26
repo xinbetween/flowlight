@@ -1,0 +1,55 @@
+<!--
+title: Flowlight について
+description: Flowlight をつくった理由、その土台にある原則、そして誰がつくっているか。
+nav: about
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">概要</p>
+    <h1>Flowlight をつくった理由</h1>
+    <p class="lede">Mac のソフトウェアは、次に何をするかを自分で決めるようになりました。Flowlight は、それが何をしたのかを見るための道具です。</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="このページの内容">
+      <strong>このページの内容</strong>
+      <a href="#story">経緯</a><a href="#principles">原則</a><a href="#who">つくっている人</a><a href="#thanks">謝辞</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">経緯</h2>
+      <p>長いあいだ、「この Mac は何と通信しているのか」という問いの読み手は限られていました。外部と通信するアプリが気になる人たちです。
+        そこへ AI エージェントが現れました。エージェントはファイルを読み、シェルコマンドを実行し、ツールを呼びます。しかもあなたが別のことを
+        しているあいだに。そして、そのどのツールもネットワーク接続を開けます。</p>
+      <p>2026 年 9 月、あるフォルダがディスクを 700&nbsp;MB も食っている理由を調べていた開発者が、AI コーディングアプリの ZCode が
+        Git の履歴を含むワークスペース全体をまとめ、バックグラウンドでクラウドストレージに送信していたことを見つけました。開発元は謝罪し、
+        その機能を無効化し、アプリをオープンソース化しました。しかし発見のきっかけは、それに気づくために作られたツールではなく、
+        ディスク使用量の謎でした。</p>
+      <p>送信内容は暗号化されていました。肝心な部分は暗号化されていません。<strong>どのアプリが、どのホストへ、何メガバイト、いつ。</strong>
+        macOS は、対応するネットワークフローについてそうした事実を明かしています。Flowlight はそれを画面に出し、履歴を残し、アプリが、
+        とりわけエージェントが、いつもの姿と違うことをしたときに知らせます。</p>
+
+      <h2 id="principles">原則</h2>
+      <ul>
+        <li><strong>まず説明する。ブロックは頼まれたときだけ。</strong>Flowlight はデフォルトでは監視して説明します。拒否することもできます。
+          許可リスト、アプリや接続先についてのルール、エージェントのツールへのガードレールです。ただしそれはあなたがオンにしたときだけで、
+          ローカルのトラフィック、DNS、Apple のサービスに対しては決して行いません。どの拒否も記録され、どの拒否にも抜け道が添えてあります。</li>
+        <li><strong>デフォルトはメタデータ。</strong>標準の監視で記録するのはホスト名、ポート、バイト数で、ペイロードは暗号化されたままです。任意の HTTPS インスペクションは明示的で、対象が限定され、ローカルに保存されます。</li>
+        <li><strong>まずローカルで。</strong>あなたの履歴は Mac 上のファイルです。アカウントもクラウドもテレメトリもありません。</li>
+        <li><strong>理由がわかるアラート。</strong>アラートには、アプリ、関係する接続先、そしてルールを発動させた根拠が含まれます。Flowlight は中身の見えないリスクモデルを使いません。</li>
+        <li><strong>オープンソース。</strong>あなたのトラフィックを見張る道具は、あなたが読めるものであるべきです。Flowlight は GPL-3.0 です。</li>
+      </ul>
+
+      <h2 id="who">つくっている人</h2>
+      <p>Flowlight は <a href="https://github.com/xinbetween">xinbetween</a> と
+        <a href="https://github.com/{{repo}}/graphs/contributors">コントリビューター</a>による独立したオープンソースプロジェクトです。
+        Apple および本サイトに挙げた AI プロバイダとは関係ありません。アイデア、バグ報告、プルリクエストを歓迎します。とくに、認識対象に加えるべき
+        新しいエージェントやプロバイダの情報はありがたいです。</p>
+
+      <h2 id="thanks">謝辞</h2>
+      <ul>
+        <li><a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a> さん。このアプリをつくる理由になった ZCode の解析に。</li>
+        <li>Wireshark プロジェクト。Flowlight のパケットキャプチャのセットアップは、その ChmodBPF の方式を踏襲しています。</li>
+        <li>Team Cymru。ネットワーク所有者の表示を支える無償の IP から ASN への照会サービスに。</li>
+      </ul>
+    </article>
+  </div>
+</main>

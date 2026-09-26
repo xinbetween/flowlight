@@ -1,0 +1,54 @@
+<!--
+title: 關於 Flowlight
+description: Flowlight 為何存在、它建立在哪些原則上，以及是誰在做它。
+nav: about
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">關於</p>
+    <h1>Flowlight 為何存在</h1>
+    <p class="lede">你 Mac 上的軟體現在會自己決定下一步要做什麼。Flowlight 讓你看見它做了什麼。</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="本頁內容">
+      <strong>本頁內容</strong>
+      <a href="#story">事情的起因</a><a href="#principles">原則</a><a href="#who">由誰製作</a><a href="#thanks">致謝</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">事情的起因</h2>
+      <p>多年以來，「我的 Mac 在跟誰通訊？」這個問題的讀者很單純：一些好奇某個 App 是否偷偷回報總部的人。接著
+        AI 代理出現了。它們會讀你的檔案、執行 shell 指令、呼叫工具，而且常常是在你忙著別的事情時進行，而
+        其中任何一個工具都可以開啟網路連線。</p>
+      <p>2026 年 9 月，一位開發者想弄清楚一個檔案夾為什麼吃掉了 700&nbsp;MB 磁碟空間，結果發現 AI 程式開發 App ZCode
+        一直在把整個工作區（連 Git 歷史一起）打包，並在背景上傳到雲端儲存空間。該公司
+        道歉、關閉了這項功能，並把 App 開源。但這件事是從一個磁碟用量之謎裡被翻出來的，不是靠任何為了
+        察覺這種事而做的工具。</p>
+      <p>那些上傳是加密的，真正重要的部分卻不是：<strong>哪個 App、哪台主機、幾 MB、什麼時候。</strong>對於支援的網路流量，
+        macOS 會把這些事實提供出來。Flowlight 把它們放到畫面上、保留歷史記錄，並在某個 App —
+        尤其是代理 — 做出不像它平常樣子的事情時發出警示。</p>
+
+      <h2 id="principles">原則</h2>
+      <ul>
+        <li><strong>先解釋，只有你要求才封鎖。</strong>Flowlight 預設只監看和解釋。它也可以拒絕 — 一份
+          允許清單、一條關於 App 或目標的規則、一道加在代理工具上的防護機制 — 但都要等你開啟，而且對
+          本機流量、DNS 或 Apple 服務永遠不會拒絕。每一次拒絕都會被記錄，而每一次拒絕都帶著它的退路。</li>
+        <li><strong>預設只看後設資料。</strong>標準的監控會記錄主機名稱、連接埠和位元組計數，內容則維持加密。選用的 HTTPS 檢查是明確開啟、有範圍限制，而且只儲存在本機。</li>
+        <li><strong>優先在本機。</strong>你的歷史記錄是你 Mac 上的一個檔案。沒有帳號、沒有雲端、沒有遙測。</li>
+        <li><strong>說得清楚的警示。</strong>警示會包含 App、相關的目標，以及觸發規則的證據。Flowlight 不使用看不透的風險模型。</li>
+        <li><strong>開放原始碼。</strong>一個監看你流量的工具，應該是你讀得到原始碼的工具。Flowlight 採用 GPL-3.0。</li>
+      </ul>
+
+      <h2 id="who">由誰製作</h2>
+      <p>Flowlight 是由 <a href="https://github.com/xinbetween">xinbetween</a> 和
+        <a href="https://github.com/{{repo}}/graphs/contributors">它的貢獻者</a>共同進行的獨立開放原始碼專案。它與 Apple 及本站提及的任何 AI 供應商
+        均無關聯。歡迎提供想法、回報問題和送出 pull request，尤其是要新增辨識的代理和供應商。</p>
+
+      <h2 id="thanks">致謝</h2>
+      <ul>
+        <li><a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a>，感謝那篇 ZCode 拆解分析，它讓這個 App 有了存在的理由。</li>
+        <li>Wireshark 專案，Flowlight 的封包擷取設定沿用了它的 ChmodBPF 做法。</li>
+        <li>Team Cymru，感謝支撐網路擁有者標示的免費 IP 轉 ASN 服務。</li>
+      </ul>
+    </article>
+  </div>
+</main>

@@ -1,0 +1,84 @@
+<!--
+title: Privacy di Flowlight
+description: Cosa registra Flowlight, dove viene archiviato e quali servizi esterni contatta l'app.
+nav: privacy
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Privacy</p>
+    <h1>Locale per impostazione predefinita, con eccezioni documentate</h1>
+    <p class="lede">Flowlight non richiede alcun account e non contiene analisi di prodotto. I dati sul traffico sono archiviati in locale. Questa pagina documenta
+      cosa registra l'app, quali funzioni facoltative contattano servizi esterni e come verificare queste affermazioni nel <a href="https://github.com/{{repo}}">codice sorgente</a>.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="In questa pagina">
+      <strong>In questa pagina</strong>
+      <a href="#short">In breve</a><a href="#records">Cosa registra</a><a href="#packets">Acquisizione dei pacchetti</a><a href="#local">Cosa legge in locale</a><a href="#inspection">Ispezione HTTPS</a>
+      <a href="#requests">Richieste di rete</a><a href="#permissions">Permessi</a><a href="#retention">Conservazione</a>
+      <a href="#website">Questo sito</a><a href="#contact">Contatti</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">In breve</h2>
+      <ul>
+        <li>Flowlight registra i metadati di rete (quale app, quale host, quale porta, quanti byte, quando) in un database sul tuo Mac.</li>
+        <li>Non registra mai il contenuto dei pacchetti e non decifra mai il traffico, a meno che non attivi l'ispezione HTTPS facoltativa per le app che instradi attraverso di essa.</li>
+        <li>Flowlight non carica il suo database del traffico e non contiene telemetria, segnalazione degli arresti anomali o analisi di prodotto.</li>
+        <li>Le richieste esterne dell'app e i percorsi di esportazione configurati da te sono documentati qui sotto.</li>
+      </ul>
+
+      <h2 id="records">Cosa registra</h2>
+      <p>Per ogni secondo: l'app (ID bundle, nome, percorso dell'eseguibile, ID del processo), l'indirizzo IP remoto, il nome host, la porta, il trasporto e il
+        protocollo, e i byte inviati e ricevuti. Conserva anche gli avvisi che genera e le linee di base per app usate dalle regole sulle anomalie.
+        Tutto questo si trova in <code>~/Library/Application Support/Flowlight</code>.</p>
+
+      <h2 id="packets">Acquisizione dei pacchetti</h2>
+      <p>Se approvi la configurazione iniziale per i nomi host, Flowlight legge i pacchetti sull'interfaccia di rete principale attraverso un filtro nel kernel che
+        lascia passare solo due cose: le risposte DNS e il primo messaggio di una connessione TLS (il ClientHello). Di questi conserva solo i
+        nomi host e gli indirizzi a cui corrispondono, in memoria. Tutto il resto viene scartato nel kernel, e nessun pacchetto viene scritto su disco.</p>
+
+      <h2 id="local">Cosa legge sul tuo Mac</h2>
+      <p>Per attribuire gli strumenti e i server MCP di un agente, Flowlight legge da macOS il processo padre e la riga di comando di ogni processo, e i file di
+        configurazione MCP degli agenti che supporta (per esempio <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code> e
+        <code>~/.codex/config.toml</code>). Di ogni server conserva solo il nome, il comando di avvio e l'URL, in memoria, e salva soltanto le
+        etichette che ne derivano («via curl», «github MCP») insieme al tuo traffico. Nulla di quei file o di quelle righe di comando viene inviato da nessuna parte.</p>
+
+      <h2 id="inspection">Ispezione HTTPS</h2>
+      <p>Disattivata per impostazione predefinita. Se la attivi, Flowlight crea un'autorità di certificazione sul tuo Mac (la sua chiave non lascia mai
+        <code>~/Library/Application Support/Flowlight/Inspection</code>) e avvia un proxy che accetta connessioni solo da questo Mac. Per le app che
+        instradi attraverso di esso registra richieste e risposte, compresi i corpi fino a 2 MB, nel database locale per 3 giorni. Le intestazioni con credenziali
+        (Authorization, cookie, chiavi API) vengono sostituite con la loro lunghezza prima che qualsiasi cosa venga archiviata. Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password. I dati registrati dall'ispezione non vengono caricati da Flowlight. Disattivando l'ispezione il proxy si arresta; <strong>Rimuovi certificato e dati
+        registrati</strong> elimina il certificato, la sua impostazione di attendibilità e tutte le richieste registrate.</p>
+
+      <h2 id="requests">Richieste di rete che fa l'app</h2>
+      <table>
+        <tr><th>Richiesta</th><th>Inviata a</th><th>Cosa contiene</th><th>Quando</th></tr>
+        <tr><td>Controllo aggiornamenti</td><td><code>api.github.com</code></td><td>Una normale richiesta HTTPS per l'ultima versione; GitHub vede il tuo indirizzo IP e lo user agent <code>Flowlight/&lt;version&gt;</code></td><td>All'avvio e una volta al giorno, dalla 0.1.2. Interruttore per disattivarla in Impostazioni › Generali</td></tr>
+        <tr><td>Download dell'aggiornamento</td><td><code>github.com</code></td><td>L'immagine disco e il suo file di checksum</td><td>Solo quando fai clic su Scarica e apri</td></tr>
+        <tr><td>DNS inverso</td><td>Il resolver DNS che hai configurato</td><td>Una ricerca del nome registrato di un indirizzo IP, quando non è stato rilevato alcun nome host</td><td>Quando serve, nella modalità di acquisizione predefinita</td></tr>
+        <tr><td>Ricerca del proprietario della rete</td><td>Team Cymru, via DNS</td><td>Indirizzi IP pubblici senza nome host noto. Gli indirizzi privati e riservati non lasciano mai il tuo Mac</td><td>Attiva per impostazione predefinita. Interruttore per disattivarla in Acquisizione › Identifica i proprietari della rete</td></tr>
+        <tr><td>Chiedi con un modello ospitato</td><td>Il provider che selezioni: Anthropic, OpenAI, Google Gemini o un endpoint compatibile</td><td>La tua domanda e i risultati restituiti dalle query di sola lettura di Flowlight selezionate dal modello. Il database del traffico non viene caricato</td><td>Solo quando selezioni un provider ospitato e invii una domanda. La schermata Chiedi mostra le richieste trasmesse</td></tr>
+        <tr><td>Esportazione verso un collector</td><td>L'endpoint OpenTelemetry o HTTP che configuri</td><td>I campi mostrati in Impostazioni › Esportazione, come le aggregazioni del traffico e gli avvisi. Le intestazioni di autenticazione sono conservate nel portachiavi</td><td>Solo dopo che hai configurato un endpoint e attivato l'esportazione</td></tr>
+        <tr><td>Traffico delle applicazioni ispezionate</td><td>La destinazione originale richiesta dall'applicazione ispezionata</td><td>La richiesta dell'applicazione, inoltrata attraverso il proxy locale di Flowlight dopo la decifrazione</td><td>Solo mentre l'ispezione HTTPS è attiva e l'applicazione è instradata attraverso il proxy</td></tr>
+      </table>
+
+      <h2 id="permissions">Permessi</h2>
+      <ul>
+        <li><strong>Password di amministratore, una volta,</strong> per l'accesso all'acquisizione dei pacchetti. Revocabile dalla schermata Acquisizione.</li>
+        <li><strong>Notifiche,</strong> per gli avvisi. Facoltative.</li>
+        <li><strong>Elemento di login,</strong> solo se attivi Avvia all'accesso.</li>
+      </ul>
+
+      <h2 id="retention">Conservazione</h2>
+      <p>Dati al secondo 6 ore (regolabile), dati al minuto 14 giorni, dati orari 400 giorni, totali giornalieri a tempo indeterminato, avvisi 90 giorni.
+        <strong>Acquisizione › Cancella tutti i dati</strong> elimina tutto, e rimuovere <code>~/Library/Application Support/Flowlight</code> fa lo stesso.</p>
+
+      <h2 id="website">Questo sito</h2>
+      <p>Questo sito è una pagina statica ospitata su GitHub Pages e distribuita tramite Cloudflare. Non imposta cookie e non esegue analisi. GitHub
+        e Cloudflare elaborano le richieste per distribuirlo, e i caratteri vengono caricati da Google Fonts, che riceve il tuo indirizzo IP quando lo visiti.</p>
+
+      <h2 id="contact">Contatti</h2>
+      <p>Domande o dubbi sulla privacy? <a href="https://github.com/{{repo}}/issues">Apri una segnalazione</a>. Per qualsiasi cosa delicata, usa la
+        segnalazione privata delle vulnerabilità di GitHub sul repository.</p>
+    </article>
+  </div>
+</main>

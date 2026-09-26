@@ -6,6 +6,17 @@
 <title>Flowlight privacy</title>
 <meta name="description" content="What Flowlight records, where it is stored, and which external services the app contacts.">
 <link rel="canonical" href="https://flowlight.xinbetween.com/privacy/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/privacy/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/privacy/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/privacy/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/privacy/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/privacy/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/privacy/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/privacy/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/privacy/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/privacy/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/privacy/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/privacy/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Flowlight">
 <meta property="og:locale" content="en">
@@ -40,6 +51,10 @@
       <a href="../about/">About</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
     </nav>
+    <details class="lang">
+      <summary aria-label="Language" title="Language"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">English</span></summary>
+      <div class="lang-menu"><span lang="en" aria-current="true">English</span><a href="../de/privacy/" hreflang="de" lang="de">Deutsch</a><a href="../es/privacy/" hreflang="es" lang="es">Español</a><a href="../fr/privacy/" hreflang="fr" lang="fr">Français</a><a href="../it/privacy/" hreflang="it" lang="it">Italiano</a><a href="../pt-PT/privacy/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../ja/privacy/" hreflang="ja" lang="ja">日本語</a><a href="../zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../ko/privacy/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
     <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
   </div>
 </header>
@@ -204,6 +219,18 @@
     targets.forEach(function (target) {
       target.classList.add("reveal");
       observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
     });
   })();
 </script>

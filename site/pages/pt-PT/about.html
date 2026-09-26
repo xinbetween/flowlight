@@ -1,0 +1,54 @@
+<!--
+title: Acerca do Flowlight
+description: Porque existe o Flowlight, os princípios em que foi construído e quem o faz.
+nav: about
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Acerca</p>
+    <h1>Porque existe o Flowlight</h1>
+    <p class="lede">O software no seu Mac já decide sozinho o que fazer a seguir. O Flowlight é a forma de ver o que ele fez.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Nesta página">
+      <strong>Nesta página</strong>
+      <a href="#story">A história</a><a href="#principles">Princípios</a><a href="#who">Quem o faz</a><a href="#thanks">Agradecimentos</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">A história</h2>
+      <p>Durante anos, a pergunta «com quem é que o meu Mac está a falar?» tinha um público simples: pessoas curiosas sobre uma app que comunicava com o exterior. Depois
+        chegaram os agentes de IA. Leem os seus ficheiros, executam comandos de shell e chamam ferramentas, muitas vezes enquanto está a fazer outra coisa, e qualquer uma
+        dessas ferramentas pode abrir uma ligação de rede.</p>
+      <p>Em setembro de 2026, um programador foi procurar a razão pela qual uma pasta estava a comer 700&nbsp;MB de disco e descobriu que o ZCode, uma app de programação com IA,
+        andava a empacotar áreas de trabalho inteiras, histórico de Git incluído, e a enviá-las para armazenamento na nuvem em segundo plano. A empresa
+        pediu desculpa, desativou a funcionalidade e abriu o código da app. Mas a descoberta veio de um mistério de espaço em disco, e não de uma ferramenta
+        feita para dar por isso.</p>
+      <p>Os envios estavam encriptados. A parte que importava não estava: <strong>que app, que anfitrião, quantos megabytes e quando.</strong> O macOS
+        expõe esses factos nos fluxos de rede suportados. O Flowlight põe-nos no ecrã, guarda o histórico e alerta quando uma app,
+        sobretudo um agente, faz algo que não parece próprio dela.</p>
+
+      <h2 id="principles">Princípios</h2>
+      <ul>
+        <li><strong>Explicar primeiro, bloquear só se lhe pedirem.</strong> Por predefinição, o Flowlight observa e explica. Também pode recusar — uma
+          lista de permissões, uma regra sobre uma app ou um destino, uma proteção nas ferramentas de um agente — mas só depois de o ativar, e nunca
+          no tráfego local, no DNS ou nos serviços da Apple. Todas as recusas são registadas e todas as recusas trazem consigo a sua saída.</li>
+        <li><strong>Metadados por predefinição.</strong> A monitorização normal regista nomes de anfitrião, portas e contagens de bytes, enquanto os conteúdos continuam encriptados. A inspeção HTTPS, opcional, é explícita, delimitada e guardada localmente.</li>
+        <li><strong>Primeiro o local.</strong> O seu histórico é um ficheiro no seu Mac. Sem conta, sem nuvem, sem telemetria.</li>
+        <li><strong>Alertas que se explicam.</strong> Os alertas incluem a app, o destino relevante e as provas que dispararam a regra. O Flowlight não usa um modelo de risco opaco.</li>
+        <li><strong>Código aberto.</strong> Uma ferramenta que vigia o seu tráfego devia ser uma ferramenta que consegue ler. O Flowlight é GPL-3.0.</li>
+      </ul>
+
+      <h2 id="who">Quem o faz</h2>
+      <p>O Flowlight é um projeto independente de código aberto de <a href="https://github.com/xinbetween">xinbetween</a> e
+        <a href="https://github.com/{{repo}}/graphs/contributors">de quem contribui</a>. Não tem qualquer ligação à Apple nem a algum fornecedor de IA
+        mencionado neste site. Ideias, relatos de erros e pull requests são bem-vindos, sobretudo novos agentes e fornecedores a reconhecer.</p>
+
+      <h2 id="thanks">Agradecimentos</h2>
+      <ul>
+        <li>A <a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a>, pela análise do ZCode que justificou esta app.</li>
+        <li>Ao projeto Wireshark, cuja abordagem ChmodBPF é seguida pela configuração de captura de pacotes do Flowlight.</li>
+        <li>À Team Cymru, pelo serviço gratuito de IP para ASN que está por trás das etiquetas de proprietário da rede.</li>
+      </ul>
+    </article>
+  </div>
+</main>

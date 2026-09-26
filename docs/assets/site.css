@@ -455,3 +455,26 @@
   @media (max-width: 520px) {
     .views { grid-template-columns: minmax(0, 1fr); }
   }
+
+  /* ---- Language picker ---- */
+  /* A menu, not a <select>: it has to work before JavaScript does, and every entry is a real link so that a
+     reader can open one in a new tab, and a crawler can follow it. */
+  .lang { position: relative; font-size: 14px; color: var(--muted); }
+  .lang > summary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; list-style: none;
+                    padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .lang > summary::-webkit-details-marker { display: none; }
+  .lang > summary:hover { color: var(--ink); }
+  .lang > summary svg { width: 16px; height: 16px; flex: none; }
+  .lang-menu {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; display: grid; gap: 1px; min-width: 170px;
+    padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow);
+  }
+  .lang-menu a, .lang-menu span { padding: 7px 10px; border-radius: 8px; text-decoration: none; white-space: nowrap; }
+  .lang-menu a:hover { background: var(--surface-2); color: var(--ink); }
+  .lang-menu [aria-current="true"] { color: var(--ink); font-weight: 600; background: var(--surface-2); }
+
+  @media (max-width: 760px) {
+    /* On a phone the row is brand, globe, Download — the language's own name is what the globe already says. */
+    .lang-name { display: none; }
+    .lang > summary { padding: 7px 8px; }
+  }

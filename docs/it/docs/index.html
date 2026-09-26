@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Documentazione di Flowlight</title>
+<meta name="description" content="Installa Flowlight, dai un nome al traffico, leggi le viste, regola le regole per gli agenti IA e disinstalla senza lasciare tracce.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/it/docs/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/docs/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/docs/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/docs/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/docs/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/docs/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/docs/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/docs/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/docs/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/docs/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/docs/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/docs/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="it_IT">
+<meta property="og:title" content="Documentazione di Flowlight">
+<meta property="og:description" content="Installa Flowlight, dai un nome al traffico, leggi le viste, regola le regole per gli agenti IA e disinstalla senza lasciare tracce.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/it/docs/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../assets/icon.png">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../../assets/site.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-it", "url": "https://flowlight.xinbetween.com/it/", "name": "Flowlight", "inLanguage": "it", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/it/"}, {"@type": "ListItem", "position": 2, "name": "Documentazione di Flowlight", "item": "https://flowlight.xinbetween.com/it/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/it/docs/#faq", "mainEntity": [{"@type": "Question", "name": "Perché macOS ha chiesto a Flowlight l'accesso alla Scrivania o ai Documenti?", "acceptedAnswer": {"@type": "Answer", "text": "Solo perché gli hai indicato una cartella di progetto dentro una delle due. Per impostazione predefinita Flowlight legge la configurazione degli agenti dalle cartelle nella tua cartella Inizio e non tocca mai quelle tre."}}, {"@type": "Question", "name": "Flowlight vede tutto il mio traffico o qualcosa gli sfugge?", "acceptedAnswer": {"@type": "Answer", "text": "Dipende da quale motore di acquisizione usi, e la differenza non è sottile. Il campionatore predefinito legge i contatori di byte di macOS una volta al secondo e registra la variazione, quindi un trasferimento lungo è conteggiato con esattezza — ma una connessione che si apre e si chiude tra due letture non compare affatto. L'estensione di rete viene chiamata da macOS a ogni connessione stabilita, quindi anche una richiesta di cinque millisecondi viene registrata. Se stai osservando un agente IA che scatena molte richieste brevi, installa l'estensione da Acquisizione. Il confronto completo è qui sopra."}}, {"@type": "Question", "name": "Ho attivato l'estensione di rete e non compare nulla. Il campionatore funziona bene.", "acceptedAnswer": {"@type": "Answer", "text": "Quasi sempre perché un altro filtro di contenuto occupa già il posto. macOS esegue un solo filtro di contenuto alla volta, e di solito lo rivendica il software di sicurezza aziendale — Palo Alto Networks GlobalProtect, CrowdStrike Falcon e simili. Il filtro di Flowlight si installa, si attiva e si connette comunque, quindi Acquisizione dice Connesso all'estensione filtro, ma macOS non gli consegna mai una sola connessione e le schermate restano vuote. Acquisizione elenca i filtri che trova e propone di riportarti al campionatore, che non usa un filtro e convive con loro. Perdi solo le connessioni molto brevi (il confronto); tutto il resto viene registrato allo stesso modo."}}, {"@type": "Question", "name": "L'estensione ha smesso di funzionare dopo l'aggiornamento di Flowlight.", "acceptedAnswer": {"@type": "Answer", "text": "Le versioni prima della 0.2.5 avevano questo problema: macOS continua a eseguire la build dell'estensione attivata per ultima, quindi dopo un aggiornamento l'estensione era la versione vecchia e macOS rifiuta la connessione tra una coppia non corrispondente. Dalla 0.2.5 Flowlight controlla all'avvio e riattiva il filtro da sé. Su una versione più vecchia, premi una volta Installa e attiva il filtro in Acquisizione."}}, {"@type": "Question", "name": "C'è qualcos'altro che non va nell'acquisizione e non so cosa.", "acceptedAnswer": {"@type": "Answer", "text": "Esegui questo e leggi cosa stampa — riporta solo stato e conteggi, mai nulla di ciò che Flowlight ha registrato sul tuo traffico: curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zshCopia Mostra quali estensioni sono installate, se macOS ha davvero avviato il filtro di Flowlight e quanto di recente è stato registrato qualcosa. Incollalo in una segnalazione."}}, {"@type": "Question", "name": "Flowlight invia da qualche parte informazioni su di me?", "acceptedAnswer": {"@type": "Answer", "text": "No. Non c'è account, non c'è telemetria, non ci sono analisi. Le sole richieste che fa sono il controllo giornaliero degli aggiornamenti, le ricerche facoltative sul proprietario della rete e il DNS inverso — ognuna elencata e ognuna con un interruttore per disattivarla, nella pagina sulla privacy."}}, {"@type": "Question", "name": "Rallenta il Mac o consuma la batteria?", "acceptedAnswer": {"@type": "Answer", "text": "Con la finestra chiusa Flowlight fa quasi nulla: mantiene le velocità nella barra dei menu e scrive una riga al secondo. L'estensione di rete costa meno del campionatore di riserva, che avvia un breve processo nettop ogni secondo."}}, {"@type": "Question", "name": "Può bloccare le connessioni?", "acceptedAnswer": {"@type": "Answer", "text": "Sì, con l'estensione di rete. L'elenco consentiti di un agente può rifiutare oltre che avvisare, una regola può bloccare un'app, una destinazione o un URL per il tempo che dici tu, e una protezione può togliere uno strumento a un agente prima che venga offerto al suo modello. Nulla blocca finché non glielo chiedi, e ogni rifiuto porta con sé la sua via d'uscita."}}, {"@type": "Question", "name": "Mi serve l'estensione di rete?", "acceptedAnswer": {"@type": "Answer", "text": "No. Il campionatore non richiede alcun entitlement e copre la maggior parte del traffico. L'estensione aggiunge i flussi più brevi di un secondo, l'attribuzione tramite firma del codice, i nomi host senza la configurazione per l'acquisizione dei pacchetti, ed è il solo motore che può rifiutare una connessione."}}, {"@type": "Question", "name": "Cosa succede ai miei dati se disinstallo?", "acceptedAnswer": {"@type": "Answer", "text": "Tutto si trova in ~/Library/Application Support/Flowlight. Elimina quella cartella e non c'è più; vedi Disinstallazione per l'helper di acquisizione dei pacchetti e il certificato dell'ispezione."}}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Vai al contenuto</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../../it/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Sito">
+      <a href="../../it/#agents">Agenti IA</a>
+      <a href="../../it/docs/" aria-current="page">Documentazione</a>
+      <a href="../../it/privacy/">Privacy</a>
+      <a href="../../releases/">Versioni</a>
+      <a href="../../it/about/">Informazioni</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="Lingua" title="Lingua"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">Italiano</span></summary>
+      <div class="lang-menu"><a href="../../docs/" hreflang="en" lang="en">English</a><a href="../../de/docs/" hreflang="de" lang="de">Deutsch</a><a href="../../es/docs/" hreflang="es" lang="es">Español</a><a href="../../fr/docs/" hreflang="fr" lang="fr">Français</a><span lang="it" aria-current="true">Italiano</span><a href="../../pt-PT/docs/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../../ja/docs/" hreflang="ja" lang="ja">日本語</a><a href="../../zh-Hans/docs/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/docs/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../../ko/docs/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Scarica</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Documentazione</p>
+    <h1>Usare Flowlight</h1>
+    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.7.7, macOS 15 o successivo.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="In questa pagina">
+      <details class="toc-sheet" open>
+        <summary>In questa pagina</summary>
+        <div class="toc-group">
+          <strong>Per iniziare</strong>
+          <a href="#install">Installazione</a><a href="#first-launch">Primo avvio</a>
+          <a href="#hostnames">Nomi host</a><a href="#language">Lingua</a>
+        </div>
+        <div class="toc-group">
+          <strong>Traffico</strong>
+          <a href="#views">Le viste</a><a href="#agents">Agenti IA</a><a href="#tools">Strumenti e MCP</a>
+          <a href="#agent-configuration">Configurazione degli agenti</a><a href="#worth-a-look">Vale un'occhiata</a>
+          <a href="#channels">Da dove sono usciti i byte</a><a href="#alerts">Avvisi</a>
+        </div>
+        <div class="toc-group">
+          <strong>Analizza</strong>
+          <a href="#ask">Chiedi</a><a href="#inspection">Ispezione HTTPS</a><a href="#mocks">Risposte simulate</a>
+        </div>
+        <div class="toc-group">
+          <strong>Controllo</strong>
+          <a href="#rules">Regole</a><a href="#allowlists">Elenchi consentiti</a>
+          <a href="#blocking">Blocco</a><a href="#guardrails">Protezioni</a>
+        </div>
+        <div class="toc-group">
+          <strong>Origini</strong>
+          <a href="#capture">Acquisizione</a><a href="#devices">Dispositivi</a>
+        </div>
+        <div class="toc-group">
+          <strong>Impostazioni e dati</strong>
+          <a href="#focus">Modalità Focus</a><a href="#background">In background</a><a href="#export">Esportazione</a>
+          <a href="#data">I tuoi dati</a><a href="#updates">Aggiornamenti</a>
+          <a href="#demo">Modalità demo</a><a href="#uninstall">Disinstallazione</a>
+        </div>
+        <div class="toc-group">
+          <strong>Riferimento</strong>
+          <a href="#faq">Domande e risposte</a><a href="#limits">Limitazioni</a>
+        </div>
+      </details>
+    </nav>
+    <article class="prose">
+      <h2 id="install">Installazione</h2>
+      <ol>
+        <li>Con Homebrew: lo stesso comando lo aggiorna anche in seguito.
+          <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copia</button></p></li>
+        <li>Oppure scarica <a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Flowlight.dmg</a>, aprilo e trascina Flowlight in Applicazioni.</li>
+        <li>Preferisci un installer? Ogni <a href="https://github.com/xinbetween/flowlight/releases/latest">versione</a> include anche un <code>.pkg</code>.</li>
+        <li>Per compilare dal codice sorgente servono Xcode 16 o successivo e <code>xcodegen</code>:</li>
+      </ol>
+<pre>brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git &amp;&amp; cd flowlight
+xcodegen generate &amp;&amp; scripts/build-local.sh
+open build/Build/Products/Release/Flowlight.app</pre>
+
+      <h2 id="first-launch">Primo avvio</h2>
+      <p>Le versioni dalla 0.1.6 sono firmate con un certificato Developer ID e autenticate da Apple, quindi il primo avvio funziona subito. Puoi
+        verificarlo da te: <code>spctl -a -vvv /Applications/Flowlight.app</code> deve rispondere <em>Notarized Developer ID</em>.
+        Le versioni fino alla 0.1.5 non erano firmate: per quelle serve una volta <strong>Impostazioni di Sistema › Privacy e sicurezza › Apri comunque</strong>.</p>
+      <p>Il traffico inizia a comparire entro un secondo. I valori ↓↑ nella barra dei menu sono le velocità di download e upload in diretta.</p>
+
+      <h2 id="hostnames">Nomi host: la configurazione iniziale</h2>
+      <p>Per impostazione predefinita macOS comunica a Flowlight solo l'indirizzo IP con cui parla ogni app. Per mostrare i nomi host reali,
+        Flowlight legge due cose dai pacchetti di rete: le risposte DNS e il nome del server che un client richiede quando apre una connessione HTTPS (SNI di TLS).
+        Un filtro nel kernel scarta ogni altro pacchetto prima che Flowlight lo veda, e il contenuto dei pacchetti non viene mai memorizzato.</p>
+      <p>macOS permette di leggere i pacchetti solo agli amministratori, quindi la finestra <strong>Dai un nome al traffico</strong> chiede una volta la tua password. Installa
+        <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>, che a ogni avvio dà al gruppo <code>access_bpf</code> l'accesso in lettura a
+        <code>/dev/bpf*</code>, lo stesso approccio usato da Wireshark. Puoi rimuoverlo quando vuoi da <strong>Acquisizione › Revoca l'accesso all'acquisizione dei pacchetti</strong>.</p>
+      <p><strong>Identifica i proprietari della rete</strong> etichetta il traffico senza nome host con chi gestisce l'indirizzo
+        (<em>Cloudflare, Inc. · AS13335</em>). È attivo per impostazione predefinita e invia quegli indirizzi IP pubblici (mai quelli privati) al servizio
+        DNS di Team Cymru. Disattivalo in <strong>Acquisizione</strong>.</p>
+
+      <h2 id="language">Lingua</h2>
+      <p>Flowlight è tradotto in English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español e
+        Português. Per impostazione predefinita segue il Mac: se tra le tue lingue preferite c'è una di quelle che Flowlight parla, userà
+        quella — e per il cinese distingue il semplificato dal tradizionale in base a scrittura e regione, così un Mac impostato su zh-TW ottiene il tradizionale.
+        Tutto ciò in cui non è stato tradotto torna all'inglese.</p>
+      <p>Scegli una lingua esplicitamente in <strong>Impostazioni ⌘,</strong> alla voce Generali. Cambia immediatamente, non al prossimo
+        avvio. Quando la scelta è <em>Sistema</em>, sotto la riga compare quale lingua ne è risultata.</p>
+      <p>La traduzione arriva schermata per schermata: navigazione, impostazioni e i controlli comuni sono pronti, mentre i passaggi
+        esplicativi più lunghi per ora sono ancora in inglese — una chiave senza traduzione mostra l'inglese corretto invece di uno spazio
+        vuoto o di un identificatore.</p>
+
+      <h2 id="views"><span id="live"></span><span id="reports"></span>Le viste</h2>
+      <table>
+        <tr><th>Vista</th><th>Scorciatoia</th><th>A cosa risponde</th></tr>
+        <tr><td>In diretta</td><td>⌘1</td><td>Cosa si muove adesso: velocità per app negli ultimi secondi e la destinazione più trafficata.</td></tr>
+        <tr><td>Agenti IA</td><td>⌘2</td><td>Quali agenti sono attivi, quali provider IA usano e cos'altro hanno contattato.</td></tr>
+        <tr><td>Rapporti</td><td>⌘3</td><td>Dove è andato il traffico, dal secondo all'anno. Raggruppa per App, Destinazione o IP; passa a Grafici o a <a href="#worth-a-look">Vale un'occhiata</a>; esporta in CSV.</td></tr>
+        <tr><td>Avvisi</td><td>⌘4</td><td>Tutto ciò che è sembrato insolito, con l'app, la destinazione e il numero che ha fatto scattare la regola.</td></tr>
+        <tr><td>Ispeziona</td><td>⌘5</td><td>Opzionale: le richieste decifrate degli agenti che instradi attraverso Flowlight e le chiamate agli strumenti che le hanno prodotte. La ricerca entra nei corpi di richieste e risposte.</td></tr>
+        <tr><td>Acquisizione</td><td>⌘6</td><td>Quale motore sta registrando, lo stato dell'estensione, l'apprendimento dei nomi host e dove si trova il database.</td></tr>
+      </table>
+      <p>In Rapporti, passa il puntatore su una barra per vedere quali app l'hanno generata, fai clic per ingrandire e doppio clic su una riga per limitare il rapporto a essa.</p>
+
+      <h2 id="agents">Regole per gli agenti IA</h2>
+      <p>Un'app conta come agente se Flowlight la conosce per nome (oggi 16, tra cui Claude Code, Codex, Cursor, GitHub Copilot,
+        Gemini CLI, Ollama e ZCode) o se chiama uno dei 27 provider di API LLM. I browser sono esclusi.</p>
+      <table>
+        <tr><th>Regola</th><th>Scatta quando un agente…</th><th>Predefinito</th></tr>
+        <tr><td>Canale sensibile</td><td>usa e-mail, trasferimento file, SSH o desktop remoto, un tunnel o un proxy, peer-to-peer o una connessione a un database</td><td>Attiva. Critica per e-mail, trasferimento file, tunnel e P2P</td></tr>
+        <tr><td>Possibile esfiltrazione</td><td>carica verso host che non sono provider IA, nell'arco di un'ora</td><td>100 MB/h</td></tr>
+        <tr><td>Host senza nome</td><td>si connette a un IP grezzo senza nome host su una porta insolita</td><td>Attiva</td></tr>
+        <tr><td>Attivo mentre sei via</td><td>sposta 1 MB o più in un minuto dopo che hai smesso di usare tastiera e mouse</td><td>15 minuti</td></tr>
+      </table>
+      <p>Gli agenti hanno un periodo di apprendimento di 1 ora prima che scattino gli avvisi sulle nuove destinazioni. Puoi cambiare tutto questo in <strong>Impostazioni › Rilevamento</strong>.</p>
+
+      <h2 id="tools">Strumenti e server MCP</h2>
+      <p>Gli agenti svolgono molto del loro lavoro tramite altri processi: uno strumento shell esegue <code>curl</code>, <code>git</code> o <code>npm</code>, e i server
+        MCP girano come processi a sé. Flowlight risale la catena dei processi padre fino all'agente che li ha avviati, così quel traffico conta
+        come traffico dell'agente. In <strong>Agenti IA</strong>, il dettaglio dell'agente li elenca sotto <strong>Strumenti e server MCP</strong>, e le
+        destinazioni riportano <em>via curl</em> o <em>via github MCP</em>. In <strong>Rapporti</strong>, la riga del processo riporta <em>via Claude Code</em>.</p>
+      <p>I server MCP prendono il nome confrontando la loro riga di comando con la configurazione MCP di Claude Code (<code>~/.claude.json</code>), Claude Desktop,
+        Cursor (<code>~/.cursor/mcp.json</code>), Windsurf, VS Code, Codex (<code>~/.codex/config.toml</code>), Zed e Gemini CLI. I server MCP remoti
+        vengono riconosciuti dal nome host nel loro URL, e quelli non configurati da nomi di pacchetto riconoscibili come
+        <code>@modelcontextprotocol/server-github</code>.</p>
+      <p>L'attribuzione è per processo: Flowlight non può sapere quale singola chiamata a uno strumento, dentro un server MCP di lunga durata, abbia aperto una connessione.</p>
+
+      <h2 id="agent-configuration">Configurazione degli agenti: cosa legge Flowlight sul tuo Mac</h2>
+      <p>Le capacità di un agente sono scritte in file: le skill che può caricare, i subagent e i comandi slash che definisce, gli
+        <strong>hook</strong> che eseguono comandi shell in risposta agli eventi, le regole di permesso che ha ricevuto e i server MCP che avvia. Flowlight
+        legge quei file perché il pannello <strong>Strumenti</strong> possa mostrare cosa è configurato a fare ogni agente, ancora prima che faccia una sola richiesta.
+        Un hook che invia dati a un webhook, o una regola che consente <code>Bash(curl:*)</code>, spiega traffico che altrimenti dovresti indovinare.</p>
+      <ul>
+        <li><strong>Dove guarda per impostazione predefinita:</strong> le cartelle degli agenti nella tua cartella Inizio — <code>~/.claude</code>, <code>~/.codex</code>,
+          <code>~/.cursor</code>, <code>~/.gemini</code>, <code>~/.agents</code> e simili. Non percorre tutta la cartella Inizio, così macOS
+          non deve chiedere l'accesso a Scrivania, Documenti o Download.</li>
+        <li><strong>I tuoi progetti:</strong> usa <em>Aggiungi cartella di progetto…</em> per indicare a Flowlight dove si trova il tuo codice. macOS concede
+          l'accesso solo a quella cartella. Se la cartella è dentro Documenti o Scrivania, macOS chiede prima il permesso, e quella è l'unica richiesta che vedrai.</li>
+        <li><strong>Una volta, non continuamente:</strong> il risultato viene ricordato. Flowlight riesamina solo quando fai clic su <em>Riesamina</em>, e lo propone
+          dopo un paio di settimane, nel caso in cui tu abbia aggiunto agenti o progetti. Nulla viene esaminato in background.</li>
+        <li><strong>Cosa conserva:</strong> nomi, descrizioni, il comando che esegue un hook e i comandi o gli URL dei server MCP. Non copia mai il tuo
+          codice, i tuoi prompt o i tuoi file, e nulla di tutto questo lascia il Mac. <em>Dimentica ciò che è stato trovato</em> lo cancella.</li>
+      </ul>
+
+      <h2 id="worth-a-look">Vale un'occhiata</h2>
+      <p>Una terza modalità in <strong>Rapporti</strong>, accanto alla ripartizione e ai grafici. Confronta tra loro le app presenti nel rapporto
+        e indica quelle le cui destinazioni non assomigliano alle altre: molti più posti dei loro pari, indirizzi che non sono mai stati
+        risolti in un nome, nomi host che sembrano generati anziché scelti, molto più inviato che ricevuto, e protocolli che sono un'attività
+        collaterale anziché lo scopo dell'app. Ogni rilievo porta con sé le prove che lo sostengono, e facendo clic su uno il rapporto si limita a quell'app.</p>
+      <p>Si chiama <em>Vale un'occhiata</em> e non <em>Sospetto</em>, di proposito. Ciò che i dati sostengono è «insolito rispetto alle altre
+        app di questo rapporto»: uno strumento di backup parla con molti posti per buone ragioni, e un Mac tranquillo non produce alcun rilievo. Non
+        dice nulla sul traffico comune a tutte le app.</p>
+
+      <h2 id="channels">Da dove sono usciti i byte</h2>
+      <p>Non tutto il traffico va su internet. AirDrop, Handoff, AirPlay, Sidecar e Controllo universale vanno direttamente a un dispositivo nella
+        stanza tramite Apple Wireless Direct Link: nessun router, nessuna internet e nessun indirizzo raggiungibile da altri. Flowlight contava
+        già quei flussi; non aveva una parola per definirli, così un AirDrop di una cartella da 4&nbsp;GB sembrava qualche megabyte verso un indirizzo
+        senza nome.</p>
+      <p>Ogni flusso ora porta un <strong>canale</strong>: <em>Rete</em>, <em>Wi-Fi peer-to-peer</em>, <em>Questo Mac</em> (loopback,
+        che non ha mai lasciato la macchina) o <em>Tunnel</em> (dentro una VPN; dove sia andato dopo non è visibile qui). Limita un rapporto a
+        uno di essi dalla barra strumenti di Rapporti; il canale viaggia con le esportazioni CSV e con tutto ciò che viene inviato a un collector.</p>
+      <p><strong>Le righe peer-to-peer prendono il nome dalla funzione che le ha aperte</strong> — <code>AirDrop and Handoff · nearby device</code>,
+        <code>Continuity · nearby device</code> — perché un indirizzo link-local non dice nulla e il dispositivo nella stanza non ha un nome
+        che questo Mac possa apprendere. Un'app che usa la radio direttamente mantiene il proprio nome, che per lei è la risposta veritiera.</p>
+      <p><strong>I due motori rispondono in modo diverso.</strong> Il campionatore legge l'interfaccia a cui è associato ogni socket
+        (<code>awdl0</code>, <code>llw0</code>), ed è esatto. All'estensione di rete vengono passati i socket, non le interfacce, quindi
+        giudica dall'indirizzo: un indirizzo link-local è il modo in cui viene indirizzato il traffico peer-to-peer. È il più approssimativo dei due —
+        una stampante raggiunta via Ethernet può essere indirizzata allo stesso modo — e Flowlight preferisce dirlo piuttosto che arrotondare.</p>
+      <p>Nulla di tutto questo viene registrato ex novo, e non è coinvolto alcun nuovo permesso. È la stessa acquisizione, finalmente etichettata.</p>
+
+      <h2 id="alerts">Altri avvisi</h2>
+      <ul>
+        <li><strong>Picco di traffico:</strong> un'ora almeno 3σ sopra la linea di base mobile dell'app (dopo 24 ore di cronologia, sopra 1 MB).</li>
+        <li><strong>Numero insolito di destinazioni</strong> in un giorno, rispetto alla linea di base dell'app.</li>
+        <li><strong>Caricamento sopra il 99° percentile</strong> dei caricamenti orari dell'app negli ultimi 30 giorni.</li>
+        <li><strong>Primo contatto</strong> con un nuovo dominio e <strong>porte non standard</strong>, dopo un periodo di apprendimento di 24 ore per app.</li>
+        <li><strong>Traffico senza attività a schermo:</strong> un'app con finestra che non usi da 10 minuti carica più di 5 MB al minuto.</li>
+      </ul>
+      <p><strong>Le app di Apple sono escluse per impostazione predefinita.</strong> macOS comunica costantemente con Apple — Aggiornamento Software, iCloud,
+      notifiche push, ora, riquadri di Mappe — su host e porte che la prima volta risultano nuovi, e segnalare tutto questo seppellisce l'unica
+      riga che vale la pena leggere. Disattivalo in <strong>Impostazioni › Avvisi</strong> se li vuoi. In ogni caso il traffico viene comunque
+      registrato, compare in In diretta, Rapporti e Chiedi, e resta soggetto a ogni regola, protezione ed elenco consentiti: l'impostazione
+      decide cosa viene elencato, mai cosa viene consentito.</p>
+
+      <h2 id="ask">Chiedi</h2>
+      <p>Chiedi in linguaggio naturale — <em>cosa ha caricato Claude Code ieri?</em>, <em>quale app ha iniziato a parlare con un posto nuovo
+        questa settimana?</em>, <em>riassumi l'ultima ora</em> — e ottieni una risposta dalla cronologia registrata su questo Mac.</p>
+      <p><strong>Il modello non riceve mai la tua cronologia.</strong> Gli viene consegnato un elenco di sette query di sola lettura che può
+        richiamare e nient'altro: totali, app principali, destinazioni principali, nuove destinazioni, avvisi, agenti e una serie nel tempo. Non esiste
+        una query che accetti SQL, e non ci sarà: un modello che può scrivere la propria query può leggere qualsiasi cosa. Flowlight esegue
+        in locale quella che il modello indica e restituisce totali e nomi. Ciò che lascia il Mac, se qualcosa lo lascia, è la tua
+        domanda e quei numeri — mai il database.</p>
+      <p><strong>Prima il locale.</strong> Dove macOS mette a disposizione un modello sul dispositivo, quella è la scelta predefinita: non costa nulla, funziona
+        offline e non invia un solo byte da nessuna parte. Altrimenti fa lo stesso un server di modelli che già gestisci — Ollama, LM Studio, llama.cpp.
+        Entrambi sono elencati sopra le opzioni ospitate, perché uno strumento che promette nessun account e nessun cloud non dovrebbe
+        aver bisogno né dell'uno né dell'altro per rispondere a una domanda su di sé.</p>
+      <p><strong>Oppure porta la tua chiave</strong> per Anthropic, OpenAI, Gemini o qualsiasi endpoint compatibile con OpenAI. La chiave finisce nel
+        portachiavi di accesso, non nelle preferenze di Flowlight. Quando un provider invia qualcosa fuori dal Mac, la schermata lo dice
+        prima che tu chieda, e <strong>ogni richiesta è mostrata per intero sotto la risposta</strong>.</p>
+      <p><strong>Risponde anche a domande su Flowlight stesso.</strong> <em>Come attivo l'ispezione HTTPS?</em>,
+        <em>come impedisco a un agente di usare il suo strumento shell?</em>, <em>perché non vedo traffico?</em> — a queste risponde attingendo
+        alla guida scritta dell'app su ogni funzione e a un'istantanea di come è configurato ora questo Mac. Mai dalla
+        memoria del modello: i percorsi dei menu cambiano tra le versioni, e uno inventato è peggio di nessuna risposta. Quando la risposta richiede
+        di cambiare un'impostazione, dice dov'è e propone di aprire quella schermata, che è un clic che fai tu.</p>
+      <p><strong>Grafici quando conta la forma.</strong> Un andamento nel tempo torna come linea, un confronto come barre, la ripartizione di un
+        intero come torta. Flowlight li disegna dalle stesse righe restituite dalla query, così immagine e frase non possono contraddirsi,
+        e il modello può chiedere una forma diversa o nessuna.</p>
+      <p><strong>Ogni query è elencata sotto la risposta, e facendo clic su una si aprono quelle righe in Rapporti.</strong> Una risposta che non
+        puoi verificare è un'ipotesi con una grammatica migliore.</p>
+      <p><strong>Flowlight applica a sé stesso il proprio standard.</strong> Tutto ciò che questa funzione invia compare in In diretta e Rapporti
+        come il traffico di qualsiasi altra app — anche quando il server del modello è su questo stesso Mac, che è il caso che sarebbe stato
+        più facile lasciar fuori in silenzio.</p>
+
+      <h2 id="inspection">Ispezione HTTPS (opzionale)</h2>
+      <p>Disattivata per impostazione predefinita. Quando la attivi in <strong>Ispeziona</strong>, Flowlight avvia un proxy locale su <code>127.0.0.1:8877</code> con una propria
+        autorità di certificazione, creata sul tuo Mac. Per le app che instradi attraverso di esso decifra HTTPS e mostra ogni richiesta e risposta:
+        intestazioni, corpi, stato e tempi. Dalle risposte del modello di un agente IA legge ogni <strong>chiamata a uno strumento</strong> richiesta dal modello
+        (Anthropic, OpenAI Chat e Responses, Gemini e le richieste MCP <code>tools/call</code>) e il risultato che l'agente ha restituito, e
+        collega ogni richiesta fatta da uno strumento alla chiamata che l'ha causata: la richiesta di curl a <em>paste.example</em> mostra
+        <em>← Bash: curl -s https://paste.example/up</em>. In <strong>Agenti IA</strong>, il dettaglio di un agente acquisisce <strong>Chiamate agli strumenti</strong>
+        (ogni chiamata con il suo comando, il risultato o l'errore e le richieste che ha fatto), <strong>Server MCP</strong> (nome e versione, locale o
+        remoto o <em>via provider</em>, gli strumenti che offre, chiamate ed errori) e <strong>Strumenti</strong> (ogni strumento che l'agente dichiara al
+        modello, con la frequenza d'uso). La riga di intestazione dell'agente mostra il modello, il numero di chiamate e i token spesi, compresi
+        quelli dalla cache. I corpi si aprono come albero JSON espandibile nell'ordine originale delle chiavi; i flussi di eventi mostrano un evento alla volta.</p>
+      <p>Gli agenti dichiarano i loro strumenti a ogni turno, quindi una richiesta ispezionata mostra più delle sole chiamate: gli strumenti che l'agente offre,
+        quelli che il provider esegue sui propri server (ricerca web, esecuzione di codice) e i server MCP a cui il provider si collega per l'agente
+        (<code>mcp_servers</code> di Anthropic, lo strumento <code>mcp</code> di OpenAI) con il loro URL, token, impostazione di approvazione e strumenti consentiti.
+        Quest'ultimo gruppo non compare mai sulla tua rete, perché quelle connessioni le fa il provider, non il tuo Mac.</p>
+      <p><strong>Configurarla è un solo interruttore.</strong> Attiva l'ispezione HTTPS in <strong>Ispeziona</strong> e Flowlight crea il suo certificato,
+        chiede una volta la password, lo considera affidabile e instrada le app attraverso il proxy. Disattivando l'interruttore tutto torna come prima. Il file
+        di configurazione del proxy ripiega su una connessione diretta ogni volta che Flowlight non è in esecuzione, così chiuderlo non taglia mai fuori il Mac.</p>
+      <p>Gli agenti a riga di comando ignorano le impostazioni proxy di sistema, quindi per Claude Code, Codex, Gemini CLI o Aider usa <strong>Apri Terminale ispezionato</strong>
+        e avviali da lì. In <strong>Avanzate</strong> puoi decifrare solo gli agenti IA invece di tutte le app, modificare l'elenco di quelli mai decifrati, copiare
+        la configurazione shell per una shell, oppure rimuovere il certificato e tutto ciò che è stato registrato.</p>
+      <p>Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password (modifica l'elenco in Configura). Le app che applicano il pinning dei certificati possono rifiutare il
+        certificato di Flowlight; Flowlight lo rileva e le inoltra cifrate. Chiavi API, cookie e altre intestazioni con credenziali non vengono mai
+        memorizzate, le richieste registrate vengono conservate 3 giorni e <strong>Rimuovi certificato e dati registrati</strong> elimina il certificato, la sua
+        impostazione di attendibilità e tutto ciò che è stato registrato. L'ispezione è solo HTTP/1.1 (Flowlight lo richiede a entrambe le parti) e non è disponibile in modalità demo.</p>
+
+      <h2 id="mocks">Risposte simulate</h2>
+      <p>Per vedere come reagisce un agente quando un'API fallisce, si blocca o restituisce qualcosa di strano, rispondi tu a quell'endpoint. In
+        <strong>Ispeziona › Risposte simulate</strong>, una regola indica un host, un percorso e un metodo, e fornisce lo stato, le intestazioni, il corpo e un
+        ritardo facoltativo con cui rispondere. La richiesta non viene mai inviata: risponde Flowlight.</p>
+      <ul>
+        <li><strong>Host</strong> è esatto — <code>api.example.com</code> — oppure <code>*.example.com</code> per un dominio e i suoi
+          sottodomini. Esatto per impostazione predefinita, perché una simulazione rivolta a un endpoint non deve rispondere in silenzio per un intero dominio.</li>
+        <li><strong>Percorso</strong> accetta un carattere jolly <code>*</code>: <code>/v1/*</code>, <code>/v1/*/items</code> o un percorso esatto. La
+          query string viene ignorata a meno che il tuo pattern non ne contenga una.</li>
+        <li><strong>Metodo</strong> corrisponde a un solo verbo, o a qualsiasi.</li>
+        <li>Le regole sono ordinate e risponde la prima corrispondenza attiva. Ognuna si attiva e si disattiva per conto proprio.</li>
+      </ul>
+      <p>Uno scambio simulato viene registrato come qualsiasi altro e contrassegnato come <strong>Simulato</strong> nell'elenco, con il pannello dei dettagli che dice che ha
+        risposto Flowlight e non l'host, e con il nome della regola. Puoi sempre capire, più tardi, cosa era reale.</p>
+      <p>Due cose da sapere. Si possono simulare solo le richieste che Flowlight decifra, quindi l'endpoint deve passare dall'ispezione
+        HTTPS — una regola per un host fa sì che Flowlight decifri quell'host anche se il tuo ambito è «solo agenti». E la destinazione viene comunque
+        contattata: una simulazione cambia la risposta, non la possibilità di connettersi, quindi «l'API restituisce 500» funziona mentre «l'API
+        è del tutto irraggiungibile» no.</p>
+
+      <h2 id="rules">Regole</h2>
+      <p>Un elenco consentiti è l'idea che un singolo agente ha di dove può andare. Una <strong>regola</strong> è la versione generale: indica un
+        <strong>soggetto</strong> — un'app, un agente, una destinazione, un URL o una coppia di due di questi — e dice <strong>blocca</strong>
+        o <strong>consenti</strong>. Fai clic con il tasto destro su una riga in In diretta, Rapporti, Agenti IA o Ispeziona per scriverne una su ciò che stai guardando;
+        tutte finiscono nello stesso editor della schermata <strong>Regole</strong>, perché una regola che entra in vigore fuori dalla vista
+        sarebbe una regola che non potresti più ritrovare.</p>
+      <p><strong>Modelli.</strong> Ventidue, in cinque gruppi: impedire a un agente di raggiungere i registri di pacchetti o altri
+        provider di modelli, chiudere le vie più comuni per cui i dati escono (siti di paste, raccoglitori di webhook, servizi anonimi per caricare file, tunnel, DNS over
+        HTTPS), analisi di prodotto e segnalazione degli arresti anomali, politiche sull'orario di lavoro, e il classico «blocca questo per un'ora mentre capisco
+        cos'è». Sfogliali dalla barra strumenti di Regole, oppure fai clic con il tasto destro su una riga in In diretta, Rapporti, Agenti IA o Ispeziona e
+        applicane uno a ciò che stai guardando.</p>
+      <p>Ogni modello dice cosa farà prima di farlo. Tutto ciò che scrive più di una regola apre una scheda con l'elenco di ogni
+        host e orario; tutto ciò che è permanente apre l'editor già compilato; e <strong>solo le regole che si annullano da sole</strong> — un'ora,
+        o questa esecuzione di Flowlight — vengono applicate senza essere mostrate prima. Ognuno porta con sé anche i suoi limiti, compreso il
+        motore che richiede: un modello che funziona solo con l'ispezione HTTPS lo dice.</p>
+      <p><strong>Quale regola vince.</strong> Decide la corrispondenza più specifica e, dove due regole sono ugualmente strette, resta valido il blocco.
+        Così un'eccezione scritta sotto un blocco ampio funziona — <code>Cursor may reach api.github.com</code> sopravvive a
+        <code>nothing reaches github.com</code> — mentre un'eccezione più ampia di ciò che eccettua non lo allarga in silenzio.</p>
+      <p><strong>Per quanto tempo.</strong> Per sempre; fino a un orario; fino alla chiusura di Flowlight; o in fasce orarie scelte in giorni scelti. Le ore sono
+        locali e valutate nel momento in cui viene stabilita una connessione, così un Mac che ha dormito oltre la fine di una fascia la trova chiusa al risveglio,
+        e un cambio di orologio o di fuso sposta la fascia con sé. La chiusura di una fascia blocca le nuove connessioni, non smonta quelle
+        già aperte. C'è anche un unico <strong>Sospendi il blocco</strong> globale, perché è la via di fuga a rendere vivibili le regole
+        severe.</p>
+      <p><strong>Sbloccare fa parte del bloccare.</strong> Ogni rifiuto porta con sé la sua via d'uscita: dall'avviso, consentilo una volta, per un'ora
+        o fino alla chiusura di Flowlight. Ognuna di queste è a sua volta una regola con una scadenza, così l'elenco può sempre rispondere a <em>perché questo sta
+        passando?</em> — anche per quella concessione su cui hai fatto clic due settimane fa.</p>
+      <p><strong>Dove una regola morde, e dove non può.</strong> L'estensione di rete rifiuta connessioni intere: conosce l'host,
+        l'indirizzo e la porta, nulla dei percorsi, e solo in modalità estensione. L'ispezione HTTPS rifiuta una singola richiesta, quindi può corrispondere a un
+        URL e rispondere con uno stato che l'agente può leggere, invece di un socket morto senza spiegazioni. Il campionatore nettop non può
+        rifiutare nulla. Una regola che la configurazione attuale non può applicare lo dice nell'elenco, invece di starsene lì con l'aria di essere in vigore.</p>
+      <p>Il secondo pannello è il <strong>flusso delle violazioni</strong>: ogni connessione decisa da una regola, con l'app, dove era diretta, quale
+        regola ha deciso e se si è trattato di un rifiuto o di un'eccezione che l'ha lasciata passare.</p>
+
+      <h2 id="allowlists">Elenchi consentiti</h2>
+      <p>Seleziona un agente in <strong>Agenti IA</strong> e usa <strong>Elenco consentiti</strong> nel suo dettaglio per dire dove può connettersi. Inserisci domini
+        (sottodomini compresi), indirizzi IP o intervalli CIDR, oppure scegli una preimpostazione: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o
+        Apple. I provider IA dell'agente (a meno che non lo disattivi) e la tua rete locale sono sempre consentiti.</p>
+      <p>Da quel momento, tutto ciò che l'agente o i suoi strumenti contattano e che non è elencato genera un avviso critico di <strong>Violazione dell'elenco consentiti</strong> (una volta
+        per dominio ogni 6 ore) e viene contrassegnato come <em>Non consentito</em>, con un pulsante <strong>Consenti</strong> che lo aggiunge. Per impostazione predefinita un elenco consentiti avvisa anziché rifiutare
+        le connessioni; il blocco richiede il motore dell'estensione di rete ed è in programma.</p>
+
+      <h2 id="blocking">Rifiutare le connessioni</h2>
+      <p>Per impostazione predefinita un elenco consentiti avvisa. Attiva <strong>Rifiuta le connessioni fuori dall'elenco</strong> per un agente e le
+        rifiuterà anche: la connessione viene interrotta e un avviso registra cosa è stato rifiutato, con <strong>Consenti … da ora in poi</strong> per aggiungerlo
+        all'elenco con un clic. Il tentativo successivo dell'agente passa.</p>
+      <p><strong>Richiede l'estensione di rete.</strong> Rifiutare una connessione significa stare sul suo percorso, cosa che il campionatore nettop
+        non può fare: Acquisizione lo dice, invece di offrire un interruttore che non fa nulla.</p>
+      <p>Alcune cose non vengono mai rifiutate, qualunque cosa dica un elenco: la tua rete locale, il DNS, i servizi di Apple e il traffico di Flowlight
+        stesso. Un Mac bloccato è un esito peggiore di un agente bloccato, quindi nel dubbio la connessione viene consentita e registrata.
+        L'applicazione decade anche pochi secondi dopo che Flowlight smette di funzionare: un rifiuto che nessuno può vedere è peggio di nessun rifiuto, e il modo
+        per annullarne uno sta nell'app.</p>
+      <p>Ispezione HTTPS e blocco non si combinano: il traffico instradato attraverso il proxy di Flowlight esce come traffico di Flowlight, che non viene
+        mai rifiutato.</p>
+
+      <h2 id="guardrails">Protezioni per gli agenti: bloccare uno strumento, un server o una risorsa</h2>
+      <p><em>Quali strumenti può usare questo agente</em> è una domanda diversa da <em>quali host può raggiungere</em>, quindi ha una
+        sezione a sé: un pannello <strong>Protezioni</strong> accanto a ogni agente in Agenti IA, con un interruttore su ogni strumento che dichiara e su ogni
+        server MCP che raggiunge, preimpostazioni utili (<em>sola lettura</em>, <em>niente shell</em>, <em>niente scritture</em>) e un registro di ciò che
+        è stato tolto.</p>
+      <p><strong>La leva più forte è la dichiarazione.</strong> Gli agenti reinviano l'intero elenco di strumenti a ogni turno. Flowlight rimuove
+        uno strumento rifiutato da quell'elenco prima che la richiesta parta, così al modello non viene mai offerto: nessun rifiuto su cui discutere, nessun
+        ciclo di tentativi. Funziona allo stesso modo per uno strumento che l'agente esegue da sé e per uno dietro un server MCP remoto, e legge le stesse strutture
+        che Flowlight già analizza per Anthropic, OpenAI e Gemini.</p>
+      <p><strong>A una chiamata rifiutata si risponde a dovere.</strong> Per i server MCP raggiunti via HTTP, un <code>tools/call</code> bloccato
+        torna come <em>result</em> con <code>isError: true</code> e una frase in chiaro, perché è così che il protocollo descrive
+        uno strumento che fallisce: il modello la legge e si organizza diversamente, mentre un errore di trasporto sembrerebbe un server guasto.
+        <code>resources/read</code> e <code>prompts/get</code> non hanno una struttura simile, quindi ricevono invece un errore JSON-RPC.</p>
+      <p><strong>I connettori vengono ristretti, non intercettati.</strong> Quando è il provider a raggiungere un server MCP per conto dell'agente, quel
+        traffico non tocca mai questo Mac. L'unica leva è la richiesta che lo predispone, quindi Flowlight restringe gli strumenti che il connettore
+        può chiamare, oppure lo elimina del tutto.</p>
+      <p><strong>I server stdio locali comunicano tramite pipe, e nessun proxy può vederlo.</strong> Lì Flowlight può osservare il traffico di rete del
+        processo server, che è già attribuito all'agente che lo ha avviato, e consegnarti l'elenco dei divieti da
+        incollare nelle impostazioni dell'agente: Claude Code accetta <code>mcp__server__tool</code> in <code>permissions.deny</code>, e i suoi
+        vicini hanno equivalenti. Ha effetto al riavvio dell'agente.</p>
+      <p><strong>Le protezioni richiedono l'ispezione HTTPS</strong>, perché l'elenco degli strumenti sta dentro il corpo di una richiesta. Con l'ispezione disattivata il
+        pannello lo dice, invece di dare l'impressione di funzionare.</p>
+      <p><strong>Questa non è una sandbox.</strong> Uno strumento rifiutato non viene più offerto e non riceve più risposta. Un agente che ha ancora una
+        shell può fare a mano ciò che avrebbe fatto lo strumento. Flowlight lo registra; non pretende di impedirlo.</p>
+
+      <h2 id="capture"><span id="engines"></span>Acquisizione: motori e origini</h2>
+      <p>Flowlight registra il traffico in uno di due modi, da scegliere in <strong>Acquisizione</strong>. Differiscono per ciò che possono perdere, e vale
+        la pena capirlo prima di affidarsi all'uno o all'altro.</p>
+      <table>
+        <tr><th></th><th>campionatore nettop (predefinito)</th><th>estensione di rete</th></tr>
+        <tr><td>Richiede</td><td>Nulla</td><td>L'installazione di un'estensione di sistema e la tua approvazione</td></tr>
+        <tr><td>Come vede il traffico</td><td>Legge i totali correnti una volta al secondo e registra la differenza</td><td>macOS la chiama a ogni connessione stabilita</td></tr>
+        <tr><td>Trasferimenti lunghi</td><td>Conteggiati con esattezza, per quanto irregolari</td><td>Conteggiati</td></tr>
+        <tr><td>Connessioni brevi</td><td><strong>Possono sfuggire del tutto</strong></td><td>Registrate, per quanto brevi</td></tr>
+        <tr><td>Consumo</td><td>Avvia un processo ogni secondo</td><td>Inferiore: nessun polling</td></tr>
+      </table>
+      <p><strong>Ciò che il campionatore perde sono connessioni intere, non byte.</strong> Poiché confronta i totali correnti, nulla che duri
+        attraverso due letture va perso, per quanti dati arrivino nel frattempo. Ciò che non compare mai è tutto quello che inizia <em>e</em>
+        finisce tra le due — una rapida richiesta DNS, una chiamata API veloce, uno script che esegue <code>curl</code> ed esce. Per osservare un agente
+        che fa molte richieste brevi, quella differenza conta.</p>
+      <p>L'estensione, invece, sta nel percorso dei dati, quindi una richiesta che dura cinque millisecondi viene registrata come qualsiasi altra. Nemmeno lei è magia:
+        il traffico precedente alla sua attivazione non c'è, una parte del traffico di sistema è esente dai filtri di contenuto, e i suoi conteggi di byte
+        vengono dalle statistiche del filtro stesso anziché dal conteggio dei pacchetti. Rifiuta una connessione solo dove una regola o un
+        elenco consentiti scritto da te lo richiede.</p>
+      <p><strong>Quando l'estensione non risponde più.</strong> macOS esegue la build dell'estensione attivata per ultima, quindi
+        dopo un aggiornamento dell'app le due possono non concordare — e quando succede, macOS rifiuta la connessione tra loro. Impostazioni di Sistema dice
+        che il filtro è attivo, Flowlight dice che la connessione è stata invalidata, e nessuno dei due cambia idea. Ora Flowlight se ne tira fuori
+        da solo: riprova un paio di volte, poi chiede a macOS quale build sta eseguendo e reinstalla l'estensione se non è
+        quella di questa app; se nulla di tutto questo funziona, acquisisce con il campionatore nettop così che ci siano comunque dati — dicendolo chiaramente
+        e lasciando invariata l'origine che hai scelto. <em>Riprova con l'estensione</em>, sotto Estensione di rete, ricomincia da capo.</p>
+      <p><strong>Su alcuni Mac non può proprio funzionare.</strong> macOS consente un solo filtro di contenuto alla volta, e normalmente lo occupa il software
+        di sicurezza aziendale — Palo Alto Networks GlobalProtect, CrowdStrike Falcon e simili. Su quelle macchine il filtro di Flowlight si installa e si connette,
+        e poi non riceve mai una connessione. Acquisizione elenca quelli che trova e propone di riportarti al campionatore, che
+        non richiede alcun filtro e convive con loro.
+        Vedi <a href="https://github.com/xinbetween/flowlight/blob/main/docs/DEVELOPMENT.md">la guida per sviluppatori</a> per come è costruito.</p>
+
+      <h2 id="devices">Dispositivi: Bluetooth, USB e archiviazione esterna</h2>
+      <p>Un Mac invia e riceve oltre TCP e UDP. La schermata <strong>Dispositivi</strong> copre il resto, ed è disattivata
+        finché non la attivi — non perché serva un permesso che Flowlight non ha già, ma perché monitorare una parte più ampia del tuo
+        Mac deve essere una tua decisione e non qualcosa fatto da un aggiornamento.</p>
+      <p><strong>Bluetooth</strong> mostra quali dispositivi sono abbinati, quali sono connessi e quando è cambiato, letto dal sistema
+        ogni mezzo minuto. Accanto c'è l'elenco delle applicazioni predisposte per usare il Bluetooth, preso dall'<code>Info.plist</code> di
+        ciascuna app.</p>
+      <p><strong>Cosa non può dirti, e lo dice.</strong> Qui non ci sono conteggi di byte. macOS non tiene una contabilità per app del
+        Bluetooth, e le tracce HCI a livello di byte che la fornirebbero richiedono il profilo PacketLogger di Apple, che un'app comune non può
+        leggere. Allo stesso modo l'elenco delle app dice <em>chi ha chiesto</em> il Bluetooth, non <em>a chi è stato concesso</em>: macOS conserva le autorizzazioni in un
+        database che un'app non può aprire, e Flowlight preferisce nominare quella differenza piuttosto che confonderla.</p>
+      <p><strong>USB e archiviazione esterna</strong> elenca ciò che è collegato — di cosa si tratta, chi lo produce e la capacità di un disco — e
+        registra quando ciascuno è arrivato e andato via. Le due metà funzionano in modo diverso di proposito: i dispositivi USB vengono letti dal sistema
+        periodicamente, mentre i volumi arrivano dallo spazio di lavoro nel momento in cui uno viene montato o espulso, perché la comparsa di un disco è
+        l'evento che interessa davvero. Nemmeno qui c'è il throughput, per la stessa ragione per cui non c'è sotto Bluetooth.</p>
+
+      <h2 id="focus">Modalità Focus</h2>
+      <p>Scegli qualche app e qualche destinazione e ogni schermata mostra solo quelle — In diretta, Rapporti, Avvisi, Agenti IA e Ispeziona, e le velocità
+        nella barra dei menu. Serve a osservare un agente all'opera senza il resto del Mac di mezzo.</p>
+      <ul>
+        <li>Fai clic con il tasto destro su una riga in In diretta, Rapporti o Agenti IA e scegli <strong>Focus su…</strong>, oppure usa il controllo Focus in fondo
+          alla barra laterale per scegliere tra le app che sono state attive e per digitare destinazioni.</li>
+        <li><kbd>⇧⌘F</kbd> attiva e disattiva Focus, come fa anche la barra dei menu, che mostra anche cosa è sotto focus.</li>
+        <li>Una destinazione porta con sé i suoi sottodomini: <code>example.com</code> copre <code>api.example.com</code>. Gli indirizzi IP funzionano;
+          gli intervalli come <code>10.0.0.0/8</code> no.</li>
+        <li>App e destinazioni sono un'unione, non un'intersezione: mettere sotto focus Claude Code <em>e</em> <code>github.com</code> mostra
+          tutto ciò che fa Claude Code più tutto ciò che parla con GitHub.</li>
+      </ul>
+      <p>Un'app e una destinazione sono allo stesso modo un focus, e ciascuna da sola basta. Aggiungi un'app digitandone il nome o l'ID bundle —
+        ogni applicazione sul Mac è ricercabile, così si può mettere a fuoco anche una che è rimasta zitta tutto il giorno, come un agente a riga di comando
+        senza bundle applicativo — oppure spunta una tra quelle attive di recente. Aggiungi una destinazione allo stesso modo.</p>
+      <p>Una cosa che una destinazione non può restringere: gli avvisi registrano l'app che li ha generati e nulla su dove è andato il traffico, quindi un
+        focus fatto solo di destinazioni non modifica l'elenco degli avvisi. L'editor lo dice, invece di lasciare che una schermata lo ignori in silenzio.</p>
+      <p><strong>Focus filtra ciò che vedi, mai ciò che viene registrato.</strong> Flowlight continua ad acquisire e archiviare tutto mentre è attivo, e
+        le linee di base delle anomalie continuano ad apprendere da tutto, così disattivando Focus ricompare il traffico che nascondeva. Una conseguenza: un avviso
+        indica l'app che lo ha generato e non dove è andato il traffico, quindi un focus fatto solo di destinazioni lascia l'elenco degli avvisi come era.</p>
+
+      <h2 id="background">Esecuzione in background</h2>
+      <p>Flowlight continua a registrare con la finestra chiusa e costa quasi nulla mentre è inattivo: smette di costruire grafici che nessuno
+        guarda. <strong>Impostazioni › Generali › Esegui in background</strong> va oltre e toglie l'icona nel Dock e la voce in Cmd-Tab;
+        la barra dei menu mantiene le velocità in diretta e acquisisce <strong>Mostra l'icona nel Dock</strong> per annullare. <strong>Avvia all'accesso</strong> è nello
+        stesso punto.</p>
+      <p>La finestra si apre dove l'hai lasciata, della dimensione che le hai dato. Al primo avvio riempie invece lo schermo, così nulla resta nascosto
+        dietro una finestra piccola, e una finestra la cui posizione salvata è fuori schermo — un display scollegato — torna sullo schermo che
+        hai. La configurazione dei nomi host viene proposta un po' dopo l'avvio e solo mentre una finestra è aperta, invece di accogliere il primo avvio con una
+        richiesta della password; la proposta ritorna al lancio successivo finché non l'accetti o non la rifiuti.</p>
+      <p>Chiudere Flowlight ferma il campionatore. Non ferma l'estensione di rete: un'estensione di sistema funziona per conto proprio, quindi il filtro
+        continua a ispezionare le connessioni finché non lo disattivi o lo disinstalli in <strong>Acquisizione</strong>.</p>
+
+      <h2 id="export">Esportazione verso OpenTelemetry o un SIEM</h2>
+      <p><strong>Disattivata finché non la configuri, e non esiste alcun servizio Flowlight a cui inviare.</strong> Indichi tu l'endpoint — il tuo
+        collector, il tuo SIEM — e nulla parte finché non lo fai. Impostazioni › Esportazione.</p>
+      <ul>
+        <li><strong>OTLP su HTTP</strong> con corpo JSON: le aggregazioni vanno a <code>/v1/metrics</code>, gli avvisi a <code>/v1/logs</code>,
+          perché un avviso è un evento con una frase attaccata e una metrica perderebbe la frase. Per i collector che vogliono solo righe c'è
+          il JSON delimitato da righe.</li>
+        <li><strong>Ciò che esce è elencato per intero nel pannello</strong>, campo per campo, e un'<em>anteprima</em> mostra un payload reale
+          costruito dai tuoi dati prima che venga inviato qualcosa.</li>
+        <li><strong>Mai nulla dall'ispezione HTTPS.</strong> Nessuna intestazione, nessun corpo, nessuna chiamata agli strumenti: l'esportazione può trasportare solo
+          aggregazioni e avvisi, quindi non c'è nessun posto dove possano finire, nemmeno per sbaglio.</li>
+        <li>Le intestazioni di autenticazione sono conservate nel portachiavi di accesso, non nelle preferenze. Di esse vengono mostrati solo i nomi.</li>
+        <li><strong>Ciò che Flowlight invia compare in Flowlight</strong>, in In diretta e Rapporti, come il traffico di qualsiasi altra app — compreso
+          un collector su <code>127.0.0.1</code>.</li>
+      </ul>
+      <p>Due cose da aspettarsi: le aggregazioni vengono consolidate con circa due minuti di ritardo, quindi un intervallo inferiore al minuto interroga più
+        spesso senza che i dati arrivino prima; e <strong>Prova connessione</strong> dimostra che l'endpoint risponde, non che ha convalidato le tue credenziali:
+        la riga «ultima esportazione riuscita» è il segnale onesto.</p>
+
+      <h2 id="data">I tuoi dati</h2>
+      <p>Tutto si trova in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Le righe al secondo vengono conservate 6 ore
+        (regolabile), quelle al minuto 14 giorni, quelle orarie 400 giorni, quelle giornaliere a tempo indeterminato e gli avvisi 90 giorni.
+        <strong>Acquisizione › Cancella tutti i dati</strong> le elimina.</p>
+
+      <h2 id="updates">Aggiornamenti</h2>
+      <p>Quando compare una nuova versione, Flowlight te lo dice con una notifica e un contrassegno nella barra laterale, invece di interrompere quello che stai
+        facendo; facendo clic su uno dei due si apre la finestra di aggiornamento. Un controllo che avvii tu la apre subito.</p>
+      <p>Flowlight controlla su GitHub se c'è una nuova versione all'avvio e una volta al giorno, e <strong>Cerca aggiornamenti…</strong> è nei menu dell'app
+        e della barra dei menu. <strong>Download</strong> scarica l'immagine disco in Download e la verifica con lo SHA-256 pubblicato della versione. Nulla viene installato
+        finché non scegli tu: <strong>Esci e installa</strong> chiude Flowlight, lo sostituisce con la nuova versione e lo riapre, conservando cronologia e
+        impostazioni. <strong>Installa più tardi</strong> ti lascia lavorare. Se Flowlight è stato installato con il <code>.pkg</code>, macOS chiede una password
+        di amministratore per sostituirlo. Disattiva il controllo in <strong>Impostazioni › Generali</strong>.</p>
+      <p>Aggiorni a mano? Chiudi prima Flowlight (icona nella barra dei menu › Esci), poi trascina la nuova versione in Applicazioni. Il Finder non può sostituire
+        un'app ancora in esecuzione e dice che l'elemento è in uso.</p>
+
+      <h2 id="demo">Modalità demo</h2>
+      <p><code>open /Applications/Flowlight.app --args -FLDemo YES</code> avvia Flowlight con 90 giorni di traffico sintetico in un database
+        separato, così puoi dare un'occhiata senza registrare il tuo. È quello che mostrano le schermate di questo sito.</p>
+
+      <h2 id="uninstall">Disinstallazione</h2>
+      <ol>
+        <li>In <strong>Acquisizione</strong>, scegli <strong>Revoca l'accesso all'acquisizione dei pacchetti</strong> (chiede la password) se l'avevi attivato,
+          disinstalla il filtro di contenuto se l'avevi installato e disattiva l'ispezione HTTPS in <strong>Ispeziona</strong> così il suo certificato
+          esce dal portachiavi. Solo Flowlight stesso può ritirare queste tre cose.</li>
+        <li>Chiudi Flowlight e spostalo da Applicazioni al Cestino — oppure, se l'hai installato con Homebrew,
+          <code>brew uninstall --cask flowlight</code>.</li>
+        <li>Elimina <code>~/Library/Application Support/Flowlight</code> per rimuovere la cronologia registrata, oppure lascia fare a Homebrew con
+          <code>brew uninstall --zap --cask flowlight</code>.</li>
+      </ol>
+
+      <h2 id="faq">Domande e risposte</h2>
+      <dl>
+        <dt><strong>Perché macOS ha chiesto a Flowlight l'accesso alla Scrivania o ai Documenti?</strong></dt>
+        <dd>Solo perché gli hai indicato una cartella di progetto dentro una delle due. Per impostazione predefinita Flowlight legge la configurazione degli agenti dalle cartelle
+          nella tua cartella Inizio e non tocca mai quelle tre.</dd>
+        <dt><strong>Flowlight vede tutto il mio traffico o qualcosa gli sfugge?</strong></dt>
+        <dd>Dipende da quale motore di acquisizione usi, e la differenza non è sottile. Il campionatore predefinito legge i contatori di byte
+          di macOS una volta al secondo e registra la variazione, quindi un trasferimento lungo è conteggiato con esattezza — ma una connessione che si apre e si
+          chiude tra due letture non compare affatto. L'estensione di rete viene chiamata da macOS a ogni connessione stabilita, quindi
+          anche una richiesta di cinque millisecondi viene registrata. Se stai osservando un agente IA che scatena molte richieste brevi, installa
+          l'estensione da <strong>Acquisizione</strong>. <a href="#engines">Il confronto completo è qui sopra.</a></dd>
+        <dt><strong>Ho attivato l'estensione di rete e non compare nulla. Il campionatore funziona bene.</strong></dt>
+        <dd>Quasi sempre perché un altro filtro di contenuto occupa già il posto. <strong>macOS esegue un solo filtro di contenuto alla volta</strong>, e
+          di solito lo rivendica il software di sicurezza aziendale — Palo Alto Networks GlobalProtect, CrowdStrike Falcon e simili. Il filtro di
+          Flowlight si installa, si attiva e si connette comunque, quindi Acquisizione dice <em>Connesso all'estensione filtro</em>, ma macOS non gli consegna mai una
+          sola connessione e le schermate restano vuote. <strong>Acquisizione elenca i filtri che trova</strong> e propone di riportarti al
+          campionatore, che non usa un filtro e convive con loro. Perdi solo le connessioni molto brevi
+          (<a href="#engines">il confronto</a>); tutto il resto viene registrato allo stesso modo.</dd>
+        <dt><strong>L'estensione ha smesso di funzionare dopo l'aggiornamento di Flowlight.</strong></dt>
+        <dd>Le versioni prima della 0.2.5 avevano questo problema: macOS continua a eseguire la build dell'estensione attivata per ultima, quindi dopo un aggiornamento
+          l'estensione era la versione vecchia e macOS rifiuta la connessione tra una coppia non corrispondente. Dalla 0.2.5 Flowlight controlla all'avvio
+          e riattiva il filtro da sé. Su una versione più vecchia, premi una volta <strong>Installa e attiva il filtro</strong> in Acquisizione.</dd>
+        <dt><strong>C'è qualcos'altro che non va nell'acquisizione e non so cosa.</strong></dt>
+        <dd>Esegui questo e leggi cosa stampa — riporta solo stato e conteggi, mai nulla di ciò che Flowlight ha registrato sul tuo traffico:
+          <p class="brew"><code>curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh</code><button type="button" class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh">Copia</button></p>
+          Mostra quali estensioni sono installate, se macOS ha davvero avviato il filtro di Flowlight e quanto di recente è stato registrato qualcosa.
+          Incollalo in <a href="https://github.com/xinbetween/flowlight/issues">una segnalazione</a>.</dd>
+        <dt><strong>Flowlight invia da qualche parte informazioni su di me?</strong></dt>
+        <dd>No. Non c'è account, non c'è telemetria, non ci sono analisi. Le sole richieste che fa sono il controllo giornaliero degli aggiornamenti, le ricerche
+          facoltative sul proprietario della rete e il DNS inverso — ognuna elencata e ognuna con un interruttore per disattivarla, nella <a href="../../it/privacy/">pagina sulla privacy</a>.</dd>
+        <dt><strong>Rallenta il Mac o consuma la batteria?</strong></dt>
+        <dd>Con la finestra chiusa Flowlight fa quasi nulla: mantiene le velocità nella barra dei menu e scrive una riga al secondo. L'estensione di rete
+          costa meno del campionatore di riserva, che avvia un breve processo <code>nettop</code> ogni secondo.</dd>
+        <dt><strong>Può bloccare le connessioni?</strong></dt>
+        <dd>Sì, con l'estensione di rete. L'elenco consentiti di un agente può rifiutare oltre che avvisare, una <a href="#rules">regola</a> può bloccare un'app,
+          una destinazione o un URL per il tempo che dici tu, e una <a href="#guardrails">protezione</a> può togliere uno strumento a un agente
+          prima che venga offerto al suo modello. Nulla blocca finché non glielo chiedi, e ogni rifiuto porta con sé la sua via d'uscita.</dd>
+        <dt><strong>Mi serve l'estensione di rete?</strong></dt>
+        <dd>No. Il campionatore non richiede alcun entitlement e copre la maggior parte del traffico. L'estensione aggiunge i flussi più brevi di un secondo, l'attribuzione tramite
+          firma del codice, i nomi host senza la configurazione per l'acquisizione dei pacchetti, ed è il solo motore che può rifiutare una connessione.</dd>
+        <dt><strong>Cosa succede ai miei dati se disinstallo?</strong></dt>
+        <dd>Tutto si trova in <code>~/Library/Application Support/Flowlight</code>. Elimina quella cartella e non c'è più; vedi
+          <a href="#uninstall">Disinstallazione</a> per l'helper di acquisizione dei pacchetti e il certificato dell'ispezione.</dd>
+      </dl>
+
+      <h2 id="limits">Limitazioni</h2>
+      <ul>
+        <li>Solo TCP e UDP. ICMP (ping) e gli altri protocolli su IP grezzo non vengono attribuiti.</li>
+        <li>L'attribuzione è per processo, non per thread.</li>
+        <li>Se non attivi l'ispezione HTTPS, Flowlight legge solo i metadati e non decifra mai il traffico. I nomi server di QUIC arrivano dal DNS anziché
+          dall'handshake cifrato.</li>
+        <li>L'ispezione vede solo le app che usano il proxy, e mai quelle che applicano il pinning dei certificati.</li>
+        <li>L'acquisizione dei nomi host segue l'interfaccia di rete principale.</li>
+      </ul>
+
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../../it/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+        <p>Monitoraggio di rete app per app su macOS, con lo sguardo più attento sugli agenti IA.</p>
+      </div>
+      <div><h4>Prodotto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Scarica per macOS</a></li>
+        <li><a href="../../it/docs/#install">Installa con Homebrew</a></li>
+        <li><a href="../../releases/">Note di rilascio</a></li>
+        <li><a href="../../it/docs/">Documentazione</a></li>
+      </ul></div>
+      <div><h4>Progetto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Codice sorgente</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contribuire</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Segnala un problema</a></li>
+      </ul></div>
+      <div><h4>Fiducia</h4><ul>
+        <li><a href="../../it/privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">Licenza (GPL-3.0)</a></li>
+        <li><a href="../../it/about/">Informazioni</a></li>
+      </ul></div>
+      <div><h4>Per gli agenti IA</h4><ul>
+        <li><a href="../../llms.txt">llms.txt</a></li>
+        <li><a href="../../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../../sitemap.xml">Mappa del sito</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Versione 0.7.7 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Copiato";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Copia"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

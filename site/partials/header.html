@@ -1,15 +1,16 @@
-<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<a class="skip" href="#main" style="position:absolute;left:-999px">{{t:nav.skip}}</a>
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="{{root}}"><img src="{{root}}assets/icon.png" alt="">Flowlight</a>
-    <nav class="nav-links" aria-label="Site">
-      <a href="{{root}}#agents">AI agents</a>
-      <a href="{{root}}docs/"{{current:docs}}>Docs</a>
-      <a href="{{root}}privacy/"{{current:privacy}}>Privacy</a>
-      <a href="{{root}}releases/"{{current:releases}}>Releases</a>
-      <a href="{{root}}about/"{{current:about}}>About</a>
-      <a href="https://github.com/{{repo}}">GitHub</a>
+    <a class="brand" href="{{link:home}}"><img src="{{root}}assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="{{t:nav.site}}">
+      <a href="{{link:home}}#agents">{{t:nav.agents}}</a>
+      <a href="{{link:docs}}"{{current:docs}}>{{t:nav.docs}}</a>
+      <a href="{{link:privacy}}"{{current:privacy}}>{{t:nav.privacy}}</a>
+      <a href="{{link:releases}}"{{current:releases}}>{{t:nav.releases}}</a>
+      <a href="{{link:about}}"{{current:about}}>{{t:nav.about}}</a>
+      <a href="https://github.com/{{repo}}">{{t:nav.github}}</a>
     </nav>
-    <a class="btn btn-primary btn-sm" href="{{dmg}}">Download</a>
+    {{langpicker}}
+    <a class="btn btn-primary btn-sm" href="{{dmg}}">{{t:nav.download}}</a>
   </div>
 </header>

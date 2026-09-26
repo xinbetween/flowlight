@@ -1,0 +1,84 @@
+<!--
+title: Datenschutz bei Flowlight
+description: Was Flowlight aufzeichnet, wo es gespeichert wird und welche externen Dienste die App kontaktiert.
+nav: privacy
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Datenschutz</p>
+    <h1>Standardmäßig lokal, mit dokumentierten Ausnahmen</h1>
+    <p class="lede">Flowlight braucht kein Konto und enthält keine Produktanalyse. Aufzeichnungen des Datenverkehrs bleiben lokal. Diese Seite dokumentiert,
+      was die App aufzeichnet, welche optionalen Funktionen externe Dienste kontaktieren und wie du das alles im <a href="https://github.com/{{repo}}">Quellcode</a> nachprüfst.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Auf dieser Seite">
+      <strong>Auf dieser Seite</strong>
+      <a href="#short">Kurz gefasst</a><a href="#records">Was es aufzeichnet</a><a href="#packets">Paketmitschnitt</a><a href="#local">Lokal gelesen</a><a href="#inspection">HTTPS-Inspektion</a>
+      <a href="#requests">Netzwerkanfragen</a><a href="#permissions">Berechtigungen</a><a href="#retention">Aufbewahrung</a>
+      <a href="#website">Diese Website</a><a href="#contact">Kontakt</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">Kurz gefasst</h2>
+      <ul>
+        <li>Flowlight zeichnet Netzwerk-Metadaten auf (welche App, welcher Host, welcher Port, wie viele Bytes, wann) – in einer Datenbank auf deinem Mac.</li>
+        <li>Es zeichnet nie Paketinhalte auf und entschlüsselt nie Datenverkehr, außer du schaltest die optionale HTTPS-Inspektion für Apps ein, die du darüber leitest.</li>
+        <li>Flowlight lädt seine Verkehrsdatenbank nicht hoch und enthält keine Telemetrie, keine Fehlerberichte und keine Produktanalyse.</li>
+        <li>Die eigenen externen Anfragen der App und die von dir eingerichteten Exportwege sind unten dokumentiert.</li>
+      </ul>
+
+      <h2 id="records">Was es aufzeichnet</h2>
+      <p>Pro Sekunde: die App (Bundle-ID, Name, Pfad der ausführbaren Datei, Prozess-ID), die entfernte IP-Adresse, den Hostnamen, den Port, das Transport- und
+        das Anwendungsprotokoll sowie gesendete und empfangene Bytes. Außerdem speichert es die Warnungen, die es auslöst, und die Basislinien pro App, die die Anomalie-Regeln nutzen.
+        All das liegt in <code>~/Library/Application Support/Flowlight</code>.</p>
+
+      <h2 id="packets">Paketmitschnitt</h2>
+      <p>Bestätigst du die einmalige Hostnamen-Einrichtung, liest Flowlight Pakete auf deiner primären Netzwerkschnittstelle durch einen Filter im Kernel, der
+        nur zwei Dinge durchlässt: DNS-Antworten und die erste Nachricht einer TLS-Verbindung (das ClientHello). Daraus behält es nur
+        Hostnamen und die Adressen, auf die sie zeigen, im Arbeitsspeicher. Alles andere wird im Kernel verworfen, und kein Paket wird auf die Festplatte geschrieben.</p>
+
+      <h2 id="local">Was es auf deinem Mac liest</h2>
+      <p>Um die Tools und MCP-Server eines Agenten zuzuordnen, liest Flowlight zu jedem Prozess den Elternprozess und die Befehlszeile aus macOS sowie die
+        MCP-Konfigurationsdateien der unterstützten Agenten (zum Beispiel <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code> und
+        <code>~/.codex/config.toml</code>). Es behält nur Name, Startbefehl und URL jedes Servers, im Arbeitsspeicher, und speichert nur die daraus entstehenden
+        Bezeichnungen („über curl“, „github MCP“) zu deinem Datenverkehr. Nichts aus diesen Dateien oder Befehlszeilen wird irgendwohin gesendet.</p>
+
+      <h2 id="inspection">HTTPS-Inspektion</h2>
+      <p>Standardmäßig aus. Schaltest du sie ein, erzeugt Flowlight eine Zertifizierungsstelle auf deinem Mac (ihr Schlüssel verlässt
+        <code>~/Library/Application Support/Flowlight/Inspection</code> nie) und betreibt einen Proxy, der nur Verbindungen von diesem Mac annimmt. Für Apps, die du
+        darüber leitest, zeichnet es Anfragen und Antworten auf, samt Bodys bis 2 MB, in der lokalen Datenbank und für 3 Tage. Header mit Zugangsdaten
+        (Authorization, Cookies, API-Schlüssel) werden vor dem Speichern durch ihre Länge ersetzt. Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus. Aufgezeichnete Inspektionsdaten werden von Flowlight nicht hochgeladen. Die Inspektion auszuschalten stoppt den Proxy; <strong>Zertifikat &amp; aufgezeichnete
+        Daten entfernen</strong> löscht das Zertifikat, seine Vertrauenseinstellung und jede aufgezeichnete Anfrage.</p>
+
+      <h2 id="requests">Netzwerkanfragen, die die App stellt</h2>
+      <table>
+        <tr><th>Anfrage</th><th>Gesendet an</th><th>Was sie enthält</th><th>Wann</th></tr>
+        <tr><td>Update-Prüfung</td><td><code>api.github.com</code></td><td>Eine normale HTTPS-Anfrage nach der neuesten Version; GitHub sieht deine IP-Adresse und den User-Agent <code>Flowlight/&lt;version&gt;</code></td><td>Beim Start und täglich, ab 0.1.2. Abschalten in Einstellungen › Allgemein</td></tr>
+        <tr><td>Update-Download</td><td><code>github.com</code></td><td>Das Image und seine Prüfsummendatei</td><td>Nur wenn du auf „Herunterladen &amp; öffnen“ klickst</td></tr>
+        <tr><td>Reverse-DNS</td><td>Der von dir eingerichtete DNS-Resolver</td><td>Eine Abfrage des registrierten Namens einer IP-Adresse, wenn kein Hostname gesehen wurde</td><td>Nach Bedarf, im Standard-Erfassungsmodus</td></tr>
+        <tr><td>Abfrage des Netzinhabers</td><td>Team Cymru, über DNS</td><td>Öffentliche IP-Adressen ohne bekannten Hostnamen. Private und reservierte Adressen verlassen deinen Mac nie</td><td>Standardmäßig ein. Abschalten in Erfassung › Netzinhaber bestimmen</td></tr>
+        <tr><td>Fragen mit einem gehosteten Modell</td><td>Der Anbieter, den du wählst: Anthropic, OpenAI, Google Gemini oder ein kompatibler Endpunkt</td><td>Deine Frage und die Ergebnisse der nur lesenden Flowlight-Abfragen, die das Modell ausgewählt hat. Die Verkehrsdatenbank selbst wird nicht hochgeladen</td><td>Nur wenn du einen gehosteten Anbieter wählst und eine Frage abschickst. Der Bildschirm Fragen zeigt die gesendeten Anfragen</td></tr>
+        <tr><td>Export an einen Collector</td><td>Der OpenTelemetry- oder HTTP-Endpunkt, den du einrichtest</td><td>Die Felder, die in Einstellungen › Export stehen, etwa Verkehrs-Rollups und Warnungen. Authentifizierungs-Header liegen im Schlüsselbund</td><td>Nur nachdem du einen Endpunkt eingerichtet und den Export aktiviert hast</td></tr>
+        <tr><td>Datenverkehr inspizierter Programme</td><td>Das ursprüngliche Ziel, das das inspizierte Programm angefragt hat</td><td>Die Anfrage des Programms, nach der Entschlüsselung über Flowlights lokalen Proxy weitergeleitet</td><td>Nur solange die HTTPS-Inspektion aktiv ist und das Programm über den Proxy geleitet wird</td></tr>
+      </table>
+
+      <h2 id="permissions">Berechtigungen</h2>
+      <ul>
+        <li><strong>Administrator-Passwort, ein Mal,</strong> für den Zugriff auf den Paketmitschnitt. Entfernbar über den Bildschirm Erfassung.</li>
+        <li><strong>Benachrichtigungen,</strong> für Warnungen. Optional.</li>
+        <li><strong>Anmeldeobjekt,</strong> nur wenn du „Beim Anmelden starten“ einschaltest.</li>
+      </ul>
+
+      <h2 id="retention">Aufbewahrung</h2>
+      <p>Sekundendaten 6 Stunden (einstellbar), Minutendaten 14 Tage, Stundendaten 400 Tage, Tagessummen dauerhaft, Warnungen 90 Tage.
+        <strong>Erfassung › Alle Daten löschen</strong> löscht alles, und <code>~/Library/Application Support/Flowlight</code> zu entfernen tut dasselbe.</p>
+
+      <h2 id="website">Diese Website</h2>
+      <p>Diese Seite ist eine statische Seite, gehostet auf GitHub Pages und ausgeliefert über Cloudflare. Sie setzt keine Cookies und führt keine Analyse aus. GitHub
+        und Cloudflare verarbeiten Anfragen, um sie auszuliefern, und die Schriften kommen von Google Fonts, das beim Besuch deine IP-Adresse erhält.</p>
+
+      <h2 id="contact">Kontakt</h2>
+      <p>Fragen oder ein Anliegen zum Datenschutz? <a href="https://github.com/{{repo}}/issues">Öffne ein Issue</a>. Für alles Sensible nutze GitHubs
+        private Schwachstellenmeldung im Repository.</p>
+    </article>
+  </div>
+</main>

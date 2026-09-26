@@ -2,35 +2,34 @@
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a class="brand" href="{{root}}"><img src="{{root}}assets/icon.png" alt="">Flowlight</a>
-        <p>Application-aware network monitoring for macOS, with focused visibility into AI agents.</p>
+        <a class="brand" href="{{link:home}}"><img src="{{root}}assets/icon.png" alt="">Flowlight</a>
+        <p>{{t:footer.tagline}}</p>
       </div>
-      <div><h4>Product</h4><ul>
-        <li><a href="{{dmg}}">Download for macOS</a></li>
-        <li><a href="{{root}}docs/#install">Install with Homebrew</a></li>
-        <li><a href="{{root}}releases/">Release notes</a></li>
-        <li><a href="{{root}}docs/">Documentation</a></li>
+      <div><h4>{{t:footer.product}}</h4><ul>
+        <li><a href="{{dmg}}">{{t:footer.download}}</a></li>
+        <li><a href="{{link:docs}}#install">{{t:footer.homebrew}}</a></li>
+        <li><a href="{{link:releases}}">{{t:footer.releasenotes}}</a></li>
+        <li><a href="{{link:docs}}">{{t:footer.documentation}}</a></li>
       </ul></div>
-      <div><h4>Project</h4><ul>
-        <li><a href="https://github.com/{{repo}}">Source code</a></li>
-        <li><a href="https://github.com/{{repo}}/blob/main/CONTRIBUTING.md">Contributing</a></li>
-        <li><a href="https://github.com/{{repo}}/issues">Report an issue</a></li>
+      <div><h4>{{t:footer.project}}</h4><ul>
+        <li><a href="https://github.com/{{repo}}">{{t:footer.source}}</a></li>
+        <li><a href="https://github.com/{{repo}}/blob/main/CONTRIBUTING.md">{{t:footer.contributing}}</a></li>
+        <li><a href="https://github.com/{{repo}}/issues">{{t:footer.issue}}</a></li>
       </ul></div>
-      <div><h4>Trust</h4><ul>
-        <li><a href="{{root}}privacy/">Privacy</a></li>
-        <li><a href="https://github.com/{{repo}}/blob/main/LICENSE">License (GPL-3.0)</a></li>
-        <li><a href="{{root}}about/">About</a></li>
+      <div><h4>{{t:footer.trust}}</h4><ul>
+        <li><a href="{{link:privacy}}">{{t:footer.privacy}}</a></li>
+        <li><a href="https://github.com/{{repo}}/blob/main/LICENSE">{{t:footer.license}}</a></li>
+        <li><a href="{{link:about}}">{{t:footer.about}}</a></li>
       </ul></div>
-      <div><h4>For AI agents</h4><ul>
+      <div><h4>{{t:footer.foragents}}</h4><ul>
         <li><a href="{{root}}llms.txt">llms.txt</a></li>
         <li><a href="{{root}}llms-full.txt">llms-full.txt</a></li>
-        <li><a href="{{root}}sitemap.xml">Sitemap</a></li>
+        <li><a href="{{root}}sitemap.xml">{{t:footer.sitemap}}</a></li>
       </ul></div>
     </div>
     <div class="legal">
-      <span>© {{year}} The Flowlight contributors. Flowlight is free software, released under the
-        <a href="https://github.com/{{repo}}/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version {{version}} · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>{{t:footer.legal.copyright}}</span>
+      <span>{{t:footer.legal.version}}</span>
     </div>
   </div>
 </footer>
@@ -39,9 +38,9 @@
   document.querySelectorAll("button.copy").forEach(function (button) {
     button.addEventListener("click", function () {
       var done = function () {
-        button.textContent = "Copied";
+        button.textContent = "{{t:copy.copied}}";
         button.setAttribute("data-copied", "");
-        setTimeout(function () { button.textContent = "Copy"; button.removeAttribute("data-copied"); }, 1600);
+        setTimeout(function () { button.textContent = "{{t:copy.copy}}"; button.removeAttribute("data-copied"); }, 1600);
       };
       var text = button.getAttribute("data-copy");
       if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
@@ -80,6 +79,18 @@
     targets.forEach(function (target) {
       target.classList.add("reveal");
       observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
     });
   })();
 </script>

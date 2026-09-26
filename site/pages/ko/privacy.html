@@ -1,0 +1,86 @@
+<!--
+title: Flowlight 개인정보
+description: Flowlight가 무엇을 기록하고 어디에 저장하는지, 그리고 앱이 어떤 외부 서비스에 접속하는지.
+nav: privacy
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">개인정보</p>
+    <h1>기본은 로컬, 예외는 모두 문서로</h1>
+    <p class="lede">Flowlight는 계정이 필요 없고 제품 분석 기능도 없습니다. 트래픽 기록은 Mac 안에 저장됩니다. 이 페이지는 앱이
+      무엇을 기록하는지, 외부 서비스에 접속하는 선택 기능은 무엇인지, 그리고 이 설명을 <a href="https://github.com/{{repo}}">소스 코드</a>에서 어떻게 확인할 수 있는지 밝힙니다.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="이 페이지 안에서">
+      <strong>이 페이지 안에서</strong>
+      <a href="#short">요약</a><a href="#records">기록하는 것</a><a href="#packets">패킷 캡처</a><a href="#local">Mac에서 읽는 것</a><a href="#inspection">HTTPS 검사</a>
+      <a href="#requests">네트워크 요청</a><a href="#permissions">권한</a><a href="#retention">보관 기간</a>
+      <a href="#website">이 웹사이트</a><a href="#contact">문의</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">요약</h2>
+      <ul>
+        <li>Flowlight는 네트워크 메타데이터(어떤 앱이, 어떤 호스트로, 어떤 포트로, 몇 바이트를, 언제)를 Mac 안의 데이터베이스에 기록합니다.</li>
+        <li>패킷 내용은 절대 기록하지 않고 트래픽을 복호화하지도 않습니다. 선택 사항인 HTTPS 검사를 켜고 앱을 그리로 보낸 경우만 예외입니다.</li>
+        <li>Flowlight는 트래픽 데이터베이스를 업로드하지 않으며, 텔레메트리와 크래시 보고, 제품 분석 기능이 없습니다.</li>
+        <li>앱 자신이 내는 외부 요청과 사용자가 설정한 내보내기 경로는 아래에 정리해 두었습니다.</li>
+      </ul>
+
+      <h2 id="records">기록하는 것</h2>
+      <p>1초마다 앱(번들 ID, 이름, 실행 파일 경로, 프로세스 ID)과 원격 IP 주소, 호스트 이름, 포트, 전송 방식과 프로토콜, 그리고
+        보내고 받은 바이트 수를 기록합니다. 띄운 알림과 이상 탐지 규칙이 쓰는 앱별 기준선도 저장합니다.
+        전부 <code>~/Library/Application Support/Flowlight</code>에 있습니다.</p>
+
+      <h2 id="packets">패킷 캡처</h2>
+      <p>한 번만 하는 호스트 이름 설정을 승인하면, Flowlight는 기본 네트워크 인터페이스의 패킷을 커널 필터를 통해 읽습니다. 이 필터는
+        두 가지만 통과시킵니다. DNS 응답, 그리고 TLS 연결의 첫 메시지(ClientHello)입니다. 거기에서 호스트 이름과 그것이 가리키는
+        주소만 메모리에 보관합니다. 나머지는 커널에서 버려지며, 어떤 패킷도 디스크에 쓰이지 않습니다.</p>
+
+      <h2 id="local">Mac에서 읽는 것</h2>
+      <p>에이전트의 도구와 MCP 서버를 귀속시키기 위해, Flowlight는 macOS에서 각 프로세스의 부모와 명령줄을 읽고, 지원하는 에이전트의
+        MCP 설정 파일(예를 들어 <code>~/.claude.json</code>, <code>~/.cursor/mcp.json</code>,
+        <code>~/.codex/config.toml</code>)을 읽습니다. 각 서버의 이름과 실행 명령, URL만 메모리에 보관하고, 트래픽과 함께 저장하는
+        것은 그 결과로 붙는 표시(“curl 경유”, “github MCP”)뿐입니다. 이 파일이나 명령줄의 내용은 어디로도 보내지 않습니다.</p>
+
+      <h2 id="inspection">HTTPS 검사</h2>
+      <p>기본값은 끔입니다. 켜면 Flowlight가 Mac 안에 인증 기관을 만들고(그 키는
+        <code>~/Library/Application Support/Flowlight/Inspection</code>를 벗어나지 않습니다) 이 Mac에서 오는 연결만 받는 프록시를
+        돌립니다. 이 프록시를 거치도록 지정한 앱에 대해서는 요청과 응답을, 최대 2 MB까지의 본문을 포함해 로컬 데이터베이스에 3일
+        동안 기록합니다. 인증 정보 헤더(Authorization, 쿠키, API 키)는 저장 전에 그 길이 값으로 대체됩니다. Flowlight는 내장된
+        Apple 서비스와 암호 관리자 목록을 복호화에서 제외합니다. 기록된 검사 데이터를 Flowlight가 업로드하는 일은 없습니다. 검사를
+        끄면 프록시가 멈추고, <strong>인증서 및 기록된 데이터 제거</strong>는 인증서와 그 신뢰 설정, 기록된 모든 요청을 삭제합니다.</p>
+
+      <h2 id="requests">앱이 내는 네트워크 요청</h2>
+      <table>
+        <tr><th>요청</th><th>보내는 곳</th><th>담기는 내용</th><th>시점</th></tr>
+        <tr><td>업데이트 확인</td><td><code>api.github.com</code></td><td>최신 릴리스를 묻는 일반적인 HTTPS 요청. GitHub는 IP 주소와 <code>Flowlight/&lt;version&gt;</code> 사용자 에이전트를 보게 됩니다</td><td>0.1.2부터, 실행 시와 하루에 한 번. 끄는 스위치는 설정 › 일반</td></tr>
+        <tr><td>업데이트 다운로드</td><td><code>github.com</code></td><td>디스크 이미지와 체크섬 파일</td><td>다운로드 후 열기를 클릭할 때만</td></tr>
+        <tr><td>역방향 DNS</td><td>설정된 DNS 리졸버</td><td>호스트 이름이 관측되지 않았을 때, IP 주소에 등록된 이름 조회</td><td>기본 캡처 모드에서 필요할 때</td></tr>
+        <tr><td>네트워크 소유자 조회</td><td>Team Cymru, DNS로</td><td>알려진 호스트 이름이 없는 공용 IP 주소. 사설 주소와 예약 주소는 절대 Mac을 벗어나지 않습니다</td><td>기본값 켬. 끄는 스위치는 캡처 › 네트워크 소유자 확인</td></tr>
+        <tr><td>호스팅 모델로 질문</td><td>선택한 제공업체: Anthropic, OpenAI, Google Gemini 또는 호환 엔드포인트</td><td>내 질문과, 모델이 고른 Flowlight 읽기 전용 질의가 돌려준 결과. 트래픽 데이터베이스 자체는 업로드되지 않습니다</td><td>호스팅 제공업체를 고르고 질문을 보낼 때만. 질문 화면에 전송된 요청이 표시됩니다</td></tr>
+        <tr><td>수집기로 내보내기</td><td>직접 설정한 OpenTelemetry 또는 HTTP 엔드포인트</td><td>설정 › 내보내기에 표시된 필드, 예를 들어 트래픽 집계와 알림. 인증 헤더는 키체인에 저장됩니다</td><td>엔드포인트를 설정하고 내보내기를 켠 뒤에만</td></tr>
+        <tr><td>검사 대상 앱의 트래픽</td><td>검사 대상 앱이 요청한 원래 목적지</td><td>복호화한 뒤 Flowlight의 로컬 프록시를 거쳐 전달되는 그 앱의 요청</td><td>HTTPS 검사가 켜져 있고 그 앱이 프록시를 거치는 동안만</td></tr>
+      </table>
+
+      <h2 id="permissions">권한</h2>
+      <ul>
+        <li>패킷 캡처 권한을 위한 <strong>관리자 암호, 한 번.</strong> 캡처 화면에서 되돌릴 수 있습니다.</li>
+        <li>경고를 알리기 위한 <strong>알림 권한.</strong> 선택 사항입니다.</li>
+        <li><strong>로그인 항목.</strong> 로그인 시 실행을 켠 경우에만 해당합니다.</li>
+      </ul>
+
+      <h2 id="retention">보관 기간</h2>
+      <p>초 단위 데이터는 6시간(조절 가능), 분 단위는 14일, 시간 단위는 400일, 일 단위 합계는 무기한, 알림은 90일입니다.
+        <strong>캡처 › 모든 데이터 지우기</strong>가 전부 삭제하며, <code>~/Library/Application Support/Flowlight</code>를 지워도 같습니다.</p>
+
+      <h2 id="website">이 웹사이트</h2>
+      <p>이 사이트는 GitHub Pages에 올려 Cloudflare를 통해 제공하는 정적 페이지입니다. 쿠키를 설정하지 않고 분석 도구도 돌리지
+        않습니다. 페이지를 전달하기 위해 GitHub와 Cloudflare가 요청을 처리하며, 폰트는 Google Fonts에서 불러오므로 방문 시 그곳이
+        IP 주소를 받게 됩니다.</p>
+
+      <h2 id="contact">문의</h2>
+      <p>궁금한 점이나 개인정보 관련 우려가 있다면 <a href="https://github.com/{{repo}}/issues">이슈를 올려</a> 주세요. 민감한
+        내용이라면 저장소의 GitHub 비공개 취약점 신고 기능을 이용하세요.</p>
+    </article>
+  </div>
+</main>

@@ -1,0 +1,84 @@
+<!--
+title: Flowlight 隱私
+description: Flowlight 記錄什麼、資料存放在哪裡，以及這個 App 會連線哪些外部服務。
+nav: privacy
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">隱私</p>
+    <h1>預設留在本機，例外都寫明</h1>
+    <p class="lede">Flowlight 不需要帳號，也不含任何產品分析。流量記錄都儲存在本機。本頁說明這個 App
+      記錄了什麼、哪些選用功能會連線外部服務，以及如何在<a href="https://github.com/{{repo}}">原始碼</a>中驗證這些說法。</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="本頁內容">
+      <strong>本頁內容</strong>
+      <a href="#short">簡短版</a><a href="#records">它記錄什麼</a><a href="#packets">封包擷取</a><a href="#local">在本機讀取什麼</a><a href="#inspection">HTTPS 檢查</a>
+      <a href="#requests">網路請求</a><a href="#permissions">權限</a><a href="#retention">保留期限</a>
+      <a href="#website">關於本網站</a><a href="#contact">聯絡</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">簡短版</h2>
+      <ul>
+        <li>Flowlight 會把網路後設資料（哪個 App、哪台主機、哪個連接埠、多少位元組、什麼時候）記錄在你 Mac 上的資料庫中。</li>
+        <li>除非你為轉送經過它的 App 開啟選用的 HTTPS 檢查，它絕不記錄封包內容，也絕不解密流量。</li>
+        <li>Flowlight 不會上傳它的流量資料庫，也不含遙測、當掉回報或產品分析。</li>
+        <li>這個 App 自己發出的外部請求，以及由使用者設定的匯出路徑，都記載在下面。</li>
+      </ul>
+
+      <h2 id="records">它記錄什麼</h2>
+      <p>每一秒記錄：App（Bundle ID、名稱、執行檔路徑、程序 ID）、遠端 IP 位址、主機名稱、連接埠、傳輸層與
+        協定，以及傳送和接收的位元組數。它也會儲存自己發出的警示，以及異常規則所使用的各 App 基線。
+        全部都放在 <code>~/Library/Application Support/Flowlight</code>。</p>
+
+      <h2 id="packets">封包擷取</h2>
+      <p>如果你同意一次性的主機名稱設定，Flowlight 會透過一個核心層過濾器讀取你主要網路介面上的封包，而該過濾器
+        只放行兩種東西：DNS 回應，以及 TLS 連線的第一個訊息（ClientHello）。它只從中保留
+        主機名稱和它們對應的位址，而且只存在記憶體裡。其他所有內容都在核心層被丟掉，沒有任何封包會寫入磁碟。</p>
+
+      <h2 id="local">它在你的 Mac 上讀取什麼</h2>
+      <p>為了把代理的工具和 MCP 伺服器歸屬出來，Flowlight 會從 macOS 讀取每個程序的上層程序和命令列，以及
+        它支援的那些代理的 MCP 設定檔（例如 <code>~/.claude.json</code>、<code>~/.cursor/mcp.json</code> 和
+        <code>~/.codex/config.toml</code>）。它只在記憶體中保留每個伺服器的名稱、啟動指令和 URL，並且只把產生出來的
+        標籤（「via curl」、「github MCP」）和你的流量一起儲存。這些檔案和命令列的內容不會被送到任何地方。</p>
+
+      <h2 id="inspection">HTTPS 檢查</h2>
+      <p>預設為關閉。如果你開啟它，Flowlight 會在你的 Mac 上建立一個憑證授權單位（它的金鑰絕不會離開
+        <code>~/Library/Application Support/Flowlight/Inspection</code>），並執行一個只接受來自這台 Mac 連線的代理伺服器。對於你
+        轉送經過它的 App，它會把請求與回應（包含最多 2 MB 的內文）記錄在本機資料庫中，保留 3 天。憑證類標頭
+        （Authorization、cookie、API 金鑰）在任何內容儲存之前就會被換成它們的長度。Flowlight 會把內建清單中的 Apple 服務和密碼管理程式排除在解密之外。記錄下來的檢查資料不會被 Flowlight 上傳。關閉檢查功能會停止代理伺服器；<strong>「移除憑證與記錄的
+        資料」</strong>會刪除憑證、它的信任設定，以及每一筆記錄下來的請求。</p>
+
+      <h2 id="requests">這個 App 發出的網路請求</h2>
+      <table>
+        <tr><th>請求</th><th>送到哪裡</th><th>內容是什麼</th><th>什麼時候</th></tr>
+        <tr><td>更新檢查</td><td><code>api.github.com</code></td><td>一個查詢最新版本的標準 HTTPS 請求；GitHub 會看到你的 IP 位址和 <code>Flowlight/&lt;version&gt;</code> 這個 user agent</td><td>啟動時以及每天一次，自 0.1.2 起。關閉開關在「設定」› 「一般」</td></tr>
+        <tr><td>更新下載</td><td><code>github.com</code></td><td>磁碟映像檔及其總和檢查碼檔案</td><td>只有在你點「下載並開啟」時</td></tr>
+        <tr><td>反向 DNS</td><td>你設定的 DNS 解析器</td><td>在沒有看到主機名稱時，查詢某個 IP 位址登記的名稱</td><td>在預設的擷取模式下，需要時進行</td></tr>
+        <tr><td>網路擁有者查詢</td><td>Team Cymru，透過 DNS</td><td>沒有已知主機名稱的公開 IP 位址。私有和保留位址絕不會離開你的 Mac</td><td>預設開啟。關閉開關在「擷取」› 「辨識網路擁有者」</td></tr>
+        <tr><td>用託管模型提問</td><td>你選擇的供應商：Anthropic、OpenAI、Google Gemini 或相容的端點</td><td>你的問題，以及模型所選用的 Flowlight 唯讀查詢回傳的結果。流量資料庫本身不會被上傳</td><td>只有在你選擇託管供應商並送出問題時。「提問」畫面會顯示送出的請求</td></tr>
+        <tr><td>收集器匯出</td><td>你設定的 OpenTelemetry 或 HTTP 端點</td><td>「設定」› 「匯出」中列出的欄位，例如流量彙總資料和警示。驗證標頭儲存在鑰匙串中</td><td>只有在你設定端點並啟用匯出之後</td></tr>
+        <tr><td>受檢查 App 的流量</td><td>受檢查的 App 原本要連的目標</td><td>該 App 的請求，解密後經由 Flowlight 的本機代理伺服器轉送</td><td>只有在 HTTPS 檢查已啟用，且該 App 的流量經過代理伺服器時</td></tr>
+      </table>
+
+      <h2 id="permissions">權限</h2>
+      <ul>
+        <li><strong>管理者密碼，一次，</strong>用於封包擷取存取權。可從「擷取」畫面移除。</li>
+        <li><strong>通知，</strong>用於警告。選用。</li>
+        <li><strong>登入項目，</strong>只有在你開啟「登入時啟動」時才需要。</li>
+      </ul>
+
+      <h2 id="retention">保留期限</h2>
+      <p>每秒資料 6 小時（可調整）、分鐘資料 14 天、小時資料 400 天、每日總量永久保留、警示 90 天。
+        <strong>「擷取」› 「清除所有資料」</strong>會刪除所有內容，移除 <code>~/Library/Application Support/Flowlight</code> 也有同樣效果。</p>
+
+      <h2 id="website">關於本網站</h2>
+      <p>本站是託管在 GitHub Pages 上、經由 Cloudflare 提供的靜態頁面。它不設定 cookie，也不執行任何分析。GitHub
+        和 Cloudflare 會處理提供本站所需的請求，字型則從 Google Fonts 載入，它會在你造訪時收到你的 IP 位址。</p>
+
+      <h2 id="contact">聯絡</h2>
+      <p>有問題或隱私方面的疑慮？<a href="https://github.com/{{repo}}/issues">開一個 issue</a>。若是敏感內容，請使用該儲存庫上
+        GitHub 的私密漏洞回報功能。</p>
+    </article>
+  </div>
+</main>

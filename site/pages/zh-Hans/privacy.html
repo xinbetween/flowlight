@@ -1,0 +1,84 @@
+<!--
+title: Flowlight 隐私说明
+description: Flowlight 记录什么、记录在哪里，以及这个应用会联系哪些外部服务。
+nav: privacy
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">隐私</p>
+    <h1>默认只在本地，例外都写清楚</h1>
+    <p class="lede">Flowlight 不需要账号，也不含任何产品分析。流量记录保存在本地。本页说明
+      应用记录了什么、哪些可选功能会联系外部服务，以及如何在<a href="https://github.com/{{repo}}">源代码</a>里核实这些说法。</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="本页内容">
+      <strong>本页内容</strong>
+      <a href="#short">一句话概括</a><a href="#records">它记录什么</a><a href="#packets">数据包捕获</a><a href="#local">在本地读取什么</a><a href="#inspection">HTTPS 检查</a>
+      <a href="#requests">网络请求</a><a href="#permissions">权限</a><a href="#retention">保留期限</a>
+      <a href="#website">本网站</a><a href="#contact">联系方式</a>
+    </nav>
+    <article class="prose">
+      <h2 id="short">一句话概括</h2>
+      <ul>
+        <li>Flowlight 把网络元数据（哪个应用、哪台主机、哪个端口、多少字节、什么时候）记录在你 Mac 上的一个数据库里。</li>
+        <li>它绝不记录数据包内容，也绝不解密流量，除非你为交给它转发的应用打开可选的 HTTPS 检查。</li>
+        <li>Flowlight 不会上传它的流量数据库，也不含遥测、崩溃上报或产品分析。</li>
+        <li>应用自身发出的外部请求，以及由用户配置的导出路径，都在下面列明。</li>
+      </ul>
+
+      <h2 id="records">它记录什么</h2>
+      <p>对每一秒：应用（Bundle ID、名称、可执行文件路径、进程 ID）、远端 IP 地址、主机名、端口、传输层与
+        应用层协议，以及发送和接收的字节数。它还会保存自己发出的警报，以及异常规则用到的各应用基线。
+        所有这些都存放在 <code>~/Library/Application Support/Flowlight</code> 里。</p>
+
+      <h2 id="packets">数据包捕获</h2>
+      <p>如果你同意那次一次性的主机名设置，Flowlight 会通过一个内核过滤器读取主网络接口上的数据包，该过滤器
+        只放行两样东西：DNS 响应，以及 TLS 连接的第一条消息（ClientHello）。它只从其中保留
+        主机名和它们映射到的地址，并放在内存里。其余一切都在内核中被丢掉，没有任何数据包会写入磁盘。</p>
+
+      <h2 id="local">它在你的 Mac 上读取什么</h2>
+      <p>为了把代理的工具和 MCP 服务器归属清楚，Flowlight 会从 macOS 读取每个进程的父进程和命令行，以及它
+        支持的那些代理的 MCP 配置文件（例如 <code>~/.claude.json</code>、<code>~/.cursor/mcp.json</code> 和
+        <code>~/.codex/config.toml</code>）。它只在内存中保留每个服务器的名称、启动命令和 URL，随流量一起存下来的只有由此得出的
+        标签（“经由 curl”“github MCP”）。这些文件和命令行里的内容不会发往任何地方。</p>
+
+      <h2 id="inspection">HTTPS 检查</h2>
+      <p>默认关闭。如果你打开它，Flowlight 会在你的 Mac 上创建一个证书颁发机构（它的私钥绝不离开
+        <code>~/Library/Application Support/Flowlight/Inspection</code>），并运行一个只接受来自本机连接的代理。对于你
+        交给它转发的应用，它会把请求和响应（含最多 2 MB 的正文）记录在本地数据库里，保留 3 天。凭据标头
+        （Authorization、cookie、API 密钥）在任何内容被存储之前，都会被替换为它们的长度。Flowlight 会把内置的 Apple 服务和密码管理器名单排除在解密之外。记录下来的检查数据不会被 Flowlight 上传。关掉检查会停止代理；<strong>移除证书与记录的
+        数据</strong>会删除证书、它的信任设置以及每一条已记录的请求。</p>
+
+      <h2 id="requests">应用发出的网络请求</h2>
+      <table>
+        <tr><th>请求</th><th>发往</th><th>包含什么</th><th>什么时候</th></tr>
+        <tr><td>更新检查</td><td><code>api.github.com</code></td><td>一个查询最新版本的标准 HTTPS 请求；GitHub 会看到你的 IP 地址和 <code>Flowlight/&lt;version&gt;</code> 这个 User-Agent 标识</td><td>启动时以及每天一次，自 0.1.2 起。关闭开关在设置 › 通用</td></tr>
+        <tr><td>更新下载</td><td><code>github.com</code></td><td>磁盘映像及其校验和文件</td><td>只在你点击“下载并打开”时</td></tr>
+        <tr><td>反向 DNS</td><td>你配置的 DNS 解析器</td><td>在没有看到主机名时，查询某个 IP 地址登记的名称</td><td>按需进行，在默认捕获模式下</td></tr>
+        <tr><td>网络所有者查询</td><td>Team Cymru，通过 DNS</td><td>没有已知主机名的公网 IP 地址。私有地址和保留地址绝不离开你的 Mac</td><td>默认开启。关闭开关在捕获 › 识别网络所有者</td></tr>
+        <tr><td>用托管模型提问</td><td>你选择的提供方：Anthropic、OpenAI、Google Gemini 或兼容的端点</td><td>你的问题，以及模型选中的那些只读 Flowlight 查询所返回的结果。流量数据库本身不会被上传</td><td>只在你选择了托管提供方并提交问题时。提问界面会显示发送出去的请求</td></tr>
+        <tr><td>收集器导出</td><td>你配置的 OpenTelemetry 或 HTTP 端点</td><td>设置 › 导出里列出的字段，例如流量汇总和警报。认证标头保存在钥匙串里</td><td>只在你配置好端点并启用导出之后</td></tr>
+        <tr><td>被检查应用的流量</td><td>被检查应用原本请求的目标</td><td>该应用的请求，在解密后经由 Flowlight 的本地代理转发</td><td>只在 HTTPS 检查已启用、且该应用经由代理转发时</td></tr>
+      </table>
+
+      <h2 id="permissions">权限</h2>
+      <ul>
+        <li><strong>管理员密码，一次，</strong>用于数据包捕获访问权限。可在捕获界面里移除。</li>
+        <li><strong>通知，</strong>用于警告。可选。</li>
+        <li><strong>登录项，</strong>仅在你打开“登录时启动”时。</li>
+      </ul>
+
+      <h2 id="retention">保留期限</h2>
+      <p>每秒数据 6 小时（可调），分钟数据 14 天，小时数据 400 天，每日总量无限期保留，警报 90 天。
+        <strong>捕获 › 清除所有数据</strong>会删除一切，删除 <code>~/Library/Application Support/Flowlight</code> 也是同样的效果。</p>
+
+      <h2 id="website">本网站</h2>
+      <p>本站是托管在 GitHub Pages 上、经由 Cloudflare 提供服务的静态页面。它不设置 cookie，也不运行任何分析。GitHub
+        和 Cloudflare 会处理请求以便提供服务，而字体从 Google Fonts 加载，你访问时它会收到你的 IP 地址。</p>
+
+      <h2 id="contact">联系方式</h2>
+      <p>有问题或隐私方面的顾虑？<a href="https://github.com/{{repo}}/issues">提交一个 issue</a>。涉及敏感内容的，请使用 GitHub
+        在本仓库上的私密漏洞报告功能。</p>
+    </article>
+  </div>
+</main>

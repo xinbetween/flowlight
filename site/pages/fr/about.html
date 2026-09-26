@@ -1,0 +1,54 @@
+<!--
+title: À propos de Flowlight
+description: Pourquoi Flowlight existe, les principes sur lesquels il est bâti, et qui le fait.
+nav: about
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">À propos</p>
+    <h1>Pourquoi Flowlight existe</h1>
+    <p class="lede">Les logiciels de votre Mac décident maintenant d’eux-mêmes de la suite. Flowlight, c’est la façon de voir ce qu’ils ont fait.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Sur cette page">
+      <strong>Sur cette page</strong>
+      <a href="#story">L’histoire</a><a href="#principles">Principes</a><a href="#who">Qui le fait</a><a href="#thanks">Remerciements</a>
+    </nav>
+    <article class="prose">
+      <h2 id="story">L’histoire</h2>
+      <p>Pendant des années, la question «&nbsp;à quoi mon Mac parle-t-il&nbsp;?&nbsp;» avait un public restreint&nbsp;: les curieux d’une app qui appelait chez elle. Puis
+        les agents IA sont arrivés. Ils lisent vos fichiers, exécutent des commandes shell et appellent des outils, souvent pendant que vous faites autre chose, et n’importe lequel de
+        ces outils peut ouvrir une connexion réseau.</p>
+      <p>En septembre 2026, un développeur a cherché pourquoi un dossier dévorait 700&nbsp;MB de disque et a découvert que ZCode, une app de code assistée par IA,
+        empaquetait des espaces de travail entiers, historique Git compris, et les envoyait vers un stockage cloud en arrière-plan. L’entreprise
+        s’est excusée, a désactivé la fonctionnalité et a ouvert le code de l’app. Mais la découverte est venue d’une énigme d’espace disque, et d’aucun outil
+        conçu pour s’en apercevoir.</p>
+      <p>Les envois étaient chiffrés. Ce qui comptait ne l’était pas&nbsp;: <strong>quelle app, quel hôte, combien de mégaoctets, et quand.</strong> macOS
+        expose ces faits pour les flux réseau pris en charge. Flowlight les met à l’écran, en garde l’historique et alerte quand une app,
+        un agent en particulier, fait quelque chose qui ne lui ressemble pas.</p>
+
+      <h2 id="principles">Principes</h2>
+      <ul>
+        <li><strong>Expliquer d’abord, bloquer seulement si on le demande.</strong> Par défaut, Flowlight observe et explique. Il peut aussi refuser — une
+          liste d’autorisation, une règle sur une app ou une destination, un garde-fou sur les outils d’un agent — mais seulement une fois que vous l’avez activé, et jamais
+          pour le trafic local, le DNS ou les services Apple. Chaque refus est enregistré, et chaque refus porte sa sortie de secours.</li>
+        <li><strong>Des métadonnées par défaut.</strong> La surveillance standard enregistre les noms d’hôte, les ports et le nombre d’octets, tandis que les contenus restent chiffrés. L’inspection HTTPS facultative est explicite, délimitée et stockée localement.</li>
+        <li><strong>Local d’abord.</strong> Votre historique est un fichier sur votre Mac. Pas de compte, pas de cloud, pas de télémétrie.</li>
+        <li><strong>Des alertes explicables.</strong> Une alerte comporte l’app, la destination concernée et les indices qui ont déclenché la règle. Flowlight n’utilise pas de modèle de risque opaque.</li>
+        <li><strong>Open source.</strong> Un outil qui observe votre trafic devrait être un outil que vous pouvez lire. Flowlight est sous GPL-3.0.</li>
+      </ul>
+
+      <h2 id="who">Qui le fait</h2>
+      <p>Flowlight est un projet open source indépendant de <a href="https://github.com/xinbetween">xinbetween</a> et de
+        <a href="https://github.com/{{repo}}/graphs/contributors">ses contributeurs</a>. Il n’a de lien ni avec Apple ni avec aucun fournisseur d’IA
+        cité sur ce site. Idées, rapports de bugs et pull requests sont bienvenus, en particulier de nouveaux agents et fournisseurs à reconnaître.</p>
+
+      <h2 id="thanks">Remerciements</h2>
+      <ul>
+        <li><a href="https://blog.ferstar.org/en/posts/zcode-silent-workspace-snapshot-upload/">ferstar</a>, pour l’analyse de ZCode qui a justifié cette app.</li>
+        <li>Le projet Wireshark, dont l’approche ChmodBPF inspire la configuration de capture de paquets de Flowlight.</li>
+        <li>Team Cymru, pour le service gratuit IP vers ASN derrière les étiquettes de propriétaire de réseau.</li>
+      </ul>
+    </article>
+  </div>
+</main>

