@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "Apri la documentazione di %@";
 "Documentation" = "Documentazione";
 "Open %@" = "Apri %@";
+
+/* Settings. */
+"Storage" = "Archiviazione";
+"AI agents" = "Agenti IA";
+"First contact with a new domain" = "Primo contatto con un nuovo dominio";
+"Connections to non-standard ports" = "Connessioni a porte non standard";
+"Ignore Apple's own apps" = "Ignora le app di Apple";
+"Traffic without UI activity" = "Traffico senza attività a schermo";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "L'agente usa e-mail, trasferimento file, SSH, tunnel o database";
+"Agent connects to a raw IP on an unusual port" = "L'agente si connette a un IP grezzo su una porta insolita";
+"Agent active while you're away" = "Agente attivo mentre sei via";
+"Uploads to non-AI hosts above" = "Caricamenti verso host non IA oltre";
+"Away after" = "Assente dopo";
+"Learning period per app" = "Periodo di apprendimento per app";
+"Z-score threshold" = "Soglia punteggio Z";
+"Ignore hours below" = "Ignora le ore sotto";
+"App idle for at least" = "App inattiva da almeno";
+"Uploading more than" = "Caricamento superiore a";
+"Keep per-second data" = "Conserva i dati al secondo";
+"Launch at login" = "Avvia all'accesso";
+"Run in the background" = "Esegui in background";
+"Show live rates in the menu bar" = "Mostra le velocità nella barra dei menu";
+"Show notifications for warnings" = "Mostra notifiche per gli avvisi";
+"Check for updates automatically" = "Controlla automaticamente gli aggiornamenti";
+"Check Now" = "Controlla ora";
+"Open Flowlight" = "Apri Flowlight";
+"Show Dock Icon" = "Mostra l'icona nel Dock";
+"Quit" = "Esci";
+"Review Alerts…" = "Esamina gli avvisi…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Nessuna icona nel Dock né voce in Cmd-Tab. Flowlight continua a registrare e resta raggiungibile dalla barra dei menu.";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Il traffico orario e il numero giornaliero di destinazioni sono confrontati con la linea di base mobile di ogni app.";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Le aggregazioni al minuto durano 14 giorni, quelle orarie 400 giorni, quelle giornaliere per sempre. Gli avvisi 90 giorni.";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Una volta al giorno Flowlight chiede a GitHub l'ultima versione. La richiesta contiene solo il tuo indirizzo IP e la versione di Flowlight.";

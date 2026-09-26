@@ -78,3 +78,21 @@ final class LocalizationTests: XCTestCase {
     private func keys(for language: String) throws -> Set<String> { Set(try table(for: language).keys) }
     private func values(for language: String) throws -> [String: String] { try table(for: language) }
 }
+
+/// The Settings panel, which is where someone looks first after changing the language.
+extension LocalizationTests {
+
+    func testSettingsStringsAreActuallyTranslated() throws {
+        let settingsKeys = ["Detection", "Storage", "Launch at login", "Run in the background",
+                            "Check for updates automatically", "Ignore Apple's own apps",
+                            "First contact with a new domain", "Z-score threshold"]
+        for language in AppLanguage.translated where language != .english {
+            let table = try values(for: language.rawValue)
+            for key in settingsKeys {
+                let value = try XCTUnwrap(table[key], "\(language.rawValue) has no \(key)")
+                XCTAssertFalse(value.isEmpty)
+                XCTAssertNotEqual(value, key, "\(language.rawValue) left \"\(key)\" in English")
+            }
+        }
+    }
+}

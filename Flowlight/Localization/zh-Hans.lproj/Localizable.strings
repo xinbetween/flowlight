@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "打开“%@”的文档";
 "Documentation" = "文档";
 "Open %@" = "打开%@";
+
+/* Settings. */
+"Storage" = "存储";
+"AI agents" = "AI 代理";
+"First contact with a new domain" = "首次连接新域名";
+"Connections to non-standard ports" = "连接到非标准端口";
+"Ignore Apple's own apps" = "忽略 Apple 自带应用";
+"Traffic without UI activity" = "无界面操作时的流量";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "代理使用邮件、文件传输、SSH、隧道或数据库";
+"Agent connects to a raw IP on an unusual port" = "代理通过异常端口连接裸 IP";
+"Agent active while you're away" = "你离开时代理仍在活动";
+"Uploads to non-AI hosts above" = "上传至非 AI 主机超过";
+"Away after" = "离开判定时间";
+"Learning period per app" = "每个应用的学习期";
+"Z-score threshold" = "Z 分数阈值";
+"Ignore hours below" = "忽略低于此值的小时";
+"App idle for at least" = "应用闲置至少";
+"Uploading more than" = "上传超过";
+"Keep per-second data" = "保留每秒数据";
+"Launch at login" = "登录时启动";
+"Run in the background" = "在后台运行";
+"Show live rates in the menu bar" = "在菜单栏显示实时速率";
+"Show notifications for warnings" = "为警告显示通知";
+"Check for updates automatically" = "自动检查更新";
+"Check Now" = "立即检查";
+"Open Flowlight" = "打开 Flowlight";
+"Show Dock Icon" = "显示程序坞图标";
+"Quit" = "退出";
+"Review Alerts…" = "查看提醒…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "不显示程序坞图标，也不出现在 Cmd-Tab 中。Flowlight 继续记录，并可从菜单栏访问。";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "每小时流量与每日目标数量会与各应用的滚动基线比较。";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分钟汇总保留 14 天，小时汇总 400 天，每日汇总永久保留。提醒保留 90 天。";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight 每天向 GitHub 查询一次最新版本。该请求只包含你的 IP 地址和 Flowlight 的版本号。";

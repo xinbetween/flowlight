@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "%@ のドキュメントを開く";
 "Documentation" = "ドキュメント";
 "Open %@" = "%@ を開く";
+
+/* Settings. */
+"Storage" = "保存";
+"AI agents" = "AI エージェント";
+"First contact with a new domain" = "新しいドメインへの初回接続";
+"Connections to non-standard ports" = "非標準ポートへの接続";
+"Ignore Apple's own apps" = "Apple 純正アプリを除外";
+"Traffic without UI activity" = "操作のないトラフィック";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "エージェントがメール・ファイル転送・SSH・トンネル・データベースを使用";
+"Agent connects to a raw IP on an unusual port" = "エージェントが異常なポートで生 IP に接続";
+"Agent active while you're away" = "離席中にエージェントが動作";
+"Uploads to non-AI hosts above" = "AI 以外のホストへの送信が";
+"Away after" = "離席とみなす時間";
+"Learning period per app" = "アプリごとの学習期間";
+"Z-score threshold" = "Z スコアのしきい値";
+"Ignore hours below" = "これ未満の時間は無視";
+"App idle for at least" = "アプリの未操作が";
+"Uploading more than" = "送信量が";
+"Keep per-second data" = "秒単位データの保持";
+"Launch at login" = "ログイン時に起動";
+"Run in the background" = "バックグラウンドで実行";
+"Show live rates in the menu bar" = "メニューバーに現在の速度を表示";
+"Show notifications for warnings" = "警告を通知で表示";
+"Check for updates automatically" = "自動的にアップデートを確認";
+"Check Now" = "今すぐ確認";
+"Open Flowlight" = "Flowlight を開く";
+"Show Dock Icon" = "Dock アイコンを表示";
+"Quit" = "終了";
+"Review Alerts…" = "アラートを確認…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Dock アイコンと Cmd-Tab の項目を表示しません。記録は続き、メニューバーから開けます。";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "1 時間ごとのトラフィックと 1 日の接続先数を、アプリごとの移動基準値と比較します。";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分単位の集計は 14 日、時間単位は 400 日、日単位は無期限で保持します。アラートは 90 日です。";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight は 1 日 1 回 GitHub に最新リリースを問い合わせます。送信されるのは IP アドレスと Flowlight のバージョンだけです。";

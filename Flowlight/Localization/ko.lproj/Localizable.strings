@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "%@ 문서 열기";
 "Documentation" = "문서";
 "Open %@" = "%@ 열기";
+
+/* Settings. */
+"Storage" = "저장";
+"AI agents" = "AI 에이전트";
+"First contact with a new domain" = "새 도메인에 대한 첫 연결";
+"Connections to non-standard ports" = "비표준 포트 연결";
+"Ignore Apple's own apps" = "Apple 기본 앱 무시";
+"Traffic without UI activity" = "화면 조작 없는 트래픽";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "에이전트가 이메일, 파일 전송, SSH, 터널 또는 데이터베이스 사용";
+"Agent connects to a raw IP on an unusual port" = "에이전트가 비정상 포트로 원시 IP에 연결";
+"Agent active while you're away" = "자리를 비운 사이 에이전트 활동";
+"Uploads to non-AI hosts above" = "AI 외 호스트로 업로드가";
+"Away after" = "자리 비움 기준";
+"Learning period per app" = "앱별 학습 기간";
+"Z-score threshold" = "Z 점수 임계값";
+"Ignore hours below" = "이 값 미만 시간 무시";
+"App idle for at least" = "앱 유휴 시간 최소";
+"Uploading more than" = "업로드가";
+"Keep per-second data" = "초 단위 데이터 보관";
+"Launch at login" = "로그인 시 실행";
+"Run in the background" = "백그라운드에서 실행";
+"Show live rates in the menu bar" = "메뉴 막대에 실시간 속도 표시";
+"Show notifications for warnings" = "경고 알림 표시";
+"Check for updates automatically" = "자동으로 업데이트 확인";
+"Check Now" = "지금 확인";
+"Open Flowlight" = "Flowlight 열기";
+"Show Dock Icon" = "Dock 아이콘 표시";
+"Quit" = "종료";
+"Review Alerts…" = "알림 검토…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Dock 아이콘과 Cmd-Tab 항목이 없습니다. 기록은 계속되며 메뉴 막대에서 열 수 있습니다.";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "시간당 트래픽과 일일 목적지 수를 앱별 이동 기준선과 비교합니다.";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "분 단위 집계는 14일, 시간 단위는 400일, 일 단위는 무기한 보관합니다. 알림은 90일입니다.";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight은 하루에 한 번 GitHub에 최신 릴리스를 확인합니다. 요청에는 IP 주소와 Flowlight 버전만 포함됩니다.";

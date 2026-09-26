@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "開啟「%@」的說明文件";
 "Documentation" = "說明文件";
 "Open %@" = "開啟%@";
+
+/* Settings. */
+"Storage" = "儲存";
+"AI agents" = "AI 代理";
+"First contact with a new domain" = "首次連線新網域";
+"Connections to non-standard ports" = "連線到非標準連接埠";
+"Ignore Apple's own apps" = "忽略 Apple 內建 App";
+"Traffic without UI activity" = "無介面操作時的流量";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "代理使用郵件、檔案傳輸、SSH、通道或資料庫";
+"Agent connects to a raw IP on an unusual port" = "代理透過異常連接埠連線裸 IP";
+"Agent active while you're away" = "你離開時代理仍在活動";
+"Uploads to non-AI hosts above" = "上傳至非 AI 主機超過";
+"Away after" = "離開判定時間";
+"Learning period per app" = "每個 App 的學習期";
+"Z-score threshold" = "Z 分數閾值";
+"Ignore hours below" = "忽略低於此值的小時";
+"App idle for at least" = "App 閒置至少";
+"Uploading more than" = "上傳超過";
+"Keep per-second data" = "保留每秒資料";
+"Launch at login" = "登入時啟動";
+"Run in the background" = "在背景執行";
+"Show live rates in the menu bar" = "在選單列顯示即時速率";
+"Show notifications for warnings" = "為警告顯示通知";
+"Check for updates automatically" = "自動檢查更新";
+"Check Now" = "立即檢查";
+"Open Flowlight" = "開啟 Flowlight";
+"Show Dock Icon" = "顯示 Dock 圖像";
+"Quit" = "結束";
+"Review Alerts…" = "檢視警示…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "不顯示 Dock 圖像，也不出現在 Cmd-Tab 中。Flowlight 繼續記錄，並可從選單列存取。";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "每小時流量與每日目標數量會與各 App 的滾動基線比較。";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分鐘彙總保留 14 天，小時彙總 400 天，每日彙總永久保留。警示保留 90 天。";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight 每天向 GitHub 查詢一次最新版本。該請求只包含你的 IP 位址和 Flowlight 的版本號。";

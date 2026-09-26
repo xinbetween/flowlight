@@ -31,7 +31,6 @@ struct CaptureView: View {
                 CaptureWarningBanner()
                 if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 sourceSection
-                extensionSection
                 if monitor.mode == .nettop { HostnameSection() }
                 storageSection
             }
@@ -65,6 +64,7 @@ struct CaptureView: View {
             CaptureHeading("Source")
             VStack(spacing: 0) {
                 sourceRow(.networkExtension)
+                extensionControls
                 filterNotes
                 Divider().padding(.leading, 50)
                 sourceRow(.nettop)
@@ -143,37 +143,29 @@ struct CaptureView: View {
 
     // MARK: Network Extension
 
-    private var extensionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading("Network Extension")
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 12) {
-                    CaptureGlyph(symbol: extensionSymbol, tint: extensionTint)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(extensionManager.state.label)
-                            .font(.body.weight(.medium))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(extensionFacts)
-                            .font(.caption.monospaced()).foregroundStyle(.tertiary)
-                    }
-                    if monitor.mode == .nettop {
-                        Button(showExtensionSetup ? "Hide Setup" : "Show Setup…") { showExtensionSetup.toggle() }
-                            .controlSize(.small)
-                    }
-                }
-                if extensionDetailsVisible {
-                    if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
-                    if monitor.extensionFellBack {
-                        CaptureNote(text: "Flowlight couldn't reach the filter extension and is sampling with nettop "
-                                    + "so you still get data. Your chosen source is still the extension.",
-                                    icon: "arrow.uturn.down.circle.fill")
-                    }
-                    extensionButtons
+    /// Install, disable, uninstall, refresh — directly under the source they belong to, so choosing the
+    /// extension and turning it on are the same place rather than two sections apart.
+    private var extensionControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                CaptureGlyph(symbol: extensionSymbol, tint: extensionTint)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(extensionManager.state.label)
+                        .font(.body.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(extensionFacts)
+                        .font(.caption.monospaced()).foregroundStyle(.tertiary)
                 }
             }
-            .captureCard()
-            if extensionDetailsVisible { filterNotes }
+            if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
+            if monitor.extensionFellBack {
+                CaptureNote(text: "Flowlight couldn't reach the filter extension and is sampling with nettop "
+                            + "so you still get data. Your chosen source is still the extension.",
+                            icon: "arrow.uturn.down.circle.fill")
+            }
+            extensionButtons
         }
+        .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
     }
 
     private var extensionButtons: some View {

@@ -27,18 +27,18 @@ struct SettingsView: View {
         TabView {
             Form {
                 LanguageRow()
-                Toggle("Launch at login", isOn: $launchAtLogin)
+                Toggle(L("Launch at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
                 Toggle(isOn: $backgroundOnly) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Run in the background")
-                        Text("No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar.")
+                        Text(L("Run in the background"))
+                        Text(L("No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Toggle("Show live rates in the menu bar", isOn: $menuBarRates)
-                Toggle("Show notifications for warnings", isOn: $notifications)
+                Toggle(L("Show live rates in the menu bar"), isOn: $menuBarRates)
+                Toggle(L("Show notifications for warnings"), isOn: $notifications)
                 UpdateSettingsRow()
             }
             .formStyle(.grouped)
@@ -47,42 +47,42 @@ struct SettingsView: View {
 
             Form {
                 Section {
-                    Stepper(value: $sigma, in: 1.5...10, step: 0.5) { LabeledContent("Z-score threshold", value: "\(sigma.formatted())σ") }
-                    Stepper(value: $learningHours, in: 0...336, step: 6) { LabeledContent("Learning period per app", value: "\(Int(learningHours)) h") }
-                    Stepper(value: $minAlertMB, in: 0...1000, step: 1) { LabeledContent("Ignore hours below", value: "\(minAlertMB.formatted()) MB") }
+                    Stepper(value: $sigma, in: 1.5...10, step: 0.5) { LabeledContent(L("Z-score threshold"), value: "\(sigma.formatted())σ") }
+                    Stepper(value: $learningHours, in: 0...336, step: 6) { LabeledContent(L("Learning period per app"), value: "\(Int(learningHours)) h") }
+                    Stepper(value: $minAlertMB, in: 0...1000, step: 1) { LabeledContent(L("Ignore hours below"), value: "\(minAlertMB.formatted()) MB") }
                 } footer: {
-                    Text("Hourly traffic and daily destination counts are compared with each app's rolling baseline.")
+                    Text(L("Hourly traffic and daily destination counts are compared with each app's rolling baseline."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Section("Rules") {
-                    Toggle("First contact with a new domain", isOn: $firstContact)
-                    Toggle("Connections to non-standard ports", isOn: $nonStandardPorts)
-                    Toggle("Ignore Apple's own apps", isOn: $ignoreAppleApps)
+                Section(L("Rules")) {
+                    Toggle(L("First contact with a new domain"), isOn: $firstContact)
+                    Toggle(L("Connections to non-standard ports"), isOn: $nonStandardPorts)
+                    Toggle(L("Ignore Apple's own apps"), isOn: $ignoreAppleApps)
                     Text("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it "
                          + "buries the one line that matters. Their traffic is still recorded, still shown in Live "
                          + "and Reports, and still subject to every rule and guardrail.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
-                    Toggle("Agent uses email, file transfer, SSH, tunnels or databases", isOn: $agentSensitive)
-                    Toggle("Agent connects to a raw IP on an unusual port", isOn: $agentUnnamed)
+                    Toggle(L("Agent uses email, file transfer, SSH, tunnels or databases"), isOn: $agentSensitive)
+                    Toggle(L("Agent connects to a raw IP on an unusual port"), isOn: $agentUnnamed)
                     Stepper(value: $agentEgressMB, in: 1...10_000, step: 10) {
-                        LabeledContent("Uploads to non-AI hosts above", value: "\(Int(agentEgressMB)) MB/h")
+                        LabeledContent(L("Uploads to non-AI hosts above"), value: "\(Int(agentEgressMB)) MB/h")
                     }
-                    Toggle("Agent active while you're away", isOn: $agentAway)
+                    Toggle(L("Agent active while you're away"), isOn: $agentAway)
                     Stepper(value: $agentAwayMinutes, in: 1...240, step: 1) {
-                        LabeledContent("Away after", value: "\(Int(agentAwayMinutes)) min without input")
+                        LabeledContent(L("Away after"), value: "\(Int(agentAwayMinutes)) min without input")
                     }
                     .disabled(!agentAway)
                 } header: {
-                    Text("AI agents")
+                    Text(L("AI agents"))
                 } footer: {
                     Text("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Section("Traffic without UI activity") {
-                    Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent("App idle for at least", value: "\(Int(idleMinutes)) min") }
-                    Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent("Uploading more than", value: "\(idleUploadMB.formatted()) MB/min") }
+                Section(L("Traffic without UI activity")) {
+                    Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent(L("App idle for at least"), value: "\(Int(idleMinutes)) min") }
+                    Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent(L("Uploading more than"), value: "\(idleUploadMB.formatted()) MB/min") }
                 }
             }
             .formStyle(.grouped)
@@ -91,9 +91,9 @@ struct SettingsView: View {
 
             Form {
                 Section {
-                    Stepper(value: $retentionHours, in: 1...72, step: 1) { LabeledContent("Keep per-second data", value: "\(Int(retentionHours)) h") }
+                    Stepper(value: $retentionHours, in: 1...72, step: 1) { LabeledContent(L("Keep per-second data"), value: "\(Int(retentionHours)) h") }
                 } footer: {
-                    Text("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days.")
+                    Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -138,19 +138,19 @@ struct MenuBarContent: View {
             Text("\(monitor.unacknowledgedAlerts) unacknowledged alert\(monitor.unacknowledgedAlerts == 1 ? "" : "s")")
         }
         Divider()
-        Button("Open Flowlight") {
+        Button(L("Open Flowlight")) {
             openWindow(id: "main")
             NSApp.activate()
         }
         .keyboardShortcut("o")
         if backgroundOnly {
-            Button("Show Dock Icon") { backgroundOnly = false }
+            Button(L("Show Dock Icon")) { backgroundOnly = false }
         }
         if !focus.targets.isEmpty {
             Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
         }
         if monitor.unacknowledgedAlerts > 0 {
-            Button("Review Alerts…") {
+            Button(L("Review Alerts…")) {
                 nav.selection = .alerts
                 openWindow(id: "main")
                 NSApp.activate()
@@ -164,7 +164,7 @@ struct MenuBarContent: View {
         } else {
             CheckForUpdatesButton()
         }
-        Button("Quit") { NSApp.terminate(nil) }.keyboardShortcut("q")
+        Button(L("Quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 }
 
@@ -176,15 +176,15 @@ struct UpdateSettingsRow: View {
     var body: some View {
         Toggle(isOn: Binding(get: { updater.automatic }, set: { updater.automatic = $0 })) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Check for updates automatically")
-                Text("Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version.")
+                Text(L("Check for updates automatically"))
+                Text(L("Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version."))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         LabeledContent("Version \(updater.currentVersion)") {
             HStack(spacing: 8) {
                 Text(status).font(.caption).foregroundStyle(.secondary)
-                Button("Check Now") {
+                Button(L("Check Now")) {
                     openWindow(id: "update")
                     Task { await updater.check(userInitiated: true) }
                 }

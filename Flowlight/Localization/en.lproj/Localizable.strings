@@ -39,3 +39,36 @@
 "Open the documentation for %@" = "Open the documentation for %@";
 "Documentation" = "Documentation";
 "Open %@" = "Open %@";
+
+/* Settings. */
+"Storage" = "Storage";
+"AI agents" = "AI agents";
+"First contact with a new domain" = "First contact with a new domain";
+"Connections to non-standard ports" = "Connections to non-standard ports";
+"Ignore Apple's own apps" = "Ignore Apple's own apps";
+"Traffic without UI activity" = "Traffic without UI activity";
+"Agent uses email, file transfer, SSH, tunnels or databases" = "Agent uses email, file transfer, SSH, tunnels or databases";
+"Agent connects to a raw IP on an unusual port" = "Agent connects to a raw IP on an unusual port";
+"Agent active while you're away" = "Agent active while you're away";
+"Uploads to non-AI hosts above" = "Uploads to non-AI hosts above";
+"Away after" = "Away after";
+"Learning period per app" = "Learning period per app";
+"Z-score threshold" = "Z-score threshold";
+"Ignore hours below" = "Ignore hours below";
+"App idle for at least" = "App idle for at least";
+"Uploading more than" = "Uploading more than";
+"Keep per-second data" = "Keep per-second data";
+"Launch at login" = "Launch at login";
+"Run in the background" = "Run in the background";
+"Show live rates in the menu bar" = "Show live rates in the menu bar";
+"Show notifications for warnings" = "Show notifications for warnings";
+"Check for updates automatically" = "Check for updates automatically";
+"Check Now" = "Check Now";
+"Open Flowlight" = "Open Flowlight";
+"Show Dock Icon" = "Show Dock Icon";
+"Quit" = "Quit";
+"Review Alerts…" = "Review Alerts…";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar.";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Hourly traffic and daily destination counts are compared with each app's rolling baseline.";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days.";
+"Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version.";

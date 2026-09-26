@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.7, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.6
+ 0.7.7
 September 25, 2026Latest
+
+ Settings speaks all ten languages. Thirty-four more strings translated, and a test that
+ fails if any language leaves one of them in English. The rest of the interface follows.
+
+ The filter controls sit with the source they control on the Capture screen, and the
+ explanation that was printed twice is printed once.
+
+ Downloads and checksums →
+
+ 0.7.6
+September 25, 2026
 
  The menu bar says Flowlight again. With “run in the background” on, the app never became
  the active application, so another app's name stayed beside the Apple logo and Flowlight's own menus were
