@@ -80,6 +80,25 @@ jobs:
             exit 1
           }
 
+      # The site is served from docs/ on main, and its Download button points at
+      # releases/latest/download/Flowlight.dmg. So a main that announces a version before the release exists
+      # sends people to the previous DMG while telling them a newer one is out. Version work belongs on a
+      # release branch — where this check doesn't run — and merges to main only once the tag has published.
+      - name: The site must not announce a version that has no release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          site=$(grep -m1 -o '<h2>[0-9][^<]*</h2>' site/pages/releases.html | tr -dc '0-9.')
+          released=$(gh api "repos/${{ github.repository }}/releases/latest" -q .tag_name | tr -dc '0-9.')
+          echo "site announces $site · latest release is $released"
+          if [ "$site" != "$released" ] && [ "$(printf '%s\n%s\n' "$site" "$released" | sort -V | tail -1)" = "$site" ]; then
+            echo "::error::The site announces $site but the newest release is $released. Tag and publish the"
+            echo "::error::release first, then merge the release branch into main so the download link works."
+            exit 1
+          fi
+
   test:
     needs: changes
     if: needs.changes.outputs.app == 'true'

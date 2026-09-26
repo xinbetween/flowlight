@@ -266,6 +266,24 @@ git -C "$(brew --repository xinbetween/tap)" push          # publishes it
   keychain profile, on your own Mac) or `NOTARY_KEY` + `NOTARY_KEY_ID` + `NOTARY_ISSUER` (an App Store Connect key,
   which is what CI uses). With neither, it prints why it did nothing and exits 0.
 
+## Release branches
+
+The website is served from `docs/` on `main`, and its Download button points at
+`releases/latest/download/Flowlight.dmg`. A `main` that carries the new version therefore announces a release
+that cannot be downloaded yet — for however long signing and notarization take. `docs/` also has to match
+`site/` in the same commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump
+and the rebuilt site cannot be separated. The way out is to keep both off `main` until the release exists:
+
+```sh
+git switch -c release/0.7.8                                # version bump, release notes, rebuilt docs/
+git tag -a v0.7.8 -m "Flowlight 0.7.8" && git push origin v0.7.8   # release.yml signs, notarizes, publishes
+git switch main && git merge --no-ff release/0.7.8 && git push     # the site now catches up
+```
+
+`release.yml` triggers on the tag, not the branch, so nothing else has to change. CI enforces the ordering:
+on `main` it fails when the newest version on the releases page is ahead of the newest published release. The
+check does not run on a release branch, which is what lets the branch carry the future version.
+
 ## Releasing from CI
 
 `.github/workflows/release.yml` does all of the above on a version tag: it checks the tag matches
