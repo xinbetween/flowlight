@@ -1,74 +1,431 @@
 /* Flowlight — en. The key is the English text, so an untranslated string shows correct English. */
 
-"Traffic" = "Traffic";
-"Investigate" = "Investigate";
-"Control" = "Control";
-"Sources" = "Sources";
+/* App/AppNavigation.swift */
 "Live" = "Live";
 "AI Agents" = "AI Agents";
 "Reports" = "Reports";
 "Alerts" = "Alerts";
 "Rules" = "Rules";
 "Ask" = "Ask";
-"Inspect" = "Inspect";
 "Devices" = "Devices";
+"Inspect" = "Inspect";
 "Capture" = "Capture";
-"Cancel" = "Cancel";
-"Done" = "Done";
-"Save" = "Save";
-"Add" = "Add";
-"Edit" = "Edit";
-"Delete" = "Delete";
-"Refresh" = "Refresh";
-"Clear" = "Clear";
-"Copy" = "Copy";
-"Off" = "Off";
-"On" = "On";
-"Settings" = "Settings";
-"General" = "General";
-"Detection" = "Detection";
-"Export" = "Export";
-"Language" = "Language";
-"System" = "System";
-"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into.";
-"Now showing %@" = "Now showing %@";
+"Traffic" = "Traffic";
+"Investigate" = "Investigate";
+"Control" = "Control";
+"Sources" = "Sources";
 
-/* Help that follows the screen you are on. */
-"Help" = "Help";
+/* App/FlowlightApp.swift */
+"About Flowlight" = "About Flowlight";
 "Help for %@" = "Help for %@";
-"Open the documentation for %@" = "Open the documentation for %@";
-"Documentation" = "Documentation";
-"Open %@" = "Open %@";
+"Flowlight Help" = "Flowlight Help";
+"Questions & Answers" = "Questions & Answers";
+"What Flowlight Reads on This Mac" = "What Flowlight Reads on This Mac";
+"Privacy" = "Privacy";
+"Report an Issue" = "Report an Issue";
+"Check for Updates…" = "Check for Updates…";
 
-/* Settings. */
-"Storage" = "Storage";
-"AI agents" = "AI agents";
+/* Export/ExportSettingsView.swift */
+"Send to my collector" = "Send to my collector";
+"Export to OpenTelemetry / SIEM" = "Export to OpenTelemetry / SIEM";
+"Endpoint" = "Endpoint";
+"Format" = "Format";
+"https://collector.example.com:4318" = "https://collector.example.com:4318";
+"Name" = "Name";
+"Authorization" = "Authorization";
+"Value" = "Value";
+"Bearer …" = "Bearer …";
+"Remove this header" = "Remove this header";
+"Add Header" = "Add Header";
+"Headers" = "Headers";
+"Per-app and destination rollups" = "Per-app and destination rollups";
+"Service name" = "Service name";
+"flowlight" = "flowlight";
+"Include this Mac's host name" = "Include this Mac's host name";
+"What Flowlight sends" = "What Flowlight sends";
+"Show What Would Be Sent…" = "Show What Would Be Sent…";
+"Test" = "Test";
+"Status" = "Status";
+"What would be sent" = "What would be sent";
+"Copy" = "Copy";
+"Done" = "Done";
+
+/* UI/AgentsView.swift */
+"Observed AI agent activity, including destinations outside each agent's model provider." = "Observed AI agent activity, including destinations outside each agent's model provider.";
+"Window" = "Window";
+"No AI agents seen" = "No AI agents seen";
+"Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider." = "Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider.";
+"Show Traffic in Reports" = "Show Traffic in Reports";
+"None seen" = "None seen";
+"Connected to an address with no hostname" = "Connected to an address with no hostname";
+"All allowed" = "All allowed";
+"Unlisted destinations are refused, not only reported" = "Unlisted destinations are refused, not only reported";
+"Off" = "Off";
+"Allowlist" = "Allowlist";
+"Only allow listed destinations" = "Only allow listed destinations";
+"Always allow its AI providers" = "Always allow its AI providers";
+"Block connections that aren't allowed" = "Block connections that aren't allowed";
+"Block Unlisted Destinations" = "Block Unlisted Destinations";
+"Cancel" = "Cancel";
+"github.com, 10.0.0.0/8…" = "github.com, 10.0.0.0/8…";
+"Add" = "Add";
+"Presets" = "Presets";
+"Tools & MCP servers" = "Tools & MCP servers";
+"AI providers" = "AI providers";
+"None in this window" = "None in this window";
+"Show" = "Show";
+"Guardrails" = "Guardrails";
+"Open in Reports" = "Open in Reports";
+"Only AI providers. Nothing else was contacted." = "Only AI providers. Nothing else was contacted.";
+"via " = "via ";
+"Opened by " = "Opened by ";
+"Not allowed" = "Not allowed";
+"Allow" = "Allow";
+"Completed" = "Completed";
+"The tool reported an error" = "The tool reported an error";
+"No result seen yet" = "No result seen yet";
+"The agent sent the provider a token for this server" = "The agent sent the provider a token for this server";
+"Allowed: " = "Allowed: ";
+"Tools this server offers; the ones with a count were called in this window" = "Tools this server offers; the ones with a count were called in this window";
+"project" = "project";
+"configured, no calls seen" = "configured, no calls seen";
+"Reading agent configuration…" = "Reading agent configuration…";
+"Look for agent configuration" = "Look for agent configuration";
+"Why?" = "Why?";
+"out of date" = "out of date";
+"Rescan" = "Rescan";
+"Add project folder…" = "Add project folder…";
+"Set up HTTPS inspection" = "Set up HTTPS inspection";
+
+/* UI/AlertsView.swift */
+"Just once" = "Just once";
+"For an hour" = "For an hour";
+"Until Flowlight quits" = "Until Flowlight quits";
+"Edit a rule instead…" = "Edit a rule instead…";
+"Acknowledge" = "Acknowledge";
+"Copy Detail" = "Copy Detail";
+"Rule" = "Rule";
+"All rules" = "All rules";
+"Show acknowledged" = "Show acknowledged";
+"Filter which alerts are listed" = "Filter which alerts are listed";
+"Mark alerts as seen" = "Mark alerts as seen";
+
+/* UI/AskView.swift */
+"Clear" = "Clear";
+"Forget this conversation" = "Forget this conversation";
+"Ask about your traffic" = "Ask about your traffic";
+"Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer." = "Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer.";
+"Ask about this Mac's network activity" = "Ask about this Mac's network activity";
+"Choose a provider…" = "Choose a provider…";
+"Working…" = "Working…";
+"Open %@" = "Open %@";
+"Documentation" = "Documentation";
+"Who answers" = "Who answers";
+"The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself." = "The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself.";
+"Provider" = "Provider";
+"Model" = "Model";
+"API key" = "API key";
+"Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at." = "Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at.";
+"Ask this" = "Ask this";
+
+/* UI/CaptureView.swift */
+"Delete all recorded traffic, baselines and alerts?" = "Delete all recorded traffic, baselines and alerts?";
+"Delete everything" = "Delete everything";
+"Install & Enable Filter" = "Install & Enable Filter";
+"Disable Filter" = "Disable Filter";
+"Uninstall" = "Uninstall";
+"Refresh" = "Refresh";
+"Re-check the filter and reconnect to it" = "Re-check the filter and reconnect to it";
+"Try the Extension Again" = "Try the Extension Again";
+"Stop sampling with nettop and reconnect to the filter extension" = "Stop sampling with nettop and reconnect to the filter extension";
+"Flowlight reads " = "Flowlight reads ";
+"/usr/bin/nettop" = "/usr/bin/nettop";
+" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics." = " once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.";
+"Database" = "Database";
+"Reveal in Finder" = "Reveal in Finder";
+"Clear All Data…" = "Clear All Data…";
+"Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner." = "Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner.";
+"Remove Access…" = "Remove Access…";
+"See which sites your apps talk to" = "See which sites your apps talk to";
+"Without this, most traffic shows only an IP address or network owner." = "Without this, most traffic shows only an IP address or network owner.";
+"Identify network owners when no hostname is available" = "Identify network owners when no hostname is available";
+"On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac.";
+"Not Now" = "Not Now";
+"Enable Hostnames…" = "Enable Hostnames…";
+
+/* UI/CaptureWarning.swift */
+"The Network Extension can't capture on this Mac" = "The Network Extension can't capture on this Mac";
+"Use the nettop Sampler" = "Use the nettop Sampler";
+"Use the Network Extension" = "Use the Network Extension";
+
+/* UI/ContentView.swift */
+"See what's new and download the update" = "See what's new and download the update";
+"Capture source status — click to configure" = "Capture source status — click to configure";
+"Open the documentation for %@" = "Open the documentation for %@";
+"Help" = "Help";
+"Error" = "Error";
+"OK" = "OK";
+
+/* UI/DevicesView.swift */
+"Read the device list again now (⌘R)" = "Read the device list again now (⌘R)";
+"Watch Bluetooth" = "Watch Bluetooth";
+"Watch USB and external storage" = "Watch USB and external storage";
+"Channels" = "Channels";
+"Choose which channels Flowlight watches" = "Choose which channels Flowlight watches";
+"Nothing but the network is being watched" = "Nothing but the network is being watched";
+"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed.";
+"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed.";
+"This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it." = "This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it.";
+"How Flowlight recognises this device between sightings" = "How Flowlight recognises this device between sightings";
+
+/* UI/FocusView.swift */
+"Focus" = "Focus";
+"While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there." = "While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there.";
+"Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either." = "Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either.";
+"Alerts name an app, not a destination, so this focus leaves the alert list alone." = "Alerts name an app, not a destination, so this focus leaves the alert list alone.";
+"App" = "App";
+"Destination" = "Destination";
+"Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here." = "Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here.";
+
+/* UI/GuardrailsPane.swift */
+"HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet." = "HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet.";
+"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read.";
+"MCP servers" = "MCP servers";
+"never yet" = "never yet";
+"Refuse a tool by name or pattern, e.g. write*" = "Refuse a tool by name or pattern, e.g. write*";
+"This is not a sandbox." = "This is not a sandbox.";
+"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list.";
+
+/* UI/Insights/BehaviourPanel.swift */
+"Nothing stands out" = "Nothing stands out";
+
+/* UI/Insights/InsightsPanel.swift */
+"All traffic" = "All traffic";
+"No traffic in this window" = "No traffic in this window";
+"Received vs sent" = "Received vs sent";
+"Network owner: no hostname was seen for this traffic" = "Network owner: no hostname was seen for this traffic";
+"Filter" = "Filter";
+
+/* UI/InspectView.swift */
+"Nothing inspected yet" = "Nothing inspected yet";
+"Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal.";
+"Open Inspected Terminal" = "Open Inspected Terminal";
+"Check Setup" = "Check Setup";
+"Flowlight is answering some requests itself instead of forwarding them. Click to review the rules." = "Flowlight is answering some requests itself instead of forwarding them. Click to review the rules.";
+"A Terminal window whose agents and tools go through Flowlight" = "A Terminal window whose agents and tools go through Flowlight";
+"Setup…" = "Setup…";
+"Mocked" = "Mocked";
+"Guarded" = "Guarded";
+"Mock This Endpoint…" = "Mock This Endpoint…";
+"Block This Endpoint…" = "Block This Endpoint…";
+"HTTPS inspection" = "HTTPS inspection";
+"Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally." = "Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally.";
+"Turn on HTTPS inspection" = "Turn on HTTPS inspection";
+"Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back." = "Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back.";
+"Waiting for your password…" = "Waiting for your password…";
+"Command-line agents ignore system proxy settings; start them from this window instead" = "Command-line agents ignore system proxy settings; start them from this window instead";
+"Decrypt" = "Decrypt";
+"With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded." = "With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded.";
+"Never decrypted" = "Never decrypted";
+"These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically." = "These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically.";
+"bank.example" = "bank.example";
+"Restore Defaults" = "Restore Defaults";
+"Copy Shell Setup" = "Copy Shell Setup";
+"Environment variables that send one shell's tools through Flowlight" = "Environment variables that send one shell's tools through Flowlight";
+"Show Certificate in Finder" = "Show Certificate in Finder";
+"Remove Certificate & Recorded Data…" = "Remove Certificate & Recorded Data…";
+"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored.";
+"Advanced" = "Advanced";
+"Mock responses" = "Mock responses";
+"macOS will ask you twice" = "macOS will ask you twice";
+"Continue" = "Continue";
+"First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both." = "First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both.";
+"Remove HTTPS inspection?" = "Remove HTTPS inspection?";
+"Remove" = "Remove";
+"Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request." = "Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request.";
+"Mock This…" = "Mock This…";
+"Answer this endpoint from Flowlight instead of letting the request through" = "Answer this endpoint from Flowlight instead of letting the request through";
+"Part" = "Part";
+"Request" = "Request";
+"Response" = "Response";
+
+/* UI/JSONTreeView.swift */
+"Switch to the raw view, where matches are highlighted" = "Switch to the raw view, where matches are highlighted";
+"View" = "View";
+"Tree" = "Tree";
+"Raw" = "Raw";
+"Copy the body (pretty-printed when it's JSON)" = "Copy the body (pretty-printed when it's JSON)";
+"Only the first 2 MB were kept." = "Only the first 2 MB were kept.";
+"Copy Value" = "Copy Value";
+"Copy Key" = "Copy Key";
+"null" = "null";
+
+/* UI/LiveView.swift */
+"Last 2 minutes" = "Last 2 minutes";
+"Download" = "Download";
+"Upload" = "Upload";
+"Show in Reports" = "Show in Reports";
+"Copy Bundle ID" = "Copy Bundle ID";
+"Top talkers · average of the last 5 seconds" = "Top talkers · average of the last 5 seconds";
+"No app has sent or received data in the last few seconds." = "No app has sent or received data in the last few seconds.";
+"Waiting for traffic data" = "Waiting for traffic data";
+"Open Capture Settings" = "Open Capture Settings";
+
+/* UI/MockRulesView.swift */
+"Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it.";
+"Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule." = "Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule.";
+"HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet." = "HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet.";
+"No mock rules." = "No mock rules.";
+"Rules are tried from the top; the first enabled one that matches answers." = "Rules are tried from the top; the first enabled one that matches answers.";
+"Add Rule…" = "Add Rule…";
+"Turn All Off" = "Turn All Off";
+"Optional, e.g. “GitHub is down”" = "Optional, e.g. “GitHub is down”";
+"Host" = "Host";
+"api.example.com" = "api.example.com";
+"Exactly that host. Write *.example.com to cover the domain and its subdomains." = "Exactly that host. Write *.example.com to cover the domain and its subdomains.";
+"Path" = "Path";
+"/v1/*" = "/v1/*";
+"A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?." = "A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?.";
+"Method" = "Method";
+"Delay" = "Delay";
+"seconds" = "seconds";
+"One Name: value per line. Content-Length and Connection are written by Flowlight." = "One Name: value per line. Content-Length and Connection are written by Flowlight.";
+"Body" = "Body";
+
+/* UI/ReportsView.swift */
+"Way out" = "Way out";
+"Every way out" = "Every way out";
+"Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel" = "Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel";
+"Time series (CSV)…" = "Time series (CSV)…";
+"Breakdown (CSV)…" = "Breakdown (CSV)…";
+"Export" = "Export";
+"Export the current report as CSV" = "Export the current report as CSV";
+"Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs." = "Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs.";
+"Measure" = "Measure";
+"Group by" = "Group by";
+"App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP, Destination › App › IP, or IP › App";
+"Choose a longer window or clear filters." = "Choose a longer window or clear filters.";
+"Back" = "Back";
+"Return to the previous zoom level" = "Return to the previous zoom level";
+"Granularity" = "Granularity";
+"Earlier (⌘[)" = "Earlier (⌘[)";
+"Earlier" = "Earlier";
+"Later (⌘])" = "Later (⌘])";
+"Later" = "Later";
+"Now" = "Now";
+"Showing only:" = "Showing only:";
+"Click a bar to zoom in" = "Click a bar to zoom in";
+"Show Only This" = "Show Only This";
+"Copy Hostname" = "Copy Hostname";
+
+/* UI/RuleEditor.swift */
+"Then" = "Then";
+"Block it" = "Block it";
+"Allow it" = "Allow it";
+"What it names" = "What it names";
+"Any app — or a name, or a bundle identifier" = "Any app — or a name, or a bundle identifier";
+"Anywhere — or a domain, an IP address, or a range" = "Anywhere — or a domain, an IP address, or a range";
+"A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started." = "A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started.";
+"For how long" = "For how long";
+"Lasts" = "Lasts";
+"Forever" = "Forever";
+"Until a time" = "Until a time";
+"Between chosen hours" = "Between chosen hours";
+"Gone when Flowlight quits, including a crash. Nothing is left behind in force." = "Gone when Flowlight quits, including a crash. Nothing is left behind in force.";
+"Any path — or /v1/*" = "Any path — or /v1/*";
+"Answer with" = "Answer with";
+"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why.";
+"One URL rather than the whole host" = "One URL rather than the whole host";
+"Name an app or a destination — a rule that names neither would decide every connection on the Mac." = "Name an app or a destination — a rule that names neither would decide every connection on the Mac.";
+" reaching " = " reaching ";
+" requests from " = " requests from ";
+" to " = " to ";
+
+/* UI/RulesView.swift */
+"Templates" = "Templates";
+"Rules worth having, grouped by what they are for, with the hosts already written out" = "Rules worth having, grouped by what they are for, with the hosts already written out";
+"Add Rule" = "Add Rule";
+"Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "Write a rule: an app, an agent, a destination or a URL, blocked or allowed";
+"Nothing is being refused. Click to start again now." = "Nothing is being refused. Click to start again now.";
+"10 minutes" = "10 minutes";
+"1 hour" = "1 hour";
+"Until I resume" = "Until I resume";
+"Pause Blocking" = "Pause Blocking";
+"Stand every rule down for a while, without deleting anything" = "Stand every rule down for a while, without deleting anything";
+"Resume now" = "Resume now";
+"No rules yet" = "No rules yet";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by.";
+"Browse Templates…" = "Browse Templates…";
+"Write One…" = "Write One…";
+"Nothing yet" = "Nothing yet";
+"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable.";
+"Edit…" = "Edit…";
+"Reset Count" = "Reset Count";
+"Delete" = "Delete";
+"Show the Rule…" = "Show the Rule…";
+"Everywhere" = "Everywhere";
+"For the next hour" = "For the next hour";
+"For every app" = "For every app";
+"Apply a Template" = "Apply a Template";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out.";
+"Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started.";
+"A domain, an IP address, or a range" = "A domain, an IP address, or a range";
+"Added" = "Added";
+"A name, or a bundle identifier" = "A name, or a bundle identifier";
+
+/* UI/SettingsView.swift */
+"Launch at login" = "Launch at login";
+"Run in the background" = "Run in the background";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar.";
+"Show live rates in the menu bar" = "Show live rates in the menu bar";
+"Show notifications for warnings" = "Show notifications for warnings";
+"General" = "General";
+"Z-score threshold" = "Z-score threshold";
+"Learning period per app" = "Learning period per app";
+"Ignore hours below" = "Ignore hours below";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Hourly traffic and daily destination counts are compared with each app's rolling baseline.";
 "First contact with a new domain" = "First contact with a new domain";
 "Connections to non-standard ports" = "Connections to non-standard ports";
 "Ignore Apple's own apps" = "Ignore Apple's own apps";
-"Traffic without UI activity" = "Traffic without UI activity";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail.";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "Agent uses email, file transfer, SSH, tunnels or databases";
 "Agent connects to a raw IP on an unusual port" = "Agent connects to a raw IP on an unusual port";
-"Agent active while you're away" = "Agent active while you're away";
 "Uploads to non-AI hosts above" = "Uploads to non-AI hosts above";
+"Agent active while you're away" = "Agent active while you're away";
 "Away after" = "Away after";
-"Learning period per app" = "Learning period per app";
-"Z-score threshold" = "Z-score threshold";
-"Ignore hours below" = "Ignore hours below";
+"AI agents" = "AI agents";
+"Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours." = "Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours.";
+"Traffic without UI activity" = "Traffic without UI activity";
 "App idle for at least" = "App idle for at least";
 "Uploading more than" = "Uploading more than";
+"Detection" = "Detection";
 "Keep per-second data" = "Keep per-second data";
-"Launch at login" = "Launch at login";
-"Run in the background" = "Run in the background";
-"Show live rates in the menu bar" = "Show live rates in the menu bar";
-"Show notifications for warnings" = "Show notifications for warnings";
-"Check for updates automatically" = "Check for updates automatically";
-"Check Now" = "Check Now";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days.";
+"Storage" = "Storage";
 "Open Flowlight" = "Open Flowlight";
 "Show Dock Icon" = "Show Dock Icon";
-"Quit" = "Quit";
 "Review Alerts…" = "Review Alerts…";
-"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar.";
-"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Hourly traffic and daily destination counts are compared with each app's rolling baseline.";
-"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days.";
+"Quit" = "Quit";
+"Check for updates automatically" = "Check for updates automatically";
 "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version.";
+"Check Now" = "Check Now";
+"Language" = "Language";
+"System" = "System";
+"Now showing %@" = "Now showing %@";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into.";
+
+/* UI/UpdateView.swift */
+"See what changed on GitHub" = "See what changed on GitHub";
+"Skip This Version" = "Skip This Version";
+"View on GitHub" = "View on GitHub";
+"Remind Me Later" = "Remind Me Later";
+"Open Disk Image" = "Open Disk Image";
+"Install Later" = "Install Later";
+"Quit & Install" = "Quit & Install";
+"Check Again" = "Check Again";
+
+/* Common words kept for menus macOS builds itself. */
+"Edit" = "Edit";
+"On" = "On";
+"Save" = "Save";
+"Settings" = "Settings";

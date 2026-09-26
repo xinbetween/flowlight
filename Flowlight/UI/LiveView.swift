@@ -38,10 +38,10 @@ struct LiveView: View {
                 .padding(.top, 4)
             } label: {
                 HStack(spacing: 14) {
-                    Text("Last 2 minutes")
+                    Text(L("Last 2 minutes"))
                     Spacer()
-                    Label("Download", systemImage: "arrow.down").foregroundStyle(TrafficColors.inbound)
-                    Label("Upload", systemImage: "arrow.up").foregroundStyle(TrafficColors.outbound)
+                    Label(L("Download"), systemImage: "arrow.down").foregroundStyle(TrafficColors.inbound)
+                    Label(L("Upload"), systemImage: "arrow.up").foregroundStyle(TrafficColors.outbound)
                 }
                 .font(.caption)
             }
@@ -67,12 +67,12 @@ struct LiveView: View {
                 }
                 .contextMenu(forSelectionType: LiveTalker.ID.self) { ids in
                     if let id = ids.first {
-                        Button("Show in Reports") { openReport(id) }
+                        Button(L("Show in Reports")) { openReport(id) }
                         FocusMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id))
                         Divider()
                         RuleMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
                                       host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
-                        Button("Copy Bundle ID") {
+                        Button(L("Copy Bundle ID")) {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(id, forType: .string)
                         }
@@ -82,11 +82,11 @@ struct LiveView: View {
                 }
                 .overlay { emptyState }
             } label: {
-                Text("Top talkers · average of the last 5 seconds")
+                Text(L("Top talkers · average of the last 5 seconds"))
             }
         }
         .padding()
-        .navigationTitle("Live")
+        .navigationTitle(L("Live"))
     }
 
     @ViewBuilder
@@ -94,10 +94,10 @@ struct LiveView: View {
         if monitor.talkers.isEmpty {
             if monitor.isReceiving {
                 ContentUnavailableView("The network is quiet", systemImage: "network",
-                                       description: Text("No app has sent or received data in the last few seconds."))
+                                       description: Text(L("No app has sent or received data in the last few seconds.")))
             } else {
                 ContentUnavailableView {
-                    Label("Waiting for traffic data", systemImage: "antenna.radiowaves.left.and.right.slash")
+                    Label(L("Waiting for traffic data"), systemImage: "antenna.radiowaves.left.and.right.slash")
                 } description: {
                     // The banner explains a source that cannot work here; the status line is for everything else.
                     if monitor.captureWarning != nil {
@@ -106,7 +106,7 @@ struct LiveView: View {
                         Text(monitor.status)
                     }
                 } actions: {
-                    Button("Open Capture Settings") { nav.selection = .capture }
+                    Button(L("Open Capture Settings")) { nav.selection = .capture }
                 }
             }
         }

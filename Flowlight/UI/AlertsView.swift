@@ -27,7 +27,7 @@ struct AlertsView: View {
                 table
             }
         }
-        .navigationTitle("Alerts")
+        .navigationTitle(L("Alerts"))
         // The sidebar badge counts what is unread; this says how much there is to read at all, which is the
         // difference between "quiet" and "already dealt with".
         .navigationSubtitle(alerts.isEmpty ? ""
@@ -71,29 +71,29 @@ struct AlertsView: View {
                 // Every refusal carries its way out, and each way out is itself a rule with an expiry — so the
                 // Rules screen can still answer "why is this getting through?" tomorrow morning.
                 Menu("Allow \(a.allowPattern) for \(a.appName)…") {
-                    Button("Just once") {
+                    Button(L("Just once")) {
                         monitor.rules.save(RuleStore.allow(app: a.bundleID, destination: a.allowPattern,
                                                            once: true, origin: .allowOnce))
                     }
-                    Button("For an hour") {
+                    Button(L("For an hour")) {
                         monitor.rules.save(RuleStore.allow(app: a.bundleID, destination: a.allowPattern,
                                                            forSeconds: 3600))
                     }
-                    Button("Until Flowlight quits") {
+                    Button(L("Until Flowlight quits")) {
                         var rule = RuleStore.allow(app: a.bundleID, destination: a.allowPattern)
                         rule.schedule = .thisSession(RuleStore.session)
                         monitor.rules.save(rule)
                     }
                     Divider()
-                    Button("Edit a rule instead…") {
+                    Button(L("Edit a rule instead…")) {
                         nav.writeRule(RuleStore.allow(app: a.bundleID, destination: a.allowPattern, origin: .alert))
                     }
                 }
                 Divider()
             }
-            Button("Show Traffic in Reports") { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)
-            Button("Acknowledge") { monitor.acknowledgeAlerts(ids: Array(ids)) }
-            Button("Copy Detail") {
+            Button(L("Show Traffic in Reports")) { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)
+            Button(L("Acknowledge")) { monitor.acknowledgeAlerts(ids: Array(ids)) }
+            Button(L("Copy Detail")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(ids.compactMap { alert($0)?.detail }.joined(separator: "\n"), forType: .string)
             }
@@ -108,20 +108,20 @@ struct AlertsView: View {
         // narrows the list; acknowledging is one verb with two objects, so it reads better as one button.
         ToolbarItemGroup {
             Menu {
-                Picker("Rule", selection: $rule) {
-                    Text("All rules").tag("")
+                Picker(L("Rule"), selection: $rule) {
+                    Text(L("All rules")).tag("")
                     ForEach(rules, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.inline)
                 Divider()
-                Toggle("Show acknowledged", isOn: $showAcknowledged)
+                Toggle(L("Show acknowledged"), isOn: $showAcknowledged)
             } label: {
                 Label(filterLabel, systemImage: isFiltered ? "line.3.horizontal.decrease.circle.fill"
                                                            : "line.3.horizontal.decrease.circle")
             }
             .labelStyle(.titleAndIcon)   // icon-only reads as two mystery buttons in the corner
             .disabled(alerts.isEmpty)
-            .help("Filter which alerts are listed")
+            .help(L("Filter which alerts are listed"))
 
             Menu {
                 Button("Selected (\(selection.count))") { monitor.acknowledgeAlerts(ids: Array(selection)) }
@@ -129,11 +129,11 @@ struct AlertsView: View {
                 Button("All unacknowledged (\(monitor.unacknowledgedAlerts))") { monitor.acknowledgeAlerts(ids: nil) }
                     .disabled(monitor.unacknowledgedAlerts == 0)
             } label: {
-                Label("Acknowledge", systemImage: "checkmark.circle")
+                Label(L("Acknowledge"), systemImage: "checkmark.circle")
             }
             .labelStyle(.titleAndIcon)
             .disabled(alerts.isEmpty)
-            .help("Mark alerts as seen")
+            .help(L("Mark alerts as seen"))
         }
     }
 

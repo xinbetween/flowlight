@@ -1,74 +1,431 @@
 /* Flowlight — zh-Hant. The key is the English text, so an untranslated string shows correct English. */
 
-"Traffic" = "流量";
-"Investigate" = "調查";
-"Control" = "管控";
-"Sources" = "來源";
+/* App/AppNavigation.swift */
 "Live" = "即時";
 "AI Agents" = "AI 代理";
 "Reports" = "報告";
 "Alerts" = "警示";
 "Rules" = "規則";
 "Ask" = "提問";
-"Inspect" = "檢查";
 "Devices" = "裝置";
+"Inspect" = "檢查";
 "Capture" = "擷取";
-"Cancel" = "取消";
-"Done" = "完成";
-"Save" = "儲存";
-"Add" = "加入";
-"Edit" = "編輯";
-"Delete" = "刪除";
-"Refresh" = "重新整理";
-"Clear" = "清除";
-"Copy" = "拷貝";
-"Off" = "關閉";
-"On" = "開啟";
-"Settings" = "設定";
-"General" = "一般";
-"Detection" = "偵測";
-"Export" = "匯出";
-"Language" = "語言";
-"System" = "跟隨系統";
-"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "設為「跟隨系統」時，介面語言會與您的 Mac 一致；若 Flowlight 尚未翻譯成該語言，則會退回英文。";
-"Now showing %@" = "目前顯示：%@";
+"Traffic" = "流量";
+"Investigate" = "調查";
+"Control" = "管控";
+"Sources" = "來源";
 
-/* Help that follows the screen you are on. */
-"Help" = "輔助說明";
+/* App/FlowlightApp.swift */
+"About Flowlight" = "關於 Flowlight";
 "Help for %@" = "%@ 輔助說明";
-"Open the documentation for %@" = "開啟「%@」的說明文件";
-"Documentation" = "說明文件";
-"Open %@" = "開啟%@";
+"Flowlight Help" = "Flowlight 輔助說明";
+"Questions & Answers" = "常見問答";
+"What Flowlight Reads on This Mac" = "Flowlight 在這台 Mac 上讀取哪些資料";
+"Privacy" = "隱私權";
+"Report an Issue" = "回報問題";
+"Check for Updates…" = "檢查更新…";
 
-/* Settings. */
-"Storage" = "儲存";
-"AI agents" = "AI 代理";
+/* Export/ExportSettingsView.swift */
+"Send to my collector" = "傳送到我的收集器";
+"Export to OpenTelemetry / SIEM" = "匯出到 OpenTelemetry / SIEM";
+"Endpoint" = "端點";
+"Format" = "格式";
+"https://collector.example.com:4318" = "https://collector.example.com:4318";
+"Name" = "名稱";
+"Authorization" = "Authorization";
+"Value" = "值";
+"Bearer …" = "Bearer …";
+"Remove this header" = "移除此標頭";
+"Add Header" = "加入標頭";
+"Headers" = "標頭";
+"Per-app and destination rollups" = "各 App 與目標的彙總資料";
+"Service name" = "服務名稱";
+"flowlight" = "flowlight";
+"Include this Mac's host name" = "包含這台 Mac 的主機名稱";
+"What Flowlight sends" = "Flowlight 傳送的內容";
+"Show What Would Be Sent…" = "顯示將傳送的內容…";
+"Test" = "測試";
+"Status" = "狀態";
+"What would be sent" = "將傳送的內容";
+"Copy" = "拷貝";
+"Done" = "完成";
+
+/* UI/AgentsView.swift */
+"Observed AI agent activity, including destinations outside each agent's model provider." = "觀察到的 AI 代理活動，包含各代理在其模型供應商之外連線的目標。";
+"Window" = "時間範圍";
+"No AI agents seen" = "未看到 AI 代理";
+"Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider." = "Flowlight 能辨識 Claude Code、Codex、Cursor 和 Ollama 等支援的代理，也會把連線到已知 LLM API 供應商的非瀏覽器 App 歸類為代理。";
+"Show Traffic in Reports" = "在「報告」中顯示流量";
+"None seen" = "未看到任何項目";
+"Connected to an address with no hostname" = "連線到沒有主機名稱的位址";
+"All allowed" = "全部允許";
+"Unlisted destinations are refused, not only reported" = "未列出的目標會被拒絕，而不只是記錄下來";
+"Off" = "關閉";
+"Allowlist" = "允許清單";
+"Only allow listed destinations" = "只允許清單中的目標";
+"Always allow its AI providers" = "一律允許其 AI 供應商";
+"Block connections that aren't allowed" = "封鎖未經允許的連線";
+"Block Unlisted Destinations" = "封鎖未列出的目標";
+"Cancel" = "取消";
+"github.com, 10.0.0.0/8…" = "github.com, 10.0.0.0/8…";
+"Add" = "加入";
+"Presets" = "預設組合";
+"Tools & MCP servers" = "工具與 MCP 伺服器";
+"AI providers" = "AI 供應商";
+"None in this window" = "此時間範圍內沒有";
+"Show" = "顯示";
+"Guardrails" = "防護機制";
+"Open in Reports" = "在「報告」中開啟";
+"Only AI providers. Nothing else was contacted." = "只有 AI 供應商，沒有連線其他目標。";
+"via " = "透過 ";
+"Opened by " = "開啟者：";
+"Not allowed" = "未允許";
+"Allow" = "允許";
+"Completed" = "已完成";
+"The tool reported an error" = "工具回報了錯誤";
+"No result seen yet" = "尚未看到結果";
+"The agent sent the provider a token for this server" = "代理把這個伺服器的權杖送給了供應商";
+"Allowed: " = "允許：";
+"Tools this server offers; the ones with a count were called in this window" = "這個伺服器提供的工具；有次數的是在此時間範圍內被呼叫過的";
+"project" = "專案";
+"configured, no calls seen" = "已設定，未看到呼叫";
+"Reading agent configuration…" = "正在讀取代理設定…";
+"Look for agent configuration" = "尋找代理設定";
+"Why?" = "為什麼？";
+"out of date" = "已過期";
+"Rescan" = "重新掃描";
+"Add project folder…" = "加入專案檔案夾…";
+"Set up HTTPS inspection" = "設定 HTTPS 檢查";
+
+/* UI/AlertsView.swift */
+"Just once" = "只有這一次";
+"For an hour" = "一小時內";
+"Until Flowlight quits" = "直到 Flowlight 結束";
+"Edit a rule instead…" = "改為編輯規則…";
+"Acknowledge" = "確認";
+"Copy Detail" = "拷貝詳細資料";
+"Rule" = "規則";
+"All rules" = "所有規則";
+"Show acknowledged" = "顯示已確認的項目";
+"Filter which alerts are listed" = "篩選要列出哪些警示";
+"Mark alerts as seen" = "將警示標示為已看過";
+
+/* UI/AskView.swift */
+"Clear" = "清除";
+"Forget this conversation" = "忘記這段對話";
+"Ask about your traffic" = "詢問你的流量";
+"Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer." = "Flowlight 用這台 Mac 上的歷史記錄回答。模型看不到這些記錄，它只能呼叫一組固定的查詢，而且每一次執行的查詢都會列在答案下方。";
+"Ask about this Mac's network activity" = "詢問這台 Mac 的網路活動";
+"Choose a provider…" = "選擇供應商…";
+"Working…" = "處理中…";
+"Open %@" = "開啟%@";
+"Documentation" = "說明文件";
+"Who answers" = "由誰回答";
+"The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself." = "不傳出任何資料的那兩個排在最前面。這不是偶然：一個以不需帳號、不需雲端為承諾的工具，在回答關於自己的問題時，也不該需要這兩者。";
+"Provider" = "供應商";
+"Model" = "模型";
+"API key" = "API 金鑰";
+"Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at." = "存放在你的登入鑰匙串裡，而不是 Flowlight 的偏好設定中 — plist 可以被任何以你的身分執行的程式讀取，而這正是這個 App 想讓你看見的那類事情。";
+"Ask this" = "提出這個問題";
+
+/* UI/CaptureView.swift */
+"Delete all recorded traffic, baselines and alerts?" = "要刪除所有已記錄的流量、基線和警示嗎？";
+"Delete everything" = "全部刪除";
+"Install & Enable Filter" = "安裝並啟用過濾器";
+"Disable Filter" = "停用過濾器";
+"Uninstall" = "解除安裝";
+"Refresh" = "重新整理";
+"Re-check the filter and reconnect to it" = "重新檢查過濾器並重新連接";
+"Try the Extension Again" = "再試一次延伸功能";
+"Stop sampling with nettop and reconnect to the filter extension" = "停止用 nettop 取樣，並重新連接過濾器延伸功能";
+"Flowlight reads " = "Flowlight 讀取 ";
+"/usr/bin/nettop" = "/usr/bin/nettop";
+" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics." = "，每秒一次。你會得到每個程序、每條連線的位元組計數，不需要任何權限授權，通訊協定則是依連接埠推測而來。";
+"Database" = "資料庫";
+"Reveal in Finder" = "在 Finder 中顯示";
+"Clear All Data…" = "清除所有資料…";
+"Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner." = "以過去一小時內看到的連線為準。判定順序：TLS 伺服器名稱、DNS 回應、反向 DNS、網路擁有者。";
+"Remove Access…" = "移除存取權…";
+"See which sites your apps talk to" = "查看你的 App 連線哪些網站";
+"Without this, most traffic shows only an IP address or network owner." = "沒有這項功能，大部分流量只會顯示 IP 位址或網路擁有者。";
+"Identify network owners when no hostname is available" = "沒有主機名稱時，辨識網路擁有者";
+"On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "預設開啟。會把公開的目標 IP 傳送到 Team Cymru 的 DNS 服務。關閉後，這些查詢只會在你的 Mac 上進行。";
+"Not Now" = "現在不要";
+"Enable Hostnames…" = "啟用主機名稱…";
+
+/* UI/CaptureWarning.swift */
+"The Network Extension can't capture on this Mac" = "網路延伸功能無法在這台 Mac 上擷取";
+"Use the nettop Sampler" = "使用 nettop 取樣器";
+"Use the Network Extension" = "使用網路延伸功能";
+
+/* UI/ContentView.swift */
+"See what's new and download the update" = "查看更新內容並下載更新";
+"Capture source status — click to configure" = "擷取來源狀態 — 點按以設定";
+"Open the documentation for %@" = "開啟「%@」的說明文件";
+"Help" = "輔助說明";
+"Error" = "錯誤";
+"OK" = "好";
+
+/* UI/DevicesView.swift */
+"Read the device list again now (⌘R)" = "立即重新讀取裝置列表（⌘R）";
+"Watch Bluetooth" = "監看藍牙";
+"Watch USB and external storage" = "監看 USB 與外接儲存裝置";
+"Channels" = "通道";
+"Choose which channels Flowlight watches" = "選擇 Flowlight 要監看哪些通道";
+"Nothing but the network is being watched" = "目前只監看網路";
+"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "藍牙和 USB 要等你開啟才會作用。兩者都不需要 Flowlight 還沒有的權限 — 預設關閉是因為監看它們會擴大這個 App 觀察的範圍，而這應該由你決定，不該是某次更新替你決定的。\n\n兩者都無法回報位元組數。macOS 不會為這些通道記錄各 App 的用量，所以 Flowlight 能誠實顯示的，是有什麼連著、哪些 App 本來就會用它，以及這些狀況何時改變。";
+"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "這些通道沒有位元組計數。macOS 不會為藍牙或 USB 記錄各 App 的用量，所以這裡若出現數字也只是編出來的。能誠實呈現的，是有什麼連著、哪些 App 本來就會用它，以及這些狀況何時改變。";
+"This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it." = "這是各 App 在自己的 Info.plist 中宣告的 — 是誰要求使用藍牙，而不是 macOS 把權限給了誰。後者記在一個 App 讀不到的資料庫裡，而 Flowlight 寧可把這個差別說清楚，也不願含糊帶過。";
+"How Flowlight recognises this device between sightings" = "Flowlight 如何在不同次出現之間認出這個裝置";
+
+/* UI/FocusView.swift */
+"Focus" = "焦點";
+"While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there." = "開啟「焦點」時，每個畫面只會顯示這裡列出的項目。記錄不會中斷 — 關閉「焦點」後，其餘內容依然都在。";
+"Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either." = "還沒有選擇任何項目。單獨一個 App 就是一個焦點，單獨一個目標也是。兩者一起則表示符合其中任一項。";
+"Alerts name an app, not a destination, so this focus leaves the alert list alone." = "警示指名的是 App 而不是目標，所以這個焦點不會影響警示列表。";
+"App" = "App";
+"Destination" = "目標";
+"Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here." = "輸入主機名稱、網域或 IP 位址。這裡不支援 10.0.0.0/8 這類範圍。";
+
+/* UI/GuardrailsPane.swift */
+"HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet." = "HTTPS 檢查已關閉，Flowlight 無法讀取工具列表 — 這裡的設定還沒有生效。";
+"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "代理每一輪都會重新送出完整的工具列表。在這裡關閉某個工具，會在模型看到那份列表之前就先把它移除 — 所以沒有拒絕訊息可以爭論，也不會出現重試循環。對於透過 HTTP 連線的 MCP 伺服器，被拒絕的呼叫也會在這裡得到回應，並附上一句模型讀得懂的說明。";
+"MCP servers" = "MCP 伺服器";
+"never yet" = "還沒有過";
+"Refuse a tool by name or pattern, e.g. write*" = "依名稱或樣式拒絕工具，例如 write*";
+"This is not a sandbox." = "這不是沙箱。";
+"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "被拒絕的工具不會再提供給模型，也不會再得到回應。若代理仍然有 shell 可用，它還是能自己動手做到那個工具原本要做的事 — Flowlight 會把這件事記錄下來，但無法阻止。本機的 MCP 伺服器透過管道通訊，任何代理伺服器都看不到：Flowlight 在那裡能做的，是監看該伺服器自己的網路流量（這些流量已經歸給啟動它的代理），並協助你寫出代理本身的拒絕清單。";
+
+/* UI/Insights/BehaviourPanel.swift */
+"Nothing stands out" = "沒有特別異常之處";
+
+/* UI/Insights/InsightsPanel.swift */
+"All traffic" = "所有流量";
+"No traffic in this window" = "此時間範圍內沒有流量";
+"Received vs sent" = "接收與傳送對比";
+"Network owner: no hostname was seen for this traffic" = "網路擁有者：這筆流量沒有看到主機名稱";
+"Filter" = "篩選";
+
+/* UI/InspectView.swift */
+"Nothing inspected yet" = "尚未檢查任何內容";
+"Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "會遵循系統代理伺服器設定的 App — 瀏覽器、大多數 Mac App — 會自己出現在這裡。命令列代理不會：它們需要從受檢查的「終端機」取得環境變數。";
+"Open Inspected Terminal" = "開啟受檢查的「終端機」";
+"Check Setup" = "檢查設定狀態";
+"Flowlight is answering some requests itself instead of forwarding them. Click to review the rules." = "Flowlight 正在自行回應部分請求，而不是轉送出去。點按以檢視這些規則。";
+"A Terminal window whose agents and tools go through Flowlight" = "一個「終端機」視窗，其中的代理和工具都會經過 Flowlight";
+"Setup…" = "設定…";
+"Mocked" = "已模擬";
+"Guarded" = "已防護";
+"Mock This Endpoint…" = "模擬此端點…";
+"Block This Endpoint…" = "封鎖此端點…";
+"HTTPS inspection" = "HTTPS 檢查";
+"Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally." = "檢查經由 Flowlight 轉送的 App 的 HTTP 請求與回應，包含支援的模型工具呼叫。Flowlight 會使用本機代理伺服器，以及在這台 Mac 上建立的憑證授權單位。檢查功能預設為關閉，記錄的資料只儲存在本機。";
+"Turn on HTTPS inspection" = "開啟 HTTPS 檢查";
+"Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back." = "會建立憑證、要求輸入一次密碼以信任該憑證，並讓 App 的流量經過 Flowlight。關閉後一切都會還原。";
+"Waiting for your password…" = "正在等待你輸入密碼…";
+"Command-line agents ignore system proxy settings; start them from this window instead" = "命令列代理會忽略系統的代理伺服器設定；請改從這個視窗啟動它們";
+"Decrypt" = "解密";
+"With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded." = "選擇「僅 AI 代理」時，其他 App 仍會經過代理伺服器，但會以加密狀態直接通過，不會被記錄。";
+"Never decrypted" = "永不解密";
+"These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically." = "這些主機及其子網域一律以加密狀態通過。使用憑證綁定的 App 會被偵測出來並自動放行。";
+"bank.example" = "bank.example";
+"Restore Defaults" = "回復預設值";
+"Copy Shell Setup" = "拷貝 Shell 設定";
+"Environment variables that send one shell's tools through Flowlight" = "讓單一 shell 中的工具經過 Flowlight 的環境變數";
+"Show Certificate in Finder" = "在 Finder 中顯示憑證";
+"Remove Certificate & Recorded Data…" = "移除憑證與記錄的資料…";
+"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "記錄的請求會保留 3 天。API 金鑰、cookie 和其他憑證類標頭一律不會儲存。";
+"Advanced" = "進階";
+"Mock responses" = "模擬回應";
+"macOS will ask you twice" = "macOS 會詢問你兩次";
+"Continue" = "繼續";
+"First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both." = "先是信任 Flowlight 的憑證（Touch ID 或你的密碼），接著是輸入管理者密碼，讓 App 的流量經過代理伺服器。關閉檢查功能會把兩者一併還原。";
+"Remove HTTPS inspection?" = "要移除 HTTPS 檢查嗎？";
+"Remove" = "移除";
+"Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request." = "會關閉檢查功能、移除憑證及其信任設定，並刪除所有記錄下來的請求。";
+"Mock This…" = "模擬這個…";
+"Answer this endpoint from Flowlight instead of letting the request through" = "由 Flowlight 回應這個端點，而不讓請求送出去";
+"Part" = "部分";
+"Request" = "請求";
+"Response" = "回應";
+
+/* UI/JSONTreeView.swift */
+"Switch to the raw view, where matches are highlighted" = "切換到原始檢視，符合的部分會標示出來";
+"View" = "檢視";
+"Tree" = "樹狀";
+"Raw" = "原始";
+"Copy the body (pretty-printed when it's JSON)" = "拷貝內文（JSON 會格式化排版）";
+"Only the first 2 MB were kept." = "只保留了前 2 MB。";
+"Copy Value" = "拷貝值";
+"Copy Key" = "拷貝鍵";
+"null" = "null";
+
+/* UI/LiveView.swift */
+"Last 2 minutes" = "最近 2 分鐘";
+"Download" = "下載";
+"Upload" = "上傳";
+"Show in Reports" = "在「報告」中顯示";
+"Copy Bundle ID" = "拷貝 Bundle ID";
+"Top talkers · average of the last 5 seconds" = "流量最高的項目 · 最近 5 秒的平均值";
+"No app has sent or received data in the last few seconds." = "最近幾秒內沒有 App 傳送或接收資料。";
+"Waiting for traffic data" = "正在等待流量資料";
+"Open Capture Settings" = "開啟擷取設定";
+
+/* UI/MockRulesView.swift */
+"Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "由你自己回應選定的端點，而不讓請求送到伺服器 — 一個 500、一次速率限制、一段格式錯誤的內文，或是長時間的等待 — 然後看代理會怎麼處理。";
+"Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule." = "只有 Flowlight 會解密的請求才能被模擬。以通道方式通過的主機 — 永不解密清單、使用憑證綁定的 App、以及任何不經過代理伺服器的流量 — 都不會被規則影響。";
+"HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet." = "HTTPS 檢查已關閉，因此不會解密任何內容，目前也沒有規則能回應任何請求。";
+"No mock rules." = "沒有模擬規則。";
+"Rules are tried from the top; the first enabled one that matches answers." = "規則由上往下比對；第一個已啟用且符合的規則負責回應。";
+"Add Rule…" = "加入規則…";
+"Turn All Off" = "全部關閉";
+"Optional, e.g. “GitHub is down”" = "選填，例如「GitHub is down」";
+"Host" = "主機";
+"api.example.com" = "api.example.com";
+"Exactly that host. Write *.example.com to cover the domain and its subdomains." = "只符合該主機。輸入 *.example.com 可涵蓋該網域及其子網域。";
+"Path" = "路徑";
+"/v1/*" = "/v1/*";
+"A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?." = "這是 glob 樣式：* 可符合任意一段字元。除非樣式中含有 ?，否則會忽略查詢字串。";
+"Method" = "方法";
+"Delay" = "延遲";
+"seconds" = "秒";
+"One Name: value per line. Content-Length and Connection are written by Flowlight." = "每行一組 Name: value。Content-Length 和 Connection 由 Flowlight 自行填寫。";
+"Body" = "內文";
+
+/* UI/ReportsView.swift */
+"Way out" = "出口";
+"Every way out" = "所有出口";
+"Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel" = "限定一種離開 Mac 的出口：網路、點對點無線傳輸、這台 Mac 本身，或通道";
+"Time series (CSV)…" = "時間序列（CSV）…";
+"Breakdown (CSV)…" = "分項明細（CSV）…";
+"Export" = "匯出";
+"Export the current report as CSV" = "將目前的報告匯出為 CSV";
+"Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs." = "涵蓋率是以過去一小時的所有流量計算，而不是所選的報告時間範圍。沒有名稱的 IP 可能屬於共享主機或 CDN。";
+"Measure" = "量測項目";
+"Group by" = "分組方式";
+"App › Domain › IP, Destination › App › IP, or IP › App" = "App › 網域 › IP、目標 › App › IP，或 IP › App";
+"Choose a longer window or clear filters." = "請選擇較長的時間範圍，或清除篩選條件。";
+"Back" = "返回";
+"Return to the previous zoom level" = "回到上一個縮放層級";
+"Granularity" = "精細度";
+"Earlier (⌘[)" = "較早（⌘[）";
+"Earlier" = "較早";
+"Later (⌘])" = "較晚（⌘]）";
+"Later" = "較晚";
+"Now" = "現在";
+"Showing only:" = "僅顯示：";
+"Click a bar to zoom in" = "點按長條可放大檢視";
+"Show Only This" = "只顯示這個";
+"Copy Hostname" = "拷貝主機名稱";
+
+/* UI/RuleEditor.swift */
+"Then" = "則";
+"Block it" = "封鎖";
+"Allow it" = "允許";
+"What it names" = "規則指名的對象";
+"Any app — or a name, or a bundle identifier" = "任何 App — 或輸入名稱、Bundle ID";
+"Anywhere — or a domain, an IP address, or a range" = "任何地方 — 或輸入網域、IP 位址或範圍";
+"A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started." = "網域會連帶包含其子網域：`example.com` 涵蓋 `api.example.com`。指名一個代理，則會涵蓋它啟動的工具和 MCP 伺服器。";
+"For how long" = "持續多久";
+"Lasts" = "持續";
+"Forever" = "永久";
+"Until a time" = "到某個時間為止";
+"Between chosen hours" = "在指定的時段內";
+"Gone when Flowlight quits, including a crash. Nothing is left behind in force." = "Flowlight 結束時就會消失，當掉也一樣，不會留下仍在生效的規則。";
+"Any path — or /v1/*" = "任何路徑 — 或 /v1/*";
+"Answer with" = "回應內容";
+"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "只有在能讀取請求內容時才比對得到路徑，也就是要開啟 HTTPS 檢查。這也讓這種拒絕比較友善：代理會收到一個讀得懂的狀態，而不是一條莫名斷掉的連線。";
+"One URL rather than the whole host" = "只針對一個 URL，而不是整台主機";
+"Name an app or a destination — a rule that names neither would decide every connection on the Mac." = "請指名一個 App 或一個目標 — 兩者都沒有指名的規則會決定這台 Mac 上的每一條連線。";
+" reaching " = " 連線到 ";
+" requests from " = " 請求，來自 ";
+" to " = " 到 ";
+
+/* UI/RulesView.swift */
+"Templates" = "範本";
+"Rules worth having, grouped by what they are for, with the hosts already written out" = "值得一用的規則，依用途分組，主機都已經寫好";
+"Add Rule" = "加入規則";
+"Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "寫一條規則：指定 App、代理、目標或 URL，並選擇封鎖或允許";
+"Nothing is being refused. Click to start again now." = "目前沒有任何連線被拒絕。點按可立即恢復。";
+"10 minutes" = "10 分鐘";
+"1 hour" = "1 小時";
+"Until I resume" = "直到我手動恢復";
+"Pause Blocking" = "暫停封鎖";
+"Stand every rule down for a while, without deleting anything" = "讓所有規則暫時停止作用，不刪除任何東西";
+"Resume now" = "立即恢復";
+"No rules yet" = "還沒有任何規則";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "一條規則會指名某個對象 — App、代理、目標或 URL — 並決定封鎖或允許。在「即時」、「報告」、「AI 代理」或「檢查」中對任一列按右鍵，就能針對你正在看的東西寫一條規則；也可以從範本庫開始 — 它已經知道安裝套件會連到哪些主機，以及檔案通常是從哪些主機離開的。";
+"Browse Templates…" = "瀏覽範本…";
+"Write One…" = "自己寫一條…";
+"Nothing yet" = "還沒有任何項目";
+"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "每一條由規則決定的連線都會出現在這裡 — 被拒絕的，以及例外放行的。後者的存在，正是為了讓「為什麼這個還通得過？」始終有答案。";
+"Edit…" = "編輯…";
+"Reset Count" = "重設計數";
+"Delete" = "刪除";
+"Show the Rule…" = "顯示這條規則…";
+"Everywhere" = "所有地方";
+"For the next hour" = "接下來一小時";
+"For every app" = "所有 App";
+"Apply a Template" = "套用範本";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "每個範本都會把一般的規則寫進列表，你可以像對待其他規則一樣閱讀、關閉或刪除它們。拒絕連線是網路延伸功能的工作，所以當「擷取」中選用 nettop 取樣器時，這些規則只會被監看，不會實際執行。";
+"Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "選填。留空表示套用到這台 Mac 上的所有項目；指名某個 App 則會縮小到該 App 以及它啟動的工具。";
+"A domain, an IP address, or a range" = "網域、IP 位址或範圍";
+"Added" = "加入時間";
+"A name, or a bundle identifier" = "名稱或 Bundle ID";
+
+/* UI/SettingsView.swift */
+"Launch at login" = "登入時啟動";
+"Run in the background" = "在背景執行";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "不顯示 Dock 圖像，也不出現在 Cmd-Tab 中。Flowlight 繼續記錄，並可從選單列存取。";
+"Show live rates in the menu bar" = "在選單列顯示即時速率";
+"Show notifications for warnings" = "為警告顯示通知";
+"General" = "一般";
+"Z-score threshold" = "Z 分數閾值";
+"Learning period per app" = "每個 App 的學習期";
+"Ignore hours below" = "忽略低於此值的小時";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "每小時流量與每日目標數量會與各 App 的滾動基線比較。";
 "First contact with a new domain" = "首次連線新網域";
 "Connections to non-standard ports" = "連線到非標準連接埠";
 "Ignore Apple's own apps" = "忽略 Apple 內建 App";
-"Traffic without UI activity" = "無介面操作時的流量";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS 會不斷與 Apple 通訊 — 更新、iCloud、推播、時間 — 把這些全部報告出來，只會埋掉真正重要的那一行。這些流量仍然會被記錄，仍然會顯示在「即時」和「報告」中，也仍然受所有規則和防護機制約束。";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "代理使用郵件、檔案傳輸、SSH、通道或資料庫";
 "Agent connects to a raw IP on an unusual port" = "代理透過異常連接埠連線裸 IP";
-"Agent active while you're away" = "你離開時代理仍在活動";
 "Uploads to non-AI hosts above" = "上傳至非 AI 主機超過";
+"Agent active while you're away" = "你離開時代理仍在活動";
 "Away after" = "離開判定時間";
-"Learning period per app" = "每個 App 的學習期";
-"Z-score threshold" = "Z 分數閾值";
-"Ignore hours below" = "忽略低於此值的小時";
+"AI agents" = "AI 代理";
+"Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours." = "代理包含 Claude Code、Codex 和 Cursor 等可辨識的工具，以及連線到已知 LLM API 供應商的非瀏覽器 App。它們的學習期是 1 小時，而不是 24 小時。";
+"Traffic without UI activity" = "無介面操作時的流量";
 "App idle for at least" = "App 閒置至少";
 "Uploading more than" = "上傳超過";
+"Detection" = "偵測";
 "Keep per-second data" = "保留每秒資料";
-"Launch at login" = "登入時啟動";
-"Run in the background" = "在背景執行";
-"Show live rates in the menu bar" = "在選單列顯示即時速率";
-"Show notifications for warnings" = "為警告顯示通知";
-"Check for updates automatically" = "自動檢查更新";
-"Check Now" = "立即檢查";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分鐘彙總保留 14 天，小時彙總 400 天，每日彙總永久保留。警示保留 90 天。";
+"Storage" = "儲存";
 "Open Flowlight" = "開啟 Flowlight";
 "Show Dock Icon" = "顯示 Dock 圖像";
-"Quit" = "結束";
 "Review Alerts…" = "檢視警示…";
-"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "不顯示 Dock 圖像，也不出現在 Cmd-Tab 中。Flowlight 繼續記錄，並可從選單列存取。";
-"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "每小時流量與每日目標數量會與各 App 的滾動基線比較。";
-"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分鐘彙總保留 14 天，小時彙總 400 天，每日彙總永久保留。警示保留 90 天。";
+"Quit" = "結束";
+"Check for updates automatically" = "自動檢查更新";
 "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight 每天向 GitHub 查詢一次最新版本。該請求只包含你的 IP 位址和 Flowlight 的版本號。";
+"Check Now" = "立即檢查";
+"Language" = "語言";
+"System" = "跟隨系統";
+"Now showing %@" = "目前顯示：%@";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "設為「跟隨系統」時，介面語言會與您的 Mac 一致；若 Flowlight 尚未翻譯成該語言，則會退回英文。";
+
+/* UI/UpdateView.swift */
+"See what changed on GitHub" = "在 GitHub 上查看變更內容";
+"Skip This Version" = "跳過此版本";
+"View on GitHub" = "在 GitHub 上查看";
+"Remind Me Later" = "稍後提醒我";
+"Open Disk Image" = "開啟磁碟映像檔";
+"Install Later" = "稍後安裝";
+"Quit & Install" = "結束並安裝";
+"Check Again" = "再次檢查";
+
+/* Common words kept for menus macOS builds itself. */
+"Edit" = "編輯";
+"On" = "開啟";
+"Save" = "儲存";
+"Settings" = "設定";

@@ -43,7 +43,7 @@ struct RulesView: View {
                 activityFeed
             }
         }
-        .navigationTitle("Rules")
+        .navigationTitle(L("Rules"))
         // The title bar carries the state that would otherwise need a trip to the screen to discover: how many
         // rules are live, and whether they are standing down.
         .navigationSubtitle(subtitle)
@@ -113,16 +113,16 @@ struct RulesView: View {
             Button {
                 sheet = .library(nil, RuleTemplate.Subject())
             } label: {
-                Label("Templates", systemImage: "square.grid.2x2")
+                Label(L("Templates"), systemImage: "square.grid.2x2")
             }
-            .help("Rules worth having, grouped by what they are for, with the hosts already written out")
+            .help(L("Rules worth having, grouped by what they are for, with the hosts already written out"))
             Button {
                 sheet = .editor(Rule(), isNew: true)
             } label: {
-                Label("Add Rule", systemImage: "plus")
+                Label(L("Add Rule"), systemImage: "plus")
             }
             .keyboardShortcut("n", modifiers: .command)
-            .help("Write a rule: an app, an agent, a destination or a URL, blocked or allowed")
+            .help(L("Write a rule: an app, an agent, a destination or a URL, blocked or allowed"))
         }
     }
 
@@ -137,16 +137,16 @@ struct RulesView: View {
                 Label("Paused until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "play.circle.fill")
             }
             .tint(.orange)
-            .help("Nothing is being refused. Click to start again now.")
+            .help(L("Nothing is being refused. Click to start again now."))
         } else {
             Menu {
-                Button("10 minutes") { store.pause(for: 600) }
-                Button("1 hour") { store.pause(for: 3600) }
-                Button("Until I resume") { store.pause(for: 60 * 60 * 24 * 365) }
+                Button(L("10 minutes")) { store.pause(for: 600) }
+                Button(L("1 hour")) { store.pause(for: 3600) }
+                Button(L("Until I resume")) { store.pause(for: 60 * 60 * 24 * 365) }
             } label: {
-                Label("Pause Blocking", systemImage: "pause.circle")
+                Label(L("Pause Blocking"), systemImage: "pause.circle")
             }
-            .help("Stand every rule down for a while, without deleting anything")
+            .help(L("Stand every rule down for a while, without deleting anything"))
         }
     }
 
@@ -225,7 +225,7 @@ struct RulesView: View {
                 Text("Nothing is being refused until \(until.formatted(date: .omitted, time: .shortened)).")
                     .font(.callout)
                 Spacer(minLength: 8)
-                Button("Resume now") { store.resume() }.buttonStyle(.link)
+                Button(L("Resume now")) { store.resume() }.buttonStyle(.link)
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
             .background(.bar)
@@ -244,15 +244,12 @@ struct RulesView: View {
 
     private var empty: some View {
         ContentUnavailableView {
-            Label("No rules yet", systemImage: "hand.raised")
+            Label(L("No rules yet"), systemImage: "hand.raised")
         } description: {
-            Text("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. "
-                 + "Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're "
-                 + "looking at, or start from the library — it already knows which hosts a package install "
-                 + "reaches, and which ones a file leaves by.")
+            Text(L("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by."))
         } actions: {
-            Button("Browse Templates…") { sheet = .library(nil, RuleTemplate.Subject()) }
-            Button("Write One…") { sheet = .editor(Rule(), isNew: true) }
+            Button(L("Browse Templates…")) { sheet = .library(nil, RuleTemplate.Subject()) }
+            Button(L("Write One…")) { sheet = .editor(Rule(), isNew: true) }
         }
     }
 
@@ -262,10 +259,9 @@ struct RulesView: View {
         Group {
             if store.events.isEmpty {
                 ContentUnavailableView {
-                    Label("Nothing yet", systemImage: "list.bullet.rectangle")
+                    Label(L("Nothing yet"), systemImage: "list.bullet.rectangle")
                 } description: {
-                    Text("Every connection a rule decides lands here — the refusals, and the exceptions that let "
-                         + "something through. The second half is how \"why is this getting through?\" stays answerable.")
+                    Text(L("Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable."))
                 }
             } else {
                 feed
@@ -375,10 +371,10 @@ private struct RuleRow: View {
                     .accessibilityLabel("Enable \(rule.title)")
                     .padding(.top, 2)
                 Menu {
-                    Button("Edit…", action: edit)
-                    if rule.hits > 0 { Button("Reset Count") { store.resetHits(rule) } }
+                    Button(L("Edit…"), action: edit)
+                    if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }
                     Divider()
-                    Button("Delete", role: .destructive) { store.delete(rule) }
+                    Button(L("Delete"), role: .destructive) { store.delete(rule) }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
@@ -400,10 +396,10 @@ private struct RuleRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: edit)
         .contextMenu {
-            Button("Edit…", action: edit)
-            if rule.hits > 0 { Button("Reset Count") { store.resetHits(rule) } }
+            Button(L("Edit…"), action: edit)
+            if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }
             Divider()
-            Button("Delete", role: .destructive) { store.delete(rule) }
+            Button(L("Delete"), role: .destructive) { store.delete(rule) }
         }
     }
 
@@ -430,7 +426,7 @@ private struct RuleRow: View {
         let verb = rule.action == .block ? "Block " : "Allow "
         return Text(verb).font(.body.weight(.medium))
             + code(rule.app.isEmpty ? "any app" : rule.app)
-            + Text(" reaching ").font(.body.weight(.medium))
+            + Text(L(" reaching ")).font(.body.weight(.medium))
             + code(target)
     }
 
@@ -466,7 +462,7 @@ private struct RuleRow: View {
                 }
             } else if rule.enabled {
                 Text("·").font(.caption).foregroundStyle(.quaternary)
-                Text("never yet").font(.caption).foregroundStyle(.tertiary)
+                Text(L("never yet")).font(.caption).foregroundStyle(.tertiary)
             }
         }
     }
@@ -530,8 +526,8 @@ private struct EventRow: View {
         .padding(.horizontal, 10).padding(.vertical, 8)
         .contentShape(Rectangle())
         .contextMenu {
-            Button("Show the Rule…", action: showRule)
-            Button("Copy") {
+            Button(L("Show the Rule…"), action: showRule)
+            Button(L("Copy")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(
                     "\(event.timestamp.formatted(date: .abbreviated, time: .standard))  "
@@ -571,18 +567,18 @@ struct RuleMenuItems: View {
     var body: some View {
         if let app, !app.bundleID.isEmpty {
             Menu("Block \(app.name)…") {
-                Button("Everywhere") { write(RuleStore.block(app: app.bundleID, name: "Block \(app.name)")) }
+                Button(L("Everywhere")) { write(RuleStore.block(app: app.bundleID, name: "Block \(app.name)")) }
                 if let host {
                     Button("From reaching \(host)") {
                         write(RuleStore.block(app: app.bundleID, destination: host,
                                               name: "\(app.name) can't reach \(host)"))
                     }
                 }
-                Button("For the next hour") {
+                Button(L("For the next hour")) {
                     write(RuleStore.block(app: app.bundleID, name: "\(app.name), for an hour",
                                           schedule: .expiring(in: 3600)))
                 }
-                Button("Until Flowlight quits") {
+                Button(L("Until Flowlight quits")) {
                     write(RuleStore.block(app: app.bundleID, name: "\(app.name), this session",
                                           schedule: .thisSession(RuleStore.session)))
                 }
@@ -590,8 +586,8 @@ struct RuleMenuItems: View {
         }
         if let host, !host.isEmpty {
             Menu("Block \(host)…") {
-                Button("For every app") { write(RuleStore.block(destination: host, name: "Nothing reaches \(host)")) }
-                Button("For the next hour") {
+                Button(L("For every app")) { write(RuleStore.block(destination: host, name: "Nothing reaches \(host)")) }
+                Button(L("For the next hour")) {
                     write(RuleStore.block(destination: host, name: "\(host), for an hour",
                                           schedule: .expiring(in: 3600)))
                 }
@@ -607,7 +603,7 @@ struct RuleMenuItems: View {
     private var templateMenu: some View {
         let applicable = RuleTemplate.applicable(to: subject)
         if !applicable.isEmpty {
-            Menu("Apply a Template") {
+            Menu(L("Apply a Template")) {
                 ForEach(RuleTemplate.Category.allCases) { category in
                     let found = applicable.filter { $0.category == category }
                     if !found.isEmpty {
@@ -703,7 +699,7 @@ struct RuleTemplateLibrary: View {
             Divider()
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button(L("Done")) { dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding(Measure.gutter)
         }
@@ -713,10 +709,8 @@ struct RuleTemplateLibrary: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Templates").font(.title3.weight(.semibold))
-            Text("Each one writes ordinary rules into the list, where they can be read, switched off or deleted "
-                 + "like anything else. Refusing a connection is the Network Extension's job, so with the nettop "
-                 + "sampler selected in Capture these are watched rather than carried out.")
+            Text(L("Templates")).font(.title3.weight(.semibold))
+            Text(L("Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out."))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(Measure.gutter)
@@ -777,13 +771,12 @@ struct RuleTemplateLibrary: View {
                 appField
             } else if template.scopesToApp {
                 appField
-                Text("Optional. Left empty this applies to everything on the Mac; naming an app narrows it to "
-                     + "that app and the tools it started.")
+                Text(L("Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if template.needs == .destination || template.needs == .both {
-                TextField("Destination", text: $destination,
-                          prompt: Text("A domain, an IP address, or a range"))
+                TextField(L("Destination"), text: $destination,
+                          prompt: Text(L("A domain, an IP address, or a range")))
                     .textFieldStyle(.roundedBorder)
             }
             if template.engines(for: filled).contains(.request) {
@@ -803,7 +796,7 @@ struct RuleTemplateLibrary: View {
             HStack(spacing: 10) {
                 Spacer()
                 if added.contains(template.id) {
-                    Label("Added", systemImage: "checkmark.circle.fill")
+                    Label(L("Added"), systemImage: "checkmark.circle.fill")
                         .font(.caption).foregroundStyle(.green)
                 }
                 Button(rules.count > 1 ? "Add \(rules.count) Rules" : "Add Rule") {
@@ -817,7 +810,7 @@ struct RuleTemplateLibrary: View {
 
     private var appField: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TextField("App", text: $app, prompt: Text("A name, or a bundle identifier"))
+            TextField(L("App"), text: $app, prompt: Text(L("A name, or a bundle identifier")))
                 .textFieldStyle(.roundedBorder)
             ForEach(suggestions) { found in
                 Button {

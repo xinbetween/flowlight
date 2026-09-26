@@ -30,7 +30,7 @@ private struct AskContent: View {
             composer
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("Ask")
+        .navigationTitle(L("Ask"))
         .navigationSubtitle(ask.sendsOffDevice ? "\(ask.provider.title) · leaves this Mac" : "Answered on this Mac")
         .toolbar { toolbar }
         .sheet(isPresented: $showingSettings) { AskSettingsSheet(ask: ask) }
@@ -41,8 +41,8 @@ private struct AskContent: View {
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
             if !ask.turns.isEmpty {
-                Button { ask.clear() } label: { Label("Clear", systemImage: "trash") }
-                    .help("Forget this conversation")
+                Button { ask.clear() } label: { Label(L("Clear"), systemImage: "trash") }
+                    .help(L("Forget this conversation"))
             }
             Button { showingSettings = true } label: {
                 Label(ask.provider.title, systemImage: ask.sendsOffDevice ? "cloud" : "desktopcomputer")
@@ -57,10 +57,9 @@ private struct AskContent: View {
 
     private var empty: some View {
         ContentUnavailableView {
-            Label("Ask about your traffic", systemImage: "text.bubble")
+            Label(L("Ask about your traffic"), systemImage: "text.bubble")
         } description: {
-            Text("Flowlight answers from the history on this Mac. The model never sees it — it can only call a "
-                 + "fixed set of queries, and every one it runs is listed under the answer.")
+            Text(L("Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer."))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -108,7 +107,7 @@ private struct AskContent: View {
                     Image(systemName: "magnifyingglass").foregroundStyle(.tertiary).padding(.top, 2)
                     // Three lines of room, because the questions worth asking are sentences rather than keywords
                     // and a one-line field makes them look wrong before they are finished.
-                    TextField("Ask about this Mac's network activity", text: $question, axis: .vertical)
+                    TextField(L("Ask about this Mac's network activity"), text: $question, axis: .vertical)
                         .lineLimit(3, reservesSpace: true)
                         .textFieldStyle(.plain)
                         .focused($typing)
@@ -127,7 +126,7 @@ private struct AskContent: View {
                 if ask.thinking {
                     ProgressView().controlSize(.small).frame(width: 52)
                 } else {
-                    Button("Ask") { askNow(question) }
+                    Button(L("Ask")) { askNow(question) }
                         .buttonStyle(.borderedProminent)
                         .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty || ask.blockedReason != nil)
                 }
@@ -137,7 +136,7 @@ private struct AskContent: View {
                 HStack(spacing: 6) {
                     Label(reason, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
-                    Button("Choose a provider…") { showingSettings = true }
+                    Button(L("Choose a provider…")) { showingSettings = true }
                         .buttonStyle(.link).font(.caption)
                     Spacer(minLength: 0)
                 }
@@ -200,7 +199,7 @@ private struct AskTurnView: View {
             } else if turn.answer.isEmpty && thinking {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Working…").foregroundStyle(.secondary)
+                    Text(L("Working…")).foregroundStyle(.secondary)
                 }
             } else {
                 Text(turn.answer)
@@ -329,14 +328,13 @@ private struct AskSettingsSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Who answers").font(.headline)
-            Text("The two that send nothing come first. That isn't an accident: a tool whose promise is no account "
-                 + "and no cloud shouldn't need either to answer a question about itself.")
+            Text(L("Who answers")).font(.headline)
+            Text(L("The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself."))
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.top, 4).padding(.bottom, 12)
 
             Form {
-                Picker("Provider", selection: Binding(get: { ask.provider }, set: { ask.provider = $0; key = ask.apiKey })) {
+                Picker(L("Provider"), selection: Binding(get: { ask.provider }, set: { ask.provider = $0; key = ask.apiKey })) {
                     ForEach(AskProviderKind.allCases) { kind in
                         Text(kind.title).tag(kind)
                     }
@@ -345,14 +343,13 @@ private struct AskSettingsSheet: View {
                     Text(reason).font(.caption).foregroundStyle(.orange)
                 }
                 if ask.provider != .onDevice {
-                    TextField("Endpoint", text: Binding(get: { ask.endpoint }, set: { ask.endpoint = $0 }))
-                    TextField("Model", text: Binding(get: { ask.model }, set: { ask.model = $0 }))
+                    TextField(L("Endpoint"), text: Binding(get: { ask.endpoint }, set: { ask.endpoint = $0 }))
+                    TextField(L("Model"), text: Binding(get: { ask.model }, set: { ask.model = $0 }))
                 }
                 if ask.provider.needsKey {
-                    SecureField("API key", text: $key)
+                    SecureField(L("API key"), text: $key)
                         .onSubmit { ask.apiKey = key }
-                    Text("Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by "
-                         + "anything running as you, which is the sort of thing this app exists to point at.")
+                    Text(L("Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
@@ -368,7 +365,7 @@ private struct AskSettingsSheet: View {
 
             HStack {
                 Spacer()
-                Button("Done") { ask.apiKey = key; dismiss() }.keyboardShortcut(.defaultAction)
+                Button(L("Done")) { ask.apiKey = key; dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding(.top, 10)
         }
@@ -478,6 +475,6 @@ private struct SuggestionChip: View {
             .scaleEffect(hovering ? 1.03 : 1)
             .onHover { hovering = $0 }
             .motion(Motion.control, value: hovering)
-            .help("Ask this")
+            .help(L("Ask this"))
     }
 }

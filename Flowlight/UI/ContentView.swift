@@ -35,7 +35,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 10)
-                    .help("See what's new and download the update")
+                    .help(L("See what's new and download the update"))
                 }
                 FocusBar()
                 Button { nav.selection = .capture } label: {
@@ -53,7 +53,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(10)
-                .help("Capture source status — click to configure")
+                .help(L("Capture source status — click to configure"))
                 .accessibilityLabel("Capture status: \(monitor.status)")
               }
             }
@@ -95,8 +95,8 @@ struct ContentView: View {
             // A single Window scene, so several restored main windows don't compete to present it.
             if show { openWindow(id: "capture-onboarding") } else if was { dismissWindow(id: "capture-onboarding") }
         }
-        .alert("Error", isPresented: Binding(get: { monitor.lastError != nil }, set: { if !$0 { monitor.lastError = nil } })) {
-            Button("OK") { monitor.lastError = nil }
+        .alert(L("Error"), isPresented: Binding(get: { monitor.lastError != nil }, set: { if !$0 { monitor.lastError = nil } })) {
+            Button(L("OK")) { monitor.lastError = nil }
         } message: {
             Text(monitor.lastError ?? "")
         }

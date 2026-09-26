@@ -103,28 +103,28 @@ struct ReportsView: View {
                 .padding()
             }
         }
-        .navigationTitle("Reports")
+        .navigationTitle(L("Reports"))
         .searchable(text: $query, placement: .toolbar, prompt: "App, domain, IP, port")
         .toolbar {
             ToolbarItem {
                 Menu {
-                    Picker("Way out", selection: $filter.channel) {
-                        Text("Every way out").tag(NetworkChannel?.none)
+                    Picker(L("Way out"), selection: $filter.channel) {
+                        Text(L("Every way out")).tag(NetworkChannel?.none)
                         Divider()
                         ForEach(NetworkChannel.allCases, id: \.self) { channel in
                             Text(channel.title).tag(NetworkChannel?.some(channel))
                         }
                     }
                     .pickerStyle(.inline)
-                } label: { Label("Way out", systemImage: filter.channel?.icon ?? "point.3.filled.connected.trianglepath.dotted") }
-                .help("Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel")
+                } label: { Label(L("Way out"), systemImage: filter.channel?.icon ?? "point.3.filled.connected.trianglepath.dotted") }
+                .help(L("Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel"))
             }
             ToolbarItem {
                 Menu {
-                    Button("Time series (CSV)…") { export(csv: CSVExport.series(series, granularity: granularity), name: "flowlight-series") }
-                    Button("Breakdown (CSV)…") { export(csv: CSVExport.breakdown(breakdownRows, query: query), name: "flowlight-breakdown") }
-                } label: { Label("Export", systemImage: "square.and.arrow.up") }
-                .help("Export the current report as CSV")
+                    Button(L("Time series (CSV)…")) { export(csv: CSVExport.series(series, granularity: granularity), name: "flowlight-series") }
+                    Button(L("Breakdown (CSV)…")) { export(csv: CSVExport.breakdown(breakdownRows, query: query), name: "flowlight-breakdown") }
+                } label: { Label(L("Export"), systemImage: "square.and.arrow.up") }
+                .help(L("Export the current report as CSV"))
             }
         }
         .task(id: ReloadKey(granularity: granularity, end: followNow ? nil : endDate, filter: scoped, version: monitor.dataVersion,
@@ -179,12 +179,12 @@ struct ReportsView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .help("Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs.")
+        .help(L("Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs."))
     }
 
     private var lowerModeBar: some View {
         HStack {
-            Picker("View", selection: $lowerMode) {
+            Picker(L("View"), selection: $lowerMode) {
                 ForEach(LowerMode.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -192,8 +192,8 @@ struct ReportsView: View {
             .frame(width: 320)
             if lowerMode == .charts {
                 Spacer()
-                Text("Measure").font(.caption).foregroundStyle(.secondary)
-                Picker("Measure", selection: $metric) {
+                Text(L("Measure")).font(.caption).foregroundStyle(.secondary)
+                Picker(L("Measure"), selection: $metric) {
                     ForEach(InsightMetric.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
@@ -201,14 +201,14 @@ struct ReportsView: View {
                 .frame(width: 230)
             } else {
                 Spacer()
-                Text("Group by").font(.caption).foregroundStyle(.secondary)
-                Picker("Group by", selection: $grouping) {
+                Text(L("Group by")).font(.caption).foregroundStyle(.secondary)
+                Picker(L("Group by"), selection: $grouping) {
                     ForEach(BreakdownGrouping.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 270)
-                .help("App › Domain › IP, Destination › App › IP, or IP › App")
+                .help(L("App › Domain › IP, Destination › App › IP, or IP › App"))
             }
         }
         .onChange(of: grouping) {
@@ -220,7 +220,7 @@ struct ReportsView: View {
 
     private var emptyCharts: some View {
         ContentUnavailableView("No traffic in this window", systemImage: "chart.pie",
-                               description: Text("Choose a longer window or clear filters."))
+                               description: Text(L("Choose a longer window or clear filters.")))
             .frame(minHeight: 200)
     }
 
@@ -238,10 +238,10 @@ struct ReportsView: View {
     private var controls: some View {
         HStack(spacing: 8) {
             if !history.isEmpty {
-                Button { goBack() } label: { Label("Back", systemImage: "arrow.uturn.backward") }
-                    .help("Return to the previous zoom level")
+                Button { goBack() } label: { Label(L("Back"), systemImage: "arrow.uturn.backward") }
+                    .help(L("Return to the previous zoom level"))
             }
-            Picker("Granularity", selection: Binding(get: { granularity }, set: { history.removeAll(); granularity = $0 })) {
+            Picker(L("Granularity"), selection: Binding(get: { granularity }, set: { history.removeAll(); granularity = $0 })) {
                 ForEach(Granularity.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -251,7 +251,7 @@ struct ReportsView: View {
             Spacer()
 
             Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-                .help("Earlier (⌘[)").accessibilityLabel("Earlier")
+                .help(L("Earlier (⌘[)")).accessibilityLabel(L("Earlier"))
                 .keyboardShortcut("[", modifiers: .command)
             Text(rangeLabel)
                 .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
@@ -259,16 +259,16 @@ struct ReportsView: View {
                 .fixedSize()
                 .help("\(startDate.formatted(date: .complete, time: .shortened)) – \(endDate.formatted(date: .complete, time: .shortened))")
             Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                .help("Later (⌘])").accessibilityLabel("Later")
+                .help(L("Later (⌘])")).accessibilityLabel(L("Later"))
                 .keyboardShortcut("]", modifiers: .command)
                 .disabled(followNow)
-            Button("Now") { followNow = true; endDate = Date() }.disabled(followNow)
+            Button(L("Now")) { followNow = true; endDate = Date() }.disabled(followNow)
         }
     }
 
     private var filterChips: some View {
         HStack(spacing: 6) {
-            Text("Showing only:").font(.caption).foregroundStyle(.secondary)
+            Text(L("Showing only:")).font(.caption).foregroundStyle(.secondary)
             if let app = filter.bundleID { chip("App: \(appName(for: app))") { filter.bundleID = nil } }
             if let owner = filter.owner { chip("Owner: \(owner)") { filter.owner = nil; filter.domain = nil; filter.remoteIP = nil } }
             else if let domain = filter.domain { chip("Domain: \(domain.isEmpty ? "(none)" : domain)") { filter.domain = nil; filter.remoteIP = nil } }
@@ -276,7 +276,7 @@ struct ReportsView: View {
             if let ip = filter.remoteIP { chip("IP: \(ip)") { filter.remoteIP = nil } }
             if let proto = filter.appProtocol { chip("Protocol: \(proto)") { filter.appProtocol = nil } }
             if let channel = filter.channel { chip("Way out: \(channel.title)") { filter.channel = nil } }
-            Button("Clear") { filter = .none }.buttonStyle(.link).font(.caption)
+            Button(L("Clear")) { filter = .none }.buttonStyle(.link).font(.caption)
         }
     }
 
@@ -362,7 +362,7 @@ struct ReportsView: View {
                 Text(filter.isEmpty ? "All traffic" : "Filtered traffic")
                 Spacer()
                 if granularity.finer != nil {
-                    Text("Click a bar to zoom in").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Click a bar to zoom in")).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -510,7 +510,7 @@ struct ReportsView: View {
         }
         .contextMenu(forSelectionType: TrafficNode.ID.self) { ids in
             if let id = ids.first, let node = find(id), node.kind != .more {
-                Button("Show Only This") { applyFilter(node) }
+                Button(L("Show Only This")) { applyFilter(node) }
                 if node.kind != .app, let bundleID = node.bundleID {
                     Button("Show Only \(node.appName ?? bundleID)") { var f = filter; f.bundleID = bundleID; filter = f }
                 }
@@ -521,8 +521,8 @@ struct ReportsView: View {
                               host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
                 Divider()
                 Button("Copy \(node.kind == .app ? "Name" : node.kind == .ip ? "IP Address" : "Destination")") { copy(node.title) }
-                if node.kind == .app, let bundleID = node.bundleID { Button("Copy Bundle ID") { copy(bundleID) } }
-                if node.kind == .ip, !node.detail.isEmpty { Button("Copy Hostname") { copy(node.detail) } }
+                if node.kind == .app, let bundleID = node.bundleID { Button(L("Copy Bundle ID")) { copy(bundleID) } }
+                if node.kind == .ip, !node.detail.isEmpty { Button(L("Copy Hostname")) { copy(node.detail) } }
             }
         } primaryAction: { ids in
             guard let id = ids.first, let node = find(id) else { return }

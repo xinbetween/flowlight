@@ -94,14 +94,14 @@ struct CaptureWarningBanner: View {
             HStack(alignment: .top, spacing: 12) {
                 CaptureGlyph(symbol: "exclamationmark.triangle.fill", tint: .orange)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("The Network Extension can't capture on this Mac")
+                    Text(L("The Network Extension can't capture on this Mac"))
                         .font(.body.weight(.medium))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(warning)
                         .font(.caption).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if showSwitch, monitor.mode == .networkExtension {
-                        Button("Use the nettop Sampler") { monitor.setMode(.nettop) }
+                        Button(L("Use the nettop Sampler")) { monitor.setMode(.nettop) }
                             .controlSize(.small)
                             .padding(.top, 2)
                     }
@@ -131,7 +131,7 @@ struct BlockingUnavailableNotice: View {
                     .font(.caption2).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if ExtensionManager.isEntitled, monitor.mode != .networkExtension {
-                    Button("Use the Network Extension") { monitor.setMode(.networkExtension) }
+                    Button(L("Use the Network Extension")) { monitor.setMode(.networkExtension) }
                         .controlSize(.mini)
                 }
             }
@@ -187,7 +187,7 @@ struct OtherFiltersNotice: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if monitor.mode == .networkExtension {
-                    Button("Use the nettop Sampler") { monitor.setMode(.nettop) }
+                    Button(L("Use the nettop Sampler")) { monitor.setMode(.nettop) }
                         .controlSize(.small)
                 }
             }

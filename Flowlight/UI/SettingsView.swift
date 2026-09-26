@@ -58,9 +58,7 @@ struct SettingsView: View {
                     Toggle(L("First contact with a new domain"), isOn: $firstContact)
                     Toggle(L("Connections to non-standard ports"), isOn: $nonStandardPorts)
                     Toggle(L("Ignore Apple's own apps"), isOn: $ignoreAppleApps)
-                    Text("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it "
-                         + "buries the one line that matters. Their traffic is still recorded, still shown in Live "
-                         + "and Reports, and still subject to every rule and guardrail.")
+                    Text(L("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
@@ -77,7 +75,7 @@ struct SettingsView: View {
                 } header: {
                     Text(L("AI agents"))
                 } footer: {
-                    Text("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours.")
+                    Text(L("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section(L("Traffic without UI activity")) {
@@ -87,7 +85,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .frame(height: 640)
-            .tabItem { Label("Detection", systemImage: "waveform.badge.exclamationmark") }
+            .tabItem { Label(L("Detection"), systemImage: "waveform.badge.exclamationmark") }
 
             Form {
                 Section {
@@ -99,10 +97,10 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .frame(height: 150)
-            .tabItem { Label("Storage", systemImage: "internaldrive") }
+            .tabItem { Label(L("Storage"), systemImage: "internaldrive") }
 
             ExportSettingsTab()
-                .tabItem { Label("Export", systemImage: "arrow.up.forward.square") }
+                .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
         }
         .frame(width: 500)
     }

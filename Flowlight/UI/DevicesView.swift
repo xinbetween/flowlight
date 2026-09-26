@@ -25,7 +25,7 @@ private struct DevicesContent: View {
                 offer
             }
         }
-        .navigationTitle("Devices")
+        .navigationTitle(L("Devices"))
         .navigationSubtitle(subtitle)
         .toolbar { toolbar }
     }
@@ -46,19 +46,19 @@ private struct DevicesContent: View {
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
             if store.isWatchingAnything {
-                Button { store.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                Button { store.refresh() } label: { Label(L("Refresh"), systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r", modifiers: .command)
-                    .help("Read the device list again now (⌘R)")
+                    .help(L("Read the device list again now (⌘R)"))
             }
             Menu {
-                Toggle("Watch Bluetooth", isOn: Binding(get: { store.watchingBluetooth },
+                Toggle(L("Watch Bluetooth"), isOn: Binding(get: { store.watchingBluetooth },
                                                         set: { store.watchingBluetooth = $0 }))
-                Toggle("Watch USB and external storage", isOn: Binding(get: { store.watchingUSB },
+                Toggle(L("Watch USB and external storage"), isOn: Binding(get: { store.watchingUSB },
                                                                        set: { store.watchingUSB = $0 }))
             } label: {
-                Label("Channels", systemImage: "switch.2")
+                Label(L("Channels"), systemImage: "switch.2")
             }
-            .help("Choose which channels Flowlight watches")
+            .help(L("Choose which channels Flowlight watches"))
         }
     }
 
@@ -66,16 +66,12 @@ private struct DevicesContent: View {
     /// than after.
     private var offer: some View {
         ContentUnavailableView {
-            Label("Nothing but the network is being watched", systemImage: "dot.radiowaves.left.and.right")
+            Label(L("Nothing but the network is being watched"), systemImage: "dot.radiowaves.left.and.right")
         } description: {
-            Text("Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't "
-                 + "already have — they're off because watching them widens what the app looks at, and that should "
-                 + "be your decision rather than something an update did.\n\n"
-                 + "Neither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight "
-                 + "can honestly show is what is connected, which apps are built to use it, and when that changed.")
+            Text(L("Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed."))
         } actions: {
-            Button("Watch Bluetooth") { store.watchingBluetooth = true }
-            Button("Watch USB and external storage") { store.watchingUSB = true }
+            Button(L("Watch Bluetooth")) { store.watchingBluetooth = true }
+            Button(L("Watch USB and external storage")) { store.watchingUSB = true }
         }
     }
 
@@ -100,9 +96,7 @@ private struct DevicesContent: View {
     private var accounting: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "number").font(.caption)
-            Text("No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a "
-                 + "figure here would be invented. What is honest is what's connected, which apps are built to use "
-                 + "it, and when that changed.")
+            Text(L("No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed."))
                 .font(.caption)
             Spacer(minLength: 0)
         }
@@ -154,9 +148,7 @@ private struct DevicesContent: View {
                         Spacer(minLength: 0)
                     }
                 }
-                Text("This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS "
-                     + "granted it to. That second list lives in a database an app can't read, and Flowlight would "
-                     + "rather name the difference than blur it.")
+                Text(L("This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it."))
                     .font(.caption2).foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 4)
@@ -264,7 +256,7 @@ private struct DeviceRow: View {
                     Text(device.id)
                         .font(.caption.monospaced()).foregroundStyle(.tertiary)
                         .lineLimit(1).truncationMode(.middle)
-                        .help("How Flowlight recognises this device between sightings")
+                        .help(L("How Flowlight recognises this device between sightings"))
                 }
             }
             Spacer(minLength: 8)

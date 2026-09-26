@@ -46,27 +46,27 @@ struct FocusEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Toggle("Focus", isOn: $focus.isOn)
+                Toggle(L("Focus"), isOn: $focus.isOn)
                     .toggleStyle(.switch)
                     .disabled(focus.targets.isEmpty)
                 Spacer()
                 if !focus.targets.isEmpty {
-                    Button("Clear") { focus.clear() }.buttonStyle(.link)
+                    Button(L("Clear")) { focus.clear() }.buttonStyle(.link)
                 }
             }
-            Text("While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there.")
+            Text(L("While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             if focus.targets.isEmpty {
                 // Saying what counts as enough, before anyone wonders whether they need one of each.
-                Text("Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either.")
+                Text(L("Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either."))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 FlowChips(targets: focus.targets) { focus.remove($0) }
                 if focus.apps.isEmpty {
                     // Alerts record the app that raised them and nothing about where the traffic went, so a
                     // destination can't narrow them. Better said here than left as a screen that ignores Focus.
-                    Label("Alerts name an app, not a destination, so this focus leaves the alert list alone.",
+                    Label(L("Alerts name an app, not a destination, so this focus leaves the alert list alone."),
                           systemImage: "info.circle")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
@@ -74,9 +74,9 @@ struct FocusEditor: View {
 
             Divider()
 
-            Picker("Add", selection: $adding) {
-                Text("App").tag(Adding.app)
-                Text("Destination").tag(Adding.destination)
+            Picker(L("Add"), selection: $adding) {
+                Text(L("App")).tag(Adding.app)
+                Text(L("Destination")).tag(Adding.destination)
             }
             .pickerStyle(.segmented).labelsHidden()
 
@@ -84,10 +84,10 @@ struct FocusEditor: View {
                 TextField(adding == .app ? "Name or bundle identifier" : "api.example.com", text: $typed)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addTyped)
-                Button("Add", action: addTyped).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button(L("Add"), action: addTyped).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             if invalid {
-                Text("Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here.")
+                Text(L("Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here."))
                     .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
 

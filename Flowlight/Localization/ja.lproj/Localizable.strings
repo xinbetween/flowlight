@@ -1,74 +1,431 @@
 /* Flowlight — ja. The key is the English text, so an untranslated string shows correct English. */
 
-"Traffic" = "トラフィック";
-"Investigate" = "調査";
-"Control" = "制御";
-"Sources" = "ソース";
+/* App/AppNavigation.swift */
 "Live" = "ライブ";
 "AI Agents" = "AI エージェント";
 "Reports" = "レポート";
 "Alerts" = "アラート";
 "Rules" = "ルール";
 "Ask" = "質問";
-"Inspect" = "インスペクト";
 "Devices" = "デバイス";
+"Inspect" = "インスペクト";
 "Capture" = "キャプチャ";
-"Cancel" = "キャンセル";
-"Done" = "完了";
-"Save" = "保存";
-"Add" = "追加";
-"Edit" = "編集";
-"Delete" = "削除";
-"Refresh" = "更新";
-"Clear" = "消去";
-"Copy" = "コピー";
-"Off" = "オフ";
-"On" = "オン";
-"Settings" = "設定";
-"General" = "一般";
-"Detection" = "検出";
-"Export" = "書き出し";
-"Language" = "言語";
-"System" = "システムに合わせる";
-"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "「システムに合わせる」にすると、インターフェイスは Mac の言語に従います。Flowlight が未翻訳の言語の場合は英語に戻ります。";
-"Now showing %@" = "現在の表示：%@";
+"Traffic" = "トラフィック";
+"Investigate" = "調査";
+"Control" = "制御";
+"Sources" = "ソース";
 
-/* Help that follows the screen you are on. */
-"Help" = "ヘルプ";
+/* App/FlowlightApp.swift */
+"About Flowlight" = "Flowlight について";
 "Help for %@" = "%@ のヘルプ";
-"Open the documentation for %@" = "%@ のドキュメントを開く";
-"Documentation" = "ドキュメント";
-"Open %@" = "%@ を開く";
+"Flowlight Help" = "Flowlight ヘルプ";
+"Questions & Answers" = "よくある質問";
+"What Flowlight Reads on This Mac" = "Flowlight がこの Mac で読み取るもの";
+"Privacy" = "プライバシー";
+"Report an Issue" = "問題を報告";
+"Check for Updates…" = "アップデートを確認…";
 
-/* Settings. */
-"Storage" = "保存";
-"AI agents" = "AI エージェント";
+/* Export/ExportSettingsView.swift */
+"Send to my collector" = "自分のコレクターに送信";
+"Export to OpenTelemetry / SIEM" = "OpenTelemetry / SIEM に書き出す";
+"Endpoint" = "エンドポイント";
+"Format" = "形式";
+"https://collector.example.com:4318" = "https://collector.example.com:4318";
+"Name" = "名前";
+"Authorization" = "Authorization";
+"Value" = "値";
+"Bearer …" = "Bearer …";
+"Remove this header" = "このヘッダを削除します";
+"Add Header" = "ヘッダを追加";
+"Headers" = "ヘッダ";
+"Per-app and destination rollups" = "アプリ別・接続先別の集計";
+"Service name" = "サービス名";
+"flowlight" = "flowlight";
+"Include this Mac's host name" = "この Mac のホスト名を含める";
+"What Flowlight sends" = "Flowlight が送信する内容";
+"Show What Would Be Sent…" = "送信される内容を表示…";
+"Test" = "テスト";
+"Status" = "状況";
+"What would be sent" = "送信される内容";
+"Copy" = "コピー";
+"Done" = "完了";
+
+/* UI/AgentsView.swift */
+"Observed AI agent activity, including destinations outside each agent's model provider." = "観測された AI エージェントの活動です。各エージェントのモデルプロバイダ以外の接続先も含みます。";
+"Window" = "期間";
+"No AI agents seen" = "AI エージェントは検出されていません";
+"Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider." = "Flowlight は Claude Code、Codex、Cursor、Ollama などの対応エージェントを認識します。既知の LLM API プロバイダに接続するブラウザ以外のアプリも、エージェントとして分類します。";
+"Show Traffic in Reports" = "トラフィックをレポートで表示";
+"None seen" = "検出なし";
+"Connected to an address with no hostname" = "ホスト名のないアドレスに接続しました";
+"All allowed" = "すべて許可済み";
+"Unlisted destinations are refused, not only reported" = "リストにない接続先は、報告するだけでなく拒否します";
+"Off" = "オフ";
+"Allowlist" = "許可リスト";
+"Only allow listed destinations" = "リストにある接続先のみ許可";
+"Always allow its AI providers" = "このエージェントの AI プロバイダは常に許可";
+"Block connections that aren't allowed" = "許可されていない接続をブロック";
+"Block Unlisted Destinations" = "リストにない接続先をブロック";
+"Cancel" = "キャンセル";
+"github.com, 10.0.0.0/8…" = "github.com, 10.0.0.0/8…";
+"Add" = "追加";
+"Presets" = "プリセット";
+"Tools & MCP servers" = "ツールと MCP サーバ";
+"AI providers" = "AI プロバイダ";
+"None in this window" = "この期間には該当なし";
+"Show" = "表示";
+"Guardrails" = "ガードレール";
+"Open in Reports" = "レポートで開く";
+"Only AI providers. Nothing else was contacted." = "AI プロバイダのみです。ほかへの接続はありません。";
+"via " = "経由: ";
+"Opened by " = "この接続を開いたもの: ";
+"Not allowed" = "許可されていません";
+"Allow" = "許可";
+"Completed" = "完了しました";
+"The tool reported an error" = "ツールがエラーを報告しました";
+"No result seen yet" = "結果はまだ確認されていません";
+"The agent sent the provider a token for this server" = "エージェントはこのサーバ用のトークンをプロバイダに送信しました";
+"Allowed: " = "許可済み: ";
+"Tools this server offers; the ones with a count were called in this window" = "このサーバが提供するツールです。回数が付いているものは、この期間に呼び出されました";
+"project" = "プロジェクト";
+"configured, no calls seen" = "設定済み・呼び出しなし";
+"Reading agent configuration…" = "エージェントの設定を読み取り中…";
+"Look for agent configuration" = "エージェントの設定を探す";
+"Why?" = "なぜ？";
+"out of date" = "情報が古い";
+"Rescan" = "再スキャン";
+"Add project folder…" = "プロジェクトフォルダを追加…";
+"Set up HTTPS inspection" = "HTTPS インスペクションを設定";
+
+/* UI/AlertsView.swift */
+"Just once" = "1 回だけ";
+"For an hour" = "1 時間";
+"Until Flowlight quits" = "Flowlight を終了するまで";
+"Edit a rule instead…" = "代わりにルールを編集…";
+"Acknowledge" = "確認済みにする";
+"Copy Detail" = "詳細をコピー";
+"Rule" = "ルール";
+"All rules" = "すべてのルール";
+"Show acknowledged" = "確認済みも表示";
+"Filter which alerts are listed" = "表示するアラートを絞り込みます";
+"Mark alerts as seen" = "アラートを確認済みにします";
+
+/* UI/AskView.swift */
+"Clear" = "消去";
+"Forget this conversation" = "この会話を破棄します";
+"Ask about your traffic" = "トラフィックについて質問";
+"Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer." = "Flowlight はこの Mac にある履歴から回答します。モデルが履歴を見ることはありません。モデルが呼び出せるのは決まった問い合わせだけで、実行した問い合わせは回答の下にすべて表示されます。";
+"Ask about this Mac's network activity" = "この Mac のネットワーク活動について質問";
+"Choose a provider…" = "プロバイダを選択…";
+"Working…" = "処理中…";
+"Open %@" = "%@ を開く";
+"Documentation" = "ドキュメント";
+"Who answers" = "回答する相手";
+"The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself." = "何も送信しない 2 つを先頭に置いています。これは偶然ではありません。アカウント不要・クラウド不要をうたうツールが、自分自身について答えるためにそのどちらかを必要とするのは筋が通らないからです。";
+"Provider" = "プロバイダ";
+"Model" = "モデル";
+"API key" = "API キー";
+"Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at." = "Flowlight の環境設定ではなく、ログインキーチェーンに保存されます。plist は自分の権限で動くあらゆるプログラムから読めてしまいます。まさにそういうものを指し示すために、このアプリはあります。";
+"Ask this" = "これを質問します";
+
+/* UI/CaptureView.swift */
+"Delete all recorded traffic, baselines and alerts?" = "記録したトラフィック・基準値・アラートをすべて削除しますか？";
+"Delete everything" = "すべて削除";
+"Install & Enable Filter" = "フィルタをインストールして有効にする";
+"Disable Filter" = "フィルタを無効にする";
+"Uninstall" = "アンインストール";
+"Refresh" = "更新";
+"Re-check the filter and reconnect to it" = "フィルタを再確認して接続し直します";
+"Try the Extension Again" = "機能拡張を再試行";
+"Stop sampling with nettop and reconnect to the filter extension" = "nettop でのサンプリングを止め、フィルタ機能拡張に接続し直します";
+"Flowlight reads " = "Flowlight は ";
+"/usr/bin/nettop" = "/usr/bin/nettop";
+" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics." = " を 1 秒ごとに読み取ります。特別な権限なしでプロセスごと・接続ごとのバイト数が得られ、プロトコルはポート番号から推定します。";
+"Database" = "データベース";
+"Reveal in Finder" = "Finder に表示";
+"Clear All Data…" = "すべてのデータを消去…";
+"Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner." = "過去 1 時間に観測した接続が対象です。優先順位は TLS のサーバ名、DNS の応答、逆引き DNS、ネットワーク所有者です。";
+"Remove Access…" = "アクセスを解除…";
+"See which sites your apps talk to" = "アプリがどのサイトと通信しているかを見る";
+"Without this, most traffic shows only an IP address or network owner." = "これがないと、ほとんどのトラフィックは IP アドレスかネットワーク所有者しか表示されません。";
+"Identify network owners when no hostname is available" = "ホスト名がない場合にネットワーク所有者を特定";
+"On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "デフォルトでオンです。パブリックな接続先 IP を Team Cymru の DNS サービスに送信します。オフにすると、この照会はこの Mac 内だけで行われます。";
+"Not Now" = "今はしない";
+"Enable Hostnames…" = "ホスト名を有効にする…";
+
+/* UI/CaptureWarning.swift */
+"The Network Extension can't capture on this Mac" = "この Mac ではネットワーク機能拡張でキャプチャできません";
+"Use the nettop Sampler" = "nettop サンプラーを使用";
+"Use the Network Extension" = "ネットワーク機能拡張を使用";
+
+/* UI/ContentView.swift */
+"See what's new and download the update" = "変更点を確認してアップデートをダウンロードします";
+"Capture source status — click to configure" = "キャプチャソースの状況 — クリックすると設定します";
+"Open the documentation for %@" = "%@ のドキュメントを開く";
+"Help" = "ヘルプ";
+"Error" = "エラー";
+"OK" = "OK";
+
+/* UI/DevicesView.swift */
+"Read the device list again now (⌘R)" = "デバイスのリストをいま読み直します（⌘R）";
+"Watch Bluetooth" = "Bluetooth を監視";
+"Watch USB and external storage" = "USB と外部ストレージを監視";
+"Channels" = "チャンネル";
+"Choose which channels Flowlight watches" = "Flowlight が監視するチャンネルを選びます";
+"Nothing but the network is being watched" = "ネットワーク以外は監視していません";
+"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Bluetooth と USB は、オンにするまで監視しません。どちらも Flowlight がすでに持っている以外の権限を必要とするものではありません。オフになっているのは、監視するとアプリが見る範囲が広がるからです。それはアップデートが勝手に決めることではなく、あなたが決めることです。\n\nどちらもバイト数は報告できません。macOS はこれらのチャンネルについてアプリごとの集計を行わないため、Flowlight が正直に示せるのは、何が接続されているか、どのアプリがそれを使うように作られているか、そしてそれがいつ変わったかです。";
+"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "これらのチャンネルにバイト数はありません。macOS は Bluetooth や USB についてアプリごとの集計を行わないため、ここに数値を出しても作り物になります。正直に示せるのは、何が接続されているか、どのアプリがそれを使うように作られているか、そしてそれがいつ変わったかです。";
+"This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it." = "これは各アプリが自身の Info.plist で宣言している内容です。Bluetooth を要求したアプリであって、macOS が実際に許可したアプリではありません。後者のリストはアプリから読めないデータベースにあるため、Flowlight はその違いをぼかさず書き分けています。";
+"How Flowlight recognises this device between sightings" = "検出をまたいでこのデバイスを識別する方法";
+
+/* UI/FocusView.swift */
+"Focus" = "フォーカス";
+"While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there." = "フォーカスがオンの間、どの画面もここに挙げたものだけを表示します。記録が止まることはありません。フォーカスをオフにすれば、残りもそのまま残っています。";
+"Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either." = "まだ何も選ばれていません。アプリ 1 つでもフォーカスになり、接続先 1 つでもフォーカスになります。両方を指定すると、どちらかに当てはまるものが対象です。";
+"Alerts name an app, not a destination, so this focus leaves the alert list alone." = "アラートはアプリを対象とし、接続先は対象としないため、このフォーカスはアラートのリストには影響しません。";
+"App" = "アプリ";
+"Destination" = "接続先";
+"Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here." = "ホスト名、ドメイン、または IP アドレスを入力します。ここでは 10.0.0.0/8 のような範囲は指定できません。";
+
+/* UI/GuardrailsPane.swift */
+"HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet." = "HTTPS インスペクションがオフのため、Flowlight はツールのリストを読み取れません。ここでの設定はまだ適用されていません。";
+"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "エージェントは毎ターン、ツールのリスト全体を送り直します。ここでツールをオフにすると、モデルが見る前にそのリストから外されます。そのため、拒否をめぐるやり取りも再試行の繰り返しも起きません。HTTP で接続する MCP サーバについては、拒否した呼び出しにもここで応答し、モデルが読める説明を返します。";
+"MCP servers" = "MCP サーバ";
+"never yet" = "まだ 1 度もなし";
+"Refuse a tool by name or pattern, e.g. write*" = "ツールを名前かパターンで拒否します（例: write*）";
+"This is not a sandbox." = "これはサンドボックスではありません。";
+"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "拒否したツールはモデルに提示されなくなり、呼び出しにも応答しなくなります。ただしシェルを使えるエージェントは、そのツールがしていたことを手作業で行えます。Flowlight はそれを記録できますが、止めることはできません。ローカルの MCP サーバはパイプで通信するため、どのプロキシからも見えません。そこで Flowlight ができるのは、そのサーバ自身のネットワーク通信を監視することです。その通信は起動したエージェントにすでに結び付けられており、エージェント自身の拒否リストを書き込むこともできます。";
+
+/* UI/Insights/BehaviourPanel.swift */
+"Nothing stands out" = "目立った変化はありません";
+
+/* UI/Insights/InsightsPanel.swift */
+"All traffic" = "すべてのトラフィック";
+"No traffic in this window" = "この期間にトラフィックはありません";
+"Received vs sent" = "受信と送信";
+"Network owner: no hostname was seen for this traffic" = "ネットワーク所有者: このトラフィックにはホスト名が見つかりませんでした";
+"Filter" = "絞り込み";
+
+/* UI/InspectView.swift */
+"Nothing inspected yet" = "まだ何もインスペクトしていません";
+"Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "システムのプロキシ設定に従うアプリ（ブラウザや多くの Mac アプリ）は、自動的にここに現れます。コマンドラインのエージェントは現れません。インスペクト用のターミナルの環境変数が必要です。";
+"Open Inspected Terminal" = "インスペクト用のターミナルを開く";
+"Check Setup" = "設定を確認";
+"Flowlight is answering some requests itself instead of forwarding them. Click to review the rules." = "Flowlight は一部のリクエストを転送せず、自身で応答しています。クリックするとルールを確認できます。";
+"A Terminal window whose agents and tools go through Flowlight" = "エージェントとツールが Flowlight を経由するターミナルウインドウ";
+"Setup…" = "設定…";
+"Mocked" = "モック済み";
+"Guarded" = "ガード済み";
+"Mock This Endpoint…" = "このエンドポイントをモック…";
+"Block This Endpoint…" = "このエンドポイントをブロック…";
+"HTTPS inspection" = "HTTPS インスペクション";
+"Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally." = "Flowlight を経由するアプリの HTTP リクエストとレスポンスをインスペクトします。対応しているモデルのツール呼び出しも含みます。Flowlight はローカルのプロキシと、この Mac 上で作成した証明書認証局を使います。インスペクションはデフォルトでオフで、記録したデータはこの Mac に保存されます。";
+"Turn on HTTPS inspection" = "HTTPS インスペクションをオンにする";
+"Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back." = "証明書を作成し、それを信頼するためにパスワードを 1 回確認したうえで、アプリの通信を Flowlight 経由にします。オフにすると元の状態に戻ります。";
+"Waiting for your password…" = "パスワードの入力を待っています…";
+"Command-line agents ignore system proxy settings; start them from this window instead" = "コマンドラインのエージェントはシステムのプロキシ設定を無視するため、このウインドウから起動してください";
+"Decrypt" = "復号の対象";
+"With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded." = "「AI エージェントのみ」の場合、ほかのアプリもプロキシを通りますが、暗号化されたまま通過し、記録されません。";
+"Never decrypted" = "復号しないホスト";
+"These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically." = "ここに挙げたホストとそのサブドメインは、常に暗号化されたまま通過します。証明書をピン留めしているアプリは自動的に検出され、そのまま通過します。";
+"bank.example" = "bank.example";
+"Restore Defaults" = "デフォルトに戻す";
+"Copy Shell Setup" = "シェル用の設定をコピー";
+"Environment variables that send one shell's tools through Flowlight" = "1 つのシェルのツールを Flowlight 経由にする環境変数";
+"Show Certificate in Finder" = "証明書を Finder に表示";
+"Remove Certificate & Recorded Data…" = "証明書と記録データを削除…";
+"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "記録したリクエストは 3 日間保持されます。API キーや Cookie などの認証情報ヘッダは保存されません。";
+"Advanced" = "詳細";
+"Mock responses" = "モック応答";
+"macOS will ask you twice" = "macOS が 2 回確認します";
+"Continue" = "続ける";
+"First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both." = "1 回目は Flowlight の証明書を信頼するため（Touch ID またはパスワード）、2 回目はアプリの通信をプロキシ経由にするための管理者パスワードです。インスペクションをオフにすると、どちらも元に戻ります。";
+"Remove HTTPS inspection?" = "HTTPS インスペクションを削除しますか？";
+"Remove" = "削除";
+"Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request." = "インスペクションをオフにし、証明書とその信頼設定を取り除き、記録したリクエストをすべて削除します。";
+"Mock This…" = "これをモック…";
+"Answer this endpoint from Flowlight instead of letting the request through" = "リクエストを通さず、このエンドポイントへの応答を Flowlight が返します";
+"Part" = "部分";
+"Request" = "リクエスト";
+"Response" = "レスポンス";
+
+/* UI/JSONTreeView.swift */
+"Switch to the raw view, where matches are highlighted" = "一致箇所がハイライトされる生データ表示に切り替えます";
+"View" = "表示形式";
+"Tree" = "ツリー";
+"Raw" = "生データ";
+"Copy the body (pretty-printed when it's JSON)" = "本文をコピーします（JSON の場合は整形します）";
+"Only the first 2 MB were kept." = "先頭の 2 MB のみ保持しています。";
+"Copy Value" = "値をコピー";
+"Copy Key" = "キーをコピー";
+"null" = "null";
+
+/* UI/LiveView.swift */
+"Last 2 minutes" = "過去 2 分";
+"Download" = "ダウンロード";
+"Upload" = "アップロード";
+"Show in Reports" = "レポートで表示";
+"Copy Bundle ID" = "バンドル ID をコピー";
+"Top talkers · average of the last 5 seconds" = "通信量の多いアプリ · 過去 5 秒の平均";
+"No app has sent or received data in the last few seconds." = "この数秒間にデータを送受信したアプリはありません。";
+"Waiting for traffic data" = "トラフィックデータを待っています";
+"Open Capture Settings" = "キャプチャの設定を開く";
+
+/* UI/MockRulesView.swift */
+"Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "リクエストをサーバに届けず、選んだエンドポイントに自分で応答します。500、レート制限、壊れた本文、長い待ち時間などを返して、エージェントがどう振る舞うかを確かめられます。";
+"Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule." = "モックできるのは、Flowlight が復号したリクエストだけです。トンネルされるホスト（復号しないホストのリスト、証明書をピン留めしているアプリ、プロキシを経由しない通信）は、ルールの対象になりません。";
+"HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet." = "HTTPS インスペクションがオフのため、何も復号されず、ルールが応答することもまだありません。";
+"No mock rules." = "モックルールはありません。";
+"Rules are tried from the top; the first enabled one that matches answers." = "ルールは上から順に照合され、最初に一致した有効なルールが応答します。";
+"Add Rule…" = "ルールを追加…";
+"Turn All Off" = "すべてオフにする";
+"Optional, e.g. “GitHub is down”" = "省略可（例: 「GitHub is down」）";
+"Host" = "ホスト";
+"api.example.com" = "api.example.com";
+"Exactly that host. Write *.example.com to cover the domain and its subdomains." = "そのホストだけに一致します。ドメインとそのサブドメインを含めるには *.example.com と書きます。";
+"Path" = "パス";
+"/v1/*" = "/v1/*";
+"A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?." = "グロブです。* は任意の長さの文字列に一致します。パターンに ? が含まれない限り、クエリ文字列は無視されます。";
+"Method" = "メソッド";
+"Delay" = "遅延";
+"seconds" = "秒";
+"One Name: value per line. Content-Length and Connection are written by Flowlight." = "1 行に「名前: 値」を 1 つ書きます。Content-Length と Connection は Flowlight が付けます。";
+"Body" = "本文";
+
+/* UI/ReportsView.swift */
+"Way out" = "出口";
+"Every way out" = "すべての出口";
+"Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel" = "Mac からの出口を 1 つに絞ります: ネットワーク、ピアツーピアの無線、この Mac 内、トンネル";
+"Time series (CSV)…" = "時系列（CSV）…";
+"Breakdown (CSV)…" = "内訳（CSV）…";
+"Export" = "書き出し";
+"Export the current report as CSV" = "現在のレポートを CSV で書き出します";
+"Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs." = "カバー率は、選択したレポート期間ではなく、過去 1 時間のすべてのトラフィックが対象です。名前のない IP は、共有ホスティングや CDN のものである場合があります。";
+"Measure" = "指標";
+"Group by" = "グループ化";
+"App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP、Destination › App › IP、または IP › App";
+"Choose a longer window or clear filters." = "より長い期間を選ぶか、絞り込みを解除してください。";
+"Back" = "戻る";
+"Return to the previous zoom level" = "1 つ前のズーム段階に戻ります";
+"Granularity" = "粒度";
+"Earlier (⌘[)" = "前へ（⌘[）";
+"Earlier" = "前へ";
+"Later (⌘])" = "次へ（⌘]）";
+"Later" = "次へ";
+"Now" = "現在";
+"Showing only:" = "絞り込み中:";
+"Click a bar to zoom in" = "バーをクリックすると拡大します";
+"Show Only This" = "これのみ表示";
+"Copy Hostname" = "ホスト名をコピー";
+
+/* UI/RuleEditor.swift */
+"Then" = "動作";
+"Block it" = "ブロックする";
+"Allow it" = "許可する";
+"What it names" = "対象とするもの";
+"Any app — or a name, or a bundle identifier" = "すべてのアプリ — または名前かバンドル識別子";
+"Anywhere — or a domain, an IP address, or a range" = "すべての接続先 — またはドメイン、IP アドレス、範囲";
+"A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started." = "ドメインはサブドメインも含みます。`example.com` は `api.example.com` にも一致します。エージェントを指定すると、そのエージェントが起動したツールと MCP サーバも対象になります。";
+"For how long" = "期間";
+"Lasts" = "有効期間";
+"Forever" = "無期限";
+"Until a time" = "指定した時刻まで";
+"Between chosen hours" = "指定した時間帯";
+"Gone when Flowlight quits, including a crash. Nothing is left behind in force." = "Flowlight を終了すると（クラッシュした場合も）なくなります。有効なまま残るものはありません。";
+"Any path — or /v1/*" = "すべてのパス — または /v1/*";
+"Answer with" = "応答するステータス";
+"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "パスで一致させられるのは、リクエストを読み取れる場合、つまり HTTPS インスペクションが有効な場合だけです。それがこの拒否のしかたを穏やかなものにもしています。エージェントは、理由もわからず切れた接続ではなく、読み取れるステータスを受け取れます。";
+"One URL rather than the whole host" = "ホスト全体ではなく 1 つの URL";
+"Name an app or a destination — a rule that names neither would decide every connection on the Mac." = "アプリか接続先を指定してください。どちらも指定しないルールは、この Mac のすべての接続を左右します。";
+" reaching " = " の接続先 ";
+" requests from " = " リクエスト、送信元 ";
+" to " = "、接続先 ";
+
+/* UI/RulesView.swift */
+"Templates" = "テンプレート";
+"Rules worth having, grouped by what they are for, with the hosts already written out" = "用意しておく価値のあるルールを用途別にまとめました。ホストはすでに書き込まれています";
+"Add Rule" = "ルールを追加";
+"Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "ルールを作成します。アプリ、エージェント、接続先、URL のいずれかを、ブロックまたは許可します";
+"Nothing is being refused. Click to start again now." = "現在、何も拒否していません。クリックするとすぐに再開します。";
+"10 minutes" = "10 分";
+"1 hour" = "1 時間";
+"Until I resume" = "再開するまで";
+"Pause Blocking" = "ブロックを一時停止";
+"Stand every rule down for a while, without deleting anything" = "何も削除せずに、すべてのルールをしばらく止めます";
+"Resume now" = "今すぐ再開";
+"No rules yet" = "ルールがありません";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "ルールは対象（アプリ、エージェント、接続先、URL）を指定し、ブロックか許可を決めます。ライブ、レポート、AI エージェント、インスペクトの行を右クリックすれば、いま見ているものについてルールを作れます。テンプレートから始めることもできます。パッケージのインストールがどのホストに接続するか、ファイルがどのホストから出ていくかは、すでに書かれています。";
+"Browse Templates…" = "テンプレートを見る…";
+"Write One…" = "作成する…";
+"Nothing yet" = "まだ何もありません";
+"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "ルールが判断した接続はすべてここに記録されます。拒否したものと、通過を許した例外の両方です。後者があることで、「なぜこれが通っているのか」に答えられる状態が保たれます。";
+"Edit…" = "編集…";
+"Reset Count" = "カウントをリセット";
+"Delete" = "削除";
+"Show the Rule…" = "ルールを表示…";
+"Everywhere" = "すべての接続先";
+"For the next hour" = "1 時間だけ";
+"For every app" = "すべてのアプリから";
+"Apply a Template" = "テンプレートを適用";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "どのテンプレートも、ふつうのルールをリストに書き込みます。ほかのルールと同じように、内容を読み、オフにし、削除できます。接続を拒否するのはネットワーク機能拡張の役目のため、キャプチャで nettop サンプラーを選んでいる場合は、実行ではなく監視にとどまります。";
+"Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "省略できます。空のままにするとこの Mac 全体に適用され、アプリを指定すると、そのアプリとそれが起動したツールだけに絞られます。";
+"A domain, an IP address, or a range" = "ドメイン、IP アドレス、または範囲";
+"Added" = "追加しました";
+"A name, or a bundle identifier" = "名前またはバンドル識別子";
+
+/* UI/SettingsView.swift */
+"Launch at login" = "ログイン時に起動";
+"Run in the background" = "バックグラウンドで実行";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Dock アイコンと Cmd-Tab の項目を表示しません。記録は続き、メニューバーから開けます。";
+"Show live rates in the menu bar" = "メニューバーに現在の速度を表示";
+"Show notifications for warnings" = "警告を通知で表示";
+"General" = "一般";
+"Z-score threshold" = "Z スコアのしきい値";
+"Learning period per app" = "アプリごとの学習期間";
+"Ignore hours below" = "これ未満の時間は無視";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "1 時間ごとのトラフィックと 1 日の接続先数を、アプリごとの移動基準値と比較します。";
 "First contact with a new domain" = "新しいドメインへの初回接続";
 "Connections to non-standard ports" = "非標準ポートへの接続";
 "Ignore Apple's own apps" = "Apple 純正アプリを除外";
-"Traffic without UI activity" = "操作のないトラフィック";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS は Apple と絶えず通信しています（アップデート、iCloud、プッシュ、時刻）。そのすべてを報告すると、本当に重要な 1 行が埋もれてしまいます。Apple のアプリのトラフィックも記録は続き、ライブとレポートには表示され、すべてのルールとガードレールの対象になります。";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "エージェントがメール・ファイル転送・SSH・トンネル・データベースを使用";
 "Agent connects to a raw IP on an unusual port" = "エージェントが異常なポートで生 IP に接続";
-"Agent active while you're away" = "離席中にエージェントが動作";
 "Uploads to non-AI hosts above" = "AI 以外のホストへの送信が";
+"Agent active while you're away" = "離席中にエージェントが動作";
 "Away after" = "離席とみなす時間";
-"Learning period per app" = "アプリごとの学習期間";
-"Z-score threshold" = "Z スコアのしきい値";
-"Ignore hours below" = "これ未満の時間は無視";
+"AI agents" = "AI エージェント";
+"Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours." = "エージェントには、Claude Code、Codex、Cursor などの認識済みツールと、既知の LLM API プロバイダに接続するブラウザ以外のアプリが含まれます。学習期間は 24 時間ではなく 1 時間です。";
+"Traffic without UI activity" = "操作のないトラフィック";
 "App idle for at least" = "アプリの未操作が";
 "Uploading more than" = "送信量が";
+"Detection" = "検出";
 "Keep per-second data" = "秒単位データの保持";
-"Launch at login" = "ログイン時に起動";
-"Run in the background" = "バックグラウンドで実行";
-"Show live rates in the menu bar" = "メニューバーに現在の速度を表示";
-"Show notifications for warnings" = "警告を通知で表示";
-"Check for updates automatically" = "自動的にアップデートを確認";
-"Check Now" = "今すぐ確認";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分単位の集計は 14 日、時間単位は 400 日、日単位は無期限で保持します。アラートは 90 日です。";
+"Storage" = "保存";
 "Open Flowlight" = "Flowlight を開く";
 "Show Dock Icon" = "Dock アイコンを表示";
-"Quit" = "終了";
 "Review Alerts…" = "アラートを確認…";
-"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Dock アイコンと Cmd-Tab の項目を表示しません。記録は続き、メニューバーから開けます。";
-"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "1 時間ごとのトラフィックと 1 日の接続先数を、アプリごとの移動基準値と比較します。";
-"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "分単位の集計は 14 日、時間単位は 400 日、日単位は無期限で保持します。アラートは 90 日です。";
+"Quit" = "終了";
+"Check for updates automatically" = "自動的にアップデートを確認";
 "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Flowlight は 1 日 1 回 GitHub に最新リリースを問い合わせます。送信されるのは IP アドレスと Flowlight のバージョンだけです。";
+"Check Now" = "今すぐ確認";
+"Language" = "言語";
+"System" = "システムに合わせる";
+"Now showing %@" = "現在の表示：%@";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "「システムに合わせる」にすると、インターフェイスは Mac の言語に従います。Flowlight が未翻訳の言語の場合は英語に戻ります。";
+
+/* UI/UpdateView.swift */
+"See what changed on GitHub" = "変更点を GitHub で確認します";
+"Skip This Version" = "このバージョンをスキップ";
+"View on GitHub" = "GitHub で見る";
+"Remind Me Later" = "あとで通知";
+"Open Disk Image" = "ディスクイメージを開く";
+"Install Later" = "あとでインストール";
+"Quit & Install" = "終了してインストール";
+"Check Again" = "もう一度確認";
+
+/* Common words kept for menus macOS builds itself. */
+"Edit" = "編集";
+"On" = "オン";
+"Save" = "保存";
+"Settings" = "設定";

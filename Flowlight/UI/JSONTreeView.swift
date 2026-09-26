@@ -29,22 +29,22 @@ struct BodyView: View {
                     Text(count == 0 ? "no match" : "\(count) matching \(count == 1 ? "line" : "lines")")
                         .font(.caption).foregroundStyle(count == 0 ? .secondary : Color.accentColor)
                     if count > 0, mode == "tree", isStructured {
-                        Button("Show") { mode = "raw" }
+                        Button(L("Show")) { mode = "raw" }
                             .controlSize(.small)
-                            .help("Switch to the raw view, where matches are highlighted")
+                            .help(L("Switch to the raw view, where matches are highlighted"))
                     }
                 }
                 Spacer()
                 if isStructured {
-                    Picker("View", selection: $mode) {
-                        Text("Tree").tag("tree")
-                        Text("Raw").tag("raw")
+                    Picker(L("View"), selection: $mode) {
+                        Text(L("Tree")).tag("tree")
+                        Text(L("Raw")).tag("raw")
                     }
                     .pickerStyle(.segmented).labelsHidden().frame(width: 120).controlSize(.small)
                 }
-                Button { copy() } label: { Label("Copy", systemImage: "doc.on.doc") }
+                Button { copy() } label: { Label(L("Copy"), systemImage: "doc.on.doc") }
                     .controlSize(.small)
-                    .help("Copy the body (pretty-printed when it's JSON)")
+                    .help(L("Copy the body (pretty-printed when it's JSON)"))
             }
             switch content {
             case .json(let value) where mode == "tree":
@@ -71,7 +71,7 @@ struct BodyView: View {
                 }
             }
             if truncated {
-                Label("Only the first 2 MB were kept.", systemImage: "scissors").font(.caption).foregroundStyle(.secondary)
+                Label(L("Only the first 2 MB were kept."), systemImage: "scissors").font(.caption).foregroundStyle(.secondary)
             }
         }
         .task(id: data) {
@@ -231,8 +231,8 @@ struct JSONNodeView: View {
             else if case .string = value { fullString.toggle() }
         }
         .contextMenu {
-            Button("Copy Value") { copy(value.isContainer ? value.pretty() : plain) }
-            if let key { Button("Copy Key") { copy(key) } }
+            Button(L("Copy Value")) { copy(value.isContainer ? value.pretty() : plain) }
+            if let key { Button(L("Copy Key")) { copy(key) } }
         }
     }
 
@@ -249,7 +249,7 @@ struct JSONNodeView: View {
         case .bool(let b):
             Text(b ? "true" : "false").foregroundStyle(Color(nsColor: .systemPurple))
         case .null:
-            Text("null").foregroundStyle(.tertiary)
+            Text(L("null")).foregroundStyle(.tertiary)
         }
     }
 

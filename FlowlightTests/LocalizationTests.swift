@@ -58,11 +58,17 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    /// Sample text a person is meant to type or recognise exactly: a header value and a list of example
+    /// patterns. They are placeholders, not sentences, so every language keeps them as they are — translating
+    /// `Bearer` would describe an HTTP scheme that doesn't exist.
+    private static let verbatim: Set<String> = ["Bearer …", "github.com, 10.0.0.0/8…"]
+
     func testNothingIsLeftInEnglishByAccident() throws {
         // A key whose translation equals the English is either untranslated or a word that genuinely doesn't
         // change. The second is real — "Slack", "Live" in German — so this only guards the obviously wrong case.
         let untranslatedChinese = try values(for: "zh-Hans").filter { key, value in
             key == value && key.count > 6 && key.rangeOfCharacter(from: .whitespaces) != nil
+                && !Self.verbatim.contains(key)
         }
         XCTAssertTrue(untranslatedChinese.isEmpty, "left in English in zh-Hans: \(untranslatedChinese.keys.sorted())")
     }

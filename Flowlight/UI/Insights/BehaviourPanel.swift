@@ -12,7 +12,7 @@ struct BehaviourPanel: View {
     var body: some View {
         if findings.isEmpty {
             ContentUnavailableView {
-                Label("Nothing stands out", systemImage: "checkmark.shield")
+                Label(L("Nothing stands out"), systemImage: "checkmark.shield")
             } description: {
                 Text("No app's destinations look unusual next to the others in \(period). "
                      + "This compares apps with each other, so it says nothing about traffic every app on this Mac shares.")

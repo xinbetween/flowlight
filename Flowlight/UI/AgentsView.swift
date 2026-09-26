@@ -50,11 +50,11 @@ struct AgentsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 if roomy {
-                    Text("Observed AI agent activity, including destinations outside each agent's model provider.")
+                    Text(L("Observed AI agent activity, including destinations outside each agent's model provider."))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Window", selection: $window) {
+                Picker(L("Window"), selection: $window) {
                     ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 280)
@@ -63,9 +63,9 @@ struct AgentsView: View {
             if roomy { tiles.fixedSize(horizontal: false, vertical: true) }
             if agents.isEmpty && loaded {
                 ContentUnavailableView {
-                    Label("No AI agents seen", systemImage: "sparkles")
+                    Label(L("No AI agents seen"), systemImage: "sparkles")
                 } description: {
-                    Text("Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider.")
+                    Text(L("Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider."))
                 }
                 .frame(maxHeight: .infinity)
             } else {
@@ -84,7 +84,7 @@ struct AgentsView: View {
             }
         }
         .padding()
-        .navigationTitle("AI Agents")
+        .navigationTitle(L("AI Agents"))
         .task(id: LoadKey(window: window, version: monitor.dataVersion, focus: focus.scope)) { await load() }
     }
 
@@ -143,7 +143,7 @@ struct AgentsView: View {
         }
         .contextMenu(forSelectionType: AgentSummary.ID.self) { ids in
             if let id = ids.first {
-                Button("Show Traffic in Reports") { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
+                Button(L("Show Traffic in Reports")) { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
                 FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 Divider()
                 RuleMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
@@ -187,7 +187,7 @@ struct RiskBadges: View {
     var body: some View {
         HStack(spacing: 4) {
             if agent.sensitiveProtocols.isEmpty && !agent.hasUnnamedHost && !agent.hasLargeUpload {
-                Text("None seen").font(.caption).foregroundStyle(.secondary)
+                Text(L("None seen")).font(.caption).foregroundStyle(.secondary)
             }
             ForEach(agent.sensitiveProtocols.prefix(3), id: \.self) { proto in
                 badge(proto.uppercased(), icon: icon(for: ProtocolCatalog.category(of: proto)), color: TrafficColors.anomaly)
@@ -198,7 +198,7 @@ struct RiskBadges: View {
             }
             if agent.hasUnnamedHost {
                 badge("Raw IP", icon: "questionmark.circle", color: .orange)
-                    .help("Connected to an address with no hostname")
+                    .help(L("Connected to an address with no hostname"))
             }
         }
     }
@@ -247,15 +247,15 @@ struct AllowlistStatus: View {
                     Label("\(violations) not allowed", systemImage: "xmark.octagon.fill")
                         .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
                 } else {
-                    Label("All allowed", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
+                    Label(L("All allowed"), systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
                 }
                 if policy.enforce {
                     Image(systemName: "shield.lefthalf.filled").font(.caption2).foregroundStyle(.orange)
-                        .help("Unlisted destinations are refused, not only reported")
+                        .help(L("Unlisted destinations are refused, not only reported"))
                 }
             }
         } else {
-            Text("Off").font(.caption).foregroundStyle(.secondary)
+            Text(L("Off")).font(.caption).foregroundStyle(.secondary)
         }
     }
 }
@@ -272,16 +272,16 @@ struct AllowlistEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Allowlist").font(.caption.bold()).foregroundStyle(.secondary)
-            Toggle("Only allow listed destinations", isOn: Binding(get: { policy.enabled }, set: { var p = policy; p.enabled = $0; save(p) }))
+            Text(L("Allowlist")).font(.caption.bold()).foregroundStyle(.secondary)
+            Toggle(L("Only allow listed destinations"), isOn: Binding(get: { policy.enabled }, set: { var p = policy; p.enabled = $0; save(p) }))
                 .font(.caption)
-            Toggle("Always allow its AI providers", isOn: Binding(get: { policy.allowAIProviders }, set: { var p = policy; p.allowAIProviders = $0; save(p) }))
+            Toggle(L("Always allow its AI providers"), isOn: Binding(get: { policy.allowAIProviders }, set: { var p = policy; p.allowAIProviders = $0; save(p) }))
                 .font(.caption)
                 .disabled(!policy.enabled)
             if monitor.canBlock {
                 // Turning this on is asked about; turning it off is not. Blocking is the change that can break
                 // the agent, and it is never what an existing allowlist did before the user said so here.
-                Toggle("Block connections that aren't allowed", isOn: Binding(
+                Toggle(L("Block connections that aren't allowed"), isOn: Binding(
                     get: { policy.enforce },
                     set: { on in
                         if on { confirmBlocking = true } else { var p = policy; p.enforce = false; save(p) }
@@ -289,8 +289,8 @@ struct AllowlistEditor: View {
                     .font(.caption)
                     .disabled(!policy.enabled)
                     .confirmationDialog("Let Flowlight block \(agentName)'s connections?", isPresented: $confirmBlocking) {
-                        Button("Block Unlisted Destinations") { var p = policy; p.enforce = true; save(p) }
-                        Button("Cancel", role: .cancel) {}
+                        Button(L("Block Unlisted Destinations")) { var p = policy; p.enforce = true; save(p) }
+                        Button(L("Cancel"), role: .cancel) {}
                     } message: {
                         Text("""
                         Until now this allowlist only raised alerts. From here on, anything \(agentName) or its tools \
@@ -321,11 +321,11 @@ struct AllowlistEditor: View {
                 .frame(minHeight: min(CGFloat(policy.patterns.count) * 18, 72), maxHeight: 90)
             }
             HStack(spacing: 4) {
-                TextField("github.com, 10.0.0.0/8…", text: $draft)
+                TextField(L("github.com, 10.0.0.0/8…"), text: $draft)
                     .textFieldStyle(.roundedBorder).font(.caption)
                     .onSubmit(add)
-                Button("Add", action: add).controlSize(.small).disabled(draft.isEmpty)
-                Menu("Presets") {
+                Button(L("Add"), action: add).controlSize(.small).disabled(draft.isEmpty)
+                Menu(L("Presets")) {
                     ForEach(AgentPolicy.presets) { preset in
                         Button(preset.name) { add(patterns: preset.patterns) }
                     }
@@ -396,7 +396,7 @@ struct AgentDetail: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     if !agent.tools.isEmpty || !toolCalls.isEmpty {
-                        Text("Tools & MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text(L("Tools & MCP servers")).font(.caption.bold()).foregroundStyle(.secondary)
                         ForEach(toolCalls.prefix(6)) { usage in
                             Button { tab = .calls } label: {
                                 HStack {
@@ -429,9 +429,9 @@ struct AgentDetail: View {
                         }
                         Divider().padding(.vertical, 2)
                     }
-                    Text("AI providers").font(.caption.bold()).foregroundStyle(.secondary)
+                    Text(L("AI providers")).font(.caption.bold()).foregroundStyle(.secondary)
                     if agent.providers.isEmpty {
-                        Text("None in this window").font(.caption).foregroundStyle(.secondary)
+                        Text(L("None in this window")).font(.caption).foregroundStyle(.secondary)
                     }
                     ForEach(agent.providers, id: \.name) { provider in
                         HStack {
@@ -453,18 +453,18 @@ struct AgentDetail: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         do {
-                            Picker("Show", selection: $tab) {
+                            Picker(L("Show"), selection: $tab) {
                                 Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
                                 Text(activity.isEmpty ? "Tool calls" : "Tool calls (\(activity.count))").tag(Tab.calls)
                                 Text(toolCount > 0 ? "Tools (\(toolCount))" : "Tools").tag(Tab.tools)
                                 let mcpCount = servers.count + unusedServers.count
                                 Text(mcpCount > 0 ? "MCP servers (\(mcpCount))" : "MCP servers").tag(Tab.servers)
-                                Text("Guardrails").tag(Tab.guardrails)
+                                Text(L("Guardrails")).tag(Tab.guardrails)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
                         }
                         Spacer()
-                        Button("Open in Reports") {
+                        Button(L("Open in Reports")) {
                             nav.showReport(filter: TrafficFilter(bundleID: agent.bundleID), granularity: window.granularity)
                         }
                         .controlSize(.small)
@@ -472,7 +472,7 @@ struct AgentDetail: View {
                     switch tab {
                     case .destinations:
                         if agent.otherDestinations.isEmpty {
-                            Text("Only AI providers. Nothing else was contacted.").font(.caption).foregroundStyle(.secondary)
+                            Text(L("Only AI providers. Nothing else was contacted.")).font(.caption).foregroundStyle(.secondary)
                         }
                         ScrollView {
                             VStack(spacing: 3) {
@@ -647,16 +647,16 @@ struct AgentDetail: View {
             Text(d.protocols.joined(separator: ", ") + (d.ports.isEmpty ? "" : " · " + d.ports))
                 .foregroundStyle(d.isSensitive ? TrafficColors.anomaly : .secondary).lineLimit(1)
             if !d.via.isEmpty {
-                Text("via " + d.via.prefix(2).joined(separator: ", "))
+                Text(L("via ") + d.via.prefix(2).joined(separator: ", "))
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(.quaternary, in: Capsule())
                     .lineLimit(1)
-                    .help("Opened by " + d.via.joined(separator: ", "))
+                    .help(L("Opened by ") + d.via.joined(separator: ", "))
             }
             Spacer()
             if policy.enabled && !d.isAllowed(by: policy) {
-                Text("Not allowed").font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
-                Button("Allow") {
+                Text(L("Not allowed")).font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
+                Button(L("Allow")) {
                     var p = policy
                     if !p.patterns.contains(d.allowPattern) { p.patterns.append(d.allowPattern) }
                     save(p)
@@ -746,9 +746,9 @@ struct ToolActivityRow: View {
 
     @ViewBuilder private var outcomeIcon: some View {
         switch activity.outcome {
-        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("Completed")
-        case .error: Image(systemName: "xmark.octagon.fill").foregroundStyle(TrafficColors.anomaly).help("The tool reported an error")
-        case .pending: Image(systemName: "circle.dotted").foregroundStyle(.secondary).help("No result seen yet")
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help(L("Completed"))
+        case .error: Image(systemName: "xmark.octagon.fill").foregroundStyle(TrafficColors.anomaly).help(L("The tool reported an error"))
+        case .pending: Image(systemName: "circle.dotted").foregroundStyle(.secondary).help(L("No result seen yet"))
         }
     }
 }
@@ -807,7 +807,7 @@ struct MCPServerRow: View {
                     .background(.quaternary, in: Capsule())
                     .help(kindHelp)
                 if server.authorized {
-                    Image(systemName: "key.fill").foregroundStyle(.secondary).help("The agent sent the provider a token for this server")
+                    Image(systemName: "key.fill").foregroundStyle(.secondary).help(L("The agent sent the provider a token for this server"))
                 }
                 Spacer()
                 if server.errors > 0 { Text("\(server.errors) failed").foregroundStyle(TrafficColors.anomaly) }
@@ -821,11 +821,11 @@ struct MCPServerRow: View {
                     .help(approval == "never" ? "The agent told the provider to run this server's tools without asking" : "")
             }
             if let allowed = server.allowedTools, !allowed.isEmpty {
-                Text("Allowed: " + allowed.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(2)
+                Text(L("Allowed: ") + allowed.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(2)
             }
             if !server.tools.isEmpty {
                 Text(toolList).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(3)
-                    .help("Tools this server offers; the ones with a count were called in this window")
+                    .help(L("Tools this server offers; the ones with a count were called in this window"))
             }
         }
         .font(.caption)
@@ -869,7 +869,7 @@ struct CapabilityRow: View {
                 HStack(spacing: 5) {
                     Text(capability.name).bold(capability.kind == .hook)
                     if capability.isProject {
-                        Text("project").padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
+                        Text(L("project")).padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
                     }
                 }
                 if let detail = capability.detail {
@@ -910,7 +910,7 @@ struct ConfiguredServerRow: View {
                 Text(server.url == nil ? "local" : "remote")
                     .padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
                 Spacer()
-                Text("configured, no calls seen").foregroundStyle(.secondary)
+                Text(L("configured, no calls seen")).foregroundStyle(.secondary)
             }
             Text(server.url?.absoluteString ?? ([server.command].compactMap { $0 } + server.args).joined(separator: " "))
                 .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -932,22 +932,22 @@ struct AgentSetupBar: View {
             if store.scanning {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Reading agent configuration…").foregroundStyle(.secondary)
+                    Text(L("Reading agent configuration…")).foregroundStyle(.secondary)
                 }
             } else if !store.hasScanned {
                 Text("Flowlight can also list what \(agent) is set up with: its skills, subagents, slash commands, hooks and MCP servers. It reads those config files on this Mac and keeps only their names; nothing is sent anywhere.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    Button("Look for agent configuration") { store.refresh(force: true) }
-                    Button("Why?") { openURL(Help.agentConfiguration) }.buttonStyle(.link)
+                    Button(L("Look for agent configuration")) { store.refresh(force: true) }
+                    Button(L("Why?")) { openURL(Help.agentConfiguration) }.buttonStyle(.link)
                 }
             } else {
                 HStack(spacing: 8) {
                     Text(summary).foregroundStyle(.secondary)
                     Spacer()
-                    if store.isStale { Text("out of date").foregroundStyle(.orange) }
-                    Button("Rescan") { store.refresh(force: true) }.controlSize(.small)
-                    Button("Add project folder…") { pickFolder() }.controlSize(.small)
+                    if store.isStale { Text(L("out of date")).foregroundStyle(.orange) }
+                    Button(L("Rescan")) { store.refresh(force: true) }.controlSize(.small)
+                    Button(L("Add project folder…")) { pickFolder() }.controlSize(.small)
                 }
                 if !store.roots.isEmpty {
                     ForEach(store.roots, id: \.self) { root in

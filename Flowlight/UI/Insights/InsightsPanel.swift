@@ -160,7 +160,7 @@ struct DonutCard: View {
     private var singleEntity: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let only = slices.first {
-                Text("All traffic").font(.caption).foregroundStyle(.secondary)
+                Text(L("All traffic")).font(.caption).foregroundStyle(.secondary)
                 Text(only.entity.label).font(.headline).lineLimit(1)
                 Text(ByteFormat.string(metric.value(only.counters))).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             } else {
@@ -186,7 +186,7 @@ struct TrendCard: View {
     var body: some View {
         GroupBox {
             if insight.trends.isEmpty {
-                Text("No traffic in this window").font(.caption).foregroundStyle(.secondary)
+                Text(L("No traffic in this window")).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -359,7 +359,7 @@ struct DirectionCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } label: {
-            Text("Received vs sent")
+            Text(L("Received vs sent"))
         }
         .frame(maxWidth: .infinity)
     }
@@ -394,7 +394,7 @@ struct EntityGlyph: View {
             if let path = entity.iconPath { AppIconView(path: path, size: 14) }
         case .owner:
             Image(systemName: "building.2").font(.caption2).foregroundStyle(.secondary)
-                .help("Network owner: no hostname was seen for this traffic")
+                .help(L("Network owner: no hostname was seen for this traffic"))
         case .unknownDestination:
             Image(systemName: "questionmark.circle").font(.caption2).foregroundStyle(.secondary)
         default:
@@ -422,7 +422,7 @@ struct EntityListView: View {
                 Text("\(insight.entityCount.formatted())").foregroundStyle(.secondary)
                 Spacer()
             }
-            TextField("Filter", text: $query).textFieldStyle(.roundedBorder)
+            TextField(L("Filter"), text: $query).textFieldStyle(.roundedBorder)
             List(rows) { slice in
                 Button { onSelect(slice.entity) } label: {
                     HStack(spacing: 6) {

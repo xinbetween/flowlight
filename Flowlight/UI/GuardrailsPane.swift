@@ -20,7 +20,7 @@ struct GuardrailsPane: View {
             LazyVStack(alignment: .leading, spacing: 10) {
                 explanation
                 if !monitor.inspection.enabled {
-                    Label("HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet.",
+                    Label(L("HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet."),
                           systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                 }
@@ -38,15 +38,13 @@ struct GuardrailsPane: View {
     }
 
     private var explanation: some View {
-        Text("An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list "
-             + "before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers "
-             + "reached over HTTP, a refused call is answered here too, with a sentence the model can read.")
+        Text(L("An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read."))
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
     private var presets: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Presets").font(.caption.bold()).foregroundStyle(.secondary)
+            Text(L("Presets")).font(.caption.bold()).foregroundStyle(.secondary)
             HStack {
                 ForEach(Guardrail.presets) { preset in
                     Button(preset.name) { store.save(Guardrail.preset(preset, agent: agentKey)) }
@@ -68,7 +66,7 @@ struct GuardrailsPane: View {
 
     private var serverList: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("MCP servers").font(.caption.bold()).foregroundStyle(.secondary)
+            Text(L("MCP servers")).font(.caption.bold()).foregroundStyle(.secondary)
             ForEach(servers, id: \.self) { server in
                 toggleRow(name: "", server: server, detail: "every tool on this server")
             }
@@ -118,7 +116,7 @@ struct GuardrailsPane: View {
                             Text("\(guardrail.hits) times · last \(last.formatted(.relative(presentation: .named)))")
                                 .font(.caption).foregroundStyle(.tertiary)
                         } else {
-                            Text("never yet").font(.caption).foregroundStyle(.tertiary)
+                            Text(L("never yet")).font(.caption).foregroundStyle(.tertiary)
                         }
                     }
                     Spacer()
@@ -131,10 +129,10 @@ struct GuardrailsPane: View {
 
     private var custom: some View {
         HStack {
-            TextField("Refuse a tool by name or pattern, e.g. write*", text: $typed)
+            TextField(L("Refuse a tool by name or pattern, e.g. write*"), text: $typed)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(add)
-            Button("Add", action: add).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button(L("Add"), action: add).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 
@@ -149,12 +147,8 @@ struct GuardrailsPane: View {
     /// still do by hand what the tool would have done. Flowlight reports that; it doesn't pretend to prevent it.
     private var limits: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label("This is not a sandbox.", systemImage: "info.circle").font(.caption.bold()).foregroundStyle(.secondary)
-            Text("A refused tool stops being offered to the model and stops being answered. An agent that still has a "
-                 + "shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. "
-                 + "Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the "
-                 + "server's own network traffic, which is already attributed to the agent that started it, and offer to "
-                 + "write the agent's own deny list.")
+            Label(L("This is not a sandbox."), systemImage: "info.circle").font(.caption.bold()).foregroundStyle(.secondary)
+            Text(L("A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if !mine.isEmpty {
                 DenyListOffer(agent: agentName, guardrails: mine)

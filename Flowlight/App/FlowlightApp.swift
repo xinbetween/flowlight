@@ -65,7 +65,7 @@ struct FlowlightApp: App {
         .commands {
             SidebarCommands()
             CommandGroup(replacing: .appInfo) {
-                Button("About Flowlight") { AboutPanel.show() }
+                Button(L("About Flowlight")) { AboutPanel.show() }
             }
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesButton().environmentObject(updater)
@@ -75,13 +75,13 @@ struct FlowlightApp: App {
                 // about rules, not the top of a page they then have to search.
                 Button(L("Help for %@", nav.selection.title)) { NSWorkspace.shared.open(Help.forScreen(nav.selection)) }
                     .keyboardShortcut("?", modifiers: .command)
-                Button("Flowlight Help") { NSWorkspace.shared.open(Help.base) }
-                Button("Questions & Answers") { NSWorkspace.shared.open(Help.faq) }
+                Button(L("Flowlight Help")) { NSWorkspace.shared.open(Help.base) }
+                Button(L("Questions & Answers")) { NSWorkspace.shared.open(Help.faq) }
                 Divider()
-                Button("What Flowlight Reads on This Mac") { NSWorkspace.shared.open(Help.agentConfiguration) }
-                Button("Privacy") { NSWorkspace.shared.open(Help.privacy) }
+                Button(L("What Flowlight Reads on This Mac")) { NSWorkspace.shared.open(Help.agentConfiguration) }
+                Button(L("Privacy")) { NSWorkspace.shared.open(Help.privacy) }
                 Divider()
-                Button("Report an Issue") { NSWorkspace.shared.open(Help.issues) }
+                Button(L("Report an Issue")) { NSWorkspace.shared.open(Help.issues) }
             }
             CommandGroup(before: .sidebar) {
                 ForEach(SidebarItem.allCases) { item in
@@ -158,7 +158,7 @@ struct CheckForUpdatesButton: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Check for Updates…") {
+        Button(L("Check for Updates…")) {
             openWindow(id: "update")
             NSApp.activate()
             Task { await updater.check(userInitiated: true) }

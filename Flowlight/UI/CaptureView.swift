@@ -40,14 +40,14 @@ struct CaptureView: View {
             .padding(Measure.gutter)
             .measured()
         }
-        .navigationTitle("Capture")
+        .navigationTitle(L("Capture"))
         // The one thing worth a trip to this screen to find out — what is feeding the app right now — said in the
         // title bar, so it can be read from any other screen's neighbour.
         .navigationSubtitle(subtitle)
         // Which other content filters exist decides whether ours can work at all, so it's read when the screen opens.
         .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
-        .confirmationDialog("Delete all recorded traffic, baselines and alerts?", isPresented: $confirmClear) {
-            Button("Delete everything", role: .destructive) { monitor.clearAllData() }
+        .confirmationDialog(L("Delete all recorded traffic, baselines and alerts?"), isPresented: $confirmClear) {
+            Button(L("Delete everything"), role: .destructive) { monitor.clearAllData() }
         }
     }
 
@@ -170,22 +170,22 @@ struct CaptureView: View {
 
     private var extensionButtons: some View {
         HStack(spacing: 8) {
-            Button("Install & Enable Filter") { extensionManager.activate() }
+            Button(L("Install & Enable Filter")) { extensionManager.activate() }
                 .disabled(extensionManager.blocker != nil)
-            Button("Disable Filter") { extensionManager.setFilterEnabled(false) }
+            Button(L("Disable Filter")) { extensionManager.setFilterEnabled(false) }
                 .disabled(extensionManager.state != .enabled)
-            Button("Uninstall") { extensionManager.deactivate() }
+            Button(L("Uninstall")) { extensionManager.deactivate() }
                 .disabled(!extensionManager.hasEntitlement)
-            Button("Refresh") {
+            Button(L("Refresh")) {
                 extensionManager.refresh()
                 // Also redial the extension: reloading its settings tells you nothing about whether the app can
                 // actually reach it, which is the part that looked broken.
                 monitor.reconnectSource()
             }
-            .help("Re-check the filter and reconnect to it")
+            .help(L("Re-check the filter and reconnect to it"))
             if monitor.extensionFellBack {
-                Button("Try the Extension Again") { monitor.reconnectSource() }
-                    .help("Stop sampling with nettop and reconnect to the filter extension")
+                Button(L("Try the Extension Again")) { monitor.reconnectSource() }
+                    .help(L("Stop sampling with nettop and reconnect to the filter extension"))
             }
             Spacer(minLength: 0)
         }
@@ -253,10 +253,9 @@ struct CaptureView: View {
     /// What the sampler costs, under the sampler.
     private var samplerNotes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            (Text("Flowlight reads ").font(.caption)
-             + Text("/usr/bin/nettop").font(.caption.monospaced())
-             + Text(" once per second. You get per-process, per-connection byte counts with no entitlements, and "
-                    + "protocols from port heuristics.").font(.caption))
+            (Text(L("Flowlight reads ")).font(.caption)
+             + Text(L("/usr/bin/nettop")).font(.caption.monospaced())
+             + Text(L(" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.")).font(.caption))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
@@ -279,7 +278,7 @@ struct CaptureView: View {
                 HStack(alignment: .top, spacing: 12) {
                     CaptureGlyph(symbol: "internaldrive", tint: .secondary)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Database").font(.body.weight(.medium))
+                        Text(L("Database")).font(.body.weight(.medium))
                         Text(monitor.db.url.path)
                             .font(.caption.monospaced()).foregroundStyle(.secondary)
                             .textSelection(.enabled)
@@ -287,9 +286,9 @@ struct CaptureView: View {
                     }
                 }
                 HStack(spacing: 8) {
-                    Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([monitor.db.url]) }
+                    Button(L("Reveal in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([monitor.db.url]) }
                     Spacer(minLength: 8)
-                    Button("Clear All Data…", role: .destructive) { confirmClear = true }
+                    Button(L("Clear All Data…"), role: .destructive) { confirmClear = true }
                 }
                 .controlSize(.small)
             }
@@ -324,8 +323,7 @@ struct HostnameSection: View {
                 figure("Named or owner known", monitor.coverage.owned)
                 Spacer(minLength: 0)
             }
-            Text("Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, "
-                 + "reverse DNS, network owner.")
+            Text(L("Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner."))
                 .font(.caption).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -356,7 +354,7 @@ struct HostnameSection: View {
                     Text(statusText).font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     if monitor.captureState != .noPermission, CaptureAccess.isInstalled {
-                        Button("Remove Access…") { run(.uninstall) }
+                        Button(L("Remove Access…")) { run(.uninstall) }
                             .controlSize(.small).disabled(working)
                     }
                 }
@@ -464,8 +462,8 @@ struct CaptureOnboardingView: View {
                 Image(systemName: "network.badge.shield.half.filled")
                     .font(.system(size: 38)).foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("See which sites your apps talk to").font(.title2.bold())
-                    Text("Without this, most traffic shows only an IP address or network owner.")
+                    Text(L("See which sites your apps talk to")).font(.title2.bold())
+                    Text(L("Without this, most traffic shows only an IP address or network owner."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -479,8 +477,8 @@ struct CaptureOnboardingView: View {
 
             Toggle(isOn: $ownerLookup) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Identify network owners when no hostname is available")
-                    Text("On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac.")
+                    Text(L("Identify network owners when no hostname is available"))
+                    Text(L("On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -488,11 +486,11 @@ struct CaptureOnboardingView: View {
             if let message { Text(message).font(.callout).foregroundStyle(.secondary) }
 
             HStack {
-                Button("Not Now") { monitor.dismissCaptureOnboarding() }
+                Button(L("Not Now")) { monitor.dismissCaptureOnboarding() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 if working { ProgressView().controlSize(.small) }
-                Button("Enable Hostnames…") {
+                Button(L("Enable Hostnames…")) {
                     working = true
                     DispatchQueue.main.async {
                         message = monitor.performCaptureSetup(.install)

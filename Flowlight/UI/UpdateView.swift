@@ -22,7 +22,7 @@ struct UpdateView: View {
                     if ReleaseNotes.isEmpty(release.notes) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("No release notes were published for \(release.version).")
-                            Button("See what changed on GitHub") { NSWorkspace.shared.open(release.pageURL) }
+                            Button(L("See what changed on GitHub")) { NSWorkspace.shared.open(release.pageURL) }
                                 .buttonStyle(.link)
                         }
                         .foregroundStyle(.secondary)
@@ -51,18 +51,18 @@ struct UpdateView: View {
 
             HStack {
                 if case .available(let release) = updater.state {
-                    Button("Skip This Version") { updater.skip(release); dismissWindow(id: "update") }
+                    Button(L("Skip This Version")) { updater.skip(release); dismissWindow(id: "update") }
                     Spacer()
-                    Button("View on GitHub") { NSWorkspace.shared.open(release.pageURL) }
-                    Button("Remind Me Later") { dismissWindow(id: "update") }
-                    Button("Download") { updater.download(release) }
+                    Button(L("View on GitHub")) { NSWorkspace.shared.open(release.pageURL) }
+                    Button(L("Remind Me Later")) { dismissWindow(id: "update") }
+                    Button(L("Download")) { updater.download(release) }
                         .keyboardShortcut(.defaultAction)
                         .disabled(isDownloading)
                 } else if case .ready(let release, let dmg) = updater.state {
-                    Button("Open Disk Image") { updater.openDiskImage() }
+                    Button(L("Open Disk Image")) { updater.openDiskImage() }
                     Spacer()
-                    Button("Install Later") { dismissWindow(id: "update") }
-                    Button("Quit & Install") { updater.installAndRelaunch(release, dmg: dmg) }
+                    Button(L("Install Later")) { dismissWindow(id: "update") }
+                    Button(L("Quit & Install")) { updater.installAndRelaunch(release, dmg: dmg) }
                         .keyboardShortcut(.defaultAction)
                 } else if case .installing = updater.state {
                     Spacer()
@@ -73,11 +73,11 @@ struct UpdateView: View {
                     Spacer()
                 } else {
                     if updater.downloadedDMG != nil {
-                        Button("Open Disk Image") { updater.openDiskImage() }
+                        Button(L("Open Disk Image")) { updater.openDiskImage() }
                     }
                     Spacer()
-                    Button("Check Again") { Task { await updater.check(userInitiated: true) } }
-                    Button("OK") { dismissWindow(id: "update") }.keyboardShortcut(.defaultAction)
+                    Button(L("Check Again")) { Task { await updater.check(userInitiated: true) } }
+                    Button(L("OK")) { dismissWindow(id: "update") }.keyboardShortcut(.defaultAction)
                 }
             }
 

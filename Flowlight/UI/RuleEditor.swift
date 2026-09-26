@@ -19,31 +19,30 @@ struct RuleEditor: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Form {
-                Picker("Then", selection: $rule.action) {
-                    Text("Block it").tag(Rule.Action.block)
-                    Text("Allow it").tag(Rule.Action.allow)
+                Picker(L("Then"), selection: $rule.action) {
+                    Text(L("Block it")).tag(Rule.Action.block)
+                    Text(L("Allow it")).tag(Rule.Action.allow)
                 }
                 .pickerStyle(.segmented)
 
-                Section("What it names") {
-                    TextField("App", text: $rule.app, prompt: Text("Any app — or a name, or a bundle identifier"))
+                Section(L("What it names")) {
+                    TextField(L("App"), text: $rule.app, prompt: Text(L("Any app — or a name, or a bundle identifier")))
                         .onChange(of: rule.app) { _, new in appQuery = new }
                     if !rule.app.isEmpty, !matchedApps.isEmpty, !exactlyNamed {
                         appSuggestions
                     }
-                    TextField("Destination", text: $rule.destination,
-                              prompt: Text("Anywhere — or a domain, an IP address, or a range"))
-                    Text("A domain carries its subdomains with it: `example.com` covers `api.example.com`. "
-                         + "Naming an agent covers the tools and MCP servers it started.")
+                    TextField(L("Destination"), text: $rule.destination,
+                              prompt: Text(L("Anywhere — or a domain, an IP address, or a range")))
+                    Text(L("A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
 
-                Section("For how long") {
-                    Picker("Lasts", selection: $rule.schedule.kind) {
-                        Text("Forever").tag(Rule.Schedule.Kind.always)
-                        Text("Until a time").tag(Rule.Schedule.Kind.until)
-                        Text("Until Flowlight quits").tag(Rule.Schedule.Kind.session)
-                        Text("Between chosen hours").tag(Rule.Schedule.Kind.window)
+                Section(L("For how long")) {
+                    Picker(L("Lasts"), selection: $rule.schedule.kind) {
+                        Text(L("Forever")).tag(Rule.Schedule.Kind.always)
+                        Text(L("Until a time")).tag(Rule.Schedule.Kind.until)
+                        Text(L("Until Flowlight quits")).tag(Rule.Schedule.Kind.session)
+                        Text(L("Between chosen hours")).tag(Rule.Schedule.Kind.window)
                     }
                     .onChange(of: rule.schedule.kind) { _, kind in
                         if kind == .until, rule.schedule.until == nil {
@@ -68,7 +67,7 @@ struct RuleEditor: View {
                                + "and a window closing stops new connections — it doesn't tear down ones already open.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     case .session:
-                        Text("Gone when Flowlight quits, including a crash. Nothing is left behind in force.")
+                        Text(L("Gone when Flowlight quits, including a crash. Nothing is left behind in force."))
                             .font(.caption).foregroundStyle(.secondary)
                     case .always:
                         EmptyView()
@@ -77,27 +76,25 @@ struct RuleEditor: View {
 
                 Section {
                     DisclosureGroup(isExpanded: $showAdvanced) {
-                        TextField("Path", text: $rule.path, prompt: Text("Any path — or /v1/*"))
-                        Picker("Method", selection: $rule.method) {
+                        TextField(L("Path"), text: $rule.path, prompt: Text(L("Any path — or /v1/*")))
+                        Picker(L("Method"), selection: $rule.method) {
                             ForEach(MockRule.methods, id: \.self) { method in
                                 Text(method).tag(method == "ANY" ? "" : method)
                             }
                         }
                         if rule.action == .block {
-                            Picker("Answer with", selection: $rule.status) {
+                            Picker(L("Answer with"), selection: $rule.status) {
                                 ForEach([403, 401, 404, 429, 451, 500, 503], id: \.self) { code in
                                     Text("\(code) \(MockRule.reason(code))").tag(code)
                                 }
                             }
                         }
-                        Text("A path can only be matched where the request can be read, which is HTTPS inspection. "
-                             + "That is also what makes this the friendlier refusal: the agent gets a status it can "
-                             + "read instead of a connection that died without saying why.")
+                        Text(L("A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why."))
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     } label: {
                         // The summary a closed row earns: what is set in there, rather than only the offer to look.
                         HStack(spacing: 6) {
-                            Text("One URL rather than the whole host")
+                            Text(L("One URL rather than the whole host"))
                             if !advancedSummary.isEmpty {
                                 Text(advancedSummary).font(.caption.monospaced()).foregroundStyle(.secondary)
                                     .lineLimit(1).truncationMode(.middle)
@@ -107,19 +104,19 @@ struct RuleEditor: View {
                 }
 
                 Section {
-                    TextField("Name", text: $rule.name, prompt: Text(rule.title))
+                    TextField(L("Name"), text: $rule.name, prompt: Text(rule.title))
                 }
             }
             .formStyle(.grouped)
 
             HStack {
                 if !rule.isComplete {
-                    Label("Name an app or a destination — a rule that names neither would decide every connection on the Mac.",
+                    Label(L("Name an app or a destination — a rule that names neither would decide every connection on the Mac."),
                           systemImage: "exclamationmark.circle")
                         .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(isNew ? "Add" : "Save") {
                     save(rule)
                     dismiss()
@@ -177,10 +174,10 @@ struct RuleEditor: View {
         let when = rule.schedule.describe(at: Date(), session: RuleStore.session)
         let tail = Text(" \(when == "Always" ? "Always" : when).").foregroundStyle(.secondary)
         if rule.method.isEmpty {
-            return Text("\(verb) ") + who + Text(" reaching ") + target + Text(".") + tail
+            return Text("\(verb) ") + who + Text(L(" reaching ")) + target + Text(".") + tail
         }
-        return Text("\(verb) ") + code(rule.method.uppercased()) + Text(" requests from ") + who
-            + Text(" to ") + target + Text(".") + tail
+        return Text("\(verb) ") + code(rule.method.uppercased()) + Text(L(" requests from ")) + who
+            + Text(L(" to ")) + target + Text(".") + tail
     }
 
     private func code(_ string: String) -> Text {

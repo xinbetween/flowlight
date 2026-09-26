@@ -37,11 +37,10 @@ private struct InspectContent: View {
                 statusBar
                 if exchanges.isEmpty {
                     ContentUnavailableView {
-                        Label("Nothing inspected yet", systemImage: "lock.open.display")
+                        Label(L("Nothing inspected yet"), systemImage: "lock.open.display")
                     } description: {
                         VStack(spacing: 10) {
-                            Text("Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. "
-                                 + "Command-line agents don't: they need the environment from an inspected Terminal.")
+                            Text(L("Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal."))
                             if let diagnosis = inspection.diagnosis {
                                 Text(diagnosis)
                                     .font(.callout)
@@ -51,8 +50,8 @@ private struct InspectContent: View {
                         }
                         .frame(maxWidth: 460)
                     } actions: {
-                        Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
-                        Button("Check Setup") { Task { await inspection.checkSetup() } }
+                        Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
+                        Button(L("Check Setup")) { Task { await inspection.checkSetup() } }
                     }
                     .frame(maxHeight: .infinity)
                     .task { if inspection.diagnosis == nil { await inspection.checkSetup() } }
@@ -66,7 +65,7 @@ private struct InspectContent: View {
             }
         }
         .padding()
-        .navigationTitle("Inspect")
+        .navigationTitle(L("Inspect"))
         // Inspection is off by default, so an empty list means either "nothing happened" or "nothing is being
         // decrypted". Only one of those is worth acting on.
         .navigationSubtitle(inspection.enabled ? (inspection.running ? "Decrypting · \(exchanges.count) shown"
@@ -114,17 +113,17 @@ private struct InspectContent: View {
                           systemImage: "wand.and.stars")
                 }
                 .buttonStyle(.plain).font(.callout.bold()).foregroundStyle(.purple)
-                .help("Flowlight is answering some requests itself instead of forwarding them. Click to review the rules.")
+                .help(L("Flowlight is answering some requests itself instead of forwarding them. Click to review the rules."))
             }
             Spacer()
-            Picker("Window", selection: $window) {
+            Picker(L("Window"), selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
             if !DemoData.isEnabled {
-                Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
-                    .help("A Terminal window whose agents and tools go through Flowlight")
-                Button("Setup…") { openMocks = false; showSetup = true }
+                Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
+                    .help(L("A Terminal window whose agents and tools go through Flowlight"))
+                Button(L("Setup…")) { openMocks = false; showSetup = true }
             }
         }
     }
@@ -162,12 +161,12 @@ private struct InspectContent: View {
                         HStack(spacing: 5) {
                             Text("\(e.method) \(e.host)").lineLimit(1)
                             if e.mockRule != nil {
-                                Label("Mocked", systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(.purple)
+                                Label(L("Mocked"), systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(.purple)
                                     .labelStyle(.titleAndIcon)
                                     .help("Flowlight answered this itself; the request never reached \(e.host)")
                             }
                             if let guardrail = e.guardrail {
-                                Label("Guarded", systemImage: "shield.lefthalf.filled").font(.caption2.bold())
+                                Label(L("Guarded"), systemImage: "shield.lefthalf.filled").font(.caption2.bold())
                                     .foregroundStyle(.teal).labelStyle(.titleAndIcon)
                                     .help("A guardrail changed this request before it left: \(guardrail)")
                             }
@@ -198,11 +197,11 @@ private struct InspectContent: View {
         }
         .contextMenu(forSelectionType: HTTPExchange.ID.self) { ids in
             if !DemoData.isEnabled, let id = ids.first, let e = exchanges.first(where: { $0.id == id }), e.note == nil {
-                Button("Mock This Endpoint…") { mockDraft = MockRule(mocking: e) }
+                Button(L("Mock This Endpoint…")) { mockDraft = MockRule(mocking: e) }
                 Divider()
                 // Inspect is the one screen that can offer a URL rather than a whole host, because it is the one
                 // place the path was ever visible.
-                Button("Block This Endpoint…") {
+                Button(L("Block This Endpoint…")) {
                     var rule = RuleStore.block(app: e.bundleID, destination: e.host,
                                                name: "Block \(e.method) \(e.host)\(e.path.split(separator: "?").first.map(String.init) ?? "")")
                     rule.path = e.path.split(separator: "?").first.map(String.init) ?? "/"
@@ -242,8 +241,8 @@ private struct InspectionSetup: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "lock.open.display").font(.system(size: 34)).foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("HTTPS inspection").font(.title2.bold())
-                    Text("Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally.")
+                    Text(L("HTTPS inspection")).font(.title2.bold())
+                    Text(L("Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally."))
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -254,8 +253,8 @@ private struct InspectionSetup: View {
                         if wanted { confirmTurnOn = true } else { inspection.setEnabled(false) }
                     })) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Turn on HTTPS inspection").font(.headline)
-                            Text("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back.")
+                            Text(L("Turn on HTTPS inspection")).font(.headline)
+                            Text(L("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back."))
                                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -265,7 +264,7 @@ private struct InspectionSetup: View {
                     if inspection.working {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
-                            Text("Waiting for your password…").font(.caption).foregroundStyle(.secondary)
+                            Text(L("Waiting for your password…")).font(.caption).foregroundStyle(.secondary)
                         }
                     } else if inspection.enabled {
                         VStack(alignment: .leading, spacing: 4) {
@@ -276,10 +275,10 @@ private struct InspectionSetup: View {
                         }
                         .font(.caption)
                         HStack {
-                            Button("Open Inspected Terminal") { inspection.openInspectedTerminal() }
-                                .help("Command-line agents ignore system proxy settings; start them from this window instead")
+                            Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
+                                .help(L("Command-line agents ignore system proxy settings; start them from this window instead"))
                             Spacer()
-                            Button("Done") { done() }.keyboardShortcut(.defaultAction)
+                            Button(L("Done")) { done() }.keyboardShortcut(.defaultAction)
                         }
                     }
                 }
@@ -294,16 +293,16 @@ private struct InspectionSetup: View {
 
             DisclosureGroup(isExpanded: $showAdvanced) {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker("Decrypt", selection: Binding(get: { inspection.scope }, set: { inspection.scope = $0 })) {
+                    Picker(L("Decrypt"), selection: Binding(get: { inspection.scope }, set: { inspection.scope = $0 })) {
                         ForEach(InspectionController.Scope.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.radioGroup)
-                    Text("With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded.")
+                    Text(L("With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Never decrypted").font(.caption.bold()).foregroundStyle(.secondary)
-                        Text("These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically.")
+                        Text(L("Never decrypted")).font(.caption.bold()).foregroundStyle(.secondary)
+                        Text(L("These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically."))
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6, alignment: .leading)], alignment: .leading, spacing: 6) {
                             ForEach(inspection.neverInspect, id: \.self) { pattern in
@@ -320,35 +319,35 @@ private struct InspectionSetup: View {
                             }
                         }
                         HStack {
-                            TextField("bank.example", text: $newPattern).textFieldStyle(.roundedBorder).frame(maxWidth: 260)
+                            TextField(L("bank.example"), text: $newPattern).textFieldStyle(.roundedBorder).frame(maxWidth: 260)
                                 .onSubmit(add)
-                            Button("Add", action: add).disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
+                            Button(L("Add"), action: add).disabled(newPattern.trimmingCharacters(in: .whitespaces).isEmpty)
                             Spacer()
-                            Button("Restore Defaults") { inspection.neverInspect = InspectionController.defaultNeverInspect }
+                            Button(L("Restore Defaults")) { inspection.neverInspect = InspectionController.defaultNeverInspect }
                         }
                     }
 
                     HStack {
-                        Button("Copy Shell Setup") { inspection.copyShellSetup() }
-                            .help("Environment variables that send one shell's tools through Flowlight")
-                        Button("Show Certificate in Finder") { inspection.revealCertificate() }.disabled(!inspection.caExists)
+                        Button(L("Copy Shell Setup")) { inspection.copyShellSetup() }
+                            .help(L("Environment variables that send one shell's tools through Flowlight"))
+                        Button(L("Show Certificate in Finder")) { inspection.revealCertificate() }.disabled(!inspection.caExists)
                         Spacer()
-                        Button("Remove Certificate & Recorded Data…", role: .destructive) { confirmRemove = true }
+                        Button(L("Remove Certificate & Recorded Data…"), role: .destructive) { confirmRemove = true }
                             .disabled(!inspection.caExists)
                     }
-                    Text("Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored.")
+                    Text(L("Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 10)
             } label: {
-                Text("Advanced").font(.headline)
+                Text(L("Advanced")).font(.headline)
             }
 
             DisclosureGroup(isExpanded: $showMocks) {
                 MockRulesSection(inspection: inspection).padding(.top, 10)
             } label: {
                 HStack(spacing: 8) {
-                    Text("Mock responses").font(.headline)
+                    Text(L("Mock responses")).font(.headline)
                     if inspection.activeMockRules > 0 {
                         Label(inspection.activeMockRules == 1 ? "1 on" : "\(inspection.activeMockRules) on", systemImage: "wand.and.stars")
                             .font(.caption.bold()).foregroundStyle(.purple)
@@ -357,16 +356,16 @@ private struct InspectionSetup: View {
             }
         }
         .measured(Measure.prose)
-        .confirmationDialog("macOS will ask you twice", isPresented: $confirmTurnOn) {
-            Button("Continue") { inspection.setEnabled(true) }
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog(L("macOS will ask you twice"), isPresented: $confirmTurnOn) {
+            Button(L("Continue")) { inspection.setEnabled(true) }
+            Button(L("Cancel"), role: .cancel) {}
         } message: {
-            Text("First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both.")
+            Text(L("First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both."))
         }
-        .confirmationDialog("Remove HTTPS inspection?", isPresented: $confirmRemove) {
-            Button("Remove", role: .destructive) { inspection.removeEverything() }
+        .confirmationDialog(L("Remove HTTPS inspection?"), isPresented: $confirmRemove) {
+            Button(L("Remove"), role: .destructive) { inspection.removeEverything() }
         } message: {
-            Text("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request.")
+            Text(L("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request."))
         }
         .onAppear { inspection.refreshStatus(); showMocks = showMocks || openMocks }
     }
@@ -406,8 +405,8 @@ private struct ExchangeDetail: View {
                 HStack(spacing: 8) {
                     Text(subtitle).font(.caption).foregroundStyle(.secondary)
                     if let mockThis, exchange.note == nil, exchange.mockRule == nil {
-                        Button("Mock This…", action: mockThis).buttonStyle(.link).font(.caption)
-                            .help("Answer this endpoint from Flowlight instead of letting the request through")
+                        Button(L("Mock This…"), action: mockThis).buttonStyle(.link).font(.caption)
+                            .help(L("Answer this endpoint from Flowlight instead of letting the request through"))
                     }
                 }
             }
@@ -494,9 +493,9 @@ private struct ExchangeDetail: View {
                     .padding(4)
                 }
             }
-            Picker("Part", selection: $tab) {
-                Text("Request").tag(0)
-                Text("Response").tag(1)
+            Picker(L("Part"), selection: $tab) {
+                Text(L("Request")).tag(0)
+                Text(L("Response")).tag(1)
             }
             .pickerStyle(.segmented).labelsHidden()
             ScrollView {

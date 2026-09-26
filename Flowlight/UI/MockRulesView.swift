@@ -11,19 +11,19 @@ struct MockRulesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it.")
+            Text(L("Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Label("Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule.",
+            Label(L("Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule."),
                   systemImage: "info.circle")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if !inspection.enabled {
-                Label("HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet.",
+                Label(L("HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet."),
                       systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
 
             if inspection.mockRules.isEmpty {
-                Text("No mock rules.").font(.caption).foregroundStyle(.tertiary)
+                Text(L("No mock rules.")).font(.caption).foregroundStyle(.tertiary)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(inspection.mockRules.enumerated()), id: \.element.id) { index, rule in
@@ -33,18 +33,18 @@ struct MockRulesSection: View {
                 }
                 .padding(.vertical, 2)
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
-                Text("Rules are tried from the top; the first enabled one that matches answers.")
+                Text(L("Rules are tried from the top; the first enabled one that matches answers."))
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             HStack {
-                Button("Add Rule…") {
+                Button(L("Add Rule…")) {
                     editing = MockRule(host: "", path: "/*", status: 500, body: #"{"error": "mocked by Flowlight"}"#)
                     isNew = true
                 }
                 Spacer()
                 if inspection.activeMockRules > 0 {
-                    Button("Turn All Off") {
+                    Button(L("Turn All Off")) {
                         inspection.mockRules = inspection.mockRules.map { var r = $0; r.enabled = false; return r }
                     }
                 }
@@ -111,27 +111,27 @@ struct MockRuleEditor: View {
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
                 GridRow {
-                    Text("Name").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    TextField("Optional, e.g. “GitHub is down”", text: $rule.name)
+                    Text(L("Name")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    TextField(L("Optional, e.g. “GitHub is down”"), text: $rule.name)
                 }
                 GridRow {
-                    Text("Host").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Host")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
-                        TextField("api.example.com", text: $rule.host)
-                        Text("Exactly that host. Write *.example.com to cover the domain and its subdomains.")
+                        TextField(L("api.example.com"), text: $rule.host)
+                        Text(L("Exactly that host. Write *.example.com to cover the domain and its subdomains."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
-                    Text("Path").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Path")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
-                        TextField("/v1/*", text: $rule.path)
-                        Text("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?.")
+                        TextField(L("/v1/*"), text: $rule.path)
+                        Text(L("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
-                    Text("Method").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Method")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     Picker("", selection: Binding(get: { rule.method.isEmpty ? "ANY" : rule.method.uppercased() },
                                                   set: { rule.method = $0 == "ANY" ? "" : $0 })) {
                         ForEach(MockRule.methods, id: \.self) { Text($0).tag($0) }
@@ -140,7 +140,7 @@ struct MockRuleEditor: View {
                 }
                 Divider().gridCellUnsizedAxes(.horizontal)
                 GridRow {
-                    Text("Status").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Status")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     HStack(spacing: 8) {
                         TextField("500", text: $statusText).frame(width: 70)
                             .onChange(of: statusText) { _, new in
@@ -148,25 +148,25 @@ struct MockRuleEditor: View {
                             }
                         Text(MockRule.reason(rule.status)).font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Text("Delay").foregroundStyle(.secondary)
+                        Text(L("Delay")).foregroundStyle(.secondary)
                         TextField("0", text: $delayText).frame(width: 60)
                             .onChange(of: delayText) { _, new in rule.delay = min(300, max(0, Double(new) ?? 0)) }
-                        Text("seconds").font(.caption).foregroundStyle(.secondary)
+                        Text(L("seconds")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 GridRow(alignment: .top) {
-                    Text("Headers").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Headers")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         TextEditor(text: $headerText)
                             .font(.caption.monospaced()).frame(height: 54)
                             .border(.quaternary)
                             .onChange(of: headerText) { _, new in rule.headers = MockRule.parseHeaders(new) }
-                        Text("One Name: value per line. Content-Length and Connection are written by Flowlight.")
+                        Text(L("One Name: value per line. Content-Length and Connection are written by Flowlight."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 GridRow(alignment: .top) {
-                    Text("Body").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Text(L("Body")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     TextEditor(text: $rule.body)
                         .font(.caption.monospaced()).frame(height: 120)
                         .border(.quaternary)
@@ -179,7 +179,7 @@ struct MockRuleEditor: View {
             }
 
             HStack {
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("Cancel"), role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
                 Button(isNew ? "Add Rule" : "Save") { save(cleaned()); dismiss() }
                     .keyboardShortcut(.defaultAction)

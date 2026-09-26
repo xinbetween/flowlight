@@ -1,74 +1,431 @@
 /* Flowlight — de. The key is the English text, so an untranslated string shows correct English. */
 
-"Traffic" = "Datenverkehr";
-"Investigate" = "Untersuchen";
-"Control" = "Steuerung";
-"Sources" = "Quellen";
+/* App/AppNavigation.swift */
 "Live" = "Live";
 "AI Agents" = "KI-Agenten";
 "Reports" = "Berichte";
 "Alerts" = "Warnungen";
 "Rules" = "Regeln";
 "Ask" = "Fragen";
-"Inspect" = "Inspizieren";
 "Devices" = "Geräte";
+"Inspect" = "Inspizieren";
 "Capture" = "Erfassung";
-"Cancel" = "Abbrechen";
-"Done" = "Fertig";
-"Save" = "Sichern";
-"Add" = "Hinzufügen";
-"Edit" = "Bearbeiten";
-"Delete" = "Löschen";
-"Refresh" = "Aktualisieren";
-"Clear" = "Löschen";
-"Copy" = "Kopieren";
-"Off" = "Aus";
-"On" = "Ein";
-"Settings" = "Einstellungen";
-"General" = "Allgemein";
-"Detection" = "Erkennung";
-"Export" = "Export";
-"Language" = "Sprache";
-"System" = "System";
-"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "Bei „System“ folgt die Oberfläche der Sprache deines Mac und fällt auf Englisch zurück, wenn Flowlight nicht in diese Sprache übersetzt ist.";
-"Now showing %@" = "Aktuell: %@";
+"Traffic" = "Datenverkehr";
+"Investigate" = "Untersuchen";
+"Control" = "Steuerung";
+"Sources" = "Quellen";
 
-/* Help that follows the screen you are on. */
-"Help" = "Hilfe";
+/* App/FlowlightApp.swift */
+"About Flowlight" = "Über Flowlight";
 "Help for %@" = "Hilfe zu %@";
-"Open the documentation for %@" = "Dokumentation zu %@ öffnen";
-"Documentation" = "Dokumentation";
-"Open %@" = "%@ öffnen";
+"Flowlight Help" = "Flowlight-Hilfe";
+"Questions & Answers" = "Fragen & Antworten";
+"What Flowlight Reads on This Mac" = "Was Flowlight auf diesem Mac liest";
+"Privacy" = "Datenschutz";
+"Report an Issue" = "Problem melden";
+"Check for Updates…" = "Nach Updates suchen…";
 
-/* Settings. */
-"Storage" = "Speicher";
-"AI agents" = "KI-Agenten";
+/* Export/ExportSettingsView.swift */
+"Send to my collector" = "An meinen Collector senden";
+"Export to OpenTelemetry / SIEM" = "Export an OpenTelemetry / SIEM";
+"Endpoint" = "Endpunkt";
+"Format" = "Format";
+"https://collector.example.com:4318" = "https://collector.example.com:4318";
+"Name" = "Name";
+"Authorization" = "Authorization";
+"Value" = "Wert";
+"Bearer …" = "Bearer …";
+"Remove this header" = "Diesen Header entfernen";
+"Add Header" = "Header hinzufügen";
+"Headers" = "Header";
+"Per-app and destination rollups" = "Zusammenfassungen pro App und Ziel";
+"Service name" = "Dienstname";
+"flowlight" = "flowlight";
+"Include this Mac's host name" = "Hostnamen dieses Mac mitsenden";
+"What Flowlight sends" = "Was Flowlight sendet";
+"Show What Would Be Sent…" = "Anzeigen, was gesendet würde…";
+"Test" = "Testen";
+"Status" = "Status";
+"What would be sent" = "Was gesendet würde";
+"Copy" = "Kopieren";
+"Done" = "Fertig";
+
+/* UI/AgentsView.swift */
+"Observed AI agent activity, including destinations outside each agent's model provider." = "Beobachtete Aktivität von KI-Agenten, einschließlich Ziele außerhalb des jeweiligen Modellanbieters.";
+"Window" = "Zeitraum";
+"No AI agents seen" = "Keine KI-Agenten gesehen";
+"Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider." = "Flowlight erkennt unterstützte Agenten wie Claude Code, Codex, Cursor und Ollama. Außerdem klassifiziert es Apps, die keine Browser sind und einen bekannten LLM-API-Anbieter kontaktieren.";
+"Show Traffic in Reports" = "Datenverkehr in Berichten zeigen";
+"None seen" = "Keine gesehen";
+"Connected to an address with no hostname" = "Mit einer Adresse ohne Hostnamen verbunden";
+"All allowed" = "Alle erlaubt";
+"Unlisted destinations are refused, not only reported" = "Nicht gelistete Ziele werden abgewiesen, nicht nur gemeldet";
+"Off" = "Aus";
+"Allowlist" = "Erlaubnisliste";
+"Only allow listed destinations" = "Nur gelistete Ziele erlauben";
+"Always allow its AI providers" = "KI-Anbieter des Agenten immer erlauben";
+"Block connections that aren't allowed" = "Nicht erlaubte Verbindungen blockieren";
+"Block Unlisted Destinations" = "Nicht gelistete Ziele blockieren";
+"Cancel" = "Abbrechen";
+"github.com, 10.0.0.0/8…" = "github.com, 10.0.0.0/8…";
+"Add" = "Hinzufügen";
+"Presets" = "Vorgaben";
+"Tools & MCP servers" = "Tools & MCP-Server";
+"AI providers" = "KI-Anbieter";
+"None in this window" = "Keine in diesem Zeitraum";
+"Show" = "Anzeigen";
+"Guardrails" = "Schutzregeln";
+"Open in Reports" = "In Berichten öffnen";
+"Only AI providers. Nothing else was contacted." = "Nur KI-Anbieter. Sonst wurde nichts kontaktiert.";
+"via " = "über ";
+"Opened by " = "Geöffnet von ";
+"Not allowed" = "Nicht erlaubt";
+"Allow" = "Erlauben";
+"Completed" = "Abgeschlossen";
+"The tool reported an error" = "Das Tool hat einen Fehler gemeldet";
+"No result seen yet" = "Noch kein Ergebnis gesehen";
+"The agent sent the provider a token for this server" = "Der Agent hat dem Anbieter ein Token für diesen Server gesendet";
+"Allowed: " = "Erlaubt: ";
+"Tools this server offers; the ones with a count were called in this window" = "Tools, die dieser Server anbietet; die mit einer Zahl wurden in diesem Zeitraum aufgerufen";
+"project" = "Projekt";
+"configured, no calls seen" = "konfiguriert, keine Aufrufe gesehen";
+"Reading agent configuration…" = "Agent-Konfiguration wird gelesen…";
+"Look for agent configuration" = "Agent-Konfiguration suchen";
+"Why?" = "Warum?";
+"out of date" = "veraltet";
+"Rescan" = "Neu scannen";
+"Add project folder…" = "Projektordner hinzufügen…";
+"Set up HTTPS inspection" = "HTTPS-Inspektion einrichten";
+
+/* UI/AlertsView.swift */
+"Just once" = "Nur einmal";
+"For an hour" = "Für eine Stunde";
+"Until Flowlight quits" = "Bis Flowlight beendet wird";
+"Edit a rule instead…" = "Stattdessen Regel bearbeiten…";
+"Acknowledge" = "Bestätigen";
+"Copy Detail" = "Details kopieren";
+"Rule" = "Regel";
+"All rules" = "Alle Regeln";
+"Show acknowledged" = "Bestätigte anzeigen";
+"Filter which alerts are listed" = "Filtern, welche Warnungen gelistet werden";
+"Mark alerts as seen" = "Warnungen als gesehen markieren";
+
+/* UI/AskView.swift */
+"Clear" = "Löschen";
+"Forget this conversation" = "Diese Unterhaltung verwerfen";
+"Ask about your traffic" = "Fragen zum Datenverkehr";
+"Flowlight answers from the history on this Mac. The model never sees it — it can only call a fixed set of queries, and every one it runs is listed under the answer." = "Flowlight antwortet aus dem Verlauf auf diesem Mac. Das Modell sieht ihn nie – es kann nur eine feste Auswahl von Abfragen aufrufen, und jede ausgeführte Abfrage steht unter der Antwort.";
+"Ask about this Mac's network activity" = "Fragen zur Netzwerkaktivität dieses Mac";
+"Choose a provider…" = "Anbieter wählen…";
+"Working…" = "Arbeitet…";
+"Open %@" = "%@ öffnen";
+"Documentation" = "Dokumentation";
+"Who answers" = "Wer antwortet";
+"The two that send nothing come first. That isn't an accident: a tool whose promise is no account and no cloud shouldn't need either to answer a question about itself." = "Die beiden, die nichts senden, stehen oben. Das ist kein Zufall: Ein Werkzeug, das kein Konto und keine Cloud verspricht, sollte für eine Frage über sich selbst auch keines von beidem brauchen.";
+"Provider" = "Anbieter";
+"Model" = "Modell";
+"API key" = "API-Schlüssel";
+"Kept in your login Keychain, not in Flowlight's preferences — a plist is readable by anything running as you, which is the sort of thing this app exists to point at." = "Wird im Anmeldeschlüsselbund gespeichert, nicht in den Einstellungen von Flowlight – eine plist kann alles lesen, was unter Ihrem Benutzer läuft, und genau darauf hinzuweisen ist der Zweck dieser App.";
+"Ask this" = "Diese Frage stellen";
+
+/* UI/CaptureView.swift */
+"Delete all recorded traffic, baselines and alerts?" = "Allen aufgezeichneten Datenverkehr, alle Basislinien und Warnungen löschen?";
+"Delete everything" = "Alles löschen";
+"Install & Enable Filter" = "Filter installieren & aktivieren";
+"Disable Filter" = "Filter deaktivieren";
+"Uninstall" = "Deinstallieren";
+"Refresh" = "Aktualisieren";
+"Re-check the filter and reconnect to it" = "Filter erneut prüfen und wieder mit ihm verbinden";
+"Try the Extension Again" = "Erweiterung erneut versuchen";
+"Stop sampling with nettop and reconnect to the filter extension" = "Abtastung mit nettop beenden und wieder mit der Filtererweiterung verbinden";
+"Flowlight reads " = "Flowlight liest ";
+"/usr/bin/nettop" = "/usr/bin/nettop";
+" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics." = " einmal pro Sekunde. Das ergibt Byte-Zähler pro Prozess und pro Verbindung ohne besondere Berechtigungen und Protokolle aus Port-Heuristiken.";
+"Database" = "Datenbank";
+"Reveal in Finder" = "Im Finder anzeigen";
+"Clear All Data…" = "Alle Daten löschen…";
+"Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner." = "Von den Verbindungen der letzten Stunde. Reihenfolge der Präferenz: TLS-Servername, DNS-Antwort, Reverse-DNS, Netzbetreiber.";
+"Remove Access…" = "Zugriff entfernen…";
+"See which sites your apps talk to" = "Sehen, mit welchen Sites Ihre Apps sprechen";
+"Without this, most traffic shows only an IP address or network owner." = "Ohne dies zeigt der meiste Datenverkehr nur eine IP-Adresse oder einen Netzbetreiber.";
+"Identify network owners when no hostname is available" = "Netzbetreiber ermitteln, wenn kein Hostname verfügbar ist";
+"On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "Standardmäßig aktiv. Sendet öffentliche Ziel-IPs an den DNS-Dienst von Team Cymru. Ausschalten, damit diese Abfragen auf dem Mac bleiben.";
+"Not Now" = "Jetzt nicht";
+"Enable Hostnames…" = "Hostnamen aktivieren…";
+
+/* UI/CaptureWarning.swift */
+"The Network Extension can't capture on this Mac" = "Die Netzwerkerweiterung kann auf diesem Mac nicht erfassen";
+"Use the nettop Sampler" = "nettop-Sampler verwenden";
+"Use the Network Extension" = "Netzwerkerweiterung verwenden";
+
+/* UI/ContentView.swift */
+"See what's new and download the update" = "Neuerungen ansehen und das Update laden";
+"Capture source status — click to configure" = "Status der Erfassungsquelle – zum Konfigurieren klicken";
+"Open the documentation for %@" = "Dokumentation zu %@ öffnen";
+"Help" = "Hilfe";
+"Error" = "Fehler";
+"OK" = "OK";
+
+/* UI/DevicesView.swift */
+"Read the device list again now (⌘R)" = "Geräteliste jetzt neu lesen (⌘R)";
+"Watch Bluetooth" = "Bluetooth überwachen";
+"Watch USB and external storage" = "USB und externe Speicher überwachen";
+"Channels" = "Kanäle";
+"Choose which channels Flowlight watches" = "Wählen, welche Kanäle Flowlight überwacht";
+"Nothing but the network is being watched" = "Es wird nur das Netzwerk überwacht";
+"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Bluetooth und USB sind aus, bis Sie sie einschalten. Für beides braucht Flowlight keine Berechtigung, die es nicht schon hat – sie sind aus, weil ihre Überwachung erweitert, worauf die App schaut, und das sollte Ihre Entscheidung sein und nicht die eines Updates.\n\nKeiner der beiden Kanäle kann Bytes melden. macOS führt für sie keine Abrechnung pro App, deshalb kann Flowlight ehrlich nur zeigen, was verbunden ist, welche Apps dafür gebaut sind und wann sich das geändert hat.";
+"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "Keine Byte-Zähler auf diesen Kanälen. macOS führt für Bluetooth und USB keine Abrechnung pro App, eine Zahl hier wäre also erfunden. Ehrlich ist, was verbunden ist, welche Apps dafür gebaut sind und wann sich das geändert hat.";
+"This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it." = "Das steht so in der Info.plist jeder App – wer Bluetooth angefordert hat, nicht wem macOS es gewährt hat. Diese zweite Liste liegt in einer Datenbank, die keine App lesen kann, und Flowlight benennt den Unterschied lieber, als ihn zu verwischen.";
+"How Flowlight recognises this device between sightings" = "Woran Flowlight dieses Gerät zwischen Sichtungen wiedererkennt";
+
+/* UI/FocusView.swift */
+"Focus" = "Fokus";
+"While Focus is on, every screen shows only what's listed here. Nothing stops being recorded — turn Focus off and the rest is still there." = "Solange der Fokus aktiv ist, zeigt jeder Bereich nur, was hier gelistet ist. Es wird weiterhin alles aufgezeichnet – Fokus aus, und der Rest ist noch da.";
+"Nothing chosen yet. One app is a focus. So is one destination. Both together is a focus on either." = "Noch nichts gewählt. Eine App ist ein Fokus. Ein Ziel ebenso. Beides zusammen ist ein Fokus auf eines von beiden.";
+"Alerts name an app, not a destination, so this focus leaves the alert list alone." = "Warnungen benennen eine App, kein Ziel, deshalb lässt dieser Fokus die Warnungsliste unberührt.";
+"App" = "App";
+"Destination" = "Ziel";
+"Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here." = "Hostnamen, Domain oder IP-Adresse eingeben. Bereiche wie 10.0.0.0/8 werden hier nicht unterstützt.";
+
+/* UI/GuardrailsPane.swift */
+"HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet." = "Die HTTPS-Inspektion ist aus, deshalb kann Flowlight die Tool-Liste nicht lesen – noch wird hier nichts durchgesetzt.";
+"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "Ein Agent sendet bei jedem Zug seine gesamte Tool-Liste erneut. Ein hier ausgeschaltetes Tool wird aus dieser Liste entfernt, bevor das Modell es überhaupt sieht – es gibt also keine Abweisung, über die sich streiten ließe, und keine Wiederholungsschleife. Bei MCP-Servern, die über HTTP erreicht werden, wird ein abgewiesener Aufruf ebenfalls hier beantwortet, mit einem Satz, den das Modell lesen kann.";
+"MCP servers" = "MCP-Server";
+"never yet" = "noch nie";
+"Refuse a tool by name or pattern, e.g. write*" = "Tool nach Name oder Muster abweisen, z. B. write*";
+"This is not a sandbox." = "Das ist keine Sandbox.";
+"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "Ein abgewiesenes Tool wird dem Modell nicht mehr angeboten und nicht mehr beantwortet. Ein Agent, der noch eine Shell hat, kann von Hand tun, was das Tool getan hätte – Flowlight zeichnet das auf, verhindern kann es das nicht. Lokale MCP-Server sprechen über Pipes, die kein Proxy sehen kann: Dort kann Flowlight den eigenen Netzwerkverkehr des Servers beobachten, der ohnehin dem Agenten zugeordnet ist, der ihn gestartet hat, und anbieten, die Sperrliste des Agenten selbst zu schreiben.";
+
+/* UI/Insights/BehaviourPanel.swift */
+"Nothing stands out" = "Nichts fällt auf";
+
+/* UI/Insights/InsightsPanel.swift */
+"All traffic" = "Gesamter Datenverkehr";
+"No traffic in this window" = "Kein Datenverkehr in diesem Zeitraum";
+"Received vs sent" = "Empfangen vs. gesendet";
+"Network owner: no hostname was seen for this traffic" = "Netzbetreiber: für diesen Datenverkehr wurde kein Hostname gesehen";
+"Filter" = "Filter";
+
+/* UI/InspectView.swift */
+"Nothing inspected yet" = "Noch nichts inspiziert";
+"Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "Apps, die dem System-Proxy folgen – Browser, die meisten Mac-Apps – erscheinen hier von selbst. Kommandozeilen-Agenten nicht: Sie brauchen die Umgebung aus einem inspizierten Terminal.";
+"Open Inspected Terminal" = "Inspiziertes Terminal öffnen";
+"Check Setup" = "Einrichtung prüfen";
+"Flowlight is answering some requests itself instead of forwarding them. Click to review the rules." = "Flowlight beantwortet einige Anfragen selbst, statt sie weiterzuleiten. Zum Prüfen der Regeln klicken.";
+"A Terminal window whose agents and tools go through Flowlight" = "Ein Terminal-Fenster, dessen Agenten und Tools über Flowlight laufen";
+"Setup…" = "Einrichten…";
+"Mocked" = "Mock";
+"Guarded" = "Geschützt";
+"Mock This Endpoint…" = "Diesen Endpunkt mocken…";
+"Block This Endpoint…" = "Diesen Endpunkt blockieren…";
+"HTTPS inspection" = "HTTPS-Inspektion";
+"Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally." = "HTTP-Anfragen und -Antworten von Apps inspizieren, die über Flowlight laufen, einschließlich unterstützter Tool-Aufrufe von Modellen. Flowlight nutzt einen lokalen Proxy und eine auf diesem Mac erzeugte Zertifizierungsstelle. Die Inspektion ist standardmäßig aus, und aufgezeichnete Daten bleiben lokal.";
+"Turn on HTTPS inspection" = "HTTPS-Inspektion aktivieren";
+"Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back." = "Erzeugt das Zertifikat, fragt einmal nach Ihrem Passwort, um ihm zu vertrauen, und leitet Apps über Flowlight. Beim Ausschalten wird alles zurückgesetzt.";
+"Waiting for your password…" = "Warten auf das Passwort…";
+"Command-line agents ignore system proxy settings; start them from this window instead" = "Kommandozeilen-Agenten ignorieren die Proxy-Einstellungen des Systems; starten Sie sie stattdessen aus diesem Fenster";
+"Decrypt" = "Entschlüsseln";
+"With AI agents only, other apps still go through the proxy but are passed through encrypted and not recorded." = "Bei „Nur KI-Agenten“ laufen andere Apps weiter über den Proxy, werden aber verschlüsselt durchgeleitet und nicht aufgezeichnet.";
+"Never decrypted" = "Nie entschlüsselt";
+"These hosts and their subdomains always pass through encrypted. Apps that pin their certificates are detected and passed through automatically." = "Diese Hosts und ihre Subdomains werden immer verschlüsselt durchgeleitet. Apps, die ihre Zertifikate pinnen, werden erkannt und automatisch durchgeleitet.";
+"bank.example" = "bank.example";
+"Restore Defaults" = "Standardwerte wiederherstellen";
+"Copy Shell Setup" = "Shell-Setup kopieren";
+"Environment variables that send one shell's tools through Flowlight" = "Umgebungsvariablen, die die Tools einer Shell über Flowlight leiten";
+"Show Certificate in Finder" = "Zertifikat im Finder anzeigen";
+"Remove Certificate & Recorded Data…" = "Zertifikat & aufgezeichnete Daten entfernen…";
+"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "Aufgezeichnete Anfragen werden 3 Tage aufbewahrt. API-Schlüssel, Cookies und andere Header mit Zugangsdaten werden nie gespeichert.";
+"Advanced" = "Erweitert";
+"Mock responses" = "Mock-Antworten";
+"macOS will ask you twice" = "macOS fragt zweimal";
+"Continue" = "Fortfahren";
+"First to trust Flowlight's certificate (Touch ID or your password), then for an administrator password to send apps through the proxy. Turning inspection off undoes both." = "Zuerst, um dem Zertifikat von Flowlight zu vertrauen (Touch ID oder Ihr Passwort), dann nach einem Administratorpasswort, um Apps über den Proxy zu leiten. Wird die Inspektion ausgeschaltet, wird beides zurückgenommen.";
+"Remove HTTPS inspection?" = "HTTPS-Inspektion entfernen?";
+"Remove" = "Entfernen";
+"Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request." = "Schaltet die Inspektion aus, entfernt das Zertifikat und seine Vertrauenseinstellung und löscht alle aufgezeichneten Anfragen.";
+"Mock This…" = "Das mocken…";
+"Answer this endpoint from Flowlight instead of letting the request through" = "Diesen Endpunkt aus Flowlight beantworten, statt die Anfrage durchzulassen";
+"Part" = "Teil";
+"Request" = "Anfrage";
+"Response" = "Antwort";
+
+/* UI/JSONTreeView.swift */
+"Switch to the raw view, where matches are highlighted" = "Zur Rohansicht wechseln, in der Treffer hervorgehoben werden";
+"View" = "Ansicht";
+"Tree" = "Baum";
+"Raw" = "Roh";
+"Copy the body (pretty-printed when it's JSON)" = "Body kopieren (bei JSON formatiert)";
+"Only the first 2 MB were kept." = "Nur die ersten 2 MB wurden behalten.";
+"Copy Value" = "Wert kopieren";
+"Copy Key" = "Schlüssel kopieren";
+"null" = "null";
+
+/* UI/LiveView.swift */
+"Last 2 minutes" = "Letzte 2 Minuten";
+"Download" = "Download";
+"Upload" = "Upload";
+"Show in Reports" = "In Berichten zeigen";
+"Copy Bundle ID" = "Bundle-ID kopieren";
+"Top talkers · average of the last 5 seconds" = "Aktivste Apps · Mittel der letzten 5 Sekunden";
+"No app has sent or received data in the last few seconds." = "In den letzten Sekunden hat keine App Daten gesendet oder empfangen.";
+"Waiting for traffic data" = "Warten auf Verkehrsdaten";
+"Open Capture Settings" = "Erfassungseinstellungen öffnen";
+
+/* UI/MockRulesView.swift */
+"Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "Einen gewählten Endpunkt selbst beantworten, statt die Anfrage zum Server zu lassen – ein 500, ein Rate-Limit, ein fehlerhafter Body oder eine lange Wartezeit – und beobachten, wie der Agent damit umgeht.";
+"Only requests Flowlight decrypts can be mocked. Hosts that are tunnelled — the never-decrypted list, apps that pin their certificates, anything not routed through the proxy — are never touched by a rule." = "Nur Anfragen, die Flowlight entschlüsselt, lassen sich mocken. Getunnelte Hosts – die Liste „Nie entschlüsselt“, Apps, die ihre Zertifikate pinnen, alles, was nicht über den Proxy läuft – werden von einer Regel nie berührt.";
+"HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet." = "Die HTTPS-Inspektion ist aus, deshalb wird nichts entschlüsselt und noch kann keine Regel etwas beantworten.";
+"No mock rules." = "Keine Mock-Regeln.";
+"Rules are tried from the top; the first enabled one that matches answers." = "Regeln werden von oben geprüft; die erste aktive, die passt, antwortet.";
+"Add Rule…" = "Regel hinzufügen…";
+"Turn All Off" = "Alle ausschalten";
+"Optional, e.g. “GitHub is down”" = "Optional, z. B. „GitHub ist ausgefallen“";
+"Host" = "Host";
+"api.example.com" = "api.example.com";
+"Exactly that host. Write *.example.com to cover the domain and its subdomains." = "Genau dieser Host. *.example.com erfasst die Domain samt ihren Subdomains.";
+"Path" = "Pfad";
+"/v1/*" = "/v1/*";
+"A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?." = "Ein Glob: * passt auf beliebig viele Zeichen. Der Query-String wird ignoriert, sofern das Muster kein ? enthält.";
+"Method" = "Methode";
+"Delay" = "Verzögerung";
+"seconds" = "Sekunden";
+"One Name: value per line. Content-Length and Connection are written by Flowlight." = "Ein „Name: Wert“ pro Zeile. Content-Length und Connection setzt Flowlight selbst.";
+"Body" = "Body";
+
+/* UI/ReportsView.swift */
+"Way out" = "Ausgang";
+"Every way out" = "Alle Ausgänge";
+"Narrow to one way out of the Mac: the network, the peer-to-peer radio, this Mac, or a tunnel" = "Auf einen Ausgang des Mac einschränken: Netzwerk, Peer-to-Peer-Funk, dieser Mac oder ein Tunnel";
+"Time series (CSV)…" = "Zeitreihe (CSV)…";
+"Breakdown (CSV)…" = "Aufschlüsselung (CSV)…";
+"Export" = "Export";
+"Export the current report as CSV" = "Aktuellen Bericht als CSV exportieren";
+"Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs." = "Die Abdeckung gilt für allen Datenverkehr der letzten Stunde, nicht für den gewählten Berichtszeitraum. IPs ohne Namen können zu Shared Hosting oder CDNs gehören.";
+"Measure" = "Messwert";
+"Group by" = "Gruppieren nach";
+"App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP, Ziel › App › IP oder IP › App";
+"Choose a longer window or clear filters." = "Längeren Zeitraum wählen oder Filter entfernen.";
+"Back" = "Zurück";
+"Return to the previous zoom level" = "Zur vorherigen Zoomstufe zurück";
+"Granularity" = "Auflösung";
+"Earlier (⌘[)" = "Früher (⌘[)";
+"Earlier" = "Früher";
+"Later (⌘])" = "Später (⌘])";
+"Later" = "Später";
+"Now" = "Jetzt";
+"Showing only:" = "Nur angezeigt:";
+"Click a bar to zoom in" = "Auf einen Balken klicken, um hineinzuzoomen";
+"Show Only This" = "Nur das anzeigen";
+"Copy Hostname" = "Hostnamen kopieren";
+
+/* UI/RuleEditor.swift */
+"Then" = "Dann";
+"Block it" = "Blockieren";
+"Allow it" = "Erlauben";
+"What it names" = "Was sie benennt";
+"Any app — or a name, or a bundle identifier" = "Jede App – oder ein Name oder eine Bundle-ID";
+"Anywhere — or a domain, an IP address, or a range" = "Überall – oder eine Domain, eine IP-Adresse oder ein Bereich";
+"A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started." = "Eine Domain nimmt ihre Subdomains mit: `example.com` deckt `api.example.com` ab. Wird ein Agent benannt, gilt das auch für die von ihm gestarteten Tools und MCP-Server.";
+"For how long" = "Wie lange";
+"Lasts" = "Dauer";
+"Forever" = "Dauerhaft";
+"Until a time" = "Bis zu einer Uhrzeit";
+"Between chosen hours" = "Zwischen bestimmten Uhrzeiten";
+"Gone when Flowlight quits, including a crash. Nothing is left behind in force." = "Verschwindet, wenn Flowlight beendet wird, auch bei einem Absturz. Es bleibt nichts in Kraft.";
+"Any path — or /v1/*" = "Jeder Pfad – oder /v1/*";
+"Answer with" = "Antworten mit";
+"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "Ein Pfad lässt sich nur dort abgleichen, wo die Anfrage lesbar ist, also bei HTTPS-Inspektion. Das macht diese Abweisung auch freundlicher: Der Agent erhält einen Status, den er lesen kann, statt einer Verbindung, die ohne Begründung abgebrochen ist.";
+"One URL rather than the whole host" = "Eine einzelne URL statt des ganzen Hosts";
+"Name an app or a destination — a rule that names neither would decide every connection on the Mac." = "Benennen Sie eine App oder ein Ziel – eine Regel, die keines von beidem benennt, würde über jede Verbindung auf dem Mac entscheiden.";
+" reaching " = " erreicht ";
+" requests from " = " Anfragen von ";
+" to " = " an ";
+
+/* UI/RulesView.swift */
+"Templates" = "Vorlagen";
+"Rules worth having, grouped by what they are for, with the hosts already written out" = "Regeln, die sich lohnen, nach Zweck gruppiert und mit den Hosts schon eingetragen";
+"Add Rule" = "Regel hinzufügen";
+"Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "Eine Regel schreiben: App, Agent, Ziel oder URL, blockiert oder erlaubt";
+"Nothing is being refused. Click to start again now." = "Es wird nichts abgewiesen. Zum sofortigen Fortsetzen klicken.";
+"10 minutes" = "10 Minuten";
+"1 hour" = "1 Stunde";
+"Until I resume" = "Bis ich fortsetze";
+"Pause Blocking" = "Blockieren pausieren";
+"Stand every rule down for a while, without deleting anything" = "Alle Regeln vorübergehend außer Kraft setzen, ohne etwas zu löschen";
+"Resume now" = "Jetzt fortsetzen";
+"No rules yet" = "Noch keine Regeln";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "Eine Regel benennt etwas – eine App, einen Agenten, ein Ziel oder eine URL – und sagt blockieren oder erlauben. Klicken Sie in Live, Berichten, KI-Agenten oder Inspizieren mit der rechten Maustaste auf eine Zeile, um eine Regel zu dem zu schreiben, was Sie gerade ansehen, oder beginnen Sie mit den Vorlagen: Dort stehen schon die Hosts, die eine Paketinstallation erreicht, und die, über die eine Datei den Mac verlässt.";
+"Browse Templates…" = "Vorlagen durchsuchen…";
+"Write One…" = "Eine schreiben…";
+"Nothing yet" = "Noch nichts";
+"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Jede Verbindung, über die eine Regel entscheidet, landet hier: die Abweisungen und die Ausnahmen, die etwas durchlassen. Die zweite Hälfte hält die Frage „Warum kommt das hier durch?“ beantwortbar.";
+"Edit…" = "Bearbeiten…";
+"Reset Count" = "Zähler zurücksetzen";
+"Delete" = "Löschen";
+"Show the Rule…" = "Regel anzeigen…";
+"Everywhere" = "Überall";
+"For the next hour" = "Für die nächste Stunde";
+"For every app" = "Für jede App";
+"Apply a Template" = "Vorlage anwenden";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Jede schreibt gewöhnliche Regeln in die Liste, wo sie wie alles andere gelesen, ausgeschaltet oder gelöscht werden können. Verbindungen abzuweisen ist Aufgabe der Netzwerkerweiterung; ist in der Erfassung der nettop-Sampler gewählt, werden diese Regeln nur beobachtet statt durchgesetzt.";
+"Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "Optional. Leer gelassen gilt dies für alles auf dem Mac; eine genannte App schränkt es auf diese App und die von ihr gestarteten Tools ein.";
+"A domain, an IP address, or a range" = "Eine Domain, eine IP-Adresse oder ein Bereich";
+"Added" = "Hinzugefügt";
+"A name, or a bundle identifier" = "Ein Name oder eine Bundle-ID";
+
+/* UI/SettingsView.swift */
+"Launch at login" = "Beim Anmelden starten";
+"Run in the background" = "Im Hintergrund ausführen";
+"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Kein Dock-Symbol und kein Cmd-Tab-Eintrag. Flowlight zeichnet weiter auf und bleibt über die Menüleiste erreichbar.";
+"Show live rates in the menu bar" = "Aktuelle Raten in der Menüleiste zeigen";
+"Show notifications for warnings" = "Benachrichtigungen bei Warnungen";
+"General" = "Allgemein";
+"Z-score threshold" = "Z-Wert-Schwelle";
+"Learning period per app" = "Lernphase pro App";
+"Ignore hours below" = "Stunden ignorieren unter";
+"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Stündlicher Datenverkehr und tägliche Zielanzahl werden mit der gleitenden Basislinie jeder App verglichen.";
 "First contact with a new domain" = "Erster Kontakt mit einer neuen Domain";
 "Connections to non-standard ports" = "Verbindungen zu Nicht-Standard-Ports";
 "Ignore Apple's own apps" = "Apples eigene Apps ignorieren";
-"Traffic without UI activity" = "Datenverkehr ohne Bildschirmaktivität";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS spricht ständig mit Apple – Updates, iCloud, Push, Zeit – und all das zu melden verschüttet die eine Zeile, die zählt. Dieser Datenverkehr wird weiter aufgezeichnet, weiter in Live und Berichten gezeigt und unterliegt weiter jeder Regel und Schutzregel.";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "Agent nutzt E-Mail, Dateiübertragung, SSH, Tunnel oder Datenbanken";
 "Agent connects to a raw IP on an unusual port" = "Agent verbindet sich über einen ungewöhnlichen Port mit einer reinen IP";
-"Agent active while you're away" = "Agent aktiv, während Sie weg sind";
 "Uploads to non-AI hosts above" = "Uploads an Nicht-KI-Hosts über";
+"Agent active while you're away" = "Agent aktiv, während Sie weg sind";
 "Away after" = "Abwesend nach";
-"Learning period per app" = "Lernphase pro App";
-"Z-score threshold" = "Z-Wert-Schwelle";
-"Ignore hours below" = "Stunden ignorieren unter";
+"AI agents" = "KI-Agenten";
+"Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours." = "Zu den Agenten zählen erkannte Tools wie Claude Code, Codex und Cursor sowie Apps, die keine Browser sind und einen bekannten LLM-API-Anbieter kontaktieren. Ihre Lernphase beträgt 1 Stunde statt 24 Stunden.";
+"Traffic without UI activity" = "Datenverkehr ohne Bildschirmaktivität";
 "App idle for at least" = "App mindestens inaktiv seit";
 "Uploading more than" = "Upload über";
+"Detection" = "Erkennung";
 "Keep per-second data" = "Sekundendaten aufbewahren";
-"Launch at login" = "Beim Anmelden starten";
-"Run in the background" = "Im Hintergrund ausführen";
-"Show live rates in the menu bar" = "Aktuelle Raten in der Menüleiste zeigen";
-"Show notifications for warnings" = "Benachrichtigungen bei Warnungen";
-"Check for updates automatically" = "Automatisch nach Updates suchen";
-"Check Now" = "Jetzt suchen";
+"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Minutenwerte werden 14 Tage, Stundenwerte 400 Tage und Tageswerte dauerhaft aufbewahrt. Warnungen 90 Tage.";
+"Storage" = "Speicher";
 "Open Flowlight" = "Flowlight öffnen";
 "Show Dock Icon" = "Dock-Symbol anzeigen";
-"Quit" = "Beenden";
 "Review Alerts…" = "Warnungen ansehen…";
-"No Dock icon and no Cmd-Tab entry. Flowlight keeps recording and stays reachable from the menu bar." = "Kein Dock-Symbol und kein Cmd-Tab-Eintrag. Flowlight zeichnet weiter auf und bleibt über die Menüleiste erreichbar.";
-"Hourly traffic and daily destination counts are compared with each app's rolling baseline." = "Stündlicher Datenverkehr und tägliche Zielanzahl werden mit der gleitenden Basislinie jeder App verglichen.";
-"Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days." = "Minutenwerte werden 14 Tage, Stundenwerte 400 Tage und Tageswerte dauerhaft aufbewahrt. Warnungen 90 Tage.";
+"Quit" = "Beenden";
+"Check for updates automatically" = "Automatisch nach Updates suchen";
 "Once a day, Flowlight asks GitHub for the latest release. The request carries only your IP address and Flowlight's version." = "Einmal täglich fragt Flowlight bei GitHub nach der neuesten Version. Die Anfrage enthält nur Ihre IP-Adresse und die Version von Flowlight.";
+"Check Now" = "Jetzt suchen";
+"Language" = "Sprache";
+"System" = "System";
+"Now showing %@" = "Aktuell: %@";
+"The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into." = "Bei „System“ folgt die Oberfläche der Sprache deines Mac und fällt auf Englisch zurück, wenn Flowlight nicht in diese Sprache übersetzt ist.";
+
+/* UI/UpdateView.swift */
+"See what changed on GitHub" = "Änderungen auf GitHub ansehen";
+"Skip This Version" = "Diese Version überspringen";
+"View on GitHub" = "Auf GitHub ansehen";
+"Remind Me Later" = "Später erinnern";
+"Open Disk Image" = "Disk-Image öffnen";
+"Install Later" = "Später installieren";
+"Quit & Install" = "Beenden & installieren";
+"Check Again" = "Erneut suchen";
+
+/* Common words kept for menus macOS builds itself. */
+"Edit" = "Bearbeiten";
+"On" = "Ein";
+"Save" = "Sichern";
+"Settings" = "Einstellungen";

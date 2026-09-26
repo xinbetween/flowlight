@@ -58,7 +58,7 @@ struct ExportSettingsTab: View {
         Section {
             Toggle(isOn: Binding(get: { exporter.enabled }, set: { exporter.setEnabled($0) })) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Send to my collector")
+                    Text(L("Send to my collector"))
                     Text(exporter.enabled
                          ? "On. Flowlight is sending to the endpoint below."
                          : "Off. Nothing about your traffic leaves this Mac.")
@@ -67,7 +67,7 @@ struct ExportSettingsTab: View {
             }
             .disabled(config.endpointURL == nil || !(includeRollups || includeAlerts))
         } header: {
-            Text("Export to OpenTelemetry / SIEM")
+            Text(L("Export to OpenTelemetry / SIEM"))
         } footer: {
             Text("""
             Flowlight has no service of its own and never will: the endpoint below is yours. This is off until you \
@@ -79,12 +79,12 @@ struct ExportSettingsTab: View {
     }
 
     private var endpointSection: some View {
-        Section("Endpoint") {
-            Picker("Format", selection: $mode) {
+        Section(L("Endpoint")) {
+            Picker(L("Format"), selection: $mode) {
                 ForEach(ExportMode.allCases) { Text($0.title).tag($0.rawValue) }
             }
             .onChange(of: mode) { _, _ in exporter.settingsChanged() }
-            TextField("Endpoint", text: $endpoint, prompt: Text("https://collector.example.com:4318"))
+            TextField(L("Endpoint"), text: $endpoint, prompt: Text(L("https://collector.example.com:4318")))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: endpoint) { _, _ in exporter.settingsChanged() }
             if config.endpointURL == nil {
@@ -102,10 +102,10 @@ struct ExportSettingsTab: View {
         Section {
             ForEach($headers) { $row in
                 HStack(spacing: 8) {
-                    TextField("Name", text: $row.name, prompt: Text("Authorization"))
+                    TextField(L("Name"), text: $row.name, prompt: Text(L("Authorization")))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 150)
-                    SecureField("Value", text: $row.value, prompt: Text("Bearer …"))
+                    SecureField(L("Value"), text: $row.value, prompt: Text(L("Bearer …")))
                         .textFieldStyle(.roundedBorder)
                     Button {
                         headers.removeAll { $0.id == row.id }
@@ -114,16 +114,16 @@ struct ExportSettingsTab: View {
                         Image(systemName: "minus.circle")
                     }
                     .buttonStyle(.borderless)
-                    .help("Remove this header")
+                    .help(L("Remove this header"))
                 }
                 .onChange(of: row) { _, _ in saveHeaders() }
             }
-            Button("Add Header") { headers.append(HeaderRow()) }
+            Button(L("Add Header")) { headers.append(HeaderRow()) }
             if let headerError {
                 Text(headerError).font(.caption).foregroundStyle(.red)
             }
         } header: {
-            Text("Headers")
+            Text(L("Headers"))
         } footer: {
             Text("""
             Header values are kept in your login Keychain, not in Flowlight's preferences — a token for your \
@@ -135,21 +135,21 @@ struct ExportSettingsTab: View {
 
     private var contentSection: some View {
         Section {
-            Toggle("Per-app and destination rollups", isOn: $includeRollups)
+            Toggle(L("Per-app and destination rollups"), isOn: $includeRollups)
                 .onChange(of: includeRollups) { _, _ in exporter.settingsChanged() }
-            Toggle("Alerts", isOn: $includeAlerts)
+            Toggle(L("Alerts"), isOn: $includeAlerts)
                 .onChange(of: includeAlerts) { _, _ in exporter.settingsChanged() }
             Stepper(value: $interval, in: 10...3600, step: 10) {
                 LabeledContent("Send every", value: "\(Int(interval)) s")
             }
             .onChange(of: interval) { _, _ in exporter.settingsChanged() }
-            TextField("Service name", text: $serviceName, prompt: Text("flowlight"))
+            TextField(L("Service name"), text: $serviceName, prompt: Text(L("flowlight")))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: serviceName) { _, _ in exporter.settingsChanged() }
-            Toggle("Include this Mac's host name", isOn: $includeHostName)
+            Toggle(L("Include this Mac's host name"), isOn: $includeHostName)
                 .onChange(of: includeHostName) { _, _ in exporter.settingsChanged() }
         } header: {
-            Text("What Flowlight sends")
+            Text(L("What Flowlight sends"))
         } footer: {
             Text("""
             A rollup is one app, one hostname and one IP address added up over the window, at the same minute \
@@ -185,7 +185,7 @@ struct ExportSettingsTab: View {
 
     private var checkSection: some View {
         Section {
-            Button("Show What Would Be Sent…") {
+            Button(L("Show What Would Be Sent…")) {
                 loadingPreview = true
                 showPreview = true
                 Task {
@@ -196,7 +196,7 @@ struct ExportSettingsTab: View {
             LabeledContent("Test connection") {
                 HStack(spacing: 8) {
                     Text(testSummary).font(.caption).foregroundStyle(testColour)
-                    Button("Test") { Task { await exporter.testConnection() } }
+                    Button(L("Test")) { Task { await exporter.testConnection() } }
                         .disabled(config.endpointURL == nil || exporter.testState == .running)
                 }
             }
@@ -228,7 +228,7 @@ struct ExportSettingsTab: View {
                 LabeledContent("Retrying", value: next.formatted(.relative(presentation: .named)))
             }
         } header: {
-            Text("Status")
+            Text(L("Status"))
         } footer: {
             Text("""
             Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, \
@@ -240,7 +240,7 @@ struct ExportSettingsTab: View {
 
     private var previewSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("What would be sent").font(.headline)
+            Text(L("What would be sent")).font(.headline)
             if loadingPreview {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -252,13 +252,13 @@ struct ExportSettingsTab: View {
                 }
             }
             HStack {
-                Button("Copy") {
+                Button(L("Copy")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(preview, forType: .string)
                 }
                 .disabled(loadingPreview)
                 Spacer()
-                Button("Done") { showPreview = false }.keyboardShortcut(.defaultAction)
+                Button(L("Done")) { showPreview = false }.keyboardShortcut(.defaultAction)
             }
         }
         .padding()
