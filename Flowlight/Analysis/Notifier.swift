@@ -35,8 +35,8 @@ enum Notifier {
     /// Tells the person a new version is out. Clicking it opens the update window.
     static func postUpdate(version: String, summary: String?) {
         let content = UNMutableNotificationContent()
-        content.title = "Flowlight \(version) is available"
-        content.body = summary ?? "Click to see what's new and install it."
+        content.title = L("Flowlight %@ is available", version)
+        content.body = summary ?? L("Click to see what's new and install it.")
         content.categoryIdentifier = updateCategory
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "flowlight.update.\(version)", content: content, trigger: nil))
@@ -51,10 +51,10 @@ enum Notifier {
         guard !arrivals.isEmpty else { return }
         let content = UNMutableNotificationContent()
         if arrivals.count == 1, let event = arrivals.first {
-            content.title = "\(event.change.title): \(event.name)"
-            content.body = event.detail.isEmpty ? event.kind.title : "\(event.kind.title) · \(event.detail)"
+            content.title = L("%@: %@", event.change.title, event.name)
+            content.body = event.detail.isEmpty ? event.kind.title : L("%@ · %@", event.kind.title, event.detail)
         } else {
-            content.title = "\(arrivals.count) devices connected"
+            content.title = L("%lld devices connected", arrivals.count)
             content.body = arrivals.prefix(3).map(\.name).joined(separator: ", ")
         }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
@@ -66,11 +66,13 @@ enum Notifier {
         guard !important.isEmpty else { return }
         let content = UNMutableNotificationContent()
         if important.count == 1, let alert = important.first {
-            content.title = "\(alert.kind): \(alert.appName)"
+            content.title = L("%@: %@", AnomalyEngine.Kind.localizedName(alert.kind), alert.appName)
             content.body = alert.detail
         } else {
-            content.title = "\(important.count) network anomalies"
-            content.body = important.prefix(3).map { "\($0.appName): \($0.kind)" }.joined(separator: "\n")
+            content.title = L("%lld network anomalies", important.count)
+            content.body = important.prefix(3)
+                .map { L("%@: %@", $0.appName, AnomalyEngine.Kind.localizedName($0.kind)) }
+                .joined(separator: "\n")
         }
         content.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))

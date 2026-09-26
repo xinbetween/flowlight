@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.8, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,36 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.7.8
+September 26, 2026Latest
+
+ The whole interface speaks ten languages, not just the parts that happened to be
+ written as literals in a view. The catalog went from 378 strings to 1,169: every table column, tab,
+ picker, status line, alert, chart label, empty state and error message. Settings › Language now
+ changes all of it, and changing it restarts Flowlight so the menus macOS draws change too.
+
+ Claude Code is called Claude Code. Its installer keeps one executable per release,
+ so the filename is the version — and the Network Extension named the process after it. Every update
+ started a fresh identity, taking its allowlist, its guardrails and its history with it; a Mac could
+ show eight of them at once. Known command-line agents are now recognised and named, while the
+ identifier underneath stays the same across updates.
+
+ The AI Agents screen stops asking for HTTPS inspection you already turned on. When
+ a tab is empty it now says which of the three reasons it is: inspection off, inspection on but this
+ agent reached its provider directly past the proxy, or inspection working and the model simply
+ hasn't asked for a tool in this window.
+
+ A rule's name no longer freezes the language it was written in. Quick blocks store
+ no name at all and the list composes one from the rule's own fields; a name you type is kept as you
+ typed it.
+
+ The website is in the same ten languages, at flowlight.xinbetween.com — English
+ stays where it is and each language has its own directory, with a picker in the nav.
+
+ Downloads and checksums →
+
  0.7.7
-September 25, 2026Latest
+September 25, 2026
 
  Settings speaks all ten languages. Thirty-four more strings translated, and a test that
  fails if any language leaves one of them in English. The rest of the interface follows.

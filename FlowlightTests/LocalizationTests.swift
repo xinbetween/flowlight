@@ -58,10 +58,11 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
-    /// Sample text a person is meant to type or recognise exactly: a header value and a list of example
-    /// patterns. They are placeholders, not sentences, so every language keeps them as they are — translating
-    /// `Bearer` would describe an HTTP scheme that doesn't exist.
-    private static let verbatim: Set<String> = ["Bearer …", "github.com, 10.0.0.0/8…"]
+    /// Strings that are the same in every language, so a translation equal to the English is the right answer
+    /// rather than a missing one: sample text a person types or recognises exactly (translating `Bearer` would
+    /// name an HTTP scheme that doesn't exist), a vendor's own product name, and a Unix term macOS itself
+    /// leaves alone in every localization.
+    private static let verbatim: Set<String> = ["Bearer …", "github.com, 10.0.0.0/8…", "Google Gemini", "pid %lld"]
 
     func testNothingIsLeftInEnglishByAccident() throws {
         // A key whose translation equals the English is either untranslated or a word that genuinely doesn't

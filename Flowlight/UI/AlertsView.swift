@@ -19,10 +19,10 @@ struct AlertsView: View {
     var body: some View {
         Group {
             if visible.isEmpty {
-                ContentUnavailableView(alerts.isEmpty ? "No alerts" : "Nothing to review", systemImage: "checkmark.shield",
+                ContentUnavailableView(alerts.isEmpty ? L("No alerts") : L("Nothing to review"), systemImage: "checkmark.shield",
                                        description: Text(alerts.isEmpty
-                                                         ? "Each app has a learning period (24 h by default) before first-contact and spike rules fire."
-                                                         : "All matching alerts have been acknowledged."))
+                                                         ? L("Each app has a learning period (24 h by default) before first-contact and spike rules fire.")
+                                                         : L("All matching alerts have been acknowledged.")))
             } else {
                 table
             }
@@ -31,8 +31,8 @@ struct AlertsView: View {
         // The sidebar badge counts what is unread; this says how much there is to read at all, which is the
         // difference between "quiet" and "already dealt with".
         .navigationSubtitle(alerts.isEmpty ? ""
-                            : monitor.unacknowledgedAlerts == 0 ? "\(alerts.count) alerts, all acknowledged"
-                            : "\(monitor.unacknowledgedAlerts) to review of \(alerts.count)")
+                            : monitor.unacknowledgedAlerts == 0 ? L("%lld alerts, all acknowledged", alerts.count)
+                            : L("%lld to review of %lld", monitor.unacknowledgedAlerts, alerts.count))
         .toolbar { toolbar }
         .task(id: monitor.dataVersion) { await load() }
         .task(id: monitor.unacknowledgedAlerts) { await load() }
@@ -45,32 +45,38 @@ struct AlertsView: View {
                 Image(systemName: a.severity >= 3 ? "exclamationmark.octagon.fill" : a.severity == 2 ? "exclamationmark.triangle.fill" : "info.circle")
                     .foregroundStyle(a.severity >= 3 ? .red : a.severity == 2 ? .orange : .secondary)
                     .opacity(a.acknowledged ? 0.4 : 1)
-                    .accessibilityLabel(a.severity >= 3 ? "Critical" : a.severity == 2 ? "Warning" : "Info")
+                    .accessibilityLabel(a.severity >= 3 ? L("Critical") : a.severity == 2 ? L("Warning") : L("Info"))
             }
             .width(24)
-            TableColumn("Time", value: \.timestamp) { a in
+            TableColumn(L("Time"), value: \.timestamp) { a in
                 Text(a.timestamp.formatted(date: .abbreviated, time: .shortened)).monospacedDigit()
                     .help(a.timestamp.formatted(date: .complete, time: .standard))
             }
             .width(min: 130, ideal: 150)
-            TableColumn("App", value: \.appName) { a in
+            TableColumn(L("App"), value: \.appName) { a in
                 Text(a.appName).help(a.bundleID).foregroundStyle(a.acknowledged ? .secondary : .primary)
             }
             .width(min: 100, ideal: 150)
-            TableColumn("Rule", value: \.kind).width(min: 140, ideal: 190)
-            TableColumn("Detail", value: \.detail) { a in
+            // The stored kind is English — it is a database value as much as a label — so the column shows the
+            // same sentence in the chosen language rather than the row as it was written.
+            TableColumn(L("Rule"), value: \.kind) { a in
+                Text(AnomalyEngine.Kind.localizedName(a.kind))
+                    .foregroundStyle(a.acknowledged ? .secondary : .primary)
+            }
+            .width(min: 140, ideal: 190)
+            TableColumn(L("Detail"), value: \.detail) { a in
                 Text(a.detail).lineLimit(2).help(a.detail).foregroundStyle(a.acknowledged ? .secondary : .primary)
             }
         }
         .contextMenu(forSelectionType: AlertRecord.ID.self) { ids in
             // The way out of a connection Flowlight refused: the agent will try again, and next time it gets through.
             if let a = alert(ids.first), !a.allowPattern.isEmpty {
-                Button("Allow \(a.allowPattern) for \(a.appName) from Now On") {
+                Button(L("Allow %@ for %@ from Now On", a.allowPattern, a.appName)) {
                     monitor.allowFromNowOn(pattern: a.allowPattern, agentID: a.bundleID)
                 }
                 // Every refusal carries its way out, and each way out is itself a rule with an expiry — so the
                 // Rules screen can still answer "why is this getting through?" tomorrow morning.
-                Menu("Allow \(a.allowPattern) for \(a.appName)…") {
+                Menu(L("Allow %@ for %@…", a.allowPattern, a.appName)) {
                     Button(L("Just once")) {
                         monitor.rules.save(RuleStore.allow(app: a.bundleID, destination: a.allowPattern,
                                                            once: true, origin: .allowOnce))
@@ -110,7 +116,7 @@ struct AlertsView: View {
             Menu {
                 Picker(L("Rule"), selection: $rule) {
                     Text(L("All rules")).tag("")
-                    ForEach(rules, id: \.self) { Text($0).tag($0) }
+                    ForEach(rules, id: \.self) { Text(AnomalyEngine.Kind.localizedName($0)).tag($0) }
                 }
                 .pickerStyle(.inline)
                 Divider()
@@ -124,9 +130,9 @@ struct AlertsView: View {
             .help(L("Filter which alerts are listed"))
 
             Menu {
-                Button("Selected (\(selection.count))") { monitor.acknowledgeAlerts(ids: Array(selection)) }
+                Button(L("Selected (%lld)", selection.count)) { monitor.acknowledgeAlerts(ids: Array(selection)) }
                     .disabled(selection.isEmpty)
-                Button("All unacknowledged (\(monitor.unacknowledgedAlerts))") { monitor.acknowledgeAlerts(ids: nil) }
+                Button(L("All unacknowledged (%lld)", monitor.unacknowledgedAlerts)) { monitor.acknowledgeAlerts(ids: nil) }
                     .disabled(monitor.unacknowledgedAlerts == 0)
             } label: {
                 Label(L("Acknowledge"), systemImage: "checkmark.circle")
@@ -142,10 +148,10 @@ struct AlertsView: View {
     /// Names what the filter is doing, so the toolbar says it without a second control.
     private var filterLabel: String {
         switch (rule.isEmpty, showAcknowledged) {
-        case (true, false): return "All rules"
-        case (true, true): return "All rules, including seen"
-        case (false, false): return rule
-        case (false, true): return "\(rule), including seen"
+        case (true, false): return L("All rules")
+        case (true, true): return L("All rules, including seen")
+        case (false, false): return AnomalyEngine.Kind.localizedName(rule)
+        case (false, true): return L("%@, including seen", AnomalyEngine.Kind.localizedName(rule))
         }
     }
 

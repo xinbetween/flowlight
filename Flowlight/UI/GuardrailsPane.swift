@@ -47,9 +47,9 @@ struct GuardrailsPane: View {
             Text(L("Presets")).font(.caption.bold()).foregroundStyle(.secondary)
             HStack {
                 ForEach(Guardrail.presets) { preset in
-                    Button(preset.name) { store.save(Guardrail.preset(preset, agent: agentKey)) }
+                    Button(preset.localizedName) { store.save(Guardrail.preset(preset, agent: agentKey)) }
                         .controlSize(.small)
-                        .help(preset.detail)
+                        .help(preset.localizedDetail)
                 }
             }
         }
@@ -57,7 +57,7 @@ struct GuardrailsPane: View {
 
     private var tools: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Declared to the model · \(declared.count)").font(.caption.bold()).foregroundStyle(.secondary)
+            Text(L("Declared to the model · %lld", declared.count)).font(.caption.bold()).foregroundStyle(.secondary)
             ForEach(Array(declared.enumerated()), id: \.offset) { _, tool in
                 toggleRow(name: tool.name, server: tool.server, detail: tool.detail)
             }
@@ -68,7 +68,7 @@ struct GuardrailsPane: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(L("MCP servers")).font(.caption.bold()).foregroundStyle(.secondary)
             ForEach(servers, id: \.self) { server in
-                toggleRow(name: "", server: server, detail: "every tool on this server")
+                toggleRow(name: "", server: server, detail: L("every tool on this server"))
             }
         }
     }
@@ -87,7 +87,7 @@ struct GuardrailsPane: View {
                     }
                 }))
                 .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                .accessibilityLabel("Allow \(name.isEmpty ? (server ?? "") : name)")
+                .accessibilityLabel(L("Allow %@", name.isEmpty ? (server ?? "") : name))
             VStack(alignment: .leading, spacing: 1) {
                 Text(name.isEmpty ? (server ?? "") : (server.map { "\($0) › \(name)" } ?? name))
                     .font(.callout)
@@ -98,22 +98,22 @@ struct GuardrailsPane: View {
             }
             Spacer()
             if let existing, existing.hits > 0 {
-                Text("\(existing.hits) taken away").font(.caption).foregroundStyle(.tertiary)
+                Text(L("%lld taken away", existing.hits)).font(.caption).foregroundStyle(.tertiary)
             }
         }
     }
 
     private var existing: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Guardrails on \(agentName)").font(.caption.bold()).foregroundStyle(.secondary)
+            Text(L("Guardrails on %@", agentName)).font(.caption.bold()).foregroundStyle(.secondary)
             ForEach(mine) { guardrail in
                 HStack(spacing: 8) {
                     Toggle("", isOn: Binding(get: { guardrail.enabled }, set: { store.setEnabled(guardrail, $0) }))
                         .toggleStyle(.switch).controlSize(.mini).labelsHidden()
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(guardrail.title).font(.callout).lineLimit(1)
+                        Text(guardrail.localizedTitle).font(.callout).lineLimit(1)
                         if guardrail.hits > 0, let last = guardrail.lastHit {
-                            Text("\(guardrail.hits) times · last \(last.formatted(.relative(presentation: .named)))")
+                            Text(L("%lld times · last %@", guardrail.hits, last.formatted(.relative(presentation: .named))))
                                 .font(.caption).foregroundStyle(.tertiary)
                         } else {
                             Text(L("never yet")).font(.caption).foregroundStyle(.tertiary)
@@ -173,13 +173,13 @@ private struct DenyListOffer: View {
 
     var body: some View {
         HStack {
-            Button(copied ? "Copied" : "Copy as a deny list") {
+            Button(copied ? L("Copied") : L("Copy as a deny list")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(lines.map { "\"\($0)\"" }.joined(separator: ",\n"), forType: .string)
                 copied = true
             }
             .controlSize(.small)
-            Text("for `permissions.deny` in \(agent)'s own settings — it takes effect when the agent restarts.")
+            Text(L("for `permissions.deny` in %@'s own settings — it takes effect when the agent restarts.", agent))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

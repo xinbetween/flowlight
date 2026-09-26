@@ -24,8 +24,8 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .networkExtension: return "Network Extension (content filter)"
-        case .nettop: return "nettop sampler (no extension required)"
+        case .networkExtension: return L("Network Extension (content filter)")
+        case .nettop: return L("nettop sampler (no extension required)")
         }
     }
 }

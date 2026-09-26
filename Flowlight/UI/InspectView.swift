@@ -44,7 +44,7 @@ private struct InspectContent: View {
                             if let diagnosis = inspection.diagnosis {
                                 Text(diagnosis)
                                     .font(.callout)
-                                    .foregroundStyle(diagnosis.hasPrefix("Ready") ? .secondary : Color.orange)
+                                    .foregroundStyle(inspection.diagnosisIsGood ? .secondary : Color.orange)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
@@ -68,10 +68,10 @@ private struct InspectContent: View {
         .navigationTitle(L("Inspect"))
         // Inspection is off by default, so an empty list means either "nothing happened" or "nothing is being
         // decrypted". Only one of those is worth acting on.
-        .navigationSubtitle(inspection.enabled ? (inspection.running ? "Decrypting · \(exchanges.count) shown"
-                                                                    : "Starting…")
-                                               : "Off")
-        .searchable(text: $search, placement: .toolbar, prompt: "Host, path, app, tool or anything in a body")
+        .navigationSubtitle(inspection.enabled ? (inspection.running ? L("Decrypting · %lld shown", exchanges.count)
+                                                                    : L("Starting…"))
+                                               : L("Off"))
+        .searchable(text: $search, placement: .toolbar, prompt: Text(L("Host, path, app, tool or anything in a body")))
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
         }
@@ -109,7 +109,8 @@ private struct InspectContent: View {
             // inspected traffic, not only in the setup page where it was switched on.
             if !DemoData.isEnabled, inspection.activeMockRules > 0 {
                 Button { openMocks = true; showSetup = true } label: {
-                    Label(inspection.activeMockRules == 1 ? "1 mock rule on" : "\(inspection.activeMockRules) mock rules on",
+                    Label(inspection.activeMockRules == 1 ? L("1 mock rule on")
+                                                          : L("%lld mock rules on", inspection.activeMockRules),
                           systemImage: "wand.and.stars")
                 }
                 .buttonStyle(.plain).font(.callout.bold()).foregroundStyle(.purple)
@@ -129,46 +130,46 @@ private struct InspectContent: View {
     }
 
     private var statusText: String {
-        if DemoData.isEnabled { return "Demo data: a synthetic Claude Code session, decrypted by the local proxy" }
-        guard inspection.running, let port = inspection.port else { return "Starting the proxy…" }
-        var parts = ["Proxy on 127.0.0.1:\(port)"]
-        if !inspection.trusted { parts.append("certificate not trusted yet") }
-        parts.append(inspection.scope == .agents ? "decrypting AI agents only" : "decrypting every app")
-        if inspection.systemProxyOn { parts.append("system proxy on") }
+        if DemoData.isEnabled { return L("Demo data: a synthetic Claude Code session, decrypted by the local proxy") }
+        guard inspection.running, let port = inspection.port else { return L("Starting the proxy…") }
+        var parts = [L("Proxy on 127.0.0.1:%lld", Int(port))]
+        if !inspection.trusted { parts.append(L("certificate not trusted yet")) }
+        parts.append(inspection.scope == .agents ? L("decrypting AI agents only") : L("decrypting every app"))
+        if inspection.systemProxyOn { parts.append(L("system proxy on")) }
         return parts.joined(separator: " · ")
     }
 
     private var table: some View {
         Table(exchanges, selection: $selection) {
-            TableColumn("Time") { e in
+            TableColumn(L("Time")) { e in
                 Text(e.started, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 70, ideal: 76)
-            TableColumn("App") { e in
+            TableColumn(L("App")) { e in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(e.agentName ?? e.appName).lineLimit(1)
                     if let via = e.via {
-                        Text("via \(via)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(L("via %@", via)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
             }
             .width(min: 80, ideal: 104)
-            TableColumn("Request") { e in
+            TableColumn(L("Request")) { e in
                 VStack(alignment: .leading, spacing: 1) {
                     if e.note != nil {
-                        Label("Not inspected: \(e.host)", systemImage: "lock").foregroundStyle(.orange).lineLimit(1)
+                        Label(L("Not inspected: %@", e.host), systemImage: "lock").foregroundStyle(.orange).lineLimit(1)
                     } else {
                         HStack(spacing: 5) {
                             Text("\(e.method) \(e.host)").lineLimit(1)
                             if e.mockRule != nil {
                                 Label(L("Mocked"), systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(.purple)
                                     .labelStyle(.titleAndIcon)
-                                    .help("Flowlight answered this itself; the request never reached \(e.host)")
+                                    .help(L("Flowlight answered this itself; the request never reached %@", e.host))
                             }
                             if let guardrail = e.guardrail {
                                 Label(L("Guarded"), systemImage: "shield.lefthalf.filled").font(.caption2.bold())
                                     .foregroundStyle(.teal).labelStyle(.titleAndIcon)
-                                    .help("A guardrail changed this request before it left: \(guardrail)")
+                                    .help(L("A guardrail changed this request before it left: %@", guardrail))
                             }
                         }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -176,21 +177,21 @@ private struct InspectContent: View {
                 }
             }
             .width(min: 150, ideal: 220)
-            TableColumn("Status") { e in
+            TableColumn(L("Status")) { e in
                 Text(e.status.map(String.init) ?? "–").monospacedDigit()
                     .foregroundStyle((e.status ?? 0) >= 400 ? .red : .primary)
             }
             .width(min: 40, ideal: 46)
-            TableColumn("Size") { e in
+            TableColumn(L("Size")) { e in
                 Text(ByteFormat.string(Int64(e.requestSize + e.responseSize))).monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 60, ideal: 68)
-            TableColumn("Tool calls") { e in
+            TableColumn(L("Tool calls")) { e in
                 if !e.toolCalls.isEmpty {
                     Text(e.toolCalls.map(\.displayName).joined(separator: ", ")).lineLimit(1).foregroundStyle(.purple)
                 } else if let id = e.id, let link = links[id] {
                     Text("← \(link.call.displayName): \(link.call.summary ?? "")").lineLimit(1).foregroundStyle(.secondary)
-                        .help("Made by the tool the model asked for: \(link.call.summary ?? link.call.input)")
+                        .help(L("Made by the tool the model asked for: %@", link.call.summary ?? link.call.input))
                 }
             }
             .width(min: 80, ideal: 150)
@@ -203,7 +204,7 @@ private struct InspectContent: View {
                 // place the path was ever visible.
                 Button(L("Block This Endpoint…")) {
                     var rule = RuleStore.block(app: e.bundleID, destination: e.host,
-                                               name: "Block \(e.method) \(e.host)\(e.path.split(separator: "?").first.map(String.init) ?? "")")
+                                               name: L("Block %@", "\(e.method) \(e.host)\(e.path.split(separator: "?").first.map(String.init) ?? "")"))
                     rule.path = e.path.split(separator: "?").first.map(String.init) ?? "/"
                     rule.method = e.method
                     nav.writeRule(rule)
@@ -219,7 +220,7 @@ private struct InspectContent: View {
                            mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) })
                 .id(selected.id)
         } else {
-            ContentUnavailableView("Select a request", systemImage: "doc.text.magnifyingglass")
+            ContentUnavailableView(L("Select a request"), systemImage: "doc.text.magnifyingglass")
         }
     }
 }
@@ -268,10 +269,10 @@ private struct InspectionSetup: View {
                         }
                     } else if inspection.enabled {
                         VStack(alignment: .leading, spacing: 4) {
-                            ready("Certificate trusted on this Mac", ok: inspection.trusted)
-                            ready("Apps routed through Flowlight", ok: inspection.systemProxyOn)
-                            ready(inspection.scope == .all ? "Decrypting every app that uses the proxy"
-                                                           : "Decrypting AI agents and their tools", ok: inspection.running)
+                            ready(L("Certificate trusted on this Mac"), ok: inspection.trusted)
+                            ready(L("Apps routed through Flowlight"), ok: inspection.systemProxyOn)
+                            ready(inspection.scope == .all ? L("Decrypting every app that uses the proxy")
+                                                           : L("Decrypting AI agents and their tools"), ok: inspection.running)
                         }
                         .font(.caption)
                         HStack {
@@ -312,7 +313,7 @@ private struct InspectionSetup: View {
                                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Remove \(pattern)")
+                                    .accessibilityLabel(L("Remove %@", pattern))
                                 }
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(.quaternary.opacity(0.6), in: Capsule())
@@ -349,7 +350,8 @@ private struct InspectionSetup: View {
                 HStack(spacing: 8) {
                     Text(L("Mock responses")).font(.headline)
                     if inspection.activeMockRules > 0 {
-                        Label(inspection.activeMockRules == 1 ? "1 on" : "\(inspection.activeMockRules) on", systemImage: "wand.and.stars")
+                        Label(inspection.activeMockRules == 1 ? L("1 on") : L("%lld on", inspection.activeMockRules),
+                              systemImage: "wand.and.stars")
                             .font(.caption.bold()).foregroundStyle(.purple)
                     }
                 }
@@ -415,24 +417,26 @@ private struct ExchangeDetail: View {
             }
             if let mock = exchange.mockRule {
                 // The whole point of the feature is that this answer is a fiction; say so before anything below is read.
-                Label("Answered by Flowlight, not by \(exchange.host) — mock rule “\(mock)”. The request was never sent.",
+                Label(L("Answered by Flowlight, not by %@ — mock rule “%@”. The request was never sent.", exchange.host, mock),
                       systemImage: "wand.and.stars")
                     .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
             }
             if let guardrail = exchange.guardrail {
                 // The exchange really happened and really was sent — but not quite as the agent wrote it, and
                 // anyone reading it has to be told which part Flowlight took out.
-                Label("A guardrail changed this request before it left: \(guardrail). Everything below is what \(exchange.host) "
-                      + "was actually sent.", systemImage: "shield.lefthalf.filled")
+                Label(L("A guardrail changed this request before it left: %@. Everything below is what %@ was actually sent.",
+                        guardrail, exchange.host), systemImage: "shield.lefthalf.filled")
                     .foregroundStyle(.teal).fixedSize(horizontal: false, vertical: true)
             }
             if let cause {
-                GroupBox("Made by a tool call") {
+                GroupBox(L("Made by a tool call")) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label(cause.call.displayName, systemImage: "arrow.turn.down.right").font(.callout.bold())
                         Text(cause.call.summary ?? cause.call.input).font(.caption.monospaced()).textSelection(.enabled).lineLimit(6)
                             .foregroundStyle(.secondary)
-                        Text("Requested by the model \(cause.requestedAt.formatted(.relative(presentation: .numeric, unitsStyle: .abbreviated))), then run by \(exchange.appName) for \(exchange.agentName ?? "the agent").")
+                        Text(L("Requested by the model %@, then run by %@ for %@.",
+                               cause.requestedAt.formatted(.relative(presentation: .numeric, unitsStyle: .abbreviated)),
+                               exchange.appName, exchange.agentName ?? L("the agent")))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -440,7 +444,7 @@ private struct ExchangeDetail: View {
                 }
             }
             if !exchange.toolCalls.isEmpty {
-                GroupBox("Tool calls the model asked for") {
+                GroupBox(L("Tool calls the model asked for")) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(exchange.toolCalls.enumerated()), id: \.offset) { _, call in
                             VStack(alignment: .leading, spacing: 2) {
@@ -459,7 +463,7 @@ private struct ExchangeDetail: View {
                 }
             }
             if !exchange.toolResults.isEmpty {
-                GroupBox("Tool results sent to the model (\(exchange.toolResults.count))") {
+                GroupBox(L("Tool results sent to the model (%lld)", exchange.toolResults.count)) {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(exchange.toolResults.prefix(20).enumerated()), id: \.offset) { _, result in
                             resultView(result)
@@ -481,7 +485,10 @@ private struct ExchangeDetail: View {
                                         .font(.callout.bold())
                                 }
                                 if let summary = m.summary { Text(summary).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(4) }
-                                if let tools = m.tools { Text("\(tools.count) tools: " + tools.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(4) }
+                                if let tools = m.tools {
+                                    Text(L("%lld tools: %@", tools.count, tools.joined(separator: " · ")))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(4)
+                                }
                                 if let output = m.output, !output.isEmpty {
                                     Text(output).font(.caption.monospaced()).lineLimit(6).textSelection(.enabled)
                                         .foregroundStyle(m.isError ? TrafficColors.anomaly : .secondary)
@@ -513,7 +520,7 @@ private struct ExchangeDetail: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 4)
                         } label: {
-                            Text("Headers (\(headers.count))").font(.caption.bold()).foregroundStyle(.secondary)
+                            Text(L("Headers (%lld)", headers.count)).font(.caption.bold()).foregroundStyle(.secondary)
                         }
                     }
                     Divider()
@@ -522,7 +529,7 @@ private struct ExchangeDetail: View {
                                  highlight: highlight)
                             .id("\(tab)-\(exchange.id ?? 0)")
                     } else {
-                        Text(bodies == nil ? "Loading…" : emptyReason).font(.caption).foregroundStyle(.secondary)
+                        Text(bodies == nil ? L("Loading…") : emptyReason).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -537,12 +544,12 @@ private struct ExchangeDetail: View {
 
     private func resultView(_ result: ToolResult) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Label(result.isError ? "Error" : "Result", systemImage: result.isError ? "xmark.octagon.fill" : "checkmark.circle.fill")
+            Label(result.isError ? L("Error") : L("Result"), systemImage: result.isError ? "xmark.octagon.fill" : "checkmark.circle.fill")
                 .font(.caption.bold()).foregroundStyle(result.isError ? TrafficColors.anomaly : .green)
-            Text(result.output.isEmpty ? "(empty)" : result.output.trimmingCharacters(in: .whitespacesAndNewlines))
+            Text(result.output.isEmpty ? L("(empty)") : result.output.trimmingCharacters(in: .whitespacesAndNewlines))
                 .font(.caption.monospaced()).lineLimit(6).textSelection(.enabled).foregroundStyle(.secondary)
             if result.outputSize > result.output.count {
-                Text("\(result.outputSize) characters in total").font(.caption2).foregroundStyle(.tertiary)
+                Text(L("%lld characters in total", result.outputSize)).font(.caption2).foregroundStyle(.tertiary)
             }
         }
         .padding(.leading, 8)
@@ -550,18 +557,20 @@ private struct ExchangeDetail: View {
     }
 
     private var emptyReason: String {
-        if tab == 1, exchange.status == 304 { return "No body: 304 Not Modified means the app's cached copy is still current." }
-        if tab == 1, exchange.status == 204 { return "No body: 204 No Content." }
-        if tab == 0, ["GET", "HEAD", "DELETE", "OPTIONS"].contains(exchange.method) { return "No body (a \(exchange.method) request normally has none)." }
-        return "No body"
+        if tab == 1, exchange.status == 304 { return L("No body: 304 Not Modified means the app's cached copy is still current.") }
+        if tab == 1, exchange.status == 204 { return L("No body: 204 No Content.") }
+        if tab == 0, ["GET", "HEAD", "DELETE", "OPTIONS"].contains(exchange.method) {
+            return L("No body (a %@ request normally has none).", exchange.method)
+        }
+        return L("No body")
     }
 
     private var subtitle: String {
         var parts = [exchange.agentName ?? exchange.appName]
-        if let via = exchange.via { parts.append("via \(via)") }
-        if exchange.pid > 0 { parts.append("pid \(exchange.pid)") }
+        if let via = exchange.via { parts.append(L("via %@", via)) }
+        if exchange.pid > 0 { parts.append(L("pid %lld", Int(exchange.pid))) }
         if let status = exchange.status { parts.append("HTTP \(status)") }
-        parts.append(String(format: "%.2f s", exchange.duration))
+        parts.append(L("%@ s", String(format: "%.2f", exchange.duration)))
         parts.append("↑ \(ByteFormat.string(Int64(exchange.requestSize))) ↓ \(ByteFormat.string(Int64(exchange.responseSize)))")
         return parts.joined(separator: " · ")
     }

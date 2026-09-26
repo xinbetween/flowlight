@@ -10,13 +10,13 @@ final class ExtensionManager: NSObject, ObservableObject {
         case unknown, notInstalled, awaitingApproval, installing, enabled, disabled, failed(String)
         var label: String {
             switch self {
-            case .unknown: return "Unknown"
-            case .notInstalled: return "Not installed"
-            case .awaitingApproval: return "Waiting for approval in System Settings › General › Login Items & Extensions"
-            case .installing: return "Installing…"
-            case .enabled: return "Filter enabled"
-            case .disabled: return "Installed, filter disabled"
-            case .failed(let m): return "Failed: \(m)"
+            case .unknown: return L("Unknown")
+            case .notInstalled: return L("Not installed")
+            case .awaitingApproval: return L("Waiting for approval in System Settings › General › Login Items & Extensions")
+            case .installing: return L("Installing…")
+            case .enabled: return L("Filter enabled")
+            case .disabled: return L("Installed, filter disabled")
+            case .failed(let m): return L("Failed: %@", m)
             }
         }
     }
@@ -28,7 +28,7 @@ final class ExtensionManager: NSObject, ObservableObject {
         var appVersion: String = ""
         /// Whether a re-activation was started to put the two back in step.
         var repairing = false
-        var installedDescription: String { installed.isEmpty ? "unknown" : installed.joined(separator: ", ") }
+        var installedDescription: String { installed.isEmpty ? L("unknown") : installed.joined(separator: ", ") }
     }
 
     @Published private(set) var state: State = .unknown
@@ -69,9 +69,9 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// Why activation cannot work right now, if anything.
     var blocker: String? {
         if !hasEntitlement {
-            return "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension."
+            return L("This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension.")
         }
-        if !isInApplications { return "Move Flowlight to /Applications. macOS only activates system extensions from there." }
+        if !isInApplications { return L("Move Flowlight to /Applications. macOS only activates system extensions from there.") }
         return nil
     }
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// Receives per-second batches from the system extension over XPC.
 final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @unchecked Sendable {
-    let displayName = "Network Extension"
+    var displayName: String { L("Network Extension") }
     private var connection: NSXPCConnection?
     private var sink: (([TrafficBatch]) -> Void)?
     private var status: ((String) -> Void)?
@@ -78,16 +78,16 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         connection.exportedInterface = NSXPCInterface(with: FlowlightAppXPC.self)
         connection.exportedObject = self
         connection.invalidationHandler = { [weak self, weak connection] in
-            self?.scheduleReconnect("Extension connection invalidated", from: connection)
+            self?.scheduleReconnect(L("Extension connection invalidated"), from: connection)
         }
         connection.interruptionHandler = { [weak self, weak connection] in
-            self?.scheduleReconnect("Extension connection interrupted", from: connection)
+            self?.scheduleReconnect(L("Extension connection interrupted"), from: connection)
         }
         connection.resume()
         self.connection = connection
 
         let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self, weak connection] error in
-            self?.scheduleReconnect("Extension unreachable: \(error.localizedDescription)", from: connection)
+            self?.scheduleReconnect(L("Extension unreachable: %@", error.localizedDescription), from: connection)
         } as? FlowlightProviderXPC
         proxy?.register { [weak self, weak connection] ok, version in
             guard let self else { return }
@@ -97,10 +97,10 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 self.version = version
                 // A refusal used to end here, with a line of status text and no timer: connected, registered at
                 // nothing, and never going to try again. It is a failure like any other, so it goes on the ladder.
-                guard ok else { self.scheduleReconnect("Extension refused registration", from: connection); return }
+                guard ok else { self.scheduleReconnect(L("Extension refused registration"), from: connection); return }
                 self.recovery.succeeded()
-                self.status?(self.sawTraffic ? "Connected to filter extension \(version)"
-                                             : "Connected to filter extension \(version) — no traffic from it yet")
+                self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
+                                             : L("Connected to filter extension %@ — no traffic from it yet", version))
                 self.startHeartbeat()
                 self.pushEnforcement()
                 self.pushRules()
@@ -120,11 +120,10 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             DispatchQueue.main.async {
                 guard self.connection === connection, !self.sawTraffic else { return }
                 let message = detail.isEmpty
-                    ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another "
-                      + "one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already "
-                      + "has that slot. The extension can't capture anything on this Mac until that changes."
-                    : "macOS refused to start Flowlight's filter: \(detail)"
-                self.status?(detail.isEmpty ? "Connected to the extension \(version), but it isn't filtering" : "The filter couldn't start")
+                    ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
+                    : L("macOS refused to start Flowlight's filter: %@", detail)
+                self.status?(detail.isEmpty ? L("Connected to the extension %@, but it isn't filtering", version)
+                                            : L("The filter couldn't start"))
                 self.onFilterUnavailable?(message)
             }
         }
@@ -240,7 +239,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         if !batches.isEmpty, !sawTraffic {
             sawTraffic = true
             let version = self.version
-            DispatchQueue.main.async { [weak self] in self?.status?("Connected to filter extension \(version)") }
+            DispatchQueue.main.async { [weak self] in self?.status?(L("Connected to filter extension %@", version)) }
         }
         // Empty deliveries are passed on too: ingest reads them as "capture is alive, nothing moved".
         sink?(batches)

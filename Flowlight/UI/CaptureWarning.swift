@@ -124,7 +124,7 @@ struct BlockingUnavailableNotice: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "shield.slash").font(.caption).foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 3) {
-                Text(enforcing ? "Blocking is on, but not in effect here" : "Blocking needs the Network Extension")
+                Text(enforcing ? L("Blocking is on, but not in effect here") : L("Blocking needs the Network Extension"))
                     .font(.caption.weight(.semibold)).foregroundStyle(.orange)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(reason)
@@ -142,14 +142,12 @@ struct BlockingUnavailableNotice: View {
 
     private var reason: String {
         if !ExtensionManager.isEntitled {
-            return "This build isn't signed for the Network Extension, so nothing sits in the path of a connection "
-                + "to refuse it. Allowlists still raise alerts."
+            return L("This build isn't signed for the Network Extension, so nothing sits in the path of a connection to refuse it. Allowlists still raise alerts.")
         }
         if monitor.mode != .networkExtension {
-            return "The nettop sampler counts traffic after it has left the Mac — it can't refuse a connection. "
-                + "Allowlists still raise alerts."
+            return L("The nettop sampler counts traffic after it has left the Mac — it can't refuse a connection. Allowlists still raise alerts.")
         }
-        return "macOS isn't letting Flowlight's filter run, so it can't refuse anything. Allowlists still raise alerts."
+        return L("macOS isn't letting Flowlight's filter run, so it can't refuse anything. Allowlists still raise alerts.")
     }
 }
 
@@ -163,8 +161,8 @@ struct OtherFiltersNotice: View {
         HStack(alignment: .top, spacing: 12) {
             CaptureGlyph(symbol: "shield.lefthalf.filled", tint: .orange)
             VStack(alignment: .leading, spacing: 6) {
-                Text(filters.count == 1 ? "Another content filter is active on this Mac"
-                                        : "\(filters.count) other content filters are active on this Mac")
+                Text(filters.count == 1 ? L("Another content filter is active on this Mac")
+                                        : L("%lld other content filters are active on this Mac", filters.count))
                     .font(.body.weight(.medium))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
@@ -178,12 +176,11 @@ struct OtherFiltersNotice: View {
                         }
                     }
                 }
-                Text("""
-                macOS runs one content filter at a time. While \(filters.count == 1 ? "this one is" : "these are") active, \
-                Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension \
-                source will stay empty. The nettop sampler doesn't use a filter and works alongside \
-                \(filters.count == 1 ? "it" : "them").
-                """)
+                // One filter and several read as two different sentences, and a sentence assembled from two
+                // interpolated fragments is one no translator can put in the order their language wants.
+                Text(filters.count == 1
+                     ? L("macOS runs one content filter at a time. While this one is active, Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension source will stay empty. The nettop sampler doesn't use a filter and works alongside it.")
+                     : L("macOS runs one content filter at a time. While these are active, Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension source will stay empty. The nettop sampler doesn't use a filter and works alongside them."))
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if monitor.mode == .networkExtension {

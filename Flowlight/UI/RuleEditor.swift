@@ -52,19 +52,18 @@ struct RuleEditor: View {
                     }
                     switch rule.schedule.kind {
                     case .until:
-                        DatePicker("Until", selection: Binding(
+                        DatePicker(L("Until"), selection: Binding(
                             get: { rule.schedule.until ?? Date().addingTimeInterval(3600) },
                             set: { rule.schedule.until = $0 }), displayedComponents: [.date, .hourAndMinute])
                     case .window:
                         weekdayPicker
                         HStack {
-                            clock("From", minutes: $rule.schedule.start)
-                            clock("To", minutes: $rule.schedule.end)
+                            clock(L("From"), minutes: $rule.schedule.start)
+                            clock(L("To"), minutes: $rule.schedule.end)
                         }
                         Text(rule.schedule.end <= rule.schedule.start
-                             ? "This window crosses midnight, so it belongs to the day it opened."
-                             : "Hours are local. A Mac that sleeps through the end of a window finds it closed on waking, "
-                               + "and a window closing stops new connections — it doesn't tear down ones already open.")
+                             ? L("This window crosses midnight, so it belongs to the day it opened.")
+                             : L("Hours are local. A Mac that sleeps through the end of a window finds it closed on waking, and a window closing stops new connections — it doesn't tear down ones already open."))
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     case .session:
                         Text(L("Gone when Flowlight quits, including a crash. Nothing is left behind in force."))
@@ -104,7 +103,7 @@ struct RuleEditor: View {
                 }
 
                 Section {
-                    TextField(L("Name"), text: $rule.name, prompt: Text(rule.title))
+                    TextField(L("Name"), text: $rule.name, prompt: Text(RuleWords.title(rule)))
                 }
             }
             .formStyle(.grouped)
@@ -117,7 +116,7 @@ struct RuleEditor: View {
                 }
                 Spacer()
                 Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(isNew ? "Add" : "Save") {
+                Button(isNew ? L("Add") : L("Save")) {
                     save(rule)
                     dismiss()
                 }
@@ -143,7 +142,7 @@ struct RuleEditor: View {
                     .background((rule.action == .block ? Color.red : Color.green).opacity(0.14),
                                 in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(isNew ? "New Rule" : "Edit Rule").font(.headline)
+                    Text(isNew ? L("New Rule") : L("Edit Rule")).font(.headline)
                     Text(engineNote).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -161,23 +160,29 @@ struct RuleEditor: View {
     /// someone has quietly moved from refusing a connection to answering a request.
     private var engineNote: String {
         rule.engine == .flow
-            ? "Refused as a connection, before it is made"
-            : "Answered as a request, with a status the agent can read"
+            ? L("Refused as a connection, before it is made")
+            : L("Answered as a request, with a status the agent can read")
     }
 
     /// The rule read back as a sentence, which is the only check most people will make. What the rule names is set
     /// in monospace, so the part that has to be typed exactly looks like it.
+    ///
+    /// The sentence is one key, verb and all — a sentence assembled from a translated preposition and an English
+    /// verb reads as neither language. `RuleWords.sentence` fills the placeholders back in as styled `Text`, so a
+    /// translator can put the app before or after the destination and still get the monospace where it belongs.
     private var sentence: Text {
-        let verb = rule.action == .block ? "Refuse" : "Allow"
-        let who = code(rule.app.isEmpty ? "anything" : rule.app)
+        let who = code(rule.app.isEmpty ? L("anything") : rule.app)
         let target = code(destinationPhrase)
-        let when = rule.schedule.describe(at: Date(), session: RuleStore.session)
-        let tail = Text(" \(when == "Always" ? "Always" : when).").foregroundStyle(.secondary)
+        let when = RuleWords.schedule(rule.schedule, at: Date(), session: RuleStore.session)
+        let tail = Text(" \(when).").foregroundStyle(.secondary)
         if rule.method.isEmpty {
-            return Text("\(verb) ") + who + Text(L(" reaching ")) + target + Text(".") + tail
+            let format = rule.action == .block ? L("Refuse %1$@ reaching %2$@.") : L("Allow %1$@ reaching %2$@.")
+            return RuleWords.sentence(format, [who, target]) + tail
         }
-        return Text("\(verb) ") + code(rule.method.uppercased()) + Text(L(" requests from ")) + who
-            + Text(L(" to ")) + target + Text(".") + tail
+        let format = rule.action == .block
+            ? L("Refuse %1$@ requests from %2$@ to %3$@.")
+            : L("Allow %1$@ requests from %2$@ to %3$@.")
+        return RuleWords.sentence(format, [code(rule.method.uppercased()), who, target]) + tail
     }
 
     private func code(_ string: String) -> Text {
@@ -185,7 +190,7 @@ struct RuleEditor: View {
     }
 
     private var destinationPhrase: String {
-        var target = rule.destination.isEmpty ? "anywhere" : rule.destination
+        var target = rule.destination.isEmpty ? L("anywhere") : rule.destination
         if !rule.path.isEmpty { target += rule.path }
         return target
     }

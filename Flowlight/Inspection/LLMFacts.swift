@@ -115,7 +115,7 @@ enum LLMFactsReader {
                 let listed = configs.filter { ($0.value["enabled"] as? Bool ?? true) }.keys.sorted()
                 if !defaultsOn, !listed.isEmpty { connectors[server]?.allowedTools = listed }
                 facts.declaredTools.append(DeclaredTool(name: server, kind: .mcpToolset, server: server,
-                                                        detail: defaultsOn ? nil : "only \(listed.count) tools enabled"))
+                                                        detail: defaultsOn ? nil : L("only %lld tools enabled", listed.count)))
             } else if let name = tool["name"] as? String {
                 let isProvider = tool["input_schema"] == nil && type != nil
                 facts.declaredTools.append(DeclaredTool(name: name, kind: isProvider ? .provider : .function,
@@ -246,7 +246,7 @@ enum LLMFactsReader {
 
     private static func approval(_ value: Any?) -> String? {
         if let text = value as? String { return text }
-        if value is [String: Any] { return "per tool" }
+        if value is [String: Any] { return L("per tool") }
         return nil
     }
 

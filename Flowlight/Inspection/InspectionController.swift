@@ -8,7 +8,7 @@ final class InspectionController: ObservableObject {
     enum Scope: String, CaseIterable, Identifiable {
         case agents, all
         var id: String { rawValue }
-        var title: String { self == .agents ? "AI agents and their tools" : "Every app that uses the proxy" }
+        var title: String { self == .agents ? L("AI agents and their tools") : L("Every app that uses the proxy") }
     }
 
     enum Keys {
@@ -39,6 +39,9 @@ final class InspectionController: ObservableObject {
     @Published private(set) var working = false
     /// What a setup check found, or nil if it hasn't been run since inspection was turned on.
     @Published private(set) var diagnosis: String?
+    /// Whether that sentence is the good news. Kept beside it rather than read back out of it: the sentence is
+    /// translated, so matching its wording would only work in English.
+    @Published private(set) var diagnosisIsGood = false
 
     private let proxy = InspectionProxy()
     private let recorder = InspectionRecorder()
@@ -127,7 +130,7 @@ final class InspectionController: ObservableObject {
                             subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
                             port: UInt16(clamping: 443), method: head.method, engine: .request)
                 return .replace(Self.reframe(bytes, body: filtered.body),
-                                note: "Removed \(filtered.removed.joined(separator: ", "))")
+                                note: L("Removed %@", filtered.removed.joined(separator: ", ")))
             }
         }
         proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
@@ -277,8 +280,7 @@ final class InspectionController: ObservableObject {
         let needsProxyChange = !services.isEmpty
         if on, services.isEmpty {
             working = false
-            lastError = "No network services to send through the proxy, so nothing would be inspected. "
-                + "Check System Settings › Network."
+            lastError = L("No network services to send through the proxy, so nothing would be inspected. Check System Settings › Network.")
             proxy.stop()
             return
         }
@@ -294,7 +296,7 @@ final class InspectionController: ObservableObject {
                 NSAppleScript(source: script)?.executeAndReturnError(&error)
                 failure = error.flatMap { e -> String? in
                     (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
-                        : (e[NSAppleScript.errorMessage] as? String ?? "authorization failed")
+                        : (e[NSAppleScript.errorMessage] as? String ?? L("authorization failed"))
                 }
                 // Don't leave the certificate trusted for a proxy that was never set up.
                 if failure != nil, trustChanged { try? certificate.setTrusted(!on) }
@@ -306,7 +308,7 @@ final class InspectionController: ObservableObject {
     private func finishSetup(on: Bool, failure: String?) {
         working = false
         if let failure {
-            if !failure.lowercased().contains("cancel") { lastError = "Couldn't set Flowlight up: \(failure)" }
+            if !failure.lowercased().contains("cancel") { lastError = L("Couldn't set Flowlight up: %@", failure) }
             if on { proxy.stop() }   // leave nothing half-configured
             UserDefaults.standard.set(false, forKey: Keys.enabled)
             UserDefaults.standard.set(false, forKey: Keys.systemProxy)
@@ -315,6 +317,7 @@ final class InspectionController: ObservableObject {
             UserDefaults.standard.set(on, forKey: Keys.systemProxy)
             if !on { proxy.stop() }
             diagnosis = nil
+            diagnosisIsGood = false
             // Confirm it actually works rather than assuming the commands took effect.
             if on { Task { await checkSetup() } }
         }
@@ -398,11 +401,16 @@ final class InspectionController: ObservableObject {
     func openInspectedTerminal() {
         let script = FileManager.default.temporaryDirectory.appendingPathComponent("Flowlight Inspected Shell.command")
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        // The greeting is translated, so it is escaped before it goes into the script: a quote or a $ in a
+        // translation would otherwise be read by the shell rather than printed.
+        let greeting = L("Flowlight is inspecting HTTPS from this window. Agents you start here show up in Flowlight › Inspect.")
+            .replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "$", with: "\\$").replacingOccurrences(of: "`", with: "\\`")
         let body = """
         #!/bin/sh
         \(shellSetup)
         clear
-        echo "Flowlight is inspecting HTTPS from this window. Agents you start here show up in Flowlight › Inspect."
+        echo "\(greeting)"
         exec \(shell) -l
         """
         do {
@@ -410,7 +418,7 @@ final class InspectionController: ObservableObject {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
             NSWorkspace.shared.open(script)
         } catch {
-            lastError = "Couldn't open a Terminal window: \(error.localizedDescription)"
+            lastError = L("Couldn't open a Terminal window: %@", error.localizedDescription)
         }
     }
 
@@ -420,9 +428,11 @@ final class InspectionController: ObservableObject {
     /// one isn't. Turning inspection on reports success as soon as the commands run, but a listener that never
     /// came up or a proxy setting that didn't take leaves the app quietly inspecting nothing.
     func checkSetup() async {
+        diagnosisIsGood = false
         guard UserDefaults.standard.bool(forKey: Keys.enabled) else { diagnosis = nil; return }
         guard let listening = port else {
-            diagnosis = "The proxy isn't listening. Another program may be using port \(configuredPort) — change it under Advanced."
+            diagnosis = L("The proxy isn't listening. Another program may be using port %lld — change it under Advanced.",
+                          Int(configuredPort))
             return
         }
         let services = SystemProxy.services()
@@ -434,7 +444,8 @@ final class InspectionController: ObservableObject {
             }
         }.value
         if !unset.isEmpty {
-            diagnosis = "\(unset.joined(separator: ", ")) isn't set to use Flowlight's proxy. Turn inspection off and on again."
+            diagnosis = L("%@ isn't set to use Flowlight's proxy. Turn inspection off and on again.",
+                          unset.joined(separator: ", "))
             return
         }
         // The PAC file has to be served, or macOS quietly falls back to connecting directly.
@@ -443,15 +454,17 @@ final class InspectionController: ObservableObject {
         do {
             let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty else {
-                diagnosis = "Flowlight isn't serving its proxy settings file, so macOS is connecting directly."
+                diagnosis = L("Flowlight isn't serving its proxy settings file, so macOS is connecting directly.")
                 return
             }
         } catch {
-            diagnosis = "Couldn't reach Flowlight's proxy settings file: \(error.localizedDescription)"
+            diagnosis = L("Couldn't reach Flowlight's proxy settings file: %@", error.localizedDescription)
             return
         }
-        let covered = scope == .agents ? "AI agents and their tools" : "every app that uses the proxy"
-        diagnosis = "Ready: \(services.joined(separator: ", ")) routed through 127.0.0.1:\(listening), inspecting \(covered)."
+        let covered = scope == .agents ? L("AI agents and their tools") : L("every app that uses the proxy")
+        diagnosis = L("Ready: %@ routed through 127.0.0.1:%lld, inspecting %@.",
+                      services.joined(separator: ", "), Int(listening), covered)
+        diagnosisIsGood = true
     }
 
     nonisolated static func pacScript(port: UInt16, never patterns: [String]) -> String {
@@ -475,7 +488,7 @@ final class InspectionController: ObservableObject {
     /// macOS asks for an administrator password.
     func setSystemProxy(_ on: Bool) {
         let services = SystemProxy.services()
-        guard !services.isEmpty else { lastError = "No network services found."; return }
+        guard !services.isEmpty else { lastError = L("No network services found."); return }
         let pac = "http://127.0.0.1:\(port ?? configuredPort)/proxy.pac"
         let commands = services.flatMap { service -> [String] in
             let quoted = InspectionShell.quote(service)
@@ -488,7 +501,8 @@ final class InspectionController: ObservableObject {
         NSAppleScript(source: source)?.executeAndReturnError(&error)
         if let error {
             if (error[NSAppleScript.errorNumber] as? Int) != -128 {
-                lastError = "Couldn't change the proxy settings: \(error[NSAppleScript.errorMessage] as? String ?? "unknown error")"
+                lastError = L("Couldn't change the proxy settings: %@",
+                              error[NSAppleScript.errorMessage] as? String ?? L("unknown error"))
             }
             return
         }

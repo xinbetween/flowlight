@@ -26,7 +26,8 @@ struct BodyView: View {
                 Text(summary).font(.caption).foregroundStyle(.secondary)
                 if !term.isEmpty {
                     let count = matchingLines.count
-                    Text(count == 0 ? "no match" : "\(count) matching \(count == 1 ? "line" : "lines")")
+                    Text(count == 0 ? L("no match")
+                         : count == 1 ? L("%lld matching line", count) : L("%lld matching lines", count))
                         .font(.caption).foregroundStyle(count == 0 ? .secondary : Color.accentColor)
                     if count > 0, mode == "tree", isStructured {
                         Button(L("Show")) { mode = "raw" }
@@ -59,7 +60,7 @@ struct BodyView: View {
                     }
                 }
             case .binary(let count):
-                Text("\(count) bytes of binary data").font(.caption).foregroundStyle(.secondary)
+                Text(L("%lld bytes of binary data", count)).font(.caption).foregroundStyle(.secondary)
             case .empty:
                 EmptyView()
             default:
@@ -119,11 +120,14 @@ struct BodyView: View {
 
     private var summary: String {
         switch content {
-        case .json(let v): return v.isContainer ? "JSON · \(v.count) \(v.count == 1 ? "item" : "items") · \(ByteFormat.string(Int64(data.count)))" : "JSON"
-        case .events(let e): return "Event stream · \(e.count) events · \(ByteFormat.string(Int64(data.count)))"
-        case .text: return "Text · \(ByteFormat.string(Int64(data.count)))"
-        case .binary: return "Binary"
-        case .empty: return "No body"
+        case .json(let v):
+            guard v.isContainer else { return "JSON" }
+            let size = ByteFormat.string(Int64(data.count))
+            return v.count == 1 ? L("JSON · %lld item · %@", v.count, size) : L("JSON · %lld items · %@", v.count, size)
+        case .events(let e): return L("Event stream · %lld events · %@", e.count, ByteFormat.string(Int64(data.count)))
+        case .text: return L("Text · %@", ByteFormat.string(Int64(data.count)))
+        case .binary: return L("Binary")
+        case .empty: return L("No body")
         }
     }
 
@@ -136,7 +140,7 @@ struct BodyView: View {
         case .text(let t): text = t
         default: text = ""
         }
-        return text.count > limit ? String(text.prefix(limit)) + "\n… (\(text.count - limit) more characters)" : text
+        return text.count > limit ? String(text.prefix(limit)) + "\n" + L("… (%lld more characters)", text.count - limit) : text
     }
 
     private func copy() {
@@ -181,7 +185,7 @@ struct JSONNodeView: View {
                                  keyStyle: isArray ? .index : .key)
                 }
                 if children.count > shown {
-                    Button("Show \(min(200, children.count - shown)) more of \(children.count - shown)") { shown += 200 }
+                    Button(L("Show %lld more of %lld", min(200, children.count - shown), children.count - shown)) { shown += 200 }
                         .buttonStyle(.link).font(.caption)
                         .padding(.leading, CGFloat(depth + 1) * 14 + 16)
                         .padding(.vertical, 2)
@@ -243,7 +247,7 @@ struct JSONNodeView: View {
         case .string(let s):
             Text(JSONValue.quote(s)).foregroundStyle(Color(nsColor: .systemGreen))
                 .lineLimit(fullString ? nil : 4).textSelection(.enabled)
-                .help(s.count > 300 && !fullString ? "Click to show the whole string" : "")
+                .help(s.count > 300 && !fullString ? L("Click to show the whole string") : "")
         case .number(let n):
             Text(n).foregroundStyle(Color(nsColor: .systemBlue)).textSelection(.enabled)
         case .bool(let b):
@@ -278,7 +282,7 @@ struct JSONNodeView: View {
             }
             return "{ " + parts.joined(separator: ", ") + (pairs.count > 4 ? ", …" : "") + " }"
         case .array(let items):
-            return "[\(items.count) \(items.count == 1 ? "item" : "items")]"
+            return items.count == 1 ? L("[%lld item]", items.count) : L("[%lld items]", items.count)
         default:
             return ""
         }

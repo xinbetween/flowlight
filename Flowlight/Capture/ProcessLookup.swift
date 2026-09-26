@@ -47,7 +47,8 @@ final class ProcessLookup: @unchecked Sendable {
                 name = String(cString: nameBuf)
             }
             if name.isEmpty { name = "pid \(pid)" }
-            info = Info(bundleID: name, name: name, path: path)
+            // The bundle id stays the executable's own name, because rules and history are keyed by it.
+            info = Info(bundleID: name, name: ProcessNaming.friendlyName(executable: name), path: path)
         }
         lock.lock(); cache[pid] = (info, Date()); lock.unlock()
         return info

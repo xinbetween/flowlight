@@ -241,7 +241,7 @@ enum DemoData {
 
 /// Live feed for demo mode: plausible per-second batches following the same app mix.
 final class DemoTrafficSource: TrafficSource, @unchecked Sendable {
-    let displayName = "Demo data"
+    var displayName: String { L("Demo data") }
     private var timer: DispatchSourceTimer?
     private var rng = SeededGenerator(seed: UInt64(Date().timeIntervalSince1970))
 

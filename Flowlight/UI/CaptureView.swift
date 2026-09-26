@@ -31,6 +31,7 @@ struct CaptureView: View {
                 CaptureWarningBanner()
                 if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 sourceSection
+                filterSection
                 if monitor.mode == .nettop { HostnameSection() }
                 storageSection
             }
@@ -52,23 +53,36 @@ struct CaptureView: View {
     }
 
     private var subtitle: String {
-        if monitor.extensionFellBack { return "nettop sampler · the extension didn't answer" }
-        let source = monitor.mode == .networkExtension ? "Network Extension" : "nettop sampler"
-        return monitor.isReceiving ? "\(source) · receiving" : "\(source) · nothing arriving yet"
+        if monitor.extensionFellBack { return L("nettop sampler · the extension didn't answer") }
+        let source = monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler")
+        return monitor.isReceiving ? L("%@ · receiving", source) : L("%@ · nothing arriving yet", source)
     }
 
     // MARK: Source
 
     private var sourceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading("Source")
+            CaptureHeading(L("Source"))
             VStack(spacing: 0) {
                 sourceRow(.networkExtension)
-                extensionControls
-                filterNotes
                 Divider().padding(.leading, 50)
                 sourceRow(.nettop)
                 samplerNotes
+            }
+            .background(.quaternary.opacity(0.35))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    /// The filter is not the choice above it. Choosing the Network Extension as the source says where Flowlight
+    /// would like its data to come from; installing, enabling and removing a system extension is a separate
+    /// thing someone does once, with macOS's approval, and it outlives both the choice and the app.
+    private var filterSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CaptureHeading(L("Content filter"))
+            VStack(spacing: 0) {
+                extensionControls
+                filterNotes
             }
             .background(.quaternary.opacity(0.35))
             .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -105,15 +119,13 @@ struct CaptureView: View {
     }
 
     private func sourceName(_ mode: CaptureMode) -> String {
-        mode == .networkExtension ? "Network Extension" : "nettop sampler"
+        mode == .networkExtension ? L("Network Extension") : L("nettop sampler")
     }
 
     private func sourceBlurb(_ mode: CaptureMode) -> String {
         mode == .networkExtension
-            ? "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and "
-              + "your approval."
-            : "Samples nettop once per second without a separate entitlement. Connections that begin and end "
-              + "between samples may not be recorded."
+            ? L("Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval.")
+            : L("Samples nettop once per second without a separate entitlement. Connections that begin and end between samples may not be recorded.")
     }
 
     /// Whether anything is actually arriving. The source rows say what was asked for; this says what happened.
@@ -137,14 +149,14 @@ struct CaptureView: View {
     }
 
     private var statusHeadline: String {
-        if monitor.extensionFellBack { return "Arriving from nettop, not the extension" }
-        return monitor.isReceiving ? "Data is arriving" : "Nothing is arriving"
+        if monitor.extensionFellBack { return L("Arriving from nettop, not the extension") }
+        return monitor.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
     }
 
     // MARK: Network Extension
 
-    /// Install, disable, uninstall, refresh — directly under the source they belong to, so choosing the
-    /// extension and turning it on are the same place rather than two sections apart.
+    /// Install, disable, uninstall, refresh: the filter's own lifecycle, in its own section. It is installed
+    /// once and stays installed — including after Flowlight quits — whichever source is selected above.
     private var extensionControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
@@ -159,13 +171,12 @@ struct CaptureView: View {
             }
             if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
             if monitor.extensionFellBack {
-                CaptureNote(text: "Flowlight couldn't reach the filter extension and is sampling with nettop "
-                            + "so you still get data. Your chosen source is still the extension.",
+                CaptureNote(text: L("Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension."),
                             icon: "arrow.uturn.down.circle.fill")
             }
             extensionButtons
         }
-        .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
+        .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 14)
     }
 
     private var extensionButtons: some View {
@@ -215,56 +226,40 @@ struct CaptureView: View {
     /// The two facts that decide whether the filter can ever run, stated before anyone presses a button that will
     /// fail because of them.
     private var extensionFacts: String {
-        (ExtensionManager.isEntitled ? "entitled" : "not entitled")
-            + " · " + (extensionManager.isInApplications ? "in /Applications" : "not in /Applications")
+        let entitlement = ExtensionManager.isEntitled ? L("entitled") : L("not entitled")
+        let location = extensionManager.isInApplications ? L("in /Applications") : L("not in /Applications")
+        return "\(entitlement) · \(location)"
     }
 
     /// What the filter is and what it costs, folded away. Every word of it matters the first time and none of it
     /// matters the twentieth, which is exactly what a disclosure is for.
     private var filterNotes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("""
-            The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, \
-            extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It \
-            requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid \
-            developer team, and the app must be in the Applications folder. It never blocks traffic.
-            """)
+            Text(L("The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else."))
             .font(.caption).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            CaptureFact(icon: "checkmark.seal", tint: .green, title: "Captures short-lived eligible flows",
-                        detail: "macOS calls the filter when an eligible connection opens, providing better "
-                        + "coverage of short requests than periodic sampling. Traffic from before activation is "
-                        + "not available, some system traffic is exempt from content filters, and byte counts "
-                        + "come from the filter's statistics reports.")
-            CaptureFact(icon: "info.circle", tint: .secondary, title: "It keeps filtering after you quit Flowlight",
-                        detail: "The system extension runs independently and remains active until you select "
-                        + "Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by "
-                        + "the extension for later delivery, subject to its retention limit.")
+            CaptureFact(icon: "checkmark.seal", tint: .green, title: L("Captures short-lived eligible flows"),
+                        detail: L("macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports."))
+            CaptureFact(icon: "info.circle", tint: .secondary, title: L("It keeps filtering after you quit Flowlight"),
+                        detail: L("The system extension runs independently and remains active until you select Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit."))
             CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
-                        title: "macOS runs one content filter at a time",
-                        detail: "If a VPN or security agent already has that slot — Palo Alto Networks "
-                        + "GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs "
-                        + "and connects but is never asked to filter anything, so nothing appears. Use the sampler "
-                        + "on those Macs.")
+                        title: L("macOS runs one content filter at a time"),
+                        detail: L("If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs."))
         }
-        .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
+        .padding(.horizontal, 12).padding(.bottom, 14)
     }
 
     /// What the sampler costs, under the sampler.
     private var samplerNotes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            (Text(L("Flowlight reads ")).font(.caption)
-             + Text(L("/usr/bin/nettop")).font(.caption.monospaced())
-             + Text(L(" once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.")).font(.caption))
+            // One sentence, one key. It used to be three — a localized fragment either side of a monospaced
+            // path — and three keys is how a sentence ends up half translated.
+            Text(L("Flowlight reads /usr/bin/nettop once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.")).font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
-                        title: "What it misses is whole connections, not bytes",
-                        detail: "nettop reports running totals, and Flowlight records the difference between "
-                        + "one second and the next — so a long transfer is counted exactly, however bursty it "
-                        + "was. What never appears is anything that starts and finishes between two readings: "
-                        + "a quick DNS lookup, a fast API call, a script that runs curl and exits. The "
-                        + "extension sees those.")
+                        title: L("What it misses is whole connections, not bytes"),
+                        detail: L("nettop reports running totals, and Flowlight records the difference between one second and the next — so a long transfer is counted exactly, however bursty it was. What never appears is anything that starts and finishes between two readings: a quick DNS lookup, a fast API call, a script that runs curl and exits. The extension sees those."))
         }
         .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
     }
@@ -273,7 +268,7 @@ struct CaptureView: View {
 
     private var storageSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading("Storage")
+            CaptureHeading(L("Storage"))
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     CaptureGlyph(symbol: "internaldrive", tint: .secondary)
@@ -307,7 +302,7 @@ struct HostnameSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading("Hostnames")
+            CaptureHeading(L("Hostnames"))
             coverageCard
             packetCaptureCard
             ownerCard
@@ -319,8 +314,8 @@ struct HostnameSection: View {
     private var coverageCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 40) {
-                figure("Named", monitor.coverage.named)
-                figure("Named or owner known", monitor.coverage.owned)
+                figure(L("Named"), monitor.coverage.named)
+                figure(L("Named or owner known"), monitor.coverage.owned)
                 Spacer(minLength: 0)
             }
             Text(L("Of the connections seen in the last hour. Order of preference: TLS server name, DNS answer, reverse DNS, network owner."))
@@ -342,9 +337,8 @@ struct HostnameSection: View {
 
     private var packetCaptureCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            toggleHeader("Learn hostnames from DNS and TLS",
-                         "Reads DNS answers and TLS server names (SNI) on the primary network interface. Packet "
-                         + "contents are not stored.",
+            toggleHeader(L("Learn hostnames from DNS and TLS"),
+                         L("Reads DNS answers and TLS server names (SNI) on the primary network interface. Packet contents are not stored."),
                          isOn: $packetCapture)
                 .onChange(of: packetCapture) { monitor.updatePacketCapture() }
             if packetCapture {
@@ -375,16 +369,14 @@ struct HostnameSection: View {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "key.fill").font(.caption)
                 Text(CaptureAccess.isInstalled
-                     ? "Setup is installed, but this login session doesn't have access yet. Log out and back in, or "
-                       + "restart your Mac."
-                     : "macOS only lets administrators read network packets. A one-time setup grants your account "
-                       + "read access, as Wireshark does. It asks for your password once.")
+                     ? L("Setup is installed, but this login session doesn't have access yet. Log out and back in, or restart your Mac.")
+                     : L("macOS only lets administrators read network packets. A one-time setup grants your account read access, as Wireshark does. It asks for your password once."))
                     .font(.caption)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.orange)
             HStack(spacing: 8) {
-                Button(CaptureAccess.isInstalled ? "Run Setup Again…" : "Enable Packet Capture…") { run(.install) }
+                Button(CaptureAccess.isInstalled ? L("Run Setup Again…") : L("Enable Packet Capture…")) { run(.install) }
                     .controlSize(.small).disabled(working)
                 if working { ProgressView().controlSize(.small) }
             }
@@ -394,9 +386,8 @@ struct HostnameSection: View {
     }
 
     private var ownerCard: some View {
-        toggleHeader("Identify network owners",
-                     "When no hostname is known, look up who operates the IP (e.g. Cloudflare, Google) using Team "
-                     + "Cymru's DNS service. Public IPs are sent to that service; private addresses never are.",
+        toggleHeader(L("Identify network owners"),
+                     L("When no hostname is known, look up who operates the IP (e.g. Cloudflare, Google) using Team Cymru's DNS service. Public IPs are sent to that service; private addresses never are."),
                      isOn: $ownerLookup)
             .captureCard()
     }
@@ -431,10 +422,11 @@ struct HostnameSection: View {
 
     private var statusText: String {
         switch monitor.captureState {
-        case .running(let interface): return "Capturing on \(interface) · \(monitor.hostnamesLearned.formatted()) hostnames learned this session"
-        case .noPermission: return "Needs one-time setup"
-        case .stopped: return "Stopped"
-        case .failed(let reason): return "Failed: \(reason)"
+        case .running(let interface):
+            return L("Capturing on %@ · %@ hostnames learned this session", interface, monitor.hostnamesLearned.formatted())
+        case .noPermission: return L("Needs one-time setup")
+        case .stopped: return L("Stopped")
+        case .failed(let reason): return L("Failed: %@", reason)
         }
     }
 
@@ -470,9 +462,9 @@ struct CaptureOnboardingView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                point("text.magnifyingglass", "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections.")
-                point("lock.shield", "Packet contents are never stored or sent anywhere. Only hostnames are kept.")
-                point("key", "macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture.")
+                point("text.magnifyingglass", L("Flowlight reads DNS answers and TLS server names on your primary network interface to name connections."))
+                point("lock.shield", L("Packet contents are never stored or sent anywhere. Only hostnames are kept."))
+                point("key", L("macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture."))
             }
 
             Toggle(isOn: $ownerLookup) {

@@ -17,7 +17,7 @@ struct LiveTalker: Identifiable, Equatable {
 /// Owns the capture source, database, anomaly engine and live state.
 @MainActor
 final class TrafficMonitor: ObservableObject {
-    @Published private(set) var status = "Starting…"
+    @Published private(set) var status = L("Starting…")
     @Published private(set) var mode: CaptureMode
     @Published private(set) var talkers: [LiveTalker] = []
     @Published private(set) var liveSeries: [SeriesPoint] = []
@@ -103,7 +103,7 @@ final class TrafficMonitor: ObservableObject {
             // Fall back to a throwaway database so the UI still works; surface the error.
             let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-\(UUID().uuidString).sqlite")
             db = try! TrafficDatabase(url: tmp)
-            lastError = "Could not open database: \(error)"
+            lastError = L("Could not open database: %@", "\(error)")
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
@@ -213,7 +213,7 @@ final class TrafficMonitor: ObservableObject {
         // Someone asking for this has usually just fixed something, so the extension gets a clean run at it
         // again even if it had given up earlier in this session.
         extensionFellBack = false
-        status = "Reconnecting…"
+        status = L("Reconnecting…")
         startSource()
     }
 
@@ -280,9 +280,9 @@ final class TrafficMonitor: ObservableObject {
         case .success:
             sniffer.stop()
             updatePacketCapture()
-            if action == .uninstall { return "Packet capture access was removed." }
-            if captureState == .noPermission { return "Access granted. Log out and back in to finish." }
-            return "Packet capture is enabled."
+            if action == .uninstall { return L("Packet capture access was removed.") }
+            if captureState == .noPermission { return L("Access granted. Log out and back in to finish.") }
+            return L("Packet capture is enabled.")
         case .failure(let error):
             return error.localizedDescription
         }
@@ -302,17 +302,14 @@ final class TrafficMonitor: ObservableObject {
         } else {
             if mode == .networkExtension {
                 fallbackNote = extensionFellBack
-                    ? "Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under "
-                      + "Network Extension to try the extension again."
-                    : "This build isn't signed for the Network Extension — sampling with nettop instead."
+                    ? L("Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again.")
+                    : L("This build isn't signed for the Network Extension — sampling with nettop instead.")
             }
             newSource = NettopTrafficSource()
         }
         // Same idea as FLForceCaptureOnboarding: a way to see this state on a Mac where the filter works.
         captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
-            ? "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN "
-              + "or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The "
-              + "extension can't capture anything on this Mac until that changes."
+            ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
             : nil
         if let extensionSource = newSource as? ExtensionTrafficSource {
             extensionSource.onFilterUnavailable = { [weak self] message in
@@ -330,7 +327,7 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         source = newSource
-        status = fallbackNote ?? "Starting \(newSource.displayName)…"
+        status = fallbackNote ?? L("Starting %@…", newSource.displayName)
         if started { updatePacketCapture() }
         newSource.start(sink: { [weak self] batches in
             self?.ingest(batches)
@@ -351,8 +348,8 @@ final class TrafficMonitor: ObservableObject {
     /// always leaves behind for a moment. Replacing it takes longer than the redial ladder's patience, so the
     /// ladder is reset and the status says what is happening rather than reporting silence.
     func extensionVersionRepairing(_ check: ExtensionManager.VersionCheck) {
-        status = "The installed filter extension is \(check.installedDescription) and this app is "
-            + "\(check.appVersion) — macOS is replacing it. Capture resumes once it has."
+        status = L("The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has.",
+                   check.installedDescription, check.appVersion)
         if let extensionSource = source as? ExtensionTrafficSource {
             extensionSource.versionRepairStarted()
         } else if mode == .networkExtension, extensionFellBack {
@@ -368,8 +365,8 @@ final class TrafficMonitor: ObservableObject {
         manager.matchExtensionToApp { [weak self] check in
             Task { @MainActor in
                 guard let self, check.repairing else { return }
-                self.status = "The installed filter extension is version \(check.installedDescription) and this app "
-                    + "is \(check.appVersion) — reinstalling the extension, then reconnecting."
+                self.status = L("The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting.",
+                                check.installedDescription, check.appVersion)
                 (self.source as? ExtensionTrafficSource)?.versionRepairStarted()
             }
         }
@@ -403,10 +400,11 @@ final class TrafficMonitor: ObservableObject {
                 let who = event.appName.isEmpty || event.appName == event.agentName
                     ? event.agentName : "\(event.agentName) › \(event.appName)"
                 let pattern = event.host.isEmpty ? event.ip : AnomalyEngine.registrableDomain(event.host)
-                let why = event.rule.isEmpty ? "not on \(event.agentName)'s allowlist" : "the rule \"\(event.rule)\""
+                let why = event.rule.isEmpty ? L("not on %@'s allowlist", event.agentName)
+                                             : L("the rule \"%@\"", event.rule)
                 alerts.append(try db.addAlert(kind: AnomalyEngine.Kind.blockedConnection.rawValue, bundleID: event.agentKey,
                                               appName: event.agentName,
-                                              detail: "Blocked \(who) from connecting to \(event.destination):\(event.port) — \(why)",
+                                              detail: L("Blocked %@ from connecting to %@:%lld — %@", who, event.destination, Int(event.port), why),
                                               severity: 3, at: Date(timeIntervalSince1970: TimeInterval(event.at)),
                                               allowPattern: pattern))
             }

@@ -88,21 +88,21 @@ struct FlowlightApp: App {
                     Button(item.title) { nav.selection = item }.keyboardShortcut(item.shortcut, modifiers: .command)
                 }
                 Divider()
-                Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
+                Button(focus.isOn ? L("Turn Focus Off") : L("Turn Focus On")) { focus.isOn.toggle() }
                     .keyboardShortcut("f", modifiers: [.command, .shift])
                     .disabled(focus.targets.isEmpty && !focus.isOn)
                 Divider()
             }
         }
 
-        Window("Software Update", id: "update") {
+        Window(L("Software Update"), id: "update") {
             UpdateView().environmentObject(updater)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .restorationBehavior(.disabled)
 
-        Window("Name Your Traffic", id: "capture-onboarding") {
+        Window(L("Name Your Traffic"), id: "capture-onboarding") {
             CaptureOnboardingView()
                 .environmentObject(monitor)
                 .onAppear { monitor.markCaptureOnboardingShown() }
@@ -179,13 +179,13 @@ enum AboutPanel {
             attrs[.link] = URL(string: url)
             return NSAttributedString(string: title, attributes: attrs)
         }
-        let credits = NSMutableAttributedString(string: "Every app. Every domain. Every agent.\n", attributes: body)
+        let credits = NSMutableAttributedString(string: L("Every app. Every domain. Every agent.") + "\n", attributes: body)
         credits.append(link("flowlight.xinbetween.com", "https://flowlight.xinbetween.com"))
         credits.append(NSAttributedString(string: "  ·  ", attributes: body))
-        credits.append(link("Source code", "https://github.com/xinbetween/flowlight"))
+        credits.append(link(L("Source code"), "https://github.com/xinbetween/flowlight"))
         credits.append(NSAttributedString(string: "  ·  ", attributes: body))
-        credits.append(link("GPL-3.0 license", "https://github.com/xinbetween/flowlight/blob/main/LICENSE"))
-        credits.append(NSAttributedString(string: "\nThis program comes with ABSOLUTELY NO WARRANTY. It is free software, and you are welcome to redistribute it under the terms of the GPL.", attributes: body))
+        credits.append(link(L("GPL-3.0 license"), "https://github.com/xinbetween/flowlight/blob/main/LICENSE"))
+        credits.append(NSAttributedString(string: "\n" + L("This program comes with ABSOLUTELY NO WARRANTY. It is free software, and you are welcome to redistribute it under the terms of the GPL."), attributes: body))
         NSApp.activate()
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }

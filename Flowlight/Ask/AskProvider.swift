@@ -21,12 +21,12 @@ enum AskProviderKind: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .onDevice: return "On-device model"
-        case .localServer: return "Local server (Ollama, LM Studio)"
-        case .anthropic: return "Anthropic"
-        case .openAI: return "OpenAI"
-        case .gemini: return "Google Gemini"
-        case .compatible: return "OpenAI-compatible endpoint"
+        case .onDevice: return L("On-device model")
+        case .localServer: return L("Local server (Ollama, LM Studio)")
+        case .anthropic: return L("Anthropic")
+        case .openAI: return L("OpenAI")
+        case .gemini: return L("Google Gemini")
+        case .compatible: return L("OpenAI-compatible endpoint")
         }
     }
 
@@ -226,7 +226,8 @@ enum AnswerText {
 
     /// What to say when cleaning leaves nothing. The queries still ran and are listed under the answer, so this
     /// points at them rather than pretending the turn produced nothing at all.
-    static let brokenReply = "The model replied with a tool call instead of an answer. The queries it ran are "
-        + "listed below — ask again, or word the question a little differently."
+    static var brokenReply: String {
+        L("The model replied with a tool call instead of an answer. The queries it ran are listed below — ask again, or word the question a little differently.")
+    }
 }
 

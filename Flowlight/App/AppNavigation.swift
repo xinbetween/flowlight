@@ -22,8 +22,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The English name, for the places that aren't the interface: the feature guide the Ask panel reads, and
-    /// anything else that runs off the main actor where the localized title can't be reached.
+    /// The English name, for the places that aren't the interface: the feature guide the Ask panel reads, whose
+    /// search index is matched against English words, and anything else the model rather than a person reads.
     nonisolated var englishTitle: String {
         switch self {
         case .live: return "Live"

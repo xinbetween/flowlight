@@ -18,6 +18,32 @@ final class AnomalyEngine: @unchecked Sendable {
         case allowlistViolation = "Allowlist violation"
         case blockedConnection = "Connection blocked"
 
+        /// The name an alert is shown under. The raw value is the English sentence and is what the database
+        /// stores; this is that sentence in the chosen language, so switching language renames old alerts too.
+        var title: String {
+            switch self {
+            case .volumeSpike: return L("Traffic spike")
+            case .destinationSpike: return L("Unusual number of destinations")
+            case .firstContact: return L("First contact with domain")
+            case .newApp: return L("New app on the network")
+            case .nonStandardPort: return L("Non-standard port")
+            case .uploadPercentile: return L("Upload above 99th percentile")
+            case .idleTraffic: return L("Traffic without UI activity")
+            case .agentSensitiveChannel: return L("Agent used a sensitive channel")
+            case .agentExfiltration: return L("Possible data exfiltration by agent")
+            case .agentUnnamedHost: return L("Agent contacted an unnamed host")
+            case .agentWhileAway: return L("Agent active while you were away")
+            case .allowlistViolation: return L("Allowlist violation")
+            case .blockedConnection: return L("Connection blocked")
+            }
+        }
+
+        /// A stored `kind`, named in the chosen language. One this build doesn't know — written by an older or a
+        /// newer Flowlight — reads as the English it already is rather than as nothing at all.
+        static func localizedName(_ stored: String) -> String {
+            Kind(rawValue: stored)?.title ?? stored
+        }
+
         static let agentKinds: Set<String> = [Kind.agentSensitiveChannel, .agentExfiltration, .agentUnnamedHost, .agentWhileAway,
                                               .allowlistViolation, .blockedConnection]
             .reduce(into: Set<String>()) { $0.insert($1.rawValue) }
@@ -140,7 +166,8 @@ final class AnomalyEngine: @unchecked Sendable {
                     // Only interesting once Flowlight itself has finished learning.
                     if !quiet, let oldest = appsFirstSeen.values.min(), now - oldest > Int64(s.learningPeriod) {
                         alerts.append(try db.addAlert(kind: Kind.newApp.rawValue, bundleID: k.bundleID, appName: k.appName,
-                                                      detail: "\(k.appName) made its first observed connection (\(k.domain.isEmpty ? k.remoteIP : k.domain))",
+                                                      detail: L("%@ made its first observed connection (%@)", k.appName,
+                                                                k.domain.isEmpty ? k.remoteIP : k.domain),
                                                       severity: 1))
                     }
                 }
@@ -155,7 +182,8 @@ final class AnomalyEngine: @unchecked Sendable {
                         newDestinations.append((k.bundleID, dest))
                         if !quiet && appLearned && s.alertFirstContact {
                             alerts.append(try db.addAlert(kind: Kind.firstContact.rawValue, bundleID: k.bundleID, appName: k.appName,
-                                                          detail: "\(k.appName) contacted \(k.domain) (\(k.remoteIP):\(k.port)) for the first time",
+                                                          detail: L("%@ contacted %@ (%@:%lld) for the first time", k.appName, k.domain,
+                                                                    k.remoteIP, Int(k.port)),
                                                           severity: 1))
                         }
                     }
@@ -167,7 +195,9 @@ final class AnomalyEngine: @unchecked Sendable {
                         newPorts.append((k.bundleID, k.port))
                         if !quiet && appLearned && s.alertNonStandardPorts {
                             alerts.append(try db.addAlert(kind: Kind.nonStandardPort.rawValue, bundleID: k.bundleID, appName: k.appName,
-                                                          detail: "\(k.appName) → \(k.domain.isEmpty ? k.remoteIP : k.domain) on \(k.transport.rawValue.uppercased()) port \(k.port) (\(k.appProtocol))",
+                                                          detail: L("%@ → %@ on %@ port %lld (%@)", k.appName,
+                                                                    k.domain.isEmpty ? k.remoteIP : k.domain,
+                                                                    k.transport.rawValue.uppercased(), Int(k.port), k.appProtocol),
                                                           severity: 2))
                         }
                     }
@@ -207,7 +237,9 @@ final class AnomalyEngine: @unchecked Sendable {
             if shouldAlert("allow|\(agentKey)|\(target)", every: 6 * 3600) {
                 let owner = k.parentAgentName ?? agent
                 alerts.append(try db.addAlert(kind: Kind.allowlistViolation.rawValue, bundleID: agentKey, appName: agent,
-                                              detail: "\(agent) contacted \(destination):\(k.port) (\(k.appProtocol)), which isn't on \(owner)'s allowlist — \(ByteFormat.string(c.bytesOut)) sent",
+                                              detail: L("%@ contacted %@:%lld (%@), which isn't on %@'s allowlist — %@ sent", agent,
+                                                        destination, Int(k.port), k.appProtocol, owner,
+                                                        ByteFormat.string(c.bytesOut)),
                                               severity: 3))
             }
         }
@@ -217,14 +249,20 @@ final class AnomalyEngine: @unchecked Sendable {
            shouldAlert("channel|\(agentKey)|\(k.appProtocol)|\(destination)", every: 6 * 3600) {
             let severe: Set<ProtocolCategory> = [.mail, .fileTransfer, .tunnel, .peerToPeer]
             alerts.append(try db.addAlert(kind: Kind.agentSensitiveChannel.rawValue, bundleID: agentKey, appName: agent,
-                                          detail: "\(agent) used \(k.appProtocol.uppercased()) (\(category.title.lowercased())) to \(destination):\(k.port) — \(ByteFormat.string(c.bytesOut)) sent",
+                                          detail: L("%@ used %@ (%@) to %@:%lld — %@ sent", agent, k.appProtocol.uppercased(),
+                                                    category.localizedTitle, destination, Int(k.port),
+                                                    ByteFormat.string(c.bytesOut)),
                                           severity: severe.contains(category) ? 3 : 2))
         }
         if s.agentUnnamedHosts, k.domain.isEmpty, owner.isEmpty || provider == nil, !local,
            !Self.standardPorts.contains(k.port), c.total > 0,
            shouldAlert("unnamed|\(agentKey)|\(k.remoteIP):\(k.port)", every: 24 * 3600) {
+            // The owner rides along with the address rather than as a placeholder of its own: a sentence with an
+            // optional word dropped into the middle of it is a sentence no translator can put in order.
+            let host = owner.isEmpty ? k.remoteIP : "\(owner) \(k.remoteIP)"
             alerts.append(try db.addAlert(kind: Kind.agentUnnamedHost.rawValue, bundleID: agentKey, appName: agent,
-                                          detail: "\(agent) connected to \(owner.isEmpty ? "" : owner + " ")\(k.remoteIP):\(k.port) (\(k.appProtocol)) with no hostname",
+                                          detail: L("%@ connected to %@:%lld (%@) with no hostname", agent, host, Int(k.port),
+                                                    k.appProtocol),
                                           severity: 2))
         }
         return alerts
@@ -246,14 +284,16 @@ final class AnomalyEngine: @unchecked Sendable {
                 lastHour.forEach { $0.destinations.forEach { totals[$0.key, default: 0] += $0.value } }
                 let top = totals.sorted { $0.value > $1.value }.prefix(2).map { "\($0.key) (\(ByteFormat.string($0.value)))" }
                 alerts.append(try db.addAlert(kind: Kind.agentExfiltration.rawValue, bundleID: bundleID, appName: name,
-                                              detail: "\(name) uploaded \(ByteFormat.string(egress)) to non-AI hosts in the last hour: \(top.joined(separator: ", "))",
+                                              detail: L("%@ uploaded %@ to non-AI hosts in the last hour: %@", name,
+                                                        ByteFormat.string(egress), top.joined(separator: ", ")),
                                               severity: 3, at: now))
             }
             let recent = history.filter { $0.minute >= currentMinute - 1 }.reduce(Int64(0)) { $0 + $1.total }
             if s.agentWhileAway, idle >= s.agentAwayMinutes * 60, recent >= s.agentAwayBytes,
                shouldAlert("away|\(bundleID)", every: 3600, now: now) {
                 alerts.append(try db.addAlert(kind: Kind.agentWhileAway.rawValue, bundleID: bundleID, appName: name,
-                                              detail: "\(name) moved \(ByteFormat.string(recent)) in the last minute while you were away (no input for \(Int(idle / 60)) min)",
+                                              detail: L("%@ moved %@ in the last minute while you were away (no input for %lld min)",
+                                                        name, ByteFormat.string(recent), Int(idle / 60)),
                                               severity: 2, at: now))
             }
         }
@@ -275,7 +315,8 @@ final class AnomalyEngine: @unchecked Sendable {
             if let last = lastIdleAlert[bundleID], now.timeIntervalSince(last) < 3600 { continue }
             lastIdleAlert[bundleID] = now
             alerts.append(try db.addAlert(kind: Kind.idleTraffic.rawValue, bundleID: bundleID, appName: entry.name,
-                                          detail: "\(entry.name) uploaded \(ByteFormat.string(entry.bytes)) in the last minute while idle for \(Int(idle / 60)) min",
+                                          detail: L("%@ uploaded %@ in the last minute while idle for %lld min", entry.name,
+                                                    ByteFormat.string(entry.bytes), Int(idle / 60)),
                                           severity: 2))
         }
         if !alerts.isEmpty { onAlert(alerts) }
@@ -314,7 +355,9 @@ final class AnomalyEngine: @unchecked Sendable {
                 let z = Self.zScore(x, b, floor: max(b.mean * 0.1, 64_000))
                 if z >= s.sigma {
                     alerts.append(try db.addAlert(kind: Kind.volumeSpike.rawValue, bundleID: bundleID, appName: name,
-                                                  detail: "\(name) moved \(ByteFormat.string(Int64(x))) in the hour starting \(Self.timeString(hour)) — \(String(format: "%.1f", z))σ above its baseline of \(ByteFormat.string(Int64(b.mean)))/h",
+                                                  detail: L("%@ moved %@ in the hour starting %@ — %@σ above its baseline of %@/h",
+                                                            name, ByteFormat.string(Int64(x)), Self.timeString(hour),
+                                                            String(format: "%.1f", z), ByteFormat.string(Int64(b.mean))),
                                                   severity: z >= s.sigma * 2 ? 3 : 2))
                 }
             }
@@ -329,7 +372,9 @@ final class AnomalyEngine: @unchecked Sendable {
                     let p99 = history[Int(Double(history.count - 1) * 0.99)]
                     if out > p99 {
                         alerts.append(try db.addAlert(kind: Kind.uploadPercentile.rawValue, bundleID: bundleID, appName: name,
-                                                      detail: "\(name) uploaded \(ByteFormat.string(out)) in the hour starting \(Self.timeString(hour)); its 30-day p99 is \(ByteFormat.string(p99))",
+                                                      detail: L("%@ uploaded %@ in the hour starting %@; its 30-day p99 is %@", name,
+                                                                ByteFormat.string(out), Self.timeString(hour),
+                                                                ByteFormat.string(p99)),
                                                       severity: 2))
                     }
                 }
@@ -350,7 +395,9 @@ final class AnomalyEngine: @unchecked Sendable {
                 let z = Self.zScore(x, b, floor: max(3, b.mean * 0.2))
                 if z >= s.sigma {
                     alerts.append(try db.addAlert(kind: Kind.destinationSpike.rawValue, bundleID: bundleID, appName: name,
-                                                  detail: "\(name) contacted \(Int(x)) distinct destinations on \(Self.dayString(day)) (baseline \(Int(b.mean.rounded())), \(String(format: "%.1f", z))σ)",
+                                                  detail: L("%@ contacted %lld distinct destinations on %@ (baseline %lld, %@σ)", name,
+                                                            Int(x), Self.dayString(day), Int(b.mean.rounded()),
+                                                            String(format: "%.1f", z)),
                                                   severity: 2))
                 }
             }

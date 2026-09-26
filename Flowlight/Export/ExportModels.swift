@@ -13,8 +13,8 @@ enum ExportMode: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .otlp: return "OpenTelemetry (OTLP/HTTP, JSON)"
-        case .ndjson: return "Newline-delimited JSON"
+        case .otlp: return L("OpenTelemetry (OTLP/HTTP, JSON)")
+        case .ndjson: return L("Newline-delimited JSON")
         }
     }
 
@@ -79,33 +79,33 @@ enum ExportField: String, CaseIterable, Identifiable, Sendable {
     /// What a reader of the Settings tab needs to decide whether they're happy for this to leave the Mac.
     var what: String {
         switch self {
-        case .serviceName: return "The name you give this Flowlight in your collector."
-        case .serviceVersion: return "Flowlight's version."
-        case .hostName: return "This Mac's local host name. Turn it off and nothing names the machine."
-        case .appBundleID: return "The app's bundle identifier, e.g. com.apple.Safari."
-        case .appName: return "The app's name, e.g. Safari."
-        case .serverAddress: return "The hostname the app connected to, when one is known."
-        case .serverPort: return "The port, when the rollup covers exactly one."
-        case .peerAddress: return "The destination IP address."
-        case .protocolName: return "The protocol Flowlight classified, e.g. https, ssh — when the rollup covers exactly one."
-        case .ioDirection: return "receive or transmit, on each byte count."
-        case .destinationOwner: return "Who owns the IP (e.g. Cloudflare, Inc.), for destinations with no hostname."
-        case .destinationASN: return "That owner's autonomous system number."
-        case .agentID: return "The AI agent this process works for, when it's one of its tools."
-        case .agentName: return "That agent's name, e.g. Claude Code."
-        case .mcpServer: return "The MCP server this process is, when Flowlight recognised it."
-        case .channel: return "Which way the bytes left: the network, peer-to-peer Wi-Fi, this Mac, or a tunnel."
-        case .eventName: return "flowlight.alert, so alerts can be told apart from everything else."
-        case .alertKind: return "Which rule fired, e.g. Possible data exfiltration by agent."
-        case .alertID: return "The alert's row id in Flowlight's local database, so a duplicate can be spotted."
-        case .time: return "When the record covers, in ISO 8601."
-        case .type: return "rollup, alert or test."
-        case .intervalSeconds: return "How many seconds of traffic a rollup adds up."
-        case .bytesReceived: return "Bytes in over that interval."
-        case .bytesSent: return "Bytes out over that interval."
-        case .flows: return "How many connections over that interval."
-        case .severity: return "info, warning or critical, for an alert."
-        case .message: return "The alert's sentence, exactly as Flowlight's Alerts screen shows it."
+        case .serviceName: return L("The name you give this Flowlight in your collector.")
+        case .serviceVersion: return L("Flowlight's version.")
+        case .hostName: return L("This Mac's local host name. Turn it off and nothing names the machine.")
+        case .appBundleID: return L("The app's bundle identifier, e.g. com.apple.Safari.")
+        case .appName: return L("The app's name, e.g. Safari.")
+        case .serverAddress: return L("The hostname the app connected to, when one is known.")
+        case .serverPort: return L("The port, when the rollup covers exactly one.")
+        case .peerAddress: return L("The destination IP address.")
+        case .protocolName: return L("The protocol Flowlight classified, e.g. https, ssh — when the rollup covers exactly one.")
+        case .ioDirection: return L("receive or transmit, on each byte count.")
+        case .destinationOwner: return L("Who owns the IP (e.g. Cloudflare, Inc.), for destinations with no hostname.")
+        case .destinationASN: return L("That owner's autonomous system number.")
+        case .agentID: return L("The AI agent this process works for, when it's one of its tools.")
+        case .agentName: return L("That agent's name, e.g. Claude Code.")
+        case .mcpServer: return L("The MCP server this process is, when Flowlight recognised it.")
+        case .channel: return L("Which way the bytes left: the network, peer-to-peer Wi-Fi, this Mac, or a tunnel.")
+        case .eventName: return L("flowlight.alert, so alerts can be told apart from everything else.")
+        case .alertKind: return L("Which rule fired, e.g. Possible data exfiltration by agent.")
+        case .alertID: return L("The alert's row id in Flowlight's local database, so a duplicate can be spotted.")
+        case .time: return L("When the record covers, in ISO 8601.")
+        case .type: return L("rollup, alert or test.")
+        case .intervalSeconds: return L("How many seconds of traffic a rollup adds up.")
+        case .bytesReceived: return L("Bytes in over that interval.")
+        case .bytesSent: return L("Bytes out over that interval.")
+        case .flows: return L("How many connections over that interval.")
+        case .severity: return L("info, warning or critical, for an alert.")
+        case .message: return L("The alert's sentence, exactly as Flowlight's Alerts screen shows it.")
         }
     }
 }

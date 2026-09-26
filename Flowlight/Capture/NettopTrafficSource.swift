@@ -6,7 +6,7 @@ import Foundation
 /// A single long-running `nettop -L 0` would be simpler, but nettop busy-loops (~150% CPU) when
 /// its stdout is a pipe. A one-shot sample takes ~0.3 s of mostly waiting, so polling stays cheap.
 final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
-    let displayName = "nettop sampler"
+    var displayName: String { L("nettop sampler") }
     private let parser = NettopParser()
     private let processes = ProcessLookup()
     private let queue = DispatchQueue(label: "flowlight.nettop", qos: .utility)
@@ -32,7 +32,7 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         timer.setEventHandler { [weak self] in self?.sampleOnce(sink: sink, status: status) }
         timer.resume()
         self.timer = timer
-        status("Sampling with nettop every second")
+        status(L("Sampling with nettop every second"))
     }
 
     func stop() {
@@ -52,7 +52,7 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         do {
             try process.run()
         } catch {
-            fail("Failed to launch nettop: \(error.localizedDescription)", status: status)
+            fail(L("Failed to launch nettop: %@", error.localizedDescription), status: status)
             return
         }
         // Terminate a hung sample, then force it; reading below returns once the process is gone.
@@ -68,16 +68,16 @@ final class NettopTrafficSource: TrafficSource, @unchecked Sendable {
         stall.cancel()
         if process.terminationReason == .uncaughtSignal {
             stalls += 1
-            fail("nettop stopped responding and was restarted (\(stalls)×). Sampling continues.", status: status)
+            fail(L("nettop stopped responding and was restarted (%lld×). Sampling continues.", stalls), status: status)
             return
         }
         guard process.terminationStatus == 0, !data.isEmpty else {
-            fail("nettop exited with status \(process.terminationStatus)", status: status)
+            fail(L("nettop exited with status %lld", Int(process.terminationStatus)), status: status)
             return
         }
         if consecutiveFailures > 0 {
             consecutiveFailures = 0
-            status("Sampling with nettop every second")
+            status(L("Sampling with nettop every second"))
         }
         let deltas = parser.feedSample(String(decoding: data, as: UTF8.self))
         // The delta covers the second that just ended.

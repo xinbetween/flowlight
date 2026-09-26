@@ -63,6 +63,11 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
     var engine: Engine { path.isEmpty && method.isEmpty ? .flow : .request }
 
     /// A sentence for the list, built from whatever the rule actually names.
+    ///
+    /// English, deliberately: this file is compiled into the Network Extension as well as the app, and the
+    /// extension is where `L()` doesn't exist — it reports a rule's name back over IPC and writes it to the log,
+    /// neither of which is the interface. The app never shows this one; `RuleWords.title` in RulesView.swift is
+    /// the same sentence in the chosen language, and the two are meant to stay in step.
     var title: String {
         if !name.isEmpty { return name }
         let verb = action == .block ? "Block" : "Allow"
@@ -154,7 +159,8 @@ extension Rule {
             return (today && minuteOfDay >= start) || (yesterday && minuteOfDay < end)
         }
 
-        /// How the schedule reads in a list.
+        /// How the schedule reads in a list, in English — see `title` above for why nothing here is looked up.
+        /// `RuleWords.schedule` in RulesView.swift is the translated twin the interface shows.
         func describe(at now: Date = Date(), session current: String = "", calendar: Calendar = .current) -> String {
             switch kind {
             case .always: return "Always"
@@ -283,7 +289,8 @@ extension Rule {
     /// Still has decisions left in it. "Allow once" is spent after the connection it let through.
     var isUsable: Bool { maxHits == 0 || hits < maxHits }
 
-    /// What a rule can't do here, in a sentence, or nil when it is being carried out.
+    /// Whether a rule can be carried out here, and what stops it, in English — the app asks through
+    /// `RuleWords.limitation` in RulesView.swift, which says the same thing in the chosen language.
     func limitation(extensionRunning: Bool, inspecting: Bool) -> String? {
         switch engine {
         case .flow:

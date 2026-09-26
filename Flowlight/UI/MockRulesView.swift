@@ -68,7 +68,7 @@ struct MockRulesSection: View {
                 inspection.mockRules[index] = copy
             }))
             .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-            .accessibilityLabel("Enable \(rule.title)")
+            .accessibilityLabel(L("Enable %@", rule.title))
             VStack(alignment: .leading, spacing: 1) {
                 Text(rule.title).font(.callout).lineLimit(1)
                 Text(summary(rule)).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
@@ -76,13 +76,13 @@ struct MockRulesSection: View {
             .opacity(rule.enabled ? 1 : 0.5)
             Spacer()
             Button { editing = rule; isNew = false } label: { Image(systemName: "pencil") }
-                .buttonStyle(.borderless).accessibilityLabel("Edit \(rule.title)")
+                .buttonStyle(.borderless).accessibilityLabel(L("Edit %@", rule.title))
             Button(role: .destructive) {
                 inspection.mockRules.removeAll { $0.id == rule.id }
             } label: {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.borderless).accessibilityLabel("Remove \(rule.title)")
+            .buttonStyle(.borderless).accessibilityLabel(L("Remove %@", rule.title))
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
     }
@@ -90,7 +90,7 @@ struct MockRulesSection: View {
     private func summary(_ rule: MockRule) -> String {
         var parts = ["\(rule.method.isEmpty ? "ANY" : rule.method.uppercased()) \(rule.host)\(rule.path)",
                      "→ \(rule.status) \(MockRule.reason(rule.status))"]
-        if rule.delay > 0 { parts.append("after \(DelayFormat.seconds(rule.delay))") }
+        if rule.delay > 0 { parts.append(L("after %@", DelayFormat.seconds(rule.delay))) }
         return parts.joined(separator: " ")
     }
 }
@@ -107,7 +107,7 @@ struct MockRuleEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(isNew ? "New mock response" : "Edit mock response").font(.title3.bold())
+            Text(isNew ? L("New mock response") : L("Edit mock response")).font(.title3.bold())
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
                 GridRow {
@@ -174,14 +174,15 @@ struct MockRuleEditor: View {
             }
 
             if rule.delay > 0 {
-                Label("The request waits \(DelayFormat.seconds(rule.delay)) before it's answered. Clients with their own timeout will give up first, which is usually the point.",
+                Label(L("The request waits %@ before it's answered. Clients with their own timeout will give up first, which is usually the point.",
+                        DelayFormat.seconds(rule.delay)),
                       systemImage: "clock").font(.caption).foregroundStyle(.secondary)
             }
 
             HStack {
                 Button(L("Cancel"), role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(isNew ? "Add Rule" : "Save") { save(cleaned()); dismiss() }
+                Button(isNew ? L("Add Rule") : L("Save")) { save(cleaned()); dismiss() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(rule.host.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -211,6 +212,6 @@ struct MockRuleEditor: View {
 enum DelayFormat {
     /// "8 s", "0.5 s" — short enough to sit inside a sentence.
     static func seconds(_ value: Double) -> String {
-        value == value.rounded() ? "\(Int(value)) s" : String(format: "%.1f s", value)
+        value == value.rounded() ? L("%lld s", Int(value)) : L("%@ s", String(format: "%.1f", value))
     }
 }

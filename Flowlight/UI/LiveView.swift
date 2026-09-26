@@ -10,23 +10,23 @@ struct LiveView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                StatTile(title: "Download", value: ByteFormat.rate(monitor.currentIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
-                StatTile(title: "Upload", value: ByteFormat.rate(monitor.currentOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
-                StatTile(title: "Received this session", value: ByteFormat.string(monitor.sessionIn), systemImage: "tray.and.arrow.down", tint: TrafficColors.inbound)
-                StatTile(title: "Sent this session", value: ByteFormat.string(monitor.sessionOut), systemImage: "tray.and.arrow.up", tint: TrafficColors.outbound)
+                StatTile(title: L("Download"), value: ByteFormat.rate(monitor.currentIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
+                StatTile(title: L("Upload"), value: ByteFormat.rate(monitor.currentOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
+                StatTile(title: L("Received this session"), value: ByteFormat.string(monitor.sessionIn), systemImage: "tray.and.arrow.down", tint: TrafficColors.inbound)
+                StatTile(title: L("Sent this session"), value: ByteFormat.string(monitor.sessionOut), systemImage: "tray.and.arrow.up", tint: TrafficColors.outbound)
             }
 
             GroupBox {
                 Chart(monitor.liveSeries) { point in
-                    AreaMark(x: .value("Time", point.date), y: .value("Bytes/s", point.bytesIn), series: .value("Direction", "In"))
+                    AreaMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), point.bytesIn), series: .value(L("Direction"), "In"))
                         .foregroundStyle(TrafficColors.inbound.opacity(0.35))
-                    LineMark(x: .value("Time", point.date), y: .value("Bytes/s", point.bytesIn), series: .value("Direction", "In"))
+                    LineMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), point.bytesIn), series: .value(L("Direction"), "In"))
                         .foregroundStyle(TrafficColors.inbound)
-                    AreaMark(x: .value("Time", point.date), y: .value("Bytes/s", -point.bytesOut), series: .value("Direction", "Out"))
+                    AreaMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), -point.bytesOut), series: .value(L("Direction"), "Out"))
                         .foregroundStyle(TrafficColors.outbound.opacity(0.35))
-                    LineMark(x: .value("Time", point.date), y: .value("Bytes/s", -point.bytesOut), series: .value("Direction", "Out"))
+                    LineMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), -point.bytesOut), series: .value(L("Direction"), "Out"))
                         .foregroundStyle(TrafficColors.outbound)
-                    RuleMark(y: .value("Zero", 0)).foregroundStyle(.secondary.opacity(0.4)).lineStyle(StrokeStyle(lineWidth: 0.5))
+                    RuleMark(y: .value(L("Zero"), 0)).foregroundStyle(.secondary.opacity(0.4)).lineStyle(StrokeStyle(lineWidth: 0.5))
                 }
                 .chartYAxis {
                     AxisMarks { value in
@@ -48,21 +48,21 @@ struct LiveView: View {
 
             GroupBox {
                 Table(monitor.talkers.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
-                    TableColumn("Application", value: \.name) { t in
-                        HStack { AppIconView(path: t.path); Text(t.name) }.help("\(t.bundleID)\nDouble-click to open in Reports")
+                    TableColumn(L("Application"), value: \.name) { t in
+                        HStack { AppIconView(path: t.path); Text(t.name) }.help(L("%@\nDouble-click to open in Reports", t.bundleID))
                     }
                     .width(min: 130)
-                    TableColumn("↓ In", value: \.rateIn) { Text("\(ByteFormat.compact($0.rateIn))/s").monospacedDigit().help(ByteFormat.rate($0.rateIn)) }
+                    TableColumn(L("↓ In"), value: \.rateIn) { Text("\(ByteFormat.compact($0.rateIn))/s").monospacedDigit().help(ByteFormat.rate($0.rateIn)) }
                         .width(76)
-                    TableColumn("↑ Out", value: \.rateOut) { Text("\(ByteFormat.compact($0.rateOut))/s").monospacedDigit().help(ByteFormat.rate($0.rateOut)) }
+                    TableColumn(L("↑ Out"), value: \.rateOut) { Text("\(ByteFormat.compact($0.rateOut))/s").monospacedDigit().help(ByteFormat.rate($0.rateOut)) }
                         .width(76)
-                    TableColumn("Total", value: \.totalRate) { Text("\(ByteFormat.compact($0.totalRate))/s").monospacedDigit().bold().help(ByteFormat.rate($0.totalRate)) }
+                    TableColumn(L("Total"), value: \.totalRate) { Text("\(ByteFormat.compact($0.totalRate))/s").monospacedDigit().bold().help(ByteFormat.rate($0.totalRate)) }
                         .width(76)
-                    TableColumn("Session ↓", value: \.sessionIn) { Text(ByteFormat.string($0.sessionIn)).monospacedDigit() }
+                    TableColumn(L("Session ↓"), value: \.sessionIn) { Text(ByteFormat.string($0.sessionIn)).monospacedDigit() }
                         .width(70)
-                    TableColumn("Session ↑", value: \.sessionOut) { Text(ByteFormat.string($0.sessionOut)).monospacedDigit() }
+                    TableColumn(L("Session ↑"), value: \.sessionOut) { Text(ByteFormat.string($0.sessionOut)).monospacedDigit() }
                         .width(70)
-                    TableColumn("Busiest destination", value: \.topDestination) { Text($0.topDestination).lineLimit(1).truncationMode(.middle).help($0.topDestination) }
+                    TableColumn(L("Busiest destination"), value: \.topDestination) { Text($0.topDestination).lineLimit(1).truncationMode(.middle).help($0.topDestination) }
                         .width(min: 150)
                 }
                 .contextMenu(forSelectionType: LiveTalker.ID.self) { ids in
@@ -93,7 +93,7 @@ struct LiveView: View {
     private var emptyState: some View {
         if monitor.talkers.isEmpty {
             if monitor.isReceiving {
-                ContentUnavailableView("The network is quiet", systemImage: "network",
+                ContentUnavailableView(L("The network is quiet"), systemImage: "network",
                                        description: Text(L("No app has sent or received data in the last few seconds.")))
             } else {
                 ContentUnavailableView {

@@ -90,12 +90,12 @@ struct ExtensionRecovery {
     static func statusLine(_ message: String, step: Step, attempt: Int) -> String {
         switch step {
         case .redial(let after):
-            return "\(message) — reconnecting in \(Int(after))s (try \(attempt) of \(maxAttempts))"
+            return L("%@ — reconnecting in %llds (try %lld of %lld)", message, Int(after), attempt, maxAttempts)
         case .repairVersion(let after):
-            return "\(message) — checking whether the installed extension matches this app, "
-                 + "then reconnecting in \(Int(after))s"
+            return L("%@ — checking whether the installed extension matches this app, then reconnecting in %llds",
+                     message, Int(after))
         case .fallBack:
-            return "\(message) — switching to the nettop sampler"
+            return L("%@ — switching to the nettop sampler", message)
         }
     }
 }

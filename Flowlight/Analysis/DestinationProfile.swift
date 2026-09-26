@@ -73,7 +73,8 @@ enum DestinationProfile {
         // Spread. Three times the typical app in this report, and more than a handful, is worth a mention.
         if domains.count >= max(8, typicalDestinations * 3) {
             found.append(BehaviourSignal(kind: .manyDestinations,
-                                         detail: "\(domains.count) destinations, against \(typicalDestinations) for a typical app here",
+                                         detail: L("%lld destinations, against %lld for a typical app here",
+                                                   domains.count, typicalDestinations),
                                          weight: 3))
         }
 
@@ -81,9 +82,11 @@ enum DestinationProfile {
         let hostless = Set(rows.filter { $0.domain.isEmpty && !AnomalyEngine.isLocal($0.remoteIP) }.map(\.remoteIP))
         if hostless.count >= 3 {
             let owners = Set(rows.filter { $0.domain.isEmpty && !$0.owner.isEmpty }.map(\.owner))
-            let where_ = owners.isEmpty ? "" : " (\(owners.sorted().prefix(2).joined(separator: ", ")))"
+            let named = owners.sorted().prefix(2).joined(separator: ", ")
             found.append(BehaviourSignal(kind: .hostless,
-                                         detail: "\(hostless.count) addresses with no hostname\(where_)",
+                                         detail: owners.isEmpty
+                                             ? L("%lld addresses with no hostname", hostless.count)
+                                             : L("%lld addresses with no hostname (%@)", hostless.count, named),
                                          weight: hostless.count >= 10 ? 3 : 2))
         }
 
@@ -91,7 +94,8 @@ enum DestinationProfile {
         let generated = domains.filter { looksGenerated($0) }
         if generated.count >= 2 {
             found.append(BehaviourSignal(kind: .generatedNames,
-                                         detail: "\(generated.count) look machine-generated, such as \(generated.sorted().first ?? "")",
+                                         detail: L("%lld look machine-generated, such as %@",
+                                                   generated.count, generated.sorted().first ?? ""),
                                          weight: 2))
         }
 
@@ -100,7 +104,7 @@ enum DestinationProfile {
         let into = rows.reduce(Int64(0)) { $0 + $1.counters.bytesIn }
         if out > 10_000_000, out > into * 3 {
             found.append(BehaviourSignal(kind: .mostlyUploading,
-                                         detail: "sent \(ByteFormat.string(out)) and received \(ByteFormat.string(into))",
+                                         detail: L("sent %@ and received %@", ByteFormat.string(out), ByteFormat.string(into)),
                                          weight: 3))
         }
 
@@ -130,7 +134,7 @@ enum DestinationProfile {
             .flatMap { namesByCategory[$0.key] ?? [] })
         if !sensitive.isEmpty {
             found.append(BehaviourSignal(kind: .sensitiveProtocol,
-                                         detail: "used \(sensitive.sorted().joined(separator: ", "))",
+                                         detail: L("used %@", sensitive.sorted().joined(separator: ", ")),
                                          weight: 3))
         }
         return found

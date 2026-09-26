@@ -8,10 +8,31 @@ enum InsightDimension: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .app: return "Apps"
-        case .destination: return "Destinations"
-        case .ip: return "IP addresses"
-        case .appProtocol: return "Protocols"
+        case .app: return L("Apps")
+        case .destination: return L("Destinations")
+        case .ip: return L("IP addresses")
+        case .appProtocol: return L("Protocols")
+        }
+    }
+
+    /// Title of the trend card, e.g. "Top apps over time". Written out per dimension rather than built from
+    /// `title` lowercased: the lowercase form of a translated noun isn't something the app can derive.
+    var trendTitle: String {
+        switch self {
+        case .app: return L("Top apps over time")
+        case .destination: return L("Top destinations over time")
+        case .ip: return L("Top IP addresses over time")
+        case .appProtocol: return L("Top protocols over time")
+        }
+    }
+
+    /// Heading of the full list behind "Other", e.g. "All destinations".
+    var listTitle: String {
+        switch self {
+        case .app: return L("All apps")
+        case .destination: return L("All destinations")
+        case .ip: return L("All IP addresses")
+        case .appProtocol: return L("All protocols")
         }
     }
 
@@ -30,7 +51,33 @@ enum InsightDimension: String, CaseIterable, Identifiable, Sendable {
 enum InsightMetric: String, CaseIterable, Identifiable, Sendable {
     case total, received, sent
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+
+    var title: String {
+        switch self {
+        case .total: return L("Total")
+        case .received: return L("Received")
+        case .sent: return L("Sent")
+        }
+    }
+
+    /// The same word mid-sentence, under the donut's figure. A lowercased translation would be wrong in any
+    /// language that capitalises its nouns, so each form is its own key.
+    var lowercaseTitle: String {
+        switch self {
+        case .total: return L("total")
+        case .received: return L("received")
+        case .sent: return L("sent")
+        }
+    }
+
+    /// "No sent traffic" — one key per measure, so the sentence is never assembled from pieces.
+    var noTrafficMessage: String {
+        switch self {
+        case .total: return L("No total traffic")
+        case .received: return L("No received traffic")
+        case .sent: return L("No sent traffic")
+        }
+    }
 
     func value(_ c: FlowCounters) -> Int64 {
         switch self {
@@ -50,7 +97,9 @@ struct InsightEntity: Hashable, Sendable, Identifiable {
     var iconPath: String?
     var id: String { key }
 
-    static let other = InsightEntity(key: "__other__", label: "Other", kind: .other)
+    /// Computed, not stored: a `static let` would hold the label in whatever language was chosen when it was
+    /// first touched, and the language can change while the app runs.
+    static var other: InsightEntity { InsightEntity(key: "__other__", label: L("Other"), kind: .other) }
 
     /// The filter that narrows the report to this entity (nil for "Other"/unknown).
     func narrowing(_ filter: TrafficFilter) -> TrafficFilter? {
@@ -76,11 +125,11 @@ struct InsightEntity: Hashable, Sendable, Identifiable {
                 return InsightEntity(key: "d:" + registrable, label: registrable, kind: .domain)
             }
             if !row.owner.isEmpty { return InsightEntity(key: "o:" + row.owner, label: row.owner, kind: .owner) }
-            return InsightEntity(key: "u:", label: "Unknown", kind: .unknownDestination)
+            return InsightEntity(key: "u:", label: L("Unknown"), kind: .unknownDestination)
         case .ip:
             return InsightEntity(key: row.remoteIP, label: row.remoteIP, kind: .ip)
         case .appProtocol:
-            return InsightEntity(key: row.appProtocol, label: row.appProtocol.isEmpty ? "unknown" : row.appProtocol, kind: .appProtocol)
+            return InsightEntity(key: row.appProtocol, label: row.appProtocol.isEmpty ? L("unknown") : row.appProtocol, kind: .appProtocol)
         }
     }
 }
