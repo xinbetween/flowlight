@@ -114,6 +114,7 @@ final class Localization: ObservableObject {
         bundle = Bundle.main.path(forResource: resolved.rawValue, ofType: "lproj").flatMap(Bundle.init(path:))
             ?? Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:))
             ?? .main
+        LanguageBundle.current = bundle
         // Also written where macOS looks, so the parts Flowlight doesn't draw itself — standard menu items, the
         // open and save panels, system alerts — follow on the next launch.
         UserDefaults.standard.set(language == .system ? nil : [resolved.rawValue], forKey: "AppleLanguages")
@@ -130,17 +131,36 @@ final class Localization: ObservableObject {
     }
 }
 
+/// The chosen language's bundle, reachable from anywhere.
+///
+/// `Localization` is the main-actor owner of the choice; this is the copy the lookup reads. Strings are needed
+/// off the main actor too — a capture engine's status line, a query runner's chart title — and those are still
+/// words someone reads, so they have to follow the picker like everything else. Writes happen only on the main
+/// actor when the language changes; a reader that races one gets the previous language for one string.
+enum LanguageBundle {
+    nonisolated(unsafe) static var current: Bundle = .main
+    /// English, for the fallback below. Resolved once: a bundle lookup per string would be wasteful.
+    nonisolated(unsafe) static let english: Bundle? =
+        Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:))
+
+    static func string(_ key: String) -> String {
+        let value = current.localizedString(forKey: key, value: nil, table: nil)
+        // A key with no translation falls back to English rather than showing the key itself.
+        guard value == key, current != Bundle.main, let english else { return value }
+        return english.localizedString(forKey: key, value: key, table: nil)
+    }
+}
+
 /// One short name for the thing done on almost every line of the interface.
 ///
 /// The key *is* the English text. That keeps the source readable — `L("Capture")` says what it will show — and it
 /// means an untranslated string degrades to correct English rather than to a dotted identifier.
-@MainActor
 func L(_ key: String) -> String {
-    Localization.shared.string(key)
+    LanguageBundle.string(key)
 }
 
-/// Interpolating version, for the sentences that carry a number or a name.
-@MainActor
+/// Interpolating version, for the sentences that carry a number or a name. The key carries the placeholders —
+/// `L("%lld of %lld used", used, total)` — so a translator can put them in the order their language wants.
 func L(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: Localization.shared.string(key), arguments: arguments)
+    String(format: LanguageBundle.string(key), arguments: arguments)
 }
