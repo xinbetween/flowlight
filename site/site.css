@@ -217,12 +217,15 @@
 
   /* FAQ */
   .faq { display: grid; gap: 10px; max-width: 820px; }
-  details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
-  summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
-  summary::-webkit-details-marker { display: none; }
-  summary::after { content: "+"; font: 500 20px/1 var(--mono); color: var(--faint); }
-  details[open] summary::after { content: "–"; }
-  details p { color: var(--muted); margin-top: 10px; font-size: 15px; }
+  /* Scoped to the FAQ. Written as bare `details`/`summary` it dressed every disclosure on the site as a
+     question card — the table of contents and the language picker both had to undo it, and the `+` it draws
+     reappeared wherever someone forgot. */
+  .faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  .faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; font: 500 20px/1 var(--mono); color: var(--faint); }
+  .faq details[open] summary::after { content: "–"; }
+  .faq details p { color: var(--muted); margin-top: 10px; font-size: 15px; }
 
   .final { padding-block: 96px; text-align: center; border-top: 1px solid var(--line); }
   .final .cta { justify-content: center; }
@@ -278,9 +281,9 @@
     section.band { padding-block: 56px; }
     .final { padding-block: 64px; }
     /* Thumbs, not cursors. */
-    .btn, .chip, summary { min-height: 44px; display: inline-flex; align-items: center; }
+    .btn, .chip, .faq summary { min-height: 44px; display: inline-flex; align-items: center; }
     .chip { padding-inline: 12px; }
-    details summary { min-height: 0; }
+    .faq details summary { min-height: 0; }
   }
 
   @media (max-width: 380px) {
@@ -293,7 +296,7 @@
      whose site shifts under the pointer would be arguing against itself. */
   .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; will-change: opacity, transform; }
   .reveal.shown { opacity: 1; transform: none; }
-  .fact, .view-card, .rule, details { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .fact, .view-card, .rule, .faq details { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
   .fact:hover, .view-card:hover, .rule:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 
   @media (max-width: 900px) {
@@ -303,7 +306,7 @@
     .log li.enter { animation: none; }
     .btn { transition: none; }
     .reveal { opacity: 1; transform: none; transition: none; }
-    .fact, .view-card, .rule, details { transition: none; }
+    .fact, .view-card, .rule, .faq details { transition: none; }
     .lang-chevron { transition: none; }
     .fact:hover, .view-card:hover, .rule:hover { transform: none; }
   }
@@ -362,9 +365,8 @@
      eight labelled groups is something you can scan. */
   .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 14px; }
   .toc-sheet { --toc-group-gap: 10px; }
-  /* It is a <details>, so it would otherwise pick up the FAQ card — border, background and all — on every page
-     that has a table of contents. It only wants that treatment on a phone, where it folds up. */
-  .toc-sheet { display: grid; gap: var(--toc-group-gap, 26px); border: 0; background: none; padding: 0; border-radius: 0; }
+  /* Plain on a wide screen; the phone rules below give it a card, where it folds up. */
+  .toc-sheet { display: grid; gap: var(--toc-group-gap, 26px); }
   .toc-sheet > summary { display: none; }
   .toc-group { display: grid; gap: 1px; }
   /* The group headings used to sit closer to the item above them than to the items below, so the list read as
