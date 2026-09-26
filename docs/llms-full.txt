@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.9, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.9macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,27 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.8
+ 0.7.9
 September 26, 2026Latest
+
+ Flowlight comes back from its own update. macOS keeps running the extension build
+ it installed, so for a while after an upgrade the filter on disk is the previous version and the new
+ app can't reach it. Flowlight now checks for that on the first failure rather than the third, asks
+ macOS to replace the extension, samples with nettop while it does, and reconnects on its own once
+ the replacement lands — where before it sat on the sampler until someone pressed a button.
+
+ And says so when only a restart will do. macOS sometimes accepts the replacement
+ but holds it until the Mac reboots. Nothing the app can do shortens that, so it says which it is
+ instead of retrying forever.
+
+ The content filter has its own section on the Capture screen. Installing a system
+ extension is not the same decision as choosing what to capture with, and it outlives both the choice
+ and the app — it keeps filtering after you quit.
+
+ Downloads and checksums →
+
+ 0.7.8
+September 26, 2026
 
  The whole interface speaks ten languages, not just the parts that happened to be
  written as literals in a view. The catalog went from 378 strings to 1,169: every table column, tab,
