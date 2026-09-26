@@ -12,8 +12,8 @@ struct FocusBar: View {
                     .foregroundStyle(focus.isActive ? Color.accentColor : .secondary)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(focus.isActive ? "Focus on" : "Focus off").font(.caption.bold())
-                    Text(focus.isActive ? focus.summary : "Pick what to watch")
+                    Text(focus.isActive ? L("Focus on") : L("Focus off")).font(.caption.bold())
+                    Text(focus.isActive ? focus.summary : L("Pick what to watch"))
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 }
                 Spacer(minLength: 4)
@@ -24,8 +24,9 @@ struct FocusBar: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 10)
         .padding(.top, 8)
-        .help(focus.isActive ? "Showing only \(focus.summary) — click to change" : "Show only the apps and destinations you choose")
-        .accessibilityLabel(focus.isActive ? "Focus on: \(focus.summary)" : "Focus off")
+        .help(focus.isActive ? L("Showing only %@ — click to change", focus.summary)
+                             : L("Show only the apps and destinations you choose"))
+        .accessibilityLabel(focus.isActive ? L("Focus on: %@", focus.summary) : L("Focus off"))
         .popover(isPresented: $editing, arrowEdge: .trailing) { FocusEditor() }
     }
 }
@@ -81,7 +82,7 @@ struct FocusEditor: View {
             .pickerStyle(.segmented).labelsHidden()
 
             HStack {
-                TextField(adding == .app ? "Name or bundle identifier" : "api.example.com", text: $typed)
+                TextField(adding == .app ? L("Name or bundle identifier") : "api.example.com", text: $typed)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addTyped)
                 Button(L("Add"), action: addTyped).disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -95,11 +96,11 @@ struct FocusEditor: View {
                 let matches = InstalledApps.search(typed, in: installed)
                 if !matches.isEmpty {
                     suggestions(matches.prefix(6).map { FocusTarget.app($0.bundleID, name: $0.name) }.compactMap { $0 },
-                                title: "Applications")
+                                title: L("Applications"))
                 } else if !candidates.isEmpty {
                     // What has actually been talking is the fastest way in; searching covers everything else,
                     // including an app that has been quiet all day and a command-line agent with no bundle.
-                    suggestions(candidates, title: "Recently active")
+                    suggestions(candidates, title: L("Recently active"))
                 }
             }
         }
@@ -166,7 +167,7 @@ private struct FlowChips: View {
                     Text(target.label).font(.caption).lineLimit(1)
                     Button { remove(target) } label: { Image(systemName: "xmark.circle.fill").font(.caption2) }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(target.label) from Focus")
+                        .accessibilityLabel(L("Remove %@ from Focus", target.label))
                 }
                 .padding(.horizontal, 7).padding(.vertical, 4)
                 .background(Color.secondary.opacity(0.12), in: Capsule())
@@ -183,12 +184,12 @@ struct FocusMenuItems: View {
 
     var body: some View {
         if let app, let target = FocusTarget.app(app.bundleID, name: app.name) {
-            Button(focus.contains(target) ? "Remove \(target.label) from Focus" : "Focus on \(target.label)") {
+            Button(focus.contains(target) ? L("Remove %@ from Focus", target.label) : L("Focus on %@", target.label)) {
                 focus.toggle(target)
             }
         }
         if let host, let target = FocusTarget.host(host) {
-            Button(focus.contains(target) ? "Remove \(target.label) from Focus" : "Focus on \(target.label)") {
+            Button(focus.contains(target) ? L("Remove %@ from Focus", target.label) : L("Focus on %@", target.label)) {
                 focus.toggle(target)
             }
         }

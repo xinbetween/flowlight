@@ -81,9 +81,11 @@ final class AskController: ObservableObject {
         switch provider {
         case .onDevice: return OnDeviceAsk.readiness.explanation
         case .localServer, .compatible:
-            return endpoint.isEmpty ? "Set the endpoint of the model server you're running." : nil
+            return endpoint.isEmpty ? L("Set the endpoint of the model server you're running.") : nil
         case .anthropic, .openAI, .gemini:
-            return apiKey.isEmpty ? "\(provider.title) needs an API key. It goes to your login Keychain, not to Flowlight's preferences." : nil
+            return apiKey.isEmpty
+                ? L("%@ needs an API key. It goes to your login Keychain, not to Flowlight's preferences.", provider.title)
+                : nil
         }
     }
 
@@ -105,7 +107,7 @@ final class AskController: ObservableObject {
         var turn = AskTurn(question: trimmed, provider: provider.label)
         turns.insert(turn, at: 0)
         thinking = true
-        status = "Asking \(provider.label)…"
+        status = L("Asking %@…", provider.label)
 
         let request = AskRequest(question: trimmed, instructions: AskPrompt.instructions(queries: AskQuery.allCases),
                                  queries: AskQuery.allCases)
@@ -182,7 +184,7 @@ private actor CallRecorder {
     private(set) var bodies: [String] = []
 
     func record(_ call: AskCall) {
-        calls.append(AskRecordedCall(call: call, summary: "running…"))
+        calls.append(AskRecordedCall(call: call, summary: L("running…")))
     }
 
     func finish(_ call: AskCall, summary: String, failed: Bool = false, filter: TrafficFilter? = nil,

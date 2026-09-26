@@ -12,9 +12,9 @@ struct PeripheralDevice: Identifiable, Equatable, Sendable, Codable {
 
         var title: String {
             switch self {
-            case .bluetooth: return "Bluetooth"
+            case .bluetooth: return L("Bluetooth")
             case .usb: return "USB"
-            case .volume: return "External storage"
+            case .volume: return L("External storage")
             }
         }
 
@@ -51,10 +51,10 @@ struct DeviceEvent: Identifiable, Equatable, Sendable {
 
         var title: String {
             switch self {
-            case .appeared: return "Paired"
-            case .connected: return "Connected"
-            case .disconnected: return "Disconnected"
-            case .removed: return "Unpaired"
+            case .appeared: return L("Paired")
+            case .connected: return L("Connected")
+            case .disconnected: return L("Disconnected")
+            case .removed: return L("Unpaired")
             }
         }
     }

@@ -5,9 +5,9 @@ enum AgentWindow: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .hour: return "Last hour"
-        case .day: return "24 hours"
-        case .week: return "7 days"
+        case .hour: return L("Last hour")
+        case .day: return L("24 hours")
+        case .week: return L("7 days")
         }
     }
     var interval: TimeInterval { self == .hour ? 3600 : self == .day ? 86400 : 7 * 86400 }
@@ -95,47 +95,47 @@ struct AgentsView: View {
         let egress = agents.reduce(Int64(0)) { $0 + $1.egress.bytesOut }
         let risky = agents.filter { !$0.sensitiveProtocols.isEmpty }.count
         return HStack(spacing: 12) {
-            StatTile(title: "Agents active", value: "\(agents.count)", systemImage: "sparkles")
-            StatTile(title: "AI API traffic", value: ByteFormat.string(ai.total), systemImage: "brain")
-            StatTile(title: "Uploaded to other hosts", value: ByteFormat.string(egress), systemImage: "arrow.up.forward.app",
+            StatTile(title: L("Agents active"), value: "\(agents.count)", systemImage: "sparkles")
+            StatTile(title: L("AI API traffic"), value: ByteFormat.string(ai.total), systemImage: "brain")
+            StatTile(title: L("Uploaded to other hosts"), value: ByteFormat.string(egress), systemImage: "arrow.up.forward.app",
                      tint: TrafficColors.outbound)
-            StatTile(title: "Using sensitive channels", value: "\(risky)", systemImage: "exclamationmark.shield",
+            StatTile(title: L("Using sensitive channels"), value: "\(risky)", systemImage: "exclamationmark.shield",
                      tint: risky > 0 ? TrafficColors.anomaly : .secondary)
-            StatTile(title: "Agent alerts", value: "\(agentAlerts)", systemImage: "bell.badge",
+            StatTile(title: L("Agent alerts"), value: "\(agentAlerts)", systemImage: "bell.badge",
                      tint: agentAlerts > 0 ? TrafficColors.anomaly : .secondary)
         }
     }
 
     private var table: some View {
         Table(agents.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
-            TableColumn("Agent", value: \.name) { agent in
+            TableColumn(L("Agent"), value: \.name) { agent in
                 HStack(spacing: 8) {
                     AppIconView(path: agent.appPath, size: 20)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(agent.name).lineLimit(1)
-                        Text(agent.vendor ?? "Detected: calls an AI API").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(agent.vendor ?? L("Detected: calls an AI API")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 .help(agent.bundleID)
             }
             .width(min: 150, ideal: 190)
-            TableColumn("AI providers") { agent in
+            TableColumn(L("AI providers")) { agent in
                 Text(agent.providers.map(\.name).joined(separator: ", ")).lineLimit(1).foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 130)
-            TableColumn("AI traffic", value: \.aiTotal) { Text(ByteFormat.string($0.ai.total)).monospacedDigit() }.width(80)
-            TableColumn("Other hosts", value: \.otherCount) { Text("\($0.otherCount)").monospacedDigit() }.width(70)
-            TableColumn("Sent elsewhere", value: \.egressOut) { agent in
+            TableColumn(L("AI traffic"), value: \.aiTotal) { Text(ByteFormat.string($0.ai.total)).monospacedDigit() }.width(80)
+            TableColumn(L("Other hosts"), value: \.otherCount) { Text("\($0.otherCount)").monospacedDigit() }.width(70)
+            TableColumn(L("Sent elsewhere"), value: \.egressOut) { agent in
                 Text(ByteFormat.string(agent.egress.bytesOut)).monospacedDigit()
                     .foregroundStyle(agent.egressShare > 0.5 && agent.egress.bytesOut > 1_000_000 ? TrafficColors.outbound : .primary)
-                    .help("\(ShareFormat.string(agent.egressShare)) of this agent's uploads went to non-AI hosts")
+                    .help(L("%@ of this agent's uploads went to non-AI hosts", ShareFormat.string(agent.egressShare)))
             }
             .width(90)
-            TableColumn("Allowlist") { agent in AllowlistStatus(agent: agent, policy: policies[agent.bundleID]) }
+            TableColumn(L("Allowlist")) { agent in AllowlistStatus(agent: agent, policy: policies[agent.bundleID]) }
                 .width(min: 80, ideal: 110)
-            TableColumn("Risk", value: \.riskScore) { agent in RiskBadges(agent: agent) }
+            TableColumn(L("Risk"), value: \.riskScore) { agent in RiskBadges(agent: agent) }
                 .width(min: 90, ideal: 160)
-            TableColumn("Alerts", value: \.alerts) { agent in
+            TableColumn(L("Alerts"), value: \.alerts) { agent in
                 Text(agent.alerts == 0 ? "–" : "\(agent.alerts)").monospacedDigit()
                     .foregroundStyle(agent.alerts > 0 ? TrafficColors.anomaly : .secondary)
             }
@@ -193,11 +193,11 @@ struct RiskBadges: View {
                 badge(proto.uppercased(), icon: icon(for: ProtocolCatalog.category(of: proto)), color: TrafficColors.anomaly)
             }
             if agent.hasLargeUpload {
-                badge("Large upload", icon: "arrow.up.doc", color: .orange)
-                    .help("\(ByteFormat.string(agent.egress.bytesOut)) sent to hosts that aren't AI providers")
+                badge(L("Large upload"), icon: "arrow.up.doc", color: .orange)
+                    .help(L("%@ sent to hosts that aren't AI providers", ByteFormat.string(agent.egress.bytesOut)))
             }
             if agent.hasUnnamedHost {
-                badge("Raw IP", icon: "questionmark.circle", color: .orange)
+                badge(L("Raw IP"), icon: "questionmark.circle", color: .orange)
                     .help(L("Connected to an address with no hostname"))
             }
         }
@@ -244,7 +244,7 @@ struct AllowlistStatus: View {
             let violations = agent.otherDestinations.filter { !$0.isAllowed(by: policy) }.count
             HStack(spacing: 4) {
                 if violations > 0 {
-                    Label("\(violations) not allowed", systemImage: "xmark.octagon.fill")
+                    Label(L("%lld not allowed", violations), systemImage: "xmark.octagon.fill")
                         .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
                 } else {
                     Label(L("All allowed"), systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
@@ -288,15 +288,11 @@ struct AllowlistEditor: View {
                     }))
                     .font(.caption)
                     .disabled(!policy.enabled)
-                    .confirmationDialog("Let Flowlight block \(agentName)'s connections?", isPresented: $confirmBlocking) {
+                    .confirmationDialog(L("Let Flowlight block %@'s connections?", agentName), isPresented: $confirmBlocking) {
                         Button(L("Block Unlisted Destinations")) { var p = policy; p.enforce = true; save(p) }
                         Button(L("Cancel"), role: .cancel) {}
                     } message: {
-                        Text("""
-                        Until now this allowlist only raised alerts. From here on, anything \(agentName) or its tools \
-                        contact that isn't listed will be refused, which can stop the agent from working. Local network, \
-                        Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts.
-                        """)
+                        Text(L("Until now this allowlist only raised alerts. From here on, anything %@ or its tools contact that isn't listed will be refused, which can stop the agent from working. Local network, Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts.", agentName))
                     }
             } else if policy.enabled {
                 BlockingUnavailableNotice(enforcing: policy.enforce)
@@ -313,7 +309,7 @@ struct AllowlistEditor: View {
                                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Remove \(pattern)")
+                                .accessibilityLabel(L("Remove %@", pattern))
                             }
                         }
                     }
@@ -327,13 +323,13 @@ struct AllowlistEditor: View {
                 Button(L("Add"), action: add).controlSize(.small).disabled(draft.isEmpty)
                 Menu(L("Presets")) {
                     ForEach(AgentPolicy.presets) { preset in
-                        Button(preset.name) { add(patterns: preset.patterns) }
+                        Button(preset.localizedName) { add(patterns: preset.patterns) }
                     }
                 }
                 .controlSize(.small)
                 .fixedSize()
             }
-            Text(invalid ? "Enter a domain, IP address or CIDR range." : footer)
+            Text(invalid ? L("Enter a domain, IP address or CIDR range.") : footer)
                 .font(.caption2).foregroundStyle(invalid ? TrafficColors.anomaly : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -341,8 +337,8 @@ struct AllowlistEditor: View {
 
     private var footer: String {
         policy.enforce && monitor.canBlock
-            ? "Anything else \(agentName) or its tools contact is refused, and the refusal is listed in Alerts."
-            : "Anything else \(agentName) or its tools contact raises an alert. Flowlight doesn't block connections."
+            ? L("Anything else %@ or its tools contact is refused, and the refusal is listed in Alerts.", agentName)
+            : L("Anything else %@ or its tools contact raises an alert. Flowlight doesn't block connections.", agentName)
     }
 
     private func add() {
@@ -405,7 +401,7 @@ struct AgentDetail: View {
                                     Text(usage.name).lineLimit(1)
                                     Spacer()
                                     if usage.errors > 0 {
-                                        Text("\(usage.errors) failed").foregroundStyle(TrafficColors.anomaly)
+                                        Text(L("%lld failed", usage.errors)).foregroundStyle(TrafficColors.anomaly)
                                     }
                                     Text("×\(usage.count)").monospacedDigit().foregroundStyle(.secondary)
                                 }
@@ -413,7 +409,7 @@ struct AgentDetail: View {
                             }
                             .buttonStyle(.plain)
                             .font(.caption)
-                            .help(usage.lastSummary.map { "Model asked for \(usage.name) \(usage.count)×. Most recent: \($0)" } ?? usage.name)
+                            .help(usage.lastSummary.map { L("Model asked for %@ %lld×. Most recent: %@", usage.name, usage.count, $0) } ?? usage.name)
                         }
                         ForEach(agent.tools.prefix(8)) { tool in
                             HStack {
@@ -425,7 +421,8 @@ struct AgentDetail: View {
                                     .monospacedDigit().foregroundStyle(.secondary)
                             }
                             .font(.caption)
-                            .help(tool.isMCP ? "MCP server started by \(agent.name)" : "Process started by \(agent.name), e.g. from a shell tool")
+                            .help(tool.isMCP ? L("MCP server started by %@", agent.name)
+                                             : L("Process started by %@, e.g. from a shell tool", agent.name))
                         }
                         Divider().padding(.vertical, 2)
                     }
@@ -454,11 +451,11 @@ struct AgentDetail: View {
                     HStack {
                         do {
                             Picker(L("Show"), selection: $tab) {
-                                Text("Destinations (\(agent.otherDestinations.count))").tag(Tab.destinations)
-                                Text(activity.isEmpty ? "Tool calls" : "Tool calls (\(activity.count))").tag(Tab.calls)
-                                Text(toolCount > 0 ? "Tools (\(toolCount))" : "Tools").tag(Tab.tools)
+                                Text(L("Destinations (%lld)", agent.otherDestinations.count)).tag(Tab.destinations)
+                                Text(activity.isEmpty ? L("Tool calls") : L("Tool calls (%lld)", activity.count)).tag(Tab.calls)
+                                Text(toolCount > 0 ? L("Tools (%lld)", toolCount) : L("Tools")).tag(Tab.tools)
                                 let mcpCount = servers.count + unusedServers.count
-                                Text(mcpCount > 0 ? "MCP servers (\(mcpCount))" : "MCP servers").tag(Tab.servers)
+                                Text(mcpCount > 0 ? L("MCP servers (%lld)", mcpCount) : L("MCP servers")).tag(Tab.servers)
                                 Text(L("Guardrails")).tag(Tab.guardrails)
                             }
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
@@ -484,7 +481,8 @@ struct AgentDetail: View {
                     case .calls:
                         if activity.isEmpty {
                             InspectionHint(inspection: monitor.inspection, agent: agent.name,
-                                           what: "the tool calls its model asks for", subject: "tool calls", seen: inspected)
+                                           what: L("the tool calls its model asks for"), subject: L("tool calls"),
+                                           seen: inspected, reaching: agent.providers.first?.name)
                         }
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 8) {
@@ -497,7 +495,8 @@ struct AgentDetail: View {
                             LazyVStack(alignment: .leading, spacing: 6) {
                                 let tools = profile?.tools ?? []
                                 if !tools.isEmpty {
-                                    Text("Declared to the model · \(tools.filter { $0.used > 0 }.count) of \(tools.count) used in this window")
+                                    Text(L("Declared to the model · %lld of %lld used in this window",
+                                           tools.filter { $0.used > 0 }.count, tools.count))
                                         .font(.caption.bold()).foregroundStyle(.secondary)
                                     ForEach(Array(tools.enumerated()), id: \.offset) { _, entry in
                                         DeclaredToolRow(tool: entry.tool, used: entry.used)
@@ -516,7 +515,8 @@ struct AgentDetail: View {
                                         }
                                         ForEach(items.prefix(kind == .permission ? 12 : 40)) { CapabilityRow(capability: $0) }
                                         if items.count > (kind == .permission ? 12 : 40) {
-                                            Text("+\(items.count - (kind == .permission ? 12 : 40)) more").font(.caption).foregroundStyle(.tertiary)
+                                            Text(L("+%lld more", items.count - (kind == .permission ? 12 : 40)))
+                                                .font(.caption).foregroundStyle(.tertiary)
                                         }
                                     }
                                 }
@@ -531,8 +531,9 @@ struct AgentDetail: View {
                                 if servers.isEmpty && unusedServers.isEmpty {
                                     AgentSetupBar(agent: agent.name)
                                     InspectionHint(inspection: monitor.inspection, agent: agent.name,
-                                                   what: "the MCP servers it calls over the network",
-                                                   subject: "MCP servers reached over the network", seen: inspected)
+                                                   what: L("the MCP servers it calls over the network"),
+                                                   subject: L("MCP servers reached over the network"),
+                                                   seen: inspected, reaching: agent.providers.first?.name)
                                 }
                                 ForEach(servers) { MCPServerRow(server: $0) }
                                 ForEach(unusedServers, id: \.server.name) { entry in
@@ -551,13 +552,15 @@ struct AgentDetail: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text("\(agent.name) · \(ByteFormat.string(agent.total.total)) in \(window.title.lowercased())")
+                // Not lowercased: the title is already translated, and lowercasing a translated word is an English habit
+// that German nouns don't survive. It is a no-op in Chinese, Japanese and Korean anyway.
+                Text(L("%@ · %@ in %@", agent.name, ByteFormat.string(agent.total.total), window.title))
                 if let profile, profile.requests > 0 {
                     Text("·").foregroundStyle(.tertiary)
                     Text(modelLine(profile)).foregroundStyle(.secondary)
-                        .help("From inspected calls to \(profile.providerName ?? "the model provider")")
+                        .help(L("From inspected calls to %@", profile.providerName ?? L("the model provider")))
                     if profile.failures > 0 {
-                        Text("· \(profile.failures) failed").foregroundStyle(TrafficColors.anomaly)
+                        Text("· " + L("%lld failed", profile.failures)).foregroundStyle(TrafficColors.anomaly)
                     }
                 }
             }
@@ -604,13 +607,13 @@ struct AgentDetail: View {
 
     static func sectionTitle(_ kind: AgentCapability.Kind, count: Int) -> String {
         switch kind {
-        case .skill: return "Skills (\(count))"
-        case .subagent: return "Subagents (\(count))"
-        case .command: return "Slash commands (\(count))"
-        case .hook: return "Hooks (\(count))"
-        case .plugin: return "Plugins (\(count))"
-        case .permission: return "Permission rules (\(count))"
-        case .instructions: return "Instructions (\(count))"
+        case .skill: return L("Skills (%lld)", count)
+        case .subagent: return L("Subagents (%lld)", count)
+        case .command: return L("Slash commands (%lld)", count)
+        case .hook: return L("Hooks (%lld)", count)
+        case .plugin: return L("Plugins (%lld)", count)
+        case .permission: return L("Permission rules (%lld)", count)
+        case .instructions: return L("Instructions (%lld)", count)
         }
     }
 
@@ -620,11 +623,12 @@ struct AgentDetail: View {
         if let model = profile.models.max(by: { $0.requests < $1.requests })?.name {
             parts.append(profile.models.count > 1 ? "\(model) +\(profile.models.count - 1)" : model)
         }
-        parts.append("\(profile.requests) \(profile.requests == 1 ? "call" : "calls")")
+        parts.append(profile.requests == 1 ? L("%lld call", profile.requests) : L("%lld calls", profile.requests))
         if !profile.usage.isEmpty {
-            var tokens = "\(Self.count(profile.usage.input)) in / \(Self.count(profile.usage.output)) out"
-            if profile.usage.cacheRead > 0 { tokens += " · \(Self.count(profile.usage.cacheRead)) cached" }
-            parts.append(tokens)
+            let input = Self.count(profile.usage.input), output = Self.count(profile.usage.output)
+            parts.append(profile.usage.cacheRead > 0
+                ? L("%@ in / %@ out · %@ cached", input, output, Self.count(profile.usage.cacheRead))
+                : L("%@ in / %@ out", input, output))
         }
         return parts.joined(separator: " · ")
     }
@@ -647,11 +651,11 @@ struct AgentDetail: View {
             Text(d.protocols.joined(separator: ", ") + (d.ports.isEmpty ? "" : " · " + d.ports))
                 .foregroundStyle(d.isSensitive ? TrafficColors.anomaly : .secondary).lineLimit(1)
             if !d.via.isEmpty {
-                Text(L("via ") + d.via.prefix(2).joined(separator: ", "))
+                Text(L("via %@", d.via.prefix(2).joined(separator: ", ")))
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(.quaternary, in: Capsule())
                     .lineLimit(1)
-                    .help(L("Opened by ") + d.via.joined(separator: ", "))
+                    .help(L("Opened by %@", d.via.joined(separator: ", ")))
             }
             Spacer()
             if policy.enabled && !d.isAllowed(by: policy) {
@@ -662,7 +666,7 @@ struct AgentDetail: View {
                     save(p)
                 }
                 .controlSize(.mini)
-                .help("Add \(d.allowPattern) to \(agent.name)'s allowlist")
+                .help(L("Add %@ to %@'s allowlist", d.allowPattern, agent.name))
             }
             Text("↑ \(ByteFormat.string(d.counters.bytesOut))  ↓ \(ByteFormat.string(d.counters.bytesIn))").monospacedDigit().foregroundStyle(.secondary)
         }
@@ -741,7 +745,7 @@ struct ToolActivityRow: View {
         .font(.caption)
         .contentShape(Rectangle())
         .onTapGesture { expanded.toggle() }
-        .help(expanded ? "Click to collapse" : "Click to show more of the command and output")
+        .help(expanded ? L("Click to collapse") : L("Click to show more of the command and output"))
     }
 
     @ViewBuilder private var outcomeIcon: some View {
@@ -765,7 +769,7 @@ struct DeclaredToolRow: View {
                 HStack(spacing: 5) {
                     Text(tool.name).bold(used > 0)
                     if tool.kind != .function {
-                        Text(tool.kind == .provider ? "runs at the provider" : "MCP server")
+                        Text(tool.kind == .provider ? L("runs at the provider") : L("MCP server"))
                             .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(.quaternary, in: Capsule())
                     }
@@ -775,12 +779,13 @@ struct DeclaredToolRow: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(used > 0 ? "×\(used)" : "unused").monospacedDigit()
+            Text(used > 0 ? "×\(used)" : L("unused")).monospacedDigit()
                 .foregroundStyle(used > 0 ? .primary : .tertiary)
         }
         .font(.caption)
         .opacity(used > 0 ? 1 : 0.75)
-        .help(tool.kind == .provider ? "\(tool.name) runs on the provider's servers, not on this Mac" : (tool.detail ?? tool.name))
+        .help(tool.kind == .provider ? L("%@ runs on the provider's servers, not on this Mac", tool.name)
+                                     : (tool.detail ?? tool.name))
     }
 
     private var icon: String {
@@ -810,18 +815,20 @@ struct MCPServerRow: View {
                     Image(systemName: "key.fill").foregroundStyle(.secondary).help(L("The agent sent the provider a token for this server"))
                 }
                 Spacer()
-                if server.errors > 0 { Text("\(server.errors) failed").foregroundStyle(TrafficColors.anomaly) }
-                Text(server.calls == 0 ? "no calls seen" : "\(server.calls) \(server.calls == 1 ? "call" : "calls")").foregroundStyle(.secondary)
+                if server.errors > 0 { Text(L("%lld failed", server.errors)).foregroundStyle(TrafficColors.anomaly) }
+                Text(server.calls == 0 ? L("no calls seen")
+                     : server.calls == 1 ? L("%lld call", server.calls) : L("%lld calls", server.calls))
+                    .foregroundStyle(.secondary)
             }
             if let endpoint = server.endpoint {
                 Text(endpoint).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             if let approval = server.approval {
-                Text("Approval: \(approval)").foregroundStyle(approval == "never" ? TrafficColors.anomaly : .secondary)
-                    .help(approval == "never" ? "The agent told the provider to run this server's tools without asking" : "")
+                Text(L("Approval: %@", approval)).foregroundStyle(approval == "never" ? TrafficColors.anomaly : .secondary)
+                    .help(approval == "never" ? L("The agent told the provider to run this server's tools without asking") : "")
             }
             if let allowed = server.allowedTools, !allowed.isEmpty {
-                Text(L("Allowed: ") + allowed.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(2)
+                Text(L("Allowed: %@", allowed.joined(separator: " · "))).foregroundStyle(.secondary).lineLimit(2)
             }
             if !server.tools.isEmpty {
                 Text(toolList).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(3)
@@ -833,23 +840,25 @@ struct MCPServerRow: View {
 
     private var kindLabel: String {
         switch server.kind {
-        case .local: return "local"
-        case .remote: return "remote"
-        case .provider: return "via provider"
+        case .local: return L("local")
+        case .remote: return L("remote")
+        case .provider: return L("via provider")
         }
     }
 
     private var kindHelp: String {
         switch server.kind {
-        case .local: return "Runs as a process on this Mac, started by the agent"
-        case .remote: return "This Mac talks to it over HTTPS"
-        case .provider: return "The provider connects to it for the agent; that traffic never reaches this Mac"
+        case .local: return L("Runs as a process on this Mac, started by the agent")
+        case .remote: return L("This Mac talks to it over HTTPS")
+        case .provider: return L("The provider connects to it for the agent; that traffic never reaches this Mac")
         }
     }
 
     private var toolList: String {
         let names = server.tools.prefix(24).map { name in server.used[name].map { "\(name) ×\($0)" } ?? name }
-        return names.joined(separator: " · ") + (server.tools.count > 24 ? " · +\(server.tools.count - 24) more" : "")
+        var list = names.joined(separator: " · ")
+        if server.tools.count > 24 { list += " · " + L("+%lld more", server.tools.count - 24) }
+        return list
     }
 }
 
@@ -881,7 +890,8 @@ struct CapabilityRow: View {
             Spacer(minLength: 0)
         }
         .font(.caption)
-        .help("\(capability.source)\(capability.kind == .hook ? " — runs automatically when this event fires" : "")")
+        .help(capability.kind == .hook ? L("%@ — runs automatically when this event fires", capability.source)
+                                       : capability.source)
     }
 
     private var icon: String {
@@ -907,7 +917,7 @@ struct ConfiguredServerRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "puzzlepiece.extension").foregroundStyle(.secondary)
                 Text(server.name).bold()
-                Text(server.url == nil ? "local" : "remote")
+                Text(server.url == nil ? L("local") : L("remote"))
                     .padding(.horizontal, 5).padding(.vertical, 1).background(.quaternary, in: Capsule())
                 Spacer()
                 Text(L("configured, no calls seen")).foregroundStyle(.secondary)
@@ -935,7 +945,7 @@ struct AgentSetupBar: View {
                     Text(L("Reading agent configuration…")).foregroundStyle(.secondary)
                 }
             } else if !store.hasScanned {
-                Text("Flowlight can also list what \(agent) is set up with: its skills, subagents, slash commands, hooks and MCP servers. It reads those config files on this Mac and keeps only their names; nothing is sent anywhere.")
+                Text(L("Flowlight can also list what %@ is set up with: its skills, subagents, slash commands, hooks and MCP servers. It reads those config files on this Mac and keeps only their names; nothing is sent anywhere.", agent))
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(L("Look for agent configuration")) { store.refresh(force: true) }
@@ -957,7 +967,7 @@ struct AgentSetupBar: View {
                                 .lineLimit(1).truncationMode(.middle)
                             Button { store.removeRoot(root) } label: { Image(systemName: "xmark.circle.fill") }
                                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                                .accessibilityLabel("Stop scanning \(root.lastPathComponent)")
+                                .accessibilityLabel(L("Stop scanning %@", root.lastPathComponent))
                         }
                         .font(.caption2)
                     }
@@ -969,8 +979,10 @@ struct AgentSetupBar: View {
 
     private var summary: String {
         let folders = store.workspaces.count
-        let when = store.scannedAt.map { $0.formatted(.relative(presentation: .named)) } ?? "never"
-        return "\(folders) configuration \(folders == 1 ? "folder" : "folders") found · scanned \(when)"
+        let when = store.scannedAt.map { $0.formatted(.relative(presentation: .named)) } ?? L("never")
+        return folders == 1
+            ? L("%lld configuration folder found · scanned %@", folders, when)
+            : L("%lld configuration folders found · scanned %@", folders, when)
     }
 
     /// Project folders are opened through a picker, so macOS grants access to that folder alone.
@@ -979,8 +991,8 @@ struct AgentSetupBar: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Scan"
-        panel.message = "Pick a folder where your projects live. Flowlight looks for agent configuration inside it."
+        panel.prompt = L("Scan")
+        panel.message = L("Pick a folder where your projects live. Flowlight looks for agent configuration inside it.")
         if panel.runModal() == .OK, let url = panel.url { store.addRoot(url) }
     }
 }
@@ -1013,6 +1025,9 @@ struct InspectionHint: View {
     let subject: String
     /// Whether anything of this agent's has actually been decrypted in this window.
     var seen: Bool = false
+    /// The model provider it has been talking to, when it has. Naming it turns "nothing arrived" into the
+    /// actual finding: the agent reached its provider directly, past the proxy.
+    var reaching: String?
     @EnvironmentObject private var nav: AppNavigation
 
     private var inspecting: Bool { inspection.enabled && inspection.running }
@@ -1025,7 +1040,7 @@ struct InspectionHint: View {
                 Button(L("Set up HTTPS inspection")) { nav.selection = .inspect }
                     .controlSize(.small)
             } else if !seen {
-                Button("Route \(agent) Through the Proxy") { nav.selection = .inspect }
+                Button(L("Route %@ Through the Proxy", agent)) { nav.selection = .inspect }
                     .controlSize(.small)
             }
         }
@@ -1034,11 +1049,15 @@ struct InspectionHint: View {
 
     private var message: String {
         if !inspecting {
-            return "Flowlight sees \(agent)'s connections, but not what's inside them. Turn on HTTPS inspection to see \(what)."
+            return L("Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@.", agent, what)
         }
         if !seen {
-            return "HTTPS inspection is on, but nothing of \(agent)'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal."
+            guard let reaching else {
+                return L("HTTPS inspection is on, but nothing of %@'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal.", agent)
+            }
+            // The traffic is right there in the table above, which is what makes the empty tab look like a bug.
+            return L("%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there.", agent, reaching)
         }
-        return "No \(subject) in this window. Flowlight is decrypting \(agent)'s traffic; its model just hasn't asked for any."
+        return L("No %@ in this window. Flowlight is decrypting %@'s traffic; its model just hasn't asked for any.", subject, agent)
     }
 }

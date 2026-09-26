@@ -48,8 +48,8 @@ struct SettingsView: View {
             Form {
                 Section {
                     Stepper(value: $sigma, in: 1.5...10, step: 0.5) { LabeledContent(L("Z-score threshold"), value: "\(sigma.formatted())σ") }
-                    Stepper(value: $learningHours, in: 0...336, step: 6) { LabeledContent(L("Learning period per app"), value: "\(Int(learningHours)) h") }
-                    Stepper(value: $minAlertMB, in: 0...1000, step: 1) { LabeledContent(L("Ignore hours below"), value: "\(minAlertMB.formatted()) MB") }
+                    Stepper(value: $learningHours, in: 0...336, step: 6) { LabeledContent(L("Learning period per app"), value: L("%lld h", Int(learningHours))) }
+                    Stepper(value: $minAlertMB, in: 0...1000, step: 1) { LabeledContent(L("Ignore hours below"), value: L("%@ MB", minAlertMB.formatted())) }
                 } footer: {
                     Text(L("Hourly traffic and daily destination counts are compared with each app's rolling baseline."))
                         .font(.caption).foregroundStyle(.secondary)
@@ -65,11 +65,11 @@ struct SettingsView: View {
                     Toggle(L("Agent uses email, file transfer, SSH, tunnels or databases"), isOn: $agentSensitive)
                     Toggle(L("Agent connects to a raw IP on an unusual port"), isOn: $agentUnnamed)
                     Stepper(value: $agentEgressMB, in: 1...10_000, step: 10) {
-                        LabeledContent(L("Uploads to non-AI hosts above"), value: "\(Int(agentEgressMB)) MB/h")
+                        LabeledContent(L("Uploads to non-AI hosts above"), value: L("%lld MB/h", Int(agentEgressMB)))
                     }
                     Toggle(L("Agent active while you're away"), isOn: $agentAway)
                     Stepper(value: $agentAwayMinutes, in: 1...240, step: 1) {
-                        LabeledContent(L("Away after"), value: "\(Int(agentAwayMinutes)) min without input")
+                        LabeledContent(L("Away after"), value: L("%lld min without input", Int(agentAwayMinutes)))
                     }
                     .disabled(!agentAway)
                 } header: {
@@ -79,8 +79,8 @@ struct SettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section(L("Traffic without UI activity")) {
-                    Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent(L("App idle for at least"), value: "\(Int(idleMinutes)) min") }
-                    Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent(L("Uploading more than"), value: "\(idleUploadMB.formatted()) MB/min") }
+                    Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent(L("App idle for at least"), value: L("%lld min", Int(idleMinutes))) }
+                    Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent(L("Uploading more than"), value: L("%@ MB/min", idleUploadMB.formatted())) }
                 }
             }
             .formStyle(.grouped)
@@ -89,7 +89,7 @@ struct SettingsView: View {
 
             Form {
                 Section {
-                    Stepper(value: $retentionHours, in: 1...72, step: 1) { LabeledContent(L("Keep per-second data"), value: "\(Int(retentionHours)) h") }
+                    Stepper(value: $retentionHours, in: 1...72, step: 1) { LabeledContent(L("Keep per-second data"), value: L("%lld h", Int(retentionHours))) }
                 } footer: {
                     Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
                         .font(.caption).foregroundStyle(.secondary)
@@ -126,14 +126,17 @@ struct MenuBarContent: View {
 
     var body: some View {
         Text("↓ \(ByteFormat.rate(monitor.currentIn))   ↑ \(ByteFormat.rate(monitor.currentOut))")
-        if focus.isActive { Text("Focus: \(focus.summary)") }
+        if focus.isActive { Text(L("Focus: %@", focus.summary)) }
         Divider()
         ForEach(monitor.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
         }
         if monitor.unacknowledgedAlerts > 0 {
             Divider()
-            Text("\(monitor.unacknowledgedAlerts) unacknowledged alert\(monitor.unacknowledgedAlerts == 1 ? "" : "s")")
+            // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of a
+            // noun is not a suffix in most of the languages Flowlight speaks.
+            Text(monitor.unacknowledgedAlerts == 1 ? L("%lld unacknowledged alert", monitor.unacknowledgedAlerts)
+                                                   : L("%lld unacknowledged alerts", monitor.unacknowledgedAlerts))
         }
         Divider()
         Button(L("Open Flowlight")) {
@@ -145,7 +148,7 @@ struct MenuBarContent: View {
             Button(L("Show Dock Icon")) { backgroundOnly = false }
         }
         if !focus.targets.isEmpty {
-            Button(focus.isOn ? "Turn Focus Off" : "Turn Focus On") { focus.isOn.toggle() }
+            Button(focus.isOn ? L("Turn Focus Off") : L("Turn Focus On")) { focus.isOn.toggle() }
         }
         if monitor.unacknowledgedAlerts > 0 {
             Button(L("Review Alerts…")) {
@@ -155,7 +158,7 @@ struct MenuBarContent: View {
             }
         }
         if let update = updater.pendingUpdate {
-            Button("Update Available: Flowlight \(update.version)…") {
+            Button(L("Update Available: Flowlight %@…", update.version)) {
                 openWindow(id: "update")
                 NSApp.activate()
             }
@@ -179,7 +182,7 @@ struct UpdateSettingsRow: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        LabeledContent("Version \(updater.currentVersion)") {
+        LabeledContent(L("Version %@", updater.currentVersion)) {
             HStack(spacing: 8) {
                 Text(status).font(.caption).foregroundStyle(.secondary)
                 Button(L("Check Now")) {
@@ -193,15 +196,15 @@ struct UpdateSettingsRow: View {
 
     private var status: String {
         switch updater.state {
-        case .checking: return "Checking…"
-        case .available(let r): return "\(r.version) available"
-        case .upToDate: return "Up to date"
-        case .failed: return "Last check failed"
-        case .downloading: return "Downloading…"
-        case .ready(let r, _): return "\(r.version) ready to install"
-        case .installing: return "Installing…"
+        case .checking: return L("Checking…")
+        case .available(let r): return L("%@ available", r.version)
+        case .upToDate: return L("Up to date")
+        case .failed: return L("Last check failed")
+        case .downloading: return L("Downloading…")
+        case .ready(let r, _): return L("%@ ready to install", r.version)
+        case .installing: return L("Installing…")
         case .idle:
-            return updater.lastCheck.map { "Checked \($0.formatted(.relative(presentation: .named)))" } ?? "Not checked yet"
+            return updater.lastCheck.map { L("Checked %@", $0.formatted(.relative(presentation: .named))) } ?? L("Not checked yet")
         }
     }
 }
@@ -212,23 +215,52 @@ struct UpdateSettingsRow: View {
 /// be — so when it is chosen the row says underneath what is actually being shown.
 private struct LanguageRow: View {
     @ObservedObject private var localization = Localization.shared
+    @State private var confirming: AppLanguage?
+    @State private var failure: String?
 
     var body: some View {
-        Picker(L("Language"), selection: Binding(get: { localization.language },
-                                                 set: { localization.language = $0 })) {
-            Text(L("System")).tag(AppLanguage.system)
-            Divider()
-            ForEach(AppLanguage.translated) { language in
-                // Each written in its own language: someone looking for theirs is not reading the others.
-                Text(language.title).tag(language)
+        // One Group so the dialogs below attach to something: the rows themselves are a tuple, and a modifier
+        // on a tuple is a modifier on nothing.
+        Group {
+            Picker(L("Language"), selection: Binding(get: { localization.language },
+                                                     set: { confirming = $0 })) {
+                Text(L("System")).tag(AppLanguage.system)
+                Divider()
+                ForEach(AppLanguage.translated) { language in
+                    // Each written in its own language: someone looking for theirs is not reading the others.
+                    Text(language.title).tag(language)
+                }
             }
-        }
-        if localization.language == .system {
-            Text(L("Now showing %@", localization.effective.title))
+            if localization.language == .system {
+                Text(L("Now showing %@", localization.effective.title))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text(L("The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into."))
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(L("Changing it restarts Flowlight, so the menus macOS draws change too. The Network Extension keeps filtering while it does."))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        Text(L("The interface follows your Mac's language when this is set to System, and falls back to English for languages Flowlight hasn't been translated into."))
-            .font(.caption).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        .confirmationDialog(L("Restart Flowlight in this language?"), isPresented: Binding(
+            get: { confirming != nil }, set: { if !$0 { confirming = nil } })) {
+            Button(L("Restart")) {
+                // Stored first, so the copy that starts in a moment reads the new choice.
+                if let chosen = confirming { localization.language = chosen }
+                confirming = nil
+                AppRestart.now { failure = $0 }
+            }
+            Button(L("Cancel"), role: .cancel) { confirming = nil }
+        } message: {
+            Text(L("The window follows the new language straight away; the application menu, the open and save panels and the standard buttons only change when Flowlight starts again."))
+        }
+        .alert(L("Flowlight couldn't restart itself"), isPresented: Binding(
+            get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+            Button(L("OK")) { failure = nil }
+        } message: {
+            // The language is already saved either way, so quitting and opening it again finishes the job.
+            Text(L("%@ — the language is saved, so quitting and opening Flowlight again will finish the change.",
+                   failure ?? ""))
+        }
     }
 }

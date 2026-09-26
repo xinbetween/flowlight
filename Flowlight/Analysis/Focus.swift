@@ -81,13 +81,20 @@ final class FocusStore: ObservableObject {
     /// On with nothing listed would hide every screen, so it reads as off until something is added.
     var isActive: Bool { isOn && !targets.isEmpty }
 
+    /// Each count is a whole sentence rather than a number spliced into one: a plural built by appending "s"
+    /// is an English rule, and the four mixed cases each read differently once a language inflects both nouns.
     var summary: String {
         let apps = apps.count, hosts = hosts.count
         switch (apps, hosts) {
-        case (0, 0): return "Nothing chosen yet"
-        case (_, 0): return apps == 1 ? "1 app" : "\(apps) apps"
-        case (0, _): return hosts == 1 ? "1 destination" : "\(hosts) destinations"
-        default: return "\(apps) app\(apps == 1 ? "" : "s"), \(hosts) destination\(hosts == 1 ? "" : "s")"
+        case (0, 0): return L("Nothing chosen yet")
+        case (1, 0): return L("1 app")
+        case (_, 0): return L("%lld apps", apps)
+        case (0, 1): return L("1 destination")
+        case (0, _): return L("%lld destinations", hosts)
+        case (1, 1): return L("1 app, 1 destination")
+        case (1, _): return L("1 app, %lld destinations", hosts)
+        case (_, 1): return L("%lld apps, 1 destination", apps)
+        default: return L("%lld apps, %lld destinations", apps, hosts)
         }
     }
 

@@ -35,8 +35,8 @@ struct AskChart: Equatable, Sendable {
     var unit: Unit
     var points: [Point]
     /// What the two values mean, when there are two.
-    var primaryName = "Sent"
-    var secondaryName = "Received"
+    var primaryName = L("Sent")
+    var secondaryName = L("Received")
 
     var isEmpty: Bool { points.isEmpty || kind == .none }
 
@@ -46,7 +46,7 @@ struct AskChart: Equatable, Sendable {
         guard points.count > limit else { return points }
         let top = Array(points.prefix(limit - 1))
         let rest = points.dropFirst(limit - 1)
-        let other = Point(label: "Other (\(rest.count))", value: rest.reduce(0) { $0 + $1.value },
+        let other = Point(label: L("Other (%lld)", rest.count), value: rest.reduce(0) { $0 + $1.value },
                           secondary: rest.contains { $0.secondary != nil }
                               ? rest.reduce(0) { $0 + ($1.secondary ?? 0) } : nil)
         return top + [other]

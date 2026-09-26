@@ -60,8 +60,8 @@ struct ExportSettingsTab: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Send to my collector"))
                     Text(exporter.enabled
-                         ? "On. Flowlight is sending to the endpoint below."
-                         : "Off. Nothing about your traffic leaves this Mac.")
+                         ? L("On. Flowlight is sending to the endpoint below.")
+                         : L("Off. Nothing about your traffic leaves this Mac."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -69,11 +69,7 @@ struct ExportSettingsTab: View {
         } header: {
             Text(L("Export to OpenTelemetry / SIEM"))
         } footer: {
-            Text("""
-            Flowlight has no service of its own and never will: the endpoint below is yours. This is off until you \
-            fill it in and turn it on, and turning it on starts from that moment — what was recorded before the \
-            decision stays in the local database. Turning it off again discards whatever was waiting to be sent.
-            """)
+            Text(L("Flowlight has no service of its own and never will: the endpoint below is yours. This is off until you fill it in and turn it on, and turning it on starts from that moment — what was recorded before the decision stays in the local database. Turning it off again discards whatever was waiting to be sent."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -88,7 +84,8 @@ struct ExportSettingsTab: View {
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: endpoint) { _, _ in exporter.settingsChanged() }
             if config.endpointURL == nil {
-                Text(endpoint.isEmpty ? "No endpoint yet." : "That isn't an http:// or https:// address with a host in it.")
+                Text(endpoint.isEmpty ? L("No endpoint yet.")
+                     : L("That isn't an http:// or https:// address with a host in it."))
                     .font(.caption).foregroundStyle(endpoint.isEmpty ? Color.secondary : Color.red)
             } else {
                 ForEach(exporter.destinations, id: \.self) { url in
@@ -125,10 +122,7 @@ struct ExportSettingsTab: View {
         } header: {
             Text(L("Headers"))
         } footer: {
-            Text("""
-            Header values are kept in your login Keychain, not in Flowlight's preferences — a token for your \
-            collector shouldn't sit in a file every process running as you can read.
-            """)
+            Text(L("Header values are kept in your login Keychain, not in Flowlight's preferences — a token for your collector shouldn't sit in a file every process running as you can read."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -140,7 +134,7 @@ struct ExportSettingsTab: View {
             Toggle(L("Alerts"), isOn: $includeAlerts)
                 .onChange(of: includeAlerts) { _, _ in exporter.settingsChanged() }
             Stepper(value: $interval, in: 10...3600, step: 10) {
-                LabeledContent("Send every", value: "\(Int(interval)) s")
+                LabeledContent(L("Send every"), value: L("%lld s", Int(interval)))
             }
             .onChange(of: interval) { _, _ in exporter.settingsChanged() }
             TextField(L("Service name"), text: $serviceName, prompt: Text(L("flowlight")))
@@ -151,19 +145,14 @@ struct ExportSettingsTab: View {
         } header: {
             Text(L("What Flowlight sends"))
         } footer: {
-            Text("""
-            A rollup is one app, one hostname and one IP address added up over the window, at the same minute \
-            granularity Reports uses — never per connection and never per packet. Rollups go about two minutes \
-            behind, once the minute they belong to is complete; alerts go as they are raised. A collector that \
-            can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down.
-            """)
+            Text(L("A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var fieldsSection: some View {
         Section {
-            DisclosureGroup("Every field that can leave this Mac (\(ExportField.allCases.count))") {
+            DisclosureGroup(L("Every field that can leave this Mac (%lld)", ExportField.allCases.count)) {
                 ForEach(ExportField.allCases) { field in
                     VStack(alignment: .leading, spacing: 1) {
                         Text(field.rawValue).font(.caption.monospaced())
@@ -173,12 +162,7 @@ struct ExportSettingsTab: View {
                 }
             }
         } footer: {
-            Text("""
-            That list is the whole of it — it is generated from the same declaration the payload is built from, so \
-            it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything \
-            HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any \
-            decrypted exchange have no path into an export.
-            """)
+            Text(L("That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -193,7 +177,7 @@ struct ExportSettingsTab: View {
                     loadingPreview = false
                 }
             }
-            LabeledContent("Test connection") {
+            LabeledContent(L("Test connection")) {
                 HStack(spacing: 8) {
                     Text(testSummary).font(.caption).foregroundStyle(testColour)
                     Button(L("Test")) { Task { await exporter.testConnection() } }
@@ -201,39 +185,35 @@ struct ExportSettingsTab: View {
                 }
             }
         } footer: {
-            Text("""
-            The preview is built from your own traffic and is never sent. Test connection sends the smallest thing \
-            the format allows — an OpenTelemetry request with no records in it, or one line marked as a test — and \
-            reports what the collector actually answered.
-            """)
+            Text(L("The preview is built from your own traffic and is never sent. Test connection sends the smallest thing the format allows — an OpenTelemetry request with no records in it, or one line marked as a test — and reports what the collector actually answered."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var statusSection: some View {
         Section {
-            LabeledContent("Last successful export",
-                           value: exporter.lastSuccess.map { "\($0.formatted(.relative(presentation: .named))) · \(exporter.lastRecordsSent) records" }
-                               ?? "Never")
-            LabeledContent("Last error") {
-                Text(exporter.lastError ?? "None").foregroundStyle(exporter.lastError == nil ? Color.secondary : Color.red)
+            LabeledContent(L("Last successful export"),
+                           value: exporter.lastSuccess.map {
+                               L("%@ · %lld records", $0.formatted(.relative(presentation: .named)),
+                                 exporter.lastRecordsSent)
+                           } ?? L("Never"))
+            LabeledContent(L("Last error")) {
+                Text(exporter.lastError ?? L("None"))
+                    .foregroundStyle(exporter.lastError == nil ? Color.secondary : Color.red)
             }
-            LabeledContent("Waiting to be sent", value: "\(exporter.buffered) records")
+            LabeledContent(L("Waiting to be sent"), value: L("%lld records", exporter.buffered))
             if exporter.dropped > 0 {
-                LabeledContent("Dropped") {
-                    Text("\(exporter.dropped) records").foregroundStyle(.orange)
+                LabeledContent(L("Dropped")) {
+                    Text(L("%lld records", exporter.dropped)).foregroundStyle(.orange)
                 }
             }
             if let next = exporter.nextAttempt, next > Date() {
-                LabeledContent("Retrying", value: next.formatted(.relative(presentation: .named)))
+                LabeledContent(L("Retrying"), value: next.formatted(.relative(presentation: .named)))
             }
         } header: {
             Text(L("Status"))
         } footer: {
-            Text("""
-            Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, \
-            and the first time they go somewhere new you'll get a first-contact alert about Flowlight.
-            """)
+            Text(L("Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -269,8 +249,8 @@ struct ExportSettingsTab: View {
 
     private var testSummary: String {
         switch exporter.testState {
-        case .idle: return "Not tested"
-        case .running: return "Testing…"
+        case .idle: return L("Not tested")
+        case .running: return L("Testing…")
         case .succeeded(let message): return message
         case .failed(let message): return message
         }
@@ -293,6 +273,7 @@ struct ExportSettingsTab: View {
         for row in headers { merged[row.name.trimmingCharacters(in: .whitespacesAndNewlines)] = row.value }
         let status = ExportSecrets.save(merged)
         headerError = status == errSecSuccess ? nil
-            : "Couldn't save to the Keychain: \((SecCopyErrorMessageString(status, nil) as String?) ?? "error \(status)")"
+            : L("Couldn't save to the Keychain: %@",
+                (SecCopyErrorMessageString(status, nil) as String?) ?? L("error %lld", Int(status)))
     }
 }

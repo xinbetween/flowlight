@@ -86,7 +86,9 @@ extension Guardrail {
 
     static func preset(_ preset: Preset, agent: String) -> [Guardrail] {
         preset.tools.map {
-            Guardrail(agent: agent, tool: $0, origin: .preset, name: "\(preset.name): \($0)")
+            // No name: it would freeze one language into the record. `origin` already says it came from a
+            // preset, and the title is composed from the fields when it is shown.
+            Guardrail(agent: agent, tool: $0, origin: .preset)
         }
     }
 }

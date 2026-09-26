@@ -34,11 +34,11 @@ struct RuleTemplate: Identifiable {
 
         var title: String {
             switch self {
-            case .agents: return "AI agents"
-            case .exfiltration: return "Ways out"
-            case .telemetry: return "Telemetry and analytics"
-            case .hours: return "Working hours"
-            case .investigation: return "One-off investigation"
+            case .agents: return L("AI agents")
+            case .exfiltration: return L("Ways out")
+            case .telemetry: return L("Telemetry and analytics")
+            case .hours: return L("Working hours")
+            case .investigation: return L("One-off investigation")
             }
         }
 
@@ -46,15 +46,15 @@ struct RuleTemplate: Identifiable {
         var summary: String {
             switch self {
             case .agents:
-                return "What an agent may reach on its own initiative — installs, other models, someone else's repo."
+                return L("What an agent may reach on its own initiative — installs, other models, someone else's repo.")
             case .exfiltration:
-                return "The short, anonymous routes a file or a secret can leave by. Handy routes, which is the problem."
+                return L("The short, anonymous routes a file or a secret can leave by. Handy routes, which is the problem.")
             case .telemetry:
-                return "Measurement that isn't part of what the app does for you."
+                return L("Measurement that isn't part of what the app does for you.")
             case .hours:
-                return "A weekly window. Nothing runs outside it."
+                return L("A weekly window. Nothing runs outside it.")
             case .investigation:
-                return "Something turned up in Live and you want it quiet while you work out what it is."
+                return L("Something turned up in Live and you want it quiet while you work out what it is.")
             }
         }
 

@@ -24,8 +24,7 @@ enum OnDeviceAsk {
             switch self {
             case .ready: return nil
             case .needsNewerMacOS:
-                return "The on-device model needs macOS 26 or later. Everything else here still works: a local server "
-                    + "like Ollama sends nothing off the Mac either."
+                return L("The on-device model needs macOS 26 or later. Everything else here still works: a local server like Ollama sends nothing off the Mac either.")
             case .notEnabled(let reason): return reason
             }
         }
@@ -38,13 +37,13 @@ enum OnDeviceAsk {
         case .available:
             return .ready
         case .unavailable(.appleIntelligenceNotEnabled):
-            return .notEnabled("Apple Intelligence is switched off in System Settings, so the on-device model isn't there to ask.")
+            return .notEnabled(L("Apple Intelligence is switched off in System Settings, so the on-device model isn't there to ask."))
         case .unavailable(.modelNotReady):
-            return .notEnabled("macOS is still downloading the on-device model. It'll be ready shortly.")
+            return .notEnabled(L("macOS is still downloading the on-device model. It'll be ready shortly."))
         case .unavailable(.deviceNotEligible):
-            return .notEnabled("This Mac can't run the on-device model. A local server like Ollama sends nothing off the Mac either.")
+            return .notEnabled(L("This Mac can't run the on-device model. A local server like Ollama sends nothing off the Mac either."))
         case .unavailable:
-            return .notEnabled("The on-device model isn't available right now.")
+            return .notEnabled(L("The on-device model isn't available right now."))
         }
         #else
         return .needsNewerMacOS
@@ -59,7 +58,7 @@ enum OnDeviceAsk {
 /// The on-device provider.
 @available(macOS 26, *)
 struct OnDeviceProvider: AskProviding {
-    let label = "On-device model"
+    let label = L("On-device model")
     let sendsOffDevice = false
 
     func answer(_ request: AskRequest, run: @escaping @Sendable (AskCall) async -> String,

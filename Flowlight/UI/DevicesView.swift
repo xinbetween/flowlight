@@ -34,12 +34,12 @@ private struct DevicesContent: View {
     /// "not watching" look the same on the screen — the title bar is where that difference can be stated once.
     private var subtitle: String {
         var on: [String] = []
-        if store.watchingBluetooth { on.append("Bluetooth") }
-        if store.watchingUSB { on.append("USB") }
-        guard !on.isEmpty else { return "Not watching" }
+        if store.watchingBluetooth { on.append(L("Bluetooth")) }
+        if store.watchingUSB { on.append(L("USB")) }
+        guard !on.isEmpty else { return L("Not watching") }
         let live = store.bluetooth.filter(\.connected).count + store.usb.count
         let channels = on.joined(separator: " · ")
-        return live == 0 ? "\(channels) · nothing connected" : "\(channels) · \(live) connected"
+        return live == 0 ? L("%@ · nothing connected", channels) : L("%@ · %lld connected", channels, live)
     }
 
     @ToolbarContentBuilder
@@ -112,7 +112,7 @@ private struct DevicesContent: View {
             heading(bluetoothHeading)
             card {
                 if store.bluetooth.isEmpty {
-                    placeholder("Nothing paired, or the list hasn't been read yet.")
+                    placeholder(L("Nothing paired, or the list hasn't been read yet."))
                 } else {
                     ForEach(Array(store.bluetooth.enumerated()), id: \.element.id) { index, device in
                         if index > 0 { Divider().padding(.leading, 50) }
@@ -124,15 +124,13 @@ private struct DevicesContent: View {
                     bluetoothApps
                 }
             }
-            footnote("Paired devices and whether they're connected, read from the system every half minute. The "
-                     + "byte-level traces that would give a throughput number need Apple's PacketLogger profile, "
-                     + "which an app can't read.")
+            footnote(L("Paired devices and whether they're connected, read from the system every half minute. The byte-level traces that would give a throughput number need Apple's PacketLogger profile, which an app can't read."))
         }
     }
 
     private var bluetoothHeading: String {
-        guard !store.bluetooth.isEmpty else { return "Bluetooth" }
-        return "Bluetooth · \(store.bluetooth.filter(\.connected).count) connected of \(store.bluetooth.count) paired"
+        guard !store.bluetooth.isEmpty else { return L("Bluetooth") }
+        return L("Bluetooth · %lld connected of %lld paired", store.bluetooth.filter(\.connected).count, store.bluetooth.count)
     }
 
     /// Who is built to use the radio. It sits folded away because it is a long list of apps that are merely
@@ -155,7 +153,7 @@ private struct DevicesContent: View {
             }
             .padding(.top, 8)
         } label: {
-            Text("\(store.bluetoothApps.count) apps are built to use Bluetooth")
+            Text(L("%lld apps are built to use Bluetooth", store.bluetoothApps.count))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -165,11 +163,11 @@ private struct DevicesContent: View {
 
     private var usbSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            heading(store.usb.isEmpty ? "USB and external storage"
-                                      : "USB and external storage · \(store.usb.count) attached")
+            heading(store.usb.isEmpty ? L("USB and external storage")
+                                      : L("USB and external storage · %lld attached", store.usb.count))
             card {
                 if store.usb.isEmpty {
-                    placeholder("Nothing attached, or the list hasn't been read yet.")
+                    placeholder(L("Nothing attached, or the list hasn't been read yet."))
                 } else {
                     ForEach(Array(store.usb.enumerated()), id: \.element.id) { index, device in
                         if index > 0 { Divider().padding(.leading, 50) }
@@ -177,9 +175,7 @@ private struct DevicesContent: View {
                     }
                 }
             }
-            footnote("Devices attached over USB and volumes that appear, with the moment each arrived and left. "
-                     + "Throughput isn't here for the same reason it isn't under Bluetooth: macOS doesn't account "
-                     + "for it per app.")
+            footnote(L("Devices attached over USB and volumes that appear, with the moment each arrived and left. Throughput isn't here for the same reason it isn't under Bluetooth: macOS doesn't account for it per app."))
         }
     }
 
@@ -189,7 +185,7 @@ private struct DevicesContent: View {
     /// newest first — the same shape the rule feed has.
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            heading("What changed")
+            heading(L("What changed"))
             card {
                 ForEach(Array(store.events.prefix(100).enumerated()), id: \.offset) { index, event in
                     if index > 0 { Divider().padding(.leading, 42) }
@@ -291,9 +287,9 @@ private struct DeviceRow: View {
     /// only one of them is a state that changes — so each channel gets the word that is true for it.
     private var stateWord: String {
         switch device.kind {
-        case .bluetooth: return device.connected ? "Connected" : "Not connected"
-        case .usb: return "Attached"
-        case .volume: return "Mounted"
+        case .bluetooth: return device.connected ? L("Connected") : L("Not connected")
+        case .usb: return L("Attached")
+        case .volume: return L("Mounted")
         }
     }
 
@@ -349,7 +345,7 @@ private struct DeviceEventRow: View {
         let calendar = Calendar.current
         if calendar.isDateInToday(event.at) { return event.at.formatted(date: .omitted, time: .shortened) }
         if calendar.isDateInYesterday(event.at) {
-            return "Yesterday \(event.at.formatted(date: .omitted, time: .shortened))"
+            return L("Yesterday %@", event.at.formatted(date: .omitted, time: .shortened))
         }
         return event.at.formatted(.dateTime.month(.abbreviated).day().hour().minute())
     }

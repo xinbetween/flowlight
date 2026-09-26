@@ -30,8 +30,9 @@ enum AskQueryRunner {
 
         var description: String {
             switch self {
-            case .badWindow(let text): return "I couldn't read the time window: \(text). Use something like '24h', '7d', 'yesterday', or an ISO-8601 timestamp."
-            case .badArgument(let text): return "That argument didn't work: \(text)."
+            case .badWindow(let text):
+                return L("I couldn't read the time window: %@. Use something like '24h', '7d', 'yesterday', or an ISO-8601 timestamp.", text)
+            case .badArgument(let text): return L("That argument didn't work: %@.", text)
             }
         }
     }
@@ -44,12 +45,19 @@ enum AskQueryRunner {
         switch call.query {
         case .settings: return settings(environment)
         case .howTo: return howTo(call.arguments["topic"] ?? "")
-        case .rules: return list(environment.rules, what: "rule", screen: .rules)
-        case .guardrails: return list(environment.guardrails, what: "guardrail", screen: .agents)
+        case .rules:
+            let rules = environment.rules.count
+            return list(environment.rules, what: "rule", screen: .rules,
+                        summary: rules == 0 ? L("no rules") : rules == 1 ? L("1 rule") : L("%lld rules", rules))
+        case .guardrails:
+            let guardrails = environment.guardrails.count
+            return list(environment.guardrails, what: "guardrail", screen: .agents,
+                        summary: guardrails == 0 ? L("no guardrails")
+                            : guardrails == 1 ? L("1 guardrail") : L("%lld guardrails", guardrails))
         default: break
         }
         guard let from = call.arguments["from"], let window = AskWindow.resolve(from: from, to: call.arguments["to"], now: now)
-        else { throw Failure.badWindow(call.arguments["from"] ?? "(missing)") }
+        else { throw Failure.badWindow(call.arguments["from"] ?? L("(missing)")) }
         let limit = try rowLimit(call.arguments["limit"])
         let app = call.arguments["app"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         let grain = granularity(for: window, requested: call.arguments["granularity"])
@@ -71,7 +79,7 @@ enum AskQueryRunner {
             return try overTime(db: db, window: window, app: app, grain: grain, chart: call.arguments["chart"])
         case .settings, .howTo, .rules, .guardrails:
             // Handled above, before a window was required.
-            throw Failure.badArgument("that query takes no time window")
+            throw Failure.badArgument(L("that query takes no time window"))
         }
     }
 
@@ -100,7 +108,9 @@ enum AskQueryRunner {
             fields["note"] = "The filter extension stopped answering, so the nettop sampler is standing in. Blocking is off while it does."
         }
         return Result(json: encode(fields),
-                      summary: "\(environment.captureSource), inspection \(environment.inspecting ? "on" : "off"), \(environment.rules.count) rules",
+                      summary: environment.inspecting
+                          ? L("%@, inspection on, %lld rules", environment.captureSource, environment.rules.count)
+                          : L("%@, inspection off, %lld rules", environment.captureSource, environment.rules.count),
                       screen: .capture)
     }
 
@@ -108,17 +118,17 @@ enum AskQueryRunner {
         let matches = FeatureGuide.search(topic)
         guard !matches.isEmpty else {
             return Result(json: encode(["features": FeatureGuide.all.map(\.title).joined(separator: ", ")]),
-                          summary: "nothing matched '\(topic)'")
+                          summary: L("nothing matched '%@'", topic))
         }
         return Result(json: encode(matches.map(\.asDictionary)),
                       summary: matches.map(\.title).joined(separator: ", "),
                       screen: matches.first?.screen)
     }
 
-    private static func list(_ items: [String], what: String, screen: SidebarItem) -> Result {
-        Result(json: encode(items.map { [what: $0] }),
-               summary: items.isEmpty ? "no \(what)s" : "\(items.count) \(what)\(items.count == 1 ? "" : "s")",
-               screen: screen)
+    /// `what` names the JSON field the model reads, so it stays English; the summary is what the panel shows and
+    /// is handed in already in the reader's language.
+    private static func list(_ items: [String], what: String, screen: SidebarItem, summary: String) -> Result {
+        Result(json: encode(items.map { [what: $0] }), summary: summary, screen: screen)
     }
 
     // MARK: The queries
@@ -128,17 +138,23 @@ enum AskQueryRunner {
         let rows = try Self.rows(db: db, window: window, grain: grain)
         let matching = rows.filter { matches(app, row: $0) }
         let counters = matching.reduce(into: FlowCounters()) { $0 += $1.counters }
-        let who = app.map { " for \(name(of: $0, in: rows))" } ?? ""
+        // Named app or not, each sentence is one key rather than a phrase glued onto the end of one.
+        let who = app.map { name(of: $0, in: rows) }
+        let received = ByteFormat.string(counters.bytesIn)
+        let sent = ByteFormat.string(counters.bytesOut)
         let kind = AskChart.kind(requested: chart, natural: counters.total > 0 ? .pie : .none)
         return Result(json: encode(["received": counters.bytesIn, "sent": counters.bytesOut,
                                     "connections": counters.flows,
                                     "apps": Int64(Set(matching.map(\.bundleID)).count)]),
-                      summary: "\(ByteFormat.string(counters.bytesIn)) in, \(ByteFormat.string(counters.bytesOut)) out\(who)",
+                      summary: who.map { L("%@ in, %@ out for %@", received, sent, $0) }
+                        ?? L("%@ in, %@ out", received, sent),
                       filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
                       from: window.from, to: window.to,
-                      chart: AskChart(kind: kind, title: "Received and sent\(who)", unit: .bytes,
-                                      points: [AskChart.Point(label: "Received", value: Double(counters.bytesIn)),
-                                               AskChart.Point(label: "Sent", value: Double(counters.bytesOut))]))
+                      chart: AskChart(kind: kind,
+                                      title: who.map { L("Received and sent for %@", $0) } ?? L("Received and sent"),
+                                      unit: .bytes,
+                                      points: [AskChart.Point(label: L("Received"), value: Double(counters.bytesIn)),
+                                               AskChart.Point(label: L("Sent"), value: Double(counters.bytesOut))]))
     }
 
     private static func topApps(db: TrafficDatabase, window: (from: Date, to: Date), limit: Int,
@@ -156,10 +172,11 @@ enum AskQueryRunner {
         let points = top.map { AskChart.Point(label: $0.value.name, value: Double($0.value.counters.bytesOut),
                                               secondary: Double($0.value.counters.bytesIn)) }
         return Result(json: encode(payload),
-                      summary: top.isEmpty ? "nothing moved" : top.map { "\($0.value.name) \(ByteFormat.string($0.value.counters.total))" }.joined(separator: ", "),
+                      summary: top.isEmpty ? L("nothing moved")
+                        : top.map { "\($0.value.name) \(ByteFormat.string($0.value.counters.total))" }.joined(separator: ", "),
                       filter: .none, from: window.from, to: window.to,
                       chart: AskChart(kind: AskChart.kind(requested: chart, natural: points.isEmpty ? .none : .bar),
-                                      title: "Busiest apps", unit: .bytes,
+                                      title: L("Busiest apps"), unit: .bytes,
                                       points: AskChart.trimmed(points, kind: .bar)))
     }
 
@@ -183,11 +200,11 @@ enum AskQueryRunner {
         let kind = AskChart.kind(requested: chart, natural: top.isEmpty ? .none : .bar)
         let points = top.map { AskChart.Point(label: $0.key, value: Double($0.value.counters.total)) }
         return Result(json: encode(payload),
-                      summary: top.isEmpty ? "no destinations" : top.prefix(3).map(\.key).joined(separator: ", "),
+                      summary: top.isEmpty ? L("no destinations") : top.prefix(3).map(\.key).joined(separator: ", "),
                       filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
                       from: window.from, to: window.to,
-                      chart: AskChart(kind: kind, title: "Busiest destinations", unit: .bytes,
-                                      points: AskChart.trimmed(points, kind: kind), primaryName: "Total"))
+                      chart: AskChart(kind: kind, title: L("Busiest destinations"), unit: .bytes,
+                                      points: AskChart.trimmed(points, kind: kind), primaryName: L("Total")))
     }
 
     /// Destinations reached in this window that had never been reached before it — the question that actually
@@ -210,7 +227,8 @@ enum AskQueryRunner {
         let top = fresh.sorted { $0.counters.total > $1.counters.total }.prefix(limit)
         let payload = top.map { ["app": $0.app, "destination": $0.destination, "sent": "\($0.counters.bytesOut)"] }
         return Result(json: encode(payload),
-                      summary: top.isEmpty ? "nothing new" : top.prefix(3).map { "\($0.app) → \($0.destination)" }.joined(separator: ", "),
+                      summary: top.isEmpty ? L("nothing new")
+                        : top.prefix(3).map { "\($0.app) → \($0.destination)" }.joined(separator: ", "),
                       filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: inWindow)) } ?? .none,
                       from: window.from, to: window.to)
     }
@@ -224,7 +242,8 @@ enum AskQueryRunner {
              "at": ISO8601DateFormatter().string(from: alert.timestamp)]
         }
         return Result(json: encode(payload),
-                      summary: inWindow.isEmpty ? "no alerts" : "\(inWindow.count) alerts, newest \(inWindow.first?.kind ?? "")",
+                      summary: inWindow.isEmpty ? L("no alerts")
+                        : L("%lld alerts, newest %@", inWindow.count, inWindow.first?.kind ?? ""),
                       filter: .none, from: window.from, to: window.to)
     }
 
@@ -253,7 +272,7 @@ enum AskQueryRunner {
              "sent": "\(entry.value.counters.bytesOut)"]
         }
         return Result(json: encode(payload),
-                      summary: payload.isEmpty ? "no agents" : payload.compactMap { $0["agent"] }.joined(separator: ", "),
+                      summary: payload.isEmpty ? L("no agents") : payload.compactMap { $0["agent"] }.joined(separator: ", "),
                       filter: .none, from: window.from, to: window.to)
     }
 
@@ -277,11 +296,13 @@ enum AskQueryRunner {
         let points = series.map { AskChart.Point(label: "", date: $0.date, value: Double($0.bytesOut),
                                                  secondary: Double($0.bytesIn)) }
         return Result(json: encode(payload),
-                      summary: peak.map { "busiest \(grain.rawValue) \($0.date.formatted(date: .abbreviated, time: .shortened)) at \(ByteFormat.string($0.total))" }
-                        ?? "nothing in this window",
+                      summary: peak.map { L("busiest %@: %@ — %@", grain.title.lowercased(),
+                                            $0.date.formatted(date: .abbreviated, time: .shortened),
+                                            ByteFormat.string($0.total)) }
+                        ?? L("nothing in this window"),
                       filter: filter, from: window.from, to: window.to,
                       chart: AskChart(kind: AskChart.kind(requested: chart, natural: points.isEmpty ? .none : .line),
-                                      title: "Over time, by \(grain.rawValue)", unit: .bytes, points: points))
+                                      title: L("Over time, by %@", grain.title.lowercased()), unit: .bytes, points: points))
     }
 
     /// The breakdown for a window, falling back to a finer tier when the coarse one has nothing.
@@ -330,7 +351,7 @@ enum AskQueryRunner {
     static func rowLimit(_ raw: String?) throws -> Int {
         guard let raw, !raw.isEmpty else { return 10 }
         guard let value = Int(raw.trimmingCharacters(in: .whitespaces)) else {
-            throw Failure.badArgument("limit must be a whole number, not '\(raw)'")
+            throw Failure.badArgument(L("limit must be a whole number, not '%@'", raw))
         }
         return min(max(1, value), maximumRows)
     }

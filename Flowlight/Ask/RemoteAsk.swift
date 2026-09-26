@@ -30,10 +30,10 @@ struct RemoteProvider: AskProviding {
             switch self {
             case .notConfigured(let what): return what
             case .http(let code, let body):
-                if code == 401 || code == 403 { return "The provider rejected the key (HTTP \(code))." }
-                if code == 404 { return "Nothing answered at that endpoint (HTTP 404). Check the URL and the model name." }
-                return "The provider returned HTTP \(code). \(body.prefix(200))"
-            case .unreadable: return "The provider's answer wasn't in a shape Flowlight could read."
+                if code == 401 || code == 403 { return L("The provider rejected the key (HTTP %lld).", code) }
+                if code == 404 { return L("Nothing answered at that endpoint (HTTP 404). Check the URL and the model name.") }
+                return L("The provider returned HTTP %lld. %@", code, String(body.prefix(200)))
+            case .unreadable: return L("The provider's answer wasn't in a shape Flowlight could read.")
             }
         }
     }
@@ -41,16 +41,16 @@ struct RemoteProvider: AskProviding {
     func answer(_ request: AskRequest, run: @escaping @Sendable (AskCall) async -> String,
                 sending: @escaping @Sendable (String) -> Void) async throws -> String {
         guard let url = URL(string: endpoint), !endpoint.isEmpty else {
-            throw Failure.notConfigured("No endpoint is set for \(kind.title).")
+            throw Failure.notConfigured(L("No endpoint is set for %@.", kind.title))
         }
         guard !kind.needsKey || !apiKey.isEmpty else {
-            throw Failure.notConfigured("\(kind.title) needs an API key. Add one in Settings — it goes to your login Keychain.")
+            throw Failure.notConfigured(L("%@ needs an API key. Add one in Settings — it goes to your login Keychain.", kind.title))
         }
         switch kind {
         case .anthropic: return try await anthropic(request, url: url, run: run, sending: sending)
         case .gemini: return try await gemini(request, url: url, run: run, sending: sending)
         case .openAI, .localServer, .compatible: return try await openAI(request, url: url, run: run, sending: sending)
-        case .onDevice: throw Failure.notConfigured("The on-device model isn't reached over HTTP.")
+        case .onDevice: throw Failure.notConfigured(L("The on-device model isn't reached over HTTP."))
         }
     }
 
@@ -76,7 +76,7 @@ struct RemoteProvider: AskProviding {
                 messages.append(["role": "tool", "tool_call_id": (call["id"] as? String) ?? "", "content": output])
             }
         }
-        return "I ran out of steps before I could answer that. Try asking something narrower."
+        return L("I ran out of steps before I could answer that. Try asking something narrower.")
     }
 
     private var openAIHeaders: [String: String] {
@@ -120,7 +120,7 @@ struct RemoteProvider: AskProviding {
             }
             messages.append(["role": "user", "content": results])
         }
-        return "I ran out of steps before I could answer that. Try asking something narrower."
+        return L("I ran out of steps before I could answer that. Try asking something narrower.")
     }
 
     private var anthropicHeaders: [String: String] {
@@ -163,7 +163,7 @@ struct RemoteProvider: AskProviding {
             }
             contents.append(["role": "user", "parts": responses])
         }
-        return "I ran out of steps before I could answer that. Try asking something narrower."
+        return L("I ran out of steps before I could answer that. Try asking something narrower.")
     }
 
     // MARK: Shared

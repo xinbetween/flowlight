@@ -31,7 +31,9 @@ private struct AskContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(L("Ask"))
-        .navigationSubtitle(ask.sendsOffDevice ? "\(ask.provider.title) · leaves this Mac" : "Answered on this Mac")
+        .navigationSubtitle(ask.sendsOffDevice
+                            ? L("%@ · leaves this Mac", ask.provider.title)
+                            : L("Answered on this Mac"))
         .toolbar { toolbar }
         .sheet(isPresented: $showingSettings) { AskSettingsSheet(ask: ask) }
         .onAppear { typing = true }
@@ -48,8 +50,8 @@ private struct AskContent: View {
                 Label(ask.provider.title, systemImage: ask.sendsOffDevice ? "cloud" : "desktopcomputer")
             }
             .help(ask.sendsOffDevice
-                  ? "Answers are produced by \(ask.provider.title). Your question and the query results leave this Mac."
-                  : "Answers are produced on this Mac. Nothing leaves it.")
+                  ? L("Answers are produced by %@. Your question and the query results leave this Mac.", ask.provider.title)
+                  : L("Answers are produced on this Mac. Nothing leaves it."))
         }
     }
 
@@ -142,7 +144,8 @@ private struct AskContent: View {
                 }
             } else if ask.sendsOffDevice {
                 // Said before the question is asked, not after it has gone.
-                Label("Your question and the query results go to \(ask.provider.title). Every request is shown under the answer.",
+                Label(L("Your question and the query results go to %@. Every request is shown under the answer.",
+                        ask.provider.title),
                       systemImage: "cloud")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,20 +159,24 @@ private struct AskContent: View {
 
     /// Two kinds of question, because the panel now answers two kinds: what happened, and how the app works.
     /// Shown as chips beside the field, which is where someone looks when they don't know what to type.
-    static let suggestions = [
-        "Summarise the last hour",
-        "Which app sent the most yesterday?",
-        "Chart my traffic over the last day",
-        "Anything new this week?",
-        "Which agents have been busy?",
-        "What did my AI agents reach besides their providers?",
-        "Any alerts worth my attention?",
-        "How do I turn on HTTPS inspection?",
-        "How do I block an app from reaching a domain?",
-        "Why am I not seeing any traffic?",
-        "What is Flowlight set up to do right now?",
-        "How do I stop an agent using its shell tool?",
-    ]
+    /// Read fresh each time rather than stored once, so the chips follow the language picker like every other
+    /// string on the screen.
+    static var suggestions: [String] {
+        [
+            L("Summarise the last hour"),
+            L("Which app sent the most yesterday?"),
+            L("Chart my traffic over the last day"),
+            L("Anything new this week?"),
+            L("Which agents have been busy?"),
+            L("What did my AI agents reach besides their providers?"),
+            L("Any alerts worth my attention?"),
+            L("How do I turn on HTTPS inspection?"),
+            L("How do I block an app from reaching a domain?"),
+            L("Why am I not seeing any traffic?"),
+            L("What is Flowlight set up to do right now?"),
+            L("How do I stop an agent using its shell tool?"),
+        ]
+    }
 
     private func askNow(_ text: String) {
         ask.ask(text)
@@ -257,7 +264,7 @@ private struct AskTurnView: View {
     private var evidenceSummary: String {
         let n = turn.calls.count
         let names = Set(turn.calls.map(\.call.query.rawValue)).sorted().joined(separator: ", ")
-        return "\(n) quer\(n == 1 ? "y" : "ies") · \(names)"
+        return n == 1 ? L("1 query · %@", names) : L("%lld queries · %@", n, names)
     }
 
     private var queryRows: some View {
@@ -285,7 +292,7 @@ private struct AskTurnView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(call.filter == nil)
-                .help(call.filter == nil ? call.summary : "Open these rows in Reports")
+                .help(call.filter == nil ? call.summary : L("Open these rows in Reports"))
                 if index < turn.calls.count - 1 { Divider() }
             }
         }
@@ -296,7 +303,7 @@ private struct AskTurnView: View {
     @ViewBuilder
     private var footer: some View {
         if turn.sent.isEmpty {
-            Label("Answered on this Mac · \(turn.provider)", systemImage: "lock")
+            Label(L("Answered on this Mac · %@", turn.provider), systemImage: "lock")
                 .font(.caption).foregroundStyle(.tertiary)
         } else {
             DisclosureGroup(isExpanded: $showingSent) {
@@ -312,7 +319,9 @@ private struct AskTurnView: View {
                 }
                 .padding(.top, 6)
             } label: {
-                Label("\(turn.sent.count) \(turn.sent.count == 1 ? "request" : "requests") left this Mac · \(turn.provider)",
+                Label(turn.sent.count == 1
+                      ? L("1 request left this Mac · %@", turn.provider)
+                      : L("%lld requests left this Mac · %@", turn.sent.count, turn.provider),
                       systemImage: "arrow.up.forward.square")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -354,8 +363,8 @@ private struct AskSettingsSheet: View {
                 }
                 Section {
                     Label(ask.sendsOffDevice
-                          ? "Your question and the results of the queries it runs will be sent to \(ask.provider.title). Your history is not sent, and every request is shown in full under the answer."
-                          : "Nothing leaves this Mac. The question, the queries and the answer all stay here.",
+                          ? L("Your question and the results of the queries it runs will be sent to %@. Your history is not sent, and every request is shown in full under the answer.", ask.provider.title)
+                          : L("Nothing leaves this Mac. The question, the queries and the answer all stay here."),
                           systemImage: ask.sendsOffDevice ? "cloud" : "lock")
                         .font(.caption)
                         .foregroundStyle(ask.sendsOffDevice ? .orange : .secondary)

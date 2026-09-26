@@ -7,15 +7,20 @@ enum BreakdownGrouping: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .app: return "App"
-        case .destination: return "Destination"
-        case .ip: return "IP address"
+        case .app: return L("App")
+        case .destination: return L("Destination")
+        case .ip: return L("IP address")
         }
     }
 
-    /// Header of the first column, e.g. "Destination › App › Host · IP".
+    /// Header of the first column. The whole path is one key rather than the level names joined: a translation
+    /// has to be able to order and word the nesting the way its own language does.
     var columnTitle: String {
-        levels.map(\.title).joined(separator: " › ")
+        switch self {
+        case .app: return L("App › Domain › IP")
+        case .destination: return L("Destination › App › IP")
+        case .ip: return L("IP › App")
+        }
     }
 
     var levels: [TreeLevel] {
@@ -41,12 +46,13 @@ enum TreeLevel {
         }
     }
 
-    /// Word for collapsed siblings in "Show more" rows.
-    var plural: String {
+    /// The whole "Show more" row, e.g. "Show 25 more · 1,203 apps not shown". The noun is part of the sentence
+    /// rather than dropped into it, so each reading is one key a translator can inflect.
+    func moreRowTitle(showing: Int, hidden: String) -> String {
         switch self {
-        case .app: return "apps"
-        case .hostname, .registrableDomain: return "destinations"
-        case .ip, .hostAndIP: return "addresses"
+        case .app: return L("Show %lld more · %@ apps not shown", showing, hidden)
+        case .hostname, .registrableDomain: return L("Show %lld more · %@ destinations not shown", showing, hidden)
+        case .ip, .hostAndIP: return L("Show %lld more · %@ addresses not shown", showing, hidden)
         }
     }
 
@@ -62,7 +68,7 @@ enum TreeLevel {
         switch self {
         case .app:
             let detail = row.parentAgentName.isEmpty ? ""
-                : row.mcpServer.isEmpty ? "via \(row.parentAgentName)" : "\(row.mcpServer) MCP · \(row.parentAgentName)"
+                : row.mcpServer.isEmpty ? L("via %@", row.parentAgentName) : "\(row.mcpServer) MCP · \(row.parentAgentName)"
             return Key(id: "a:" + row.bundleID, title: row.appName.isEmpty ? row.bundleID : row.appName, detail: detail, kind: .app) {
                 $0.bundleID = row.bundleID
             }
@@ -91,13 +97,13 @@ enum TreeLevel {
     /// Traffic with no hostname groups under its network owner, or "(no domain)".
     private static func hostless(_ row: BreakdownRow) -> Key {
         if !row.owner.isEmpty {
-            let title = row.owner == IPOwner.localNetwork.name ? "Local network" : "\(row.owner) · AS\(row.asn)"
+            let title = row.owner == IPOwner.localNetwork.name ? L("Local network") : "\(row.owner) · AS\(row.asn)"
             return Key(id: "o:" + row.owner, title: title, detail: "", kind: .owner) {
                 $0.domain = ""
                 $0.owner = row.owner
             }
         }
-        return Key(id: "u:", title: "(no domain)", detail: "", kind: .unknown) { $0.domain = "" }
+        return Key(id: "u:", title: L("(no domain)"), detail: "", kind: .unknown) { $0.domain = "" }
     }
 }
 
@@ -277,9 +283,11 @@ struct TrafficNode: Identifiable, Hashable {
         let rest = nodes.dropFirst(limit)
         if !rest.isEmpty {
             var c = FlowCounters(); rest.forEach { c += $0.counters }
-            let noun = depth < levels.count ? levels[depth].plural : "items"
+            let showing = min(pageSize, rest.count), hidden = rest.count.formatted()
+            let title = depth < levels.count ? levels[depth].moreRowTitle(showing: showing, hidden: hidden)
+                                             : L("Show %lld more · %@ items not shown", showing, hidden)
             kept.append(TrafficNode(id: parentID + moreSuffix, kind: .more,
-                                    title: "Show \(min(pageSize, rest.count)) more · \(rest.count.formatted()) \(noun) not shown",
+                                    title: title,
                                     bundleID: parent?.bundleID, appName: parent?.appName,
                                     filter: parent?.filter ?? .none, counters: c, moreCount: rest.count))
         }

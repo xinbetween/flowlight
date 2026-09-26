@@ -14,21 +14,19 @@ struct BehaviourPanel: View {
             ContentUnavailableView {
                 Label(L("Nothing stands out"), systemImage: "checkmark.shield")
             } description: {
-                Text("No app's destinations look unusual next to the others in \(period). "
-                     + "This compares apps with each other, so it says nothing about traffic every app on this Mac shares.")
+                Text(L("No app's destinations look unusual next to the others in %@. This compares apps with each other, so it says nothing about traffic every app on this Mac shares.", period))
                 .frame(maxWidth: 460)
             }
             .frame(maxHeight: .infinity)
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Compared with the other apps in \(period). Unusual isn't the same as wrong — "
-                     + "a backup tool talks to a lot of places for good reasons.")
+                Text(L("Compared with the other apps in %@. Unusual isn't the same as wrong — a backup tool talks to a lot of places for good reasons.", period))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(findings) { finding in
                     Button { onSelect(finding) } label: { row(finding) }
                         .buttonStyle(.plain)
-                        .help("Show only \(finding.appName) in this report")
+                        .help(L("Show only %@ in this report", finding.appName))
                 }
             }
         }

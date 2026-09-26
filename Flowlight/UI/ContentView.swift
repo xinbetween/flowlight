@@ -26,7 +26,7 @@ struct ContentView: View {
               VStack(spacing: 0) {
                 if let update = updater.pendingUpdate {
                     Button { openWindow(id: "update") } label: {
-                        Label("Flowlight \(update.version) is available", systemImage: "arrow.down.circle.fill")
+                        Label(L("Flowlight %@ is available", update.version), systemImage: "arrow.down.circle.fill")
                             .font(.caption.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 7)
@@ -43,7 +43,8 @@ struct ContentView: View {
                         LiveDot(color: monitor.isReceiving ? .green : .orange, active: monitor.isReceiving)
                             .padding(.top, 4)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(DemoData.isEnabled ? "Demo data" : monitor.mode == .networkExtension ? "Network Extension" : "nettop sampler")
+                            Text(DemoData.isEnabled ? L("Demo data")
+                                 : monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler"))
                                 .font(.caption.bold())
                             Text(monitor.status).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                         }
@@ -54,7 +55,7 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .padding(10)
                 .help(L("Capture source status — click to configure"))
-                .accessibilityLabel("Capture status: \(monitor.status)")
+                .accessibilityLabel(L("Capture status: %@", monitor.status))
               }
             }
         } detail: {

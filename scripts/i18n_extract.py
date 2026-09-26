@@ -30,7 +30,11 @@ def literals():
     """key -> the files it is written in, in source order."""
     found: dict[str, list[str]] = collections.OrderedDict()
     for path in sorted(SOURCE.rglob("*.swift")):
-        for match in CALL.finditer(path.read_text()):
+        # Line by line, so an `L("…")` written in a doc comment to explain the helper doesn't become a key
+        # nine translators then translate for a string nothing ever shows.
+        source = "\n".join(line for line in path.read_text().splitlines()
+                           if not line.lstrip().startswith("//"))
+        for match in CALL.finditer(source):
             key = match.group(1)
             if len(key) < 2 or not any(c.isalpha() for c in key):
                 continue

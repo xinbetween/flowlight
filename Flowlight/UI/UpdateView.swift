@@ -21,7 +21,7 @@ struct UpdateView: View {
                     // empty panel reads as a bug rather than as an absence.
                     if ReleaseNotes.isEmpty(release.notes) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("No release notes were published for \(release.version).")
+                            Text(L("No release notes were published for %@.", release.version))
                             Button(L("See what changed on GitHub")) { NSWorkspace.shared.open(release.pageURL) }
                                 .buttonStyle(.link)
                         }
@@ -40,10 +40,10 @@ struct UpdateView: View {
             }
 
             if case .downloading = updater.state {
-                ProgressView("Downloading and verifying…").controlSize(.small)
+                ProgressView(L("Downloading and verifying…")).controlSize(.small)
             }
             if case .installing = updater.state {
-                ProgressView("Preparing the update. Flowlight will quit and reopen…").controlSize(.small)
+                ProgressView(L("Preparing the update. Flowlight will quit and reopen…")).controlSize(.small)
             }
             if case .failed(let message) = updater.state {
                 Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
@@ -102,11 +102,11 @@ struct UpdateView: View {
     private var hint: String? {
         switch updater.state {
         case .available:
-            return "Flowlight downloads the update and checks it against the release's published SHA-256. Nothing is installed until you choose."
+            return L("Flowlight downloads the update and checks it against the release's published SHA-256. Nothing is installed until you choose.")
         case .ready:
-            return "Flowlight needs to quit to finish. It replaces itself and reopens, keeping your history and settings. Choose Install Later to keep using it now."
+            return L("Flowlight needs to quit to finish. It replaces itself and reopens, keeping your history and settings. Choose Install Later to keep using it now.")
         case .failed where updater.downloadedDMG != nil:
-            return "You can still install by hand: quit Flowlight, then drag the new version from the disk image into Applications."
+            return L("You can still install by hand: quit Flowlight, then drag the new version from the disk image into Applications.")
         default:
             return nil
         }
@@ -119,22 +119,22 @@ struct UpdateView: View {
 
     private var headline: String {
         switch updater.state {
-        case .available(let r): return "Flowlight \(r.version) is available"
-        case .downloading: return "Downloading Flowlight \(updater.latest?.version ?? "")"
-        case .ready(let r, _): return "Flowlight \(r.version) is ready to install"
-        case .installing(let r): return "Installing Flowlight \(r.version)"
-        case .checking: return "Checking for updates…"
-        case .upToDate: return "Flowlight is up to date"
-        case .failed: return updater.downloadedDMG == nil ? "Couldn't check for updates" : "The update didn't finish"
-        case .idle: return "Software Update"
+        case .available(let r): return L("Flowlight %@ is available", r.version)
+        case .downloading: return L("Downloading Flowlight %@", updater.latest?.version ?? "")
+        case .ready(let r, _): return L("Flowlight %@ is ready to install", r.version)
+        case .installing(let r): return L("Installing Flowlight %@", r.version)
+        case .checking: return L("Checking for updates…")
+        case .upToDate: return L("Flowlight is up to date")
+        case .failed: return updater.downloadedDMG == nil ? L("Couldn't check for updates") : L("The update didn't finish")
+        case .idle: return L("Software Update")
         }
     }
 
     private var subtitle: String {
         switch updater.state {
-        case .available: return "You have \(updater.currentVersion)."
-        case .upToDate: return "Version \(updater.currentVersion) is the latest release."
-        default: return "You have \(updater.currentVersion)."
+        case .available: return L("You have %@.", updater.currentVersion)
+        case .upToDate: return L("Version %@ is the latest release.", updater.currentVersion)
+        default: return L("You have %@.", updater.currentVersion)
         }
     }
 

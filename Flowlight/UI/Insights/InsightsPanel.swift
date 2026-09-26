@@ -34,7 +34,7 @@ struct InsightsPanel: View {
     }
 
     private func trendTitle(_ d: InsightDimension) -> String {
-        let base = "Top \(d.title.lowercased()) over time"
+        let base = d.trendTitle
         return scopeName.map { "\(base) · \($0)" } ?? base
     }
 }
@@ -111,7 +111,7 @@ struct DonutCard: View {
                 onSelect(entity)
             }
         }
-        .accessibilityLabel("\(title) share chart")
+        .accessibilityLabel(L("%@ share chart", title))
     }
 
     private var centerLabel: some View {
@@ -121,7 +121,7 @@ struct DonutCard: View {
                 Text(focused.entity.label).font(.caption2).foregroundStyle(.secondary).lineLimit(1).frame(maxWidth: 80)
             } else {
                 Text(ByteFormat.string(metric.value(insight.total))).font(.callout.monospacedDigit().bold())
-                Text(metric.title.lowercased()).font(.caption2).foregroundStyle(.secondary)
+                Text(metric.lowercaseTitle).font(.caption2).foregroundStyle(.secondary)
             }
         }
     }
@@ -134,7 +134,7 @@ struct DonutCard: View {
                     HStack(spacing: 6) {
                         Circle().fill(registry.color(for: slice.entity)).frame(width: 8, height: 8)
                         EntityGlyph(entity: slice.entity)
-                        Text(slice.entity.kind == .other ? "\(insight.hiddenCount.formatted()) more…" : slice.entity.label)
+                        Text(slice.entity.kind == .other ? L("%@ more…", insight.hiddenCount.formatted()) : slice.entity.label)
                             .lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(slice.entity.kind == .other ? Color.accentColor : .primary)
                         Spacer(minLength: 4)
@@ -150,8 +150,9 @@ struct DonutCard: View {
                 .buttonStyle(.plain)
                 .onHover { hoveredKey = $0 ? slice.id : (hoveredKey == slice.id ? nil : hoveredKey) }
                 .help(slice.entity.kind == .other
-                      ? "Everything outside the top \(InsightsBuilder.maxSlices). Click to see all \(insight.entityCount.formatted())."
-                      : "Show only \(slice.entity.label)")
+                      ? L("Everything outside the top %lld. Click to see all %@.", InsightsBuilder.maxSlices,
+                          insight.entityCount.formatted())
+                      : L("Show only %@", slice.entity.label))
             }
         }
     }
@@ -164,7 +165,7 @@ struct DonutCard: View {
                 Text(only.entity.label).font(.headline).lineLimit(1)
                 Text(ByteFormat.string(metric.value(only.counters))).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             } else {
-                Text("No \(metric.title.lowercased()) traffic").font(.caption).foregroundStyle(.secondary)
+                Text(metric.noTrafficMessage).font(.caption).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
@@ -211,12 +212,15 @@ struct TrendCard: View {
                             RoundedRectangle(cornerRadius: 1).fill(registry.color(for: trend.entity)).frame(width: 12, height: 3)
                         }
                         EntityGlyph(entity: trend.entity)
-                        Text(trend.entity.kind == .other ? "Other (\((insight.entityCount - InsightsBuilder.maxTrends).formatted()))" : trend.entity.label)
+                        Text(trend.entity.kind == .other
+                             ? L("Other (%@)", (insight.entityCount - InsightsBuilder.maxTrends).formatted())
+                             : trend.entity.label)
                             .font(.caption).lineLimit(1)
                     }
                 }
                 .buttonStyle(.plain)
-                .help(trend.entity.kind == .other ? "Everything outside the top \(InsightsBuilder.maxTrends)" : "Show only \(trend.entity.label)")
+                .help(trend.entity.kind == .other ? L("Everything outside the top %lld", InsightsBuilder.maxTrends)
+                                                  : L("Show only %@", trend.entity.label))
             }
             Spacer()
         }
@@ -226,8 +230,8 @@ struct TrendCard: View {
         Chart {
             ForEach(insight.trends) { trend in
                 ForEach(trend.points) { point in
-                    LineMark(x: .value("Time", point.date), y: .value(metric.title, metric.value(counters(point))),
-                             series: .value("Series", trend.entity.key))
+                    LineMark(x: .value(L("Time"), point.date), y: .value(metric.title, metric.value(counters(point))),
+                             series: .value(L("Series"), trend.entity.key))
                         .foregroundStyle(registry.color(for: trend.entity))
                         .lineStyle(trend.entity.kind == .other
                                    ? StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 3])
@@ -237,7 +241,7 @@ struct TrendCard: View {
                 // Direct label at the end of each line (text in ink, identity carried by the swatch),
                 // skipped where it would collide with a higher-ranked label.
                 if let last = trend.points.last, labeledKeys.contains(trend.entity.key) {
-                    PointMark(x: .value("Time", last.date), y: .value(metric.title, metric.value(counters(last))))
+                    PointMark(x: .value(L("Time"), last.date), y: .value(metric.title, metric.value(counters(last))))
                         .symbolSize(30)
                         .foregroundStyle(registry.color(for: trend.entity))
                         .annotation(position: .trailing, alignment: .leading, spacing: 4) {
@@ -246,7 +250,7 @@ struct TrendCard: View {
                 }
             }
             if let hoverDate {
-                RuleMark(x: .value("Time", hoverDate))
+                RuleMark(x: .value(L("Time"), hoverDate))
                     .foregroundStyle(.secondary.opacity(0.35))
                     .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                         tooltip(at: hoverDate)
@@ -290,7 +294,7 @@ struct TrendCard: View {
             Text(date.formatted(date: granularity >= .day ? .abbreviated : .omitted,
                                 time: granularity >= .day ? .omitted : (granularity == .second ? .standard : .shortened)))
                 .font(.caption.bold())
-            if rows.isEmpty { Text("No \(metric.title.lowercased()) traffic").font(.caption).foregroundStyle(.secondary) }
+            if rows.isEmpty { Text(metric.noTrafficMessage).font(.caption).foregroundStyle(.secondary) }
             ForEach(rows, id: \.0.key) { entity, value in
                 HStack(spacing: 6) {
                     Circle().fill(registry.color(for: entity)).frame(width: 7, height: 7)
@@ -353,8 +357,8 @@ struct DirectionCard: View {
                     }
                 }
                 .frame(height: 14)
-                row("Received", total.bytesIn, inShare, TrafficColors.inbound)
-                row("Sent", total.bytesOut, 1 - inShare, TrafficColors.outbound)
+                row(L("Received"), total.bytesIn, inShare, TrafficColors.inbound)
+                row(L("Sent"), total.bytesOut, 1 - inShare, TrafficColors.outbound)
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -418,7 +422,7 @@ struct EntityListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("All \(insight.dimension.title.lowercased())").font(.headline)
+                Text(insight.dimension.listTitle).font(.headline)
                 Text("\(insight.entityCount.formatted())").foregroundStyle(.secondary)
                 Spacer()
             }
@@ -436,12 +440,12 @@ struct EntityListView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Show only \(slice.entity.label)")
+                .help(L("Show only %@", slice.entity.label))
             }
             .listStyle(.inset)
             .frame(height: 320)
             if insight.entityCount > insight.ranked.count {
-                Text("Showing the largest \(insight.ranked.count.formatted()). Filter the report to see the rest.")
+                Text(L("Showing the largest %@. Filter the report to see the rest.", insight.ranked.count.formatted()))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

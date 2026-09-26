@@ -8,9 +8,10 @@ enum ExportError: LocalizedError {
         switch self {
         case .http(let code, let body):
             let detail = body.trimmingCharacters(in: .whitespacesAndNewlines)
-            return detail.isEmpty ? "The collector answered HTTP \(code)." : "The collector answered HTTP \(code): \(detail)"
+            return detail.isEmpty ? L("The collector answered HTTP %lld.", code)
+                : L("The collector answered HTTP %lld: %@", code, detail)
         case .notConfigured:
-            return "No endpoint. Type the address of your collector first."
+            return L("No endpoint. Type the address of your collector first.")
         }
     }
 }
@@ -206,7 +207,7 @@ final class ExportController: ObservableObject {
             queue.add(rollups: rows)
             defaults.set(Int(upper), forKey: ExportConfiguration.Keys.watermark)
         } catch {
-            lastError = "Couldn't read the rollups to export: \(error.localizedDescription)"
+            lastError = L("Couldn't read the rollups to export: %@", error.localizedDescription)
         }
     }
 
@@ -246,7 +247,7 @@ final class ExportController: ObservableObject {
             // The payload itself couldn't be built. Retrying identical input would fail identically, so the batch
             // goes rather than blocking every later one behind it.
             queue.succeeded()
-            lastError = "Couldn't build the payload: \(error.localizedDescription)"
+            lastError = L("Couldn't build the payload: %@", error.localizedDescription)
             return
         }
         guard let failure else {
@@ -314,11 +315,11 @@ final class ExportController: ObservableObject {
             case .otlp:
                 let url = ExportEndpoint.signal(ExportEndpoint.logsPath, base: base)
                 try await post(ExportPayload.emptyLogsRequest, to: url, config: config)
-                testState = .succeeded("\(url.absoluteString) accepted an empty OTLP request.")
+                testState = .succeeded(L("%@ accepted an empty OTLP request.", url.absoluteString))
             case .ndjson:
                 let body = try ExportPayload.ndjsonTestLine(resource: resource)
                 try await post(body, to: base, config: config)
-                testState = .succeeded("\(base.absoluteString) accepted one test line.")
+                testState = .succeeded(L("%@ accepted one test line.", base.absoluteString))
             }
         } catch {
             testState = .failed(error.localizedDescription)
@@ -344,8 +345,7 @@ final class ExportController: ObservableObject {
             alerts = Array(((try? await readRecentAlerts(limit)) ?? []).prefix(3))
         }
         if rollups.isEmpty && alerts.isEmpty {
-            return "Nothing has been recorded in the last \(minutes) minutes, so there is no sample to show. "
-                + "Leave Flowlight running for a moment and try again."
+            return L("Nothing has been recorded in the last %lld minutes, so there is no sample to show. Leave Flowlight running for a moment and try again.", minutes)
         }
         let headers = ExportSecrets.load().keys.sorted()
             .map { "\($0): ••••••••" }
@@ -353,7 +353,7 @@ final class ExportController: ObservableObject {
             (["POST \(url)", "Content-Type: \(config.mode.contentType)"] + headers + ["", pretty(body)]).joined(separator: "\n")
         }
         guard let base = config.endpointURL else {
-            return "Type the address of your collector first — the preview shows the request that would go to it."
+            return L("Type the address of your collector first — the preview shows the request that would go to it.")
         }
         var parts: [String] = []
         do {
@@ -372,10 +372,16 @@ final class ExportController: ObservableObject {
                                      try ExportPayload.ndjson(rollups: rollups, alerts: alerts, resource: resource)))
             }
         } catch {
-            return "Couldn't build a sample: \(error.localizedDescription)"
+            return L("Couldn't build a sample: %@", error.localizedDescription)
         }
-        let counted = "\(rollups.count) rollup\(rollups.count == 1 ? "" : "s") and \(alerts.count) alert\(alerts.count == 1 ? "" : "s")"
-        return (["# A sample of \(counted) from your own data. Nothing here has been sent.", ""] + parts).joined(separator: "\n\n")
+        // Four phrasings rather than one with an "(s)" in it: a count and its noun have to agree in every
+        // language, and gluing a plural on in Swift only ever agrees in this one.
+        let counted = rollups.count == 1
+            ? (alerts.count == 1 ? L("1 rollup and 1 alert") : L("1 rollup and %lld alerts", alerts.count))
+            : (alerts.count == 1 ? L("%lld rollups and 1 alert", rollups.count)
+                                 : L("%lld rollups and %lld alerts", rollups.count, alerts.count))
+        return ([L("# A sample of %@ from your own data. Nothing here has been sent.", counted), ""] + parts)
+            .joined(separator: "\n\n")
     }
 
     /// Re-encodes for reading. The wire format is compact; a preview nobody can read answers nothing.

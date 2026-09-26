@@ -30,7 +30,7 @@ struct RulesView: View {
     private enum Tab: String, CaseIterable, Identifiable {
         case rules, activity
         var id: String { rawValue }
-        var title: String { self == .rules ? "Rules" : "What they did" }
+        var title: String { self == .rules ? L("Rules") : L("What they did") }
     }
 
     private var store: RuleStore { monitor.rules }
@@ -87,12 +87,12 @@ struct RulesView: View {
 
     private var subtitle: String {
         if store.isPaused, let until = store.pausedUntil {
-            return "Paused until \(until.formatted(date: .omitted, time: .shortened))"
+            return L("Paused until %@", until.formatted(date: .omitted, time: .shortened))
         }
         let live = store.liveRules.count
         guard !store.rules.isEmpty else { return "" }
         return live == store.rules.count
-            ? "\(live) in force" : "\(live) of \(store.rules.count) in force"
+            ? L("%lld in force", live) : L("%1$lld of %2$lld in force", live, store.rules.count)
     }
 
     // MARK: Toolbar
@@ -134,7 +134,8 @@ struct RulesView: View {
             Button {
                 store.resume()
             } label: {
-                Label("Paused until \(until.formatted(date: .omitted, time: .shortened))", systemImage: "play.circle.fill")
+                Label(L("Paused until %@", until.formatted(date: .omitted, time: .shortened)),
+                      systemImage: "play.circle.fill")
             }
             .tint(.orange)
             .help(L("Nothing is being refused. Click to start again now."))
@@ -156,13 +157,16 @@ struct RulesView: View {
         let blind = RuleBook.unenforceable(store.rules, extensionRunning: monitor.mode == .networkExtension,
                                            inspecting: monitor.inspection.enabled)
         guard !blind.isEmpty else { return nil }
+        // One key per sentence, singular and plural apart: a count spliced into the middle of a translated
+        // sentence is a sentence no translator can shape.
         if monitor.mode != .networkExtension && blind.contains(where: { $0.engine == .flow }) {
-            return "\(blind.count == 1 ? "One rule is" : "\(blind.count) rules are") being watched but not carried out. "
-                + "Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler "
-                + "counts traffic after the fact. Select the Network Extension in Capture to enforce these rules."
+            return blind.count == 1
+                ? L("One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.")
+                : L("%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.", blind.count)
         }
-        return "\(blind.count == 1 ? "One rule is" : "\(blind.count) rules are") being watched but not carried out — "
-            + "a rule that names a path can only be matched by HTTPS inspection, and it is off."
+        return blind.count == 1
+            ? L("One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.")
+            : L("%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.", blind.count)
     }
 
     // MARK: The list
@@ -182,10 +186,10 @@ struct RulesView: View {
     private var ruleList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
-                if !resting.isEmpty && !inForce.isEmpty { heading("In force") }
+                if !resting.isEmpty && !inForce.isEmpty { heading(L("In force")) }
                 ForEach(inForce) { rule in row(rule) }
                 if !resting.isEmpty {
-                    heading("Not in force").padding(.top, inForce.isEmpty ? 0 : 12)
+                    heading(L("Not in force")).padding(.top, inForce.isEmpty ? 0 : 12)
                     ForEach(resting) { rule in row(rule) }
                 }
             }
@@ -222,7 +226,7 @@ struct RulesView: View {
         if store.isPaused, let until = store.pausedUntil {
             HStack(spacing: 8) {
                 Image(systemName: "pause.circle.fill").foregroundStyle(.orange)
-                Text("Nothing is being refused until \(until.formatted(date: .omitted, time: .shortened)).")
+                Text(L("Nothing is being refused until %@.", until.formatted(date: .omitted, time: .shortened)))
                     .font(.callout)
                 Spacer(minLength: 8)
                 Button(L("Resume now")) { store.resume() }.buttonStyle(.link)
@@ -307,8 +311,8 @@ struct RulesView: View {
         let calendar = Calendar.current
         let byDay = Dictionary(grouping: store.events) { calendar.startOfDay(for: $0.timestamp) }
         return byDay.keys.sorted(by: >).map { day in
-            let title = calendar.isDateInToday(day) ? "Today"
-                : calendar.isDateInYesterday(day) ? "Yesterday"
+            let title = calendar.isDateInToday(day) ? L("Today")
+                : calendar.isDateInYesterday(day) ? L("Yesterday")
                 : day.formatted(date: .abbreviated, time: .omitted)
             return FeedDay(id: day, title: title,
                            events: (byDay[day] ?? []).sorted { $0.timestamp > $1.timestamp })
@@ -318,9 +322,11 @@ struct RulesView: View {
     /// A decision can come from a network rule or from a guardrail — the same question asked about a destination
     /// or about a tool — so the feed looks in both lists before giving up on it.
     private func name(of event: RuleEventRecord) -> String {
-        if let rule = store.rules.first(where: { $0.id == event.ruleID }) { return rule.title }
-        if let guardrail = monitor.guardrails.guardrails.first(where: { $0.id == event.ruleID }) { return guardrail.title }
-        return "A rule since deleted"
+        if let rule = store.rules.first(where: { $0.id == event.ruleID }) { return RuleWords.title(rule) }
+        if let guardrail = monitor.guardrails.guardrails.first(where: { $0.id == event.ruleID }) {
+            return guardrail.localizedTitle
+        }
+        return L("A rule since deleted")
     }
 }
 
@@ -340,7 +346,7 @@ private struct RuleRow: View {
 
     private var limitation: String? {
         guard rule.enabled else { return nil }
-        return rule.limitation(extensionRunning: extensionRunning, inspecting: inspecting)
+        return RuleWords.limitation(rule, extensionRunning: extensionRunning, inspecting: inspecting)
     }
 
     var body: some View {
@@ -368,7 +374,7 @@ private struct RuleRow: View {
                 Spacer(minLength: 8)
                 Toggle("", isOn: Binding(get: { rule.enabled }, set: { store.setEnabled(rule, $0) }))
                     .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                    .accessibilityLabel("Enable \(rule.title)")
+                    .accessibilityLabel(L("Enable %@", RuleWords.title(rule)))
                     .padding(.top, 2)
                 Menu {
                     Button(L("Edit…"), action: edit)
@@ -381,13 +387,13 @@ private struct RuleRow: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .frame(width: 16)
-                .accessibilityLabel("More for \(rule.title)")
+                .accessibilityLabel(L("More for %@", RuleWords.title(rule)))
             }
             if let limitation {
                 note(limitation, icon: "eye", tint: .orange)
             }
             if !rule.isUsable {
-                note("Used up — a one-off allowance, already spent.", icon: "checkmark.circle", tint: .secondary)
+                note(L("Used up — a one-off allowance, already spent."), icon: "checkmark.circle", tint: .secondary)
             }
         }
         .opacity(rule.enabled ? 1 : 0.55)
@@ -416,18 +422,18 @@ private struct RuleRow: View {
             .foregroundStyle(tint)
             .frame(width: 26, height: 26)
             .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
-            .accessibilityLabel(rule.action == .block ? "Blocks" : "Allows")
+            .accessibilityLabel(rule.action == .block ? L("Blocks") : L("Allows"))
     }
 
     /// The name if there is one, otherwise the rule read back as a sentence with the parts it names set in
     /// monospace — the same shape the editor shows while it is being written.
     private var headline: Text {
         if !rule.name.isEmpty { return Text(rule.name).font(.body.weight(.medium)) }
-        let verb = rule.action == .block ? "Block " : "Allow "
-        return Text(verb).font(.body.weight(.medium))
-            + code(rule.app.isEmpty ? "any app" : rule.app)
-            + Text(L(" reaching ")).font(.body.weight(.medium))
-            + code(target)
+        // One key for the whole line, so a translator can put the app and the destination where their language
+        // wants them; both are handed back in monospace by `RuleWords.sentence`.
+        let format = rule.action == .block ? L("Block %1$@ reaching %2$@") : L("Allow %1$@ reaching %2$@")
+        return RuleWords.sentence(format, [code(rule.app.isEmpty ? L("any app") : rule.app), code(target)],
+                                  plain: { Text($0).font(.body.weight(.medium)) })
     }
 
     private func code(_ string: String) -> Text {
@@ -435,29 +441,29 @@ private struct RuleRow: View {
     }
 
     private var target: String {
-        var text = rule.destination.isEmpty ? "anywhere" : rule.destination
+        var text = rule.destination.isEmpty ? L("anywhere") : rule.destination
         if !rule.path.isEmpty { text += rule.path }
         if !rule.method.isEmpty { text = "\(rule.method.uppercased()) \(text)" }
         return text
     }
 
     private var subject: String {
-        "\(rule.app.isEmpty ? "any app" : rule.app) → \(target)"
+        "\(rule.app.isEmpty ? L("any app") : rule.app) → \(target)"
     }
 
     private var meta: some View {
         HStack(spacing: 6) {
             Image(systemName: "clock").font(.caption2).foregroundStyle(.tertiary)
-            Text(rule.schedule.describe(at: now, session: RuleStore.session))
+            Text(RuleWords.schedule(rule.schedule, at: now, session: RuleStore.session))
                 .font(.caption).foregroundStyle(.secondary)
             if rule.hits > 0 {
                 Text("·").font(.caption).foregroundStyle(.quaternary)
-                Text("\(rule.hits) \(rule.hits == 1 ? "time" : "times")")
+                Text(rule.hits == 1 ? L("%lld time", rule.hits) : L("%lld times", rule.hits))
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    .help(events == 1 ? "1 decision kept in the feed" : "\(events) decisions kept in the feed")
+                    .help(events == 1 ? L("1 decision kept in the feed") : L("%lld decisions kept in the feed", events))
                 if let last = rule.lastHit {
                     Text("·").font(.caption).foregroundStyle(.quaternary)
-                    Text("last \(last.formatted(.relative(presentation: .named)))")
+                    Text(L("last %@", last.formatted(.relative(presentation: .named))))
                         .font(.caption).foregroundStyle(.tertiary)
                 }
             } else if rule.enabled {
@@ -481,10 +487,10 @@ private struct RuleRow: View {
 
     private var originLabel: String {
         switch rule.origin {
-        case .typed: return "typed"
-        case .preset: return "preset"
-        case .alert: return "from an alert"
-        case .allowOnce: return "allowed once"
+        case .typed: return L("typed")
+        case .preset: return L("preset")
+        case .alert: return L("from an alert")
+        case .allowOnce: return L("allowed once")
         }
     }
 }
@@ -503,7 +509,7 @@ private struct EventRow: View {
                 .foregroundStyle(event.action == .block ? Color.red : Color.green)
                 .frame(width: 14)
                 .padding(.top, 2)
-                .help(event.action == .block ? "Refused" : "Allowed by an exception")
+                .help(event.action == .block ? L("Refused") : L("Allowed by an exception"))
             VStack(alignment: .leading, spacing: 2) {
                 Text(destination).font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
                 HStack(spacing: 6) {
@@ -516,11 +522,11 @@ private struct EventRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(event.timestamp.formatted(date: .omitted, time: .standard))
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                Text(event.engine == .flow ? "Connection" : "Request")
+                Text(event.engine == .flow ? L("Connection") : L("Request"))
                     .font(.caption2).foregroundStyle(.tertiary)
                     .help(event.engine == .flow
-                          ? "Refused by the Network Extension, before the connection was made"
-                          : "Refused by HTTPS inspection, which answered the request itself")
+                          ? L("Refused by the Network Extension, before the connection was made")
+                          : L("Refused by HTTPS inspection, which answered the request itself"))
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 8)
@@ -531,7 +537,7 @@ private struct EventRow: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(
                     "\(event.timestamp.formatted(date: .abbreviated, time: .standard))  "
-                    + "\(event.action == .block ? "blocked" : "allowed")  \(who)  \(destination)  \(rule)",
+                    + "\(event.action == .block ? L("blocked") : L("allowed"))  \(who)  \(destination)  \(rule)",
                     forType: .string)
             }
         }
@@ -566,29 +572,34 @@ struct RuleMenuItems: View {
 
     var body: some View {
         if let app, !app.bundleID.isEmpty {
-            Menu("Block \(app.name)…") {
-                Button(L("Everywhere")) { write(RuleStore.block(app: app.bundleID, name: "Block \(app.name)")) }
+            // No name is stored. A generated one would be written into the rule and shown ever after in the
+            // language the interface happened to be in that day; the list composes the same sentence from the
+            // rule's own fields instead, so it follows the picker. A name someone types is their words and is
+            // kept exactly as typed.
+            Menu(L("Block %@…", app.name)) {
+                Button(L("Everywhere")) { write(RuleStore.block(app: app.bundleID)) }
                 if let host {
-                    Button("From reaching \(host)") {
-                        write(RuleStore.block(app: app.bundleID, destination: host,
-                                              name: "\(app.name) can't reach \(host)"))
+                    Button(L("From reaching %@", host)) {
+                        write(RuleStore.block(app: app.bundleID, destination: host))
                     }
                 }
                 Button(L("For the next hour")) {
-                    write(RuleStore.block(app: app.bundleID, name: "\(app.name), for an hour",
+                    write(RuleStore.block(app: app.bundleID,
                                           schedule: .expiring(in: 3600)))
                 }
                 Button(L("Until Flowlight quits")) {
-                    write(RuleStore.block(app: app.bundleID, name: "\(app.name), this session",
+                    write(RuleStore.block(app: app.bundleID,
                                           schedule: .thisSession(RuleStore.session)))
                 }
             }
         }
         if let host, !host.isEmpty {
-            Menu("Block \(host)…") {
-                Button(L("For every app")) { write(RuleStore.block(destination: host, name: "Nothing reaches \(host)")) }
+            Menu(L("Block %@…", host)) {
+                Button(L("For every app")) {
+                    write(RuleStore.block(destination: host))
+                }
                 Button(L("For the next hour")) {
-                    write(RuleStore.block(destination: host, name: "\(host), for an hour",
+                    write(RuleStore.block(destination: host,
                                           schedule: .expiring(in: 3600)))
                 }
             }
@@ -621,8 +632,8 @@ struct RuleMenuItems: View {
 
     private func heading(_ category: RuleTemplate.Category, for found: [RuleTemplate]) -> String {
         let immediate = found.filter { $0.arrival(for: subject) == .now }.count
-        if immediate == found.count { return "\(category.title) · in force at once" }
-        if immediate == 0 { return "\(category.title) · shown first" }
+        if immediate == found.count { return L("%@ · in force at once", category.title) }
+        if immediate == 0 { return L("%@ · shown first", category.title) }
         return category.title
     }
 
@@ -780,15 +791,15 @@ struct RuleTemplateLibrary: View {
                     .textFieldStyle(.roundedBorder)
             }
             if template.engines(for: filled).contains(.request) {
-                note("These name an HTTP method, so only HTTPS inspection can carry them out. With it off they "
-                     + "sit in the list watching.", icon: "eye", tint: .orange)
+                note(L("These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching."),
+                     icon: "eye", tint: .orange)
             }
             if let caveat = template.caveat {
                 note(caveat, icon: "exclamationmark.circle", tint: .secondary)
             }
             if rules.isEmpty {
-                Text(template.needs == .destination ? "Name a destination to see what this would write."
-                     : "Name an app to see what this would write.")
+                Text(template.needs == .destination ? L("Name a destination to see what this would write.")
+                     : L("Name an app to see what this would write."))
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 ruleList(rules)
@@ -799,7 +810,7 @@ struct RuleTemplateLibrary: View {
                     Label(L("Added"), systemImage: "checkmark.circle.fill")
                         .font(.caption).foregroundStyle(.green)
                 }
-                Button(rules.count > 1 ? "Add \(rules.count) Rules" : "Add Rule") {
+                Button(rules.count > 1 ? L("Add %lld Rules", rules.count) : L("Add Rule")) {
                     add(rules)
                     added.insert(template.id)
                 }
@@ -846,7 +857,7 @@ struct RuleTemplateLibrary: View {
                     Text(subjectLine(rule)).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 0)
                     if rule.schedule.kind != .always {
-                        Text(rule.schedule.describe(at: Date(), session: RuleStore.session))
+                        Text(RuleWords.schedule(rule.schedule, at: Date(), session: RuleStore.session))
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                 }
@@ -857,14 +868,14 @@ struct RuleTemplateLibrary: View {
     }
 
     private func subjectLine(_ rule: Rule) -> String {
-        var target = rule.destination.isEmpty ? "anywhere" : rule.destination
+        var target = rule.destination.isEmpty ? L("anywhere") : rule.destination
         if !rule.method.isEmpty { target = "\(rule.method) \(target)" }
-        return "\(rule.app.isEmpty ? "any app" : rule.app) → \(target)"
+        return "\(rule.app.isEmpty ? L("any app") : rule.app) → \(target)"
     }
 
     private func countLabel(_ template: RuleTemplate) -> String {
         let count = template.ruleCount(for: filled)
-        return count == 1 ? "1 rule" : "\(count) rules"
+        return count == 1 ? L("1 rule") : L("%lld rules", count)
     }
 
     private func note(_ text: String, icon: String, tint: Color) -> some View {
@@ -876,5 +887,118 @@ struct RuleTemplateLibrary: View {
         .foregroundStyle(tint)
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// How a rule reads, in the language the interface is set to.
+///
+/// `Rule` itself is compiled into the Network Extension, where `L()` doesn't exist, so the sentences it can build
+/// — its title, its schedule, what stops it being carried out — are English and stay English: the extension logs
+/// them and reports them over IPC. The interface asks here instead. The decisions are still the model's; only the
+/// words are made here, which is what keeps the two from drifting into disagreeing about what a rule does.
+enum RuleWords {
+    /// The rule read back in one line: a name if someone chose one, otherwise the sentence the model would build.
+    static func title(_ rule: Rule) -> String {
+        if !rule.name.isEmpty { return rule.name }
+        let who = rule.app.isEmpty ? L("anything") : rule.app
+        var where_ = rule.destination.isEmpty ? L("anywhere") : rule.destination
+        if !rule.path.isEmpty { where_ += rule.path }
+        if !rule.method.isEmpty { where_ = "\(rule.method.uppercased()) \(where_)" }
+        return rule.action == .block ? L("Block %1$@ → %2$@", who, where_) : L("Allow %1$@ → %2$@", who, where_)
+    }
+
+    /// When the rule applies, as a phrase: the same answer `Rule.Schedule.describe` gives, in the chosen language.
+    static func schedule(_ schedule: Rule.Schedule, at now: Date = Date(), session current: String = "",
+                         calendar: Calendar = .current) -> String {
+        switch schedule.kind {
+        case .always: return L("Always")
+        case .until:
+            guard let until = schedule.until else { return L("Always") }
+            if now >= until { return L("Expired") }
+            let style = Date.RelativeFormatStyle(presentation: .named, unitsStyle: .wide)
+            return L("Until %1$@ (%2$@)", until.formatted(.dateTime.hour().minute()), until.formatted(style))
+        case .session:
+            return schedule.session == current ? L("Until Flowlight quits") : L("Expired")
+        case .window:
+            let names = calendar.shortWeekdaySymbols
+            let which = schedule.days.isEmpty ? L("Every day")
+                : schedule.days.sorted().compactMap { names.indices.contains($0 - 1) ? names[$0 - 1] : nil }
+                    .joined(separator: " ")
+            // No words of its own: the day names come from the calendar and the clocks are digits.
+            return "\(which), \(Rule.Schedule.clock(schedule.start))–\(Rule.Schedule.clock(schedule.end))"
+        }
+    }
+
+    /// What this rule can't do here, or nil when it is being carried out. Whether there is a limitation at all is
+    /// still the model's answer; this only says it in the right language.
+    static func limitation(_ rule: Rule, extensionRunning: Bool, inspecting: Bool) -> String? {
+        guard rule.limitation(extensionRunning: extensionRunning, inspecting: inspecting) != nil else { return nil }
+        switch rule.engine {
+        case .flow:
+            return L("Watching only — the Network Extension refuses connections, and it isn't running.")
+        case .request:
+            return L("Watching only — a path can only be matched by HTTPS inspection, and it is off.")
+        }
+    }
+
+    /// A localized sentence rebuilt as `Text`, with the parts that name something substituted back in.
+    ///
+    /// The whole sentence is one key — `"Refuse %1$@ reaching %2$@."` — so a translator moves the parts wherever
+    /// their language wants them, including past each other. `String(format:)` can't be used to fill it in, because
+    /// the parts are styled and it would flatten them to plain characters; so the format is split on its
+    /// placeholders instead and the pieces are concatenated as `Text`, which keeps the monospace. A placeholder a
+    /// translation asks for but nothing was passed for is dropped, and anything that isn't a string placeholder is
+    /// left exactly as written — a mistranslated format loses a word here rather than crashing.
+    static func sentence(_ format: String, _ parts: [Text], plain: (String) -> Text = { Text($0) }) -> Text {
+        var pieces: [Text] = []
+        var literal = ""
+        var next = 0
+        var rest = Substring(format)
+
+        func flush() {
+            guard !literal.isEmpty else { return }
+            pieces.append(plain(literal))
+            literal = ""
+        }
+
+        while let percent = rest.firstIndex(of: "%") {
+            literal += rest[rest.startIndex..<percent]
+            var cursor = rest.index(after: percent)
+            // `%%` is one percent sign, not a placeholder.
+            if cursor < rest.endIndex, rest[cursor] == "%" {
+                literal.append("%")
+                rest = rest[rest.index(after: cursor)...]
+                continue
+            }
+            var digits = ""
+            while cursor < rest.endIndex, rest[cursor].isNumber {
+                digits.append(rest[cursor])
+                cursor = rest.index(after: cursor)
+            }
+            var which: Int?
+            if !digits.isEmpty, cursor < rest.endIndex, rest[cursor] == "$" {
+                let at = rest.index(after: cursor)
+                if at < rest.endIndex, rest[at] == "@" {
+                    which = (Int(digits) ?? 1) - 1
+                    cursor = rest.index(after: at)
+                }
+            } else if digits.isEmpty, cursor < rest.endIndex, rest[cursor] == "@" {
+                which = next
+                next += 1
+                cursor = rest.index(after: cursor)
+            }
+            guard let index = which else {
+                // Something else entirely — keep it, and carry on after the percent sign.
+                literal.append("%")
+                rest = rest[rest.index(after: percent)...]
+                continue
+            }
+            flush()
+            if parts.indices.contains(index) { pieces.append(parts[index]) }
+            rest = rest[cursor...]
+        }
+        literal += rest
+        flush()
+        return pieces.reduce(Text(verbatim: "")) { $0 + $1 }
     }
 }

@@ -54,9 +54,9 @@ struct ReportsView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .breakdown: return "Breakdown"
-            case .charts: return "Charts"
-            case .behaviour: return "Worth a look"
+            case .breakdown: return L("Breakdown")
+            case .charts: return L("Charts")
+            case .behaviour: return L("Worth a look")
             }
         }
     }
@@ -104,7 +104,7 @@ struct ReportsView: View {
             }
         }
         .navigationTitle(L("Reports"))
-        .searchable(text: $query, placement: .toolbar, prompt: "App, domain, IP, port")
+        .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, IP, port"))
         .toolbar {
             ToolbarItem {
                 Menu {
@@ -112,7 +112,7 @@ struct ReportsView: View {
                         Text(L("Every way out")).tag(NetworkChannel?.none)
                         Divider()
                         ForEach(NetworkChannel.allCases, id: \.self) { channel in
-                            Text(channel.title).tag(NetworkChannel?.some(channel))
+                            Text(channel.localizedTitle).tag(NetworkChannel?.some(channel))
                         }
                     }
                     .pickerStyle(.inline)
@@ -173,9 +173,11 @@ struct ReportsView: View {
     private var coverageNotice: some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
-            Text("Hostname coverage, last hour: \(monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))) of bytes")
+            Text(L("Hostname coverage, last hour: %@ of bytes",
+                   monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))))
             Text("·")
-            Text("including network owners: \(monitor.coverage.owned.formatted(.percent.precision(.fractionLength(0))))")
+            Text(L("including network owners: %@",
+                   monitor.coverage.owned.formatted(.percent.precision(.fractionLength(0)))))
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -219,7 +221,7 @@ struct ReportsView: View {
     }
 
     private var emptyCharts: some View {
-        ContentUnavailableView("No traffic in this window", systemImage: "chart.pie",
+        ContentUnavailableView(L("No traffic in this window"), systemImage: "chart.pie",
                                description: Text(L("Choose a longer window or clear filters.")))
             .frame(minHeight: 200)
     }
@@ -227,7 +229,7 @@ struct ReportsView: View {
     /// What the charts are scoped to, for their titles ("Destinations · claude").
     private var scopeName: String? {
         [filter.bundleID.map(appName(for:)), filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
-         filter.remoteIP, filter.appProtocol, filter.channel.map(\.title)].compactMap { $0 }.first
+         filter.remoteIP, filter.appProtocol, filter.channel.map(\.localizedTitle)].compactMap { $0 }.first
     }
 
     private func narrow(to entity: InsightEntity) {
@@ -269,13 +271,13 @@ struct ReportsView: View {
     private var filterChips: some View {
         HStack(spacing: 6) {
             Text(L("Showing only:")).font(.caption).foregroundStyle(.secondary)
-            if let app = filter.bundleID { chip("App: \(appName(for: app))") { filter.bundleID = nil } }
-            if let owner = filter.owner { chip("Owner: \(owner)") { filter.owner = nil; filter.domain = nil; filter.remoteIP = nil } }
-            else if let domain = filter.domain { chip("Domain: \(domain.isEmpty ? "(none)" : domain)") { filter.domain = nil; filter.remoteIP = nil } }
-            if let suffix = filter.domainSuffix { chip("Domain: *.\(suffix)") { filter.domainSuffix = nil; filter.remoteIP = nil } }
-            if let ip = filter.remoteIP { chip("IP: \(ip)") { filter.remoteIP = nil } }
-            if let proto = filter.appProtocol { chip("Protocol: \(proto)") { filter.appProtocol = nil } }
-            if let channel = filter.channel { chip("Way out: \(channel.title)") { filter.channel = nil } }
+            if let app = filter.bundleID { chip(L("App: %@", appName(for: app))) { filter.bundleID = nil } }
+            if let owner = filter.owner { chip(L("Owner: %@", owner)) { filter.owner = nil; filter.domain = nil; filter.remoteIP = nil } }
+            else if let domain = filter.domain { chip(L("Domain: %@", domain.isEmpty ? L("(none)") : domain)) { filter.domain = nil; filter.remoteIP = nil } }
+            if let suffix = filter.domainSuffix { chip(L("Domain: *.%@", suffix)) { filter.domainSuffix = nil; filter.remoteIP = nil } }
+            if let ip = filter.remoteIP { chip(L("IP: %@", ip)) { filter.remoteIP = nil } }
+            if let proto = filter.appProtocol { chip(L("Protocol: %@", proto)) { filter.appProtocol = nil } }
+            if let channel = filter.channel { chip(L("Way out: %@", channel.localizedTitle)) { filter.channel = nil } }
             Button(L("Clear")) { filter = .none }.buttonStyle(.link).font(.caption)
         }
     }
@@ -284,7 +286,7 @@ struct ReportsView: View {
         HStack(spacing: 4) {
             Text(text).font(.caption)
             Button(action: remove) { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.plain).accessibilityLabel("Remove filter \(text)")
+                .buttonStyle(.plain).accessibilityLabel(L("Remove filter %@", text))
         }
         .padding(.horizontal, 8).padding(.vertical, 3)
         .background(Color.accentColor.opacity(0.15), in: Capsule())
@@ -296,13 +298,27 @@ struct ReportsView: View {
         let flows = series.reduce(0) { $0 + $1.flows }
         let peak = series.max { $0.total < $1.total }
         return HStack(spacing: 12) {
-            StatTile(title: "Received", value: ByteFormat.string(totalIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
-            StatTile(title: "Sent", value: ByteFormat.string(totalOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
-            StatTile(title: "Flows", value: flows.formatted(), systemImage: "point.3.connected.trianglepath.dotted")
-            StatTile(title: "Peak \(granularity.rawValue)", value: peak.map { ByteFormat.string($0.total) } ?? "–", systemImage: "chart.line.uptrend.xyaxis")
-            StatTile(title: "Abnormal buckets", value: "\(flagged.count)", systemImage: "exclamationmark.triangle",
+            StatTile(title: L("Received"), value: ByteFormat.string(totalIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
+            StatTile(title: L("Sent"), value: ByteFormat.string(totalOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
+            StatTile(title: L("Flows"), value: flows.formatted(), systemImage: "point.3.connected.trianglepath.dotted")
+            StatTile(title: peakTitle, value: peak.map { ByteFormat.string($0.total) } ?? "–", systemImage: "chart.line.uptrend.xyaxis")
+            StatTile(title: L("Abnormal buckets"), value: "\(flagged.count)", systemImage: "exclamationmark.triangle",
                      tint: flagged.isEmpty ? .secondary : TrafficColors.anomaly)
-                .help("Buckets at least \(sigma.formatted())σ above the mean of this window")
+                .help(L("Buckets at least %@σ above the mean of this window", sigma.formatted()))
+        }
+    }
+
+    /// "Peak minute" and its siblings. A key each rather than "Peak %@" of a lowercased period name: the period
+    /// word is part of the phrase, and not every language lets it be lowercased on its own.
+    private var peakTitle: String {
+        switch granularity {
+        case .second: return L("Peak second")
+        case .minute: return L("Peak minute")
+        case .hour: return L("Peak hour")
+        case .day: return L("Peak day")
+        case .week: return L("Peak week")
+        case .month: return L("Peak month")
+        case .year: return L("Peak year")
         }
     }
 
@@ -310,31 +326,31 @@ struct ReportsView: View {
         GroupBox {
             Chart {
                 ForEach(series) { point in
-                    BarMark(x: .value("Time", point.date, unit: granularity.calendarComponent),
-                            y: .value("Bytes", point.bytesIn))
-                        .foregroundStyle(by: .value("Direction", "Received"))
+                    BarMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent),
+                            y: .value(L("Bytes"), point.bytesIn))
+                        .foregroundStyle(by: .value(L("Direction"), L("Received")))
                         .opacity(hovered == nil || hovered?.date == point.date ? 1 : 0.55)
-                    BarMark(x: .value("Time", point.date, unit: granularity.calendarComponent),
-                            y: .value("Bytes", point.bytesOut))
-                        .foregroundStyle(by: .value("Direction", "Sent"))
+                    BarMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent),
+                            y: .value(L("Bytes"), point.bytesOut))
+                        .foregroundStyle(by: .value(L("Direction"), L("Sent")))
                         .opacity(hovered == nil || hovered?.date == point.date ? 1 : 0.55)
                 }
                 ForEach(series.filter { flagged.contains($0.date) }) { point in
-                    PointMark(x: .value("Time", point.date, unit: granularity.calendarComponent), y: .value("Bytes", point.total))
+                    PointMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent), y: .value(L("Bytes"), point.total))
                         .symbol(.triangle)
                         .symbolSize(30)
                         .foregroundStyle(TrafficColors.anomaly)
                         .offset(y: -8)
                 }
                 if let hovered {
-                    RuleMark(x: .value("Time", hovered.date, unit: granularity.calendarComponent))
+                    RuleMark(x: .value(L("Time"), hovered.date, unit: granularity.calendarComponent))
                         .foregroundStyle(.secondary.opacity(0.25))
                         .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                             tooltip(for: hovered)
                         }
                 }
             }
-            .chartForegroundStyleScale(["Received": TrafficColors.inbound, "Sent": TrafficColors.outbound])
+            .chartForegroundStyleScale([L("Received"): TrafficColors.inbound, L("Sent"): TrafficColors.outbound])
             .chartYAxis {
                 AxisMarks { value in
                     AxisGridLine()
@@ -359,7 +375,7 @@ struct ReportsView: View {
             .overlay { if loading && series.isEmpty { ProgressView() } }
         } label: {
             HStack {
-                Text(filter.isEmpty ? "All traffic" : "Filtered traffic")
+                Text(filter.isEmpty ? L("All traffic") : L("Filtered traffic"))
                 Spacer()
                 if granularity.finer != nil {
                     Text(L("Click a bar to zoom in")).font(.caption).foregroundStyle(.secondary)
@@ -375,7 +391,8 @@ struct ReportsView: View {
         return VStack(alignment: .leading, spacing: 3) {
             Text(label(for: point.date)).font(.caption.bold())
             Text("↓ \(ByteFormat.string(point.bytesIn))   ↑ \(ByteFormat.string(point.bytesOut))").font(.caption.monospacedDigit())
-            Text("\(point.flows.formatted()) new flow\(point.flows == 1 ? "" : "s")").font(.caption2).foregroundStyle(.secondary)
+            Text(point.flows == 1 ? L("1 new flow") : L("%@ new flows", point.flows.formatted()))
+                .font(.caption2).foregroundStyle(.secondary)
             if isAbnormal {
                 Label(abnormalSummary(apps, point: point), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
@@ -387,7 +404,10 @@ struct ReportsView: View {
                                    emphasized: isAbnormal && index == 0)
                 }
                 if let bucket, bucket.remainingApps > 0 {
-                    Text("+ \(bucket.remainingApps.formatted()) more app\(bucket.remainingApps == 1 ? "" : "s") · \(ShareFormat.string(Double(bucket.remaining.total) / Double(point.total)))")
+                    let count = bucket.remainingApps.formatted()
+                    let share = ShareFormat.string(Double(bucket.remaining.total) / Double(point.total))
+                    Text(bucket.remainingApps == 1 ? L("+ %@ more app · %@", count, share)
+                                                   : L("+ %@ more apps · %@", count, share))
                         .font(.caption2).foregroundStyle(.secondary).padding(.leading, 26)
                 }
             } else if point.total > 0 {
@@ -422,10 +442,10 @@ struct ReportsView: View {
 
     /// "Abnormal volume · claude 98%" once contributors are known.
     private func abnormalSummary(_ apps: [BucketContributor]?, point: SeriesPoint) -> String {
-        guard let top = apps?.first, point.total > 0 else { return "Abnormal volume" }
+        guard let top = apps?.first, point.total > 0 else { return L("Abnormal volume") }
         let share = Double(top.counters.total) / Double(point.total)
         let name = top.appName.isEmpty ? top.bundleID : top.appName
-        return "Abnormal volume · \(name) \(share.formatted(.percent.precision(.fractionLength(0))))"
+        return L("Abnormal volume · %@ %@", name, share.formatted(.percent.precision(.fractionLength(0))))
     }
 
     private func loadContributors(for point: SeriesPoint?) async {
@@ -490,19 +510,19 @@ struct ReportsView: View {
                 }
             }
             .width(min: 140)
-            TableColumn("Share", value: \.total) { node in
+            TableColumn(L("Share"), value: \.total) { node in
                 ShareBar(fraction: Double(node.total) / Double(grandTotal))
             }
             .width(80)
-            TableColumn("↓ Received", value: \.bytesIn) { Text(ByteFormat.string($0.bytesIn)).monospacedDigit() }
+            TableColumn(L("↓ Received"), value: \.bytesIn) { Text(ByteFormat.string($0.bytesIn)).monospacedDigit() }
                 .width(72)
-            TableColumn("↑ Sent", value: \.bytesOut) { Text(ByteFormat.string($0.bytesOut)).monospacedDigit() }
+            TableColumn(L("↑ Sent"), value: \.bytesOut) { Text(ByteFormat.string($0.bytesOut)).monospacedDigit() }
                 .width(72)
-            TableColumn("Total", value: \.total) { Text(ByteFormat.string($0.total)).monospacedDigit().bold() }
+            TableColumn(L("Total"), value: \.total) { Text(ByteFormat.string($0.total)).monospacedDigit().bold() }
                 .width(72)
-            TableColumn("Flows", value: \.flows) { Text($0.flows.formatted()).monospacedDigit() }
+            TableColumn(L("Flows"), value: \.flows) { Text($0.flows.formatted()).monospacedDigit() }
                 .width(48)
-            TableColumn("Protocol · Port", value: \.protocols) { node in
+            TableColumn(L("Protocol · Port"), value: \.protocols) { node in
                 let text = [node.protocols, node.ports].filter { !$0.isEmpty }.joined(separator: " · ")
                 Text(text).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary).help(text)
             }
@@ -512,7 +532,7 @@ struct ReportsView: View {
             if let id = ids.first, let node = find(id), node.kind != .more {
                 Button(L("Show Only This")) { applyFilter(node) }
                 if node.kind != .app, let bundleID = node.bundleID {
-                    Button("Show Only \(node.appName ?? bundleID)") { var f = filter; f.bundleID = bundleID; filter = f }
+                    Button(L("Show Only %@", node.appName ?? bundleID)) { var f = filter; f.bundleID = bundleID; filter = f }
                 }
                 Divider()
                 FocusMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
@@ -520,7 +540,7 @@ struct ReportsView: View {
                 RuleMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
                               host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
                 Divider()
-                Button("Copy \(node.kind == .app ? "Name" : node.kind == .ip ? "IP Address" : "Destination")") { copy(node.title) }
+                Button(node.kind == .app ? L("Copy Name") : node.kind == .ip ? L("Copy IP Address") : L("Copy Destination")) { copy(node.title) }
                 if node.kind == .app, let bundleID = node.bundleID { Button(L("Copy Bundle ID")) { copy(bundleID) } }
                 if node.kind == .ip, !node.detail.isEmpty { Button(L("Copy Hostname")) { copy(node.detail) } }
             }
@@ -531,7 +551,8 @@ struct ReportsView: View {
         .onChange(of: childLimits) { recompute() }
         .safeAreaInset(edge: .top, spacing: 0) {
             if breakdownTruncated {
-                Label("Showing the \(TrafficDatabase.breakdownLimit.formatted()) largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail.",
+                Label(L("Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail.",
+                        TrafficDatabase.breakdownLimit.formatted()),
                       systemImage: "info.circle")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -544,9 +565,9 @@ struct ReportsView: View {
                 if !query.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
-                    ContentUnavailableView("No traffic in this window", systemImage: "chart.bar",
-                                           description: Text(granularity == .second ? "Per-second data is kept for a few hours." :
-                                                             "Rollups run once a minute, so new data appears shortly."))
+                    ContentUnavailableView(L("No traffic in this window"), systemImage: "chart.bar",
+                                           description: Text(granularity == .second ? L("Per-second data is kept for a few hours.") :
+                                                             L("Rollups run once a minute, so new data appears shortly.")))
                 }
             }
         }
@@ -594,8 +615,8 @@ struct ReportsView: View {
     private func help(for node: TrafficNode) -> String {
         switch node.kind {
         case .app: return [node.bundleID, node.appPath].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
-        case .owner: return "No hostname was seen for this traffic. \(node.title) operates these addresses."
-        case .more: return "Show the next \(TrafficNode.pageSize) rows"
+        case .owner: return L("No hostname was seen for this traffic. %@ operates these addresses.", node.title)
+        case .more: return L("Show the next %lld rows", TrafficNode.pageSize)
         default: return node.detail.isEmpty ? node.title : "\(node.title) · \(node.detail)"
         }
     }
@@ -627,7 +648,7 @@ struct ReportsView: View {
     /// Compact window label: times only when the window is within today, dates for longer spans.
     private var rangeLabel: String {
         let cal = Calendar.current
-        let end = followNow ? "now" : endDate.formatted(date: cal.isDateInToday(endDate) ? .omitted : .abbreviated,
+        let end = followNow ? L("now") : endDate.formatted(date: cal.isDateInToday(endDate) ? .omitted : .abbreviated,
                                                         time: granularity <= .hour ? .shortened : .omitted)
         switch granularity {
         case .second, .minute, .hour:
@@ -635,9 +656,9 @@ struct ReportsView: View {
             let start = startDate.formatted(date: sameDay && cal.isDateInToday(startDate) ? .omitted : .abbreviated, time: .shortened)
             return "\(start) – \(end)"
         case .day, .week:
-            return "\(startDate.formatted(.dateTime.month(.abbreviated).day())) – \(followNow ? "today" : endDate.formatted(.dateTime.month(.abbreviated).day()))"
+            return "\(startDate.formatted(.dateTime.month(.abbreviated).day())) – \(followNow ? L("today") : endDate.formatted(.dateTime.month(.abbreviated).day()))"
         case .month, .year:
-            return "\(startDate.formatted(.dateTime.month(.abbreviated).year())) – \(followNow ? "now" : endDate.formatted(.dateTime.month(.abbreviated).year()))"
+            return "\(startDate.formatted(.dateTime.month(.abbreviated).year())) – \(followNow ? L("now") : endDate.formatted(.dateTime.month(.abbreviated).year()))"
         }
     }
 
@@ -646,7 +667,7 @@ struct ReportsView: View {
         case .second: return date.formatted(date: .omitted, time: .standard)
         case .minute, .hour: return date.formatted(date: .abbreviated, time: .shortened)
         case .day: return date.formatted(.dateTime.weekday(.abbreviated).month().day().year())
-        case .week: return "Week of " + date.formatted(date: .abbreviated, time: .omitted)
+        case .week: return L("Week of %@", date.formatted(date: .abbreviated, time: .omitted))
         case .month: return date.formatted(.dateTime.month(.wide).year())
         case .year: return date.formatted(.dateTime.year())
         }
@@ -706,7 +727,7 @@ struct ReportsView: View {
             nodes = TrafficNode.tree(from: result.1, grouping: grouping, base: f)
             if hovered != nil { hovered = series.first { $0.date == hovered?.date } }
         } catch {
-            monitor.lastError = "Query failed: \(error)"
+            monitor.lastError = L("Query failed: %@", "\(error)")
         }
     }
 
@@ -715,7 +736,7 @@ struct ReportsView: View {
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = "\(name)-\(granularity.rawValue).csv"
         if panel.runModal() == .OK, let url = panel.url {
-            do { try csv.write(to: url, atomically: true, encoding: .utf8) } catch { monitor.lastError = "Export failed: \(error.localizedDescription)" }
+            do { try csv.write(to: url, atomically: true, encoding: .utf8) } catch { monitor.lastError = L("Export failed: %@", error.localizedDescription) }
         }
     }
 }
@@ -737,7 +758,7 @@ struct ShareBar: View {
                 .frame(width: 38, alignment: .trailing)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(Int((fraction * 100).rounded())) percent of traffic")
+        .accessibilityLabel(L("%lld percent of traffic", Int((fraction * 100).rounded())))
     }
 }
 
