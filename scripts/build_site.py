@@ -261,15 +261,21 @@ def picker(langs, table, current, targets):
     chevron = ('<svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true">'
                '<path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" '
                'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+    # The row is a span inside the summary, not the summary itself: Safari stops honouring
+    # `::-webkit-details-marker` once the summary is a flex container, and draws its triangle anyway.
     return (f'<details class="lang">\n'
-            f'      <summary aria-label="{label}" title="{label}">{GLOBE}'
-            f'<span class="lang-name">{here_name}</span>{chevron}</summary>\n'
+            f'      <summary aria-label="{label}" title="{label}"><span class="lang-current">{GLOBE}'
+            f'<span class="lang-name">{here_name}</span>{chevron}</span></summary>\n'
             f'      <div class="lang-menu">{"".join(items)}</div>\n'
             f'    </details>')
 
 
 def build():
     css = (SITE / "site.css").read_text()
+    # The stylesheet is one URL that never changes name, so a browser and the Pages CDN both keep serving the
+    # copy they have: a restyle can ship and still look exactly as it did. The screenshots already carry a
+    # content hash for this reason; the CSS needs one more than they do.
+    css_version = hashlib.sha256(css.encode()).hexdigest()[:8]
     header, footer = (SITE / "partials" / "header.html").read_text(), (SITE / "partials" / "footer.html").read_text()
     (OUT / "assets").mkdir(parents=True, exist_ok=True)
     (OUT / "assets" / "site.css").write_text(css)
@@ -315,7 +321,8 @@ def build():
             full = fill(header + body + footer, ctx)
             dest = OUT / path.strip("/") / "index.html" if path != "/" else OUT / "index.html"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(document(meta, full, root, f"{root}assets/site.css", lang=table[lang].get("lang.html", lang),
+            dest.write_text(document(meta, full, root, f"{root}assets/site.css?v={css_version}",
+                                     lang=table[lang].get("lang.html", lang),
                                      locale=table[lang].get("lang.locale", lang), alt=alt,
                                      docs_url=f"{DOMAIN}{where('docs', lang) if 'docs' in english else '/docs/'}#install"))
             pages.append((meta, body, lang))
@@ -337,7 +344,7 @@ def build():
     nf_ctx["links"]["home"] = nf_ctx["links"]["index"]
     nf_body = fill(header + """<main id="main"><section class="page-head"><div class="wrap"><p class="eyebrow">404</p>
 <h1>{{t:notfound.title}}</h1><p class="lede">{{t:notfound.lede}}</p></div></section></main>""" + footer, nf_ctx)
-    (OUT / "404.html").write_text(document(notfound, nf_body, "/", "/assets/site.css", index=False))
+    (OUT / "404.html").write_text(document(notfound, nf_body, "/", f"/assets/site.css?v={css_version}", index=False))
 
     # lastmod comes from the commit that last touched each page's source, so it says something true even when
     # a rebuild touches every file. Google reads lastmod and ignores changefreq and priority, so neither is here.

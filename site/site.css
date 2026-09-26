@@ -462,11 +462,13 @@
      reader can open one in a new tab, and a crawler can follow it. */
   .lang { position: relative; font-size: 14px; color: var(--muted); }
   /* Weighted like a nav link, not like the Download button: the row already has one thing asking to be clicked.
-     Three rules to drop the disclosure triangle, because browsers disagree about which one they honour. */
-  .lang > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
-                    padding: 0; border: 0; background: none; color: inherit; }
+     The summary stays a plain box and the flex row lives in `.lang-current`, because Safari ignores
+     `::-webkit-details-marker` on a summary that is itself a flex container and draws its triangle regardless. */
+  .lang > summary { display: block; cursor: pointer; list-style: none; padding: 0; border: 0; background: none;
+                    color: inherit; }
   .lang > summary::-webkit-details-marker { display: none; }
   .lang > summary::marker { content: ""; }
+  .lang-current { display: inline-flex; align-items: center; gap: 6px; }
   .lang > summary:hover { color: var(--ink); }
   .lang > summary svg { width: 15px; height: 15px; flex: none; }
   .lang-chevron { width: 11px; height: 11px; opacity: .7; transition: transform .15s ease; }
