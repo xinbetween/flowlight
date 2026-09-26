@@ -41,29 +41,39 @@ Internals are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - **Don't commit real traffic.** Screenshots and fixtures come from demo mode or synthetic data only.
 - Match the surrounding code style. Keep PRs focused, with tests for behavior changes.
 
-## Releasing
+## Branches and releases
 
-Every release goes **branch → merge request → release → merge**, in that order, whatever the size of the
-change:
+Work happens on a feature branch, lands on the release branch, and reaches `main` when the release is
+published. `main` is what has shipped, not what is being built.
 
 ```sh
-git switch -c release/0.8.0                          # version bump, release notes and rebuilt docs/, one commit
+git switch -c feature/relaunch-through-proxy main   # start from main
+git rebase main                                     # keep it current — rebase, never merge main in
+
+git switch -c release/0.8.0 main                    # opened when a release starts collecting
+git merge --ff-only feature/relaunch-through-proxy  # features land here
+# last commit on the branch: version bump, release notes, rebuilt docs/
+
 git push -u origin release/0.8.0
-gh pr create --base main --title "Flowlight 0.8.0"   # its checks run while the release builds
+gh pr create --base main --title "Flowlight 0.8.0"  # its checks run while the release builds
 git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0   # signs, notarizes, publishes
-gh pr merge --merge --delete-branch                                # last: the site catches up
+gh pr merge --merge --delete-branch                                # last: main and the site catch up
 ```
 
-The order is not a convention, it is what keeps the website honest. `docs/` is served from `main` and its
-Download button points at `releases/latest/download/Flowlight.dmg`, so a version that reaches `main` before
-the release exists sends people to the previous DMG while announcing a newer one. The bump can't simply land
-later either: CI requires `docs/` to match `site/`, and the site build reads `MARKETING_VERSION`, so the
-version and the rebuilt site travel in the same commit. The release branch is what holds both back until the
-download is real.
+**Rebase feature branches, don't merge into them.** A rebase keeps the branch a straight line of your own
+commits, so the release branch takes it with `--ff-only` and the merge request reads as the change rather
+than as a tangle of merges.
 
-CI enforces it rather than trusting anyone to remember: on `main` it fails when the newest version on the
-releases page is ahead of the newest published release. It does not run that check on a release branch, since
-carrying the next version is that branch's job.
+**The merge request comes before the tag** so the release's whole diff is reviewed and its checks are green
+before anything is signed. **The merge comes after the release** so the site never announces a download that
+doesn't exist: `docs/` is served from `main` and its Download button points at
+`releases/latest/download/Flowlight.dmg`. The version bump can't simply land later either — CI requires
+`docs/` to match `site/`, and the site build reads `MARKETING_VERSION`, so the version and the rebuilt site
+travel in one commit.
+
+CI enforces the ordering rather than trusting anyone to remember: on `main` it fails when the newest version
+on the releases page is ahead of the newest published release. It does not run that check on a release
+branch, since carrying the next version is that branch's job.
 
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) has the rest: the dry run, the signing secrets and
 what the release workflow does.

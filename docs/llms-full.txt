@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.10, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.8.0, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.10macOS 15+UniversalGPL-3.0No telemetry
+ v0.8.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,30 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.10
+ 0.8.0
 September 26, 2026Latest
+
+ Send an agent through the proxy in one click. HTTPS inspection can only read what
+ goes through Flowlight, and a program reads its proxy settings once — when it starts. So an agent
+ already running when you switched inspection on sends its model traffic straight past it, and its
+ tool calls can't be read. Relaunch Through the Proxy quits the agent and starts it
+ again with its HTTPS pointed at Flowlight: an app is relaunched by macOS with the settings applied,
+ a command-line agent gets a Terminal window already running it. Electron agents are given
+ Chromium's own proxy flag as well, because Chromium reads none of the usual variables.
+
+ Capture, Devices and Rules fill the window like every other screen. They used to
+ stop at a fixed width, which read as a different app; now the cards and rows stretch and only the
+ paragraphs keep a readable measure.
+
+ Ten languages, current. Every new string is translated, and two English phrases
+ that were quietly wrong are fixed: a warning that read as "you will lose unsaved work" when the
+ opposite is true, and a docs page that still called refusing connections a roadmap item three
+ releases after it shipped.
+
+ Downloads and checksums →
+
+ 0.7.10
+September 26, 2026
 
  Two words that were doing two jobs each. A rule-template category and a Reports
  filter were both called "way out", which in Traditional Chinese had collapsed to the same word; the
