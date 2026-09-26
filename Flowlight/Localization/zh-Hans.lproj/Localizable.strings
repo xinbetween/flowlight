@@ -52,7 +52,7 @@
 
 /* Analysis/RuleTemplates.swift */
 "AI agents" = "AI 代理";
-"Ways out" = "数据出口";
+"Ways data leaves" = "数据外传途径";
 "Telemetry and analytics" = "遥测与分析";
 "Working hours" = "工作时间";
 "One-off investigation" = "一次性排查";
@@ -102,10 +102,11 @@
 "Starting…" = "正在启动…";
 "Could not open database: %@" = "无法打开数据库：%@";
 "Reconnecting…" = "正在重新连接…";
+"Trying the filter extension again…" = "正在重试过滤器扩展…";
 "Packet capture access was removed." = "数据包捕获权限已被移除。";
 "Access granted. Log out and back in to finish." = "已授予权限。请注销并重新登录以完成设置。";
 "Packet capture is enabled." = "数据包捕获已启用。";
-"Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again." = "无法连接过滤器扩展 —— 改用 nettop 采样。可在“网络扩展”下点按“刷新”，再次尝试该扩展。";
+"Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter." = "无法连接过滤器扩展 —— 改用 nettop 采样。请在“内容过滤器”下点按“重试过滤器扩展”。";
 "This build isn't signed for the Network Extension — sampling with nettop instead." = "此构建未针对网络扩展签名 —— 改用 nettop 采样。";
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS 没有启动 Flowlight 的过滤器。它一次只运行一个内容过滤器，而另一个 —— 某个 VPN，或 Palo Alto Networks GlobalProtect、CrowdStrike Falcon 这类安全代理程序 —— 已经占用了那个位置。在这一点改变之前，该扩展无法在这台 Mac 上捕获任何内容。";
 "Starting %@…" = "正在启动 %@…";
@@ -191,6 +192,7 @@
 "Installing…" = "正在安装…";
 "Filter enabled" = "过滤器已启用";
 "Installed, filter disabled" = "已安装，过滤器已停用";
+"Restart this Mac to finish replacing the filter" = "重新启动这台 Mac 以完成过滤器替换";
 "Failed: %@" = "失败：%@";
 "unknown" = "未知";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "此构建未使用网络扩展授权签名。请使用 Apple 已授予 content-filter-provider-systemextension 的团队，通过 scripts/build-signed.sh 构建。";
@@ -452,8 +454,8 @@
 "Instructions (%lld)" = "指令文件（%lld）";
 "%lld call" = "%lld 次调用";
 "%lld calls" = "%lld 次调用";
-"%@ in / %@ out · %@ cached" = "输入 %@ / 输出 %@ · 缓存 %@";
-"%@ in / %@ out" = "输入 %@ / 输出 %@";
+"%@ tokens in / %@ out · %@ cached" = "输入 %@ token / 输出 %@ · 缓存 %@";
+"%@ tokens in / %@ out" = "输入 %@ token / 输出 %@";
 "via %@" = "经由 %@";
 "Opened by %@" = "由 %@ 打开";
 "Not allowed" = "不允许";
@@ -596,7 +598,7 @@
 "Uninstall" = "卸载";
 "Refresh" = "刷新";
 "Re-check the filter and reconnect to it" = "重新检查过滤器并与其重新建立连接";
-"Try the Extension Again" = "重试网络扩展";
+"Try the Extension Again" = "重试过滤器扩展";
 "Stop sampling with nettop and reconnect to the filter extension" = "停止用 nettop 采样，并重新连接过滤器扩展";
 "entitled" = "已授权";
 "not entitled" = "未授权";

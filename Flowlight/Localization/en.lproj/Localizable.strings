@@ -1,3 +1,5 @@
+/* Flowlight — en. The key is the English text, so an untranslated string shows correct English. */
+
 /* Analysis/AnomalyEngine.swift */
 "Traffic spike" = "Traffic spike";
 "Unusual number of destinations" = "Unusual number of destinations";
@@ -52,7 +54,7 @@
 
 /* Analysis/RuleTemplates.swift */
 "AI agents" = "AI agents";
-"Ways out" = "Ways out";
+"Ways data leaves" = "Ways data leaves";
 "Telemetry and analytics" = "Telemetry and analytics";
 "Working hours" = "Working hours";
 "One-off investigation" = "One-off investigation";
@@ -102,10 +104,11 @@
 "Starting…" = "Starting…";
 "Could not open database: %@" = "Could not open database: %@";
 "Reconnecting…" = "Reconnecting…";
+"Trying the filter extension again…" = "Trying the filter extension again…";
 "Packet capture access was removed." = "Packet capture access was removed.";
 "Access granted. Log out and back in to finish." = "Access granted. Log out and back in to finish.";
 "Packet capture is enabled." = "Packet capture is enabled.";
-"Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again." = "Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again.";
+"Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter." = "Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter.";
 "This build isn't signed for the Network Extension — sampling with nettop instead." = "This build isn't signed for the Network Extension — sampling with nettop instead.";
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.";
 "Starting %@…" = "Starting %@…";
@@ -191,6 +194,7 @@
 "Installing…" = "Installing…";
 "Filter enabled" = "Filter enabled";
 "Installed, filter disabled" = "Installed, filter disabled";
+"Restart this Mac to finish replacing the filter" = "Restart this Mac to finish replacing the filter";
 "Failed: %@" = "Failed: %@";
 "unknown" = "unknown";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension.";
@@ -452,8 +456,8 @@
 "Instructions (%lld)" = "Instructions (%lld)";
 "%lld call" = "%lld call";
 "%lld calls" = "%lld calls";
-"%@ in / %@ out · %@ cached" = "%@ in / %@ out · %@ cached";
-"%@ in / %@ out" = "%@ in / %@ out";
+"%@ tokens in / %@ out · %@ cached" = "%@ tokens in / %@ out · %@ cached";
+"%@ tokens in / %@ out" = "%@ tokens in / %@ out";
 "via %@" = "via %@";
 "Opened by %@" = "Opened by %@";
 "Not allowed" = "Not allowed";

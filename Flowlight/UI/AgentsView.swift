@@ -627,8 +627,8 @@ struct AgentDetail: View {
         if !profile.usage.isEmpty {
             let input = Self.count(profile.usage.input), output = Self.count(profile.usage.output)
             parts.append(profile.usage.cacheRead > 0
-                ? L("%@ in / %@ out · %@ cached", input, output, Self.count(profile.usage.cacheRead))
-                : L("%@ in / %@ out", input, output))
+                ? L("%@ tokens in / %@ out · %@ cached", input, output, Self.count(profile.usage.cacheRead))
+                : L("%@ tokens in / %@ out", input, output))
         }
         return parts.joined(separator: " · ")
     }

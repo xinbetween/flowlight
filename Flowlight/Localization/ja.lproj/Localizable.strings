@@ -52,7 +52,7 @@
 
 /* Analysis/RuleTemplates.swift */
 "AI agents" = "AI エージェント";
-"Ways out" = "持ち出し経路";
+"Ways data leaves" = "データの持ち出し経路";
 "Telemetry and analytics" = "テレメトリと分析";
 "Working hours" = "業務時間";
 "One-off investigation" = "その場かぎりの調査";
@@ -102,10 +102,11 @@
 "Starting…" = "開始中…";
 "Could not open database: %@" = "データベースを開けませんでした: %@";
 "Reconnecting…" = "再接続中…";
+"Trying the filter extension again…" = "フィルタ機能拡張を再試行中…";
 "Packet capture access was removed." = "パケットキャプチャのアクセス権が解除されました。";
 "Access granted. Log out and back in to finish." = "アクセスを許可しました。ログアウトして再度ログインすると完了します。";
 "Packet capture is enabled." = "パケットキャプチャは有効です。";
-"Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again." = "フィルタ機能拡張に接続できなかったため、代わりに nettop でサンプリングしています。ネットワーク機能拡張の「更新」を押すと、機能拡張を再試行します。";
+"Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter." = "フィルタ機能拡張に接続できなかったため、代わりに nettop でサンプリングしています。「コンテンツフィルタ」の「機能拡張を再試行」を押してください。";
 "This build isn't signed for the Network Extension — sampling with nettop instead." = "このビルドはネットワーク機能拡張用に署名されていないため、代わりに nettop でサンプリングしています。";
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS は Flowlight のフィルタを開始していません。macOS はコンテンツフィルタを 1 つずつしか動かさず、別のフィルタ（VPN や、Palo Alto Networks GlobalProtect、CrowdStrike Falcon などのセキュリティエージェント）がその枠をすでに使っています。それが変わるまで、この Mac では機能拡張は何もキャプチャできません。";
 "Starting %@…" = "%@ を開始中…";
@@ -191,6 +192,7 @@
 "Installing…" = "インストール中…";
 "Filter enabled" = "フィルタは有効";
 "Installed, filter disabled" = "インストール済み・フィルタは無効";
+"Restart this Mac to finish replacing the filter" = "フィルタの置き換えを完了するには、この Mac を再起動してください";
 "Failed: %@" = "失敗: %@";
 "unknown" = "不明";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "このビルドにはネットワーク機能拡張の entitlement が署名されていません。Apple から content-filter-provider-systemextension を付与されたチームで scripts/build-signed.sh を使ってビルドしてください。";
@@ -452,8 +454,8 @@
 "Instructions (%lld)" = "指示（%lld）";
 "%lld call" = "%lld 回";
 "%lld calls" = "%lld 回";
-"%@ in / %@ out · %@ cached" = "受信 %@ / 送信 %@ · キャッシュ %@";
-"%@ in / %@ out" = "受信 %@ / 送信 %@";
+"%@ tokens in / %@ out · %@ cached" = "入力 %@ トークン / 出力 %@ · キャッシュ %@";
+"%@ tokens in / %@ out" = "入力 %@ トークン / 出力 %@";
 "via %@" = "%@ 経由";
 "Opened by %@" = "%@ が開きました";
 "Not allowed" = "許可されていません";

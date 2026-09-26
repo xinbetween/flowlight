@@ -52,7 +52,7 @@
 
 /* Analysis/RuleTemplates.swift */
 "AI agents" = "Agents IA";
-"Ways out" = "Voies de sortie";
+"Ways data leaves" = "Fuite de données";
 "Telemetry and analytics" = "Télémétrie et analyse d'usage";
 "Working hours" = "Heures de travail";
 "One-off investigation" = "Analyse ponctuelle";
@@ -102,10 +102,11 @@
 "Starting…" = "Démarrage…";
 "Could not open database: %@" = "Impossible d'ouvrir la base de données : %@";
 "Reconnecting…" = "Reconnexion…";
+"Trying the filter extension again…" = "Nouvelle tentative avec l'extension de filtrage…";
 "Packet capture access was removed." = "L'accès à la capture de paquets a été retiré.";
 "Access granted. Log out and back in to finish." = "Accès accordé. Fermer puis rouvrir la session pour terminer.";
 "Packet capture is enabled." = "La capture de paquets est activée.";
-"Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again." = "Impossible de joindre l'extension de filtrage — échantillonnage avec nettop à la place. Utiliser Actualiser sous Extension réseau pour réessayer l'extension.";
+"Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter." = "Impossible de joindre l'extension de filtrage — échantillonnage avec nettop à la place. Utiliser Réessayer l'extension sous Filtre de contenu.";
 "This build isn't signed for the Network Extension — sampling with nettop instead." = "Cette version n'est pas signée pour l'extension réseau — échantillonnage avec nettop à la place.";
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS n'a pas démarré le filtre de Flowlight. Il n'exécute qu'un filtre de contenu à la fois, et un autre — un VPN ou un agent de sécurité comme Palo Alto Networks GlobalProtect ou CrowdStrike Falcon — occupe déjà cette place. L'extension ne peut rien capturer sur ce Mac tant que cela ne change pas.";
 "Starting %@…" = "Démarrage de %@…";
@@ -191,6 +192,7 @@
 "Installing…" = "Installation…";
 "Filter enabled" = "Filtre activé";
 "Installed, filter disabled" = "Installé, filtre désactivé";
+"Restart this Mac to finish replacing the filter" = "Redémarrer ce Mac pour terminer le remplacement du filtre";
 "Failed: %@" = "Échec : %@";
 "unknown" = "inconnu";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "Cette version n'est pas signée avec le droit d'accès Extension réseau. Compiler avec scripts/build-signed.sh en utilisant une équipe à laquelle Apple a accordé content-filter-provider-systemextension.";
@@ -452,8 +454,8 @@
 "Instructions (%lld)" = "Instructions (%lld)";
 "%lld call" = "%lld appel";
 "%lld calls" = "%lld appels";
-"%@ in / %@ out · %@ cached" = "%@ en entrée / %@ en sortie · %@ en cache";
-"%@ in / %@ out" = "%@ en entrée / %@ en sortie";
+"%@ tokens in / %@ out · %@ cached" = "%@ tokens en entrée / %@ en sortie · %@ en cache";
+"%@ tokens in / %@ out" = "%@ tokens en entrée / %@ en sortie";
 "via %@" = "via %@";
 "Opened by %@" = "Ouvert par %@";
 "Not allowed" = "Non autorisé";

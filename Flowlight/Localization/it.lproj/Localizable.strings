@@ -52,7 +52,7 @@
 
 /* Analysis/RuleTemplates.swift */
 "AI agents" = "Agenti IA";
-"Ways out" = "Vie d'uscita";
+"Ways data leaves" = "Fuga di dati";
 "Telemetry and analytics" = "Telemetria e analisi";
 "Working hours" = "Orario di lavoro";
 "One-off investigation" = "Indagine una tantum";
@@ -102,10 +102,11 @@
 "Starting…" = "Avvio…";
 "Could not open database: %@" = "Impossibile aprire il database: %@";
 "Reconnecting…" = "Riconnessione…";
+"Trying the filter extension again…" = "Nuovo tentativo con l'estensione filtro…";
 "Packet capture access was removed." = "L'accesso all'acquisizione dei pacchetti è stato revocato.";
 "Access granted. Log out and back in to finish." = "Accesso concesso. Esci e accedi di nuovo per completare.";
 "Packet capture is enabled." = "L'acquisizione dei pacchetti è attiva.";
-"Couldn't reach the filter extension — sampling with nettop instead. Press Refresh under Network Extension to try the extension again." = "Impossibile raggiungere l'estensione filtro: campionamento con nettop. Premi Aggiorna sotto Estensione di rete per riprovare con l'estensione.";
+"Couldn't reach the filter extension — sampling with nettop instead. Press Try the Extension Again under Content filter." = "Impossibile raggiungere l'estensione filtro: campionamento con nettop. Premi Riprova con l'estensione sotto Filtro contenuti.";
 "This build isn't signed for the Network Extension — sampling with nettop instead." = "Questa build non è firmata per l'estensione di rete: campionamento con nettop.";
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS non ha avviato il filtro di Flowlight. Esegue un solo filtro contenuti alla volta e un altro — una VPN o un agente di sicurezza come Palo Alto Networks GlobalProtect o CrowdStrike Falcon — occupa già quel posto. Finché la situazione non cambia, l'estensione non può acquisire nulla su questo Mac.";
 "Starting %@…" = "Avvio di %@…";
@@ -191,6 +192,7 @@
 "Installing…" = "Installazione…";
 "Filter enabled" = "Filtro attivo";
 "Installed, filter disabled" = "Installata, filtro disattivato";
+"Restart this Mac to finish replacing the filter" = "Riavvia questo Mac per completare la sostituzione del filtro";
 "Failed: %@" = "Non riuscita: %@";
 "unknown" = "sconosciuto";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "Questa build non è firmata con l'entitlement Network Extension. Compila con scripts/build-signed.sh usando un team a cui Apple ha concesso content-filter-provider-systemextension.";
@@ -452,8 +454,8 @@
 "Instructions (%lld)" = "Istruzioni (%lld)";
 "%lld call" = "%lld chiamata";
 "%lld calls" = "%lld chiamate";
-"%@ in / %@ out · %@ cached" = "%@ in entrata / %@ in uscita · %@ in cache";
-"%@ in / %@ out" = "%@ in entrata / %@ in uscita";
+"%@ tokens in / %@ out · %@ cached" = "%@ token in ingresso / %@ in uscita · %@ in cache";
+"%@ tokens in / %@ out" = "%@ token in ingresso / %@ in uscita";
 "via %@" = "tramite %@";
 "Opened by %@" = "Aperto da %@";
 "Not allowed" = "Non consentito";

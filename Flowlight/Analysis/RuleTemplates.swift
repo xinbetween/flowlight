@@ -35,7 +35,9 @@ struct RuleTemplate: Identifiable {
         var title: String {
             switch self {
             case .agents: return L("AI agents")
-            case .exfiltration: return L("Ways out")
+            // Not "Ways out": Reports already calls the network channel a way out, and one word for two
+            // different things is a collision every translator has to invent a way around.
+            case .exfiltration: return L("Ways data leaves")
             case .telemetry: return L("Telemetry and analytics")
             case .hours: return L("Working hours")
             case .investigation: return L("One-off investigation")
