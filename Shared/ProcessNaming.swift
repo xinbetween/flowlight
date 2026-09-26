@@ -40,4 +40,12 @@ enum ProcessNaming {
     static func displayName(path: String) -> String {
         displayName(fromPathComponents: path.split(separator: "/").map(String.init))
     }
+
+    /// What to show a person. `claude` is the identity — it keys the allowlist, the guardrails and the history —
+    /// but "Claude Code" is its name, and a table that says `claude` next to `Google Chrome` is telling the
+    /// reader to know which command-line tool is which. Only the label changes; the identifier does not.
+    static func friendlyName(executable name: String) -> String {
+        guard !name.isEmpty else { return name }
+        return AgentCatalog.knownAgent(bundleID: name, appName: name)?.name ?? name
+    }
 }

@@ -82,6 +82,7 @@ final class ProcessResolver: @unchecked Sendable {
         // every update loses the allowlist, the guardrails and the history attached to the old one.
         let derived = ProcessNaming.displayName(fromPathComponents: components.map(String.init))
         let name = derived.isEmpty ? (components.last.map(String.init) ?? fallbackIdentifier ?? "pid \(pid)") : derived
-        return (fallbackIdentifier ?? name, name)
+        // Same split as the sampler: the identifier is the executable, the label is the tool's own name.
+        return (fallbackIdentifier ?? name, ProcessNaming.friendlyName(executable: name))
     }
 }

@@ -211,6 +211,16 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(name("/1.2.3"), "", "nothing nameable leaves the caller to its own fallback")
     }
 
+    /// The executable's name is the identity that rules and history are keyed by; the label is the tool's own
+    /// name, so a table doesn't ask the reader to know that `claude` is Claude Code.
+    func testKnownToolsAreShownByTheirOwnName() {
+        XCTAssertEqual(ProcessNaming.friendlyName(executable: "claude"), "Claude Code")
+        XCTAssertEqual(ProcessNaming.friendlyName(executable: "codex"), "Codex")
+        XCTAssertEqual(ProcessNaming.friendlyName(executable: "gemini"), "Gemini CLI")
+        XCTAssertEqual(ProcessNaming.friendlyName(executable: "curl"), "curl", "anything unrecognised keeps its own name")
+        XCTAssertEqual(ProcessNaming.friendlyName(executable: ""), "")
+    }
+
     func testCompactByteFormat() {
         XCTAssertEqual(ByteFormat.compact(0), "0B")
         XCTAssertEqual(ByteFormat.compact(1_234), "1.2K")
