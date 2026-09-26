@@ -207,7 +207,7 @@ struct CaptureView: View {
         switch extensionManager.state {
         case .enabled: return .green
         case .failed: return .red
-        case .awaitingApproval, .installing: return .orange
+        case .awaitingApproval, .installing, .needsReboot: return .orange
         case .unknown, .notInstalled, .disabled: return .secondary
         }
     }
@@ -218,6 +218,7 @@ struct CaptureView: View {
         case .failed: return "exclamationmark.triangle.fill"
         case .awaitingApproval: return "hourglass"
         case .installing: return "arrow.down.circle"
+        case .needsReboot: return "arrow.clockwise.circle"
         case .unknown: return "questionmark.circle"
         case .notInstalled, .disabled: return "shield.slash"
         }

@@ -8,6 +8,9 @@ import SystemExtensions
 final class ExtensionManager: NSObject, ObservableObject {
     enum State: Equatable {
         case unknown, notInstalled, awaitingApproval, installing, enabled, disabled, failed(String)
+        /// macOS accepted the replacement but will not perform it until the Mac restarts. Nothing the app does
+        /// changes that: the extension's lifecycle belongs to the system, not to this process.
+        case needsReboot
         var label: String {
             switch self {
             case .unknown: return L("Unknown")
@@ -16,6 +19,7 @@ final class ExtensionManager: NSObject, ObservableObject {
             case .installing: return L("Installing…")
             case .enabled: return L("Filter enabled")
             case .disabled: return L("Installed, filter disabled")
+            case .needsReboot: return L("Restart this Mac to finish replacing the filter")
             case .failed(let m): return L("Failed: %@", m)
             }
         }
@@ -193,6 +197,11 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // Treating the two alike switched the filter on off the back of a background lookup, and did it
             // before the replacement it had just asked for was anywhere near installed.
             if self.versionCheck === request { self.finishVersionCheck(); return }
+            // macOS can accept a replacement and then hold it until the Mac restarts — usually because the
+            // extension it is replacing is still running. Until then the old build keeps answering and the new
+            // app cannot talk to it, so redialling, reinstalling and relaunching all fail the same way. Saying
+            // so is the only useful thing left; the sampler keeps capturing in the meantime.
+            if result == .willCompleteAfterReboot { self.state = .needsReboot; return }
             if self.state == .installing || self.state == .awaitingApproval { self.setFilterEnabled(true) }
             else { self.refresh() }
         }
