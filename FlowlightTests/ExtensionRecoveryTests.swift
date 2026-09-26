@@ -165,3 +165,21 @@ final class ExtensionVersionTests: XCTestCase {
         XCTAssertEqual(ExtensionVersion.compare("0.5.0/8", "0.5.0"), .orderedSame)
     }
 }
+
+/// What the app does with the menu bar when it is meant to run in the background.
+extension ExtensionRecoveryTests {
+
+    func testARepairBringsTheLadderBackEvenAfterItGaveUp() {
+        // The shape an upgrade leaves behind: the extension is stale, every redial fails, the app falls back to
+        // the sampler — and only then does macOS report the version mismatch it is already fixing.
+        var recovery = ExtensionRecovery()
+        var lastStep: ExtensionRecovery.Step = .redial(after: 0)
+        for _ in 0..<40 { lastStep = recovery.next() }
+        XCTAssertEqual(lastStep, .fallBack, "the ladder should have run out before the repair")
+
+        recovery.repairStarted()
+        if case .fallBack = recovery.next() {
+            XCTFail("a repair in flight is a reason to try again, not to stay on the sampler")
+        }
+    }
+}

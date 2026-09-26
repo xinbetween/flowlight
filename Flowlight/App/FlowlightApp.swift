@@ -6,12 +6,25 @@ struct FlowlightApp: App {
     static let runningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
 
-    /// `.accessory` drops the Dock icon and the Cmd-Tab entry while leaving the menu bar and every window
-    /// working, so it can be turned on and off without relaunching.
+    /// `.accessory` drops the Dock icon and the Cmd-Tab entry, which is the point of running in the background.
+    /// What it also drops is the menu bar: an accessory app never becomes the active application, so bringing a
+    /// window forward left another app's name next to the Apple logo and Flowlight's own menus unreachable.
+    ///
+    /// So the policy follows the windows rather than the setting alone. While a window is open the app is
+    /// `.regular` and owns the menu bar; once the last one closes it goes back to `.accessory` and leaves only
+    /// the menu bar item behind.
     private static func applyActivationPolicy(backgroundOnly: Bool) {
         guard !runningTests else { return }
-        NSApp.setActivationPolicy(backgroundOnly ? .accessory : .regular)
-        if !backgroundOnly { NSApp.activate() }
+        let hasWindow = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+        NSApp.setActivationPolicy(backgroundOnly && !hasWindow ? .accessory : .regular)
+        if !backgroundOnly || hasWindow { NSApp.activate() }
+    }
+
+    /// Re-applies the policy after windows open or close, since the answer depends on how many are left.
+    static func windowsChanged() {
+        DispatchQueue.main.async {
+            applyActivationPolicy(backgroundOnly: UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly))
+        }
     }
 
     @StateObject private var monitor = TrafficMonitor()
@@ -37,11 +50,16 @@ struct FlowlightApp: App {
                     monitor.start()
                     monitor.applyFocus(focus.scope)
                     extensionManager.refresh()
-                    extensionManager.matchExtensionToApp()
+                    extensionManager.matchExtensionToApp { check in
+                        guard check.repairing else { return }
+                        Task { @MainActor in monitor.extensionVersionRepairing(check) }
+                    }
                     updater.start()
                 }
                 .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
                 .onChange(of: backgroundOnly, initial: true) { _, on in Self.applyActivationPolicy(backgroundOnly: on) }
+                .onAppear { Self.windowsChanged() }
+                .onDisappear { Self.windowsChanged() }
         }
         .windowToolbarStyle(.unified)
         .commands {

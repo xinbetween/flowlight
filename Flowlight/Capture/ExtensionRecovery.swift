@@ -73,10 +73,16 @@ struct ExtensionRecovery {
     }
 
     /// A stale extension is being replaced. That is a real fix in flight rather than another blind redial, so
-    /// the attempts it took to get here are given back and the next one is as patient as the first.
+    /// everything the failed attempts cost is given back — including having given up.
+    ///
+    /// Giving up is there to stop a flapping connection retrying forever, and a version repair can't flap: it
+    /// happens at most once per session. Refusing to reconsider after one left an upgraded app stuck on the
+    /// sampler saying the extension didn't answer, while macOS was in the middle of replacing the extension it
+    /// was asking for.
     mutating func repairStarted() {
-        guard !gaveUp else { return }
         attempts = 0
+        totalAttempts = 0
+        gaveUp = false
     }
 
     /// What the status line says while a step is pending. It names the delay and how far along the ladder this

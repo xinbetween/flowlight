@@ -347,6 +347,22 @@ final class TrafficMonitor: ObservableObject {
     ///
     /// Asked for once per source, by the ladder in `ExtensionRecovery`, because it can end in a System Settings
     /// prompt. A matching version costs nothing and changes nothing.
+    /// macOS found the installed extension is a different version from this app — which is what an upgrade
+    /// always leaves behind for a moment. Replacing it takes longer than the redial ladder's patience, so the
+    /// ladder is reset and the status says what is happening rather than reporting silence.
+    func extensionVersionRepairing(_ check: ExtensionManager.VersionCheck) {
+        status = "The installed filter extension is \(check.installedDescription) and this app is "
+            + "\(check.appVersion) — macOS is replacing it. Capture resumes once it has."
+        if let extensionSource = source as? ExtensionTrafficSource {
+            extensionSource.versionRepairStarted()
+        } else if mode == .networkExtension, extensionFellBack {
+            // Already on the sampler because the stale extension never answered. The repair is the answer, so
+            // go back to the extension rather than leaving someone to find Refresh on the Capture screen.
+            extensionFellBack = false
+            startSource()
+        }
+    }
+
     private func repairExtensionVersion() {
         guard let manager = ExtensionManager.current else { return }
         manager.matchExtensionToApp { [weak self] check in
