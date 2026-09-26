@@ -268,25 +268,33 @@ git -C "$(brew --repository xinbetween/tap)" push          # publishes it
 
 ## Release branches
 
-The website is served from `docs/` on `main`, and its Download button points at
-`releases/latest/download/Flowlight.dmg`. A `main` that carries the new version therefore announces a release
-that cannot be downloaded yet — for however long signing and notarization take. `docs/` also has to match
-`site/` in the same commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump
-and the rebuilt site cannot be separated. The way out is to keep both off `main` until the release exists:
+`main` is what has shipped. Work happens on a feature branch, lands on the release branch, and reaches `main`
+only when the release is published.
 
-Every release goes **branch → merge request → release → merge**, in that order:
+The reason is the website. It is served from `docs/` on `main`, and its Download button points at
+`releases/latest/download/Flowlight.dmg` — so a `main` carrying the new version announces a release that
+cannot be downloaded until signing and notarization finish. `docs/` also has to match `site/` in the same
+commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump and the rebuilt site
+cannot be separated. Keeping both off `main` until the release exists is what the branch is for.
+
+Every release goes **branch → merge request → release → merge**:
 
 ```sh
-git switch -c release/0.8.0                       # version bump, release notes and rebuilt docs/, one commit
-git push -u origin release/0.8.0
-gh pr create --base main --title "Flowlight 0.8.0"   # its checks run while the release builds
+git switch -c feature/relaunch-through-proxy main   # start from main
+git rebase main                                     # keep it current — rebase, never merge main in
 
-git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0   # release.yml signs, notarizes, publishes
-gh pr merge --merge --delete-branch                                 # last: the site now catches up
+git switch -c release/0.8.0 main
+git merge --ff-only feature/relaunch-through-proxy  # features land on the release branch
+# last commit: version bump, release notes in site/pages/releases.html, rebuilt docs/
+
+git push -u origin release/0.8.0
+gh pr create --base main --title "Flowlight 0.8.0"  # checks run while the release builds
+git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0
+gh pr merge --merge --delete-branch                 # last: main and the site catch up
 ```
 
-The merge request comes before the tag so the branch is reviewed and its checks are green before anything is
-signed, and the merge comes after the release so the site never announces a download that doesn't exist.
+The merge request comes before the tag so the release's whole diff is reviewed and green before anything is
+signed; the merge comes after the release so the site can only ever describe something downloadable.
 
 A tag push starts `release.yml` on its own. To dry-run first — build, sign, notarize and verify without
 publishing — cancel that run and dispatch it explicitly, then dispatch again without the flag:
@@ -296,10 +304,6 @@ gh run cancel <id>
 gh workflow run Release --ref v0.8.0 -f dry_run=true
 gh workflow run Release --ref v0.8.0
 ```
-
-`release.yml` triggers on the tag, not the branch, so nothing else has to change. CI enforces the ordering:
-on `main` it fails when the newest version on the releases page is ahead of the newest published release. The
-check does not run on a release branch, which is what lets the branch carry the future version.
 
 ## Releasing from CI
 
