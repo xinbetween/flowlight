@@ -27,6 +27,9 @@ struct AgentsView: View {
     @State private var toolActivity: [String: [ToolActivity]] = [:]
     @State private var mcpServers: [String: [MCPServerSummary]] = [:]
     @State private var profiles: [String: AgentProfile] = [:]
+    /// Agents Flowlight actually decrypted something from in this window — not the same question as
+    /// whether inspection is on, since an agent has to be routed through the proxy to be seen at all.
+    @State private var inspectedAgents: Set<String> = []
     @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
     @State private var selection: AgentSummary.ID?
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
@@ -71,7 +74,7 @@ struct AgentsView: View {
                 if let selected {
                     AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
                                 activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
-                                profile: profiles[selected.bundleID],
+                                profile: profiles[selected.bundleID], inspected: inspectedAgents.contains(selected.bundleID),
                                 workspaces: workspaceStore.workspaces(bundleID: selected.bundleID, name: selected.name),
                                 policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
                         policies[policy.agentID] = policy
@@ -167,6 +170,7 @@ struct AgentsView: View {
             .mapValues { Array(Set($0.map(\.mcpServer))) }
         mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
         profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
+        inspectedAgents = Set(exchanges.compactMap(\.agent))
         let built = AgentsModel.build(rows: rows, alerts: alerts)
         agents = built
         let ids = Set(built.map(\.bundleID))
@@ -365,6 +369,8 @@ struct AgentDetail: View {
     var activity: [ToolActivity] = []
     var servers: [MCPServerSummary] = []
     var profile: AgentProfile?
+    /// True when at least one of this agent's requests was decrypted in this window.
+    var inspected = false
     var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
     var save: (AgentPolicy) -> Void
@@ -476,7 +482,10 @@ struct AgentDetail: View {
                             }
                         }
                     case .calls:
-                        if activity.isEmpty { InspectionHint(agent: agent.name, what: "the tool calls its model asks for") }
+                        if activity.isEmpty {
+                            InspectionHint(inspection: monitor.inspection, agent: agent.name,
+                                           what: "the tool calls its model asks for", subject: "tool calls", seen: inspected)
+                        }
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 8) {
                                 ForEach(activity.prefix(300)) { ToolActivityRow(activity: $0) }
@@ -521,7 +530,9 @@ struct AgentDetail: View {
                             LazyVStack(alignment: .leading, spacing: 10) {
                                 if servers.isEmpty && unusedServers.isEmpty {
                                     AgentSetupBar(agent: agent.name)
-                                    InspectionHint(agent: agent.name, what: "the MCP servers it calls over the network")
+                                    InspectionHint(inspection: monitor.inspection, agent: agent.name,
+                                                   what: "the MCP servers it calls over the network",
+                                                   subject: "MCP servers reached over the network", seen: inspected)
                                 }
                                 ForEach(servers) { MCPServerRow(server: $0) }
                                 ForEach(unusedServers, id: \.server.name) { entry in
@@ -988,19 +999,46 @@ enum Help {
     static let issues = URL(string: "https://github.com/xinbetween/flowlight/issues")!
 }
 
-/// Shown where inspected data would be, when HTTPS inspection is off.
+/// Shown where inspected data would be, saying which of the three reasons there is nothing to show.
+///
+/// Telling someone to turn on a setting they already turned on is worse than saying nothing: it reads as the app
+/// not knowing its own state, and it hides the step that would actually help. Inspection being on is not enough —
+/// a command-line agent only goes through the proxy once its own shell has been pointed at it.
 struct InspectionHint: View {
+    @ObservedObject var inspection: InspectionController
     let agent: String
+    /// The long form, for the "inspection is off" sentence: "the tool calls its model asks for".
     let what: String
+    /// The short noun, for the other two: "tool calls".
+    let subject: String
+    /// Whether anything of this agent's has actually been decrypted in this window.
+    var seen: Bool = false
     @EnvironmentObject private var nav: AppNavigation
+
+    private var inspecting: Bool { inspection.enabled && inspection.running }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Flowlight sees \(agent)'s connections, but not what's inside them. Turn on HTTPS inspection to see \(what).")
+            Text(message)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button("Set up HTTPS inspection") { nav.selection = .inspect }
-                .controlSize(.small)
+            if !inspecting {
+                Button(L("Set up HTTPS inspection")) { nav.selection = .inspect }
+                    .controlSize(.small)
+            } else if !seen {
+                Button("Route \(agent) Through the Proxy") { nav.selection = .inspect }
+                    .controlSize(.small)
+            }
         }
         .padding(.bottom, 4)
+    }
+
+    private var message: String {
+        if !inspecting {
+            return "Flowlight sees \(agent)'s connections, but not what's inside them. Turn on HTTPS inspection to see \(what)."
+        }
+        if !seen {
+            return "HTTPS inspection is on, but nothing of \(agent)'s has gone through it in this window. A command-line agent has to be started with the proxy set in its own shell — Inspect › Open Inspected Terminal."
+        }
+        return "No \(subject) in this window. Flowlight is decrypting \(agent)'s traffic; its model just hasn't asked for any."
     }
 }

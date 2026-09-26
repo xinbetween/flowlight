@@ -6,8 +6,6 @@ import Foundation
 final class ProcessLookup: @unchecked Sendable {
     struct Info { var bundleID: String; var name: String; var path: String }
 
-    private static let genericDirectories: Set<String> = ["bin", "sbin", "libexec", "versions", "current", "latest", "lib", "share", "local", "macos"]
-
     /// Reads the exec path from `KERN_PROCARGS2` (layout: argc, exec path, NUL padding, argv…).
     static func execPathFromArguments(pid: Int32) -> String? {
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
@@ -20,17 +18,6 @@ final class ProcessLookup: @unchecked Sendable {
         return String(decoding: bytes[start..<end], as: UTF8.self)
     }
 
-    /// Picks a readable name for a bare executable. Versioned installs such as
-    /// `~/.local/share/claude/versions/2.1.0` are named after the tool (`claude`), not the version.
-    static func displayName(fromPathComponents components: [String]) -> String {
-        for component in components.reversed() {
-            let lower = component.lowercased()
-            if component.contains(where: \.isLetter), !genericDirectories.contains(lower), !lower.hasPrefix(".") {
-                return component
-            }
-        }
-        return ""
-    }
     private var cache: [Int32: (info: Info, at: Date)] = [:]
     private let lock = NSLock()
 
@@ -53,7 +40,7 @@ final class ProcessLookup: @unchecked Sendable {
         } else if let app = NSRunningApplication(processIdentifier: pid), let id = app.bundleIdentifier {
             info = Info(bundleID: id, name: app.localizedName ?? id, path: path)
         } else {
-            var name = Self.displayName(fromPathComponents: components.map(String.init))
+            var name = ProcessNaming.displayName(fromPathComponents: components.map(String.init))
             if name.isEmpty {
                 var nameBuf = [CChar](repeating: 0, count: 256)
                 proc_name(pid, &nameBuf, UInt32(nameBuf.count))

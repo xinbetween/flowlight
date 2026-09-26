@@ -194,10 +194,21 @@ final class ParserTests: XCTestCase {
     }
 
     func testProcessDisplayName() {
-        func name(_ path: String) -> String { ProcessLookup.displayName(fromPathComponents: path.split(separator: "/").map(String.init)) }
+        func name(_ path: String) -> String { ProcessNaming.displayName(path: path) }
         XCTAssertEqual(name("/Users/x/.local/share/claude/versions/2.1.275"), "claude")
         XCTAssertEqual(name("/usr/libexec/rapportd"), "rapportd")
         XCTAssertEqual(name("/opt/homebrew/Cellar/node/22.1.0/bin/node"), "node")
+    }
+
+    /// Both capture engines name processes through `ProcessNaming`, so an agent can't appear twice — once as
+    /// `claude` from the sampler and once as `2.1.283` from the extension — with its history split between them.
+    func testVersionedInstallsAreNamedAfterTheTool() {
+        func name(_ path: String) -> String { ProcessNaming.displayName(path: path) }
+        XCTAssertEqual(name("/Users/x/.local/share/claude/versions/2.1.283"), "claude")
+        XCTAssertEqual(name("/Users/x/.local/share/claude/versions/v2.1.283"), "claude")
+        XCTAssertEqual(name("/usr/bin/curl"), "curl")
+        XCTAssertEqual(name("/Users/x/.nvm/versions/node/v20.11.0/bin/node"), "node")
+        XCTAssertEqual(name("/1.2.3"), "", "nothing nameable leaves the caller to its own fallback")
     }
 
     func testCompactByteFormat() {

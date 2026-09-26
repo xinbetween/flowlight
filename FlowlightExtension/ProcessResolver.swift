@@ -77,7 +77,11 @@ final class ProcessResolver: @unchecked Sendable {
             if let bundle = Bundle(path: appPath), let id = bundle.bundleIdentifier { return (id, name) }
             return (fallbackIdentifier ?? name, name)
         }
-        let name = components.last.map(String.init) ?? fallbackIdentifier ?? "pid \(pid)"
+        // Not the filename: an installer that keeps one executable per release (Claude Code's
+        // `~/.local/share/claude/versions/2.1.283`) would name the agent after its version, and a new identity
+        // every update loses the allowlist, the guardrails and the history attached to the old one.
+        let derived = ProcessNaming.displayName(fromPathComponents: components.map(String.init))
+        let name = derived.isEmpty ? (components.last.map(String.init) ?? fallbackIdentifier ?? "pid \(pid)") : derived
         return (fallbackIdentifier ?? name, name)
     }
 }
