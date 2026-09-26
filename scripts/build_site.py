@@ -257,8 +257,13 @@ def picker(langs, table, current, targets):
         else:
             items.append(f'<a href="{targets[lang]}" hreflang="{code}" lang="{code}">{name}</a>')
     here_name = table[current].get("lang.name", current)
+    # A chevron rather than the disclosure marker browsers draw: it has to read as one more item in the nav.
+    chevron = ('<svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true">'
+               '<path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" '
+               'stroke-linecap="round" stroke-linejoin="round"/></svg>')
     return (f'<details class="lang">\n'
-            f'      <summary aria-label="{label}" title="{label}">{GLOBE}<span class="lang-name">{here_name}</span></summary>\n'
+            f'      <summary aria-label="{label}" title="{label}">{GLOBE}'
+            f'<span class="lang-name">{here_name}</span>{chevron}</summary>\n'
             f'      <div class="lang-menu">{"".join(items)}</div>\n'
             f'    </details>')
 

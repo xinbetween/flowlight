@@ -304,6 +304,7 @@
     .btn { transition: none; }
     .reveal { opacity: 1; transform: none; transition: none; }
     .fact, .view-card, .rule, details { transition: none; }
+    .lang-chevron { transition: none; }
     .fact:hover, .view-card:hover, .rule:hover { transform: none; }
   }
 
@@ -460,11 +461,17 @@
   /* A menu, not a <select>: it has to work before JavaScript does, and every entry is a real link so that a
      reader can open one in a new tab, and a crawler can follow it. */
   .lang { position: relative; font-size: 14px; color: var(--muted); }
-  .lang > summary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; list-style: none;
-                    padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  /* Weighted like a nav link, not like the Download button: the row already has one thing asking to be clicked.
+     Three rules to drop the disclosure triangle, because browsers disagree about which one they honour. */
+  .lang > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
+                    padding: 0; border: 0; background: none; color: inherit; }
   .lang > summary::-webkit-details-marker { display: none; }
+  .lang > summary::marker { content: ""; }
   .lang > summary:hover { color: var(--ink); }
-  .lang > summary svg { width: 16px; height: 16px; flex: none; }
+  .lang > summary svg { width: 15px; height: 15px; flex: none; }
+  .lang-chevron { width: 11px; height: 11px; opacity: .7; transition: transform .15s ease; }
+  .lang[open] > summary { color: var(--ink); }
+  .lang[open] .lang-chevron { transform: rotate(180deg); }
   .lang-menu {
     position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; display: grid; gap: 1px; min-width: 170px;
     padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow);
@@ -475,6 +482,5 @@
 
   @media (max-width: 760px) {
     /* On a phone the row is brand, globe, Download — the language's own name is what the globe already says. */
-    .lang-name { display: none; }
-    .lang > summary { padding: 7px 8px; }
+    .lang-name, .lang-chevron { display: none; }
   }
