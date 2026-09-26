@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.7.9, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.7.10, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.7.9macOS 15+UniversalGPL-3.0No telemetry
+ v0.7.10macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,24 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.7.9
+ 0.7.10
 September 26, 2026Latest
+
+ Two words that were doing two jobs each. A rule-template category and a Reports
+ filter were both called "way out", which in Traditional Chinese had collapsed to the same word; the
+ category is now "Ways data leaves". And an agent's token counts were written like traffic, so German
+ and Japanese had translated them as received and sent — they say tokens now, and read differently
+ from the byte counts beside them.
+
+ Ten languages, up to date. The three strings 0.7.9 added mid-round — the retry
+ status line, the fallback banner and the restart-required state — are translated rather than falling
+ back to English. In Simplified Chinese the "Try the Extension Again" button had been named after the
+ network extension while sitting under the content filter; both now agree.
+
+ Downloads and checksums →
+
+ 0.7.9
+September 26, 2026
 
  Flowlight comes back from its own update. macOS keeps running the extension build
  it installed, so for a while after an upgrade the filter on disk is the previous version and the new
