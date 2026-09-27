@@ -70,6 +70,7 @@
 "Rules" = "Règles";
 "Ask" = "Demander";
 "Devices" = "Appareils";
+"Coverage" = "Couverture";
 "Inspect" = "Inspecter";
 "Capture" = "Capture";
 "Traffic" = "Trafic";
@@ -181,6 +182,7 @@
 "The provider returned HTTP %lld. %@" = "Le fournisseur a renvoyé HTTP %lld. %@";
 "The provider's answer wasn't in a shape Flowlight could read." = "La réponse du fournisseur n'avait pas une forme que Flowlight puisse lire.";
 "No endpoint is set for %@." = "Aucun point de terminaison n'est défini pour %@.";
+"%@ is not an https:// address. A key and your question would cross the network in the clear, so Flowlight won't send them." = "%@ n'est pas une adresse https://. Une clé et votre question traverseraient le réseau en clair : Flowlight ne les envoie pas.";
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@ nécessite une clé API. En ajouter une dans Réglages — elle est conservée dans votre trousseau de session.";
 "The on-device model isn't reached over HTTP." = "Le modèle sur l'appareil n'est pas joint via HTTP.";
 "I ran out of steps before I could answer that. Try asking something narrower." = "Le nombre d'étapes disponibles a été épuisé avant d'obtenir une réponse. Essayer une question plus précise.";
@@ -674,6 +676,30 @@
 "Help" = "Aide";
 "Error" = "Erreur";
 "OK" = "OK";
+
+/* UI/CoverageView.swift */
+"Nothing recorded yet" = "Rien d'enregistré pour l'instant";
+"Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "La couverture est calculée à partir du trafic que Flowlight a déjà enregistré. Le laisser tourner un moment.";
+"%@ of traffic fully accounted for" = "%@ du trafic entièrement pris en compte";
+"How much of this Mac is covered" = "Quelle part de ce Mac est couverte";
+"HTTPS inspection is on" = "L'inspection HTTPS est activée";
+"HTTPS inspection is off" = "L'inspection HTTPS est désactivée";
+"What an app sent is readable only where the app was routed through the proxy. Anything else is counted and named, but its contents were never offered to Flowlight." = "Ce qu'une app a envoyé n'est lisible que là où l'app est passée par le proxy. Tout le reste est compté et nommé, mais son contenu n'a jamais été proposé à Flowlight.";
+"Flowlight sees which connections were made and where to, but not what was inside them. Nothing is decrypted until you turn inspection on." = "Flowlight voit quelles connexions ont été établies et vers où, mais pas ce qu'elles contenaient. Rien n'est déchiffré tant que vous n'activez pas l'inspection.";
+"What no engine can see" = "Ce qu'aucun moteur ne peut voir";
+"Traffic from before capture started, system services that content filters are never shown, apps that pin their certificates, QUIC the proxy is never offered, and an agent's local MCP server talking over a pipe. None of these appear anywhere in Flowlight, so they are absent from these figures too." = "Le trafic antérieur au démarrage de la capture, les services système qui ne sont jamais présentés aux filtres de contenu, les apps qui épinglent leurs certificats, le QUIC qui n'est jamais proposé au proxy, et le serveur MCP local d'un agent qui communique par un tube. Rien de tout cela n'apparaît où que ce soit dans Flowlight, et manque donc aussi dans ces chiffres.";
+"Sampling with nettop, not the filter" = "Échantillonnage avec nettop, pas avec le filtre";
+"The filter sees connections as they open" = "Le filtre voit les connexions à leur ouverture";
+"Every eligible TCP and UDP flow is attributed as it opens, including connections too short for a sampler to catch." = "Chaque flux TCP et UDP éligible est attribué à son ouverture, y compris les connexions trop brèves pour qu'un échantillonneur les saisisse.";
+"The filter isn't answering, so these figures come from the sampler: a connection that opens and closes between two readings is missing entirely, and no percentage below can show it." = "Le filtre ne répond pas, ces chiffres viennent donc de l'échantillonneur : une connexion qui s'ouvre et se ferme entre deux relevés manque entièrement, et aucun pourcentage ci-dessous ne peut la montrer.";
+"Byte counts are exact, but a connection that opens and closes between two readings is never recorded — a quick DNS lookup, a fast API call, a script that runs curl and exits. Only the filter sees those." = "Les décomptes d'octets sont exacts, mais une connexion qui s'ouvre et se ferme entre deux relevés n'est jamais enregistrée — une recherche DNS rapide, un appel d'API bref, un script qui lance curl et se termine. Seul le filtre les voit.";
+"By app" = "Par app";
+"Share of this app's bytes whose destination has a hostname rather than a bare address." = "Part des octets de cette app dont la destination porte un nom d'hôte plutôt qu'une simple adresse.";
+"%@ of its bytes went to addresses with no hostname" = "%@ de ses octets sont allés vers des adresses sans nom d'hôte";
+"nothing of its traffic reached the proxy, so no contents were read" = "rien de son trafic n'a atteint le proxy, aucun contenu n'a donc été lu";
+"it is on the Never decrypted list, so its contents are deliberately not read" = "elle est sur la liste Jamais déchiffré, son contenu n'est donc délibérément pas lu";
+"short connections may be missing entirely" = "des connexions brèves peuvent manquer entièrement";
+"Seen as it happened, named, and readable." = "Vu au moment où cela s'est produit, nommé et lisible.";
 
 /* UI/DevicesView.swift */
 "USB" = "USB";

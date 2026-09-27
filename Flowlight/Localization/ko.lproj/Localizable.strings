@@ -70,6 +70,7 @@
 "Rules" = "규칙";
 "Ask" = "질문";
 "Devices" = "기기";
+"Coverage" = "포착 범위";
 "Inspect" = "검사";
 "Capture" = "캡처";
 "Traffic" = "트래픽";
@@ -181,6 +182,7 @@
 "The provider returned HTTP %lld. %@" = "제공업체 응답: HTTP %lld. %@";
 "The provider's answer wasn't in a shape Flowlight could read." = "제공업체의 응답이 Flowlight가 읽을 수 있는 형식이 아닙니다.";
 "No endpoint is set for %@." = "%@의 엔드포인트가 설정되지 않았습니다.";
+"%@ is not an https:// address. A key and your question would cross the network in the clear, so Flowlight won't send them." = "%@는 https:// 주소가 아닙니다. 키와 질문이 평문으로 네트워크를 지나가게 되므로 Flowlight는 보내지 않습니다.";
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@에는 API 키가 필요합니다. 설정에서 추가하세요. 키는 로그인 키체인에 저장됩니다.";
 "The on-device model isn't reached over HTTP." = "온디바이스 모델은 HTTP로 연결하지 않습니다.";
 "I ran out of steps before I could answer that. Try asking something narrower." = "답을 내기 전에 단계 한도에 도달했습니다. 좀 더 좁혀서 질문해 보세요.";
@@ -674,6 +676,30 @@
 "Help" = "도움말";
 "Error" = "오류";
 "OK" = "확인";
+
+/* UI/CoverageView.swift */
+"Nothing recorded yet" = "아직 기록된 것이 없습니다";
+"Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "포착 범위는 Flowlight가 이미 기록한 트래픽으로 계산합니다. 잠시 그대로 실행해 두세요.";
+"%@ of traffic fully accounted for" = "트래픽의 %@를 완전히 파악";
+"How much of this Mac is covered" = "이 Mac을 어디까지 포착하고 있는지";
+"HTTPS inspection is on" = "HTTPS 검사가 켜져 있습니다";
+"HTTPS inspection is off" = "HTTPS 검사가 꺼져 있습니다";
+"What an app sent is readable only where the app was routed through the proxy. Anything else is counted and named, but its contents were never offered to Flowlight." = "앱이 보낸 내용은 그 앱이 프록시를 거친 부분에서만 읽을 수 있습니다. 그 밖의 것은 집계되고 이름도 붙지만, 내용이 Flowlight에 전달된 적은 없습니다.";
+"Flowlight sees which connections were made and where to, but not what was inside them. Nothing is decrypted until you turn inspection on." = "Flowlight는 어떤 연결이 어디로 이뤄졌는지는 보지만, 그 안에 무엇이 있었는지는 보지 못합니다. 검사를 켜기 전까지는 아무것도 복호화하지 않습니다.";
+"What no engine can see" = "어떤 엔진도 볼 수 없는 것";
+"Traffic from before capture started, system services that content filters are never shown, apps that pin their certificates, QUIC the proxy is never offered, and an agent's local MCP server talking over a pipe. None of these appear anywhere in Flowlight, so they are absent from these figures too." = "캡처를 시작하기 전의 트래픽, 콘텐츠 필터에는 한 번도 보이지 않는 시스템 서비스, 인증서를 고정하는 앱, 프록시에 한 번도 넘겨지지 않는 QUIC, 그리고 파이프로 통신하는 에이전트의 로컬 MCP 서버입니다. 이런 것들은 Flowlight 어디에도 나타나지 않으므로 이 수치에도 빠져 있습니다.";
+"Sampling with nettop, not the filter" = "필터가 아니라 nettop으로 샘플링 중";
+"The filter sees connections as they open" = "필터가 연결이 열리는 순간을 포착합니다";
+"Every eligible TCP and UDP flow is attributed as it opens, including connections too short for a sampler to catch." = "대상이 되는 TCP·UDP 흐름은 열리는 순간 모두 앱에 귀속됩니다. 샘플러가 잡기에는 너무 짧은 연결도 포함합니다.";
+"The filter isn't answering, so these figures come from the sampler: a connection that opens and closes between two readings is missing entirely, and no percentage below can show it." = "필터가 응답하지 않아 이 수치는 샘플러에서 나온 것입니다. 두 번의 읽기 사이에 열리고 닫히는 연결은 통째로 빠지며, 아래의 어떤 비율로도 드러나지 않습니다.";
+"Byte counts are exact, but a connection that opens and closes between two readings is never recorded — a quick DNS lookup, a fast API call, a script that runs curl and exits. Only the filter sees those." = "바이트 수는 정확하지만, 두 번의 읽기 사이에 열리고 닫히는 연결은 전혀 기록되지 않습니다. 짧은 DNS 조회, 빠른 API 호출, curl을 실행하고 끝나는 스크립트 같은 것입니다. 그런 것은 필터만 봅니다.";
+"By app" = "앱별";
+"Share of this app's bytes whose destination has a hostname rather than a bare address." = "이 앱의 바이트 중 목적지에 호스트 이름이 있었던(맨 주소가 아니었던) 비율입니다.";
+"%@ of its bytes went to addresses with no hostname" = "바이트의 %@가 호스트 이름이 없는 주소로 갔습니다";
+"nothing of its traffic reached the proxy, so no contents were read" = "트래픽이 프록시에 전혀 닿지 않아 내용을 읽지 못했습니다";
+"it is on the Never decrypted list, so its contents are deliberately not read" = "복호화하지 않을 대상 목록에 있어 내용을 일부러 읽지 않습니다";
+"short connections may be missing entirely" = "짧은 연결이 통째로 빠져 있을 수 있습니다";
+"Seen as it happened, named, and readable." = "일어난 순간에 포착되고, 이름이 붙고, 내용도 읽혔습니다.";
 
 /* UI/DevicesView.swift */
 "USB" = "USB";
