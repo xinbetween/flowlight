@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 隐私说明", "item": "https://flowlight.xinbetween.com/zh-Hans/privacy/"}]}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../../zh-Hans/#agents">AI 代理</a>
       <a href="../../zh-Hans/docs/">文档</a>
       <a href="../../zh-Hans/privacy/" aria-current="page">隐私</a>
+      <a href="../../zh-Hans/threat-model/">威胁模型</a>
       <a href="../../releases/">版本</a>
       <a href="../../zh-Hans/about/">关于</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -101,7 +100,8 @@
       <p>默认关闭。如果你打开它，Flowlight 会在你的 Mac 上创建一个证书颁发机构（它的私钥绝不离开
         <code>~/Library/Application Support/Flowlight/Inspection</code>），并运行一个只接受来自本机连接的代理。对于你
         交给它转发的应用，它会把请求和响应（含最多 2 MB 的正文）记录在本地数据库里，保留 3 天。凭据标头
-        （Authorization、cookie、API 密钥）在任何内容被存储之前，都会被替换为它们的长度。Flowlight 会把内置的 Apple 服务和密码管理器名单排除在解密之外。记录下来的检查数据不会被 Flowlight 上传。关掉检查会停止代理；<strong>移除证书与记录的
+        在任何内容被存储之前，都会被替换为它们的长度——按名称（Authorization、cookie、API 密钥）、也按名称中的词来辨认，所以
+        <code>X-Access-Key</code> 同样会被抓到。那是一种启发式判断，不是保证：一个把密钥放在没人认得的名字底下的标头，会被记录下来。Flowlight 会把内置的 Apple 服务和密码管理器名单排除在解密之外。记录下来的检查数据不会被 Flowlight 上传。关掉检查会停止代理；<strong>移除证书与记录的
         数据</strong>会删除证书、它的信任设置以及每一条已记录的请求。</p>
 
       <h2 id="requests">应用发出的网络请求</h2>
@@ -109,7 +109,7 @@
         <tr><th>请求</th><th>发往</th><th>包含什么</th><th>什么时候</th></tr>
         <tr><td>更新检查</td><td><code>api.github.com</code></td><td>一个查询最新版本的标准 HTTPS 请求；GitHub 会看到你的 IP 地址和 <code>Flowlight/&lt;version&gt;</code> 这个 User-Agent 标识</td><td>启动时以及每天一次，自 0.1.2 起。关闭开关在设置 › 通用</td></tr>
         <tr><td>更新下载</td><td><code>github.com</code></td><td>磁盘映像及其校验和文件</td><td>只在你点击“下载并打开”时</td></tr>
-        <tr><td>反向 DNS</td><td>你配置的 DNS 解析器</td><td>在没有看到主机名时，查询某个 IP 地址登记的名称</td><td>按需进行，在默认捕获模式下</td></tr>
+        <tr><td>反向 DNS</td><td>你配置的 DNS 解析器</td><td>在没有看到主机名时，查询某个 IP 地址登记的名称</td><td>按需进行，在采样器捕获模式下，也就是网络扩展开始运行之前的默认模式。没有关闭开关：没有它，采样器就没法给大多数连接命名。网络扩展从流量本身给它们命名，因此不做这件事</td></tr>
         <tr><td>网络所有者查询</td><td>Team Cymru，通过 DNS</td><td>没有已知主机名的公网 IP 地址。私有地址和保留地址绝不离开你的 Mac</td><td>默认开启。关闭开关在捕获 › 识别网络所有者</td></tr>
         <tr><td>用托管模型提问</td><td>你选择的提供方：Anthropic、OpenAI、Google Gemini 或兼容的端点</td><td>你的问题，以及模型选中的那些只读 Flowlight 查询所返回的结果。流量数据库本身不会被上传</td><td>只在你选择了托管提供方并提交问题时。提问界面会显示发送出去的请求</td></tr>
         <tr><td>收集器导出</td><td>你配置的 OpenTelemetry 或 HTTP 端点</td><td>设置 › 导出里列出的字段，例如流量汇总和警报。认证标头保存在钥匙串里</td><td>只在你配置好端点并启用导出之后</td></tr>
@@ -129,11 +129,14 @@
 
       <h2 id="website">本网站</h2>
       <p>本站是托管在 GitHub Pages 上、经由 Cloudflare 提供服务的静态页面。它不设置 cookie，也不运行任何分析。GitHub
-        和 Cloudflare 会处理请求以便提供服务，而字体从 Google Fonts 加载，你访问时它会收到你的 IP 地址。</p>
+        和 Cloudflare 会处理请求以便提供服务。字体由本域名提供，所以渲染一个页面不会向任何其他人发送任何东西——这个页面
+        以前是从 Google 加载字体的，也就是说，那个解释 Flowlight 什么都不往外发的页面，为了渲染自己而向 Google 发了一个请求。</p>
 
       <h2 id="contact">联系方式</h2>
-      <p>有问题或隐私方面的顾虑？<a href="https://github.com/xinbetween/flowlight/issues">提交一个 issue</a>。涉及敏感内容的，请使用 GitHub
-        在本仓库上的私密漏洞报告功能。</p>
+      <p>有问题或隐私方面的顾虑？<a href="https://github.com/xinbetween/flowlight/issues">提交一个 issue</a>。安全问题请使用 GitHub 的
+        <a href="https://github.com/xinbetween/flowlight/security/advisories/new">私密漏洞报告</a>，或者如果你不愿意用 GitHub，可以发邮件到
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>——可以期待什么，见
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a>。</p>
     </article>
   </div>
 </main>

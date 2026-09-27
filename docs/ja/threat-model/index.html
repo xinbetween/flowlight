@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight の脅威モデル</title>
+<meta name="description" content="Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。">
+<link rel="canonical" href="https://flowlight.xinbetween.com/ja/threat-model/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/threat-model/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/threat-model/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/threat-model/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/threat-model/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/threat-model/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/threat-model/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/threat-model/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/threat-model/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/threat-model/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="Flowlight の脅威モデル">
+<meta property="og:description" content="Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。">
+<meta property="og:url" content="https://flowlight.xinbetween.com/ja/threat-model/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../assets/icon.png">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight の脅威モデル", "item": "https://flowlight.xinbetween.com/ja/threat-model/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">本文へスキップ</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../../ja/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="サイト">
+      <a href="../../ja/#agents">AI エージェント</a>
+      <a href="../../ja/docs/">ドキュメント</a>
+      <a href="../../ja/privacy/">プライバシー</a>
+      <a href="../../ja/threat-model/" aria-current="page">脅威モデル</a>
+      <a href="../../releases/">リリース</a>
+      <a href="../../ja/about/">概要</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="言語" title="言語"><span class="lang-current"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">日本語</span><svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary>
+      <div class="lang-menu"><a href="../../threat-model/" hreflang="en" lang="en">English</a><a href="../../de/threat-model/" hreflang="de" lang="de">Deutsch</a><a href="../../es/threat-model/" hreflang="es" lang="es">Español</a><a href="../../fr/threat-model/" hreflang="fr" lang="fr">Français</a><a href="../../it/threat-model/" hreflang="it" lang="it">Italiano</a><a href="../../pt-PT/threat-model/" hreflang="pt-PT" lang="pt-PT">Português</a><span lang="ja" aria-current="true">日本語</span><a href="../../zh-Hans/threat-model/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/threat-model/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../../ko/threat-model/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">ダウンロード</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">脅威モデル</p>
+    <h1>監視であって、防止ではない</h1>
+    <p class="lede">Flowlight は、Mac 上のソフトウェアが何をどこへ送っているかを教えます。すでにマシンを手中にしている攻撃者に対する
+      防御ではありません。その違いは、脚注ではなく独立した 1 ページで述べるだけの重さがあります。</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="このページの内容">
+      <details class="toc-sheet" open>
+        <summary>このページの内容</summary>
+        <div class="toc-group">
+          <p class="toc-label">短く言えば</p>
+          <a href="#stance">何のためにあるのか</a><a href="#defends">何を防ぐのか</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">限界</p>
+          <a href="#root">root 権限を持つソフトウェア</a><a href="#capture">キャプチャが取りこぼすもの</a><a href="#inspection">インスペクションが取りこぼすもの</a>
+          <a href="#blocking">ブロックとは何で、何でないか</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Flowlight 自身</p>
+          <a href="#itself">何を保持するのか</a><a href="#updates">アップデート</a><a href="#reporting">脆弱性を報告する</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">何のためにあるのか</h2>
+      <p>Flowlight は、Mac が答えてくれない問いに答えます。<strong>どのアプリがこれを送り、どこへ行ったのか。</strong>作られた相手は、
+        隠れもせずに行儀の悪いソフトウェアです。誰も頼んでいない先に接続する AI エージェント、送るべき以上をアップロードするツール、
+        名前のないアドレスと話しているプロセス。そうした振る舞いはトラフィックに現れます。Flowlight の仕事は、それを読めるようにすること、
+        そして読めないときには正直にそう言うことです。</p>
+      <p>アンチウイルスではなく、EDR エージェントでもなく、あなたと攻撃者のあいだに立つという意味でのファイアウォールでもありません。
+        両者が重なるところ、つまり Flowlight が接続を拒否できるところでも、その拒否はすでに信頼しているソフトウェアを制御するための
+        便利さであって、信頼していないソフトウェアに対する防壁ではありません。</p>
+
+      <h2 id="defends">何を防ぐのか</h2>
+      <ul>
+        <li><strong>気づかれないまま出ていくデータ。</strong>アプリやエージェントが、あなたなら承認しなかった先へ送ること。エージェント自身が
+          実行したツール経由の場合も含みます。Flowlight はその接続を、接続を行ったプロセスと、そのプロセスを起動したエージェントに
+          結び付けます。</li>
+        <li><strong>静かな振る舞いの変化。</strong>急に新しい接続先と通信しはじめたアプリ、ベースラインよりはるかに多く動かすアプリ、
+          あなたが離れているあいだに働くアプリ。どのアラートも、それを引き起こした数値を示します。だからあなたはそれに異を唱えられます。</li>
+        <li><strong>許した範囲を超えるエージェント。</strong>エージェントごとの許可リストと、その外への接続を拒否するルール。拒否は記録され、
+          ワンクリックで許可できます。</li>
+        <li><strong>改ざんされたアップデート。</strong>どのリリースもチェックサムを公開します。アップデート機能は、検証できないダウンロードを
+          拒否し、アップデートを求めている実行中のコピーと同じチームが署名していないアプリのインストールを拒否します。</li>
+      </ul>
+
+      <h2 id="root">root 権限を持つソフトウェアは、これを止められる</h2>
+      <p>Flowlight はあなたの権限で動き、macOS がその代わりに起動するシステム機能拡張を使います。root で動くものは、そしてあなたが
+        インストーラを承認したものは、その機能拡張をアンロードし、アプリを止め、データベースを削除できます。設計上それを防ぐものは何もなく、
+        macOS 上のどの監視ツールも、あなた自身が自分で止められるツールでありつづけたまま、それを防ぐことはできません。</p>
+      <p>正直な主張はもっと狭く、それでも役に立ちます。行儀が悪いだけで、監視から積極的に逃れようとはしていないソフトウェアは見えます。
+        積極的に逃れているソフトウェアは見えないかもしれません。それでも少なくとも空白は残ります。止まった機能拡張、データのない期間です。
+        それを示すために<a href="../../ja/docs/#coverage">カバー範囲</a>の画面があります。</p>
+
+      <h2 id="capture">キャプチャが取りこぼすもの</h2>
+      <ul>
+        <li><strong>キャプチャを始める前のトラフィック。</strong>あとから埋めることはできません。フィルタより先に開いた接続は、
+          そもそもフィルタに渡されていません。</li>
+        <li><strong>コンテンツフィルタの対象外となるシステムサービス。</strong>macOS はコンテンツフィルタに何もかもを見せるわけではありません。
+          macOS 自身のトラフィックの一部は、こちらには決して届きません。</li>
+        <li><strong>その枠を別のコンテンツフィルタが握っている場合。</strong>macOS が動かすのは同時に 1 つだけです。VPN やセキュリティ
+          エージェントがそれを握っていると、Flowlight のフィルタはインストールされ、接続もしますが、何かをフィルタするよう求められることは
+          ありません。キャプチャは、空の画面を見せるのではなく、そう伝えます。</li>
+        <li><strong>短い接続。サンプラーの場合です。</strong>機能拡張がなければ、Flowlight は 1 秒ごとにカウンタを読みます。2 回の読み取りの
+          あいだに開いて閉じる接続は、決して記録されません。</li>
+        <li><strong>TCP でも UDP でもない経路。</strong>Bluetooth と USB はデバイスとしては見えますが、バイト数としては見えません。
+          エージェントのローカルの MCP サーバがパイプで話すものは、そもそもネットワークトラフィックではなく、どこにも現れません。</li>
+      </ul>
+
+      <h2 id="inspection">インスペクションが取りこぼすもの</h2>
+      <p>HTTPS インスペクションが読めるのは、Flowlight のローカルプロキシを経由したものだけで、それを決めるのはプログラムが起動する
+        瞬間です。プロキシ設定を無視するアプリ、インスペクションをオンにする前に起動したアプリ、証明書をピン留めするアプリは、手を加えられずに
+        通り過ぎます。これは意図してそうしています。ピン留めされた接続を壊せば、そのアプリが壊れるからです。QUIC もプロキシには渡されません。</p>
+      <p>つまり、インスペクトの画面が空なら、それは「ここには何も通されなかった」という意味で、「何も起きなかった」という意味では
+        ありません。どちらなのかは、カバー範囲がアプリごとに答えます。</p>
+
+      <h2 id="blocking">ブロックとは何で、何でないか</h2>
+      <p>接続を拒否するルールを実行するのはネットワーク機能拡張で、その経路の中で、接続が行われる前に実行します。URL を指定する
+        ルールを実行するのはインスペクション用のプロキシで、アプリが読める状態コードでリクエストに応えます。報告するのではなく実際に
+        手を出す Flowlight の部分は、この 2 つだけです。nettop サンプラーは何ひとつ拒否できないので、サンプラーで動いている Mac では
+        どのルールも強制されません。Flowlight は何もしないスイッチを見せるのではなく、そのことをはっきり言います。</p>
+      <p>それでも防止ではありません。シェルを使えるエージェントは、拒否されたツールがしたはずのことを手作業で行えます。ワンクリックで
+        取り消せる拒否は、エージェントの次の試みが通り抜けうる拒否でもあります。ローカルのトラフィック、DNS、Apple 純正のサービス、
+        Flowlight 自身の接続は決して拒否されません。ブロックされたエージェントより、ブロックされた Mac のほうが悪い結果だからです。
+        そして強制は、Flowlight が動作を止めた数秒後に失効します。誰にも見えない拒否は、拒否がないより悪いからです。</p>
+      <p><strong>インスペクションと拒否は両立しません。</strong>Flowlight 自身のプロキシを通ったトラフィックは、Flowlight の
+        トラフィックとして Mac を出ていき、Flowlight が自分自身を拒否することはありません。つまり、リクエストを読んでいるアプリは、
+        ルールではもう接続を止められないアプリです。もっと見るためにインスペクションをオンにすることは、強制を手放すことでもあり、
+        画面にはこれまでそう書かれていませんでした。</p>
+
+      <h2 id="itself">Flowlight 自身が保持するもの</h2>
+      <p>トラフィックのメタデータを、ローカルの SQLite データベースに、公開された保持期間のあいだ保持します。HTTPS インスペクションを
+        オンにしていれば、リクエストとレスポンスの本文も 3 日間保持します。これは Flowlight が保持するもののなかで最も機微なものです。
+        認証情報のヘッダは名前と語によって隠されますが、それはヒューリスティックであって保証ではありません。何も認識できない名前のもとに
+        秘密を載せたヘッダは、記録されることがあります。</p>
+      <p>トラフィックのデータベースがアップロードされることはありません。それでも、頼まなくても Mac から出ていくものが 3 つあり、
+        どれも<a href="../../ja/privacy/">プライバシーのページ</a>に挙げてあります。起動時と 1 日 1 回、最新のリリースを GitHub に
+        尋ねるアップデートの確認。ホスト名のない公開アドレスについて Team Cymru に尋ねるネットワーク所有者の照会。そして、
+        Flowlight が機能拡張ではなくカウンタを読んでいるあいだ、名前が見つからなかったアドレスの逆引き DNS 照会です。
+        はじめの 2 つにはオフのスイッチがあります。3 つめにはありません。サンプラーでは、接続に名前が付く道のほとんどがそれだからです。
+        照会はこの Mac がすでに使っているリゾルバへ行き、機能拡張が引き継いでトラフィック自身から名前を付けるようになれば止まります。
+        ホスト型モデルでの質問は、そのどれよりもはるかに多くを送りますが、設定するまではオフのままである唯一のものです。</p>
+
+      <h2 id="updates">アップデート</h2>
+      <p>リリースは Developer ID で署名され、公証されています。アップデート機能は公開されたチェックサムを要求し、それがないダウンロードを
+        拒否します。そのうえで、ダウンロードしたアプリが実行中のコピーと同じチームの署名であることを確かめてから、インストールします。
+        別の誰かが署名したアップデートは、ほかの点で有効であっても拒否されます。</p>
+
+      <h2 id="reporting">脆弱性を報告する</h2>
+      <p>GitHub の<a href="https://github.com/xinbetween/flowlight/security/advisories/new">プライベート脆弱性報告</a>をお使いください。GitHub を
+        使いたくない場合は <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> にメールしてください。対象範囲と
+        期待してよいことは <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> に書いてあります。
+        クラッシュ、数値の誤り、誤解を招く画面といった通常の不具合は、かわりに
+        <a href="https://github.com/xinbetween/flowlight/issues">issue</a> へどうぞ。</p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../../ja/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+        <p>macOS のアプリ単位のネットワーク監視。AI エージェントはとくに詳しく見えます。</p>
+      </div>
+      <div><h4>製品</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">macOS 版をダウンロード</a></li>
+        <li><a href="../../ja/docs/#install">Homebrew でインストール</a></li>
+        <li><a href="../../releases/">リリースノート</a></li>
+        <li><a href="../../ja/docs/">ドキュメント</a></li>
+      </ul></div>
+      <div><h4>プロジェクト</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">ソースコード</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">コントリビュート</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">問題を報告</a></li>
+      </ul></div>
+      <div><h4>信頼</h4><ul>
+        <li><a href="../../ja/privacy/">プライバシー</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">ライセンス（GPL-3.0）</a></li>
+        <li><a href="../../ja/about/">概要</a></li>
+      </ul></div>
+      <div><h4>AI エージェント向け</h4><ul>
+        <li><a href="../../llms.txt">llms.txt</a></li>
+        <li><a href="../../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../../sitemap.xml">サイトマップ</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Flowlight コントリビューター。Flowlight は <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> のもとで公開されている自由ソフトウェアです。</span>
+      <span>バージョン 0.9.1 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "コピーしました";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "コピー"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

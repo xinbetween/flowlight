@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Modelo de ameaças do Flowlight</title>
+<meta name="description" content="Contra o que o Flowlight defende, contra o que não consegue defender e porquê — observar em vez de impedir.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/threat-model/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/threat-model/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/threat-model/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/threat-model/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/threat-model/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/threat-model/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/threat-model/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/threat-model/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/threat-model/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Modelo de ameaças do Flowlight">
+<meta property="og:description" content="Contra o que o Flowlight defende, contra o que não consegue defender e porquê — observar em vez de impedir.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../assets/icon.png">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-pt-PT", "url": "https://flowlight.xinbetween.com/pt-PT/", "name": "Flowlight", "inLanguage": "pt-PT", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/"}, {"@type": "ListItem", "position": 2, "name": "Modelo de ameaças do Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/threat-model/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Ir para o conteúdo</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../../pt-PT/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../../pt-PT/#agents">Agentes de IA</a>
+      <a href="../../pt-PT/docs/">Documentação</a>
+      <a href="../../pt-PT/privacy/">Privacidade</a>
+      <a href="../../pt-PT/threat-model/" aria-current="page">Modelo de ameaças</a>
+      <a href="../../releases/">Versões</a>
+      <a href="../../pt-PT/about/">Acerca</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="Idioma" title="Idioma"><span class="lang-current"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">Português</span><svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary>
+      <div class="lang-menu"><a href="../../threat-model/" hreflang="en" lang="en">English</a><a href="../../de/threat-model/" hreflang="de" lang="de">Deutsch</a><a href="../../es/threat-model/" hreflang="es" lang="es">Español</a><a href="../../fr/threat-model/" hreflang="fr" lang="fr">Français</a><a href="../../it/threat-model/" hreflang="it" lang="it">Italiano</a><span lang="pt-PT" aria-current="true">Português</span><a href="../../ja/threat-model/" hreflang="ja" lang="ja">日本語</a><a href="../../zh-Hans/threat-model/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/threat-model/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../../ko/threat-model/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Transferir</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Modelo de ameaças</p>
+    <h1>Observar, não impedir</h1>
+    <p class="lede">O Flowlight diz-lhe o que o software do seu Mac está a enviar, e para onde. Não é uma defesa contra um atacante que já
+      controla a máquina, e a diferença importa o suficiente para ficar numa página própria em vez de numa nota de pé de página.</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Nesta página">
+      <details class="toc-sheet" open>
+        <summary>Nesta página</summary>
+        <div class="toc-group">
+          <p class="toc-label">A versão curta</p>
+          <a href="#stance">Para que serve</a><a href="#defends">Contra o que defende</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Limites</p>
+          <a href="#root">Software com root</a><a href="#capture">O que escapa à captura</a><a href="#inspection">O que escapa à inspeção</a>
+          <a href="#blocking">O que o bloqueio é e não é</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">O próprio Flowlight</p>
+          <a href="#itself">O que guarda</a><a href="#updates">Atualizações</a><a href="#reporting">Comunicar uma vulnerabilidade</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">Para que serve</h2>
+      <p>O Flowlight responde a uma pergunta a que o Mac não responde: <strong>que app enviou isto, e para onde foi?</strong> Foi feito para
+        software que se porta mal a céu aberto — um agente de IA a contactar algo que ninguém lhe pediu, uma ferramenta a carregar mais do que
+        deveria, um processo a falar com um endereço que não tem nome. Esse comportamento é visível no tráfego, e o trabalho do Flowlight é
+        torná-lo legível e dizer com honestidade quando não consegue.</p>
+      <p>Não é um antivírus, não é um agente de EDR, e não é uma firewall no sentido de algo que se coloca entre você e um atacante. Onde os dois se
+        sobrepõem — o Flowlight pode recusar ligações — a recusa é uma comodidade para controlar software em que já confia, não uma barreira contra
+        software em que não confia.</p>
+
+      <h2 id="defends">Contra o que defende</h2>
+      <ul>
+        <li><strong>Saída de dados que passa despercebida.</strong> Uma app ou um agente a enviar para um lugar que não teria aprovado, inclusive
+          através de uma ferramenta que ele próprio executou. O Flowlight atribui a ligação ao processo que a fez e ao agente que iniciou esse
+          processo.</li>
+        <li><strong>Mudanças silenciosas de comportamento.</strong> Uma app que de repente contacta destinos novos, move muito mais do que a sua
+          base de referência, ou trabalha enquanto está ausente. Cada alerta nomeia o número que a fez disparar, para que possa discordar dela.</li>
+        <li><strong>Um agente a exceder aquilo que permitiu.</strong> Uma lista de permissões por agente, e regras que recusam as ligações fora
+          dela, com a recusa registada e um clique para a permitir.</li>
+        <li><strong>Uma atualização adulterada.</strong> Cada versão publica uma soma de verificação; o atualizador recusa uma transferência que não
+          consegue verificar e recusa instalar uma app que não esteja assinada pela mesma equipa que a cópia a pedir a atualização.</li>
+      </ul>
+
+      <h2 id="root">Software com root pode desligá-lo</h2>
+      <p>O Flowlight corre em seu nome, com uma extensão de sistema que o macOS arranca por ele. Qualquer coisa a correr como root — ou qualquer
+        coisa cujo instalador aprove — pode descarregar essa extensão, parar a app ou apagar a sua base de dados. Nada na conceção o impede, e
+        nenhuma ferramenta de monitorização no macOS o consegue impedir e continuar a ser uma ferramenta que também você pode desligar.</p>
+      <p>A afirmação honesta é mais estreita e continua a ser útil: o software que se porta mal mas não está ativamente a fugir a um monitor será
+        visto. O software que lhe está ativamente a fugir pode não ser, e deixará pelo menos uma falha — uma extensão que parou, um período sem
+        dados — que o ecrã <a href="../../pt-PT/docs/#coverage">Cobertura</a> está lá para mostrar.</p>
+
+      <h2 id="capture">O que escapa à captura</h2>
+      <ul>
+        <li><strong>O tráfego anterior ao início da captura.</strong> Não há preenchimento retroativo. Uma ligação que abriu antes do filtro nunca
+          lhe foi entregue.</li>
+        <li><strong>Os serviços de sistema isentos dos filtros de conteúdo.</strong> O macOS não mostra tudo a um filtro de conteúdo; parte do seu
+          próprio tráfego nunca chega ao nosso.</li>
+        <li><strong>Outro filtro de conteúdo a ocupar o lugar.</strong> O macOS executa um de cada vez. Se uma VPN ou um agente de segurança o
+          tiver, o filtro do Flowlight instala-se, liga-se, e nunca lhe é pedido que filtre nada — a Captura di-lo, em vez de mostrar um ecrã
+          vazio.</li>
+        <li><strong>As ligações curtas, com o amostrador.</strong> Sem a extensão, o Flowlight lê contadores uma vez por segundo: uma ligação que
+          abre e fecha entre duas leituras nunca é registada.</li>
+        <li><strong>Os canais que não são TCP nem UDP.</strong> O Bluetooth e o USB vêem-se como dispositivos, não como bytes. O servidor MCP local
+          de um agente a comunicar por um pipe não é tráfego de rede nenhum e não aparece em lugar algum.</li>
+      </ul>
+
+      <h2 id="inspection">O que escapa à inspeção</h2>
+      <p>A inspeção HTTPS lê apenas o que é encaminhado pelo proxy local do Flowlight, e isso é um programa que o decide quando arranca. Uma app que
+        ignora as definições de proxy, uma que foi iniciada antes de a inspeção ser ligada, ou uma que fixa os seus certificados passa intacta — de
+        propósito, porque quebrar uma ligação com o certificado fixado quebraria a app. O QUIC também não é entregue ao proxy.</p>
+      <p>Por isso um ecrã Inspecionar vazio significa «não foi encaminhado nada para aqui», não «não aconteceu nada». A Cobertura diz qual das duas
+        coisas se aplica, app por app.</p>
+
+      <h2 id="blocking">O que o bloqueio é, e não é</h2>
+      <p>Uma regra que recusa ligações é levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Uma regra que nomeia um URL é
+        levada a cabo pelo proxy de inspeção, que responde ao pedido com um estado que a app consegue ler. São as duas únicas partes do Flowlight que
+        agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com o amostrador nenhuma regra é aplicada, e
+        o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
+      <p>Continua a não ser impedir. Um agente que consiga executar uma shell pode fazer à mão o que a ferramenta recusada teria feito. Uma recusa
+        que pode desfazer num clique é uma recusa por onde a tentativa seguinte de um agente pode passar. O tráfego local, o DNS, os serviços da
+        Apple e as ligações do próprio Flowlight nunca são recusados, porque um Mac bloqueado é um resultado pior do que um agente bloqueado. E a
+        aplicação efetiva caduca uns segundos depois de o Flowlight deixar de correr: uma recusa que ninguém consegue ver é pior do que nenhuma.</p>
+      <p><strong>A inspeção e a recusa não se combinam.</strong> O tráfego encaminhado pelo próprio proxy do Flowlight sai do Mac como tráfego do
+        Flowlight, e o Flowlight nunca se recusa a si mesmo — por isso uma app cujos pedidos está a ler é uma app cujas ligações as regras já não
+        travam. Ligar a inspeção para ver mais custa-lhe a aplicação das regras, e até agora nada no ecrã o dizia.</p>
+
+      <h2 id="itself">O que o próprio Flowlight guarda</h2>
+      <p>Metadados de tráfego numa base de dados SQLite local, com uma retenção publicada. Com a inspeção HTTPS ligada, guarda também os corpos dos
+        pedidos e das respostas durante três dias — a coisa mais sensível que chega a manter. Os cabeçalhos de credenciais são ocultados por nome e
+        por palavra, o que é uma heurística e não uma garantia; um cabeçalho que leve um segredo sob um nome que nada reconhece pode ficar
+        registado.</p>
+      <p>A base de dados de tráfego nunca é enviada. Há, ainda assim, três coisas mais pequenas que saem do Mac sem lhe serem pedidas,
+        todas nomeadas na <a href="../../pt-PT/privacy/">página de privacidade</a>: a procura de atualizações, que pede ao GitHub a versão mais
+        recente no arranque e uma vez por dia; a consulta do proprietário da rede, que pergunta ao Team Cymru por endereços públicos sem
+        nome de anfitrião; e, enquanto o Flowlight lê contadores em vez de correr a sua extensão, uma consulta de DNS inverso dos endereços
+        para os quais não viu nome. As duas primeiras têm interruptores para desligar. A terceira não tem, porque no amostrador é quase
+        tudo aquilo que dá um nome a uma ligação — vai para o resolvedor de DNS que o Mac já usa e para quando a extensão assume e passa a
+        nomear as ligações a partir do próprio tráfego. Perguntar com um modelo alojado envia muito mais do que qualquer uma delas, e é a
+        única coisa que fica desligada até a configurar.</p>
+
+      <h2 id="updates">Atualizações</h2>
+      <p>As versões são assinadas com um Developer ID e notarizadas. O atualizador exige uma soma de verificação publicada e recusa uma
+        transferência sem ela; depois verifica que a app transferida está assinada pela mesma equipa que a cópia em execução antes de a instalar. Uma
+        atualização assinada por outra pessoa é recusada mesmo que no resto seja válida.</p>
+
+      <h2 id="reporting">Comunicar uma vulnerabilidade</h2>
+      <p>Use a <a href="https://github.com/xinbetween/flowlight/security/advisories/new">comunicação privada de vulnerabilidades</a> do GitHub, ou envie um email
+        para <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> se preferir não usar o GitHub. O
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> diz o que está no âmbito e o que pode esperar.
+        Um erro comum — uma falha, um número errado, um ecrã que engana — pertence em vez disso aos
+        <a href="https://github.com/xinbetween/flowlight/issues">problemas</a>.</p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../../pt-PT/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+        <p>Monitorização de rede por app no macOS, com o olhar mais atento sobre os agentes de IA.</p>
+      </div>
+      <div><h4>Produto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Transferir para macOS</a></li>
+        <li><a href="../../pt-PT/docs/#install">Instalar com o Homebrew</a></li>
+        <li><a href="../../releases/">Notas de versão</a></li>
+        <li><a href="../../pt-PT/docs/">Documentação</a></li>
+      </ul></div>
+      <div><h4>Projeto</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Código-fonte</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contribuir</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Comunicar um problema</a></li>
+      </ul></div>
+      <div><h4>Confiança</h4><ul>
+        <li><a href="../../pt-PT/privacy/">Privacidade</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">Licença (GPL-3.0)</a></li>
+        <li><a href="../../pt-PT/about/">Acerca</a></li>
+      </ul></div>
+      <div><h4>Para agentes de IA</h4><ul>
+        <li><a href="../../llms.txt">llms.txt</a></li>
+        <li><a href="../../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../../sitemap.xml">Mapa do site</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Quem contribui para o Flowlight. O Flowlight é software livre, publicado sob a <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Versão 0.9.1 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Copiado";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Copiar"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

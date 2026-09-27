@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight のプライバシー", "item": "https://flowlight.xinbetween.com/ja/privacy/"}]}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../../ja/#agents">AI エージェント</a>
       <a href="../../ja/docs/">ドキュメント</a>
       <a href="../../ja/privacy/" aria-current="page">プライバシー</a>
+      <a href="../../ja/threat-model/">脅威モデル</a>
       <a href="../../releases/">リリース</a>
       <a href="../../ja/about/">概要</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -100,15 +99,16 @@
       <h2 id="inspection">HTTPS インスペクション</h2>
       <p>デフォルトではオフです。オンにすると、Flowlight はこの Mac 上に証明書認証局を作り（その鍵が
         <code>~/Library/Application Support/Flowlight/Inspection</code> から出ることはありません）、この Mac からの接続だけを受け付けるプロキシを動かします。
-        経由させたアプリについては、リクエストとレスポンスを、2 MB までの本文も含めてローカルのデータベースに 3 日間記録します。認証情報のヘッダ
-        （Authorization、Cookie、API キー）は、何かが保存される前にその長さに置き換えられます。Flowlight は内蔵の一覧にある Apple のサービスとパスワード管理アプリを復号の対象から除外します。記録したインスペクションのデータが Flowlight によってアップロードされることはありません。インスペクションをオフにするとプロキシが止まり、<strong>証明書と記録データを削除</strong>すると、証明書、その信頼設定、記録したすべてのリクエストが削除されます。</p>
+        経由させたアプリについては、リクエストとレスポンスを、2 MB までの本文も含めてローカルのデータベースに 3 日間記録します。認証情報のヘッダは、何かが保存される前にその長さに置き換えられます。
+        名前（Authorization、Cookie、API キー）と、名前に含まれる語で見分けるので、<code>X-Access-Key</code> も捕まえます。
+        ただしこれはヒューリスティックであって保証ではありません。何も認識できない名前のもとに秘密を載せたヘッダは、記録されてしまいます。Flowlight は内蔵の一覧にある Apple のサービスとパスワード管理アプリを復号の対象から除外します。記録したインスペクションのデータが Flowlight によってアップロードされることはありません。インスペクションをオフにするとプロキシが止まり、<strong>証明書と記録データを削除</strong>すると、証明書、その信頼設定、記録したすべてのリクエストが削除されます。</p>
 
       <h2 id="requests">アプリが行うネットワークリクエスト</h2>
       <table>
         <tr><th>リクエスト</th><th>送信先</th><th>含まれるもの</th><th>タイミング</th></tr>
         <tr><td>アップデートの確認</td><td><code>api.github.com</code></td><td>最新リリースを尋ねる通常の HTTPS リクエスト。GitHub が見るのは、IP アドレスと <code>Flowlight/&lt;version&gt;</code> というユーザーエージェントです</td><td>起動時と 1 日 1 回（0.1.2 以降）。オフのスイッチは設定 › 一般</td></tr>
         <tr><td>アップデートのダウンロード</td><td><code>github.com</code></td><td>ディスクイメージと、そのチェックサムファイル</td><td>「ダウンロードして開く」をクリックしたときだけ</td></tr>
-        <tr><td>逆引き DNS</td><td>あなたが設定した DNS リゾルバ</td><td>ホスト名が見つからなかった場合の、IP アドレスの登録名の照会</td><td>デフォルトのキャプチャモードで、必要に応じて</td></tr>
+        <tr><td>逆引き DNS</td><td>あなたが設定した DNS リゾルバ</td><td>ホスト名が見つからなかった場合の、IP アドレスの登録名の照会</td><td>必要に応じて、サンプラーのキャプチャモードで。ネットワーク機能拡張が動き出すまではこれがデフォルトです。オフのスイッチはありません。これがないとサンプラーはほとんどの接続に名前を付けられないからです。ネットワーク機能拡張はトラフィック自身から名前を付けるので、これを行いません</td></tr>
         <tr><td>ネットワーク所有者の照会</td><td>Team Cymru（DNS 経由）</td><td>ホスト名がわからないパブリック IP アドレス。プライベートアドレスと予約アドレスは、この Mac から決して出ません</td><td>デフォルトでオン。オフのスイッチはキャプチャ › ネットワーク所有者を特定</td></tr>
         <tr><td>ホスト型モデルでの質問</td><td>あなたが選んだプロバイダ：Anthropic、OpenAI、Google Gemini、または互換のエンドポイント</td><td>あなたの質問と、モデルが選んだ読み取り専用の Flowlight の問い合わせが返した結果。トラフィックのデータベース自体はアップロードされません</td><td>ホスト型のプロバイダを選び、質問を送信したときだけ。質問の画面には、送信されたリクエストが表示されます</td></tr>
         <tr><td>コレクターへの書き出し</td><td>あなたが設定した OpenTelemetry または HTTP のエンドポイント</td><td>設定 › 書き出しに表示される項目（トラフィックの集計やアラートなど）。認証ヘッダはキーチェーンに保存されます</td><td>エンドポイントを設定し、書き出しを有効にしたあとだけ</td></tr>
@@ -128,11 +128,15 @@
 
       <h2 id="website">このウェブサイト</h2>
       <p>このサイトは GitHub Pages で公開され、Cloudflare を通して配信される静的なページです。Cookie は設定せず、分析も動かしていません。
-        配信のために GitHub と Cloudflare がリクエストを処理し、フォントは Google Fonts から読み込まれるため、訪問時に IP アドレスが同社に渡ります。</p>
+        配信のために GitHub と Cloudflare がリクエストを処理します。フォントはこのドメインから配信されるので、ページを表示しても
+        ほかの誰にも何も送りません。以前はこのページが Google からフォントを読み込んでいました。つまり、Flowlight はどこにも何も送らないと
+        説明するページが、自分自身を表示するために Google へリクエストを出していたのです。</p>
 
       <h2 id="contact">連絡先</h2>
-      <p>質問やプライバシーに関する懸念がありますか？<a href="https://github.com/xinbetween/flowlight/issues">issue を作成</a>してください。機密性のある内容には、
-        リポジトリの GitHub のプライベート脆弱性報告をお使いください。</p>
+      <p>質問やプライバシーに関する懸念がありますか？<a href="https://github.com/xinbetween/flowlight/issues">issue を作成</a>してください。
+        セキュリティの問題には、GitHub の<a href="https://github.com/xinbetween/flowlight/security/advisories/new">プライベート脆弱性報告</a>をお使いください。
+        GitHub を使いたくない場合は <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> にメールしてください。
+        何を期待してよいかは <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> をご覧ください。</p>
     </article>
   </div>
 </main>

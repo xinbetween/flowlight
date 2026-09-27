@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../assets/icon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-pt-PT", "url": "https://flowlight.xinbetween.com/pt-PT/", "name": "Flowlight", "inLanguage": "pt-PT", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-pt-PT", "name": "Flowlight", "description": "O Flowlight é monitorização de rede por app no macOS, de código aberto, com visibilidade mais profunda sobre agentes de IA, ferramentas e servidores MCP.", "url": "https://flowlight.xinbetween.com/pt-PT/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/pt-PT/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../pt-PT/#agents">Agentes de IA</a>
       <a href="../pt-PT/docs/">Documentação</a>
       <a href="../pt-PT/privacy/">Privacidade</a>
+      <a href="../pt-PT/threat-model/">Modelo de ameaças</a>
       <a href="../releases/">Versões</a>
       <a href="../pt-PT/about/">Acerca</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -106,7 +105,7 @@
 
   <section class="shot" aria-label="Captura de ecrã">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="1075"
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="994"
         alt="A vista Agentes de IA do Flowlight. O Claude Code, o Cursor, o Codex e um script de Python aparecem com os respetivos fornecedores de IA, o tráfego enviado para outros sítios e indicadores de risco para SMTP, SSH, FTP, um envio grande e um IP direto."></div>
       <p class="caption">A vista Agentes de IA: o fornecedor do modelo de cada agente e tudo o mais com que falou. Mostrada com dados de demonstração.</p>
     </div>
@@ -217,7 +216,9 @@
           <div><h3>Regras, pelo tempo que quiser</h3>
             <p>Indique uma app, um agente, um destino ou um único URL e bloqueie-o — clique com o botão direito na linha onde o viu.
               Para sempre, até uma hora, até o Flowlight sair, ou entre as horas que escolher, com um interruptor de pausa e uma saída em
-              cada recusa. Ganha a regra mais específica e, em caso de empate, ganha o bloqueio.</p>
+              cada recusa. Ganha a regra mais específica e, em caso de empate, ganha o bloqueio.
+              É controlo sobre software em que já confia, não uma barreira contra
+              software em que não confia — veja o <a href="../pt-PT/threat-model/">modelo de ameaças</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · recusado 4 vezes · dias de semana 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -371,16 +372,16 @@
           seu Mac. Inicie um agente a partir de um Terminal inspecionado e o tráfego HTTP suportado do agente e das suas ferramentas é desencriptado, com as chamadas de ferramentas que o
           modelo pediu e os resultados que voltaram.</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="1075" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="994" loading="lazy"
         alt="A vista Inspecionar do Flowlight: uma lista de pedidos desencriptados do Claude Code com as respetivas chamadas de ferramentas e o detalhe do envio do curl para paste.example, feito pela chamada da ferramenta Bash que o executou, com as notas enviadas no corpo do pedido"></div>
         <figcaption><b>Para onde foram as minhas notas?</b> O envio do curl para paste.example, seguido até ao comando Bash que o modelo pediu, com o
           corpo que enviou.</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="712" loading="lazy"
           alt="O separador Ferramentas do Claude Code: Bash, Read e duas ferramentas MCP com descrições e a frequência com que o modelo chamou cada uma"></div>
           <figcaption><b>Todas as ferramentas que um agente oferece ao modelo.</b> Os agentes declaram as suas ferramentas em cada turno, por isso o Flowlight lista-as todas, com as
             que o modelo usou de facto e as que nunca tocou.</figcaption></figure>
-        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="712" loading="lazy"
           alt="O separador Servidores MCP do Codex: um servidor sentry marcado como via fornecedor, o seu URL, a aprovação definida como nunca, as ferramentas permitidas e as ferramentas que oferece"></div>
           <figcaption><b>Incluindo as que não se veem na rede.</b> Quando um agente pede ao fornecedor que se ligue a um servidor MCP, esse tráfego
             nunca passa pelo seu Mac. O pedido passa, por isso o servidor, o seu URL, a sua definição de aprovação e as suas ferramentas aparecem mesmo assim.</figcaption></figure>
@@ -399,9 +400,14 @@
       <div class="section-head">
         <p class="eyebrow">A seguir</p>
         <h2>O que está a caminho</h2>
-        <p class="lede">Hoje, o Flowlight observa, explica e recusa. Esta é a ordem pela qual o resto está a ser construído.</p>
+        <p class="lede">Hoje, o Flowlight observa, explica e recusa — observar em vez de impedir, como o
+          <a href="../pt-PT/threat-model/">modelo de ameaças</a> expõe. Esta é a ordem pela qual o resto está a ser construído.</p>
       </div>
       <div class="privacy">
+        <div><strong>Um orçamento para a inspeção <span class="tag">0.9.3</span></strong><p>Os corpos registados são a coisa mais sensível que o Flowlight guarda. Uma lista de cabeçalhos permitidos em vez de uma lista de proibidos, padrões seus, a opção de não guardar cabeçalho algum, limites por app, e uma sessão que expira por si.</p></div>
+        <div><strong>Mostra-me o que esta regra teria feito <span class="tag">0.9.4</span></strong><p>Repita o último dia contra uma regra e veja a lista do que ela teria recusado, antes de recusar o que for. Os dados já lá estão; até agora só serviram para explicar o passado.</p></div>
+        <div><strong>O que sai do Mac, antes de sair <span class="tag">0.9.5</span></strong><p>Antes de a primeira linha chegar a um coletor: o destino, se vai encriptada, que campos viajam e se algum é um cabeçalho — a divulgação que o Flowlight exige de tudo o mais, aplicada a si próprio.</p></div>
+        <div><strong>O que um agente fez para além da rede <span class="tag">1.0</span></strong><p>Um ficheiro a sair é uma leitura e depois um envio, e hoje só o envio é visível. Registar o que as ferramentas de um agente abriram, escreveram e lançaram tornaria <em>leu a chave privada e depois falou com o paste.example</em> um único achado em vez de dois ecrãs. Não é um monitor de recursos: o CPU e a memória são trabalho do Monitor de Atividade. Precisa da permissão EndpointSecurity da Apple e precisa que o orçamento de inspeção acima exista primeiro.</p></div>
         <div><strong>Linux, depois Windows</strong><p>O núcleo de análise é Swift portável; a captura não é. Primeiro vem um daemon de Linux com uma interface web local, sobre eBPF em vez das APIs do macOS.</p></div>
       </div>
     </div>
@@ -424,7 +430,7 @@
 
   <section class="band" id="agent-detail" aria-label="Captura de ecrã do detalhe de um agente">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="622" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="994" loading="lazy"
         alt="O detalhe do Claude Code no Flowlight: ferramentas e servidores MCP com contagens de chamadas e uma falha, uma lista de permissões e o separador Chamadas de ferramentas com um git push falhado, um envio do curl para paste.example com a resposta e o pedido, um npm install, um problema no GitHub, uma pesquisa na documentação e uma leitura de ficheiro, cada um com o seu resultado"></div>
         <figcaption><b>Um agente, todas as chamadas de ferramentas.</b> O tráfego do git, do curl e dos servidores MCP que o Claude Code iniciou conta como tráfego do Claude Code.
           Com a inspeção HTTPS ativada, o separador <em>Chamadas de ferramentas</em> mostra o que o modelo pediu, o que voltou e os pedidos que cada ferramenta fez:
@@ -434,10 +440,10 @@
 
   <section class="band" aria-label="Mais capturas de ecrã">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="994" loading="lazy"
         alt="A vista Relatórios com barras horárias de dados recebidos e enviados e gráficos circulares de apps, destinos e protocolos"></div>
         <figcaption><b>Relatórios.</b> Zoom do segundo ao ano, três agrupamentos, gráficos que continuam legíveis com centenas de apps.</figcaption></figure>
-      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="994" loading="lazy"
         alt="A vista Alertas a listar alertas de exfiltração por um agente, de e-mail, de FTP, de atividade durante a ausência e de picos de tráfego"></div>
         <figcaption><b>Alertas.</b> Cada um nomeia a app, o destino e o número que o disparou.</figcaption></figure>
     </div>

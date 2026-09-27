@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 隱私", "item": "https://flowlight.xinbetween.com/zh-Hant/privacy/"}]}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../../zh-Hant/#agents">AI 代理</a>
       <a href="../../zh-Hant/docs/">說明文件</a>
       <a href="../../zh-Hant/privacy/" aria-current="page">隱私</a>
+      <a href="../../zh-Hant/threat-model/">威脅模型</a>
       <a href="../../releases/">版本</a>
       <a href="../../zh-Hant/about/">關於</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -101,7 +100,8 @@
       <p>預設為關閉。如果你開啟它，Flowlight 會在你的 Mac 上建立一個憑證授權單位（它的金鑰絕不會離開
         <code>~/Library/Application Support/Flowlight/Inspection</code>），並執行一個只接受來自這台 Mac 連線的代理伺服器。對於你
         轉送經過它的 App，它會把請求與回應（包含最多 2 MB 的內文）記錄在本機資料庫中，保留 3 天。憑證類標頭
-        （Authorization、cookie、API 金鑰）在任何內容儲存之前就會被換成它們的長度。Flowlight 會把內建清單中的 Apple 服務和密碼管理程式排除在解密之外。記錄下來的檢查資料不會被 Flowlight 上傳。關閉檢查功能會停止代理伺服器；<strong>「移除憑證與記錄的
+        在任何內容儲存之前就會被換成它們的長度 — 依名稱（Authorization、cookie、API 金鑰）、也依名稱中的字詞辨認，所以
+        <code>X-Access-Key</code> 同樣會被抓到。那是一種推測規則，不是保證：一個把祕密放在沒人認得的名稱底下的標頭，會被記錄下來。Flowlight 會把內建清單中的 Apple 服務和密碼管理程式排除在解密之外。記錄下來的檢查資料不會被 Flowlight 上傳。關閉檢查功能會停止代理伺服器；<strong>「移除憑證與記錄的
         資料」</strong>會刪除憑證、它的信任設定，以及每一筆記錄下來的請求。</p>
 
       <h2 id="requests">這個 App 發出的網路請求</h2>
@@ -109,7 +109,7 @@
         <tr><th>請求</th><th>送到哪裡</th><th>內容是什麼</th><th>什麼時候</th></tr>
         <tr><td>更新檢查</td><td><code>api.github.com</code></td><td>一個查詢最新版本的標準 HTTPS 請求；GitHub 會看到你的 IP 位址和 <code>Flowlight/&lt;version&gt;</code> 這個 user agent</td><td>啟動時以及每天一次，自 0.1.2 起。關閉開關在「設定」› 「一般」</td></tr>
         <tr><td>更新下載</td><td><code>github.com</code></td><td>磁碟映像檔及其總和檢查碼檔案</td><td>只有在你點「下載並開啟」時</td></tr>
-        <tr><td>反向 DNS</td><td>你設定的 DNS 解析器</td><td>在沒有看到主機名稱時，查詢某個 IP 位址登記的名稱</td><td>在預設的擷取模式下，需要時進行</td></tr>
+        <tr><td>反向 DNS</td><td>你設定的 DNS 解析器</td><td>在沒有看到主機名稱時，查詢某個 IP 位址登記的名稱</td><td>需要時進行，在取樣器擷取模式下，也就是網路延伸功能開始運作之前的預設模式。沒有關閉開關：少了它，取樣器就沒辦法為大多數連線命名。網路延伸功能會從流量本身為它們命名，因此不做這件事</td></tr>
         <tr><td>網路擁有者查詢</td><td>Team Cymru，透過 DNS</td><td>沒有已知主機名稱的公開 IP 位址。私有和保留位址絕不會離開你的 Mac</td><td>預設開啟。關閉開關在「擷取」› 「辨識網路擁有者」</td></tr>
         <tr><td>用託管模型提問</td><td>你選擇的供應商：Anthropic、OpenAI、Google Gemini 或相容的端點</td><td>你的問題，以及模型所選用的 Flowlight 唯讀查詢回傳的結果。流量資料庫本身不會被上傳</td><td>只有在你選擇託管供應商並送出問題時。「提問」畫面會顯示送出的請求</td></tr>
         <tr><td>收集器匯出</td><td>你設定的 OpenTelemetry 或 HTTP 端點</td><td>「設定」› 「匯出」中列出的欄位，例如流量彙總資料和警示。驗證標頭儲存在鑰匙串中</td><td>只有在你設定端點並啟用匯出之後</td></tr>
@@ -129,11 +129,14 @@
 
       <h2 id="website">關於本網站</h2>
       <p>本站是託管在 GitHub Pages 上、經由 Cloudflare 提供的靜態頁面。它不設定 cookie，也不執行任何分析。GitHub
-        和 Cloudflare 會處理提供本站所需的請求，字型則從 Google Fonts 載入，它會在你造訪時收到你的 IP 位址。</p>
+        和 Cloudflare 會處理提供本站所需的請求。字型由本網域自己提供，所以顯示一個頁面不會向任何其他人送出任何東西 —
+        這個頁面以前是從 Google 載入字型的，也就是說，那個說明 Flowlight 什麼都不往外送的頁面，為了顯示自己而向 Google 發了一個請求。</p>
 
       <h2 id="contact">聯絡</h2>
-      <p>有問題或隱私方面的疑慮？<a href="https://github.com/xinbetween/flowlight/issues">開一個 issue</a>。若是敏感內容，請使用該儲存庫上
-        GitHub 的私密漏洞回報功能。</p>
+      <p>有問題或隱私方面的疑慮？<a href="https://github.com/xinbetween/flowlight/issues">開一個 issue</a>。若是安全問題，請使用 GitHub 的
+        <a href="https://github.com/xinbetween/flowlight/security/advisories/new">私密漏洞回報</a>，或者如果你不想用 GitHub，可以寄信到
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> — 可以期待什麼，請看
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a>。</p>
     </article>
   </div>
 </main>

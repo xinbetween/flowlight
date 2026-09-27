@@ -46,7 +46,9 @@ nav: privacy
       <p>기본값은 끔입니다. 켜면 Flowlight가 Mac 안에 인증 기관을 만들고(그 키는
         <code>~/Library/Application Support/Flowlight/Inspection</code>를 벗어나지 않습니다) 이 Mac에서 오는 연결만 받는 프록시를
         돌립니다. 이 프록시를 거치도록 지정한 앱에 대해서는 요청과 응답을, 최대 2 MB까지의 본문을 포함해 로컬 데이터베이스에 3일
-        동안 기록합니다. 인증 정보 헤더(Authorization, 쿠키, API 키)는 저장 전에 그 길이 값으로 대체됩니다. Flowlight는 내장된
+        동안 기록합니다. 인증 정보 헤더는 저장 전에 그 길이 값으로 대체됩니다. 이름(Authorization, 쿠키,
+        API 키)으로, 그리고 이름에 든 낱말로 알아보므로 <code>X-Access-Key</code>도 걸립니다. 다만 그것은 추정 규칙이고 보장이
+        아닙니다. 아무것도 알아보지 못하는 이름 아래 비밀을 실어 보내는 헤더는 기록됩니다. Flowlight는 내장된
         Apple 서비스와 암호 관리자 목록을 복호화에서 제외합니다. 기록된 검사 데이터를 Flowlight가 업로드하는 일은 없습니다. 검사를
         끄면 프록시가 멈추고, <strong>인증서 및 기록된 데이터 제거</strong>는 인증서와 그 신뢰 설정, 기록된 모든 요청을 삭제합니다.</p>
 
@@ -55,7 +57,7 @@ nav: privacy
         <tr><th>요청</th><th>보내는 곳</th><th>담기는 내용</th><th>시점</th></tr>
         <tr><td>업데이트 확인</td><td><code>api.github.com</code></td><td>최신 릴리스를 묻는 일반적인 HTTPS 요청. GitHub는 IP 주소와 <code>Flowlight/&lt;version&gt;</code> 사용자 에이전트를 보게 됩니다</td><td>0.1.2부터, 실행 시와 하루에 한 번. 끄는 스위치는 설정 › 일반</td></tr>
         <tr><td>업데이트 다운로드</td><td><code>github.com</code></td><td>디스크 이미지와 체크섬 파일</td><td>다운로드 후 열기를 클릭할 때만</td></tr>
-        <tr><td>역방향 DNS</td><td>설정된 DNS 리졸버</td><td>호스트 이름이 관측되지 않았을 때, IP 주소에 등록된 이름 조회</td><td>기본 캡처 모드에서 필요할 때</td></tr>
+        <tr><td>역방향 DNS</td><td>설정된 DNS 리졸버</td><td>호스트 이름이 관측되지 않았을 때, IP 주소에 등록된 이름 조회</td><td>필요할 때, 샘플러 캡처 모드에서. 네트워크 확장이 돌기 시작할 때까지는 이것이 기본값입니다. 끄는 스위치는 없습니다. 이것이 없으면 샘플러는 대부분의 연결에 이름을 붙일 수 없습니다. 네트워크 확장은 트래픽 자체에서 이름을 붙이므로 이 조회를 하지 않습니다</td></tr>
         <tr><td>네트워크 소유자 조회</td><td>Team Cymru, DNS로</td><td>알려진 호스트 이름이 없는 공용 IP 주소. 사설 주소와 예약 주소는 절대 Mac을 벗어나지 않습니다</td><td>기본값 켬. 끄는 스위치는 캡처 › 네트워크 소유자 확인</td></tr>
         <tr><td>호스팅 모델로 질문</td><td>선택한 제공업체: Anthropic, OpenAI, Google Gemini 또는 호환 엔드포인트</td><td>내 질문과, 모델이 고른 Flowlight 읽기 전용 질의가 돌려준 결과. 트래픽 데이터베이스 자체는 업로드되지 않습니다</td><td>호스팅 제공업체를 고르고 질문을 보낼 때만. 질문 화면에 전송된 요청이 표시됩니다</td></tr>
         <tr><td>수집기로 내보내기</td><td>직접 설정한 OpenTelemetry 또는 HTTP 엔드포인트</td><td>설정 › 내보내기에 표시된 필드, 예를 들어 트래픽 집계와 알림. 인증 헤더는 키체인에 저장됩니다</td><td>엔드포인트를 설정하고 내보내기를 켠 뒤에만</td></tr>
@@ -75,12 +77,15 @@ nav: privacy
 
       <h2 id="website">이 웹사이트</h2>
       <p>이 사이트는 GitHub Pages에 올려 Cloudflare를 통해 제공하는 정적 페이지입니다. 쿠키를 설정하지 않고 분석 도구도 돌리지
-        않습니다. 페이지를 전달하기 위해 GitHub와 Cloudflare가 요청을 처리하며, 폰트는 Google Fonts에서 불러오므로 방문 시 그곳이
-        IP 주소를 받게 됩니다.</p>
+        않습니다. 페이지를 전달하기 위해 GitHub와 Cloudflare가 요청을 처리합니다. 폰트는 이 도메인에서 제공하므로 페이지를 그리는
+        동안 다른 누구에게도 아무것도 보내지 않습니다. 전에는 이 페이지가 폰트를 Google에서 불러왔는데, 그것은 Flowlight가 어디로도
+        아무것도 보내지 않는다고 설명하는 페이지가 자신을 그리려고 Google에 요청을 보냈다는 뜻이었습니다.</p>
 
       <h2 id="contact">문의</h2>
-      <p>궁금한 점이나 개인정보 관련 우려가 있다면 <a href="https://github.com/{{repo}}/issues">이슈를 올려</a> 주세요. 민감한
-        내용이라면 저장소의 GitHub 비공개 취약점 신고 기능을 이용하세요.</p>
+      <p>궁금한 점이나 개인정보 관련 우려가 있다면 <a href="https://github.com/{{repo}}/issues">이슈를 올려</a> 주세요. 보안
+        문제라면 GitHub의 <a href="https://github.com/{{repo}}/security/advisories/new">비공개 취약점 신고</a>를 이용하시고,
+        GitHub를 쓰고 싶지 않다면 <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>으로 메일을 보내 주세요.
+        무엇을 기대할 수 있는지는 <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a>를 보세요.</p>
     </article>
   </div>
 </main>

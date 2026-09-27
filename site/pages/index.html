@@ -163,7 +163,9 @@ nav: home
           <div><h3>Rules, for as long as you say</h3>
             <p>Name an app, an agent, a destination or a single URL and block it — right-click the row you spotted it in.
               Forever, until a time, until Flowlight quits, or between chosen hours, with one pause switch and a way out on
-              every refusal. The most specific rule wins, and a tie goes to the block.</p>
+              every refusal. The most specific rule wins, and a tie goes to the block. It is control over software you
+              already trust, not a barrier against software you don't — see the <a href="{{link:threat-model}}">threat
+              model</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · refused 4 times · weekdays 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -345,16 +347,14 @@ nav: home
       <div class="section-head">
         <p class="eyebrow">Next</p>
         <h2>What's coming</h2>
-        <p class="lede">Flowlight watches, explains and refuses today. This is the order the rest is being built in.</p>
+        <p class="lede">Flowlight watches, explains and refuses today — monitoring rather than prevention, as the
+          <a href="{{link:threat-model}}">threat model</a> sets out. This is the order the rest is being built in.</p>
       </div>
       <div class="privacy">
-        <div><strong>Coverage, stated rather than assumed <span class="tag">0.9.0</span></strong><p>Per app: watched by the extension, decrypted by the proxy, named only by DNS or SNI, or not covered at all — and why, with the fix where there is one. A tool that claims completeness is worth less than one you can trust about its own limits.</p></div>
-        <div><strong>Inspect it from where you found it <span class="tag">0.9.1</span></strong><p>Right-click a row in Live, Reports or AI Agents and Inspect opens already looking at that app or destination — instead of changing screen and retyping the name into a search field.</p></div>
-        <div><strong>A threat model, written down <span class="tag">0.9.2</span></strong><p>What Flowlight defends against and what it doesn't, on one page: software misbehaving in the open, not software with root. Monitoring, not prevention, said beside every mention of blocking. Plus a security contact, and fonts served from here rather than from Google.</p></div>
         <div><strong>A budget for inspection <span class="tag">0.9.3</span></strong><p>Recorded bodies are the most sensitive thing Flowlight holds. A header allowlist instead of a denylist, patterns of your own, an option to keep no headers at all, per-app ceilings, and a session that expires by itself.</p></div>
         <div><strong>Show me what this rule would have done <span class="tag">0.9.4</span></strong><p>Replay the last day against a rule and list what it would have refused, before it refuses anything. The data is already there; it has only ever explained the past.</p></div>
         <div><strong>What leaves the Mac, before it leaves <span class="tag">0.9.5</span></strong><p>Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.</p></div>
-        <div><strong>What an agent did besides the network <span class="tag">1.0</span></strong><p>A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make <em>read the private key, then talked to paste.example</em> one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.</p></div>
+        <div><strong>What an agent did off the network <span class="tag">1.0</span></strong><p>A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make <em>read the private key, then talked to paste.example</em> one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.</p></div>
         <div><strong>Linux, then Windows</strong><p>The analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.</p></div>
       </div>
     </div>

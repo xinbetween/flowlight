@@ -162,7 +162,9 @@ nav: home
           <div><h3>Des règles, aussi longtemps que vous voulez</h3>
             <p>Désignez une app, un agent, une destination ou une seule URL et bloquez-la — d’un clic droit sur la ligne où vous l’avez repérée.
               Pour toujours, jusqu’à une heure donnée, jusqu’à la fermeture de Flowlight, ou entre deux heures choisies, avec un unique interrupteur de pause et une échappatoire à
-              chaque refus. La règle la plus spécifique gagne, et en cas d’égalité c’est le blocage qui l’emporte.</p>
+              chaque refus. La règle la plus spécifique gagne, et en cas d’égalité c’est le blocage qui l’emporte.
+              C’est un contrôle sur des logiciels auxquels vous faites déjà confiance, pas
+              une barrière contre ceux auxquels vous n’en faites pas — voyez le <a href="{{link:threat-model}}">modèle de menaces</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · refusé 4 fois · en semaine 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -344,9 +346,14 @@ nav: home
       <div class="section-head">
         <p class="eyebrow">La suite</p>
         <h2>Ce qui arrive</h2>
-        <p class="lede">Aujourd’hui, Flowlight observe, explique et refuse. Voici l’ordre dans lequel le reste se construit.</p>
+        <p class="lede">Aujourd’hui, Flowlight observe, explique et refuse — observer plutôt qu’empêcher, comme l’expose le
+          <a href="{{link:threat-model}}">modèle de menaces</a>. Voici l’ordre dans lequel le reste se construit.</p>
       </div>
       <div class="privacy">
+        <div><strong>Un budget pour l’inspection <span class="tag">0.9.3</span></strong><p>Les corps enregistrés sont ce que Flowlight détient de plus sensible. Une liste d’autorisation d’en-têtes plutôt qu’une liste de blocage, vos propres motifs, la possibilité de ne garder aucun en-tête, des plafonds par app, et une session qui expire d’elle-même.</p></div>
+        <div><strong>Montrez-moi ce que cette règle aurait fait <span class="tag">0.9.4</span></strong><p>Rejouez la dernière journée contre une règle et faites lister ce qu’elle aurait refusé, avant qu’elle ne refuse quoi que ce soit. Les données sont déjà là&nbsp;; elles n’ont jamais fait qu’expliquer le passé.</p></div>
+        <div><strong>Ce qui quitte le Mac, avant que ça ne le quitte <span class="tag">0.9.5</span></strong><p>Avant que la première ligne n’atteigne un collecteur&nbsp;: la destination, si c’est chiffré, quels champs voyagent et si certains sont des en-têtes — la divulgation que Flowlight exige de tout le reste, appliquée à lui-même.</p></div>
+        <div><strong>Ce qu’un agent a fait en dehors du réseau <span class="tag">1.0</span></strong><p>Un fichier qui part, c’est une lecture puis un envoi, et seul l’envoi est visible aujourd’hui. Enregistrer ce que les outils d’un agent ont ouvert, écrit et lancé ferait de <em>a lu la clé privée, puis a parlé à paste.example</em> un seul constat au lieu de deux écrans. Pas un moniteur de ressources&nbsp;: le processeur et la mémoire sont l’affaire du Moniteur d’activité. Nécessite le droit EndpointSecurity d’Apple, et suppose que le budget d’inspection ci-dessus existe d’abord.</p></div>
         <div><strong>Linux, puis Windows</strong><p>Le cœur d’analyse est en Swift portable&nbsp;; la capture, non. Un démon Linux avec une interface web locale vient d’abord, sur eBPF plutôt que sur les API de macOS.</p></div>
       </div>
     </div>

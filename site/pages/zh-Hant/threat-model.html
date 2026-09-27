@@ -1,0 +1,116 @@
+<!--
+title: Flowlight 威脅模型
+description: Flowlight 防得住什麼、防不住什麼，以及為什麼 — 它只做監控，不做防護。
+path: /threat-model/
+nav: threat-model
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">威脅模型</p>
+    <h1>只做監控，不做防護</h1>
+    <p class="lede">Flowlight 會告訴你，你 Mac 上的軟體正在送出什麼、送去哪裡。它不是用來對付已經掌控這台機器的攻擊者的，
+      而這個差別重要到值得用一整頁來講，而不是塞進註腳裡。</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="本頁內容">
+      <details class="toc-sheet" open>
+        <summary>本頁內容</summary>
+        <div class="toc-group">
+          <p class="toc-label">簡短版</p>
+          <a href="#stance">它是為了什麼</a><a href="#defends">它防得住什麼</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">限度</p>
+          <a href="#root">擁有 root 的軟體</a><a href="#capture">擷取會漏掉什麼</a><a href="#inspection">檢查會漏掉什麼</a>
+          <a href="#blocking">封鎖是什麼，不是什麼</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Flowlight 自己</p>
+          <a href="#itself">它留著什麼</a><a href="#updates">更新</a><a href="#reporting">回報漏洞</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">它是為了什麼</h2>
+      <p>Flowlight 回答一個 Mac 不回答的問題：<strong>是哪個 App 送出去的，它去了哪裡？</strong>它是為了那些在明面上就行為不端的
+        軟體而做的 — 一個去連沒人要它連的地方的 AI 代理、一個上傳得比它該上傳的還多的工具、一個正在跟沒有名字的位址說話的程序。
+        這種行為在流量裡看得見，而 Flowlight 的工作就是讓它變得可讀，並在做不到的時候老實說出來。</p>
+      <p>它不是防毒軟體，不是 EDR 代理，也不是那種站在你和攻擊者之間的防火牆。在兩者重疊的地方 — Flowlight 可以拒絕連線 —
+        那種拒絕是一種方便，用來管住你本來就信任的軟體，而不是一道擋住你不信任的軟體的屏障。</p>
+
+      <h2 id="defends">它防得住什麼</h2>
+      <ul>
+        <li><strong>沒人注意到的資料外送。</strong>某個 App 或代理把東西送到一個你不會核准的地方，包含經由它自己執行的工具送出去。
+          Flowlight 會把那條連線歸屬到發出它的程序，以及啟動那個程序的代理。</li>
+        <li><strong>行為上的悄悄改變。</strong>某個 App 突然連到新的目標、搬動的資料遠超過它自己的基線，或在你不在的時候還在工作。
+          每則警示都會指出是哪個數字觸發了它，所以你可以不同意它。</li>
+        <li><strong>超出你所允許範圍的代理。</strong>每個代理各有一份允許清單，還有拒絕清單之外連線的規則；拒絕會被記錄下來，
+          一鍵就能改成允許。</li>
+        <li><strong>被動過手腳的更新。</strong>每個版本都會公布一組總和檢查碼；更新程式會拒絕它無法驗證的下載，也會拒絕安裝
+          簽章團隊與正在要求更新的那份副本不同的 App。</li>
+      </ul>
+
+      <h2 id="root">擁有 root 的軟體可以把它關掉</h2>
+      <p>Flowlight 以你的身分執行，並使用一個由 macOS 代它啟動的系統延伸功能。任何以 root 執行的東西 — 或任何你核准過安裝程式的
+        東西 — 都可以卸載那個延伸功能、停掉這個 App，或刪掉它的資料庫。設計上沒有任何東西擋得住這件事，而 macOS 上的任何監控工具，
+        都無法一邊擋住它，一邊還是一個你自己也能關掉的工具。</p>
+      <p>誠實的說法比較窄，而且依然有用：行為不端、但沒有主動躲避監控的軟體會被看見。主動躲避監控的軟體可能不會被看見，
+        但它至少會留下一個缺口 — 一個停掉的延伸功能、一段沒有資料的時間 — 而<a href="{{link:docs}}#coverage">「涵蓋範圍」</a>
+        畫面就是為了把它顯示出來。</p>
+
+      <h2 id="capture">擷取會漏掉什麼</h2>
+      <ul>
+        <li><strong>擷取開始之前的流量。</strong>沒有事後補齊。在過濾器之前就已經開啟的連線，從來沒有被交給它。</li>
+        <li><strong>不受內容過濾器管轄的系統服務。</strong>macOS 不會把所有東西都給內容過濾器看；它自己的一部分流量永遠到不了我們這裡。</li>
+        <li><strong>那個位置被另一個內容過濾器佔著。</strong>macOS 一次只執行一個。如果有 VPN 或安全代理佔著它，Flowlight 的過濾器
+          會安裝、也會連接，但永遠不會被要求過濾任何東西 — 「擷取」會直接說明，而不是給你一個空白畫面。</li>
+        <li><strong>短連線，在取樣器上。</strong>沒有延伸功能時，Flowlight 每秒讀取一次計數器：在兩次讀取之間開啟又關閉的連線，
+          永遠不會被記錄。</li>
+        <li><strong>不是 TCP 也不是 UDP 的通道。</strong>藍牙和 USB 是以裝置的形式看得到，不是以位元組的形式。代理的本機 MCP
+          伺服器透過管道溝通，那根本不是網路流量，任何地方都不會出現。</li>
+      </ul>
+
+      <h2 id="inspection">檢查會漏掉什麼</h2>
+      <p>HTTPS 檢查只讀得到轉送經過 Flowlight 本機代理伺服器的東西，而這件事是由程式在啟動的那一刻決定的。忽略代理伺服器設定的
+        App、在檢查開啟之前就啟動的 App，或使用憑證綁定的 App，都會原封不動地直接通過 — 這是刻意的，因為弄壞一條綁定憑證的連線，
+        就等於弄壞那個 App。QUIC 同樣不會交給代理伺服器。</p>
+      <p>所以「檢查」畫面是空的，意思是「沒有東西被轉送到這裡」，而不是「什麼都沒發生」。到底是哪一種，「涵蓋範圍」會按 App
+        逐個說明。</p>
+
+      <h2 id="blocking">封鎖是什麼，不是什麼</h2>
+      <p>一條拒絕連線的規則是由網路延伸功能執行的，就在連線的路徑上，在連線建立之前。一條指名 URL 的規則則由檢查用的代理伺服器
+        執行，它用 App 讀得到的狀態來回答那個請求。這兩處是 Flowlight 裡唯一動手、而不只是回報的部分 — nettop 取樣器什麼都拒絕不了，
+        所以在用取樣器的 Mac 上，沒有任何規則會被強制執行，而 Flowlight 會把這一點說出來，而不是擺一個什麼都不做的開關。</p>
+      <p>但它依然不是防護。一個還能執行 shell 的代理，可以自己動手做那個被拒絕的工具原本要做的事。一次你能一鍵解除的拒絕，
+        也是代理下一次嘗試就可能走過去的拒絕。本機流量、DNS、Apple 自己的服務，以及 Flowlight 自己的連線永遠不會被拒絕，
+        因為一台被封死的 Mac 比一個被封住的代理更糟。而且 Flowlight 停止執行後幾秒，強制執行就會失效：
+        沒人看得到的拒絕比不拒絕更糟。</p>
+      <p><strong>檢查與拒絕無法並存。</strong>經由 Flowlight 自己的代理伺服器轉送的流量，是以 Flowlight 的流量的身分離開這台 Mac 的，
+        而 Flowlight 從不拒絕自己 — 所以一個你正在讀它請求的 App，也就是一個規則再也攔不住它連線的 App。為了看得更多而開啟檢查，
+        代價就是強制執行，而畫面上先前並沒有說這件事。</p>
+
+      <h2 id="itself">Flowlight 自己留著什麼</h2>
+      <p>流量的後設資料，放在本機的 SQLite 資料庫裡，保留期限有公布。開啟 HTTPS 檢查後，它還會把請求與回應的內文留 3 天 —
+        那是它留下來的東西裡最敏感的。憑證類標頭會依名稱、也依其中的字詞遮蔽，那是一種推測規則，不是保證；
+        一個把祕密放在沒人認得的名稱底下的標頭，是可能被記錄下來的。</p>
+      <p>流量資料庫從不上傳。不過確實有三樣比較小的東西，會在你沒有要求的情況下離開這台 Mac，它們都在<a href="{{link:privacy}}">隱私頁面</a>上
+        逐項列出：更新檢查，它在啟動時和每天一次向 GitHub 詢問最新的發布；網路擁有者查詢，它就沒有主機名稱的公開位址向 Team Cymru
+        詢問；以及，當 Flowlight 在讀計數器而不是執行它的延伸功能時，對那些它沒看到名稱的位址所做的一次反向 DNS 查詢。前兩樣都有
+        關閉開關。第三樣沒有，因為在取樣器上，一條連線能有名稱，大半就靠它 — 這個查詢會走這台 Mac 本來就在用的解析器，而一旦
+        延伸功能接手、從流量本身為連線命名，它就停了。用託管模型「提問」送出去的東西，比它們任何一個都多得多，而它也是唯一在你
+        設定之前一直關著的。</p>
+
+      <h2 id="updates">更新</h2>
+      <p>版本以 Developer ID 簽章並經過公證。更新程式要求有公布的總和檢查碼，沒有就拒絕下載；接著會在安裝之前確認下載到的 App
+        是否由與執行中副本相同的團隊簽章。由別人簽章的更新會被拒絕，即使它在其他方面都有效。</p>
+
+      <h2 id="reporting">回報漏洞</h2>
+      <p>請使用 GitHub 的<a href="https://github.com/{{repo}}/security/advisories/new">私密漏洞回報</a>，或者如果你不想用
+        GitHub，可以寄信到 <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>。
+        <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a> 寫明了哪些屬於範圍之內，以及你可以期待什麼。
+        一般的問題 — 當掉、數字不對、畫面有誤導 — 請改開<a href="https://github.com/{{repo}}/issues">issue</a>。</p>
+    </article>
+  </div>
+</main>

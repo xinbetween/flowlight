@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Origens</strong>
-          <a href="#capture">Captura</a><a href="#devices">Dispositivos</a>
+          <a href="#capture">Captura</a><a href="#coverage">Cobertura</a><a href="#devices">Dispositivos</a>
         </div>
         <div class="toc-group">
           <strong>Definições e dados</strong>
@@ -95,12 +95,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <table>
         <tr><th>Vista</th><th>Atalho</th><th>A que responde</th></tr>
         <tr><td>Em direto</td><td>⌘1</td><td>O que se move neste momento: taxas por app nos últimos segundos e o destino mais ativo.</td></tr>
-        <tr><td>Agentes de IA</td><td>⌘2</td><td>Que agentes estão ativos, que fornecedores de IA usam e com que mais contactaram.</td></tr>
+        <tr><td><a href="#agents">Agentes de IA</a></td><td>⌘2</td><td>Que agentes estão ativos, que fornecedores de IA usam e com que mais contactaram.</td></tr>
         <tr><td>Relatórios</td><td>⌘3</td><td>Para onde foi o tráfego, do segundo ao ano. Agrupe por App, Destino ou IP; mude para Gráficos ou <a href="#worth-a-look">Vale a pena ver</a>; exporte em CSV.</td></tr>
-        <tr><td>Alertas</td><td>⌘4</td><td>Tudo o que pareceu invulgar, com a app, o destino e o número que disparou a regra.</td></tr>
-        <tr><td>Inspecionar</td><td>⌘5</td><td>Opcional: pedidos desencriptados dos agentes que encaminha pelo Flowlight e as chamadas de ferramentas por trás deles. A pesquisa entra nos corpos dos pedidos e das respostas.</td></tr>
-        <tr><td>Captura</td><td>⌘6</td><td>Que motor está a registar, o estado da extensão, a aprendizagem de nomes de anfitrião e onde está a base de dados.</td></tr>
+        <tr><td><a href="#alerts">Alertas</a></td><td>⌘4</td><td>Tudo o que pareceu invulgar, com a app, o destino e o número que disparou a regra.</td></tr>
+        <tr><td><a href="#rules">Regras</a></td><td>⌘5</td><td>Todas as listas de permissões e recusas que definiu, o que cada uma abrange e o que de facto travou.</td></tr>
+        <tr><td><a href="#ask">Perguntar</a></td><td>⌘6</td><td>Perguntas sobre o seu próprio tráfego em linguagem simples, respondidas a partir do histórico registado por um modelo local ou alojado.</td></tr>
+        <tr><td><a href="#inspection">Inspecionar</a></td><td>⌘7</td><td>Opcional: pedidos desencriptados dos agentes que encaminha pelo Flowlight e as chamadas de ferramentas por trás deles. A pesquisa entra nos corpos dos pedidos e das respostas.</td></tr>
+        <tr><td><a href="#devices">Dispositivos</a></td><td>⌘8</td><td>Desligado até o ligar: Bluetooth, USB e armazenamento externo, que um Mac usa tanto como usa a rede.</td></tr>
+        <tr><td><a href="#coverage">Cobertura</a></td><td>⌘9</td><td>O que o Flowlight não consegue contabilizar — por app, se o seu tráfego foi visto, nomeado e legível.</td></tr>
+        <tr><td><a href="#capture">Captura</a></td><td>⌘0</td><td>Que motor está a registar, o estado da extensão, a aprendizagem de nomes de anfitrião e onde está a base de dados.</td></tr>
       </table>
+      <p>Os atalhos seguem a ordem da barra lateral, por isso ⌘0 é o décimo item e não uma posição saltada.</p>
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
+        alt="A vista Em direto: uma lista de aplicações com as suas taxas de envio e receção atuais e o destino mais ativo."></div>
+        <figcaption class="caption">Em direto, a vista com que o Flowlight abre.</figcaption></figure>
       <p>Em Relatórios, passe o rato sobre uma barra para ver que apps a produziram, clique nela para ampliar e faça duplo clique numa linha para restringir o relatório a essa linha.</p>
 
       <h2 id="agents">Regras dos agentes de IA</h2>
@@ -235,9 +243,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
         e inicie-os aí. Em <strong>Avançado</strong> pode desencriptar só os agentes de IA em vez de todas as apps, editar a lista dos nunca desencriptados, copiar
         a configuração da shell para uma shell, ou remover o certificado e tudo o que foi registado.</p>
       <p>O Flowlight exclui da desencriptação a sua lista integrada de serviços da Apple e de gestores de palavras-passe (edite a lista em Configurar). As apps que fixam os seus certificados podem rejeitar o
-        certificado do Flowlight; o Flowlight deteta-o e deixa-as passar encriptadas. As chaves de API, os cookies e outros cabeçalhos de credenciais nunca são
-        guardados, os pedidos registados são mantidos 3 dias, e <strong>Remover o certificado e os dados registados</strong> elimina o certificado, a sua definição de
+        certificado do Flowlight; o Flowlight deteta-o e deixa-as passar encriptadas. As chaves de API, os cookies e outros cabeçalhos de credenciais são substituídos pelo
+        respetivo comprimento antes de algo ser guardado — reconhecidos pelo nome e pelas palavras do nome, o que apanha a grafia própria de um
+        fornecedor mas não pode prometer apanhar todos —, os pedidos registados são mantidos 3 dias, e <strong>Remover o certificado e os dados registados</strong> elimina o certificado, a sua definição de
         confiança e tudo o que foi registado. A inspeção é apenas HTTP/1.1 (o Flowlight pede-o a ambos os lados) e não está disponível no modo de demonstração.</p>
+
+      <p><strong>Chegar aqui a partir de uma linha.</strong> Clique com o botão direito numa app ou num destino em Em direto, Relatórios ou Agentes de
+        IA e escolha <strong>Inspecionar o tráfego de …</strong>: o Inspecionar abre com esse nome já no campo de pesquisa. Ser o campo de pesquisa e
+        não um filtro escondido é de propósito — pode alargá-lo, apertá-lo ou limpá-lo sem voltar a onde começou. Só pode aparecer o tráfego que passou
+        pelo proxy, por isso uma linha que sabe estar movimentada pode ainda assim não mostrar nada aqui.</p>
 
       <h2 id="mocks">Respostas simuladas</h2>
       <p>Para ver como um agente se comporta quando uma API falha, fica bloqueada ou devolve algo estranho, responda você a esse endpoint. Em
@@ -368,6 +382,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         não precisa de filtro e funciona ao lado deles.
         Veja <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">o guia de desenvolvimento</a> para saber como é construído.</p>
 
+      <h2 id="coverage">Cobertura: o que o Flowlight não consegue contabilizar</h2>
+      <p>Todos os outros ecrãs respondem ao que aconteceu. A <strong>Cobertura</strong> responde ao que não lhe teria sido dito, e é isso que decide
+        quanto valem os outros ecrãs. Faz três perguntas por app, porque falham de forma independente.</p>
+      <p><strong>Foi visto?</strong> A extensão de rede vê cada fluxo à medida que abre. O amostrador nettop lê contadores uma vez por segundo, por isso
+        uma ligação que abre e fecha entre duas leituras — uma consulta DNS, uma chamada de API rápida, um script que executa <code>curl</code> e sai —
+        falta por completo. É uma falha que nenhuma percentagem consegue expressar, por isso está dita por palavras em vez de pontuada.</p>
+      <p><strong>Foi nomeado?</strong> A proporção dos <em>bytes</em> dessa app que foram para um destino com nome de anfitrião em vez de um endereço
+        simples. Bytes, não ligações: uma ligação sem nome que leva um gigabyte é um buraco maior do que cem que levam um kilobyte cada uma, e contar
+        ligações ordena-as ao contrário.</p>
+      <p><strong>Era legível?</strong> Se a inspeção HTTPS desencriptou alguma coisa do tráfego dessa app. Quatro respostas, e só uma é uma falha: está
+        a ser lido; nunca chegou ao proxy; a app está na lista Nunca desencriptado, o que é uma escolha sua; ou a inspeção está desativada, o que é uma
+        definição e não uma falha app por app.</p>
+      <p><strong>O que nenhum motor vê de forma alguma</strong> está listado no próprio ecrã e não deixado a esta página: o tráfego anterior ao início
+        da captura, os serviços do sistema que nunca são mostrados aos filtros de conteúdo, as apps que fixam os seus certificados, o QUIC que nunca é
+        oferecido ao proxy e o servidor MCP local de um agente que fala com ele por um pipe. Nada disto aparece em qualquer parte do Flowlight, por isso
+        também falta nestes números — um número de cobertura que contasse só o que consegue ver seria um sossego e não um facto.</p>
+
       <h2 id="devices">Dispositivos: Bluetooth, USB e armazenamento externo</h2>
       <p>Um Mac envia e recebe por mais do que TCP e UDP. O ecrã <strong>Dispositivos</strong> cobre o resto e está desativado
         até o ativar — não porque precise de uma permissão que o Flowlight já não tenha, mas porque vigiar mais do seu
@@ -495,8 +526,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Mostra que extensões estão instaladas, se o macOS realmente iniciou o filtro do Flowlight e há quanto tempo foi registado algo.
           Cole isso <a href="https://github.com/{{repo}}/issues">num problema</a>.</dd>
         <dt><strong>O Flowlight envia algo sobre mim para algum lado?</strong></dt>
-        <dd>Não. Não há conta, nem telemetria, nem analítica. Os únicos pedidos que faz são a procura diária de atualizações, as consultas opcionais de
-          proprietários da rede e o DNS inverso — cada um listado, e cada um com um interruptor para desativar, na <a href="{{link:privacy}}">página de privacidade</a>.</dd>
+        <dd>Não há conta, nem telemetria, nem analítica, e a sua base de dados de tráfego nunca é enviada. Três pedidos saem do Mac, todos listados na
+          <a href="{{link:privacy}}">página de privacidade</a>: a procura diária de atualizações e a consulta opcional do proprietário da rede, ambas com
+          interruptores para desativar, e o DNS inverso enquanto o Flowlight está no amostrador, que não tem nenhum — sem ele, o amostrador não conseguiria
+          dar nome à maioria das ligações.</dd>
         <dt><strong>Vai tornar o meu Mac mais lento ou gastar a bateria?</strong></dt>
         <dd>Com a janela fechada, o Flowlight quase não faz nada: mantém as taxas na barra de menus e escreve uma linha por segundo. A extensão de rede
           custa menos do que o amostrador de reserva, que inicia um processo <code>nettop</code> de vida curta a cada segundo.</dd>

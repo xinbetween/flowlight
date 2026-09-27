@@ -32,11 +32,9 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 說明文件", "item": "https://flowlight.xinbetween.com/zh-Hant/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/docs/#faq", "mainEntity": [{"@type": "Question", "name": "macOS 為什麼向 Flowlight 要求存取我的「桌面」或「文件」？", "acceptedAnswer": {"@type": "Answer", "text": "只因為你把它指向了其中一個裡面的專案檔案夾。預設情況下，Flowlight 只從你個人專屬檔案夾中的那些檔案夾 讀取代理設定，絕不會碰那三個檔案夾。"}}, {"@type": "Question", "name": "Flowlight 看得到我的全部流量，還是會漏掉一些？", "acceptedAnswer": {"@type": "Answer", "text": "這取決於你用哪個擷取引擎，而差別並不細微。預設的取樣器每秒讀取一次 macOS 的位元組 累計計數器並記錄變化量，所以長時間的傳輸計得很精確 — 但在兩次讀取之間開啟又關閉的連線， 完全不會出現。網路延伸功能則是每建立一條連線 macOS 就會呼叫它，所以連五毫秒的請求也會被記錄。 如果你要監看一個會發出大量短請求的 AI 代理，請從「擷取」安裝 延伸功能。完整的比較就在上面。"}}, {"@type": "Question", "name": "我開啟了網路延伸功能，卻什麼都沒出現。取樣器倒是很正常。", "acceptedAnswer": {"@type": "Answer", "text": "幾乎都是因為那個位置已經被另一個內容過濾器佔住了。macOS 一次只執行一個內容過濾器，而 企業安全軟體通常會把它拿下 — Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之類。Flowlight 的 過濾器照樣會安裝、啟用並連接，所以「擷取」會說已連接過濾器延伸功能，但 macOS 從來不會交給它 任何一條連線，畫面也就一直空著。「擷取」會列出它找到的過濾器，並提議把你切回 取樣器：取樣器不使用過濾器，也能和它們並存。你只會損失非常短的連線 （見比較表），其他一切的記錄方式都相同。"}}, {"@type": "Question", "name": "Flowlight 更新之後，延伸功能就不動了。", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 之前的版本有這個問題：macOS 會一直執行最後一次啟用的那個延伸功能建置版本，所以更新之後 延伸功能還是舊版，而 macOS 會拒絕版本不一致的兩者之間的連接。從 0.2.5 起，Flowlight 會在啟動時檢查 並自行重新啟用過濾器。如果你用的是更舊的版本，請在「擷取」中按一次「安裝並啟用過濾器」。"}}, {"@type": "Question", "name": "擷取還有別的問題，而我不知道是什麼。", "acceptedAnswer": {"@type": "Answer", "text": "執行這個指令，然後讀它印出的內容 — 它只回報狀態和計數，絕不包含 Flowlight 記錄下來的任何流量內容： curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh拷貝 它會顯示安裝了哪些延伸功能、macOS 是否真的啟動了 Flowlight 的過濾器，以及最近一次記錄是多久以前。 把結果貼到問題回報裡。"}}, {"@type": "Question", "name": "Flowlight 會把關於我的任何東西送到別處嗎？", "acceptedAnswer": {"@type": "Answer", "text": "不會。沒有帳號、沒有遙測、也沒有分析。它唯一會發出的請求是每天的更新檢查、選用的網路擁有者 查詢，以及反向 DNS — 每一項都列在隱私頁面上，每一項都有關閉開關。"}}, {"@type": "Question", "name": "它會讓我的 Mac 變慢或耗電嗎？", "acceptedAnswer": {"@type": "Answer", "text": "視窗關著時，Flowlight 幾乎什麼都不做：只維持選單列上的速率，並每秒寫入一列資料。網路延伸功能 比備用的取樣器更省，後者每秒都會啟動一個短命的 nettop 程序。"}}, {"@type": "Question", "name": "它能封鎖連線嗎？", "acceptedAnswer": {"@type": "Answer", "text": "可以，搭配網路延伸功能。代理的允許清單除了警示也能拒絕，規則可以封鎖一個 App、 一個目標或一個 URL，時間長短由你決定，而防護機制可以在工具送到模型面前之前， 先把它從代理手上拿走。在你要求之前不會封鎖任何東西，而每一次拒絕都帶著它的退路。"}}, {"@type": "Question", "name": "我一定要用網路延伸功能嗎？", "acceptedAnswer": {"@type": "Answer", "text": "不用。取樣器不需要任何權限授權，也涵蓋了大部分流量。延伸功能額外提供短於一秒的流量、以程式碼 簽章歸屬、不需封包擷取設定也能取得主機名稱，而且它是唯一能拒絕連線的引擎。"}}, {"@type": "Question", "name": "如果我解除安裝，我的資料會怎樣？", "acceptedAnswer": {"@type": "Answer", "text": "所有資料都在 ~/Library/Application Support/Flowlight。刪掉那個檔案夾就沒了；封包擷取輔助程式和 檢查用的憑證請見解除安裝。"}}]}]}</script>
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 說明文件", "item": "https://flowlight.xinbetween.com/zh-Hant/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/docs/#faq", "mainEntity": [{"@type": "Question", "name": "macOS 為什麼向 Flowlight 要求存取我的「桌面」或「文件」？", "acceptedAnswer": {"@type": "Answer", "text": "只因為你把它指向了其中一個裡面的專案檔案夾。預設情況下，Flowlight 只從你個人專屬檔案夾中的那些檔案夾 讀取代理設定，絕不會碰那三個檔案夾。"}}, {"@type": "Question", "name": "Flowlight 看得到我的全部流量，還是會漏掉一些？", "acceptedAnswer": {"@type": "Answer", "text": "這取決於你用哪個擷取引擎，而差別並不細微。預設的取樣器每秒讀取一次 macOS 的位元組 累計計數器並記錄變化量，所以長時間的傳輸計得很精確 — 但在兩次讀取之間開啟又關閉的連線， 完全不會出現。網路延伸功能則是每建立一條連線 macOS 就會呼叫它，所以連五毫秒的請求也會被記錄。 如果你要監看一個會發出大量短請求的 AI 代理，請從「擷取」安裝 延伸功能。完整的比較就在上面。"}}, {"@type": "Question", "name": "我開啟了網路延伸功能，卻什麼都沒出現。取樣器倒是很正常。", "acceptedAnswer": {"@type": "Answer", "text": "幾乎都是因為那個位置已經被另一個內容過濾器佔住了。macOS 一次只執行一個內容過濾器，而 企業安全軟體通常會把它拿下 — Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之類。Flowlight 的 過濾器照樣會安裝、啟用並連接，所以「擷取」會說已連接過濾器延伸功能，但 macOS 從來不會交給它 任何一條連線，畫面也就一直空著。「擷取」會列出它找到的過濾器，並提議把你切回 取樣器：取樣器不使用過濾器，也能和它們並存。你只會損失非常短的連線 （見比較表），其他一切的記錄方式都相同。"}}, {"@type": "Question", "name": "Flowlight 更新之後，延伸功能就不動了。", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 之前的版本有這個問題：macOS 會一直執行最後一次啟用的那個延伸功能建置版本，所以更新之後 延伸功能還是舊版，而 macOS 會拒絕版本不一致的兩者之間的連接。從 0.2.5 起，Flowlight 會在啟動時檢查 並自行重新啟用過濾器。如果你用的是更舊的版本，請在「擷取」中按一次「安裝並啟用過濾器」。"}}, {"@type": "Question", "name": "擷取還有別的問題，而我不知道是什麼。", "acceptedAnswer": {"@type": "Answer", "text": "執行這個指令，然後讀它印出的內容 — 它只回報狀態和計數，絕不包含 Flowlight 記錄下來的任何流量內容： curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh拷貝 它會顯示安裝了哪些延伸功能、macOS 是否真的啟動了 Flowlight 的過濾器，以及最近一次記錄是多久以前。 把結果貼到問題回報裡。"}}, {"@type": "Question", "name": "Flowlight 會把關於我的任何東西送到別處嗎？", "acceptedAnswer": {"@type": "Answer", "text": "沒有帳號、沒有遙測、也沒有分析，而且你的流量資料庫從不上傳。確實有三個請求會離開這台 Mac，它們都列在隱私頁面上： 每天的更新檢查和選用的網路擁有者查詢，這兩個都有關閉開關；以及 Flowlight 在取樣器上執行時的反向 DNS，它沒有開關 — 少了它，取樣器就沒辦法為大多數連線命名。"}}, {"@type": "Question", "name": "它會讓我的 Mac 變慢或耗電嗎？", "acceptedAnswer": {"@type": "Answer", "text": "視窗關著時，Flowlight 幾乎什麼都不做：只維持選單列上的速率，並每秒寫入一列資料。網路延伸功能 比備用的取樣器更省，後者每秒都會啟動一個短命的 nettop 程序。"}}, {"@type": "Question", "name": "它能封鎖連線嗎？", "acceptedAnswer": {"@type": "Answer", "text": "可以，搭配網路延伸功能。代理的允許清單除了警示也能拒絕，規則可以封鎖一個 App、 一個目標或一個 URL，時間長短由你決定，而防護機制可以在工具送到模型面前之前， 先把它從代理手上拿走。在你要求之前不會封鎖任何東西，而每一次拒絕都帶著它的退路。"}}, {"@type": "Question", "name": "我一定要用網路延伸功能嗎？", "acceptedAnswer": {"@type": "Answer", "text": "不用。取樣器不需要任何權限授權，也涵蓋了大部分流量。延伸功能額外提供短於一秒的流量、以程式碼 簽章歸屬、不需封包擷取設定也能取得主機名稱，而且它是唯一能拒絕連線的引擎。"}}, {"@type": "Question", "name": "如果我解除安裝，我的資料會怎樣？", "acceptedAnswer": {"@type": "Answer", "text": "所有資料都在 ~/Library/Application Support/Flowlight。刪掉那個檔案夾就沒了；封包擷取輔助程式和 檢查用的憑證請見解除安裝。"}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳至內容</a>
@@ -47,6 +45,7 @@
       <a href="../../zh-Hant/#agents">AI 代理</a>
       <a href="../../zh-Hant/docs/" aria-current="page">說明文件</a>
       <a href="../../zh-Hant/privacy/">隱私</a>
+      <a href="../../zh-Hant/threat-model/">威脅模型</a>
       <a href="../../releases/">版本</a>
       <a href="../../zh-Hant/about/">關於</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -90,7 +89,7 @@
         </div>
         <div class="toc-group">
           <strong>來源</strong>
-          <a href="#capture">擷取</a><a href="#devices">裝置</a>
+          <a href="#capture">擷取</a><a href="#coverage">涵蓋範圍</a><a href="#devices">裝置</a>
         </div>
         <div class="toc-group">
           <strong>設定與資料</strong>
@@ -149,12 +148,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <table>
         <tr><th>畫面</th><th>快速鍵</th><th>它回答什麼</th></tr>
         <tr><td>即時</td><td>⌘1</td><td>現在有什麼在傳：最近幾秒各 App 的速率，以及最忙的目標。</td></tr>
-        <tr><td>AI 代理</td><td>⌘2</td><td>哪些代理在活動、它們用哪些 AI 供應商，以及它們還連過什麼。</td></tr>
+        <tr><td><a href="#agents">AI 代理</a></td><td>⌘2</td><td>哪些代理在活動、它們用哪些 AI 供應商，以及它們還連過什麼。</td></tr>
         <tr><td>報告</td><td>⌘3</td><td>流量去了哪裡，從秒到年。依 App、目標或 IP 分組；切換到「圖表」或<a href="#worth-a-look">「值得一看」</a>；匯出 CSV。</td></tr>
-        <tr><td>警示</td><td>⌘4</td><td>所有看起來不尋常的事，附上 App、目標，以及觸發規則的那個數字。</td></tr>
-        <tr><td>檢查</td><td>⌘5</td><td>選用：你轉送經過 Flowlight 的代理，其解密後的請求，以及背後的工具呼叫。搜尋也會查進請求與回應的內文。</td></tr>
-        <tr><td>擷取</td><td>⌘6</td><td>目前由哪個引擎記錄、延伸功能的狀態、主機名稱學習，以及資料庫存放的位置。</td></tr>
+        <tr><td><a href="#alerts">警示</a></td><td>⌘4</td><td>所有看起來不尋常的事，附上 App、目標，以及觸發規則的那個數字。</td></tr>
+        <tr><td><a href="#rules">規則</a></td><td>⌘5</td><td>你設過的每一條允許清單和拒絕，各自管到哪裡，以及實際攔下了什麼。</td></tr>
+        <tr><td><a href="#ask">提問</a></td><td>⌘6</td><td>用平常的話問你自己的流量，由本機模型或託管模型從記錄下來的歷史裡作答。</td></tr>
+        <tr><td><a href="#inspection">檢查</a></td><td>⌘7</td><td>選用：你轉送經過 Flowlight 的代理，其解密後的請求，以及背後的工具呼叫。搜尋也會查進請求與回應的內文。</td></tr>
+        <tr><td><a href="#devices">裝置</a></td><td>⌘8</td><td>在你開啟之前都是關的：藍牙、USB 與外接儲存裝置，一台 Mac 用它們跟用網路一樣多。</td></tr>
+        <tr><td><a href="#coverage">涵蓋範圍</a></td><td>⌘9</td><td>Flowlight 說不清的部分 — 依 App 逐一列出，它的流量有沒有被看到、被命名、被讀懂。</td></tr>
+        <tr><td><a href="#capture">擷取</a></td><td>⌘0</td><td>目前由哪個引擎記錄、延伸功能的狀態、主機名稱學習，以及資料庫存放的位置。</td></tr>
       </table>
+      <p>快速鍵就是側邊欄的順序，所以 ⌘0 是第十項，而不是被跳過的位置。</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=07a261f8" loading="lazy"
+        alt="即時畫面：一列 App，各自帶著目前的傳送與接收速率，以及最忙的目標。"></div>
+        <figcaption class="caption">即時，Flowlight 開啟時的那個畫面。</figcaption></figure>
       <p>在「報告」中，把指標移到長條上可以看出是哪些 App 造成的，點一下可以放大，任一列雙按則把報告縮小到那一列。</p>
 
       <h2 id="agents">AI 代理規則</h2>
@@ -287,9 +294,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
         並在那裡啟動它們。在<strong>「進階」</strong>中，你可以只解密 AI 代理而不是每個 App、編輯永不解密清單、拷貝
         單一 shell 的設定，或移除憑證與所有記錄下來的內容。</p>
       <p>Flowlight 會把內建清單中的 Apple 服務和密碼管理程式排除在解密之外（清單可在「設定…」中編輯）。使用憑證綁定的 App 可能會拒絕
-        Flowlight 的憑證；Flowlight 會偵測到並讓它們以加密狀態直接通過。API 金鑰、cookie 和其他憑證類標頭一律不會
-        儲存，記錄的請求保留 3 天，而<strong>「移除憑證與記錄的資料」</strong>會刪除憑證、它的信任
+        Flowlight 的憑證；Flowlight 會偵測到並讓它們以加密狀態直接通過。API 金鑰、cookie 和其他憑證類標頭在任何內容儲存之前
+        就會被換成它們的長度 — 依名稱、也依名稱中的字詞比對，這能抓到某家廠商自己的寫法，但不能保證一個都不漏 — 記錄的請求保留 3 天，而<strong>「移除憑證與記錄的資料」</strong>會刪除憑證、它的信任
         設定，以及所有記錄下來的內容。檢查功能只支援 HTTP/1.1（Flowlight 會向雙方要求），而且在示範模式中無法使用。</p>
+
+      <p><strong>從一列直接過來。</strong>在即時、報告或 AI 代理裡按右鍵點一個 App 或一個目的地，選<strong>「檢查 … 的流量」</strong>：
+        檢查會開啟，而那個名稱已經填在搜尋欄裡。用搜尋欄而不是一個隱藏的過濾條件是刻意的 — 你可以把它放寬、縮小或清空，不必回到
+        你出發的地方。只有經過代理伺服器的流量才可能出現，所以一列你知道很忙的記錄，在這裡仍可能什麼都看不到。</p>
 
       <h2 id="mocks">模擬回應</h2>
       <p>想知道 API 失敗、卡住或回傳奇怪內容時代理會怎麼應對，就自己來回應那個端點。在
@@ -419,6 +430,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         把你切回取樣器：取樣器不需要過濾器，也能和它們並存。
         想知道它是怎麼做出來的，請看<a href="https://github.com/xinbetween/flowlight/blob/main/docs/DEVELOPMENT.md">開發者指南</a>。</p>
 
+      <h2 id="coverage">涵蓋範圍：Flowlight 說不清的部分</h2>
+      <p>其他每個畫面回答的都是發生了什麼。<strong>涵蓋範圍</strong>回答的是有什麼本來不會被告知，而這決定了其他畫面值多少。
+        它對每個 App 問三個問題，因為這三件事是各自獨立地失效的。</p>
+      <p><strong>有沒有被看到？</strong>網路延伸功能在每一條流量建立時就看到它。nettop 取樣器每秒讀一次計數器，所以在兩次讀取之間
+        開啟又關閉的連線 — 一次 DNS 查詢、一次很快的 API 呼叫、一個執行 <code>curl</code> 後就結束的指令檔 — 會整條漏掉。那是任何
+        百分比都表達不了的缺口，所以這裡用文字寫出來，而不是給它打分數。</p>
+      <p><strong>有沒有名稱？</strong>這個 App 的<em>位元組</em>中，送到有主機名稱（而不是只有一個位址）的目的地的比例。是位元組，
+        不是連線數：一條沒有名稱卻送走 1 GB 的連線，比一百條各送 1 KB 的連線是更大的洞，而按連線數來數，排序恰好相反。</p>
+      <p><strong>內容讀不讀得到？</strong>HTTPS 檢查有沒有解密這個 App 的任何一點流量。有四個答案，其中只有一個才是缺口：正在被讀；
+        它從來沒有到達代理伺服器；它在「永不解密」清單中，那是你自己做的選擇；或者檢查是關閉的，那是一項設定，而不是某個 App 上的失敗。</p>
+      <p><strong>任何引擎都完全看不到的東西</strong>列在畫面上，而不是丟給這個頁面：擷取開始之前的流量、從來不會交給內容過濾器的
+        系統服務、使用憑證綁定的 App、從來不會交給代理伺服器的 QUIC，以及某個代理透過管道與它通訊的本機 MCP 伺服器。這些在
+        Flowlight 的任何地方都不會出現，所以也不在這些數字裡 — 一個只數自己看得到的東西的涵蓋率，會是一種安慰，而不是一個事實。</p>
+
       <h2 id="devices">裝置：藍牙、USB 與外接儲存裝置</h2>
       <p>一台 Mac 的收發不只有 TCP 和 UDP。<strong>「裝置」</strong>畫面負責其餘的部分，而且要等你開啟才會
         作用 — 不是因為它需要 Flowlight 還沒有的權限，而是因為要不要監看你 Mac 的更多部分，
@@ -546,8 +571,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
           它會顯示安裝了哪些延伸功能、macOS 是否真的啟動了 Flowlight 的過濾器，以及最近一次記錄是多久以前。
           把結果貼到<a href="https://github.com/xinbetween/flowlight/issues">問題回報</a>裡。</dd>
         <dt><strong>Flowlight 會把關於我的任何東西送到別處嗎？</strong></dt>
-        <dd>不會。沒有帳號、沒有遙測、也沒有分析。它唯一會發出的請求是每天的更新檢查、選用的網路擁有者
-          查詢，以及反向 DNS — 每一項都列在<a href="../../zh-Hant/privacy/">隱私頁面</a>上，每一項都有關閉開關。</dd>
+        <dd>沒有帳號、沒有遙測、也沒有分析，而且你的流量資料庫從不上傳。確實有三個請求會離開這台 Mac，它們都列在<a href="../../zh-Hant/privacy/">隱私頁面</a>上：
+          每天的更新檢查和選用的網路擁有者查詢，這兩個都有關閉開關；以及 Flowlight 在取樣器上執行時的反向 DNS，它沒有開關 —
+          少了它，取樣器就沒辦法為大多數連線命名。</dd>
         <dt><strong>它會讓我的 Mac 變慢或耗電嗎？</strong></dt>
         <dd>視窗關著時，Flowlight 幾乎什麼都不做：只維持選單列上的速率，並每秒寫入一列資料。網路延伸功能
           比備用的取樣器更省，後者每秒都會啟動一個短命的 <code>nettop</code> 程序。</dd>

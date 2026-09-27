@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Quellen</strong>
-          <a href="#capture">Erfassung</a><a href="#devices">Geräte</a>
+          <a href="#capture">Erfassung</a><a href="#coverage">Abdeckung</a><a href="#devices">Geräte</a>
         </div>
         <div class="toc-group">
           <strong>Einstellungen und Daten</strong>
@@ -95,12 +95,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <table>
         <tr><th>Ansicht</th><th>Kurzbefehl</th><th>Was sie beantwortet</th></tr>
         <tr><td>Live</td><td>⌘1</td><td>Was sich gerade bewegt: Raten pro App über die letzten Sekunden und das meistgenutzte Ziel.</td></tr>
-        <tr><td>KI-Agenten</td><td>⌘2</td><td>Welche Agenten aktiv sind, welche KI-Anbieter sie nutzen und mit wem sie sonst gesprochen haben.</td></tr>
+        <tr><td><a href="#agents">KI-Agenten</a></td><td>⌘2</td><td>Welche Agenten aktiv sind, welche KI-Anbieter sie nutzen und mit wem sie sonst gesprochen haben.</td></tr>
         <tr><td>Berichte</td><td>⌘3</td><td>Wohin der Datenverkehr ging, von der Sekunde bis zum Jahr. Gruppiert nach App, Ziel oder IP; umschaltbar auf Diagramme oder <a href="#worth-a-look">Genauer hinsehen</a>; CSV-Export.</td></tr>
-        <tr><td>Warnungen</td><td>⌘4</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
-        <tr><td>Inspizieren</td><td>⌘5</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
-        <tr><td>Erfassung</td><td>⌘6</td><td>Welche Engine aufzeichnet, der Zustand der Erweiterung, das Lernen von Hostnamen und wo die Datenbank liegt.</td></tr>
+        <tr><td><a href="#alerts">Warnungen</a></td><td>⌘4</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
+        <tr><td><a href="#rules">Regeln</a></td><td>⌘5</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
+        <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
+        <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
+        <tr><td><a href="#devices">Geräte</a></td><td>⌘8</td><td>Aus, bis du es einschaltest: Bluetooth, USB und externe Speicher, die ein Mac genauso nutzt wie das Netzwerk.</td></tr>
+        <tr><td><a href="#coverage">Abdeckung</a></td><td>⌘9</td><td>Was Flowlight nicht belegen kann – pro App, ob sein Datenverkehr gesehen, benannt und lesbar war.</td></tr>
+        <tr><td><a href="#capture">Erfassung</a></td><td>⌘0</td><td>Welche Engine aufzeichnet, der Zustand der Erweiterung, das Lernen von Hostnamen und wo die Datenbank liegt.</td></tr>
       </table>
+      <p>Die Kurzbefehle sind die Reihenfolge der Seitenleiste, deshalb ist ⌘0 das zehnte Element und keine übersprungene Position.</p>
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
+        alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
+        <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
       <p>Fahre in Berichte über einen Balken, um zu sehen, welche Apps ihn getrieben haben, klicke ihn an, um hineinzuzoomen, und doppelklicke eine Zeile, um den Bericht darauf einzugrenzen.</p>
 
       <h2 id="agents">Regeln für KI-Agenten</h2>
@@ -235,9 +243,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         und starte sie dort. Unter <strong>Erweitert</strong> kannst du nur KI-Agenten statt aller Apps entschlüsseln, die Liste der nie entschlüsselten Ziele bearbeiten, die
         Shell-Einrichtung für eine Shell kopieren oder das Zertifikat und alles Aufgezeichnete entfernen.</p>
       <p>Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus (bearbeitbar in der Einrichtung). Apps, die ihre Zertifikate anpinnen, können das
-        Flowlight-Zertifikat ablehnen; Flowlight merkt das und lässt sie verschlüsselt durch. API-Schlüssel, Cookies und andere Header mit Zugangsdaten werden nie
-        gespeichert, aufgezeichnete Anfragen werden 3 Tage aufbewahrt, und <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht das Zertifikat, seine
+        Flowlight-Zertifikat ablehnen; Flowlight merkt das und lässt sie verschlüsselt durch. API-Schlüssel, Cookies und andere Header mit Zugangsdaten werden vor dem Speichern
+        durch ihre Länge ersetzt – erkannt nach Name und nach den Wörtern im Namen, was die eigene Schreibweise eines Anbieters mitfängt, aber
+        nicht versprechen kann, jede zu fangen –, aufgezeichnete Anfragen werden 3 Tage aufbewahrt, und <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht das Zertifikat, seine
         Vertrauenseinstellung und alles Aufgezeichnete. Die Inspektion läuft nur über HTTP/1.1 (Flowlight verlangt es von beiden Seiten) und ist im Demomodus nicht verfügbar.</p>
+
+      <p><strong>Wie du von einer Zeile aus hierherkommst.</strong> Klicke in Live, Berichten oder KI-Agenten mit der rechten Maustaste auf eine App
+        oder ein Ziel und wähle <strong>Datenverkehr von … inspizieren</strong>: Inspizieren öffnet sich, und der Name steht schon im Suchfeld. Dass
+        es das Suchfeld ist und kein verborgener Filter, ist Absicht – du kannst die Suche erweitern, einengen oder löschen, ohne dorthin
+        zurückzugehen, wo du angefangen hast. Erscheinen kann nur Datenverkehr, der über den Proxy gelaufen ist; eine Zeile, von der du weißt, dass
+        sie viel bewegt, kann hier also trotzdem nichts zeigen.</p>
 
       <h2 id="mocks">Mock-Antworten</h2>
       <p>Um zu sehen, wie ein Agent damit umgeht, dass eine API scheitert, hängt oder etwas Seltsames liefert, antworte diesem Endpunkt selbst. Unter
@@ -368,6 +383,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         keinen Filter braucht und neben ihnen funktioniert.
         Wie es gebaut ist, steht im <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">Entwicklerhandbuch</a>.</p>
 
+      <h2 id="coverage">Abdeckung: was Flowlight nicht belegen kann</h2>
+      <p>Jeder andere Bildschirm beantwortet, was passiert ist. <strong>Abdeckung</strong> beantwortet, was dir nicht gesagt worden wäre – und davon
+        hängt ab, wie viel die anderen Bildschirme wert sind. Sie stellt pro App drei Fragen, weil die drei unabhängig voneinander scheitern.</p>
+      <p><strong>Wurde es gesehen?</strong> Die Netzwerkerweiterung sieht jeden Flow beim Öffnen. Der nettop-Sampler liest Zähler einmal pro Sekunde,
+        eine Verbindung, die sich zwischen zwei Messungen öffnet und wieder schließt – eine DNS-Abfrage, ein kurzer API-Aufruf, ein Skript, das
+        <code>curl</code> ausführt und sich beendet –, fehlt also ganz. Das ist eine Lücke, die kein Prozentwert ausdrücken kann, und darum steht sie
+        in Worten da statt als Wert.</p>
+      <p><strong>Wurde es benannt?</strong> Der Anteil der <em>Bytes</em> dieser App, die an ein Ziel mit Hostnamen gingen und nicht an eine bloße
+        Adresse. Bytes, nicht Verbindungen: Eine unbenannte Verbindung, die ein Gigabyte trägt, ist ein größeres Loch als hundert, die je ein
+        Kilobyte tragen, und Verbindungen zu zählen ordnet sie genau umgekehrt.</p>
+      <p><strong>War es lesbar?</strong> Ob die HTTPS-Inspektion etwas vom Datenverkehr dieser App entschlüsselt hat. Vier Antworten, und nur eine ist
+        eine Lücke: Er wird gelesen; er hat den Proxy nie erreicht; die App steht auf der Liste „Nie entschlüsselt“, was deine eigene Entscheidung
+        ist; oder die Inspektion ist aus, was eine Einstellung ist und kein Versagen bei einer einzelnen App.</p>
+      <p><strong>Was keine Engine überhaupt sieht</strong>, steht auf dem Bildschirm selbst und wird nicht dieser Seite überlassen: Datenverkehr von
+        vor dem Start der Erfassung, Systemdienste, die Inhaltsfiltern nie gezeigt werden, Apps, die ihre Zertifikate pinnen, QUIC, das dem Proxy nie
+        angeboten wird, und der lokale MCP-Server eines Agenten, der über eine Pipe mit ihm spricht. Nichts davon erscheint irgendwo in Flowlight,
+        also fehlt es auch in diesen Zahlen – eine Abdeckungszahl, die nur zählte, was sie sehen kann, wäre eine Beruhigung und keine Tatsache.</p>
+
       <h2 id="devices">Geräte: Bluetooth, USB und externe Speicher</h2>
       <p>Ein Mac sendet und empfängt über mehr als TCP und UDP. Der Bildschirm <strong>Geräte</strong> deckt den Rest ab, und er ist aus,
         bis du ihn einschaltest – nicht weil es eine Berechtigung bräuchte, die Flowlight nicht schon hat, sondern weil mehr von deinem
@@ -495,8 +528,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Es zeigt, welche Erweiterungen installiert sind, ob macOS Flowlights Filter wirklich gestartet hat und wie kürzlich überhaupt etwas aufgezeichnet wurde.
           Füge es in <a href="https://github.com/{{repo}}/issues">ein Issue</a> ein.</dd>
         <dt><strong>Sendet Flowlight irgendetwas über mich irgendwohin?</strong></dt>
-        <dd>Nein. Es gibt kein Konto, keine Telemetrie und keine Analyse. Die einzigen Anfragen, die es stellt, sind die tägliche Update-Prüfung, optionale Abfragen
-          zum Netzinhaber und Reverse-DNS – jede aufgelistet und jede abschaltbar, auf der <a href="{{link:privacy}}">Datenschutzseite</a>.</dd>
+        <dd>Kein Konto, keine Telemetrie, keine Analyse, und deine Datenbank mit dem Datenverkehr wird nie hochgeladen. Drei Anfragen verlassen den Mac, alle auf der
+          <a href="{{link:privacy}}">Datenschutzseite</a> aufgelistet: die tägliche Update-Prüfung und die optionale Abfrage zum Netzinhaber, beide abschaltbar, und,
+          solange Flowlight auf dem Sampler läuft, Reverse-DNS, für das es keinen Schalter gibt – ohne es könnte der Sampler die meisten Verbindungen nicht benennen.</dd>
         <dt><strong>Macht es meinen Mac langsamer oder leert es den Akku?</strong></dt>
         <dd>Mit geschlossenem Fenster tut Flowlight fast nichts: Es hält die Raten in der Menüleiste und schreibt eine Zeile pro Sekunde. Die Netzwerkerweiterung
           kostet weniger als der Sampler als Rückfallebene, der jede Sekunde einen kurzlebigen <code>nettop</code>-Prozess startet.</dd>

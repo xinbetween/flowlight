@@ -1,0 +1,127 @@
+<!--
+title: Modello di minaccia di Flowlight
+description: Da cosa difende Flowlight, da cosa non può difendere e perché: osservare, non impedire.
+path: /threat-model/
+nav: threat-model
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Modello di minaccia</p>
+    <h1>Osservare, non impedire</h1>
+    <p class="lede">Flowlight ti dice cosa sta inviando il software sul tuo Mac, e dove. Non è una difesa contro un attaccante che
+      controlla già la macchina, e la differenza conta abbastanza da stare su una pagina tutta sua invece che in una nota.</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="In questa pagina">
+      <details class="toc-sheet" open>
+        <summary>In questa pagina</summary>
+        <div class="toc-group">
+          <p class="toc-label">In breve</p>
+          <a href="#stance">A cosa serve</a><a href="#defends">Da cosa difende</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Limiti</p>
+          <a href="#root">Software con root</a><a href="#capture">Cosa sfugge all'acquisizione</a><a href="#inspection">Cosa sfugge all'ispezione</a>
+          <a href="#blocking">Cosa è e cosa non è il blocco</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Flowlight stesso</p>
+          <a href="#itself">Cosa conserva</a><a href="#updates">Aggiornamenti</a><a href="#reporting">Segnalare una vulnerabilità</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">A cosa serve</h2>
+      <p>Flowlight risponde a una domanda a cui il Mac non risponde: <strong>quale app ha inviato questo, e dove è andato?</strong> È costruito per il
+        software che si comporta male alla luce del sole — un agente IA che contatta qualcosa che nessuno gli ha chiesto, uno strumento che carica più
+        del dovuto, un processo che parla con un indirizzo senza nome. Quel comportamento è visibile nel traffico, e il compito di Flowlight è renderlo
+        leggibile e dire onestamente quando non ci riesce.</p>
+      <p>Non è un antivirus, non è un agente EDR e non è un firewall nel senso di qualcosa che si mette tra te e un attaccante. Dove le due cose si
+        sovrappongono — Flowlight può rifiutare connessioni — il rifiuto è una comodità per controllare software di cui ti fidi già, non una barriera
+        contro software di cui non ti fidi.</p>
+
+      <h2 id="defends">Da cosa difende</h2>
+      <ul>
+        <li><strong>Dati che escono inosservati.</strong> Un'app o un agente che invia da qualche parte dove non l'avresti approvato, anche attraverso
+          uno strumento che ha eseguito lui stesso. Flowlight attribuisce la connessione al processo che l'ha fatta e all'agente che ha avviato quel
+          processo.</li>
+        <li><strong>Cambi di comportamento silenziosi.</strong> Un'app che all'improvviso contatta destinazioni nuove, muove molto più della sua linea
+          di base o lavora mentre sei via. Ogni avviso indica il numero che l'ha fatto scattare, così puoi non essere d'accordo.</li>
+        <li><strong>Un agente che va oltre ciò che hai consentito.</strong> Un elenco consentiti per ogni agente, e regole che rifiutano le connessioni
+          fuori da quell'elenco, con il rifiuto registrato e un clic per consentirla.</li>
+        <li><strong>Un aggiornamento manomesso.</strong> Ogni versione pubblica una checksum; l'aggiornamento rifiuta un download che non può
+          verificare e rifiuta di installare un'app che non sia firmata dallo stesso team della copia che sta chiedendo l'aggiornamento.</li>
+      </ul>
+
+      <h2 id="root">Il software con root può spegnerlo</h2>
+      <p>Flowlight gira come te, con un'estensione di sistema che macOS avvia per suo conto. Qualsiasi cosa giri come root — o qualsiasi cosa di cui
+        approvi l'installer — può scaricare quell'estensione, fermare l'app o eliminare il suo database. Nulla nel progetto lo impedisce, e nessuno
+        strumento di monitoraggio su macOS può impedirlo e restare al tempo stesso uno strumento che puoi spegnere anche tu.</p>
+      <p>L'affermazione onesta è più stretta e resta utile: il software che si comporta male ma non sta attivamente sfuggendo a un monitoraggio viene
+        visto. Il software che vi sta attivamente sfuggendo può non essere visto, e lascerà almeno un buco — un'estensione che si è fermata, un periodo
+        senza dati — che la schermata <a href="{{link:docs}}#coverage">Copertura</a> è lì per mostrare.</p>
+
+      <h2 id="capture">Cosa sfugge all'acquisizione</h2>
+      <ul>
+        <li><strong>Il traffico precedente all'avvio dell'acquisizione.</strong> Non c'è nessun recupero a posteriori. Una connessione aperta prima del
+          filtro non gli è mai stata offerta.</li>
+        <li><strong>I servizi di sistema esenti dai filtri di contenuto.</strong> macOS non mostra tutto a un filtro di contenuto; una parte del suo
+          traffico non arriva mai al nostro.</li>
+        <li><strong>Un altro filtro di contenuto che occupa il posto.</strong> macOS ne esegue uno alla volta. Se ce l'ha una VPN o un agente di
+          sicurezza, il filtro di Flowlight si installa, si connette e non gli viene mai chiesto di filtrare nulla: Acquisizione lo dice, invece di
+          mostrare una schermata vuota.</li>
+        <li><strong>Le connessioni brevi, con il campionatore.</strong> Senza l'estensione, Flowlight legge i contatori una volta al secondo: una
+          connessione che si apre e si chiude tra due letture non viene mai registrata.</li>
+        <li><strong>I canali che non sono TCP o UDP.</strong> Bluetooth e USB si vedono come dispositivi, non come byte. Il server MCP locale di un
+          agente che comunica tramite una pipe non è affatto traffico di rete e non compare da nessuna parte.</li>
+      </ul>
+
+      <h2 id="inspection">Cosa sfugge all'ispezione</h2>
+      <p>L'ispezione HTTPS legge solo ciò che viene instradato attraverso il proxy locale di Flowlight, e questo lo decide un programma quando parte.
+        Un'app che ignora le impostazioni proxy, una avviata prima che l'ispezione fosse attivata, o una che applica il pinning dei certificati passa
+        intatta — deliberatamente, perché rompere una connessione con pinning romperebbe l'app. Nemmeno QUIC viene offerto al proxy.</p>
+      <p>Quindi una schermata Ispeziona vuota significa «qui non è stato instradato nulla», non «non è successo nulla». Copertura dice quale delle due
+        cose valga, app per app.</p>
+
+      <h2 id="blocking">Cosa è, e cosa non è, il blocco</h2>
+      <p>Una regola che rifiuta le connessioni viene eseguita dall'estensione di rete, sul percorso, prima che la connessione venga stabilita. Una
+        regola che nomina un URL viene eseguita invece dal proxy di ispezione, che risponde alla richiesta con uno stato che l'app può leggere. Sono le
+        sole due parti di Flowlight che agiscono invece di riferire — il campionatore nettop non può rifiutare proprio nulla, quindi su un Mac che
+        acquisisce con il campionatore nessuna regola viene applicata, e Flowlight lo dice invece di offrire un interruttore che non fa niente.</p>
+      <p>Non è comunque impedire. Un agente che può eseguire una shell può fare a mano ciò che avrebbe fatto lo strumento rifiutato. Un rifiuto che
+        puoi annullare con un clic è un rifiuto attraverso cui il tentativo successivo di un agente può passare. Il traffico locale, il DNS, i servizi
+        di Apple e le connessioni di Flowlight stesso non vengono mai rifiutati, perché un Mac bloccato è un esito peggiore di un agente bloccato. E
+        l'applicazione decade pochi secondi dopo che Flowlight smette di funzionare: un rifiuto che nessuno può vedere è peggio di nessun rifiuto.</p>
+      <p><strong>Ispezione e rifiuto non si combinano.</strong> Il traffico instradato attraverso il proxy di Flowlight stesso lascia il Mac come
+        traffico di Flowlight, e Flowlight non rifiuta mai se stesso — quindi un'app di cui stai leggendo le richieste è un'app le cui connessioni le
+        regole non fermano più. Attivare l'ispezione per vedere di più ti costa l'applicazione delle regole, e finora nulla sullo schermo lo diceva.</p>
+
+      <h2 id="itself">Cosa conserva Flowlight stesso</h2>
+      <p>Metadati del traffico in un database SQLite locale, con una conservazione pubblicata. Con l'ispezione HTTPS attiva conserva anche i corpi delle
+        richieste e delle risposte per tre giorni — la cosa più delicata che arrivi mai a tenere. Le intestazioni con credenziali vengono oscurate per
+        nome e per parola, che è un'euristica e non una garanzia; un'intestazione che porta un segreto sotto un nome che nulla riconosce può essere
+        registrata.</p>
+      <p>Il database del traffico non viene mai caricato. Tre cose più piccole lasciano il Mac senza che nessuno le chieda, tutte e tre nominate nella
+        <a href="{{link:privacy}}">pagina sulla privacy</a>: il controllo degli aggiornamenti, che chiede a GitHub l'ultima versione all'avvio e una
+        volta al giorno; la ricerca del proprietario della rete, che chiede a Team Cymru degli indirizzi pubblici senza nome host; e, finché Flowlight
+        legge i contatori invece di far girare la sua estensione, una ricerca DNS inversa degli indirizzi per cui non ha visto alcun nome. Le prime due
+        hanno un interruttore per disattivarle. La terza no, perché sul campionatore è in gran parte il modo in cui una connessione arriva ad avere un
+        nome: va al resolver che il Mac già usa, e si ferma appena l'estensione prende il suo posto e nomina le connessioni dal traffico stesso. Chiedi
+        con un modello ospitato invia molto più di ognuna di esse, ed è la sola cosa che resta disattivata finché non la configuri.</p>
+
+      <h2 id="updates">Aggiornamenti</h2>
+      <p>Le versioni sono firmate con un Developer ID e notarizzate. L'aggiornamento richiede una checksum pubblicata e rifiuta un download che non ne
+        ha una, poi verifica che l'app scaricata sia firmata dallo stesso team della copia in esecuzione prima di installarla. Un aggiornamento firmato
+        da qualcun altro viene rifiutato anche se per il resto è valido.</p>
+
+      <h2 id="reporting">Segnalare una vulnerabilità</h2>
+      <p>Usa la <a href="https://github.com/{{repo}}/security/advisories/new">segnalazione privata delle vulnerabilità</a> di GitHub, oppure scrivi a
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> se preferisci non usare GitHub.
+        <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a> dice cosa rientra nell'ambito e cosa aspettarsi.
+        Un bug ordinario — un crash, un numero sbagliato, una schermata fuorviante — va invece nelle
+        <a href="https://github.com/{{repo}}/issues">segnalazioni</a>.</p>
+    </article>
+  </div>
+</main>

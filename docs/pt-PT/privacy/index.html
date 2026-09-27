@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-pt-PT", "url": "https://flowlight.xinbetween.com/pt-PT/", "name": "Flowlight", "inLanguage": "pt-PT", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/"}, {"@type": "ListItem", "position": 2, "name": "Privacidade do Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/privacy/"}]}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../../pt-PT/#agents">Agentes de IA</a>
       <a href="../../pt-PT/docs/">Documentação</a>
       <a href="../../pt-PT/privacy/" aria-current="page">Privacidade</a>
+      <a href="../../pt-PT/threat-model/">Modelo de ameaças</a>
       <a href="../../releases/">Versões</a>
       <a href="../../pt-PT/about/">Acerca</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -101,7 +100,9 @@
       <p>Desativada por predefinição. Se a ativar, o Flowlight cria uma autoridade de certificação no seu Mac (a chave nunca sai de
         <code>~/Library/Application Support/Flowlight/Inspection</code>) e executa um proxy que aceita ligações apenas deste Mac. Nas apps que
         encaminhar por ele, regista os pedidos e as respostas, incluindo corpos até 2 MB, na base de dados local durante 3 dias. Os cabeçalhos de credenciais
-        (Authorization, cookies, chaves de API) são substituídos pelo respetivo comprimento antes de algo ser guardado. O Flowlight exclui da desencriptação a sua lista integrada de serviços da Apple e de gestores de palavras-passe. Os dados de inspeção registados não são enviados pelo Flowlight. Desativar a inspeção interrompe o proxy; <strong>Remover o certificado e os dados
+        são substituídos pelo respetivo comprimento antes de algo ser guardado — reconhecidos pelo nome (Authorization, cookies, chaves de API) e pelas
+        palavras do nome, pelo que <code>X-Access-Key</code> também é apanhado. Isso é uma heurística, não uma garantia: um cabeçalho que leve um segredo
+        sob um nome que nada reconhece ficaria registado. O Flowlight exclui da desencriptação a sua lista integrada de serviços da Apple e de gestores de palavras-passe. Os dados de inspeção registados não são enviados pelo Flowlight. Desativar a inspeção interrompe o proxy; <strong>Remover o certificado e os dados
         registados</strong> elimina o certificado, a sua definição de confiança e todos os pedidos registados.</p>
 
       <h2 id="requests">Pedidos de rede que a app faz</h2>
@@ -109,7 +110,7 @@
         <tr><th>Pedido</th><th>Enviado para</th><th>O que contém</th><th>Quando</th></tr>
         <tr><td>Procura de atualizações</td><td><code>api.github.com</code></td><td>Um pedido HTTPS normal pela versão mais recente; o GitHub vê o seu endereço IP e o agente de utilizador <code>Flowlight/&lt;version&gt;</code></td><td>Na abertura e uma vez por dia, a partir da 0.1.2. Interruptor para desativar em Definições › Geral</td></tr>
         <tr><td>Transferência da atualização</td><td><code>github.com</code></td><td>A imagem de disco e o seu ficheiro de soma de verificação</td><td>Só quando clica em Transferir e abrir</td></tr>
-        <tr><td>DNS inverso</td><td>O resolvedor de DNS que tem configurado</td><td>Uma consulta do nome registado de um endereço IP, quando não foi visto nenhum nome de anfitrião</td><td>Conforme necessário, no modo de captura predefinido</td></tr>
+        <tr><td>DNS inverso</td><td>O resolvedor de DNS que tem configurado</td><td>Uma consulta do nome registado de um endereço IP, quando não foi visto nenhum nome de anfitrião</td><td>Conforme necessário, no modo de captura por amostrador, que é a predefinição até a extensão de rede estar a correr. Sem interruptor para desligar: sem isto, o amostrador não consegue dar nome à maioria das ligações. A extensão de rede dá-lhes nome a partir do próprio tráfego e não faz esta consulta</td></tr>
         <tr><td>Consulta do proprietário da rede</td><td>Team Cymru, por DNS</td><td>Endereços IP públicos sem nome de anfitrião conhecido. Os endereços privados e reservados nunca saem do seu Mac</td><td>Ativada por predefinição. Interruptor para desativar em Captura › Identificar os proprietários da rede</td></tr>
         <tr><td>Perguntar com um modelo alojado</td><td>O fornecedor que escolher: Anthropic, OpenAI, Google Gemini ou um endpoint compatível</td><td>A sua pergunta e os resultados devolvidos pelas consultas de leitura do Flowlight escolhidas pelo modelo. A base de dados de tráfego em si não é enviada</td><td>Só quando escolhe um fornecedor alojado e submete uma pergunta. O ecrã Perguntar mostra os pedidos transmitidos</td></tr>
         <tr><td>Exportação para um coletor</td><td>O endpoint de OpenTelemetry ou de HTTP que configurar</td><td>Os campos indicados em Definições › Exportação, como as agregações de tráfego e os alertas. Os cabeçalhos de autenticação ficam guardados no porta-chaves</td><td>Só depois de configurar um endpoint e ativar a exportação</td></tr>
@@ -129,11 +130,15 @@
 
       <h2 id="website">Este site</h2>
       <p>Este site é uma página estática alojada no GitHub Pages e servida através da Cloudflare. Não define cookies nem executa analítica alguma. O GitHub
-        e a Cloudflare processam os pedidos para o servir, e os tipos de letra são carregados do Google Fonts, que recebe o seu endereço IP quando o visita.</p>
+        e a Cloudflare processam os pedidos para o servir. Os tipos de letra são servidos deste domínio, por isso mostrar uma página não envia nada a mais
+        ninguém — esta página carregava-os antes do Google, o que significava que a página que explica que o Flowlight não envia nada para lugar algum
+        fazia um pedido ao Google para se mostrar a si mesma.</p>
 
       <h2 id="contact">Contacto</h2>
-      <p>Dúvidas ou uma preocupação de privacidade? <a href="https://github.com/xinbetween/flowlight/issues">Abra um problema</a>. Para qualquer assunto sensível, use a
-        comunicação privada de vulnerabilidades do GitHub no repositório.</p>
+      <p>Dúvidas ou uma preocupação de privacidade? <a href="https://github.com/xinbetween/flowlight/issues">Abra um problema</a>. Para um problema de segurança, use a
+        <a href="https://github.com/xinbetween/flowlight/security/advisories/new">comunicação privada de vulnerabilidades</a> do GitHub, ou envie um email para
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> se preferir não usar o GitHub — veja o
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> para saber o que esperar.</p>
     </article>
   </div>
 </main>

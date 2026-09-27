@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../assets/icon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-ja", "name": "Flowlight", "description": "Flowlight は macOS 向けのオープンソースなアプリ単位のネットワーク監視ツールです。AI エージェントやツール、MCP サーバの通信までくわしく見えます。", "url": "https://flowlight.xinbetween.com/ja/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/ja/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../ja/#agents">AI エージェント</a>
       <a href="../ja/docs/">ドキュメント</a>
       <a href="../ja/privacy/">プライバシー</a>
+      <a href="../ja/threat-model/">脅威モデル</a>
       <a href="../releases/">リリース</a>
       <a href="../ja/about/">概要</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -106,7 +105,7 @@
 
   <section class="shot" aria-label="スクリーンショット">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="1075"
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="994"
         alt="Flowlight の AI エージェントビュー。Claude Code、Cursor、Codex、Python スクリプトが、利用している AI プロバイダ、ほかへ送ったトラフィック、SMTP・SSH・FTP・大量送信・生 IP のリスクバッジとともに並んでいます。"></div>
       <p class="caption">AI エージェントビュー。各エージェントのモデルプロバイダと、それ以外に通信した相手のすべて。デモデータで表示しています。</p>
     </div>
@@ -217,7 +216,9 @@
           <div><h3>期間を決められるルール</h3>
             <p>アプリ、エージェント、接続先、あるいは 1 つの URL を指定してブロックします。見つけた行を右クリックするだけです。
               ずっと、指定の時刻まで、Flowlight を終了するまで、または決めた時間帯だけ。一時停止のスイッチが 1 つあり、拒否のたびに
-              抜け道も示します。いちばん具体的なルールが勝ち、同じ強さなら拒否が勝ちます。</p>
+              抜け道も示します。いちばん具体的なルールが勝ち、同じ強さなら拒否が勝ちます。
+              これはすでに信頼しているソフトウェアを制御する手段であって、
+              信頼していないソフトウェアを阻む壁ではありません。<a href="../ja/threat-model/">脅威モデル</a>をご覧ください。</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · 4 回拒否 · 平日 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -370,16 +371,16 @@
           インスペクト対象のターミナルからエージェントを起動すれば、エージェントとそのツールの対応 HTTP 通信が復号され、モデルが要求した
           ツール呼び出しと、返っていった結果まで見えます。</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="1075" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="994" loading="lazy"
         alt="Flowlight のインスペクトビュー。復号された Claude Code のリクエストとそのツール呼び出しの一覧、そして paste.example への curl の送信の詳細。実行元となった Bash のツール呼び出しと、リクエスト本文に入った送信済みのメモが表示されています"></div>
         <figcaption><b>あのメモはどこへ行った？</b>paste.example への curl の送信を、モデルが要求した Bash コマンドまでたどり、
           送られた本文まで示します。</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="712" loading="lazy"
           alt="Claude Code のツールタブ。Bash、Read と 2 つの MCP ツールが、説明とモデルが呼び出した回数とともに並んでいます"></div>
           <figcaption><b>エージェントがモデルに渡すツールのすべて。</b>エージェントはターンごとにツールを宣言するので、Flowlight はそれを全部並べ、
             モデルが実際に使ったものと、一度も触らなかったものを示します。</figcaption></figure>
-        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="712" loading="lazy"
           alt="Codex の MCP サーバタブ。プロバイダ経由と記された sentry サーバ、その URL、承認は「しない」に設定、許可されたツールと提供するツールが表示されています"></div>
           <figcaption><b>回線上では見えないものまで。</b>エージェントがプロバイダ側に MCP サーバへの接続を任せると、その通信は Mac を通りません。
             でも依頼そのものは通るので、サーバ、その URL、承認の設定、提供するツールはやはり表示されます。</figcaption></figure>
@@ -398,9 +399,14 @@
       <div class="section-head">
         <p class="eyebrow">次に来るもの</p>
         <h2>これから</h2>
-        <p class="lede">Flowlight は今日すでに、監視し、説明し、拒否します。残りはこの順番で作っています。</p>
+        <p class="lede">Flowlight は今日すでに、監視し、説明し、拒否します。<a href="../ja/threat-model/">脅威モデル</a>が述べるとおり、
+          これは防止ではなく監視です。残りはこの順番で作っています。</p>
       </div>
       <div class="privacy">
+        <div><strong>インスペクションに予算を <span class="tag">0.9.3</span></strong><p>記録された本文は、Flowlight が保持するもののなかで最も機微なものです。拒否リストではなくヘッダの許可リスト、自分で決めるパターン、ヘッダを一切残さない選択肢、アプリごとの上限、そして自分で期限切れになるセッション。</p></div>
+        <div><strong>このルールなら何が起きていたかを見せて <span class="tag">0.9.4</span></strong><p>ルールを直近 1 日に当てて再生し、まだ何も拒否しないうちに、拒否していたはずのものを一覧にします。データはすでにあります。ただ、これまでは過去を説明することしかしてきませんでした。</p></div>
+        <div><strong>Mac から出ていくものを、出ていく前に <span class="tag">0.9.5</span></strong><p>最初の 1 行がコレクターに届く前に、宛先、暗号化されているか、どのフィールドが送られるか、そのなかにヘッダはあるか。Flowlight がほかのすべてに求めている開示を、自分自身に当てはめます。</p></div>
+        <div><strong>エージェントがネットワーク以外で何をしたか <span class="tag">1.0</span></strong><p>ファイルが出ていくことは、読み取りとそれに続く送信であり、今日見えているのは送信だけです。エージェントのツールが何を開き、何を書き、何を起動したかを記録すれば、<em>秘密鍵を読み、そのあと paste.example と通信した</em>が、2 つの画面ではなく 1 つの発見になります。リソースモニタではありません。CPU とメモリはアクティビティモニタの仕事です。Apple の EndpointSecurity の権限が必要で、その前に、上のインスペクションの予算が必要です。</p></div>
         <div><strong>まず Linux、次に Windows</strong><p>分析の中核は移植できる Swift ですが、キャプチャはそうではありません。まずローカルの Web UI を備えた Linux 用デーモンを、macOS の API ではなく eBPF の上に作ります。</p></div>
       </div>
     </div>
@@ -423,7 +429,7 @@
 
   <section class="band" id="agent-detail" aria-label="エージェント詳細のスクリーンショット">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="622" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="994" loading="lazy"
         alt="Flowlight での Claude Code の詳細。呼び出し回数と 1 件の失敗が付いたツールと MCP サーバ、許可リスト、そしてツール呼び出しタブに、失敗した git push、応答とリクエストを伴う paste.example への curl 送信、npm install、GitHub の issue、ドキュメント検索、ファイル読み取りが、それぞれの結果とともに並んでいます"></div>
         <figcaption><b>1 つのエージェント、すべてのツール呼び出し。</b>Claude Code が起動した git や curl、MCP サーバの通信は、Claude Code のものとして数えます。
           HTTPS インスペクションをオンにすると、<em>ツール呼び出し</em>タブに、モデルが何を要求し、何が返り、各ツールがどんなリクエストを出したかが並びます。
@@ -433,10 +439,10 @@
 
   <section class="band" aria-label="そのほかのスクリーンショット">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="994" loading="lazy"
         alt="レポートビュー。1 時間ごとの受信と送信の棒グラフ、アプリ・接続先・プロトコルのドーナツグラフが表示されています"></div>
         <figcaption><b>レポート。</b>秒から年までのズーム、3 つのグループ化、アプリが数百あっても読めるグラフ。</figcaption></figure>
-      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="994" loading="lazy"
         alt="アラートビュー。エージェントの情報流出、メール、FTP、離席中、トラフィック急増のアラートが並んでいます"></div>
         <figcaption><b>アラート。</b>どれもアプリ、接続先、きっかけになった数値を示します。</figcaption></figure>
     </div>

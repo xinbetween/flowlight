@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.png">
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/de/"}, {"@type": "ListItem", "position": 2, "name": "Datenschutz bei Flowlight", "item": "https://flowlight.xinbetween.com/de/privacy/"}]}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../../de/#agents">KI-Agenten</a>
       <a href="../../de/docs/">Dokumentation</a>
       <a href="../../de/privacy/" aria-current="page">Datenschutz</a>
+      <a href="../../de/threat-model/">Bedrohungsmodell</a>
       <a href="../../releases/">Versionen</a>
       <a href="../../de/about/">Über</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -101,7 +100,9 @@
       <p>Standardmäßig aus. Schaltest du sie ein, erzeugt Flowlight eine Zertifizierungsstelle auf deinem Mac (ihr Schlüssel verlässt
         <code>~/Library/Application Support/Flowlight/Inspection</code> nie) und betreibt einen Proxy, der nur Verbindungen von diesem Mac annimmt. Für Apps, die du
         darüber leitest, zeichnet es Anfragen und Antworten auf, samt Bodys bis 2 MB, in der lokalen Datenbank und für 3 Tage. Header mit Zugangsdaten
-        (Authorization, Cookies, API-Schlüssel) werden vor dem Speichern durch ihre Länge ersetzt. Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus. Aufgezeichnete Inspektionsdaten werden von Flowlight nicht hochgeladen. Die Inspektion auszuschalten stoppt den Proxy; <strong>Zertifikat &amp; aufgezeichnete
+        werden vor dem Speichern durch ihre Länge ersetzt – erkannt nach Name (Authorization, Cookies, API-Schlüssel) und nach den Wörtern im
+        Namen, sodass auch <code>X-Access-Key</code> erkannt wird. Das ist eine Heuristik und keine Garantie: Ein Header, der ein Geheimnis unter einem
+        Namen trägt, den nichts erkennt, würde aufgezeichnet. Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus. Aufgezeichnete Inspektionsdaten werden von Flowlight nicht hochgeladen. Die Inspektion auszuschalten stoppt den Proxy; <strong>Zertifikat &amp; aufgezeichnete
         Daten entfernen</strong> löscht das Zertifikat, seine Vertrauenseinstellung und jede aufgezeichnete Anfrage.</p>
 
       <h2 id="requests">Netzwerkanfragen, die die App stellt</h2>
@@ -109,7 +110,7 @@
         <tr><th>Anfrage</th><th>Gesendet an</th><th>Was sie enthält</th><th>Wann</th></tr>
         <tr><td>Update-Prüfung</td><td><code>api.github.com</code></td><td>Eine normale HTTPS-Anfrage nach der neuesten Version; GitHub sieht deine IP-Adresse und den User-Agent <code>Flowlight/&lt;version&gt;</code></td><td>Beim Start und täglich, ab 0.1.2. Abschalten in Einstellungen › Allgemein</td></tr>
         <tr><td>Update-Download</td><td><code>github.com</code></td><td>Das Image und seine Prüfsummendatei</td><td>Nur wenn du auf „Herunterladen &amp; öffnen“ klickst</td></tr>
-        <tr><td>Reverse-DNS</td><td>Der von dir eingerichtete DNS-Resolver</td><td>Eine Abfrage des registrierten Namens einer IP-Adresse, wenn kein Hostname gesehen wurde</td><td>Nach Bedarf, im Standard-Erfassungsmodus</td></tr>
+        <tr><td>Reverse-DNS</td><td>Der von dir eingerichtete DNS-Resolver</td><td>Eine Abfrage des registrierten Namens einer IP-Adresse, wenn kein Hostname gesehen wurde</td><td>Nach Bedarf, im Erfassungsmodus des Samplers, der Standard ist, bis die Netzwerkerweiterung läuft. Kein Schalter zum Abschalten: ohne sie kann der Sampler die meisten Verbindungen nicht benennen. Die Netzwerkerweiterung benennt sie aus dem Datenverkehr selbst und macht diese Abfrage nicht</td></tr>
         <tr><td>Abfrage des Netzinhabers</td><td>Team Cymru, über DNS</td><td>Öffentliche IP-Adressen ohne bekannten Hostnamen. Private und reservierte Adressen verlassen deinen Mac nie</td><td>Standardmäßig ein. Abschalten in Erfassung › Netzinhaber bestimmen</td></tr>
         <tr><td>Fragen mit einem gehosteten Modell</td><td>Der Anbieter, den du wählst: Anthropic, OpenAI, Google Gemini oder ein kompatibler Endpunkt</td><td>Deine Frage und die Ergebnisse der nur lesenden Flowlight-Abfragen, die das Modell ausgewählt hat. Die Verkehrsdatenbank selbst wird nicht hochgeladen</td><td>Nur wenn du einen gehosteten Anbieter wählst und eine Frage abschickst. Der Bildschirm Fragen zeigt die gesendeten Anfragen</td></tr>
         <tr><td>Export an einen Collector</td><td>Der OpenTelemetry- oder HTTP-Endpunkt, den du einrichtest</td><td>Die Felder, die in Einstellungen › Export stehen, etwa Verkehrs-Rollups und Warnungen. Authentifizierungs-Header liegen im Schlüsselbund</td><td>Nur nachdem du einen Endpunkt eingerichtet und den Export aktiviert hast</td></tr>
@@ -129,11 +130,15 @@
 
       <h2 id="website">Diese Website</h2>
       <p>Diese Seite ist eine statische Seite, gehostet auf GitHub Pages und ausgeliefert über Cloudflare. Sie setzt keine Cookies und führt keine Analyse aus. GitHub
-        und Cloudflare verarbeiten Anfragen, um sie auszuliefern, und die Schriften kommen von Google Fonts, das beim Besuch deine IP-Adresse erhält.</p>
+        und Cloudflare verarbeiten Anfragen, um sie auszuliefern. Die Schriften kommen von dieser Domain, das Rendern einer Seite sendet also nichts an
+        irgendwen sonst – früher lud diese Seite sie von Google, was bedeutete, dass die Seite, die erklärt, dass Flowlight nichts irgendwohin sendet,
+        für ihre eigene Darstellung eine Anfrage an Google stellte.</p>
 
       <h2 id="contact">Kontakt</h2>
-      <p>Fragen oder ein Anliegen zum Datenschutz? <a href="https://github.com/xinbetween/flowlight/issues">Öffne ein Issue</a>. Für alles Sensible nutze GitHubs
-        private Schwachstellenmeldung im Repository.</p>
+      <p>Fragen oder ein Anliegen zum Datenschutz? <a href="https://github.com/xinbetween/flowlight/issues">Öffne ein Issue</a>. Nutze für ein Sicherheitsproblem GitHubs
+        <a href="https://github.com/xinbetween/flowlight/security/advisories/new">private Schwachstellenmeldung</a> oder schreib an
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>, wenn du GitHub lieber nicht nutzt – was dich erwartet, steht in
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a>.</p>
     </article>
   </div>
 </main>
