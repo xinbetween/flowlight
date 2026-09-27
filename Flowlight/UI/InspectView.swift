@@ -72,6 +72,13 @@ private struct InspectContent: View {
                                                                     : L("Starting…"))
                                                : L("Off"))
         .searchable(text: $search, placement: .toolbar, prompt: Text(L("Host, path, app, tool or anything in a body")))
+        // Arriving from a row somewhere else: the subject lands in the search field rather than in a hidden
+        // filter, so it is visible, editable and removable like anything else typed there.
+        .onChange(of: nav.inspectRequest, initial: true) {
+            guard let request = nav.inspectRequest else { return }
+            search = request.search
+            nav.inspectRequest = nil
+        }
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
         }

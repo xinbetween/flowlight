@@ -222,7 +222,9 @@ jobs:
           hdiutil attach -nobrowse -quiet build/Flowlight.dmg
           spctl -a -vvv /Volumes/Flowlight/Flowlight.app
           hdiutil detach /Volumes/Flowlight -quiet
-          shasum -a 256 build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" | tee build/checksums.txt
+          # Plain file names, because this file is published as an asset and the updater looks up the disk
+          # image by name. `cd build` rather than `sed` so the names in the file are the names on the release.
+          ( cd build && shasum -a 256 Flowlight.dmg "Flowlight-$VERSION.pkg" | tee SHA256SUMS.txt )
 
       - name: Publish the release
         if: ${{ github.event.inputs.dry_run != 'true' }}
@@ -242,13 +244,44 @@ jobs:
           fi
           if [[ -f "$NOTES" ]]; then
             # The checksums belong in the notes, and they're only known once the artifacts exist.
-            { cat "$NOTES"; echo; echo '### Checksums'; echo; echo '```'; sed 's|build/||' build/checksums.txt; echo '```'; } > "$RUNNER_TEMP/notes.md"
+            { cat "$NOTES"; echo; echo '### Checksums'; echo; echo '```'; cat build/SHA256SUMS.txt; echo '```'; } > "$RUNNER_TEMP/notes.md"
             ARGS+=(--notes-file "$RUNNER_TEMP/notes.md")
           else
             echo "::error::No notes for $VERSION — neither $NOTES nor an entry on the releases page."
             exit 1
           fi
-          gh release create "$TAG" "${ARGS[@]}" build/Flowlight.dmg "build/Flowlight-$VERSION.pkg"
+          # SHA256SUMS.txt is an asset, not just a paragraph in the notes. The updater refuses a download it
+          # cannot verify, and until 0.9.0 this file existed only inside the release body — where nothing can
+          # read it — so the verification was decorative and then, once it started failing closed, fatal.
+          gh release create "$TAG" "${ARGS[@]}" build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt
+
+      # The updater refuses a download whose checksum it can't find, so a release without this file is one
+      # nobody can install from inside the app. That is exactly what shipped from the beginning until 0.9.0:
+      # the checksums were written into the release body, where nothing can read them, and the missing asset
+      # was invisible because verification used to pass when it found nothing. Checked against the published
+      # release rather than the build directory, because what matters is what people can actually download.
+      - name: The release must carry the checksums the updater looks for
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          names=$(gh release view "$TAG" --json assets -q '.assets[].name')
+          echo "$names"
+          for required in SHA256SUMS.txt Flowlight.dmg; do
+            grep -qx "$required" <<< "$names" || {
+              echo "::error::$TAG has no $required. The in-app updater looks for it by name and refuses a"
+              echo "::error::download it cannot verify, so this release would be uninstallable from the app."
+              exit 1
+            }
+          done
+          # And the file has to name the disk image, not merely exist: the updater looks the name up inside it.
+          gh release download "$TAG" --pattern SHA256SUMS.txt --dir "$RUNNER_TEMP" --clobber
+          grep -q " Flowlight.dmg$" "$RUNNER_TEMP/SHA256SUMS.txt" || {
+            echo "::error::SHA256SUMS.txt has no line for Flowlight.dmg, so the updater can't verify it."
+            exit 1
+          }
 
       # The cask points at the release that was just published, so this runs last.
       - name: Update the Homebrew cask
@@ -271,7 +304,7 @@ jobs:
             echo
             echo "Signed, notarized and accepted by Gatekeeper:"
             echo '```'
-            sed 's|build/||' build/checksums.txt
+            cat build/SHA256SUMS.txt
             echo '```'
             echo "Re-run without **dry_run** to publish \`${{ steps.version.outputs.tag }}\`."
           } >> "$GITHUB_STEP_SUMMARY"

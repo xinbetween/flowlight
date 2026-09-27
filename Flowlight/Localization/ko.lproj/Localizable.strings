@@ -808,6 +808,12 @@
 "Filter" = "필터";
 "Showing the largest %@. Filter the report to see the rest." = "가장 큰 %@개만 표시합니다. 나머지를 보려면 보고서를 필터링하세요.";
 
+/* UI/InspectMenuItems.swift */
+"Inspect Traffic to %@" = "%@에 대한 트래픽 검사";
+"Inspect %@'s Traffic" = "%@의 트래픽 검사";
+"Opens Inspect with the selected name in the search field. Only traffic that went through the proxy can be shown." = "선택한 이름을 검색 필드에 넣은 상태로 검사 화면을 엽니다. 프록시를 거친 트래픽만 표시할 수 있습니다.";
+"Opens Inspect. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show." = "검사 화면을 엽니다. HTTPS 검사가 꺼져 있어 아직 복호화된 것이 없으므로 표시할 내용이 없습니다.";
+
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "아직 검사된 요청이 없습니다";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "시스템 프록시를 따르는 앱(브라우저와 대부분의 Mac 앱)은 별도 설정 없이 여기에 나타납니다. 명령줄 에이전트는 그렇지 않습니다. 검사용 터미널의 환경 변수가 필요합니다.";

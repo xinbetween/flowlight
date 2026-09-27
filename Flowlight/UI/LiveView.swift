@@ -68,6 +68,8 @@ struct LiveView: View {
                 .contextMenu(forSelectionType: LiveTalker.ID.self) { ids in
                     if let id = ids.first {
                         Button(L("Show in Reports")) { openReport(id) }
+                        InspectMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
+                                         host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
                         FocusMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id))
                         Divider()
                         RuleMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
