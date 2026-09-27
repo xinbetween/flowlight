@@ -52,6 +52,22 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
+      # Everything that is not the compilation happens before init, and deliberately so. Once init has run,
+      # CodeQL traces the job by preloading an x86_64 libtrace.dylib through DYLD_INSERT_LIBRARIES, which puts
+      # every child process under Rosetta 2 — and Homebrew refuses to install an x86_64 build into the ARM
+      # prefix: "Cannot install under Rosetta 2 in ARM default prefix". Generating the project needs no tracing
+      # anyway; only the compiler does.
+      - name: Prepare the project
+        if: matrix.build-mode == 'manual'
+        run: |
+          set -euo pipefail
+          # Newest Xcode only. CI's test job covers the oldest-supported compiler; this build exists to give
+          # CodeQL something to trace, and tracing it twice would double the cost for the same findings.
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen generate
+
       - uses: github/codeql-action/init@7999b86c43a865dc79d8923397f35af22de63401 # v4
         with:
           languages: ${{ matrix.language }}
@@ -64,11 +80,6 @@ jobs:
         if: matrix.build-mode == 'manual'
         run: |
           set -euo pipefail
-          # Newest Xcode only. CI's test job covers the oldest-supported compiler; this build exists to give
-          # CodeQL something to trace, and tracing it twice would double the cost for the same findings.
-          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-          brew install xcodegen
-          xcodegen generate
           # Signing off, as in the test job: analysis needs the compilation, not a runnable app. `clean build`
           # rather than `build`, because CodeQL only sees the files the compiler actually recompiles and an
           # incremental build would hand it a fraction of the sources.
