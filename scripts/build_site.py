@@ -128,8 +128,18 @@ def fill(text, ctx):
 
 
 def last_changed(path):
-    """The date of the commit that last touched a file, falling back to its mtime outside a checkout."""
+    """The date of the commit that last touched a file — or today, if it has been edited since.
+
+    A page is almost always rebuilt *before* the commit that changes it, so asking git alone answers with the
+    previous commit's date, and the same build run after committing answers with today's. The site is then
+    permanently one rebuild behind itself and CI fails on a one-line sitemap diff that nobody can see the cause
+    of. An edited file is dated today, which is what the commit about to be made will say.
+    """
     try:
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", str(path)],
+                               cwd=ROOT, capture_output=True, text=True, timeout=10)
+        if dirty.returncode == 0 and dirty.stdout.strip():
+            return datetime.date.today().isoformat()
         out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", str(path)],
                              cwd=ROOT, capture_output=True, text=True, timeout=10)
         if out.returncode == 0 and out.stdout.strip():
