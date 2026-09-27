@@ -31,7 +31,7 @@ struct AppRelease: Equatable, Sendable {
 }
 
 enum UpdateError: LocalizedError, Equatable {
-    case noRelease, badResponse(Int), checksumMismatch, noDownload
+    case noRelease, badResponse(Int), checksumMismatch, noDownload, noChecksum
 
     var errorDescription: String? {
         switch self {
@@ -39,6 +39,7 @@ enum UpdateError: LocalizedError, Equatable {
         case .badResponse(let code): return code == 403 ? "GitHub is rate-limiting update checks. Try again later." : "GitHub returned HTTP \(code)."
         case .checksumMismatch: return "The download didn't match its published checksum, so it wasn't opened."
         case .noDownload: return "This release has no disk image to download."
+        case .noChecksum: return "This release publishes no checksum for its disk image, so the download wasn't opened."
         }
     }
 }
@@ -205,12 +206,20 @@ final class UpdateChecker: ObservableObject {
                 let (temp, response) = try await session.download(from: dmgURL, delegate: nil)
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard code == 200 else { throw UpdateError.badResponse(code) }
-                if let sumsURL = release.checksumsURL {
-                    let (sums, _) = try await session.data(from: sumsURL)
-                    let expected = VersionCompare.checksum(for: dmgURL.lastPathComponent, in: String(decoding: sums, as: UTF8.self))
-                    let actual = SHA256.hash(data: try Data(contentsOf: temp)).map { String(format: "%02x", $0) }.joined()
-                    guard expected == nil || expected == actual else { throw UpdateError.checksumMismatch }
-                }
+                // Fail closed. This used to accept the download when the release had no SHA256SUMS.txt, or had
+                // one with no line for this disk image, or one that didn't parse — every way of *not knowing*
+                // the checksum was treated as knowing it was right, which is the one outcome verification must
+                // never produce. Every release the workflow publishes carries the file; a release that doesn't
+                // is one to refuse rather than to trust.
+                guard let sumsURL = release.checksumsURL else { throw UpdateError.noChecksum }
+                let (sums, sumsResponse) = try await session.data(from: sumsURL)
+                let sumsCode = (sumsResponse as? HTTPURLResponse)?.statusCode ?? 0
+                guard sumsCode == 200 else { throw UpdateError.badResponse(sumsCode) }
+                guard let expected = VersionCompare.checksum(for: dmgURL.lastPathComponent,
+                                                            in: String(decoding: sums, as: UTF8.self))
+                else { throw UpdateError.noChecksum }
+                let actual = SHA256.hash(data: try Data(contentsOf: temp)).map { String(format: "%02x", $0) }.joined()
+                guard expected.caseInsensitiveCompare(actual) == .orderedSame else { throw UpdateError.checksumMismatch }
                 let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
                 let destination = downloads.appendingPathComponent("Flowlight-\(release.version).dmg")
                 try? FileManager.default.removeItem(at: destination)
