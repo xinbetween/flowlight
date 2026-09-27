@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Dokumentation</p>
     <h1>Flowlight benutzen</h1>
-    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.1, macOS 15 oder neuer.</p>
+    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.3, macOS 15 oder neuer.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Auf dieser Seite">
@@ -297,15 +297,41 @@ open build/Build/Products/Release/Flowlight.app</pre>
         und starte sie dort. Unter <strong>Erweitert</strong> kannst du nur KI-Agenten statt aller Apps entschlüsseln, die Liste der nie entschlüsselten Ziele bearbeiten, die
         Shell-Einrichtung für eine Shell kopieren oder das Zertifikat und alles Aufgezeichnete entfernen.</p>
       <p>Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus (bearbeitbar in der Einrichtung). Apps, die ihre Zertifikate anpinnen, können das
-        Flowlight-Zertifikat ablehnen; Flowlight merkt das und lässt sie verschlüsselt durch. API-Schlüssel, Cookies und andere Header mit Zugangsdaten werden vor dem Speichern
-        durch ihre Länge ersetzt – erkannt nach Name und nach den Wörtern im Namen, was die eigene Schreibweise eines Anbieters mitfängt, aber
-        nicht versprechen kann, jede zu fangen –, aufgezeichnete Anfragen werden 3 Tage aufbewahrt, und <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht das Zertifikat, seine
+        Flowlight-Zertifikat ablehnen; Flowlight merkt das und lässt sie verschlüsselt durch. Standardmäßig werden Header-Werte nur behalten, wenn der Header einer ist,
+        den du erlaubst, und alles andere wird vor dem Speichern durch seine Länge ersetzt – aufgezeichnete Anfragen werden so lange aufbewahrt, wie du es einstellst, und <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht das Zertifikat, seine
         Vertrauenseinstellung und alles Aufgezeichnete. Die Inspektion läuft nur über HTTP/1.1 (Flowlight verlangt es von beiden Seiten) und ist im Demomodus nicht verfügbar.</p>
 
+      <p><strong>Was die Inspektion behalten darf.</strong> Aufgezeichnete Bodys sind das Sensibelste, was Flowlight vorhält, und bis 0.9.3
+        war das Einzige, was sie schützte, eine Vermutung darüber, welche Header Zugangsdaten tragen. Eine Vermutung hat dafür die falsche Form: Sie
+        kann nur die Header kennen, an die jemand gedacht hat, und sie scheitert stillschweigend – wobei das Scheitern ein Geheimnis ist, das
+        von Software auf die Festplatte geschrieben wird, die versprochen hat, das nicht zu tun. „Erweitert“ setzt jetzt Grenzen, statt sich auf die Vermutung zu verlassen.</p>
+      <ul>
+        <li><strong>Header werden behalten, weil sie erlaubt sind, nicht verworfen, weil sie gefährlich aussahen.</strong> Die Voreinstellung
+          behält die Werte einer Liste von Headern, die nie Zugangsdaten tragen – Inhaltstypen, Längen, Ratenlimits, API-Versionen –,
+          und ersetzt jeden anderen Wert durch seine Länge. Das alte Verhalten wird weiterhin angeboten, denn eine unbekannte API zu lesen
+          heißt, Header zu sehen, die noch niemand zu erlauben gedacht hat; es ist jetzt eine Wahl und nicht die einzige Möglichkeit. Eine dritte Option behält
+          überhaupt keine Header-Werte.</li>
+        <li><strong>Die Namen überleben immer.</strong> Welche Regelung auch gilt, du kannst sehen, welche Header gesendet wurden und wie lang jeder Wert
+          war. Den Header ganz zu verbergen wäre die leisere Lüge: Das zeigt eine kürzere Anfrage, als die tatsächlich
+          passierte, und nichts auf dem Bildschirm würde das sagen.</li>
+        <li><strong>Eigene Wörter</strong> markieren einen Header als Zugangsdaten, wie er auch heißt – für Anbieter, deren Schreibweise die
+          eingebaute Liste nicht kennt. Ein Wort, das du hinzufügst, gewinnt gegen die eingebauten Ausnahmen.</li>
+        <li><strong>Eine tägliche Obergrenze pro App</strong> für aufgezeichnete Bodys. Darüber wird der Austausch weiterhin aufgezeichnet – Zeit, Host, Pfad,
+          Status, Header – und nur die Bodys entfallen, mit einem Hinweis, warum. Ein fehlender Body ist eine Lücke, die du sehen kannst; ein fehlender
+          Austausch sieht aus, als wäre nichts passiert. Null bedeutet keine Obergrenze.</li>
+        <li><strong>Eine Sitzung, die sich selbst beendet</strong>, standardmäßig nach acht Stunden. Die Inspektion lief früher, bis jemand sich
+          daran erinnerte – womit der sensibelste Modus der App der war, der am ehesten eingeschaltet blieb, nachdem der Grund dafür
+          vorbei war. Der Bildschirm zeigt, wann sie aufhört, und lässt dich die Uhr neu starten. Du kannst sie auch
+          weiterhin laufen lassen, bis du sie ausschaltest – dann läuft sie über Neustarts hinweg weiter, und die Einstellung sagt das.</li>
+      </ul>
+      <p>Die Zeile am unteren Rand von „Erweitert“ wird aus diesen Einstellungen erzeugt, statt ausgeschrieben zu sein, sodass sie nicht mehr
+        von ihnen abweichen kann, wie es ihr fest eingebauter Vorgänger tat.</p>
+
       <p><strong>Wie du von einer Zeile aus hierherkommst.</strong> Klicke in Live, Berichten oder KI-Agenten mit der rechten Maustaste auf eine App
-        oder ein Ziel und wähle <strong>Datenverkehr von … inspizieren</strong>: Inspizieren öffnet sich, und der Name steht schon im Suchfeld. Dass
-        es das Suchfeld ist und kein verborgener Filter, ist Absicht – du kannst die Suche erweitern, einengen oder löschen, ohne dorthin
-        zurückzugehen, wo du angefangen hast. Erscheinen kann nur Datenverkehr, der über den Proxy gelaufen ist; eine Zeile, von der du weißt, dass
+        oder ein Ziel und wähle <strong>Datenverkehr von … inspizieren</strong>: Inspizieren öffnet sich und zeigt nur diese App oder nur dieses Ziel, mit
+        einer Markierung, die das sagt und die du mit einem Klick entfernen kannst. Es schränkt ein, statt zu suchen – eine frühere Version setzte den
+        Namen ins Suchfeld, das auch Antwort-Bodys durchsucht, sodass die Frage nach dem Datenverkehr eines Agenten jede Seite zurückgab, deren HTML ihn
+        bloß erwähnte. Erscheinen kann nur Datenverkehr, der über den Proxy gelaufen ist; eine Zeile, von der du weißt, dass
         sie viel bewegt, kann hier also trotzdem nichts zeigen.</p>
 
       <h2 id="mocks">Mock-Antworten</h2>
@@ -644,7 +670,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.1 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.9.3 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

@@ -152,10 +152,24 @@ final class AppNavigation: ObservableObject {
         inspectRequest = InspectRequest(search: search)
         selection = .inspect
     }
+
+    /// Scope Inspect to one app or one destination, rather than searching for its name.
+    ///
+    /// The first version of this put the name in the search field, which reads well — visible, editable — but
+    /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
+    /// those words. The scope is still shown and still removable; it is just no longer a text match.
+    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil) {
+        inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host)
+        selection = .inspect
+    }
 }
 
 /// A request from another screen to open Inspect scoped to something.
 struct InspectRequest: Equatable {
     var search: String
+    /// The app to scope to, and the name to show on the chip that says so.
+    var appID: String?
+    var appName: String?
+    var host: String?
     var id = UUID()
 }

@@ -866,7 +866,6 @@
 "Environment variables that send one shell's tools through Flowlight" = "Environment variables that send one shell's tools through Flowlight";
 "Show Certificate in Finder" = "Show Certificate in Finder";
 "Remove Certificate & Recorded Data…" = "Remove Certificate & Recorded Data…";
-"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored.";
 "Advanced" = "Advanced";
 "Mock responses" = "Mock responses";
 "1 on" = "1 on";
@@ -1314,3 +1313,72 @@
 "Edit" = "Edit";
 "On" = "On";
 "Settings" = "Settings";
+
+/* 0.9.3 inspection budget, 0.9.4 rule simulation */
+"Keep only headers I allow" = "Keep only headers I allow";
+"Keep everything except credentials" = "Keep everything except credentials";
+"Keep no header values" = "Keep no header values";
+"The safest of the three: a header nobody has thought about yet is hidden rather than stored." = "The safest of the three: a header nobody has thought about yet is hidden rather than stored.";
+"Matches names and words against a built-in list. Useful for reading an unfamiliar API, but a credential under a name nothing recognises is recorded." = "Matches names and words against a built-in list. Useful for reading an unfamiliar API, but a credential under a name nothing recognises is recorded.";
+"Names are still recorded, so you can see which headers were sent without keeping any of their values." = "Names are still recorded, so you can see which headers were sent without keeping any of their values.";
+"Only the %lld header names you allow keep their values; the rest are replaced by their length." = "Only the %lld header names you allow keep their values; the rest are replaced by their length.";
+"Headers that look like credentials are replaced by their length — a heuristic, not a guarantee." = "Headers that look like credentials are replaced by their length — a heuristic, not a guarantee.";
+"No header values are kept at all." = "No header values are kept at all.";
+"%lld minutes" = "%lld minutes";
+"%lld hours" = "%lld hours";
+"Bodies not kept: this app reached its daily inspection budget." = "Bodies not kept: this app reached its daily inspection budget.";
+"Showing only traffic to %@" = "Showing only traffic to %@";
+"Show every inspected request again" = "Show every inspected request again";
+"What inspection may keep" = "What inspection may keep";
+"Recorded bodies are the most sensitive thing Flowlight holds. These are the limits on them." = "Recorded bodies are the most sensitive thing Flowlight holds. These are the limits on them.";
+"Headers kept in full" = "Headers kept in full";
+"x-my-header" = "x-my-header";
+"No headers are allowed, so no header values are kept. The names are still recorded." = "No headers are allowed, so no header values are kept. The names are still recorded.";
+"Also treat as credentials" = "Also treat as credentials";
+"A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know." = "A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know.";
+"0 means no ceiling. An agent that resends a long conversation every turn can record a great deal in an afternoon." = "0 means no ceiling. An agent that resends a long conversation every turn can record a great deal in an afternoon.";
+"Turn inspection off automatically" = "Turn inspection off automatically";
+"Inspection will run until you switch it off, including across restarts." = "Inspection will run until you switch it off, including across restarts.";
+"What it would have done" = "What it would have done";
+"Test against" = "Test against";
+"The last day" = "The last day";
+"The last 3 days" = "The last 3 days";
+"The last week" = "The last week";
+"The last 2 weeks" = "The last 2 weeks";
+"Nothing simulated yet." = "Nothing simulated yet.";
+"Name an app or a destination first." = "Name an app or a destination first.";
+"No recorded traffic in this period to test against." = "No recorded traffic in this period to test against.";
+"Would have changed nothing. %lld connections in this period, none of them affected." = "Would have changed nothing. %lld connections in this period, none of them affected.";
+"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "Would have refused %lld of %lld connections, from %lld apps, %@ in all.";
+"Would have allowed %lld connections that are refused today." = "Would have allowed %lld connections that are refused today.";
+"%lld×" = "%lld×";
+"and %lld more" = "and %lld more";
+"Tested against traffic back to %@." = "Tested against traffic back to %@.";
+
+
+/* wording pass */
+"not kept (%lld characters)" = "not kept (%lld characters)";
+"Bodies are no longer kept once an app has recorded %@ in a day." = "Bodies are no longer kept once an app has recorded %@ in a day.";
+"Recorded requests are kept for 1 day." = "Recorded requests are kept for 1 day.";
+"Recorded requests are kept for %lld days." = "Recorded requests are kept for %lld days.";
+"Inspection turns itself off after %lld minutes." = "Inspection turns itself off after %lld minutes.";
+"Inspection turns itself off after 1 hour." = "Inspection turns itself off after 1 hour.";
+"Inspection turns itself off after %lld hours." = "Inspection turns itself off after %lld hours.";
+"Inspection turns itself off after %lld hours %lld minutes." = "Inspection turns itself off after %lld hours %lld minutes.";
+"Showing only traffic from %@" = "Showing only traffic from %@";
+"x-acme-licence" = "x-acme-licence";
+"Daily limit on recorded bodies, per app, in MB" = "Daily limit on recorded bodies, per app, in MB";
+"Past that limit, the exchange is still recorded — time, host, path, status and headers — and only its bodies are dropped." = "Past that limit, the exchange is still recorded — time, host, path, status and headers — and only its bodies are dropped.";
+"Days to keep recorded requests" = "Days to keep recorded requests";
+"Applied as soon as you change it, not only at the next cleanup." = "Applied as soon as you change it, not only at the next cleanup.";
+"Never — only when I turn it off" = "Never — only when I turn it off";
+"Inspection will turn off at %@" = "Inspection will turn off at %@";
+
+
+/* session expiry sentences */
+"Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept." = "Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept.";
+"Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept." = "Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept.";
+"Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept." = "Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept.";
+"Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept." = "Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept.";
+"Restart the timer" = "Restart the timer";
+

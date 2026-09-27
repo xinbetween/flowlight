@@ -81,7 +81,13 @@ final class ProcessResolver: @unchecked Sendable {
         // `~/.local/share/claude/versions/2.1.283`) would name the agent after its version, and a new identity
         // every update loses the allowlist, the guardrails and the history attached to the old one.
         let derived = ProcessNaming.displayName(fromPathComponents: components.map(String.init))
-        let name = derived.isEmpty ? (components.last.map(String.init) ?? fallbackIdentifier ?? "pid \(pid)") : derived
+        if let filename = components.last.map(String.init), !derived.isEmpty {
+            ProcessNaming.remember(version: filename, as: derived)
+        }
+        // Without a readable path the only candidates are the filename and the signing identifier, and a
+        // version-shaped filename is not an identity — see ProcessNaming.identity.
+        let fallback = components.last.map { ProcessNaming.identity(fromFilename: String($0), pid: pid) }
+        let name = derived.isEmpty ? (fallback ?? fallbackIdentifier ?? "pid \(pid)") : derived
         // Same split as the sampler: the identifier is the executable, the label is the tool's own name.
         return (fallbackIdentifier ?? name, ProcessNaming.friendlyName(executable: name))
     }

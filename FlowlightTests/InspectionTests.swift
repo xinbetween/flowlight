@@ -119,10 +119,16 @@ final class HTTPStreamParserTests: XCTestCase {
             HTTPHeader(name: "Cookie", value: "a=b"),
             HTTPHeader(name: "anthropic-version", value: "2023-06-01"),
         ])
-        XCTAssertEqual(headers[0].value, "Bearer ••• redacted (20 characters)")
-        XCTAssertEqual(headers[1].value, "••• redacted (6 characters)")
+        // The scheme survives so the kind of credential is still visible, and the length is reported so the
+        // screen never shows a shorter request than the one that happened. The wording between them is not
+        // what this test is about — it changed once already, when "redacted" stopped being true of every
+        // header the allowlist withholds.
+        XCTAssertTrue(headers[0].value.hasPrefix("Bearer "), headers[0].value)
+        XCTAssertTrue(headers[0].value.contains("20"), headers[0].value)
+        XCTAssertTrue(headers[1].value.contains("6"), headers[1].value)
         XCTAssertFalse(headers.map(\.value).joined().contains("sk-"))
-        XCTAssertEqual(headers[3].value, "2023-06-01")
+        XCTAssertFalse(headers.map(\.value).joined().contains("a=b"))
+        XCTAssertEqual(headers[3].value, "2023-06-01", "an allowed, non-secret header keeps its value")
     }
 
     private func gzip(_ data: Data) throws -> Data {

@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentación</p>
     <h1>Usar Flowlight</h1>
-    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.9.1, macOS 15 o posterior.</p>
+    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.9.3, macOS 15 o posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="En esta página">
@@ -297,14 +297,40 @@ open build/Build/Products/Release/Flowlight.app</pre>
         y arráncalos ahí. En <strong>Avanzado</strong> puedes descifrar solo los agentes de IA en lugar de todas las apps, editar la lista de lo que nunca se descifra, copiar
         la configuración de shell para un shell concreto, o eliminar el certificado y todo lo registrado.</p>
       <p>Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas (edita la lista en la configuración inicial). Las apps que fijan sus certificados pueden rechazar el
-        certificado de Flowlight; Flowlight lo detecta y las deja pasar cifradas. Las claves de API, las cookies y otras cabeceras con credenciales se
-        sustituyen por su longitud antes de guardar nada — reconocidas por el nombre y por las palabras del nombre, lo que atrapa la grafía propia
-        de un proveedor pero no puede prometer atraparlas todas —, las peticiones registradas se conservan 3 días y <strong>Eliminar el certificado y los datos registrados</strong> borra el certificado, su ajuste
+        certificado de Flowlight; Flowlight lo detecta y las deja pasar cifradas. Por omisión, los valores de las cabeceras solo se conservan cuando la cabecera es una
+        que tú permites, y todo lo demás se sustituye por su longitud antes de guardar nada — las peticiones registradas se conservan el tiempo que tú indiques y <strong>Eliminar el certificado y los datos registrados</strong> borra el certificado, su ajuste
         de confianza y todo lo registrado. La inspección es solo HTTP/1.1 (Flowlight lo pide a ambos lados) y no está disponible en el modo demo.</p>
 
+      <p><strong>Qué puede conservar la inspección.</strong> Los cuerpos registrados son lo más sensible que guarda Flowlight y, hasta la 0.9.3,
+        lo único que los protegía era una conjetura sobre qué cabeceras llevan credenciales. Una conjetura tiene la forma equivocada para esto: solo
+        puede conocer las cabeceras en las que alguien pensó, y falla en silencio: el fallo es un secreto escrito en el disco por un software
+        que había prometido no hacerlo. Avanzado ahora pone límites en lugar de confiar en la conjetura.</p>
+      <ul>
+        <li><strong>Las cabeceras se conservan porque están permitidas, no se descartan porque parecieran peligrosas.</strong> Por omisión se
+          conservan los valores de una lista de cabeceras que nunca llevan credenciales — tipos de contenido, longitudes, límites de frecuencia, versiones de API —
+          y cualquier otro valor se sustituye por su longitud. El comportamiento antiguo se sigue ofreciendo, porque leer una API desconocida
+          significa ver cabeceras que nadie ha pensado todavía en permitir; ahora es una opción y no la única. Una tercera opción no conserva
+          ningún valor de cabecera.</li>
+        <li><strong>Los nombres sobreviven siempre.</strong> Sea cual sea la política, puedes ver qué cabeceras se enviaron y cuánto medía cada valor.
+          Ocultar la cabecera del todo sería la mentira más silenciosa: muestra una petición más corta que la que ocurrió
+          en realidad, y nada en la pantalla lo diría.</li>
+        <li><strong>Palabras tuyas</strong> marcan una cabecera como credencial se llame como se llame, para un proveedor cuya forma de escribirlo
+          no conoce la lista integrada. Una palabra que añadas gana a las excepciones integradas.</li>
+        <li><strong>Un límite diario por app</strong> para los cuerpos registrados. Pasado ese límite, el intercambio se sigue registrando — hora, host, ruta,
+          estado, cabeceras — y solo se descartan los cuerpos, con una nota que dice por qué. Un cuerpo que falta es un hueco que puedes ver; un
+          intercambio que falta parece que nunca ocurrió. Cero significa que no hay límite.</li>
+        <li><strong>Una sesión que termina por sí sola</strong>, ocho horas por omisión. La inspección funcionaba hasta que alguien se
+          acordaba, lo que significaba que el modo más sensible de la app era el que con más probabilidad se quedaba encendido después de que el motivo
+          para encenderlo hubiera pasado. La pantalla muestra cuándo se detendrá y te deja reiniciar el reloj. También puedes elegir
+          que siga funcionando hasta que la desactives, en cuyo caso seguirá activa incluso después de reiniciar, y el ajuste lo dice.</li>
+      </ul>
+      <p>La línea del final de Avanzado se genera a partir de esos ajustes en vez de estar escrita, así que no puede desviarse de ellos
+        como sí lo hacía la que la precedía, fijada en el código.</p>
+
       <p><strong>Cómo llegar aquí desde una fila.</strong> Haz clic derecho en una app o en un destino en En vivo, Informes o Agentes de IA y elige
-        <strong>Inspeccionar el tráfico de …</strong>: Inspeccionar se abre con ese nombre ya puesto en el campo de búsqueda. Que sea el campo de
-        búsqueda y no un filtro oculto es a propósito — puedes ampliarlo, estrecharlo o vaciarlo sin volver a donde empezaste. Solo puede aparecer
+        <strong>Inspeccionar el tráfico de …</strong>: Inspeccionar se abre mostrando solo esa app, o solo ese destino, con una etiqueta que lo indica y
+        que puedes quitar con un clic. Delimita en lugar de buscar — una versión anterior ponía el nombre en el campo de búsqueda, que también busca en los
+        cuerpos de las respuestas, así que pedir el tráfico de un agente devolvía todas las páginas cuyo HTML se limitaba a mencionarlo. Solo puede aparecer
         el tráfico que pasó por el proxy, así que una fila que sabes que está movida puede no mostrar nada aquí.</p>
 
       <h2 id="mocks">Respuestas simuladas</h2>
@@ -643,7 +669,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quienes contribuyen a Flowlight. Flowlight es software libre, publicado bajo la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versión 0.9.1 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
+      <span>Versión 0.9.3 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
     </div>
   </div>
 </footer>

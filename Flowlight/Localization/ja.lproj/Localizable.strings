@@ -336,6 +336,29 @@
 "Couldn't save to the Keychain: %@" = "キーチェーンに保存できませんでした: %@";
 "error %lld" = "エラー %lld";
 
+/* Inspection/HTTPStream.swift */
+"not kept (%lld characters)" = "保持していません（%lld 文字）";
+
+/* Inspection/InspectionBudget.swift */
+"Keep only headers I allow" = "許可したヘッダのみ保持する";
+"Keep everything except credentials" = "認証情報以外はすべて保持する";
+"Keep no header values" = "ヘッダの値を保持しない";
+"The safest of the three: a header nobody has thought about yet is hidden rather than stored." = "3 つのうち最も安全です。まだ誰も想定していないヘッダは、保存されるのではなく隠されます。";
+"Matches names and words against a built-in list. Useful for reading an unfamiliar API, but a credential under a name nothing recognises is recorded." = "名前と語句を内蔵リストと照合します。見慣れない API を読むときに便利ですが、何も認識しない名前で送られた認証情報は記録されます。";
+"Names are still recorded, so you can see which headers were sent without keeping any of their values." = "名前は引き続き記録されるため、値を一切保持しなくても、どのヘッダが送られたかは確認できます。";
+"Only the %lld header names you allow keep their values; the rest are replaced by their length." = "許可した %lld 件のヘッダ名だけが値を保持し、それ以外は長さに置き換えられます。";
+"Headers that look like credentials are replaced by their length — a heuristic, not a guarantee." = "認証情報らしいヘッダは長さに置き換えられます — あくまで推測であり、保証ではありません。";
+"No header values are kept at all." = "ヘッダの値は一切保持しません。";
+"Recorded requests are kept for 1 day." = "記録したリクエストは 1 日間保持されます。";
+"Recorded requests are kept for %lld days." = "記録したリクエストは %lld 日間保持されます。";
+"Bodies are no longer kept once an app has recorded %@ in a day." = "アプリが 1 日に %@ を記録した時点で、それ以降の本文は保持しません。";
+"Inspection turns itself off after %lld minutes." = "インスペクションは %lld 分後に自動でオフになります。";
+"Inspection turns itself off after 1 hour." = "インスペクションは 1 時間後に自動でオフになります。";
+"Inspection turns itself off after %lld hours." = "インスペクションは %lld 時間後に自動でオフになります。";
+"Inspection turns itself off after %lld hours %lld minutes." = "インスペクションは %lld 時間 %lld 分後に自動でオフになります。";
+"%lld minutes" = "%lld 分";
+"%lld hours" = "%lld 時間";
+
 /* Inspection/InspectionController.swift */
 "AI agents and their tools" = "AI エージェントとそのツール";
 "Every app that uses the proxy" = "プロキシを使うすべてのアプリ";
@@ -354,6 +377,13 @@
 "No network services found." = "ネットワークサービスが見つかりませんでした。";
 "Couldn't change the proxy settings: %@" = "プロキシ設定を変更できませんでした: %@";
 "unknown error" = "不明なエラー";
+"Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept." = "インスペクションは、「詳細」の設定どおり %lld 分後に自動でオフになりました。記録したリクエストは保持されます。";
+"Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept." = "インスペクションは、「詳細」の設定どおり 1 時間後に自動でオフになりました。記録したリクエストは保持されます。";
+"Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept." = "インスペクションは、「詳細」の設定どおり %lld 時間後に自動でオフになりました。記録したリクエストは保持されます。";
+"Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept." = "インスペクションは、「詳細」の設定どおり %lld 時間 %lld 分後に自動でオフになりました。記録したリクエストは保持されます。";
+
+/* Inspection/InspectionRecorder.swift */
+"Bodies not kept: this app reached its daily inspection budget." = "本文は保持していません: このアプリは 1 日あたりのインスペクション上限に達しました。";
 
 /* Inspection/LLMFacts.swift */
 "only %lld tools enabled" = "有効なツールは %lld 件のみ";
@@ -832,6 +862,9 @@
 "decrypting AI agents only" = "AI エージェントのみ復号中";
 "decrypting every app" = "すべてのアプリを復号中";
 "system proxy on" = "システムのプロキシはオン";
+"Showing only traffic from %@" = "%@ からのトラフィックのみ表示中";
+"Showing only traffic to %@" = "%@ へのトラフィックのみ表示中";
+"Show every inspected request again" = "インスペクションしたすべてのリクエストを再表示";
 "Request" = "リクエスト";
 "Not inspected: %@" = "インスペクトしていません: %@";
 "Mocked" = "モック済み";
@@ -864,7 +897,6 @@
 "Environment variables that send one shell's tools through Flowlight" = "1 つのシェルのツールを Flowlight 経由にする環境変数";
 "Show Certificate in Finder" = "証明書を Finder に表示";
 "Remove Certificate & Recorded Data…" = "証明書と記録データを削除…";
-"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "記録したリクエストは 3 日間保持されます。API キーや Cookie などの認証情報ヘッダは保存されません。";
 "Advanced" = "詳細";
 "Mock responses" = "モック応答";
 "1 on" = "1 件オン";
@@ -898,6 +930,26 @@
 "No body" = "本文なし";
 "pid %lld" = "pid %lld";
 "%@ s" = "%@ 秒";
+
+/* UI/InspectionBudgetView.swift */
+"What inspection may keep" = "インスペクションが保持できるもの";
+"Recorded bodies are the most sensitive thing Flowlight holds. These are the limits on them." = "記録した本文は、Flowlight が保持する中で最も機密性の高いものです。以下がその上限です。";
+"Headers kept in full" = "値をそのまま保持するヘッダ";
+"x-my-header" = "x-my-header";
+"No headers are allowed, so no header values are kept. The names are still recorded." = "許可されたヘッダがないため、ヘッダの値は保持しません。名前は引き続き記録されます。";
+"Also treat as credentials" = "これらも認証情報として扱う";
+"A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know." = "名前にこれらの語を含むヘッダは、ほかがどんな名前であっても長さに置き換えられます。内蔵リストが知らない表記を使うベンダー向けです。";
+"x-acme-licence" = "x-acme-licence";
+"Daily limit on recorded bodies, per app, in MB" = "記録する本文の 1 日上限（1 アプリあたり、MB）";
+"Past that limit, the exchange is still recorded — time, host, path, status and headers — and only its bodies are dropped." = "その上限を超えても、やり取り自体は記録されます — 時刻、ホスト、パス、状況、ヘッダ — 破棄されるのは本文だけです。";
+"0 means no ceiling. An agent that resends a long conversation every turn can record a great deal in an afternoon." = "0 は上限なしという意味です。毎ターン長い会話を送り直すエージェントは、ひと午後で膨大な量を記録しかねません。";
+"Days to keep recorded requests" = "記録したリクエストを保持する日数";
+"Applied as soon as you change it, not only at the next cleanup." = "次回の一括削除を待たず、変更した時点で適用されます。";
+"Turn inspection off automatically" = "インスペクションを自動でオフにする";
+"Never — only when I turn it off" = "オフにしない — 自分でオフにするまで";
+"Inspection will turn off at %@" = "インスペクションは %@ にオフになります";
+"Restart the timer" = "タイマーを再スタート";
+"Inspection will run until you switch it off, including across restarts." = "インスペクションは、再起動をまたいでも、オフにするまで動き続けます。";
 
 /* UI/JSONTreeView.swift */
 "no match" = "一致なし";
@@ -1089,6 +1141,23 @@
 "Refuse %1$@ requests from %2$@ to %3$@." = "%2$@ から %3$@ への %1$@ リクエストを拒否します。";
 "Allow %1$@ requests from %2$@ to %3$@." = "%2$@ から %3$@ への %1$@ リクエストを許可します。";
 "anywhere" = "すべての接続先";
+"What it would have done" = "このルールが何をしていたか";
+
+/* UI/RuleSimulationView.swift */
+"Test against" = "テスト対象";
+"The last day" = "直近 1 日";
+"The last 3 days" = "直近 3 日";
+"The last week" = "直近 1 週間";
+"The last 2 weeks" = "直近 2 週間";
+"Nothing simulated yet." = "まだシミュレーションしていません。";
+"Name an app or a destination first." = "まずアプリまたは接続先を指定してください。";
+"No recorded traffic in this period to test against." = "この期間に記録されたトラフィックがないため、テストできません。";
+"Would have changed nothing. %lld connections in this period, none of them affected." = "何も変わりませんでした。この期間の接続は %lld 件で、影響を受けたものはありません。";
+"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "%lld / %lld 件の接続を拒否していました（%lld 個のアプリ、合計 %@）。";
+"Would have allowed %lld connections that are refused today." = "現在は拒否されている接続 %lld 件を許可していました。";
+"%lld×" = "%lld×";
+"and %lld more" = "ほか %lld 件";
+"Tested against traffic back to %@." = "%@ 以降のトラフィックでテストしました。";
 
 /* UI/RulesView.swift */
 "What they did" = "判断の記録";

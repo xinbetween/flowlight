@@ -19,6 +19,10 @@ private struct InspectContent: View {
     @State private var results: [String: ToolResult] = [:]
     @State private var selection: HTTPExchange.ID?
     @State private var search = ""
+    /// Scoped to one app or one destination, arrived at from a row elsewhere. Shown as a chip beside the list so
+    /// it is as visible and as removable as a search term, which is what the search field was chosen for.
+    @State private var scopeApp: (id: String, name: String)?
+    @State private var scopeHost: String?
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
     /// A rule prefilled from a recorded exchange, waiting in the editor.
@@ -35,6 +39,7 @@ private struct InspectContent: View {
                 }
             } else {
                 statusBar
+                scopeChip
                 if exchanges.isEmpty {
                     ContentUnavailableView {
                         Label(L("Nothing inspected yet"), systemImage: "lock.open.display")
@@ -77,24 +82,32 @@ private struct InspectContent: View {
         .onChange(of: nav.inspectRequest, initial: true) {
             guard let request = nav.inspectRequest else { return }
             search = request.search
+            scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
+            scopeHost = request.host
             nav.inspectRequest = nil
         }
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
         }
         .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled,
-                          focus: focus.scope)) {
+                          focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
         }
     }
 
-    private struct LoadKey: Equatable { var version: Int; var search: String; var window: AgentWindow; var enabled: Bool; var focus: FocusScope }
+    private struct LoadKey: Equatable {
+        var version: Int; var search: String; var window: AgentWindow; var enabled: Bool; var focus: FocusScope
+        var app: String?; var host: String?
+    }
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
-        exchanges = (try? await monitor.read { try $0.exchanges(since: since, search: term, focus: scope) }) ?? []
+        let app = scopeApp?.id, host = scopeHost
+        exchanges = (try? await monitor.read {
+            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host)
+        }) ?? []
         // `-FLInspectSelect paste.example`, so the published screenshot always shows the same request rather
         // than whichever one a click happened to land on.
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
@@ -144,6 +157,29 @@ private struct InspectContent: View {
         parts.append(inspection.scope == .agents ? L("decrypting AI agents only") : L("decrypting every app"))
         if inspection.systemProxyOn { parts.append(L("system proxy on")) }
         return parts.joined(separator: " · ")
+    }
+
+    /// The scope arrived at from another screen, shown so it can be seen and dropped. Without it a filtered list
+    /// is indistinguishable from a quiet one, which is the way this feature first went wrong.
+    @ViewBuilder private var scopeChip: some View {
+        if scopeApp != nil || scopeHost != nil {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease.circle.fill").foregroundStyle(.tint)
+                Text(scopeApp.map { L("Showing only traffic from %@", $0.name) } ?? L("Showing only traffic to %@", scopeHost ?? ""))
+                    .font(.callout)
+                Button {
+                    scopeApp = nil
+                    scopeHost = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(L("Show every inspected request again"))
+                Spacer()
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     private var table: some View {
@@ -343,8 +379,11 @@ private struct InspectionSetup: View {
                         Button(L("Remove Certificate & Recorded Data…"), role: .destructive) { confirmRemove = true }
                             .disabled(!inspection.caExists)
                     }
-                    Text(L("Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored."))
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Divider()
+                    // This used to be one sentence claiming requests are kept for 3 days and credential headers
+                    // are never stored. Both were wrong: the period had become a setting, and what happens to a
+                    // credential is that its length is stored. The section says what the settings actually are.
+                    InspectionBudgetSection(inspection: inspection)
                 }
                 .padding(.top, 10)
             } label: {

@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-ja", "name": "Flowlight", "description": "Flowlight は macOS 向けのオープンソースなアプリ単位のネットワーク監視ツールです。AI エージェントやツール、MCP サーバの通信までくわしく見えます。", "url": "https://flowlight.xinbetween.com/ja/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/ja/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-ja", "name": "Flowlight", "description": "Flowlight は macOS 向けのオープンソースなアプリ単位のネットワーク監視ツールです。AI エージェントやツール、MCP サーバの通信までくわしく見えます。", "url": "https://flowlight.xinbetween.com/ja/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.3", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/ja/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">本文へスキップ</a>
@@ -75,7 +75,7 @@
             GitHub でスターを付ける
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">コピー</button></p>
-          <p class="meta-row"><span>v0.9.1</span><span>macOS 15+</span><span>ユニバーサル</span><span>GPL-3.0</span><span>テレメトリなし</span></p>
+          <p class="meta-row"><span>v0.9.3</span><span>macOS 15+</span><span>ユニバーサル</span><span>GPL-3.0</span><span>テレメトリなし</span></p>
         </div>
       </div>
 
@@ -403,7 +403,6 @@
           これは防止ではなく監視です。残りはこの順番で作っています。</p>
       </div>
       <div class="privacy">
-        <div><strong>インスペクションに予算を <span class="tag">0.9.3</span></strong><p>記録された本文は、Flowlight が保持するもののなかで最も機微なものです。拒否リストではなくヘッダの許可リスト、自分で決めるパターン、ヘッダを一切残さない選択肢、アプリごとの上限、そして自分で期限切れになるセッション。</p></div>
         <div><strong>このルールなら何が起きていたかを見せて <span class="tag">0.9.4</span></strong><p>ルールを直近 1 日に当てて再生し、まだ何も拒否しないうちに、拒否していたはずのものを一覧にします。データはすでにあります。ただ、これまでは過去を説明することしかしてきませんでした。</p></div>
         <div><strong>Mac から出ていくものを、出ていく前に <span class="tag">0.9.5</span></strong><p>最初の 1 行がコレクターに届く前に、宛先、暗号化されているか、どのフィールドが送られるか、そのなかにヘッダはあるか。Flowlight がほかのすべてに求めている開示を、自分自身に当てはめます。</p></div>
         <div><strong>エージェントがネットワーク以外で何をしたか <span class="tag">1.0</span></strong><p>ファイルが出ていくことは、読み取りとそれに続く送信であり、今日見えているのは送信だけです。エージェントのツールが何を開き、何を書き、何を起動したかを記録すれば、<em>秘密鍵を読み、そのあと paste.example と通信した</em>が、2 つの画面ではなく 1 つの発見になります。リソースモニタではありません。CPU とメモリはアクティビティモニタの仕事です。Apple の EndpointSecurity の権限が必要で、その前に、上のインスペクションの予算が必要です。</p></div>
@@ -618,7 +617,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight コントリビューター。Flowlight は <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> のもとで公開されている自由ソフトウェアです。</span>
-      <span>バージョン 0.9.1 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
+      <span>バージョン 0.9.3 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
     </div>
   </div>
 </footer>

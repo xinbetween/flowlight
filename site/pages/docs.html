@@ -244,15 +244,41 @@ open build/Build/Products/Release/Flowlight.app</pre>
         and start them there. Under <strong>Advanced</strong> you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
         the shell setup for one shell, or remove the certificate and everything recorded.</p>
       <p>Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
-        Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are replaced with their
-        length before anything is stored — matched by name and by the words in the name, which catches a vendor's own spelling but
-        cannot promise to catch every one — recorded requests are kept 3 days, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
+        Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
+        allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
         setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.</p>
 
+      <p><strong>What inspection may keep.</strong> Recorded bodies are the most sensitive thing Flowlight holds, and until 0.9.3
+        the only thing protecting them was a guess at which headers carry credentials. A guess is the wrong shape for this: it can
+        only know the headers somebody thought of, and it fails silently — the failure being a secret written to disk by
+        software that promised not to. Advanced now sets limits instead of relying on the guess.</p>
+      <ul>
+        <li><strong>Headers are kept because they are allowed, not discarded because they looked dangerous.</strong> The default
+          keeps the values of a list of headers that never carry credentials — content types, lengths, rate limits, API versions —
+          and replaces every other value with its length. The old behaviour is still offered, because reading an unfamiliar API
+          means seeing headers nobody has thought to allow yet; it is a choice now rather than the only one. A third option keeps no
+          header values at all.</li>
+        <li><strong>Names always survive.</strong> Whatever the policy, you can see which headers were sent and how long each value
+          was. Hiding the header altogether would be the quieter lie: it would show a shorter request than the one that
+          actually happened, and nothing on screen would say so.</li>
+        <li><strong>Words of your own</strong> mark a header as a credential whatever it is called, for a vendor whose spelling the
+          built-in list doesn't know. A word you add wins over the built-in exceptions.</li>
+        <li><strong>A daily ceiling per app</strong> on recorded bodies. Past it the exchange is still recorded — time, host, path,
+          status, headers — and only the bodies are dropped, with a note saying why. A missing body is a gap you can see; a missing
+          exchange looks like nothing happened. Zero means no ceiling.</li>
+        <li><strong>A session that ends by itself</strong>, eight hours by default. Inspection used to run until somebody
+          remembered, which meant the most sensitive mode in the app was the one most likely to be left on after the reason for it
+          had passed. The screen shows when it will stop and lets you restart the clock. You can still choose to have it run
+          until you switch it off, in which case it keeps running across restarts, and the setting says so.</li>
+      </ul>
+      <p>The line at the bottom of Advanced is generated from those settings rather than written out, so it cannot drift from
+        them the way its hardcoded predecessor did.</p>
+
       <p><strong>Getting here from a row.</strong> Right-click an app or a destination in Live, Reports or AI Agents and
-        choose <strong>Inspect …'s Traffic</strong>: Inspect opens with that name already in the search field. It is the search
-        field rather than a hidden filter on purpose — you can widen it, narrow it or clear it without going back to where you
-        started. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.</p>
+        choose <strong>Inspect …'s Traffic</strong>: Inspect opens showing only that app, or only that destination, with a chip
+        saying so that you can remove in one click. It scopes rather than searches — an earlier version put the name in the search
+        field, which also searches response bodies, so asking for one agent's traffic returned every page whose HTML happened to
+        mention it. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.</p>
 
       <h2 id="mocks">Mock responses</h2>
       <p>To see how an agent copes when an API fails, stalls or returns something odd, answer that endpoint yourself. In

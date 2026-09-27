@@ -336,6 +336,29 @@
 "Couldn't save to the Keychain: %@" = "Impossible d'enregistrer dans le trousseau : %@";
 "error %lld" = "erreur %lld";
 
+/* Inspection/HTTPStream.swift */
+"not kept (%lld characters)" = "non conservé (%lld caractères)";
+
+/* Inspection/InspectionBudget.swift */
+"Keep only headers I allow" = "Conserver uniquement les en-têtes que j'autorise";
+"Keep everything except credentials" = "Conserver tout sauf les identifiants";
+"Keep no header values" = "Ne conserver aucune valeur d'en-tête";
+"The safest of the three: a header nobody has thought about yet is hidden rather than stored." = "La plus sûre des trois : un en-tête auquel personne n'a encore pensé est masqué plutôt que stocké.";
+"Matches names and words against a built-in list. Useful for reading an unfamiliar API, but a credential under a name nothing recognises is recorded." = "Compare les noms et les mots à une liste intégrée. Pratique pour lire une API inconnue, mais un identifiant portant un nom que rien ne reconnaît est enregistré.";
+"Names are still recorded, so you can see which headers were sent without keeping any of their values." = "Les noms sont toujours enregistrés : vous voyez donc quels en-têtes ont été envoyés sans conserver aucune de leurs valeurs.";
+"Only the %lld header names you allow keep their values; the rest are replaced by their length." = "Seuls les %lld noms d'en-tête que vous autorisez conservent leur valeur ; celle des autres est remplacée par sa longueur.";
+"Headers that look like credentials are replaced by their length — a heuristic, not a guarantee." = "Les en-têtes qui ressemblent à des identifiants sont remplacés par leur longueur — une heuristique, pas une garantie.";
+"No header values are kept at all." = "Aucune valeur d'en-tête n'est conservée.";
+"Recorded requests are kept for 1 day." = "Les requêtes enregistrées sont conservées pendant 1 jour.";
+"Recorded requests are kept for %lld days." = "Les requêtes enregistrées sont conservées pendant %lld jours.";
+"Bodies are no longer kept once an app has recorded %@ in a day." = "Dès qu'une app a enregistré %@ dans la journée, ses corps ne sont plus conservés.";
+"Inspection turns itself off after %lld minutes." = "L'inspection s'arrête d'elle-même au bout de %lld minutes.";
+"Inspection turns itself off after 1 hour." = "L'inspection s'arrête d'elle-même au bout d'une heure.";
+"Inspection turns itself off after %lld hours." = "L'inspection s'arrête d'elle-même au bout de %lld heures.";
+"Inspection turns itself off after %lld hours %lld minutes." = "L'inspection s'arrête d'elle-même au bout de %lld heures et %lld minutes.";
+"%lld minutes" = "%lld minutes";
+"%lld hours" = "%lld heures";
+
 /* Inspection/InspectionController.swift */
 "AI agents and their tools" = "Agents IA et leurs outils";
 "Every app that uses the proxy" = "Toutes les apps qui utilisent le proxy";
@@ -354,6 +377,13 @@
 "No network services found." = "Aucun service réseau trouvé.";
 "Couldn't change the proxy settings: %@" = "Impossible de modifier les réglages du proxy : %@";
 "unknown error" = "erreur inconnue";
+"Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept." = "L'inspection s'est arrêtée d'elle-même au bout de %lld minutes, comme réglé dans « Avancé ». Les requêtes enregistrées sont conservées.";
+"Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept." = "L'inspection s'est arrêtée d'elle-même au bout d'une heure, comme réglé dans « Avancé ». Les requêtes enregistrées sont conservées.";
+"Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept." = "L'inspection s'est arrêtée d'elle-même au bout de %lld heures, comme réglé dans « Avancé ». Les requêtes enregistrées sont conservées.";
+"Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept." = "L'inspection s'est arrêtée d'elle-même au bout de %lld heures et %lld minutes, comme réglé dans « Avancé ». Les requêtes enregistrées sont conservées.";
+
+/* Inspection/InspectionRecorder.swift */
+"Bodies not kept: this app reached its daily inspection budget." = "Corps non conservés : cette app a atteint son budget d'inspection quotidien.";
 
 /* Inspection/LLMFacts.swift */
 "only %lld tools enabled" = "seulement %lld outils activés";
@@ -832,6 +862,9 @@
 "decrypting AI agents only" = "déchiffrement des agents IA uniquement";
 "decrypting every app" = "déchiffrement de toutes les apps";
 "system proxy on" = "proxy du système activé";
+"Showing only traffic from %@" = "Affichage limité au trafic de %@";
+"Showing only traffic to %@" = "Affichage limité au trafic vers %@";
+"Show every inspected request again" = "Afficher à nouveau toutes les requêtes inspectées";
 "Request" = "Requête";
 "Not inspected: %@" = "Non inspecté : %@";
 "Mocked" = "Simulé";
@@ -864,7 +897,6 @@
 "Environment variables that send one shell's tools through Flowlight" = "Variables d'environnement qui font passer les outils d'un shell par Flowlight";
 "Show Certificate in Finder" = "Afficher le certificat dans le Finder";
 "Remove Certificate & Recorded Data…" = "Supprimer le certificat et les données enregistrées…";
-"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "Les requêtes enregistrées sont conservées 3 jours. Les clés API, les cookies et les autres en-têtes d'identification ne sont jamais stockés.";
 "Advanced" = "Avancé";
 "Mock responses" = "Réponses simulées";
 "1 on" = "1 activée";
@@ -898,6 +930,26 @@
 "No body" = "Aucun corps";
 "pid %lld" = "pid %lld";
 "%@ s" = "%@ s";
+
+/* UI/InspectionBudgetView.swift */
+"What inspection may keep" = "Ce que l'inspection peut conserver";
+"Recorded bodies are the most sensitive thing Flowlight holds. These are the limits on them." = "Les corps enregistrés sont ce que Flowlight détient de plus sensible. Voici les limites qui s'y appliquent.";
+"Headers kept in full" = "En-têtes conservés en entier";
+"x-my-header" = "x-my-header";
+"No headers are allowed, so no header values are kept. The names are still recorded." = "Aucun en-tête n'est autorisé, donc aucune valeur d'en-tête n'est conservée. Les noms sont toujours enregistrés.";
+"Also treat as credentials" = "Traiter aussi comme identifiants";
+"A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know." = "Un en-tête dont le nom contient l'un de ces mots est remplacé par sa longueur, quel que soit son nom complet. Pour un fournisseur dont l'orthographe est inconnue de la liste intégrée.";
+"x-acme-licence" = "x-acme-licence";
+"Daily limit on recorded bodies, per app, in MB" = "Limite quotidienne des corps enregistrés, par app, en MB";
+"Past that limit, the exchange is still recorded — time, host, path, status and headers — and only its bodies are dropped." = "Au-delà de cette limite, l'échange est toujours enregistré — heure, hôte, chemin, état et en-têtes — et seuls ses corps sont abandonnés.";
+"0 means no ceiling. An agent that resends a long conversation every turn can record a great deal in an afternoon." = "0 signifie aucun plafond. Un agent qui renvoie une longue conversation à chaque tour peut enregistrer énormément en un après-midi.";
+"Days to keep recorded requests" = "Nombre de jours de conservation des requêtes enregistrées";
+"Applied as soon as you change it, not only at the next cleanup." = "Appliqué dès que vous le changez, pas seulement au prochain nettoyage.";
+"Turn inspection off automatically" = "Arrêter l'inspection automatiquement";
+"Never — only when I turn it off" = "Jamais — seulement quand je l'arrête moi-même";
+"Inspection will turn off at %@" = "L'inspection s'arrêtera à %@";
+"Restart the timer" = "Relancer le minuteur";
+"Inspection will run until you switch it off, including across restarts." = "L'inspection restera active jusqu'à ce que vous l'arrêtiez, y compris après un redémarrage.";
 
 /* UI/JSONTreeView.swift */
 "no match" = "aucune correspondance";
@@ -1089,6 +1141,23 @@
 "Refuse %1$@ requests from %2$@ to %3$@." = "Refuser les requêtes %1$@ de %2$@ vers %3$@.";
 "Allow %1$@ requests from %2$@ to %3$@." = "Autoriser les requêtes %1$@ de %2$@ vers %3$@.";
 "anywhere" = "n'importe où";
+"What it would have done" = "Ce qu'elle aurait fait";
+
+/* UI/RuleSimulationView.swift */
+"Test against" = "Tester sur";
+"The last day" = "le dernier jour";
+"The last 3 days" = "les 3 derniers jours";
+"The last week" = "la dernière semaine";
+"The last 2 weeks" = "les 2 dernières semaines";
+"Nothing simulated yet." = "Rien n'a encore été simulé.";
+"Name an app or a destination first." = "Indiquez d'abord une app ou une destination.";
+"No recorded traffic in this period to test against." = "Aucun trafic enregistré sur cette période pour faire le test.";
+"Would have changed nothing. %lld connections in this period, none of them affected." = "N'aurait rien changé. %lld connexions sur cette période, aucune concernée.";
+"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "Aurait refusé %lld connexions sur %lld, provenant de %lld apps, %@ en tout.";
+"Would have allowed %lld connections that are refused today." = "Aurait autorisé %lld connexions qui sont refusées aujourd'hui.";
+"%lld×" = "%lld×";
+"and %lld more" = "et %lld de plus";
+"Tested against traffic back to %@." = "Testée sur le trafic remontant jusqu'à %@.";
 
 /* UI/RulesView.swift */
 "What they did" = "Ce qu'elles ont fait";

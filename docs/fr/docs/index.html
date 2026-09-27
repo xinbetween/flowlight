@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.1, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.3, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -297,15 +297,41 @@ open build/Build/Products/Release/Flowlight.app</pre>
         et lancez-les depuis là. Sous <strong>Avancé</strong>, vous pouvez déchiffrer les agents IA seulement plutôt que toutes les apps, modifier la liste des exclusions, copier
         la configuration shell pour un shell donné, ou supprimer le certificat et tout ce qui a été enregistré.</p>
       <p>Flowlight exclut du déchiffrement sa liste intégrée de services Apple et de gestionnaires de mots de passe (modifiez la liste dans la Configuration). Les apps qui épinglent leurs certificats peuvent rejeter le
-        certificat de Flowlight&nbsp;; Flowlight s’en aperçoit et les laisse passer chiffrées. Les clés d’API, les cookies et les autres en-têtes d’identification sont remplacés par
-        leur longueur avant tout enregistrement — repérés par leur nom et par les mots de leur nom, ce qui attrape l’orthographe propre d’un fournisseur
-        sans pouvoir promettre de les attraper tous —, les requêtes enregistrées sont gardées 3 jours, et <strong>Supprimer le certificat &amp; les données enregistrées</strong> supprime le certificat, son réglage
+        certificat de Flowlight&nbsp;; Flowlight s’en aperçoit et les laisse passer chiffrées. Par défaut, les valeurs d’en-tête ne sont conservées que si l’en-tête est un de ceux que
+        vous autorisez, et tout le reste est remplacé par sa longueur avant tout enregistrement — les requêtes enregistrées sont gardées aussi longtemps que vous le réglez, et <strong>Supprimer le certificat &amp; les données enregistrées</strong> supprime le certificat, son réglage
         d’approbation et tout ce qui a été enregistré. L’inspection est en HTTP/1.1 uniquement (Flowlight le demande aux deux parties) et n’est pas disponible en mode démo.</p>
 
+      <p><strong>Ce que l’inspection peut conserver.</strong> Les corps enregistrés sont ce que Flowlight détient de plus sensible, et jusqu’à la 0.9.3
+        la seule chose qui les protégeait était une supposition sur les en-têtes qui portent des identifiants. Une supposition a la mauvaise forme pour
+        cela&nbsp;: elle ne peut connaître que les en-têtes auxquels quelqu’un a pensé, et elle échoue en silence — cet échec étant un secret écrit
+        sur le disque par un logiciel qui avait promis de ne pas le faire. Avancé fixe désormais des limites au lieu de s’en remettre à la supposition.</p>
+      <ul>
+        <li><strong>Les en-têtes sont conservés parce qu’ils sont autorisés, non écartés parce qu’ils avaient l’air dangereux.</strong> Par défaut,
+          les valeurs d’une liste d’en-têtes qui ne portent jamais d’identifiants sont conservées — types de contenu, longueurs, limites de débit, versions d’API —
+          et toute autre valeur est remplacée par sa longueur. L’ancien comportement reste proposé, car lire une API inconnue
+          suppose de voir des en-têtes que personne n’a encore songé à autoriser&nbsp;; c’est désormais un choix et non la seule possibilité. Une troisième option ne conserve
+          aucune valeur d’en-tête.</li>
+        <li><strong>Les noms survivent toujours.</strong> Quelle que soit la règle retenue, vous voyez quels en-têtes ont été envoyés et quelle était la longueur de
+          chaque valeur. Masquer l’en-tête complètement serait le mensonge le plus discret&nbsp;: cela montre une requête plus courte que
+          celle qui a réellement eu lieu, et rien à l’écran ne le dirait.</li>
+        <li><strong>Vos propres mots</strong> marquent un en-tête comme identifiant quel que soit son nom, pour un fournisseur dont l’orthographe est
+          inconnue de la liste intégrée. Un mot que vous ajoutez l’emporte sur les exceptions intégrées.</li>
+        <li><strong>Un plafond quotidien par app</strong> sur les corps enregistrés. Au-delà, l’échange est toujours enregistré — heure, hôte, chemin,
+          état, en-têtes — et seuls les corps sont abandonnés, avec une note qui dit pourquoi. Un corps manquant est un trou que vous voyez&nbsp;; un échange
+          manquant donne l’impression qu’il ne s’est rien passé. Zéro signifie aucun plafond.</li>
+        <li><strong>Une session qui s’arrête d’elle-même</strong>, huit heures par défaut. L’inspection tournait jusqu’à ce que quelqu’un y
+          repense, ce qui faisait du mode le plus sensible de l’app celui qui avait le plus de chances de rester actif une fois la raison de l’avoir
+          allumé passée. L’écran indique quand elle s’arrêtera et vous laisse relancer le compte à rebours. Vous pouvez
+          toujours choisir de la laisser tourner jusqu’à ce que vous l’arrêtiez&nbsp;: elle reste alors active après un redémarrage, et le réglage le dit.</li>
+      </ul>
+      <p>La ligne en bas d’Avancé est générée à partir de ces réglages plutôt qu’écrite en dur, de sorte qu’elle ne peut plus s’en écarter
+        comme le faisait celle qui l’a précédée.</p>
+
       <p><strong>Y arriver depuis une ligne.</strong> Faites un clic droit sur une app ou une destination dans En direct, Rapports ou Agents IA et
-        choisissez <strong>Inspecter le trafic de …</strong>&nbsp;: Inspecter s’ouvre avec ce nom déjà dans le champ de recherche. Que ce soit le champ
-        de recherche et non un filtre caché est voulu — vous pouvez l’élargir, le restreindre ou l’effacer sans retourner d’où vous veniez. Seul le
-        trafic passé par le proxy peut apparaître&nbsp;: une ligne dont vous savez qu’elle est chargée peut donc ne rien montrer ici.</p>
+        choisissez <strong>Inspecter le trafic de …</strong>&nbsp;: Inspecter s’ouvre en n’affichant que cette app, ou que cette destination, avec une
+        étiquette qui le dit et que vous retirez d’un clic. C’est un cadrage, non une recherche — une version antérieure mettait le nom dans le champ
+        de recherche, qui cherche aussi dans les corps des réponses&nbsp;: demander le trafic d’un agent renvoyait donc toutes les pages dont le HTML se
+        contentait de le mentionner. Seul le trafic passé par le proxy peut apparaître&nbsp;: une ligne dont vous savez qu’elle est chargée peut donc ne rien montrer ici.</p>
 
       <h2 id="mocks">Réponses simulées</h2>
       <p>Pour voir comment un agent réagit quand une API échoue, se bloque ou renvoie quelque chose d’étrange, répondez vous-même à ce point de terminaison. Dans
@@ -644,7 +670,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.1 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.9.3 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

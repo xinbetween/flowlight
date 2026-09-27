@@ -37,6 +37,44 @@ enum ProcessNaming {
         return s.allSatisfy { $0.isNumber || $0 == "." || $0 == "-" }
     }
 
+    /// Names learned for executables whose filename is a version.
+    ///
+    /// `proc_pidpath` fails whenever the path cannot be read — the commonest case being a process that has since
+    /// exited, which for a short-lived agent invocation is most of them. The caller then falls back to
+    /// `proc_name`, which returns the filename, and for an installer that keeps one file per release the
+    /// filename *is* the version. So the whole point of this file was defeated by a failure mode it never saw:
+    /// the path-based rule was correct and simply never ran, and `2.1.283` went into the database as an identity
+    /// of its own.
+    ///
+    /// Remembering the answer from the times the path *was* readable fixes that, because the same executable is
+    /// resolved successfully many times before it is resolved badly once.
+    private static let memo = NSLock()
+    nonisolated(unsafe) private static var namesByVersion: [String: String] = [:]
+
+    /// Records that this version-shaped filename belongs to a tool of this name.
+    static func remember(version: String, as name: String) {
+        guard isVersion(version), !name.isEmpty, !isVersion(name) else { return }
+        memo.lock(); defer { memo.unlock() }
+        namesByVersion[version] = name
+    }
+
+    /// The tool a version-shaped filename belongs to, if it has ever been seen with a readable path.
+    static func rememberedName(forVersion version: String) -> String? {
+        memo.lock(); defer { memo.unlock() }
+        return namesByVersion[version]
+    }
+
+    /// What to record when all that is known about a process is its filename.
+    ///
+    /// A version is never an identity: taking one would give the agent a new name, a new allowlist and a new
+    /// history on every update, which is the failure this whole file exists to prevent. Better a remembered
+    /// name, and failing that an honest `pid N` — a row labelled by pid is obviously incomplete, where a row
+    /// labelled `2.1.283` looks like an answer.
+    static func identity(fromFilename filename: String, pid: Int32) -> String {
+        guard isVersion(filename) else { return filename }
+        return rememberedName(forVersion: filename) ?? "pid \(pid)"
+    }
+
     static func displayName(path: String) -> String {
         displayName(fromPathComponents: path.split(separator: "/").map(String.init))
     }

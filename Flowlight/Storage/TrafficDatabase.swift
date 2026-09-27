@@ -252,6 +252,70 @@ final class TrafficDatabase: @unchecked Sendable {
         if !readOnly { try migrate() }
     }
 
+    /// One-time repair: agents that were recorded under a version number instead of their name.
+    ///
+    /// `proc_pidpath` fails for a process that has already exited, and the fallback is the executable's
+    /// filename — which, for an installer that keeps one file per release, is the version. So Claude Code
+    /// arrived in the database as `2.1.260`, then `2.1.267`, then `2.1.283`: a fresh identity every update,
+    /// each with its own allowlist, its own baselines and its own slice of the history.
+    ///
+    /// Fixing the naming stops new rows going in wrong. It does nothing for the ones already there, and daily
+    /// totals are kept indefinitely — so without this the bug stays on screen forever and reads as unfixed.
+    /// A read for tests to check what a migration actually did to the rows. Not part of the app's own surface:
+    /// everything the app reads has a named method, so a query written at a call site would be a query nobody
+    /// maintains.
+    func raw<T>(_ sql: String, _ values: [SQLValue] = [], map: (SQLRow) -> T) throws -> [T] {
+        try conn.query(sql, values, map: map)
+    }
+
+    /// Internal rather than private so a test can run it against a database it has filled: the repair happens
+    /// once, at first open, which leaves no way to exercise it afterwards through the public surface.
+    func repairVersionedNames() throws {
+        // What each version belongs to, learned from the rows that did keep a path.
+        var realName: [String: (id: String, name: String)] = [:]
+        for table in Self.tables {
+            for (bundleID, path) in try conn.query(
+                "SELECT DISTINCT bundle_id, app_path FROM \(table) WHERE app_path <> ''", map: { ($0.text(0), $0.text(1)) }) {
+                guard ProcessNaming.isVersion(bundleID) else { continue }
+                let derived = ProcessNaming.displayName(path: path)
+                guard !derived.isEmpty, !ProcessNaming.isVersion(derived) else { continue }
+                realName[bundleID] = (derived, ProcessNaming.friendlyName(executable: derived))
+            }
+        }
+        guard !realName.isEmpty else { return }
+
+        let columns = "ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, " +
+                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel"
+        for (version, real) in realName {
+            for table in Self.tables {
+                // Re-inserted rather than updated, because `bundle_id` is part of the unique key: renaming can
+                // collide with a row already under the real name, and the two are the same traffic counted
+                // twice. The upsert adds the byte counts together instead of letting one overwrite the other.
+                try conn.run("""
+                    INSERT INTO \(table) (\(columns))
+                    SELECT ts, pid, ?, ?, app_path, remote_ip, domain, port, transport, protocol,
+                           bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel
+                    FROM \(table) WHERE bundle_id = ?
+                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel)
+                    DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
+                                  bytes_out = bytes_out + excluded.bytes_out,
+                                  flows = flows + excluded.flows;
+                    """, [.text(real.id), .text(real.name), .text(version)])
+                try conn.run("DELETE FROM \(table) WHERE bundle_id = ?", [.text(version)])
+            }
+            // Everything else keyed by the identity follows it, or the agent keeps a split history by another route.
+            for (table, column) in [("seen_destinations", "bundle_id"), ("seen_ports", "bundle_id"),
+                                    ("baselines", "bundle_id"), ("alerts", "bundle_id"), ("apps", "bundle_id"),
+                                    ("agent_policies", "agent_id"), ("http_exchanges", "bundle_id")] {
+                try conn.run("UPDATE OR IGNORE \(table) SET \(column) = ? WHERE \(column) = ?",
+                                 [.text(real.id), .text(version)])
+            }
+            try conn.run("UPDATE http_exchanges SET app_name = ? WHERE app_name = ?", [.text(real.name), .text(version)])
+            try conn.run("UPDATE alerts SET app_name = ? WHERE app_name = ?", [.text(real.name), .text(version)])
+            try conn.run("DELETE FROM apps WHERE bundle_id = ?", [.text(version)])
+        }
+    }
+
     private func migrate() throws {
         for table in Self.tables {
             try conn.execute("""
@@ -342,6 +406,15 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE INDEX IF NOT EXISTS rule_events_ts ON rule_events(ts);
         CREATE INDEX IF NOT EXISTS rule_events_rule ON rule_events(rule_id, ts);
         """)
+
+        // Runs once. `rollup_state` already exists to remember how far a job has got, so the repair uses it
+        // rather than introducing a second way to record the same kind of fact.
+        let repaired = try conn.query("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
+                                      map: { $0.int(0) }).first
+        if repaired == nil {
+            try conn.transaction { try repairVersionedNames() }
+            try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 1)")
+        }
     }
 
     // MARK: Ingest
@@ -902,8 +975,24 @@ final class TrafficDatabase: @unchecked Sendable {
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
     /// `search` also looks inside the bodies, so a keyword only present in a request or response still finds it.
-    func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none) throws -> [HTTPExchange] {
+    /// - Parameter app: a bundle id to scope to. Separate from `search` on purpose: "show me this app's traffic"
+    ///   is a different question from "find this text", and answering the first with the second matches any
+    ///   response body that merely mentions the app's name — which is how asking for Claude Code's traffic
+    ///   returned every GitHub page whose HTML says "Claude Code".
+    func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
+                   app: String? = nil, host: String? = nil) throws -> [HTTPExchange] {
         let like = "%\(search)%"
+        var scopeClause = ""
+        var scopeValues: [SQLValue] = []
+        if let app, !app.isEmpty {
+            scopeClause += " AND bundle_id = ?"
+            scopeValues.append(.text(app))
+        }
+        if let host, !host.isEmpty {
+            scopeClause += " AND (host = ? OR host LIKE ?)"
+            scopeValues.append(.text(host))
+            scopeValues.append(.text("%." + host))
+        }
         // An exchange records the host it went to but not the address behind it, so an IP target can't match here.
         var focusClause = ""
         var focusValues: [SQLValue] = []
@@ -925,11 +1014,11 @@ final class TrafficDatabase: @unchecked Sendable {
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm, mock_rule, guardrail
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)
             ORDER BY ts DESC LIMIT ?
             """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
                   .text(like), .text(like)]
-                  + focusValues + [.int(Int64(limit))]) { row in
+                  + focusValues + scopeValues + [.int(Int64(limit))]) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
             let tools = row.text(22), results = row.text(24), mcp = row.text(25), llm = row.text(26)
