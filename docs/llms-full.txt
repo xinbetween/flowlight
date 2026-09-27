@@ -157,10 +157,21 @@ open build/Build/Products/Release/Flowlight.app
 
  Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
 
- Inspect⌘5Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
+ Rules⌘5Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.
 
- Capture⌘6Which engine is recording, the extension's state, hostname learning, and where the database lives.
+ Ask⌘6Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.
 
+ Inspect⌘7Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
+
+ Devices⌘8Off until you turn it on: Bluetooth, USB and external storage, which a Mac uses as much as it uses the network.
+
+ Coverage⌘9What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.
+
+ Capture⌘0Which engine is recording, the extension's state, hostname learning, and where the database lives.
+
+ The shortcuts are the sidebar's order, so ⌘0 is the tenth item rather than a skipped position.
+
+ Live, the screen Flowlight opens on.
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
 
  AI agent rules
@@ -330,9 +341,15 @@ open build/Build/Products/Release/Flowlight.app
  the shell setup for one shell, or remove the certificate and everything recorded.
 
  Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
- Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are never
- stored, recorded requests are kept 3 days, and Remove Certificate & Recorded Data deletes the certificate, its trust
+ Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are replaced with their
+ length before anything is stored — matched by name and by the words in the name, which catches a vendor's own spelling but
+ cannot promise to catch every one — recorded requests are kept 3 days, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
+
+ Getting here from a row. Right-click an app or a destination in Live, Reports or AI Agents and
+ choose Inspect …'s Traffic: Inspect opens with that name already in the search field. It is the search
+ field rather than a hidden filter on purpose — you can widen it, narrow it or clear it without going back to where you
+ started. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.
 
  Mock responses
 
@@ -497,11 +514,6 @@ open build/Build/Products/Release/Flowlight.app
  machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
  needs no filter and works alongside them.
  See the developer guide for how it's built.
-
- Getting here from a row. Right-click an app or a destination in Live, Reports or AI Agents and
- choose Inspect …'s Traffic: Inspect opens with that name already in the search field. It is the search
- field rather than a hidden filter on purpose — you can widen it, narrow it or clear it without going back to where you
- started. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.
 
  Coverage: what Flowlight can't account for
 
@@ -678,8 +690,9 @@ open build/Build/Products/Release/Flowlight.app
  It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded.
  Paste it into an issue.
  Does Flowlight send anything about me anywhere?
- No. There's no account, no telemetry and no analytics. The only requests it makes are the daily update check, optional network-owner
- lookups, and reverse DNS — each listed, and each with an off switch, on the privacy page.
+ No account, no telemetry, no analytics, and your traffic database is never uploaded. Three requests do leave the Mac, all listed on the
+ privacy page: the daily update check and the optional network-owner lookup, both with off switches, and
+ reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections.
  Will it slow my Mac down or drain the battery?
  With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
  costs less than the fallback sampler, which starts a short-lived nettop process every second.
@@ -865,7 +878,9 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
 
  Name an app, an agent, a destination or a single URL and block it — right-click the row you spotted it in.
  Forever, until a time, until Flowlight quits, or between chosen hours, with one pause switch and a way out on
- every refusal. The most specific rule wins, and a tie goes to the block.
+ every refusal. The most specific rule wins, and a tie goes to the block. It is control over software you
+ already trust, not a barrier against software you don't — see the threat
+ model.
 
  Cursor ⇥ raw.githubusercontent.com · refused 4 times · weekdays 18:00–09:00
 
@@ -1060,13 +1075,8 @@ e.g. Wireshark
 
  What's coming
 
- Flowlight watches, explains and refuses today. This is the order the rest is being built in.
-
- Coverage, stated rather than assumed 0.9.0Per app: watched by the extension, decrypted by the proxy, named only by DNS or SNI, or not covered at all — and why, with the fix where there is one. A tool that claims completeness is worth less than one you can trust about its own limits.
-
- Inspect it from where you found it 0.9.1Right-click a row in Live, Reports or AI Agents and Inspect opens already looking at that app or destination — instead of changing screen and retyping the name into a search field.
-
- A threat model, written down 0.9.2What Flowlight defends against and what it doesn't, on one page: software misbehaving in the open, not software with root. Monitoring, not prevention, said beside every mention of blocking. Plus a security contact, and fonts served from here rather than from Google.
+ Flowlight watches, explains and refuses today — monitoring rather than prevention, as the
+ threat model sets out. This is the order the rest is being built in.
 
  A budget for inspection 0.9.3Recorded bodies are the most sensitive thing Flowlight holds. A header allowlist instead of a denylist, patterns of your own, an option to keep no headers at all, per-app ceilings, and a session that expires by itself.
 
@@ -1074,7 +1084,7 @@ e.g. Wireshark
 
  What leaves the Mac, before it leaves 0.9.5Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.
 
- What an agent did besides the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
+ What an agent did off the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
 
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
 
@@ -1230,8 +1240,10 @@ Privacy
 
  Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
  ~/Library/Application Support/Flowlight/Inspection) and runs a proxy that accepts connections only from this Mac. For apps you
- route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
- (Authorization, cookies, API keys) are replaced with their length before anything is stored. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; Remove Certificate & Recorded
+ route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers are
+ replaced with their length before anything is stored — recognised by name (Authorization, cookies, API keys) and by the words
+ in the name, so X-Access-Key is caught as well. That is a heuristic, not a guarantee: a header carrying a secret
+ under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; Remove Certificate & Recorded
  Data deletes the certificate, its trust setting and every recorded request.
 
  Network requests the app makes
@@ -1242,7 +1254,7 @@ Privacy
 
  Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
 
- Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the default capture mode
+ Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this
 
  Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Capture › Identify network owners
 
@@ -1268,12 +1280,16 @@ Privacy
  This website
 
  This site is a static page hosted on GitHub Pages and served through Cloudflare. It sets no cookies and runs no analytics. GitHub
- and Cloudflare process requests to serve it, and the fonts load from Google Fonts, which receives your IP address when you visit.
+ and Cloudflare process requests to serve it. The fonts are served from this domain, so rendering a page sends nothing to anyone
+ else — this page used to load them from Google, which meant the page explaining that Flowlight sends nothing anywhere made a
+ request to Google to render itself.
 
  Contact
 
- Questions or a privacy concern? Open an issue. For anything sensitive, use GitHub's
- private vulnerability reporting on the repository.
+ Questions or a privacy concern? Open an issue. For a security issue, use GitHub's
+ private vulnerability reporting, or email
+ security@xinbetween.com if you would rather not use GitHub — see
+ SECURITY.md for what to expect.
 
 ---
 
@@ -2091,3 +2107,137 @@ September 21, 2026First preview
  Anomaly alerts, a menu bar readout, a disk image and an installer package.
 
  Downloads and checksums →
+
+---
+
+# Flowlight threat model
+URL: https://flowlight.xinbetween.com/threat-model/
+
+Threat model
+
+ Monitoring, not prevention
+
+ Flowlight tells you what software on your Mac is sending and where. It is not a defence against an attacker who
+ already controls the machine, and the difference matters enough to state on its own page rather than in footnotes.
+
+ On this page
+
+ The short version
+
+ What it is forWhat it defends against
+
+ Limits
+
+ Software with rootWhat capture missesWhat inspection misses
+ What blocking is and isn't
+
+ Flowlight itself
+
+ What it holdsUpdatesReporting a vulnerability
+
+ What it is for
+
+ Flowlight answers a question the Mac does not: which app sent this, and where did it go? It is built for
+ software that behaves badly in the open — an AI agent contacting something nobody asked it to, a tool uploading more than it
+ should, a process talking to an address that has no name. That behaviour is visible in the traffic, and Flowlight's job is to
+ make it legible and to say honestly when it cannot.
+
+ It is not antivirus, not an EDR agent, and not a firewall in the sense of something that stands between you and an attacker.
+ Where the two overlap — Flowlight can refuse connections — the refusal is a convenience for controlling software you already
+ trust, not a barrier against software you don't.
+
+ What it defends against
+
+ Unnoticed egress. An app or an agent sending somewhere you would not have approved, including through a
+ tool it ran itself. Flowlight attributes the connection to the process that made it and to the agent that started that
+ process.
+
+ Quiet changes in behaviour. An app that suddenly contacts new destinations, moves far more than its
+ baseline, or works while you are away. Every alert names the number that tripped it, so you can disagree with it.
+
+ An agent exceeding what you allowed. An allowlist per agent, and rules that refuse connections outside it,
+ with the refusal recorded and one click to allow it.
+
+ A tampered update. Every release publishes a checksum; the updater refuses a download it cannot verify and
+ refuses to install an app not signed by the same team as the copy asking for the update.
+
+ Software with root can switch it off
+
+ Flowlight runs as you, with a system extension macOS starts on its behalf. Anything running as root — or anything you approve
+ an installer for — can unload that extension, stop the app, or delete its database. Nothing in the design prevents that, and no
+ monitoring tool on macOS can prevent it while remaining a tool you can also turn off yourself.
+
+ The honest claim is narrower and still useful: software that is misbehaving but not actively evading a monitor will be seen.
+ Software that is actively evading one may not be, and will at least leave a gap — an extension that stopped, a period with no
+ data — which the Coverage screen is there to show.
+
+ What capture misses
+
+ Traffic from before capture started. There is no backfill. A connection that opened before the filter did
+ was never offered to it.
+
+ System services exempt from content filters. macOS does not show a content filter everything; some of its
+ own traffic never reaches ours.
+
+ Another content filter holding the slot. macOS runs one at a time. If a VPN or a security agent has it,
+ Flowlight's filter installs, connects, and is never asked to filter anything — Capture says so rather than showing an empty
+ screen.
+
+ Short connections, on the sampler. Without the extension, Flowlight reads counters once a second: a
+ connection that opens and closes between two readings is never recorded.
+
+ Channels that are not TCP or UDP. Bluetooth and USB are visible as devices, not as bytes. An agent's local
+ MCP server talking over a pipe is not network traffic at all and appears nowhere.
+
+ What inspection misses
+
+ HTTPS inspection reads only what is routed through Flowlight's local proxy, and a program decides that when it starts. An app
+ that ignores proxy settings, one started before inspection was switched on, or one that pins its certificates is passed through
+ untouched — deliberately, because breaking a pinned connection would break the app. QUIC is not offered to the proxy either.
+
+ So an empty Inspect screen means "nothing was routed here", not "nothing happened". Coverage says which of the two applies,
+ per app.
+
+ What blocking is, and isn't
+
+ A rule that refuses a connection is carried out by the Network Extension, in the path, before the connection is made. A rule
+ that names a URL is carried out by the inspection proxy instead, which answers the request with a status the app can read.
+ Those are the only two parts of Flowlight that act rather than report — the nettop sampler can refuse nothing at all, so on a
+ Mac running the sampler no rule is enforced, and Flowlight says so rather than offering a switch that does nothing.
+
+ It is still not prevention. An agent that can run a shell can do by hand what a refused tool would have done. A refusal you
+ can undo in one click is a refusal an agent's next attempt may walk through. Local traffic, DNS, Apple's own services and
+ Flowlight's own connections are never refused, because a blocked Mac is a worse outcome than a blocked agent. And enforcement
+ lapses a few seconds after Flowlight stops running: a refusal nobody can see is worse than none.
+
+ Inspection and refusal do not combine. Traffic routed through Flowlight's own proxy leaves the Mac as
+ Flowlight's traffic, and Flowlight never refuses itself — so an app whose requests you are reading is an app whose connections
+ rules no longer stop. Turning inspection on to see more costs you enforcement, and nothing on screen previously said so.
+
+ What Flowlight itself holds
+
+ Traffic metadata in a local SQLite database, with published retention. With HTTPS inspection on it also holds request and
+ response bodies for three days — the most sensitive thing it ever keeps. Credential headers are redacted by name and by word,
+ which is a heuristic and not a guarantee; a header carrying a secret under a name nothing recognises can be recorded.
+
+ The traffic database is never uploaded. Three smaller things do leave the Mac without being asked for, all of them named on
+ the privacy page: the update check, which asks GitHub for the latest release on launch and
+ daily; the network-owner lookup, which asks Team Cymru about public addresses that have no hostname; and, while Flowlight is
+ reading counters instead of running its extension, a reverse-DNS lookup of addresses it saw no name for. The first two have
+ off switches. The third does not, because on the sampler it is most of how a connection gets a name at all — it goes to the
+ resolver the Mac already uses, and it stops once the extension takes over and names connections from the traffic itself.
+ Ask with a hosted model sends far more than any of them, and is the one thing that stays off until you configure it.
+
+ Updates
+
+ Releases are signed with a Developer ID and notarized. The updater requires a published checksum and refuses a download
+ without one, then verifies that the downloaded app is signed by the same team as the running copy before installing it. An
+ update signed by somebody else is refused even if it is otherwise valid.
+
+ Reporting a vulnerability
+
+ Use GitHub's private vulnerability reporting, or email
+ security@xinbetween.com if you would rather not use GitHub.
+ SECURITY.md says what is in scope and what to expect.
+ An ordinary bug — a crash, a wrong number, a misleading screen — belongs in the
+ issue tracker instead.

@@ -162,7 +162,9 @@ nav: home
           <div><h3>원하는 기간만큼만 사는 규칙</h3>
             <p>앱이든 에이전트든, 목적지든 URL 하나든 지정해서 막으세요. 발견한 행에서 오른쪽 클릭하면 됩니다.
               영구히, 특정 시각까지, Flowlight를 종료할 때까지, 또는 정해 둔 시간대에만. 일시 정지 스위치 하나와
-              모든 거부마다 빠져나갈 길이 있습니다. 가장 구체적인 규칙이 이기고, 비기면 차단이 이깁니다.</p>
+              모든 거부마다 빠져나갈 길이 있습니다. 가장 구체적인 규칙이 이기고, 비기면 차단이 이깁니다.
+              이미 신뢰하는 소프트웨어를 통제하는 수단이지, 신뢰하지 않는
+              소프트웨어를 막아 주는 장벽은 아닙니다. <a href="{{link:threat-model}}">위협 모델</a>을 보세요.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · 4회 거부 · 평일 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -344,9 +346,14 @@ nav: home
       <div class="section-head">
         <p class="eyebrow">다음</p>
         <h2>앞으로 올 것</h2>
-        <p class="lede">Flowlight는 지금 지켜보고 설명하고 거부합니다. 나머지는 이 순서로 만들고 있습니다.</p>
+        <p class="lede">Flowlight는 지금 지켜보고 설명하고 거부합니다. <a href="{{link:threat-model}}">위협 모델</a>이 밝히듯, 이것은
+          예방이 아니라 관찰입니다. 나머지는 이 순서로 만들고 있습니다.</p>
       </div>
       <div class="privacy">
+        <div><strong>검사에도 예산을 <span class="tag">0.9.3</span></strong><p>기록된 본문은 Flowlight가 보관하는 것 중 가장 민감한 것입니다. 차단 목록이 아니라 헤더 허용 목록, 직접 정하는 패턴, 헤더를 아예 남기지 않는 선택, 앱별 상한, 그리고 스스로 만료되는 세션.</p></div>
+        <div><strong>이 규칙이라면 무엇을 막았을지 보여줘 <span class="tag">0.9.4</span></strong><p>지난 하루를 규칙에 다시 돌려, 아직 아무것도 거부하지 않은 채로 무엇을 거부했을지 나열합니다. 데이터는 이미 있습니다. 지금까지 그 데이터가 한 일이 지난 일을 설명하는 것뿐이었습니다.</p></div>
+        <div><strong>Mac을 떠나는 것을, 떠나기 전에 <span class="tag">0.9.5</span></strong><p>첫 줄이 수집기에 닿기 전에 목적지, 암호화 여부, 어떤 필드가 나가는지, 그중에 헤더가 있는지. Flowlight가 다른 모든 것에 요구하는 그 공개를 자기 자신에게 적용합니다.</p></div>
+        <div><strong>에이전트가 네트워크 밖에서 한 일 <span class="tag">1.0</span></strong><p>파일이 나가는 일은 읽기 다음에 보내기이고, 오늘 보이는 것은 보내기뿐입니다. 에이전트의 도구가 무엇을 열고 쓰고 실행했는지 기록하면 <em>개인 키를 읽고, 그다음 paste.example와 통신했다</em>가 화면 두 개가 아니라 하나의 발견이 됩니다. 리소스 모니터가 아닙니다. CPU와 메모리는 활성 상태 보기의 일입니다. Apple의 EndpointSecurity 권한이 필요하고, 그보다 먼저 위의 검사 예산이 있어야 합니다.</p></div>
         <div><strong>Linux, 그다음 Windows</strong><p>분석 코어는 어디로든 옮길 수 있는 Swift이지만 캡처는 그렇지 않습니다. macOS API 대신 eBPF를 쓰고 로컬 웹 UI가 딸린 Linux 데몬이 먼저 나옵니다.</p></div>
       </div>
     </div>

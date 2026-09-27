@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Fuentes</strong>
-          <a href="#capture">Captura</a><a href="#devices">Dispositivos</a>
+          <a href="#capture">Captura</a><a href="#coverage">Cobertura</a><a href="#devices">Dispositivos</a>
         </div>
         <div class="toc-group">
           <strong>Ajustes y datos</strong>
@@ -95,12 +95,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <table>
         <tr><th>Vista</th><th>Atajo</th><th>Qué responde</th></tr>
         <tr><td>En vivo</td><td>⌘1</td><td>Qué se mueve ahora mismo: tasas por app en los últimos segundos y el destino más activo.</td></tr>
-        <tr><td>Agentes de IA</td><td>⌘2</td><td>Qué agentes están activos, qué proveedores de IA usan y con qué más han contactado.</td></tr>
+        <tr><td><a href="#agents">Agentes de IA</a></td><td>⌘2</td><td>Qué agentes están activos, qué proveedores de IA usan y con qué más han contactado.</td></tr>
         <tr><td>Informes</td><td>⌘3</td><td>Adónde fue el tráfico, del segundo al año. Agrupa por App, Destino o IP; cambia a Gráficos o a <a href="#worth-a-look">Merece un vistazo</a>; exporta a CSV.</td></tr>
-        <tr><td>Alertas</td><td>⌘4</td><td>Todo lo que ha resultado inusual, con la app, el destino y la cifra que activó la regla.</td></tr>
-        <tr><td>Inspeccionar</td><td>⌘5</td><td>Opcional: las peticiones descifradas de los agentes que encamines por Flowlight, y las llamadas de herramientas que hay detrás. La búsqueda llega a los cuerpos de las peticiones y las respuestas.</td></tr>
-        <tr><td>Captura</td><td>⌘6</td><td>Qué motor está registrando, el estado de la extensión, el aprendizaje de nombres de host y dónde está la base de datos.</td></tr>
+        <tr><td><a href="#alerts">Alertas</a></td><td>⌘4</td><td>Todo lo que ha resultado inusual, con la app, el destino y la cifra que activó la regla.</td></tr>
+        <tr><td><a href="#rules">Reglas</a></td><td>⌘5</td><td>Cada lista de permitidos y cada rechazo que hayas puesto, qué abarca cada uno y qué ha detenido realmente.</td></tr>
+        <tr><td><a href="#ask">Preguntar</a></td><td>⌘6</td><td>Preguntas sobre tu propio tráfico en lenguaje corriente, respondidas a partir del historial registrado por un modelo local o alojado.</td></tr>
+        <tr><td><a href="#inspection">Inspeccionar</a></td><td>⌘7</td><td>Opcional: las peticiones descifradas de los agentes que encamines por Flowlight, y las llamadas de herramientas que hay detrás. La búsqueda llega a los cuerpos de las peticiones y las respuestas.</td></tr>
+        <tr><td><a href="#devices">Dispositivos</a></td><td>⌘8</td><td>Desactivado hasta que lo enciendes: Bluetooth, USB y almacenamiento externo, que un Mac usa tanto como usa la red.</td></tr>
+        <tr><td><a href="#coverage">Cobertura</a></td><td>⌘9</td><td>Lo que Flowlight no puede contabilizar — por app, si su tráfico se vio, se nombró y se pudo leer.</td></tr>
+        <tr><td><a href="#capture">Captura</a></td><td>⌘0</td><td>Qué motor está registrando, el estado de la extensión, el aprendizaje de nombres de host y dónde está la base de datos.</td></tr>
       </table>
+      <p>Los atajos son el orden de la barra lateral, así que ⌘0 es el décimo elemento y no una posición omitida.</p>
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
+        alt="La pantalla En vivo: una lista de aplicaciones con sus tasas actuales de envío y recepción y su destino más activo."></div>
+        <figcaption class="caption">En vivo, la pantalla con la que se abre Flowlight.</figcaption></figure>
       <p>En Informes, pasa el cursor por una barra para ver qué apps la generaron, haz clic para ampliar y haz doble clic en cualquier fila para limitar el informe a ella.</p>
 
       <h2 id="agents">Reglas de los agentes de IA</h2>
@@ -235,9 +243,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
         y arráncalos ahí. En <strong>Avanzado</strong> puedes descifrar solo los agentes de IA en lugar de todas las apps, editar la lista de lo que nunca se descifra, copiar
         la configuración de shell para un shell concreto, o eliminar el certificado y todo lo registrado.</p>
       <p>Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas (edita la lista en la configuración inicial). Las apps que fijan sus certificados pueden rechazar el
-        certificado de Flowlight; Flowlight lo detecta y las deja pasar cifradas. Las claves de API, las cookies y otras cabeceras con credenciales no se
-        guardan nunca, las peticiones registradas se conservan 3 días y <strong>Eliminar el certificado y los datos registrados</strong> borra el certificado, su ajuste
+        certificado de Flowlight; Flowlight lo detecta y las deja pasar cifradas. Las claves de API, las cookies y otras cabeceras con credenciales se
+        sustituyen por su longitud antes de guardar nada — reconocidas por el nombre y por las palabras del nombre, lo que atrapa la grafía propia
+        de un proveedor pero no puede prometer atraparlas todas —, las peticiones registradas se conservan 3 días y <strong>Eliminar el certificado y los datos registrados</strong> borra el certificado, su ajuste
         de confianza y todo lo registrado. La inspección es solo HTTP/1.1 (Flowlight lo pide a ambos lados) y no está disponible en el modo demo.</p>
+
+      <p><strong>Cómo llegar aquí desde una fila.</strong> Haz clic derecho en una app o en un destino en En vivo, Informes o Agentes de IA y elige
+        <strong>Inspeccionar el tráfico de …</strong>: Inspeccionar se abre con ese nombre ya puesto en el campo de búsqueda. Que sea el campo de
+        búsqueda y no un filtro oculto es a propósito — puedes ampliarlo, estrecharlo o vaciarlo sin volver a donde empezaste. Solo puede aparecer
+        el tráfico que pasó por el proxy, así que una fila que sabes que está movida puede no mostrar nada aquí.</p>
 
       <h2 id="mocks">Respuestas simuladas</h2>
       <p>Para ver cómo se las arregla un agente cuando una API falla, se queda colgada o devuelve algo raro, responde tú por ese endpoint. En
@@ -368,6 +382,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         no necesita filtro y funciona junto a ellos.
         Consulta <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">la guía para desarrolladores</a> para ver cómo está construido.</p>
 
+      <h2 id="coverage">Cobertura: lo que Flowlight no puede contabilizar</h2>
+      <p>Todas las demás pantallas responden qué pasó. <strong>Cobertura</strong> responde qué no te habrían contado, que es lo que decide cuánto
+        valen las demás pantallas. Hace tres preguntas por app, porque fallan de forma independiente.</p>
+      <p><strong>¿Se vio?</strong> La extensión de red ve cada flujo en el momento en que se abre. El muestreador nettop lee contadores una vez por
+        segundo, así que una conexión que se abre y se cierra entre dos lecturas — una consulta DNS, una llamada de API veloz, un script que ejecuta
+        <code>curl</code> y sale — falta por completo. Eso es un hueco que ningún porcentaje puede expresar, así que se dice con palabras en lugar de
+        puntuarlo.</p>
+      <p><strong>¿Se nombró?</strong> La proporción de los <em>bytes</em> de esa app que fueron a un destino con nombre de host y no a una dirección a
+        secas. Bytes, no conexiones: una conexión sin nombre que lleva un gigabyte es un agujero mayor que cien que llevan un kilobyte cada una, y
+        contar conexiones las ordena al revés.</p>
+      <p><strong>¿Era legible?</strong> Si la inspección HTTPS descifró algo del tráfico de esa app. Cuatro respuestas, y solo una es un hueco: se está
+        leyendo; no llegó nunca al proxy; la app está en la lista de nunca descifrados, que es una decisión tuya; o la inspección está desactivada,
+        que es un ajuste y no un fallo app por app.</p>
+      <p><strong>Lo que ningún motor ve en absoluto</strong> está listado en la pantalla misma y no se deja a esta página: el tráfico anterior al
+        inicio de la captura, los servicios del sistema que nunca se muestran a los filtros de contenido, las apps que fijan sus certificados, el QUIC
+        que nunca se le ofrece al proxy y el servidor MCP local de un agente que habla con él por una tubería. Nada de eso aparece en ningún sitio de
+        Flowlight, así que también falta en estas cifras — una cifra de cobertura que contara solo lo que puede ver sería un consuelo y no un hecho.</p>
+
       <h2 id="devices">Dispositivos: Bluetooth, USB y almacenamiento externo</h2>
       <p>Un Mac envía y recibe por más vías que TCP y UDP. La pantalla <strong>Dispositivos</strong> cubre el resto, y está desactivada
         hasta que la actives: no porque necesite un permiso que Flowlight no tenga ya, sino porque vigilar más cosas de tu
@@ -495,8 +527,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Muestra qué extensiones están instaladas, si macOS arrancó de verdad el filtro de Flowlight y cuándo se registró algo por última vez.
           Pégalo en <a href="https://github.com/{{repo}}/issues">una incidencia</a>.</dd>
         <dt><strong>¿Flowlight envía algo sobre mí a alguna parte?</strong></dt>
-        <dd>No. No hay cuenta, ni telemetría, ni analítica. Las únicas peticiones que hace son la comprobación diaria de actualizaciones, las consultas opcionales sobre el
-          propietario de la red y el DNS inverso: cada una está listada y cada una tiene su interruptor para desactivarla, en la <a href="{{link:privacy}}">página de privacidad</a>.</dd>
+        <dd>Sin cuenta, sin telemetría, sin analítica, y tu base de datos de tráfico nunca se sube. Tres peticiones sí salen del Mac, todas listadas en la
+          <a href="{{link:privacy}}">página de privacidad</a>: la comprobación diaria de actualizaciones y la consulta opcional del propietario de la red, las dos con
+          interruptor para desactivarlas, y el DNS inverso mientras Flowlight está en el muestreador, que no lo tiene — sin él el muestreador no podría nombrar la mayoría de las conexiones.</dd>
         <dt><strong>¿Ralentizará mi Mac o gastará la batería?</strong></dt>
         <dd>Con la ventana cerrada, Flowlight casi no hace nada: mantiene las tasas de la barra de menús y escribe una fila por segundo. La extensión de red
           cuesta menos que el muestreador de reserva, que arranca un proceso <code>nettop</code> efímero cada segundo.</dd>

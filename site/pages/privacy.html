@@ -46,8 +46,10 @@ nav: privacy
       <h2 id="inspection">HTTPS inspection</h2>
       <p>Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
         <code>~/Library/Application Support/Flowlight/Inspection</code>) and runs a proxy that accepts connections only from this Mac. For apps you
-        route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers
-        (Authorization, cookies, API keys) are replaced with their length before anything is stored. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
+        route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers are
+        replaced with their length before anything is stored — recognised by name (Authorization, cookies, API keys) and by the words
+        in the name, so <code>X-Access-Key</code> is caught as well. That is a heuristic, not a guarantee: a header carrying a secret
+        under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
         Data</strong> deletes the certificate, its trust setting and every recorded request.</p>
 
       <h2 id="requests">Network requests the app makes</h2>
@@ -55,7 +57,7 @@ nav: privacy
         <tr><th>Request</th><th>Sent to</th><th>What it contains</th><th>When</th></tr>
         <tr><td>Update check</td><td><code>api.github.com</code></td><td>A standard HTTPS request for the latest release; GitHub sees your IP address and the <code>Flowlight/&lt;version&gt;</code> user agent</td><td>On launch and daily, from 0.1.2. Off switch in Settings › General</td></tr>
         <tr><td>Update download</td><td><code>github.com</code></td><td>The disk image and its checksum file</td><td>Only when you click Download &amp; Open</td></tr>
-        <tr><td>Reverse DNS</td><td>Your configured DNS resolver</td><td>A lookup of an IP address's registered name, when no hostname was seen</td><td>As needed, in the default capture mode</td></tr>
+        <tr><td>Reverse DNS</td><td>Your configured DNS resolver</td><td>A lookup of an IP address's registered name, when no hostname was seen</td><td>As needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this</td></tr>
         <tr><td>Network owner lookup</td><td>Team Cymru, over DNS</td><td>Public IP addresses with no known hostname. Private and reserved addresses never leave your Mac</td><td>On by default. Off switch in Capture › Identify network owners</td></tr>
         <tr><td>Ask with a hosted model</td><td>The provider you select: Anthropic, OpenAI, Google Gemini or a compatible endpoint</td><td>Your question and the results returned by the read-only Flowlight queries selected by the model. The traffic database itself is not uploaded</td><td>Only when you select a hosted provider and submit a question. The Ask screen shows the transmitted requests</td></tr>
         <tr><td>Collector export</td><td>The OpenTelemetry or HTTP endpoint you configure</td><td>The fields shown in Settings › Export, such as traffic rollups and alerts. Authentication headers are stored in Keychain</td><td>Only after you configure an endpoint and enable export</td></tr>
@@ -75,11 +77,15 @@ nav: privacy
 
       <h2 id="website">This website</h2>
       <p>This site is a static page hosted on GitHub Pages and served through Cloudflare. It sets no cookies and runs no analytics. GitHub
-        and Cloudflare process requests to serve it, and the fonts load from Google Fonts, which receives your IP address when you visit.</p>
+        and Cloudflare process requests to serve it. The fonts are served from this domain, so rendering a page sends nothing to anyone
+        else — this page used to load them from Google, which meant the page explaining that Flowlight sends nothing anywhere made a
+        request to Google to render itself.</p>
 
       <h2 id="contact">Contact</h2>
-      <p>Questions or a privacy concern? <a href="https://github.com/{{repo}}/issues">Open an issue</a>. For anything sensitive, use GitHub's
-        private vulnerability reporting on the repository.</p>
+      <p>Questions or a privacy concern? <a href="https://github.com/{{repo}}/issues">Open an issue</a>. For a security issue, use GitHub's
+        <a href="https://github.com/{{repo}}/security/advisories/new">private vulnerability reporting</a>, or email
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> if you would rather not use GitHub — see
+        <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a> for what to expect.</p>
     </article>
   </div>
 </main>

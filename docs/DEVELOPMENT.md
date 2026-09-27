@@ -79,6 +79,14 @@ TEAM_ID=ABCDE12345 scripts/build-signed.sh
 
 Run the tests with `xcodebuild -scheme Flowlight test CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`.
 
+**If the checkout is under `~/Desktop`, `~/Documents` or `~/Downloads`, two tests will hang for two minutes
+each and the run will fail.** `HelpTests` reads the built `docs/docs/index.html` to check that every screen's
+Help anchor exists, and macOS asks for consent before the test host may read those folders — with nobody there
+to click Allow, the read blocks until the test times out. Nothing is wrong with the code: the same two tests
+pass in milliseconds from a checkout outside those folders, which is also why CI never sees it. Move the
+checkout, or grant the test host Full Disk Access. `python3 scripts/check_site.py` asserts the same agreement
+without a test host, so it is the quicker way to check that particular thing anyway.
+
 ### Activating the extension
 
 1. Request `content-filter-provider-systemextension` from Apple
@@ -237,6 +245,43 @@ traffic and a live synthetic feed. Suspicious destinations use reserved document
 - Byte counts in the extension come from `NEFilterReport` statistics events (`statisticsReportFrequency = .high`).
   Check them against the flows logged on a real device (build order step 2) before relying on them.
 - QUIC SNI isn't decrypted. QUIC flows get their domain from the system hostname or the DNS cache.
+
+## Website
+
+`site/` is the source, `docs/` is the generated site GitHub Pages serves, and both are committed — CI rebuilds
+and fails if they differ. Pages are templates: `site/pages/` for English, `site/pages/<lang>/` for the nine
+translations, strings in `site/i18n/<lang>.json`, and `{{link:}}`, `{{t:}}`, `{{current:}}`, `{{root}}`
+placeholders the build resolves.
+
+```sh
+python3 scripts/build_site.py     # regenerate docs/
+python3 scripts/check_site.py     # then check what the build cannot
+```
+
+The build is a renderer, so anything that is still valid HTML gets published. `check_site.py` covers the ways
+that has gone wrong, most of them in production:
+
+| Check | The bug it exists for |
+| --- | --- |
+| No unrendered `{{...}}` | `{{t:nav.threat-model}}` printed itself on all 51 pages — the pattern didn't allow hyphens |
+| No third-party fetches | The privacy page loaded its fonts from Google, which is the one thing it promises not to do |
+| Anchors exist in their target | A section added to the English docs left nine translated pages linking to `#coverage` |
+| Internal links resolve | — |
+| The roadmap is ahead of the newest release | "What's coming" kept listing versions you could already download |
+| Translations have every English section | The same `#coverage` gap, caught at the missing section rather than at the dangling link |
+| Translated roadmaps list as much as English | Nine home pages promised "the rest, in this order" and then one item |
+| Every screen's `helpAnchor` has a docs section | Coverage shipped with a Help button and nothing on the page to land on |
+| Screenshots exist, and none is unused | `live.png` was served to nobody for two releases |
+| The views table matches the sidebar | It gave Inspect ⌘5 long after it became ⌘7, and never listed Rules, Ask, Devices or Coverage |
+| One `<h1>` per page | A translation duplicating a heading while editing |
+
+Three of those read the app rather than the site — `helpAnchor` and the sidebar's own order come from
+`AppNavigation.swift`, so adding a screen is itself what asks for the documentation and renumbers the
+shortcuts. That order is positional, which is exactly why the table drifted: inserting Rules moved every
+screen after it and nothing said so. Screenshot `width`/`height` used to be on this list; the
+build now stamps them from the PNG, which is better than checking a number a person has to keep correct.
+
+Add a rule when something slips past this list; that is cheaper than finding it twice.
 
 ## Releasing
 

@@ -46,7 +46,9 @@ nav: privacy
       <p>Desactivada por defecto. Si la activas, Flowlight crea una autoridad de certificación en tu Mac (su clave no sale nunca de
         <code>~/Library/Application Support/Flowlight/Inspection</code>) y ejecuta un proxy que acepta conexiones solo de este Mac. En las apps que
         encamines por él, registra las peticiones y las respuestas, incluidos los cuerpos de hasta 2 MB, en la base de datos local durante 3 días. Las cabeceras con credenciales
-        (Authorization, cookies, claves de API) se sustituyen por su longitud antes de guardar nada. Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas. Flowlight no sube los datos de inspección registrados. Al desactivar la inspección se detiene el proxy; <strong>Eliminar el certificado y los datos
+        se sustituyen por su longitud antes de guardar nada — reconocidas por el nombre (Authorization, cookies, claves de API) y por las palabras
+        del nombre, así que <code>X-Access-Key</code> también se atrapa. Eso es una heurística, no una garantía: una cabecera que lleve un secreto con un
+        nombre que nada reconoce quedaría registrada. Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas. Flowlight no sube los datos de inspección registrados. Al desactivar la inspección se detiene el proxy; <strong>Eliminar el certificado y los datos
         registrados</strong> borra el certificado, su ajuste de confianza y todas las peticiones registradas.</p>
 
       <h2 id="requests">Peticiones de red que hace la app</h2>
@@ -54,7 +56,7 @@ nav: privacy
         <tr><th>Petición</th><th>Enviada a</th><th>Qué contiene</th><th>Cuándo</th></tr>
         <tr><td>Comprobación de actualizaciones</td><td><code>api.github.com</code></td><td>Una petición HTTPS normal de la última versión; GitHub ve tu dirección IP y el agente de usuario <code>Flowlight/&lt;version&gt;</code></td><td>Al arrancar y a diario, desde la 0.1.2. Interruptor para desactivarla en Ajustes › General</td></tr>
         <tr><td>Descarga de la actualización</td><td><code>github.com</code></td><td>La imagen de disco y su archivo de suma de verificación</td><td>Solo cuando pulsas Descargar y abrir</td></tr>
-        <tr><td>DNS inverso</td><td>El servidor DNS que tengas configurado</td><td>Una consulta del nombre registrado de una dirección IP, cuando no se ha visto ningún nombre de host</td><td>Según haga falta, en el modo de captura predeterminado</td></tr>
+        <tr><td>DNS inverso</td><td>El servidor DNS que tengas configurado</td><td>Una consulta del nombre registrado de una dirección IP, cuando no se ha visto ningún nombre de host</td><td>Según haga falta, en el modo de captura del muestreador, que es el predeterminado hasta que la extensión de red esté en marcha. Sin interruptor para desactivarla: sin ella el muestreador no puede nombrar la mayoría de las conexiones. La extensión de red las nombra a partir del propio tráfico y no hace esta consulta</td></tr>
         <tr><td>Consulta del propietario de la red</td><td>Team Cymru, por DNS</td><td>Direcciones IP públicas sin nombre de host conocido. Las direcciones privadas y reservadas no salen nunca de tu Mac</td><td>Activada por defecto. Interruptor para desactivarla en Captura › Identificar a los propietarios de la red</td></tr>
         <tr><td>Preguntar con un modelo alojado</td><td>El proveedor que elijas: Anthropic, OpenAI, Google Gemini o un endpoint compatible</td><td>Tu pregunta y los resultados que devuelvan las consultas de solo lectura de Flowlight que elija el modelo. La base de datos de tráfico en sí no se sube</td><td>Solo cuando eliges un proveedor alojado y envías una pregunta. La pantalla Preguntar muestra las peticiones transmitidas</td></tr>
         <tr><td>Exportación a un colector</td><td>El endpoint de OpenTelemetry o de HTTP que configures</td><td>Los campos que se muestran en Ajustes › Exportación, como los agregados de tráfico y las alertas. Las cabeceras de autenticación se guardan en el llavero</td><td>Solo después de que configures un endpoint y actives la exportación</td></tr>
@@ -74,11 +76,15 @@ nav: privacy
 
       <h2 id="website">Este sitio web</h2>
       <p>Este sitio es una página estática alojada en GitHub Pages y servida a través de Cloudflare. No pone cookies y no ejecuta analítica. GitHub
-        y Cloudflare procesan las peticiones para servirlo, y las tipografías se cargan desde Google Fonts, que recibe tu dirección IP cuando lo visitas.</p>
+        y Cloudflare procesan las peticiones para servirlo. Las tipografías se sirven desde este dominio, así que representar una página no envía nada
+        a nadie más: esta página antes las cargaba de Google, lo que significaba que la página que explica que Flowlight no envía nada a ninguna parte
+        hacía una petición a Google para representarse a sí misma.</p>
 
       <h2 id="contact">Contacto</h2>
-      <p>¿Dudas o alguna preocupación sobre privacidad? <a href="https://github.com/{{repo}}/issues">Abre una incidencia</a>. Para cualquier asunto delicado, usa el
-        informe privado de vulnerabilidades de GitHub en el repositorio.</p>
+      <p>¿Dudas o alguna preocupación sobre privacidad? <a href="https://github.com/{{repo}}/issues">Abre una incidencia</a>. Para un problema de seguridad, usa el
+        <a href="https://github.com/{{repo}}/security/advisories/new">informe privado de vulnerabilidades</a> de GitHub, o escribe a
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> si prefieres no usar GitHub: consulta
+        <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a> para saber qué esperar.</p>
     </article>
   </div>
 </main>

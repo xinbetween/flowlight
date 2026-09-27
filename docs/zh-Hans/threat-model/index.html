@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight 威胁模型</title>
+<meta name="description" content="Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。">
+<link rel="canonical" href="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/threat-model/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/threat-model/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/threat-model/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/threat-model/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/threat-model/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/threat-model/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/threat-model/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/threat-model/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/threat-model/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Flowlight 威胁模型">
+<meta property="og:description" content="Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。">
+<meta property="og:url" content="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../assets/icon.png">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../../zh-Hans/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="站点">
+      <a href="../../zh-Hans/#agents">AI 代理</a>
+      <a href="../../zh-Hans/docs/">文档</a>
+      <a href="../../zh-Hans/privacy/">隐私</a>
+      <a href="../../zh-Hans/threat-model/" aria-current="page">威胁模型</a>
+      <a href="../../releases/">版本</a>
+      <a href="../../zh-Hans/about/">关于</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="语言" title="语言"><span class="lang-current"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">简体中文</span><svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary>
+      <div class="lang-menu"><a href="../../threat-model/" hreflang="en" lang="en">English</a><a href="../../de/threat-model/" hreflang="de" lang="de">Deutsch</a><a href="../../es/threat-model/" hreflang="es" lang="es">Español</a><a href="../../fr/threat-model/" hreflang="fr" lang="fr">Français</a><a href="../../it/threat-model/" hreflang="it" lang="it">Italiano</a><a href="../../pt-PT/threat-model/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../../ja/threat-model/" hreflang="ja" lang="ja">日本語</a><span lang="zh-Hans" aria-current="true">简体中文</span><a href="../../zh-Hant/threat-model/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../../ko/threat-model/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">下载</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">威胁模型</p>
+    <h1>只做监控，不做防护</h1>
+    <p class="lede">Flowlight 会告诉你，你 Mac 上的软件正在发送什么、发往哪里。它不是用来对付已经掌控这台机器的攻击者的，
+      而这个区别重要到值得单开一页来讲，而不是塞进脚注里。</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="本页内容">
+      <details class="toc-sheet" open>
+        <summary>本页内容</summary>
+        <div class="toc-group">
+          <p class="toc-label">简短版</p>
+          <a href="#stance">它是做什么用的</a><a href="#defends">它能防住什么</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">限度</p>
+          <a href="#root">拥有 root 的软件</a><a href="#capture">捕获会漏掉什么</a><a href="#inspection">检查会漏掉什么</a>
+          <a href="#blocking">阻止是什么，不是什么</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Flowlight 自身</p>
+          <a href="#itself">它保存了什么</a><a href="#updates">更新</a><a href="#reporting">报告漏洞</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">它是做什么用的</h2>
+      <p>Flowlight 回答一个 Mac 不回答的问题：<strong>是哪个应用发出去的，它去了哪里？</strong>它针对的是明面上就行为不端的
+        软件——一个去联系没人让它联系的地方的 AI 代理、一个上传得比它该上传的更多的工具、一个在跟没有名字的地址说话的进程。
+        这种行为在流量里是看得见的，而 Flowlight 的职责就是把它变得可读，并在做不到的时候老实说出来。</p>
+      <p>它不是杀毒软件，不是 EDR 代理，也不是那种站在你和攻击者之间的防火墙。在两者重叠的地方——Flowlight 可以拒绝连接——
+        那种拒绝是一种便利，用来管住你本来就信任的软件，而不是一道拦住你不信任的软件的屏障。</p>
+
+      <h2 id="defends">它能防住什么</h2>
+      <ul>
+        <li><strong>没人留意的数据外流。</strong>某个应用或代理把东西发往一个你本来不会批准的地方，包括经由它自己运行的工具发出去。
+          Flowlight 会把这条连接归属到发起它的进程，以及启动那个进程的代理。</li>
+        <li><strong>行为上的悄然变化。</strong>某个应用突然联系新的目标、移动的数据远超它自己的基线，或在你离开时还在工作。
+          每条警报都会说明是哪个数字触发了它，所以你可以不同意它。</li>
+        <li><strong>超出你所允许范围的代理。</strong>每个代理各有一份允许列表，还有拒绝列表之外连接的规则；拒绝会被记录下来，
+          一键就能改为允许。</li>
+        <li><strong>被篡改的更新。</strong>每个版本都会公布校验和；更新程序会拒绝无法校验的下载，也会拒绝安装签名团队与
+          发起更新的那份运行中副本不一致的应用。</li>
+      </ul>
+
+      <h2 id="root">拥有 root 的软件可以把它关掉</h2>
+      <p>Flowlight 以你的身份运行，并使用一个由 macOS 代它启动的系统扩展。任何以 root 运行的东西——或者任何你批准了安装程序的
+        东西——都可以卸载那个扩展、停掉这个应用，或者删掉它的数据库。设计上没有任何东西能阻止这一点，而 macOS 上的任何监控工具
+        都无法在保持为一个你自己也能关掉的工具的同时阻止它。</p>
+      <p>诚实的说法更窄，但依然有用：行为不端、却没有主动躲避监控的软件会被看见。主动躲避监控的软件可能不会被看见，
+        但它至少会留下一个缺口——一个停掉的扩展、一段没有数据的时间——而<a href="../../zh-Hans/docs/#coverage">覆盖范围</a>界面
+        就是为了把它显示出来。</p>
+
+      <h2 id="capture">捕获会漏掉什么</h2>
+      <ul>
+        <li><strong>捕获开始之前的流量。</strong>没有事后补录。在过滤器之前就已经建立的连接，从来没有交给过它。</li>
+        <li><strong>豁免于内容过滤器的系统服务。</strong>macOS 并不会把一切都给内容过滤器看；它自己的一部分流量永远到不了我们这里。</li>
+        <li><strong>位置被另一个内容过滤器占着。</strong>macOS 一次只运行一个。如果某个 VPN 或安全代理占着它，Flowlight 的过滤器
+          能安装、能连接，却永远不会被要求过滤任何东西——捕获界面会明说这一点，而不是给你一个空白界面。</li>
+        <li><strong>短连接，在采样器上。</strong>没有扩展时，Flowlight 每秒读取一次计数器：在两次读取之间开启又关闭的连接，
+          永远不会被记录。</li>
+        <li><strong>不是 TCP 也不是 UDP 的通道。</strong>蓝牙和 USB 是以设备的形式可见的，不是以字节的形式。代理的本地 MCP 服务器
+          通过管道通信，那根本不是网络流量，任何地方都不会出现。</li>
+      </ul>
+
+      <h2 id="inspection">检查会漏掉什么</h2>
+      <p>HTTPS 检查只读得到经由 Flowlight 本地代理转发的东西，而这件事是由程序在启动的那一刻决定的。忽略代理设置的应用、
+        在检查打开之前就启动的应用，或者固定自己证书的应用，都会原封不动地直接通过——这是刻意的，因为破坏一条固定了证书的连接
+        就等于弄坏那个应用。QUIC 同样不会交给代理。</p>
+      <p>所以，检查界面是空的，意思是“没有东西被转发到这里”，而不是“什么都没发生”。到底是哪一种，覆盖范围会按应用逐个说明。</p>
+
+      <h2 id="blocking">阻止是什么，不是什么</h2>
+      <p>一条拒绝连接的规则由网络扩展执行，就在连接的路径上，在连接建立之前。一条指名 URL 的规则则由检查用的代理服务器执行，
+        它用应用能读到的状态来回答那个请求。这两处是 Flowlight 里唯一动手而不只是报告的部分——nettop 采样器什么都拒绝不了，
+        所以在用采样器的 Mac 上，没有任何规则会被强制执行，而 Flowlight 会把这一点说出来，而不是摆一个什么都不做的开关。</p>
+      <p>它仍然不是防护。一个能运行 shell 的代理，可以手动做到那个被拒绝的工具本来要做的事。一次你能一键撤销的拒绝，
+        也是代理下一次尝试就可能走过去的拒绝。本地流量、DNS、Apple 自家的服务以及 Flowlight 自己的连接永远不会被拒绝，
+        因为一台被封住的 Mac 比一个被封住的代理更糟。而且 Flowlight 停止运行几秒之后，强制执行就会失效：
+        没人能看见的拒绝比没有拒绝更糟。</p>
+      <p><strong>检查与拒绝无法并存。</strong>经由 Flowlight 自己的代理服务器转发的流量，是以 Flowlight 的流量的身份离开这台 Mac 的，
+        而 Flowlight 从不拒绝自己——所以一个你正在读它请求的应用，也就是一个规则不再拦得住它连接的应用。为了看得更多而打开检查，
+        代价就是强制执行，而画面上此前并没有说这一点。</p>
+
+      <h2 id="itself">Flowlight 自己保存了什么</h2>
+      <p>流量元数据，存在本地的 SQLite 数据库里，保留期限是公布的。打开 HTTPS 检查后，它还会保存请求和响应的正文三天——
+        这是它所保存的东西里最敏感的。凭据标头会按名称、也按其中的词来遮蔽，那是一种启发式判断，不是保证；
+        一个把密钥放在没人认得的名字底下的标头，是可能被记录下来的。</p>
+      <p>流量数据库从不上传。不过确实有三样比较小的东西，会在你没有要求的情况下离开这台 Mac，它们都在<a href="../../zh-Hans/privacy/">隐私页面</a>上
+        逐项列出：更新检查，它在启动时和每天一次向 GitHub 询问最新的发布；网络所有者查询，它就没有主机名的公网地址向 Team Cymru
+        询问；以及，当 Flowlight 在读计数器而不是在跑它的扩展时，对那些它没看到名字的地址做的一次反向 DNS 查询。前两样都有关闭
+        开关。第三样没有，因为在采样器上，一条连接能有名字，大半就靠它——这次查询会走这台 Mac 本来就在用的解析器，而一旦扩展
+        接手、从流量本身给连接命名，它就停了。用托管模型提问，送出去的东西比它们任何一个都多得多，而它也是唯一在你配置之前
+        一直关着的。</p>
+
+      <h2 id="updates">更新</h2>
+      <p>版本以 Developer ID 签名并经过公证。更新程序要求有公布的校验和，没有就拒绝下载；随后会在安装之前核对下载到的应用
+        是否由与运行中副本相同的团队签名。由别人签名的更新会被拒绝，即使它在其他方面都有效。</p>
+
+      <h2 id="reporting">报告漏洞</h2>
+      <p>请使用 GitHub 的<a href="https://github.com/xinbetween/flowlight/security/advisories/new">私密漏洞报告</a>，或者如果你不愿意用
+        GitHub，可以发邮件到 <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>。
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> 写明了哪些属于范围之内，以及你可以期待什么。
+        普通的缺陷——崩溃、数字不对、画面有误导——请改提<a href="https://github.com/xinbetween/flowlight/issues">issue</a>。</p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../../zh-Hans/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+        <p>面向 macOS 的应用级网络监控，尤其看得清 AI 代理。</p>
+      </div>
+      <div><h4>产品</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">下载 macOS 版</a></li>
+        <li><a href="../../zh-Hans/docs/#install">用 Homebrew 安装</a></li>
+        <li><a href="../../releases/">更新说明</a></li>
+        <li><a href="../../zh-Hans/docs/">文档</a></li>
+      </ul></div>
+      <div><h4>项目</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">源代码</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">参与贡献</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">反馈问题</a></li>
+      </ul></div>
+      <div><h4>信任</h4><ul>
+        <li><a href="../../zh-Hans/privacy/">隐私</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">许可证（GPL-3.0）</a></li>
+        <li><a href="../../zh-Hans/about/">关于</a></li>
+      </ul></div>
+      <div><h4>给 AI 代理</h4><ul>
+        <li><a href="../../llms.txt">llms.txt</a></li>
+        <li><a href="../../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../../sitemap.xml">站点地图</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
+      <span>版本 0.9.1 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "已拷贝";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "拷贝"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

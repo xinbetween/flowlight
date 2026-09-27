@@ -25,7 +25,10 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
+    # been carrying an annotation saying so. A named image means the move happens when we make it, with a
+    # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -33,6 +36,12 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      # CI checks this on every pull request, but this workflow is the one that actually puts the site in front
+      # of people, and a deploy is not something you can take back from a cache. Seconds of Python for the
+      # guarantee that nothing broken is ever served.
+      - name: Check the site before serving it
+        run: python3 scripts/check_site.py --ci
 
       # docs/ is committed and CI already checks it matches a fresh build, so there is nothing to build here.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

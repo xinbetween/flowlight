@@ -1,0 +1,128 @@
+<!--
+title: Modelo de ameaças do Flowlight
+description: Contra o que o Flowlight defende, contra o que não consegue defender e porquê — observar em vez de impedir.
+path: /threat-model/
+nav: threat-model
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Modelo de ameaças</p>
+    <h1>Observar, não impedir</h1>
+    <p class="lede">O Flowlight diz-lhe o que o software do seu Mac está a enviar, e para onde. Não é uma defesa contra um atacante que já
+      controla a máquina, e a diferença importa o suficiente para ficar numa página própria em vez de numa nota de pé de página.</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Nesta página">
+      <details class="toc-sheet" open>
+        <summary>Nesta página</summary>
+        <div class="toc-group">
+          <p class="toc-label">A versão curta</p>
+          <a href="#stance">Para que serve</a><a href="#defends">Contra o que defende</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Limites</p>
+          <a href="#root">Software com root</a><a href="#capture">O que escapa à captura</a><a href="#inspection">O que escapa à inspeção</a>
+          <a href="#blocking">O que o bloqueio é e não é</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">O próprio Flowlight</p>
+          <a href="#itself">O que guarda</a><a href="#updates">Atualizações</a><a href="#reporting">Comunicar uma vulnerabilidade</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">Para que serve</h2>
+      <p>O Flowlight responde a uma pergunta a que o Mac não responde: <strong>que app enviou isto, e para onde foi?</strong> Foi feito para
+        software que se porta mal a céu aberto — um agente de IA a contactar algo que ninguém lhe pediu, uma ferramenta a carregar mais do que
+        deveria, um processo a falar com um endereço que não tem nome. Esse comportamento é visível no tráfego, e o trabalho do Flowlight é
+        torná-lo legível e dizer com honestidade quando não consegue.</p>
+      <p>Não é um antivírus, não é um agente de EDR, e não é uma firewall no sentido de algo que se coloca entre você e um atacante. Onde os dois se
+        sobrepõem — o Flowlight pode recusar ligações — a recusa é uma comodidade para controlar software em que já confia, não uma barreira contra
+        software em que não confia.</p>
+
+      <h2 id="defends">Contra o que defende</h2>
+      <ul>
+        <li><strong>Saída de dados que passa despercebida.</strong> Uma app ou um agente a enviar para um lugar que não teria aprovado, inclusive
+          através de uma ferramenta que ele próprio executou. O Flowlight atribui a ligação ao processo que a fez e ao agente que iniciou esse
+          processo.</li>
+        <li><strong>Mudanças silenciosas de comportamento.</strong> Uma app que de repente contacta destinos novos, move muito mais do que a sua
+          base de referência, ou trabalha enquanto está ausente. Cada alerta nomeia o número que a fez disparar, para que possa discordar dela.</li>
+        <li><strong>Um agente a exceder aquilo que permitiu.</strong> Uma lista de permissões por agente, e regras que recusam as ligações fora
+          dela, com a recusa registada e um clique para a permitir.</li>
+        <li><strong>Uma atualização adulterada.</strong> Cada versão publica uma soma de verificação; o atualizador recusa uma transferência que não
+          consegue verificar e recusa instalar uma app que não esteja assinada pela mesma equipa que a cópia a pedir a atualização.</li>
+      </ul>
+
+      <h2 id="root">Software com root pode desligá-lo</h2>
+      <p>O Flowlight corre em seu nome, com uma extensão de sistema que o macOS arranca por ele. Qualquer coisa a correr como root — ou qualquer
+        coisa cujo instalador aprove — pode descarregar essa extensão, parar a app ou apagar a sua base de dados. Nada na conceção o impede, e
+        nenhuma ferramenta de monitorização no macOS o consegue impedir e continuar a ser uma ferramenta que também você pode desligar.</p>
+      <p>A afirmação honesta é mais estreita e continua a ser útil: o software que se porta mal mas não está ativamente a fugir a um monitor será
+        visto. O software que lhe está ativamente a fugir pode não ser, e deixará pelo menos uma falha — uma extensão que parou, um período sem
+        dados — que o ecrã <a href="{{link:docs}}#coverage">Cobertura</a> está lá para mostrar.</p>
+
+      <h2 id="capture">O que escapa à captura</h2>
+      <ul>
+        <li><strong>O tráfego anterior ao início da captura.</strong> Não há preenchimento retroativo. Uma ligação que abriu antes do filtro nunca
+          lhe foi entregue.</li>
+        <li><strong>Os serviços de sistema isentos dos filtros de conteúdo.</strong> O macOS não mostra tudo a um filtro de conteúdo; parte do seu
+          próprio tráfego nunca chega ao nosso.</li>
+        <li><strong>Outro filtro de conteúdo a ocupar o lugar.</strong> O macOS executa um de cada vez. Se uma VPN ou um agente de segurança o
+          tiver, o filtro do Flowlight instala-se, liga-se, e nunca lhe é pedido que filtre nada — a Captura di-lo, em vez de mostrar um ecrã
+          vazio.</li>
+        <li><strong>As ligações curtas, com o amostrador.</strong> Sem a extensão, o Flowlight lê contadores uma vez por segundo: uma ligação que
+          abre e fecha entre duas leituras nunca é registada.</li>
+        <li><strong>Os canais que não são TCP nem UDP.</strong> O Bluetooth e o USB vêem-se como dispositivos, não como bytes. O servidor MCP local
+          de um agente a comunicar por um pipe não é tráfego de rede nenhum e não aparece em lugar algum.</li>
+      </ul>
+
+      <h2 id="inspection">O que escapa à inspeção</h2>
+      <p>A inspeção HTTPS lê apenas o que é encaminhado pelo proxy local do Flowlight, e isso é um programa que o decide quando arranca. Uma app que
+        ignora as definições de proxy, uma que foi iniciada antes de a inspeção ser ligada, ou uma que fixa os seus certificados passa intacta — de
+        propósito, porque quebrar uma ligação com o certificado fixado quebraria a app. O QUIC também não é entregue ao proxy.</p>
+      <p>Por isso um ecrã Inspecionar vazio significa «não foi encaminhado nada para aqui», não «não aconteceu nada». A Cobertura diz qual das duas
+        coisas se aplica, app por app.</p>
+
+      <h2 id="blocking">O que o bloqueio é, e não é</h2>
+      <p>Uma regra que recusa ligações é levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Uma regra que nomeia um URL é
+        levada a cabo pelo proxy de inspeção, que responde ao pedido com um estado que a app consegue ler. São as duas únicas partes do Flowlight que
+        agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com o amostrador nenhuma regra é aplicada, e
+        o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
+      <p>Continua a não ser impedir. Um agente que consiga executar uma shell pode fazer à mão o que a ferramenta recusada teria feito. Uma recusa
+        que pode desfazer num clique é uma recusa por onde a tentativa seguinte de um agente pode passar. O tráfego local, o DNS, os serviços da
+        Apple e as ligações do próprio Flowlight nunca são recusados, porque um Mac bloqueado é um resultado pior do que um agente bloqueado. E a
+        aplicação efetiva caduca uns segundos depois de o Flowlight deixar de correr: uma recusa que ninguém consegue ver é pior do que nenhuma.</p>
+      <p><strong>A inspeção e a recusa não se combinam.</strong> O tráfego encaminhado pelo próprio proxy do Flowlight sai do Mac como tráfego do
+        Flowlight, e o Flowlight nunca se recusa a si mesmo — por isso uma app cujos pedidos está a ler é uma app cujas ligações as regras já não
+        travam. Ligar a inspeção para ver mais custa-lhe a aplicação das regras, e até agora nada no ecrã o dizia.</p>
+
+      <h2 id="itself">O que o próprio Flowlight guarda</h2>
+      <p>Metadados de tráfego numa base de dados SQLite local, com uma retenção publicada. Com a inspeção HTTPS ligada, guarda também os corpos dos
+        pedidos e das respostas durante três dias — a coisa mais sensível que chega a manter. Os cabeçalhos de credenciais são ocultados por nome e
+        por palavra, o que é uma heurística e não uma garantia; um cabeçalho que leve um segredo sob um nome que nada reconhece pode ficar
+        registado.</p>
+      <p>A base de dados de tráfego nunca é enviada. Há, ainda assim, três coisas mais pequenas que saem do Mac sem lhe serem pedidas,
+        todas nomeadas na <a href="{{link:privacy}}">página de privacidade</a>: a procura de atualizações, que pede ao GitHub a versão mais
+        recente no arranque e uma vez por dia; a consulta do proprietário da rede, que pergunta ao Team Cymru por endereços públicos sem
+        nome de anfitrião; e, enquanto o Flowlight lê contadores em vez de correr a sua extensão, uma consulta de DNS inverso dos endereços
+        para os quais não viu nome. As duas primeiras têm interruptores para desligar. A terceira não tem, porque no amostrador é quase
+        tudo aquilo que dá um nome a uma ligação — vai para o resolvedor de DNS que o Mac já usa e para quando a extensão assume e passa a
+        nomear as ligações a partir do próprio tráfego. Perguntar com um modelo alojado envia muito mais do que qualquer uma delas, e é a
+        única coisa que fica desligada até a configurar.</p>
+
+      <h2 id="updates">Atualizações</h2>
+      <p>As versões são assinadas com um Developer ID e notarizadas. O atualizador exige uma soma de verificação publicada e recusa uma
+        transferência sem ela; depois verifica que a app transferida está assinada pela mesma equipa que a cópia em execução antes de a instalar. Uma
+        atualização assinada por outra pessoa é recusada mesmo que no resto seja válida.</p>
+
+      <h2 id="reporting">Comunicar uma vulnerabilidade</h2>
+      <p>Use a <a href="https://github.com/{{repo}}/security/advisories/new">comunicação privada de vulnerabilidades</a> do GitHub, ou envie um email
+        para <a href="mailto:security@xinbetween.com">security@xinbetween.com</a> se preferir não usar o GitHub. O
+        <a href="https://github.com/{{repo}}/blob/main/SECURITY.md">SECURITY.md</a> diz o que está no âmbito e o que pode esperar.
+        Um erro comum — uma falha, um número errado, um ecrã que engana — pertence em vez disso aos
+        <a href="https://github.com/{{repo}}/issues">problemas</a>.</p>
+    </article>
+  </div>
+</main>

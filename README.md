@@ -369,6 +369,14 @@ in exchange, traffic from before you enabled it isn't there and some system traf
 Storage rolls per-second rows into minute, hour and day tables. Week, month and year views read the daily table,
 so a year of history stays fast.
 
+## Monitoring, not prevention
+
+Flowlight tells you what software on your Mac is sending and where. It is not a defence against an attacker who already
+controls the machine: anything running as root can unload its extension or stop the app. Blocking is real — the Network
+Extension refuses the connection before it is made — but it is control over software you already trust rather than a
+barrier against software you don't, and an agent that can run a shell can do by hand what a refused tool would have done.
+The [threat model](https://flowlight.xinbetween.com/threat-model/) says what is defended, what is not, and why.
+
 ## Honest limitations
 
 - **TCP and UDP only.** That covers essentially all app traffic, but ICMP (ping) and other raw-IP protocols aren't attributed.
@@ -413,31 +421,15 @@ Shipped:
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)
 - [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
+- [x] Coverage: what Flowlight can't account for, per app (0.9.0)
+- [x] Inspect an app or destination from the row you found it on (0.9.1)
+- [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
+  no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
 
-- **0.9.0 — Coverage, stated rather than assumed.** Flowlight says it sees every connection, and then the honest
-  paragraphs elsewhere explain the exceptions: traffic from before the filter started, system services exempt
-  from content filters, a Mac where another content filter owns the slot, apps that pin their certificates, QUIC
-  the proxy never sees, and an agent's local MCP server talking over a pipe. Today you have to know all of that
-  to read the screens correctly. A coverage view would say it per app: watched by the extension, decrypted by
-  the proxy, named only by DNS or SNI, or not covered at all — and *why*, with the fix where there is one. It is
-  the difference between a tool that claims completeness and one that can be trusted about its own limits.
-- **0.9.1 — Inspect it from where you found it.** Seeing in Live that an agent talked to a host and wanting to
-  know what it said is the commonest move there is, and it meant changing screen, remembering the name and
-  typing it into a search field. Right-click any row in Live, Reports or AI Agents and Inspect opens already
-  looking at that app or destination. The subject lands in the search field rather than a hidden filter, so it
-  stays visible and can be widened or dropped without going back.
-- **0.9.2 — A threat model, written down.** What Flowlight defends against, and what it does not, on one page:
-  software on this Mac behaving badly in the open; not software with root, which can switch the filter off.
-  A signed update from someone who is not us — which 0.8.2 closed. A VPN or security agent holding the content
-  filter slot. Certificate pinning, QUIC, and anything routed around the proxy. The product language should say
-  **monitoring, not prevention** beside every mention of blocking, because "block" invites a guarantee the
-  design cannot make. Alongside it, a security contact address and key for people who can't or won't use
-  GitHub's private reporting, and the web fonts served from this domain rather than Google's — a local-first
-  tool shouldn't make a third-party request to render its own privacy page.
 - **0.9.3 — A budget for inspection.** HTTPS inspection records request and response bodies for three days, and
   that is the most sensitive thing Flowlight ever holds. The redaction that protects it is a guess at which
   headers carry credentials — improved in 0.8.2, still a guess. This turns it into something with limits you
@@ -453,7 +445,7 @@ Planned, in order:
   is encrypted, exactly which fields travel and whether any of them are headers — the same disclosure Flowlight
   demands of everything else it watches, applied to itself.
 
-- **1.0 — What an agent did besides the network.** Flowlight can say that Claude Code uploaded 40 MB to an
+- **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
   unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration
   story: a file leaving is a read followed by a send, and only the send is visible today. This would record
   what an agent's tools opened, wrote and spawned, and line it up against the connections that followed —
@@ -466,7 +458,7 @@ Planned, in order:
   **Two things gate it, both stated here rather than discovered later.** Per-process file attribution on macOS
   needs the EndpointSecurity framework, whose entitlement Apple grants on request and review — not a
   checkbox — and which only works from a system extension. And it would put far more sensitive material in
-  Flowlight's hands than network metadata ever did, so the inspection budget in 0.9.2 stops being a nicety and
+  Flowlight's hands than network metadata ever did, so the inspection budget in 0.9.3 stops being a nicety and
   becomes the thing that has to exist first. A tool that asks you not to monitor it has to deserve that twice
   over when it can see every file you open.
 

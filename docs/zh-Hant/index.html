@@ -32,10 +32,8 @@
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../assets/icon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=0e85a400">
+
+<link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hant", "name": "Flowlight", "description": "Flowlight 是開放原始碼的 macOS App 層級網路監控工具，看得見每個 App 的連線，也看得清 AI 代理、工具與 MCP 伺服器。", "url": "https://flowlight.xinbetween.com/zh-Hant/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hant/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
@@ -47,6 +45,7 @@
       <a href="../zh-Hant/#agents">AI 代理</a>
       <a href="../zh-Hant/docs/">說明文件</a>
       <a href="../zh-Hant/privacy/">隱私</a>
+      <a href="../zh-Hant/threat-model/">威脅模型</a>
       <a href="../releases/">版本</a>
       <a href="../zh-Hant/about/">關於</a>
       <a href="https://github.com/xinbetween/flowlight">GitHub</a>
@@ -106,7 +105,7 @@
 
   <section class="shot" aria-label="螢幕截圖">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="1075"
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="994"
         alt="Flowlight 的「AI 代理」畫面。Claude Code、Cursor、Codex 和一個 Python 指令碼列在其中，顯示各自的 AI 供應商、傳往其他地方的流量，以及 SMTP、SSH、FTP、大量上傳和裸 IP 的風險標記。"></div>
       <p class="caption">「AI 代理」畫面：每個代理的模型供應商，以及它連線過的其他所有目標。圖中為示範資料。</p>
     </div>
@@ -217,7 +216,8 @@
           <div><h3>規則，要生效多久由你說</h3>
             <p>指名一個 App、一個代理、一個目標或單一 URL，然後把它封鎖 — 在你發現它的那一列上按右鍵就行。
               可以永久、到某個時間為止、直到 Flowlight 結束，或只在指定的時段內；另有一個暫停開關，而且每次拒絕都留著
-              一條退路。最明確的規則優先，兩者相當時以封鎖為準。</p>
+              一條退路。最明確的規則優先，兩者相當時以封鎖為準。
+              它是對你本來就信任的軟體的管控，不是一道擋住你不信任的軟體的屏障 — 見<a href="../zh-Hant/threat-model/">威脅模型</a>。</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · 已拒絕 4 次 · 平日 18:00–09:00</p></div>
         </div>
         <div class="rule">
@@ -370,16 +370,16 @@
           單位。從受檢查的「終端機」啟動代理，它和它的工具所產生的支援 HTTP 流量就會被解密，連同模型要求的
           工具呼叫和回傳的結果。</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="1075" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="994" loading="lazy"
         alt="Flowlight 的「檢查」畫面：一份解密後的 Claude Code 請求列表及其工具呼叫，以及 curl 上傳到 paste.example 的詳細內容 — 那次上傳由執行它的 Bash 工具呼叫發出，請求內文中還有上傳的筆記"></div>
         <figcaption><b>我的筆記去哪了？</b> curl 上傳到 paste.example，追溯到模型要求執行的 Bash 指令，連同它
           送出的內文。</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="712" loading="lazy"
           alt="Claude Code 的「工具」標籤頁：Bash、Read 和兩個 MCP 工具，附上說明以及模型各呼叫了幾次"></div>
           <figcaption><b>代理提供給模型的每一個工具。</b> 代理每一輪都會宣告自己的工具，所以 Flowlight 會全部列出來，包含模型
             真正用過的，以及完全沒碰過的。</figcaption></figure>
-        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="622" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="712" loading="lazy"
           alt="Codex 的「MCP 伺服器」標籤頁：一個標示為「透過供應商」的 sentry 伺服器，包含它的 URL、設為永不核准的核准設定、允許的工具，以及它提供的工具"></div>
           <figcaption><b>連你在線路上看不到的也算。</b> 當代理請供應商去連接某個 MCP 伺服器，那段流量
             根本不會經過你的 Mac。但代理的請求會，所以那個伺服器、它的 URL、它的核准設定和它的工具仍然會出現。</figcaption></figure>
@@ -398,9 +398,14 @@
       <div class="section-head">
         <p class="eyebrow">接下來</p>
         <h2>即將推出</h2>
-        <p class="lede">Flowlight 今天已經能監看、解釋並拒絕。其餘的部分會按這個順序做下去。</p>
+        <p class="lede">Flowlight 今天已經能監看、解釋並拒絕 — 正如<a href="../zh-Hant/threat-model/">威脅模型</a>所說，
+          這是監控，不是防護。其餘的部分會按這個順序做下去。</p>
       </div>
       <div class="privacy">
+        <div><strong>給檢查一份預算 <span class="tag">0.9.3</span></strong><p>記錄下來的內文是 Flowlight 留著的東西裡最敏感的。用標頭的允許清單而不是拒絕清單，加上你自己的樣式、一個乾脆不保留任何標頭的選項、依 App 的上限，以及一個自己會過期的工作階段。</p></div>
+        <div><strong>讓我看看這條規則會攔下什麼 <span class="tag">0.9.4</span></strong><p>把最近一天拿來對一條規則重播，在它拒絕任何東西之前，先列出它原本會拒絕的。資料早就在那裡了，只是它一直只用來解釋過去。</p></div>
+        <div><strong>什麼會離開這台 Mac，在它離開之前 <span class="tag">0.9.5</span></strong><p>在第一列資料抵達收集器之前：目的地、是否加密、哪些欄位會走、其中有沒有標頭 — Flowlight 要求其他一切做到的那種揭露，用在自己身上。</p></div>
+        <div><strong>代理除了連網還做了什麼 <span class="tag">1.0</span></strong><p>一個檔案的外流是一次讀取加一次傳送，而今天只看得見傳送。把代理的工具開了什麼、寫了什麼、啟動了什麼記錄下來，就能讓<em>讀取了私密金鑰，然後連上了 paste.example</em>變成一項發現，而不是兩個畫面。它不是資源監視器：CPU 和記憶體是活動監視器的事。這需要 Apple 的 EndpointSecurity 授權，也需要上面那份檢查預算先存在。</p></div>
         <div><strong>先 Linux，再 Windows</strong><p>分析核心是可移植的 Swift，擷取部分不是。先出一個帶本機網頁介面的 Linux 常駐程式，基於 eBPF 而不是 macOS 的 API。</p></div>
       </div>
     </div>
@@ -423,7 +428,7 @@
 
   <section class="band" id="agent-detail" aria-label="代理詳細資料的螢幕截圖">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="622" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="994" loading="lazy"
         alt="Flowlight 中 Claude Code 的詳細資料：工具與 MCP 伺服器及其呼叫次數和一次失敗、一份允許清單，以及「工具呼叫」標籤頁 — 其中列出一次失敗的 git push、一次 curl 上傳到 paste.example 及其回應與請求、npm install、一個 GitHub issue、一次說明文件搜尋和一次檔案讀取，每一項都附上結果"></div>
         <figcaption><b>一個代理，每一次工具呼叫。</b> Claude Code 啟動的 git、curl 和 MCP 伺服器所產生的流量，都算成 Claude Code 的。
           開啟 HTTPS 檢查後，<em>工具呼叫</em>標籤頁會顯示模型要求了什麼、回來了什麼，以及各個工具發出的請求：
@@ -433,10 +438,10 @@
 
   <section class="band" aria-label="更多螢幕截圖">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="994" loading="lazy"
         alt="「報告」畫面：每小時接收與傳送的長條圖，以及 App、目標和協定的環圈圖"></div>
         <figcaption><b>報告。</b> 從秒到年的縮放、三種分組方式，即使有上百個 App，圖表依然看得清楚。</figcaption></figure>
-      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="1075" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="994" loading="lazy"
         alt="「警示」畫面：列出代理資料外洩、郵件、FTP、離開期間活動和流量尖峰等警示"></div>
         <figcaption><b>警示。</b> 每一則都指出 App、目標，以及觸發它的那個數字。</figcaption></figure>
     </div>

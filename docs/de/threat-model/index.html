@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bedrohungsmodell von Flowlight</title>
+<meta name="description" content="Wogegen Flowlight schützt, wogegen es nicht schützen kann und warum – beobachten statt verhindern.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/de/threat-model/">
+<link rel="alternate" hreflang="en" href="https://flowlight.xinbetween.com/threat-model/">
+<link rel="alternate" hreflang="de" href="https://flowlight.xinbetween.com/de/threat-model/">
+<link rel="alternate" hreflang="es" href="https://flowlight.xinbetween.com/es/threat-model/">
+<link rel="alternate" hreflang="fr" href="https://flowlight.xinbetween.com/fr/threat-model/">
+<link rel="alternate" hreflang="it" href="https://flowlight.xinbetween.com/it/threat-model/">
+<link rel="alternate" hreflang="ja" href="https://flowlight.xinbetween.com/ja/threat-model/">
+<link rel="alternate" hreflang="ko" href="https://flowlight.xinbetween.com/ko/threat-model/">
+<link rel="alternate" hreflang="pt-PT" href="https://flowlight.xinbetween.com/pt-PT/threat-model/">
+<link rel="alternate" hreflang="zh-Hans" href="https://flowlight.xinbetween.com/zh-Hans/threat-model/">
+<link rel="alternate" hreflang="zh-Hant" href="https://flowlight.xinbetween.com/zh-Hant/threat-model/">
+<link rel="alternate" hreflang="x-default" href="https://flowlight.xinbetween.com/threat-model/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="Bedrohungsmodell von Flowlight">
+<meta property="og:description" content="Wogegen Flowlight schützt, wogegen es nicht schützen kann und warum – beobachten statt verhindern.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/de/threat-model/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../assets/icon.png">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+
+<link rel="stylesheet" href="../../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/de/"}, {"@type": "ListItem", "position": 2, "name": "Bedrohungsmodell von Flowlight", "item": "https://flowlight.xinbetween.com/de/threat-model/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Zum Inhalt springen</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../../de/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Website">
+      <a href="../../de/#agents">KI-Agenten</a>
+      <a href="../../de/docs/">Dokumentation</a>
+      <a href="../../de/privacy/">Datenschutz</a>
+      <a href="../../de/threat-model/" aria-current="page">Bedrohungsmodell</a>
+      <a href="../../releases/">Versionen</a>
+      <a href="../../de/about/">Über</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="Sprache" title="Sprache"><span class="lang-current"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">Deutsch</span><svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary>
+      <div class="lang-menu"><a href="../../threat-model/" hreflang="en" lang="en">English</a><span lang="de" aria-current="true">Deutsch</span><a href="../../es/threat-model/" hreflang="es" lang="es">Español</a><a href="../../fr/threat-model/" hreflang="fr" lang="fr">Français</a><a href="../../it/threat-model/" hreflang="it" lang="it">Italiano</a><a href="../../pt-PT/threat-model/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../../ja/threat-model/" hreflang="ja" lang="ja">日本語</a><a href="../../zh-Hans/threat-model/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../../zh-Hant/threat-model/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../../ko/threat-model/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Herunterladen</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Bedrohungsmodell</p>
+    <h1>Beobachten, nicht verhindern</h1>
+    <p class="lede">Flowlight sagt dir, was Software auf deinem Mac sendet und wohin. Es ist keine Verteidigung gegen einen Angreifer, der
+      die Maschine schon kontrolliert, und dieser Unterschied ist wichtig genug für eine eigene Seite statt für eine Fußnote.</p>
+  </div></section>
+
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="Auf dieser Seite">
+      <details class="toc-sheet" open>
+        <summary>Auf dieser Seite</summary>
+        <div class="toc-group">
+          <p class="toc-label">Die kurze Fassung</p>
+          <a href="#stance">Wofür es da ist</a><a href="#defends">Wogegen es schützt</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Grenzen</p>
+          <a href="#root">Software mit Root-Rechten</a><a href="#capture">Was der Erfassung entgeht</a><a href="#inspection">Was der Inspektion entgeht</a>
+          <a href="#blocking">Was Blockieren ist und was nicht</a>
+        </div>
+        <div class="toc-group">
+          <p class="toc-label">Flowlight selbst</p>
+          <a href="#itself">Was es aufbewahrt</a><a href="#updates">Updates</a><a href="#reporting">Eine Schwachstelle melden</a>
+        </div>
+      </details>
+    </nav>
+
+    <article class="prose">
+      <h2 id="stance">Wofür es da ist</h2>
+      <p>Flowlight beantwortet eine Frage, die der Mac nicht beantwortet: <strong>Welche App hat das gesendet, und wohin ging es?</strong> Es ist
+        für Software gebaut, die sich offen schlecht verhält – ein KI-Agent, der etwas kontaktiert, worum ihn niemand gebeten hat, ein Tool, das mehr
+        hochlädt als es sollte, ein Prozess, der mit einer Adresse ohne Namen spricht. Dieses Verhalten ist im Datenverkehr sichtbar, und Flowlights
+        Aufgabe ist, es lesbar zu machen – und ehrlich zu sagen, wenn es das nicht kann.</p>
+      <p>Es ist kein Virenschutz, kein EDR-Agent und keine Firewall in dem Sinne, dass etwas zwischen dir und einem Angreifer stünde.
+        Wo sich beides überschneidet – Flowlight kann Verbindungen verweigern –, ist die Verweigerung eine Bequemlichkeit, um Software zu steuern,
+        der du schon vertraust, kein Riegel gegen Software, der du nicht vertraust.</p>
+
+      <h2 id="defends">Wogegen es schützt</h2>
+      <ul>
+        <li><strong>Unbemerkter Abfluss.</strong> Eine App oder ein Agent sendet irgendwohin, wo du es nicht erlaubt hättest – auch über ein
+          Tool, das er selbst ausgeführt hat. Flowlight rechnet die Verbindung dem Prozess zu, der sie aufgebaut hat, und dem Agenten, der diesen
+          Prozess gestartet hat.</li>
+        <li><strong>Stille Verhaltensänderungen.</strong> Eine App, die plötzlich neue Ziele kontaktiert, weit mehr bewegt als ihre
+          Basislinie oder arbeitet, während du weg bist. Jede Warnung nennt den Wert, der sie ausgelöst hat, damit du ihr widersprechen kannst.</li>
+        <li><strong>Ein Agent, der über das Erlaubte hinausgeht.</strong> Eine Erlaubnisliste pro Agent und Regeln, die Verbindungen außerhalb davon
+          verweigern, mit der Verweigerung im Protokoll und einem Klick, um sie zu erlauben.</li>
+        <li><strong>Ein manipuliertes Update.</strong> Zu jeder Version wird eine Prüfsumme veröffentlicht; die Updatefunktion verweigert einen
+          Download, den sie nicht prüfen kann, und verweigert die Installation einer App, die nicht vom selben Team signiert ist wie die Kopie, die
+          nach dem Update fragt.</li>
+      </ul>
+
+      <h2 id="root">Software mit Root-Rechten kann es abschalten</h2>
+      <p>Flowlight läuft als du, mit einer Systemerweiterung, die macOS für es startet. Alles, was als Root läuft – oder alles, dessen
+        Installationsprogramm du zustimmst –, kann diese Erweiterung entladen, die App stoppen oder ihre Datenbank löschen. Nichts im Entwurf
+        verhindert das, und kein Überwachungswerkzeug auf macOS kann es verhindern und dabei ein Werkzeug bleiben, das du auch selbst abschalten kannst.</p>
+      <p>Die ehrliche Aussage ist schmaler und trotzdem nützlich: Software, die sich schlecht verhält, aber einer Überwachung nicht aktiv ausweicht,
+        wird gesehen. Software, die ihr aktiv ausweicht, vielleicht nicht – und sie lässt zumindest eine Lücke zurück: eine Erweiterung, die stehen
+        geblieben ist, ein Zeitraum ohne Daten. Dafür ist der Bildschirm <a href="../../de/docs/#coverage">Abdeckung</a> da.</p>
+
+      <h2 id="capture">Was der Erfassung entgeht</h2>
+      <ul>
+        <li><strong>Datenverkehr von vor dem Beginn der Erfassung.</strong> Es gibt kein Nachtragen. Eine Verbindung, die vor dem Filter geöffnet
+          wurde, ist ihm nie angeboten worden.</li>
+        <li><strong>Systemdienste, die von Inhaltsfiltern ausgenommen sind.</strong> macOS zeigt einem Inhaltsfilter nicht alles; ein Teil seines
+          eigenen Datenverkehrs erreicht unseren nie.</li>
+        <li><strong>Ein anderer Inhaltsfilter, der den Platz hält.</strong> macOS führt einen zur Zeit aus. Hat ihn ein VPN oder ein
+          Sicherheitsagent, installiert sich Flowlights Filter, verbindet sich und wird nie gebeten, etwas zu filtern – Erfassung sagt das, statt einen
+          leeren Bildschirm zu zeigen.</li>
+        <li><strong>Kurze Verbindungen, beim Sampler.</strong> Ohne die Erweiterung liest Flowlight Zähler einmal pro Sekunde: Eine Verbindung, die
+          zwischen zwei Messungen öffnet und schließt, wird nie aufgezeichnet.</li>
+        <li><strong>Kanäle, die nicht TCP oder UDP sind.</strong> Bluetooth und USB sind als Geräte sichtbar, nicht als Bytes. Der lokale
+          MCP-Server eines Agenten, der über eine Pipe spricht, ist überhaupt kein Netzwerkverkehr und erscheint nirgends.</li>
+      </ul>
+
+      <h2 id="inspection">Was der Inspektion entgeht</h2>
+      <p>Die HTTPS-Inspektion liest nur, was über Flowlights lokalen Proxy geleitet wird, und darüber entscheidet ein Programm beim Start. Eine App,
+        die Proxy-Einstellungen ignoriert, eine, die vor dem Einschalten der Inspektion gestartet wurde, oder eine, die ihre Zertifikate anpinnt, geht
+        unberührt durch – absichtlich, denn eine angepinnte Verbindung zu brechen würde die App brechen. QUIC wird dem Proxy ebenfalls nicht angeboten.</p>
+      <p>Ein leerer Bildschirm Inspizieren heißt also „hier wurde nichts durchgeleitet“ und nicht „es ist nichts passiert“. Abdeckung sagt pro App,
+        welches von beidem gilt.</p>
+
+      <h2 id="blocking">Was Blockieren ist und was nicht</h2>
+      <p>Eine Regel, die Verbindungen verweigert, wird von der Netzwerkerweiterung ausgeführt, im Weg der Verbindung, bevor sie zustande kommt. Eine
+        Regel, die eine URL nennt, führt stattdessen der Inspektions-Proxy aus, der die Anfrage mit einem Status beantwortet, den die App lesen kann.
+        Das sind die einzigen zwei Teile von Flowlight, die handeln statt zu berichten – der nettop-Sampler kann überhaupt nichts verweigern, auf einem
+        Mac, der mit dem Sampler erfasst, wird also keine Regel durchgesetzt, und Flowlight sagt das, statt einen Schalter anzubieten, der nichts tut.</p>
+      <p>Verhindern ist es trotzdem nicht. Ein Agent, der eine Shell ausführen kann, kann von Hand tun, was ein verweigertes Tool getan hätte. Eine
+        Verweigerung, die du mit einem Klick aufheben kannst, ist eine Verweigerung, durch die der nächste Versuch eines Agenten hindurchgehen kann.
+        Lokaler Datenverkehr, DNS, Apples eigene Dienste und Flowlights eigene Verbindungen werden nie verweigert, denn ein blockierter Mac ist ein
+        schlechteres Ergebnis als ein blockierter Agent. Und die Durchsetzung endet wenige Sekunden nachdem Flowlight nicht mehr läuft: Eine
+        Verweigerung, die niemand sehen kann, ist schlimmer als keine.</p>
+      <p><strong>Inspektion und Verweigerung lassen sich nicht verbinden.</strong> Datenverkehr, der über Flowlights eigenen Proxy geleitet wird,
+        verlässt den Mac als Flowlights Datenverkehr, und Flowlight verweigert sich selbst nie – eine App, deren Anfragen du liest, ist also eine App,
+        deren Verbindungen Regeln nicht mehr stoppen. Die Inspektion einzuschalten, um mehr zu sehen, kostet dich die Durchsetzung, und auf dem
+        Bildschirm stand das vorher nirgends.</p>
+
+      <h2 id="itself">Was Flowlight selbst aufbewahrt</h2>
+      <p>Metadaten zum Datenverkehr in einer lokalen SQLite-Datenbank, mit veröffentlichten Aufbewahrungsfristen. Bei eingeschalteter
+        HTTPS-Inspektion außerdem Anfrage- und Antwort-Bodys für drei Tage – das Sensibelste, was es überhaupt aufbewahrt. Header mit Zugangsdaten
+        werden nach Name und nach Wortbestandteil unlesbar gemacht, was eine Heuristik ist und keine Garantie; ein Header, der ein Geheimnis unter
+        einem Namen trägt, den nichts erkennt, kann aufgezeichnet werden.</p>
+      <p>Die Datenbank mit dem Datenverkehr wird nie hochgeladen. Drei kleinere Dinge verlassen den Mac, ohne dass jemand danach fragt, alle drei auf der
+        <a href="../../de/privacy/">Datenschutzseite</a> benannt: die Update-Prüfung, die GitHub beim Start und täglich nach der neuesten Version
+        fragt; die Abfrage zum Netzinhaber, die Team Cymru nach öffentlichen Adressen ohne Hostnamen fragt; und, solange Flowlight Zähler liest
+        statt seine Erweiterung zu betreiben, eine Reverse-DNS-Abfrage der Adressen, zu denen es keinen Namen gesehen hat. Die ersten beiden haben
+        Schalter zum Abschalten. Die dritte nicht, denn auf dem Sampler ist sie fast der einzige Weg, auf dem eine Verbindung überhaupt zu einem
+        Namen kommt – sie geht an den Resolver, den der Mac schon benutzt, und sie hört auf, sobald die Erweiterung übernimmt und Verbindungen aus dem
+        Datenverkehr selbst benennt. Fragen mit einem gehosteten Modell sendet weit mehr als alle drei und ist das eine, das aus bleibt, bis du es
+        einrichtest.</p>
+
+      <h2 id="updates">Updates</h2>
+      <p>Versionen sind mit einer Developer ID signiert und notarisiert. Die Updatefunktion verlangt eine veröffentlichte Prüfsumme und verweigert
+        einen Download ohne sie, und prüft dann vor der Installation, dass die heruntergeladene App vom selben Team signiert ist wie die laufende
+        Kopie. Ein Update, das jemand anderes signiert hat, wird verweigert, auch wenn es sonst gültig ist.</p>
+
+      <h2 id="reporting">Eine Schwachstelle melden</h2>
+      <p>Nutze GitHubs <a href="https://github.com/xinbetween/flowlight/security/advisories/new">private Schwachstellenmeldung</a> oder schreib an
+        <a href="mailto:security@xinbetween.com">security@xinbetween.com</a>, wenn du GitHub lieber nicht nutzt.
+        <a href="https://github.com/xinbetween/flowlight/blob/main/SECURITY.md">SECURITY.md</a> sagt, was in den Rahmen fällt und was du erwarten kannst.
+        Ein gewöhnlicher Fehler – ein Absturz, eine falsche Zahl, ein irreführender Bildschirm – gehört stattdessen in
+        <a href="https://github.com/xinbetween/flowlight/issues">den Issue-Tracker</a>.</p>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../../de/"><img src="../../assets/icon.png" alt="">Flowlight</a>
+        <p>App-genaue Netzwerküberwachung für macOS, mit dem genauesten Blick auf KI-Agenten.</p>
+      </div>
+      <div><h4>Produkt</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Für macOS herunterladen</a></li>
+        <li><a href="../../de/docs/#install">Mit Homebrew installieren</a></li>
+        <li><a href="../../releases/">Versionshinweise</a></li>
+        <li><a href="../../de/docs/">Dokumentation</a></li>
+      </ul></div>
+      <div><h4>Projekt</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Quellcode</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Mitmachen</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Problem melden</a></li>
+      </ul></div>
+      <div><h4>Vertrauen</h4><ul>
+        <li><a href="../../de/privacy/">Datenschutz</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">Lizenz (GPL-3.0)</a></li>
+        <li><a href="../../de/about/">Über</a></li>
+      </ul></div>
+      <div><h4>Für KI-Agenten</h4><ul>
+        <li><a href="../../llms.txt">llms.txt</a></li>
+        <li><a href="../../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.9.1 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Kopiert";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Kopieren"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>来源</strong>
-          <a href="#capture">捕获</a><a href="#devices">设备</a>
+          <a href="#capture">捕获</a><a href="#coverage">覆盖范围</a><a href="#devices">设备</a>
         </div>
         <div class="toc-group">
           <strong>设置与数据</strong>
@@ -91,12 +91,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <table>
         <tr><th>视图</th><th>快捷键</th><th>它回答什么</th></tr>
         <tr><td>实时</td><td>⌘1</td><td>现在什么在动：最近几秒按应用的速率，以及最忙的目标。</td></tr>
-        <tr><td>AI 代理</td><td>⌘2</td><td>哪些代理在活动、它们用哪些 AI 提供方，以及它们还联系了什么。</td></tr>
+        <tr><td><a href="#agents">AI 代理</a></td><td>⌘2</td><td>哪些代理在活动、它们用哪些 AI 提供方，以及它们还联系了什么。</td></tr>
         <tr><td>报告</td><td>⌘3</td><td>流量去了哪里，从秒到年。按应用、目标或 IP 分组；切到图表或<a href="#worth-a-look">值得一看</a>；导出 CSV。</td></tr>
-        <tr><td>警报</td><td>⌘4</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
-        <tr><td>检查</td><td>⌘5</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
-        <tr><td>捕获</td><td>⌘6</td><td>哪个引擎在记录、扩展的状态、主机名学习，以及数据库放在哪里。</td></tr>
+        <tr><td><a href="#alerts">警报</a></td><td>⌘4</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
+        <tr><td><a href="#rules">规则</a></td><td>⌘5</td><td>你设过的每一条允许列表和拒绝，各自管到哪里，以及实际拦下了什么。</td></tr>
+        <tr><td><a href="#ask">提问</a></td><td>⌘6</td><td>用平常的话问你自己的流量，由本地模型或托管模型从记录下来的历史里作答。</td></tr>
+        <tr><td><a href="#inspection">检查</a></td><td>⌘7</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
+        <tr><td><a href="#devices">设备</a></td><td>⌘8</td><td>你打开之前一直是关的：蓝牙、USB 与外置存储，一台 Mac 用它们跟用网络一样多。</td></tr>
+        <tr><td><a href="#coverage">覆盖范围</a></td><td>⌘9</td><td>Flowlight 说不清的部分——按应用，它的流量有没有被看到、被命名、被读懂。</td></tr>
+        <tr><td><a href="#capture">捕获</a></td><td>⌘0</td><td>哪个引擎在记录、扩展的状态、主机名学习，以及数据库放在哪里。</td></tr>
       </table>
+      <p>快捷键就是侧边栏的顺序，所以 ⌘0 是第十项，不是被跳过的位置。</p>
+      <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
+        alt="实时视图：一列应用，各自带着当前的发送与接收速率，以及最忙的目标。"></div>
+        <figcaption class="caption">实时，Flowlight 打开时进入的那个视图。</figcaption></figure>
       <p>在报告里，把指针停在某根柱子上就能看到是哪些应用造成的，点它可以放大，双击任意一行则把报告收窄到那一项。</p>
 
       <h2 id="agents">AI 代理规则</h2>
@@ -226,9 +234,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
         并在那里启动它们。在<strong>高级</strong>里，你可以只解密 AI 代理而不是所有应用、编辑从不解密列表、拷贝
         某个 shell 的配置，或者移除证书和所有已记录的内容。</p>
       <p>Flowlight 会把内置的 Apple 服务和密码管理器名单排除在解密之外（在“设置”里可以编辑这份列表）。固定证书的应用可能会拒绝
-        Flowlight 的证书；Flowlight 会发现并让它们以加密方式直接通过。API 密钥、cookie 以及其他凭据标头从不
-        保存，记录的请求保留 3 天，<strong>移除证书与记录的数据</strong>会删除证书、它的信任
+        Flowlight 的证书；Flowlight 会发现并让它们以加密方式直接通过。API 密钥、cookie 以及其他凭据标头在任何内容被存储之前
+        都会被替换为它们的长度——按名称、也按名称中的词来匹配，这能抓到某家厂商自己的写法，但不能保证一个都不漏——记录的请求保留 3 天，<strong>移除证书与记录的数据</strong>会删除证书、它的信任
         设置以及所有已记录的内容。检查仅支持 HTTP/1.1（Flowlight 会向双方请求它），且在演示模式下不可用。</p>
+
+      <p><strong>从一行直接过来。</strong>在实时、报告或 AI 代理里右键点击一个应用或一个目的地，选择<strong>检查 … 的流量</strong>：
+        检查会打开，而那个名字已经填在搜索框里。用搜索框而不是一个隐藏的过滤器是故意的——你可以把它放宽、收窄或清空，而不必回到
+        你出发的地方。只有经过代理服务器的流量才可能出现，所以一行你知道很忙的记录，在这里仍可能什么都不显示。</p>
 
       <h2 id="mocks">模拟响应</h2>
       <p>想看看某个 API 失败、卡住或返回奇怪内容时代理会怎么应对，那就自己来响应那个端点。在
@@ -359,6 +371,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         不需要过滤器，可以和它们并存。
         关于它是如何构建的，见<a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">开发者指南</a>。</p>
 
+      <h2 id="coverage">覆盖范围：Flowlight 说不清的部分</h2>
+      <p>其他每个画面回答的都是发生了什么。<strong>覆盖范围</strong>回答的是有什么本来不会被告诉你，而这决定了其他画面值多少。
+        它对每个应用问三个问题，因为这三件事是各自独立地失效的。</p>
+      <p><strong>有没有被看到？</strong>网络扩展在每一条流建立时就看到它。nettop 采样器每秒读一次计数器，所以在两次读取之间开启
+        又关闭的连接——一次 DNS 查询、一次很快的 API 调用、一个运行 <code>curl</code> 后就退出的脚本——会整条缺失。那是任何百分比
+        都表达不了的缺口，所以这里用文字写出来，而不是给它打分。</p>
+      <p><strong>有没有名字？</strong>该应用的<em>字节</em>中，发往有主机名（而不是只有一个地址）的目的地的比例。是字节，不是连接数：
+        一条没有名字却运走一个 GB 的连接，比一百条各运一个 KB 的连接是更大的洞，而按连接数来数，排序恰好相反。</p>
+      <p><strong>内容能不能读？</strong>HTTPS 检查是否解密了该应用的任何一点流量。有四个答案，其中只有一个才是缺口：正在被读；
+        它从未到达代理服务器；它在“从不解密”列表中，那是你自己做的选择；或者检查是关闭的，那是一个设置，而不是某个应用上的失败。</p>
+      <p><strong>任何引擎都完全看不到的东西</strong>列在画面上，而不是留给这个页面：捕获开始之前的流量、从不会交给内容过滤器的
+        系统服务、固定证书的应用、从不会交给代理服务器的 QUIC，以及某个代理通过管道与它通信的本地 MCP 服务器。这些在 Flowlight 的
+        任何地方都不会出现，因此也不在这些数字之内——一个只数自己能看到的东西的覆盖率，会是一种安慰，而不是一个事实。</p>
+
       <h2 id="devices">设备：蓝牙、USB 与外置存储</h2>
       <p>一台 Mac 收发数据的途径不止 TCP 和 UDP。<strong>设备</strong>界面负责其余部分，而且在你打开之前
         它一直关闭——不是因为它需要 Flowlight 尚未拥有的权限，而是因为监视你 Mac 的更多部分
@@ -485,8 +511,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
           它会显示安装了哪些扩展、macOS 是否真的启动了 Flowlight 的过滤器，以及最近一次记录是什么时候。
           把它粘贴到<a href="https://github.com/{{repo}}/issues">一个 issue</a> 里。</dd>
         <dt><strong>Flowlight 会把关于我的任何信息发到什么地方吗？</strong></dt>
-        <dd>不会。没有账号，没有遥测，也没有分析。它发出的请求只有每日更新检查、可选的网络所有者
-          查询，以及反向 DNS——每一项都列在<a href="{{link:privacy}}">隐私页面</a>上，并且每一项都有开关可以关掉。</dd>
+        <dd>没有账号，没有遥测，也没有分析，而且你的流量数据库从不上传。确实有三个请求会离开这台 Mac，它们都列在<a href="{{link:privacy}}">隐私页面</a>上：
+          每日更新检查和可选的网络所有者查询，这两个都有开关可以关掉；以及 Flowlight 在采样器上运行时的反向 DNS，它没有开关——
+          没有它，采样器就没法给大多数连接命名。</dd>
         <dt><strong>它会让我的 Mac 变慢，或者更耗电吗？</strong></dt>
         <dd>窗口关闭时 Flowlight 几乎什么都不做：它保留菜单栏速率，每秒写入一行。网络扩展
           比作为后备的采样器更省，后者每秒都要启动一个短命的 <code>nettop</code> 进程。</dd>
