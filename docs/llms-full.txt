@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.8.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.8.1, macOS 15 or later.
 
  On this page
 
@@ -698,7 +698,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.8.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.8.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1244,8 +1244,28 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.8.0
+ 0.8.1
 September 26, 2026Latest
+
+ Flowlight stops working when you are not looking at it. It was rebuilding the live
+ chart and the per-app list every second whenever a window existed — including when that window was
+ minimised, completely covered by another app, or parked on a Space you had left. The work was gated on
+ SwiftUI's onAppear, which only says a window exists, not that anyone can see it. It now
+ follows the window's occlusion state, so a hidden Flowlight builds nothing and the menu bar rates keep
+ updating as before.
+
+ A blocking system call no longer ran once a second, forever. Settings read "launch
+ at login" in a property's default value, and that expression re-runs every time the settings pane is
+ constructed — which happened on every traffic update, whether or not Settings was open. Reading it
+ means a synchronous round trip to the system service manager on the main thread. It is now read once,
+ when the pane actually appears.
+
+ Together these are the difference between an idle Flowlight costing a measurable share of a CPU core
+ and costing almost nothing. If macOS had been listing Flowlight under "Using Significant Energy" while
+ it sat in the background, this is why.
+
+ 0.8.0
+September 26, 2026
 
  Send an agent through the proxy in one click. HTTPS inspection can only read what
  goes through Flowlight, and a program reads its proxy settings once — when it starts. So an agent

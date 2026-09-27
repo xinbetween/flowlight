@@ -69,19 +69,17 @@ final class TrafficMonitor: ObservableObject {
     private var source: TrafficSource?
     private var timers: [Timer] = []
 
-    /// How many Flowlight windows are on screen. With none, the menu bar only needs the current rates, so the live
-    /// chart series and the per-app list aren't built at all.
-    private var visibleWindows = 0
-    var uiVisible: Bool { visibleWindows > 0 }
+    private var windows = WindowVisibility()
 
-    func windowAppeared() { visibleWindows += 1 }
+    /// Whether anything on screen needs the live chart series and the per-app list. With nothing visible the menu
+    /// bar only needs the current rates, so neither is built at all.
+    var uiVisible: Bool { windows.isVisible }
 
-    func windowDisappeared() {
-        visibleWindows = max(0, visibleWindows - 1)
-        if !uiVisible {
-            liveSeries = []
-            talkers = []
-        }
+    func windowVisibility(_ window: AnyObject, isVisible: Bool) {
+        guard windows.update(window, isVisible: isVisible) == .becameHidden else { return }
+        // Nothing can see them, and they are rebuilt on the next tick once something can.
+        liveSeries = []
+        talkers = []
     }
 
     private let liveWindow = 120
