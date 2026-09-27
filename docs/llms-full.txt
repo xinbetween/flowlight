@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.8.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.0, macOS 15 or later.
 
  On this page
 
@@ -721,7 +721,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.8.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1279,8 +1279,30 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.8.2
+ 0.9.0
 September 27, 2026Latest
+
+ A new screen: Coverage. Every other screen says what happened. This one says what
+ you would not have been told — per app, and separately for each of the three ways it can go wrong.
+ Was the connection seen at all: the filter sees flows as they open, while the sampler reads
+ counters once a second and misses whole connections between readings. Was the destination
+ named, measured in bytes rather than connections, because one unnamed connection carrying a
+ gigabyte is a bigger hole than a hundred carrying a kilobyte. And was it readable — with
+ being on the Never decrypted list counted as the choice it is, not as a failure.
+
+ What no engine sees is on the screen, not in a footnote: traffic from before
+ capture started, system services content filters are never shown, apps that pin their certificates,
+ QUIC, and an agent's local MCP server talking over a pipe. A coverage figure that counted only what
+ it could see would be a reassurance rather than a fact.
+
+ A crash that was waiting for a tenth screen. The sidebar derived ⌘1 to ⌘9 from
+ each item's position, so adding a tenth produced an impossible keyboard shortcut and trapped on
+ launch. It runs ⌘1–⌘9 then ⌘0 now, the way browsers number tabs.
+
+ Downloads and checksums →
+
+ 0.8.2
+September 27, 2026
 
  An update is verified before it is installed. The checksum comparison treated
  "no checksum published", "no line for this disk image" and "the file didn't parse" as a match —

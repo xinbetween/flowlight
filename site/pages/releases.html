@@ -13,7 +13,27 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.8.2</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.9.0</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>A new screen: Coverage.</strong> Every other screen says what happened. This one says what
+            you would not have been told — per app, and separately for each of the three ways it can go wrong.
+            Was the connection <em>seen</em> at all: the filter sees flows as they open, while the sampler reads
+            counters once a second and misses whole connections between readings. Was the destination
+            <em>named</em>, measured in bytes rather than connections, because one unnamed connection carrying a
+            gigabyte is a bigger hole than a hundred carrying a kilobyte. And was it <em>readable</em> — with
+            being on the Never decrypted list counted as the choice it is, not as a failure.</li>
+          <li><strong>What no engine sees is on the screen</strong>, not in a footnote: traffic from before
+            capture started, system services content filters are never shown, apps that pin their certificates,
+            QUIC, and an agent's local MCP server talking over a pipe. A coverage figure that counted only what
+            it could see would be a reassurance rather than a fact.</li>
+          <li><strong>A crash that was waiting for a tenth screen.</strong> The sidebar derived ⌘1 to ⌘9 from
+            each item's position, so adding a tenth produced an impossible keyboard shortcut and trapped on
+            launch. It runs ⌘1–⌘9 then ⌘0 now, the way browsers number tabs.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.9.0">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.8.2</h2><time datetime="2026-09-27">September 27, 2026</time></header>
         <ul>
           <li><strong>An update is verified before it is installed.</strong> The checksum comparison treated
             "no checksum published", "no line for this disk image" and "the file didn't parse" as a match —
