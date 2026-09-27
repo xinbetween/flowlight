@@ -418,6 +418,36 @@ Shipped:
 
 Planned, in order:
 
+- **0.9.0 — Coverage, stated rather than assumed.** Flowlight says it sees every connection, and then the honest
+  paragraphs elsewhere explain the exceptions: traffic from before the filter started, system services exempt
+  from content filters, a Mac where another content filter owns the slot, apps that pin their certificates, QUIC
+  the proxy never sees, and an agent's local MCP server talking over a pipe. Today you have to know all of that
+  to read the screens correctly. A coverage view would say it per app: watched by the extension, decrypted by
+  the proxy, named only by DNS or SNI, or not covered at all — and *why*, with the fix where there is one. It is
+  the difference between a tool that claims completeness and one that can be trusted about its own limits.
+- **0.9.1 — A threat model, written down.** What Flowlight defends against, and what it does not, on one page:
+  software on this Mac behaving badly in the open; not software with root, which can switch the filter off.
+  A signed update from someone who is not us — which 0.8.2 closed. A VPN or security agent holding the content
+  filter slot. Certificate pinning, QUIC, and anything routed around the proxy. The product language should say
+  **monitoring, not prevention** beside every mention of blocking, because "block" invites a guarantee the
+  design cannot make. Alongside it, a security contact address and key for people who can't or won't use
+  GitHub's private reporting, and the web fonts served from this domain rather than Google's — a local-first
+  tool shouldn't make a third-party request to render its own privacy page.
+- **0.9.2 — A budget for inspection.** HTTPS inspection records request and response bodies for three days, and
+  that is the most sensitive thing Flowlight ever holds. The redaction that protects it is a guess at which
+  headers carry credentials — improved in 0.8.2, still a guess. This turns it into something with limits you
+  set: a header allowlist rather than a denylist, patterns of your own, an option to keep no headers at all,
+  per-app byte ceilings, bodies deleted on a schedule you choose, and an inspection session that expires by
+  itself instead of running until someone remembers.
+- **0.9.3 — Show me what this rule would have done.** A rule that refuses connections is easy to write and
+  frightening to switch on, because the first thing you learn about it is what it breaks. Simulation replays the
+  last day of recorded traffic against a rule and lists what it would have refused, before it refuses anything.
+  The data is already there; it has only ever been used to explain the past.
+- **0.9.4 — What leaves the Mac, before it leaves.** The OpenTelemetry export sends recorded traffic to a
+  collector someone typed in. Before the first row goes, it should show the destination, whether the connection
+  is encrypted, exactly which fields travel and whether any of them are headers — the same disclosure Flowlight
+  demands of everything else it watches, applied to itself.
+
 Later, no version yet:
 
 - **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification, agent
