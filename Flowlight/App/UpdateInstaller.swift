@@ -31,6 +31,25 @@ enum UpdateInstaller {
         return bundleURL
     }
 
+    /// Whether an update may be installed: signed by this app's own team, or — for a build that has no team,
+    /// which is an ad-hoc local one — refused, because a copy that cannot prove who signed it cannot judge
+    /// anyone else's signature either.
+    ///
+    /// `FLSkipUpdateSignatureCheck` exists for the same local builds, which are unsigned and could otherwise
+    /// never test the update path at all. It is read from the defaults of the *running* app, so it cannot be
+    /// set by anything inside a downloaded disk image.
+    static func verifySignature(of app: URL) throws {
+        if UserDefaults.standard.bool(forKey: "FLSkipUpdateSignatureCheck") { return }
+        guard let team = CodeSignatureCheck.runningTeamIdentifier() else {
+            throw InstallError.wrongApp(CodeSignatureCheck.Failure.selfUnknown.errorDescription ?? "unsigned")
+        }
+        do {
+            try CodeSignatureCheck.verify(app, expectedTeam: team)
+        } catch {
+            throw InstallError.wrongApp(error.localizedDescription)
+        }
+    }
+
     /// Mounts the disk image, copies Flowlight.app to a staging folder and checks it's the expected version.
     static func stage(dmg: URL, expectedVersion: String, bundleID: String?) throws -> URL {
         let mount = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-update-\(UUID().uuidString)")
@@ -49,6 +68,11 @@ enum UpdateInstaller {
         if let bundleID, bundle.bundleIdentifier != bundleID {
             throw InstallError.wrongApp("bundle \(bundle.bundleIdentifier ?? "?")")
         }
+        // The version and the bundle id above are strings inside the disk image, which nothing signs. This is
+        // the check that can't be forged: the update has to be signed by the same team as the copy asking for
+        // it, with a valid Developer ID signature over every nested binary. It runs before anything is staged,
+        // and the quarantine flag is only dropped later because this passed.
+        try verifySignature(of: source)
 
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-staged-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)

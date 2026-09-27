@@ -38,10 +38,36 @@ struct RemoteProvider: AskProviding {
         }
     }
 
+    /// HTTPS anywhere, or plain HTTP only where the traffic cannot leave the machine or the local network.
+    static func isSafeEndpoint(_ url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "https": return true
+        case "http": break
+        default: return false
+        }
+        guard let host = url.host?.lowercased() else { return false }
+        if host == "localhost" || host == "::1" || host.hasSuffix(".local") { return true }
+        if host == "127.0.0.1" || host.hasPrefix("127.") { return true }
+        // The private ranges, for a model served from another machine on the same network.
+        if host.hasPrefix("10.") || host.hasPrefix("192.168.") { return true }
+        if host.hasPrefix("172.") {
+            let second = host.split(separator: ".").dropFirst().first.flatMap { Int($0) } ?? -1
+            return (16...31).contains(second)
+        }
+        return false
+    }
+
     func answer(_ request: AskRequest, run: @escaping @Sendable (AskCall) async -> String,
                 sending: @escaping @Sendable (String) -> Void) async throws -> String {
         guard let url = URL(string: endpoint), !endpoint.isEmpty else {
             throw Failure.notConfigured(L("No endpoint is set for %@.", kind.title))
+        }
+        // The request carries an API key and a question about this Mac's own traffic. Over http:// both are
+        // readable by anything on the path — including, with some irony, Flowlight. A loopback or private
+        // address is the exception worth keeping: that is how someone points this at a model running on their
+        // own machine or LAN, where there is no network to eavesdrop on.
+        guard Self.isSafeEndpoint(url) else {
+            throw Failure.notConfigured(L("%@ is not an https:// address. A key and your question would cross the network in the clear, so Flowlight won't send them.", endpoint))
         }
         guard !kind.needsKey || !apiKey.isEmpty else {
             throw Failure.notConfigured(L("%@ needs an API key. Add one in Settings — it goes to your login Keychain.", kind.title))

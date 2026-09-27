@@ -247,12 +247,34 @@ enum HeaderRedaction {
         "x-auth-token", "x-amz-security-token", "x-csrf-token", "x-xsrf-token", "openai-organization-key",
     ]
 
+    /// Words that make a header a credential whatever it is called. The named list above can only know the
+    /// headers someone thought of: `X-Access-Key`, `X-Client-Credential` and every vendor's own spelling went
+    /// straight into the database, under a promise that says API keys are redacted. Matching on the word
+    /// rather than the whole name is what closes that, at the cost of occasionally hiding a value that wasn't
+    /// secret — the right direction to err in for something written to disk.
+    static let secretWords = ["token", "secret", "api-key", "apikey", "key", "auth", "credential", "password",
+                              "passwd", "session", "signature", "sig", "nonce", "bearer"]
+
+    /// Headers whose name contains one of those words but which carry no secret — without these, ordinary
+    /// request metadata would be redacted and the recorded exchange would be harder to read for no gain.
+    static let notSecret: Set<String> = [
+        "keep-alive", "x-request-id", "x-correlation-id", "x-session-duration", "content-signature-algorithm",
+    ]
+
+    static func isSecret(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        if notSecret.contains(lower) { return false }
+        if secretNames.contains(lower) { return true }
+        // Word-ish boundaries, so `x-api-key` and `x_auth_token` match while `monkey` and `authority` don't.
+        let parts = lower.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == "." }).map(String.init)
+        if parts.contains(where: { secretWords.contains($0) }) { return true }
+        return secretWords.contains { $0.contains("-") && lower.contains($0) }
+    }
+
     static func redact(_ headers: [HTTPHeader]) -> [HTTPHeader] {
         headers.map { header in
             let name = header.name.lowercased()
-            guard secretNames.contains(name) || name.hasSuffix("-token") || name.hasSuffix("-secret") || name.contains("api-key") else {
-                return header
-            }
+            guard isSecret(name) else { return header }
             // Keep the scheme ("Bearer") so the kind of credential is still visible.
             let scheme = header.value.split(separator: " ").first.map(String.init)
             let keepScheme = name.hasSuffix("authorization") && header.value.contains(" ") ? scheme.map { $0 + " " } ?? "" : ""

@@ -13,7 +13,30 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.8.1</h2><time datetime="2026-09-26">September 26, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.8.2</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>An update is verified before it is installed.</strong> The checksum comparison treated
+            "no checksum published", "no line for this disk image" and "the file didn't parse" as a match —
+            every way of not knowing was read as knowing it was right. It now requires a published checksum and
+            refuses the download without one.</li>
+          <li><strong>And it has to be signed by us.</strong> The installer checked the downloaded app's
+            version and bundle identifier — strings inside the disk image that nothing signs — and then removed
+            the quarantine flag, which is what would have made macOS check the signature on first launch.
+            Updates are now validated against Apple's anchor and the Team ID of the running copy: an update has
+            to come from whoever signed the Flowlight asking for it.</li>
+          <li><strong>A model endpoint can't take your key over plain HTTP.</strong> A compatible hosted
+            endpoint sent an API key and a question about your own traffic to whatever address was typed.
+            <code>https://</code> is now required, except for loopback and private addresses, where the model is
+            running on your own machine or network.</li>
+          <li><strong>Credential headers are recognised by their words, not by a list.</strong> Redaction knew
+            the common names, so <code>X-Access-Key</code> or a vendor's own spelling was written to disk under
+            a promise that says API keys are never stored. Anything whose name carries key, token, secret,
+            auth, credential, session or signature is redacted now.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.8.2">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.8.1</h2><time datetime="2026-09-26">September 26, 2026</time></header>
         <ul>
           <li><strong>Flowlight stops working when you are not looking at it.</strong> It was rebuilding the live
             chart and the per-app list every second whenever a window existed — including when that window was
