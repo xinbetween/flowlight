@@ -56,7 +56,27 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.8.0</h2><time datetime="2026-09-26">September 26, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.8.1</h2><time datetime="2026-09-26">September 26, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Flowlight stops working when you are not looking at it.</strong> It was rebuilding the live
+            chart and the per-app list every second whenever a window existed — including when that window was
+            minimised, completely covered by another app, or parked on a Space you had left. The work was gated on
+            SwiftUI's <code>onAppear</code>, which only says a window exists, not that anyone can see it. It now
+            follows the window's occlusion state, so a hidden Flowlight builds nothing and the menu bar rates keep
+            updating as before.</li>
+          <li><strong>A blocking system call no longer ran once a second, forever.</strong> Settings read "launch
+            at login" in a property's default value, and that expression re-runs every time the settings pane is
+            constructed — which happened on every traffic update, whether or not Settings was open. Reading it
+            means a synchronous round trip to the system service manager on the main thread. It is now read once,
+            when the pane actually appears.</li>
+          <li>Together these are the difference between an idle Flowlight costing a measurable share of a CPU core
+            and costing almost nothing. If macOS had been listing Flowlight under "Using Significant Energy" while
+            it sat in the background, this is why.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.8.0</h2><time datetime="2026-09-26">September 26, 2026</time></header>
         <ul>
           <li><strong>Send an agent through the proxy in one click.</strong> HTTPS inspection can only read what
             goes through Flowlight, and a program reads its proxy settings once — when it starts. So an agent
@@ -714,7 +734,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.8.0 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.8.1 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
