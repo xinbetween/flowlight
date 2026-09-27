@@ -47,9 +47,9 @@ def counts():
 
 COUNTS = counts()
 YEAR = str(datetime.date.today().year)
-FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800'
-         '&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">')
+# The fonts are in site.css and served from this domain, so a page needs no third-party stylesheet and makes
+# no request to Google to render itself. See the @font-face block at the top of site/site.css.
+FONTS = ""
 
 GLOBE = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">'
          '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>')
@@ -115,8 +115,11 @@ def front_matter(text):
 
 
 def fill(text, ctx):
-    text = re.sub(r"\{\{current:(\w+)\}\}", lambda m: ' aria-current="page"' if m.group(1) == ctx["nav"] else "", text)
-    text = re.sub(r"\{\{t:([\w.]+)\}\}", lambda m: ctx["strings"][m.group(1)], text)
+    # Hyphens allowed in all three names, not just in {{link:}}. A nav called `threat-model` matched the link
+    # pattern and neither of these, so the header printed the placeholder itself — on all 51 pages, in every
+    # language, with the translated label sitting unreachable in the string table.
+    text = re.sub(r"\{\{current:([\w.-]+)\}\}", lambda m: ' aria-current="page"' if m.group(1) == ctx["nav"] else "", text)
+    text = re.sub(r"\{\{t:([\w.-]+)\}\}", lambda m: ctx["strings"][m.group(1)], text)
     # On its own line in the header, so a site in one language has no blank line where it would go.
     pick = ctx.get("langpicker", "")
     text = re.sub(r"\n[ \t]*\{\{langpicker\}\}", ("\n    " + pick) if pick else "", text)
@@ -124,7 +127,35 @@ def fill(text, ctx):
     for k, v in {"root": ctx["root"], "repo": REPO, "dmg": DMG, "version": VERSION, "year": YEAR, **COUNTS}.items():
         text = text.replace("{{%s}}" % k, v)
     # Screenshots keep their names across updates; a content hash makes caches fetch the new image.
-    return re.sub(r'(assets/screenshots/[\w-]+\.png)"', lambda m: f'{m.group(1)}?v={asset_hash(m.group(1))}"', text)
+    text = re.sub(r'(assets/screenshots/[\w-]+\.png)"', lambda m: f'{m.group(1)}?v={asset_hash(m.group(1))}"', text)
+    return stamp_dimensions(text)
+
+
+def png_size(path):
+    """Width and height from a PNG's IHDR, without a dependency."""
+    head = pathlib.Path(path).read_bytes()[16:24]
+    return int.from_bytes(head[:4], "big"), int.from_bytes(head[4:], "big")
+
+
+def stamp_dimensions(text):
+    """Set every screenshot's width and height from the file itself.
+
+    `.frame img` is `width: 100%; height: auto`, so these attributes do one job: give the browser the aspect
+    ratio to reserve space with before the image arrives. Hand-written, they rot the first time anyone
+    re-captures a screen at a different size, and then every image on the page jumps as it loads — which is
+    what they were added to prevent. Screenshots are captured at 2x, so the attributes are half the real size.
+    """
+    def one(match):
+        tag, name = match.group(0), match.group(1)
+        real = png_size(OUT / f"assets/screenshots/{name}")
+        if not real[0] or not real[1]:
+            return tag
+        for attr, value in (("width", real[0] // 2), ("height", real[1] // 2)):
+            tag = (re.sub(rf'\b{attr}="\d+"', f'{attr}="{value}"', tag) if f'{attr}="' in tag
+                   else tag.replace("<img", f'<img {attr}="{value}"', 1))
+        return tag
+
+    return re.sub(r'<img[^>]*assets/screenshots/([\w-]+\.png)[^>]*>', one, text)
 
 
 def last_changed(path):

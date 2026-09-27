@@ -23,7 +23,10 @@ concurrency:
 jobs:
   # What changed, so the expensive job can be skipped when nothing it covers did.
   changes:
-    runs-on: ubuntu-latest
+    # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
+    # been carrying an annotation saying so. A named image means the move happens when we make it, with a
+    # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
+    runs-on: ubuntu-24.04
     outputs:
       app: ${{ steps.what.outputs.app }}
     steps:
@@ -64,7 +67,10 @@ jobs:
   # Seconds of Python, so it runs on everything: the site is generated from Swift sources and project.yml as well
   # as from site/, and "docs/ is out of date" should be caught whichever of those moved.
   site:
-    runs-on: ubuntu-latest
+    # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
+    # been carrying an annotation saying so. A named image means the move happens when we make it, with a
+    # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
+    runs-on: ubuntu-24.04
     steps:
       # Full history: the sitemap dates each page from the commit that last touched its source, and a shallow
       # clone can only see one commit, so every page would look as though it changed today.
@@ -79,6 +85,13 @@ jobs:
             echo "::error::docs/ is out of date — run scripts/build_site.py and commit the result."
             exit 1
           }
+
+      # The build is a template renderer: it cannot fail on a placeholder that did not render, a link to a
+      # section that exists in English only, a font that came back from Google, or a roadmap still promising
+      # what you can already download. Each of those shipped once. check_site.py is where they go to stay
+      # fixed, and it runs on every branch — these are mistakes to catch before the release, not at the merge.
+      - name: Check the built site
+        run: python3 scripts/check_site.py --ci
 
       # The site is served from docs/ on main, and its Download button points at
       # releases/latest/download/Flowlight.dmg. So a main that announces a version before the release exists
@@ -99,6 +112,20 @@ jobs:
             echo "::error::release first, then merge the release branch into main so the download link works."
             exit 1
           fi
+
+          # The same claim lives in README's "Shipped:" list, where it is a ticked checkbox rather than a
+          # download button — so it went unnoticed that it credited a version nobody could install. Anything
+          # ticked has to exist.
+          bad=0
+          while read -r version; do
+            [ -z "$version" ] && continue
+            if [ "$version" != "$released" ] && \
+               [ "$(printf '%s\n%s\n' "$version" "$released" | sort -V | tail -1)" = "$version" ]; then
+              echo "::error file=README.md::README ticks ($version) as shipped, but the newest release is $released."
+              bad=1
+            fi
+          done <<< "$(sed -n '/^Shipped:/,/^Planned/p' README.md | grep -o '([0-9]\+\.[0-9]\+\.[0-9]\+)' | tr -d '()')"
+          [ "$bad" -eq 0 ] || exit 1
 
   test:
     needs: changes
