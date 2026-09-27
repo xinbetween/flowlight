@@ -20,7 +20,12 @@ struct SettingsView: View {
     @AppStorage(K.agentAway) private var agentAway = true
     @AppStorage(K.agentAwayMinutes) private var agentAwayMinutes = 15.0
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    // Read once the pane is on screen, never in the property's default expression: that
+    // expression re-runs every time this struct is constructed, and `Settings { }` is
+    // rebuilt whenever the App body is invalidated — which TrafficMonitor does every
+    // second. SMAppService.status is a synchronous XPC round trip to smd, so the default
+    // form put blocking IPC on the main thread at 1 Hz for the life of the process.
+    @State private var launchAtLogin = false
     @State private var loginItemError: String?
 
     var body: some View {
@@ -29,6 +34,7 @@ struct SettingsView: View {
                 LanguageRow()
                 Toggle(L("Launch at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
+                    .task { launchAtLogin = SMAppService.mainApp.status == .enabled }
                 if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
                 Toggle(isOn: $backgroundOnly) {
                     VStack(alignment: .leading, spacing: 2) {

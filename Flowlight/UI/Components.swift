@@ -92,6 +92,65 @@ enum TrafficColors {
 /// `setFrameAutosaveName` looks like the answer and quietly isn't: SwiftUI's `WindowGroup` owns the window's
 /// restoration, so the name is rejected and nothing is ever written. Watching the window and storing the frame
 /// is a few more lines and actually works.
+/// Reports whether the hosting window is actually on screen.
+///
+/// `onAppear`/`onDisappear` track the view's lifecycle, which says nothing about whether anyone can see the
+/// window: it stays "appeared" when the window is minimised, fully covered, or on another Space. AppKit answers
+/// the real question through `occlusionState`, and posts when it changes.
+struct WindowVisibilityReporter: NSViewRepresentable {
+    let report: (AnyObject, Bool) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(report: report) }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        // The view has no window until it is in the hierarchy.
+        DispatchQueue.main.async { context.coordinator.attach(to: view.window) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        // A window can be reassigned — moved between scenes, or restored after a close.
+        if view.window !== context.coordinator.window {
+            DispatchQueue.main.async { context.coordinator.attach(to: view.window) }
+        }
+    }
+
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    final class Coordinator {
+        private(set) weak var window: NSWindow?
+        private let report: (AnyObject, Bool) -> Void
+        private var observer: NSObjectProtocol?
+
+        init(report: @escaping (AnyObject, Bool) -> Void) { self.report = report }
+
+        func attach(to window: NSWindow?) {
+            guard window !== self.window else { return }
+            detach()
+            guard let window else { return }
+            self.window = window
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+            ) { [weak self, weak window] _ in
+                guard let self, let window else { return }
+                self.report(window, window.occlusionState.contains(.visible))
+            }
+            report(window, window.occlusionState.contains(.visible))
+        }
+
+        /// Report gone before dropping the window, or a close while occluded leaves it counted forever.
+        func detach() {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            if let window { report(window, false) }
+            window = nil
+        }
+    }
+}
+
 struct WindowSizer: NSViewRepresentable {
     private static let key = "window.mainFrame"
 
