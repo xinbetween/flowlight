@@ -70,6 +70,7 @@
 "Rules" = "规则";
 "Ask" = "提问";
 "Devices" = "设备";
+"Coverage" = "覆盖范围";
 "Inspect" = "检查";
 "Capture" = "捕获";
 "Traffic" = "流量";
@@ -181,6 +182,7 @@
 "The provider returned HTTP %lld. %@" = "提供方返回了 HTTP %lld。%@";
 "The provider's answer wasn't in a shape Flowlight could read." = "提供方的应答不是 Flowlight 能读取的格式。";
 "No endpoint is set for %@." = "尚未为 %@ 设置端点。";
+"%@ is not an https:// address. A key and your question would cross the network in the clear, so Flowlight won't send them." = "%@ 不是 https:// 地址。密钥和你的问题会以明文经过网络，因此 Flowlight 不会发送它们。";
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@ 需要 API 密钥。请在“设置”中添加 —— 它会保存到你的登录钥匙串。";
 "The on-device model isn't reached over HTTP." = "设备端模型不通过 HTTP 访问。";
 "I ran out of steps before I could answer that. Try asking something narrower." = "在能够作答之前步数已用尽。请把问题问得更具体一些。";
@@ -674,6 +676,30 @@
 "Help" = "帮助";
 "Error" = "错误";
 "OK" = "好";
+
+/* UI/CoverageView.swift */
+"Nothing recorded yet" = "尚未记录到任何内容";
+"Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "覆盖范围是根据 Flowlight 已经记录的流量算出来的。请让它再运行一会儿。";
+"%@ of traffic fully accounted for" = "%@ 的流量完全有据可查";
+"How much of this Mac is covered" = "这台 Mac 被覆盖了多少";
+"HTTPS inspection is on" = "HTTPS 检查已开启";
+"HTTPS inspection is off" = "HTTPS 检查已关闭";
+"What an app sent is readable only where the app was routed through the proxy. Anything else is counted and named, but its contents were never offered to Flowlight." = "应用发送的内容，只有在该应用经由代理服务器时才可读。其余的都有计数、也有名称，但其内容从未交给 Flowlight。";
+"Flowlight sees which connections were made and where to, but not what was inside them. Nothing is decrypted until you turn inspection on." = "Flowlight 能看到建立了哪些连接、连到哪里，但看不到其中的内容。在你开启检查之前，什么都不会被解密。";
+"What no engine can see" = "任何引擎都看不到的东西";
+"Traffic from before capture started, system services that content filters are never shown, apps that pin their certificates, QUIC the proxy is never offered, and an agent's local MCP server talking over a pipe. None of these appear anywhere in Flowlight, so they are absent from these figures too." = "捕获开始之前的流量、从不会交给内容过滤器的系统服务、固定证书的应用、从不会交给代理服务器的 QUIC，以及某个代理通过管道通信的本地 MCP 服务器。这些在 Flowlight 的任何地方都不会出现，因此也不在这些数字之内。";
+"Sampling with nettop, not the filter" = "正在用 nettop 采样，而不是过滤器";
+"The filter sees connections as they open" = "过滤器在连接建立时就看到它们";
+"Every eligible TCP and UDP flow is attributed as it opens, including connections too short for a sampler to catch." = "每一条符合条件的 TCP 和 UDP 流都在建立时归属到应用，包括短到采样器抓不到的连接。";
+"The filter isn't answering, so these figures come from the sampler: a connection that opens and closes between two readings is missing entirely, and no percentage below can show it." = "过滤器没有响应，因此以下数字来自采样器：在两次读取之间开启又关闭的连接会整条缺失，下面任何百分比都无法显示它。";
+"Byte counts are exact, but a connection that opens and closes between two readings is never recorded — a quick DNS lookup, a fast API call, a script that runs curl and exits. Only the filter sees those." = "字节数是精确的，但在两次读取之间开启又关闭的连接从不会被记录 —— 一次快速的 DNS 查询、一次很快的 API 调用、一个运行 curl 后就退出的脚本。这些只有过滤器能看到。";
+"By app" = "按应用";
+"Share of this app's bytes whose destination has a hostname rather than a bare address." = "该应用的字节中，目的地有主机名（而不是只有一个地址）的比例。";
+"%@ of its bytes went to addresses with no hostname" = "该应用 %@ 的字节发往了没有主机名的地址";
+"nothing of its traffic reached the proxy, so no contents were read" = "它的流量没有任何一部分到达代理服务器，因此没有读取到任何内容";
+"it is on the Never decrypted list, so its contents are deliberately not read" = "它在“从不解密”列表中，因此其内容是故意不去读取的";
+"short connections may be missing entirely" = "短连接可能整条缺失";
+"Seen as it happened, named, and readable." = "在发生时即被看到，有名称，内容也可读。";
 
 /* UI/DevicesView.swift */
 "USB" = "USB";

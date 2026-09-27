@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, ask, inspect, devices, capture
+    case live, agents, reports, alerts, rules, ask, inspect, devices, coverage, capture
     var id: String { rawValue }
     /// The part of the documentation that explains this screen.
     ///
@@ -18,6 +18,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "ask"
         case .inspect: return "inspection"
         case .devices: return "devices"
+        case .coverage: return "coverage"
         case .capture: return "capture"
         }
     }
@@ -34,6 +35,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "Ask"
         case .inspect: return "Inspect"
         case .devices: return "Devices"
+        case .coverage: return "Coverage"
         case .capture: return "Capture"
         }
     }
@@ -47,6 +49,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .rules: return L("Rules")
         case .ask: return L("Ask")
         case .devices: return L("Devices")
+        case .coverage: return L("Coverage")
         case .inspect: return L("Inspect")
         case .capture: return L("Capture")
         }
@@ -60,18 +63,25 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .rules: return "hand.raised"
         case .ask: return "text.bubble"
         case .devices: return "dot.radiowaves.left.and.right"
+        case .coverage: return "circle.dashed.inset.filled"
         case .inspect: return "lock.open.display"
         case .capture: return "antenna.radiowaves.left.and.right"
         }
     }
-    var shortcut: KeyEquivalent { KeyEquivalent(Character(String((Self.allCases.firstIndex(of: self) ?? 0) + 1))) }
+    /// ⌘1…⌘9 and then ⌘0, the way every browser numbers its tabs. Nil past the tenth: there is no eleventh
+    /// digit, and the arithmetic that assumed there was turned `10` into a `Character` and trapped the moment
+    /// a tenth screen was added.
+    var shortcut: KeyEquivalent? {
+        guard let index = Self.allCases.firstIndex(of: self), index < 10 else { return nil }
+        return KeyEquivalent(Character("\(index == 9 ? 0 : index + 1)"))
+    }
 
     var section: SidebarSection {
         switch self {
         case .live, .agents, .reports, .alerts: return .traffic
         case .ask, .inspect: return .investigate
         case .rules: return .control
-        case .devices, .capture: return .sources
+        case .devices, .coverage, .capture: return .sources
         }
     }
 }

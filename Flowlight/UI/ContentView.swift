@@ -69,6 +69,7 @@ struct ContentView: View {
                 case .inspect: InspectView()
                 case .ask: AskView()
                 case .devices: DevicesView()
+                case .coverage: CoverageView()
                 case .capture: CaptureView()
                 }
             }

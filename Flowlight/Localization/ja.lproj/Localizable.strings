@@ -70,6 +70,7 @@
 "Rules" = "ルール";
 "Ask" = "質問";
 "Devices" = "デバイス";
+"Coverage" = "カバー範囲";
 "Inspect" = "インスペクト";
 "Capture" = "キャプチャ";
 "Traffic" = "トラフィック";
@@ -181,6 +182,7 @@
 "The provider returned HTTP %lld. %@" = "プロバイダが HTTP %lld を返しました。%@";
 "The provider's answer wasn't in a shape Flowlight could read." = "プロバイダの応答は Flowlight が読み取れる形式ではありませんでした。";
 "No endpoint is set for %@." = "%@ のエンドポイントが設定されていません。";
+"%@ is not an https:// address. A key and your question would cross the network in the clear, so Flowlight won't send them." = "%@ は https:// のアドレスではありません。キーとあなたの質問が平文でネットワークを流れることになるため、Flowlight は送信しません。";
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@ には API キーが必要です。設定で追加してください。キーはログインキーチェーンに保存されます。";
 "The on-device model isn't reached over HTTP." = "オンデバイスモデルへは HTTP で接続しません。";
 "I ran out of steps before I could answer that. Try asking something narrower." = "回答にたどり着く前に手順の上限に達しました。もう少し範囲を絞って質問してください。";
@@ -674,6 +676,30 @@
 "Help" = "ヘルプ";
 "Error" = "エラー";
 "OK" = "OK";
+
+/* UI/CoverageView.swift */
+"Nothing recorded yet" = "まだ何も記録されていません";
+"Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "カバー範囲は、Flowlight がすでに記録したトラフィックから算出します。しばらく動かしたままにしてください。";
+"%@ of traffic fully accounted for" = "トラフィックの %@ を完全に把握";
+"How much of this Mac is covered" = "この Mac をどこまでカバーできているか";
+"HTTPS inspection is on" = "HTTPS インスペクションはオンです";
+"HTTPS inspection is off" = "HTTPS インスペクションはオフです";
+"What an app sent is readable only where the app was routed through the proxy. Anything else is counted and named, but its contents were never offered to Flowlight." = "アプリが送った内容を読めるのは、そのアプリがプロキシを経由した部分だけです。それ以外は数えられ、名前も付きますが、中身が Flowlight に渡されたことはありません。";
+"Flowlight sees which connections were made and where to, but not what was inside them. Nothing is decrypted until you turn inspection on." = "Flowlight には、どの接続がどこへ向けて行われたかは見えますが、その中身は見えません。インスペクションをオンにするまで、何も復号しません。";
+"What no engine can see" = "どのエンジンにも見えないもの";
+"Traffic from before capture started, system services that content filters are never shown, apps that pin their certificates, QUIC the proxy is never offered, and an agent's local MCP server talking over a pipe. None of these appear anywhere in Flowlight, so they are absent from these figures too." = "キャプチャを始める前のトラフィック、コンテンツフィルタに一度も見せられないシステムサービス、証明書をピン留めしているアプリ、プロキシに一度も渡されない QUIC、そしてパイプで通信するエージェントのローカル MCP サーバ。これらは Flowlight のどこにも現れないため、ここの数値にも入っていません。";
+"Sampling with nettop, not the filter" = "フィルタではなく nettop でサンプリング中";
+"The filter sees connections as they open" = "フィルタは接続が開かれた時点で見ています";
+"Every eligible TCP and UDP flow is attributed as it opens, including connections too short for a sampler to catch." = "対象となる TCP と UDP のフローはすべて、開かれた時点でアプリに結び付けられます。サンプラーでは捉えられないほど短い接続も含みます。";
+"The filter isn't answering, so these figures come from the sampler: a connection that opens and closes between two readings is missing entirely, and no percentage below can show it." = "フィルタが応答しないため、ここの数値はサンプラーによるものです。2 回の読み取りの間に開いて閉じる接続はまるごと欠け、下のどのパーセンテージにも現れません。";
+"Byte counts are exact, but a connection that opens and closes between two readings is never recorded — a quick DNS lookup, a fast API call, a script that runs curl and exits. Only the filter sees those." = "バイト数は正確ですが、2 回の読み取りの間に開いて閉じる接続は記録されません。短い DNS 照会、速い API 呼び出し、curl を実行して終了するスクリプトなどです。それが見えるのはフィルタだけです。";
+"By app" = "アプリ別";
+"Share of this app's bytes whose destination has a hostname rather than a bare address." = "このアプリのバイト数のうち、宛先にホスト名があった（単なるアドレスではなかった）割合です。";
+"%@ of its bytes went to addresses with no hostname" = "バイト数の %@ がホスト名のないアドレスに向かいました";
+"nothing of its traffic reached the proxy, so no contents were read" = "トラフィックがプロキシに届いていないため、中身は読めていません";
+"it is on the Never decrypted list, so its contents are deliberately not read" = "「復号しないホスト」に入っているため、中身はあえて読んでいません";
+"short connections may be missing entirely" = "短い接続がまるごと欠けている可能性があります";
+"Seen as it happened, named, and readable." = "発生した時点で見えており、名前も付き、中身も読めています。";
 
 /* UI/DevicesView.swift */
 "USB" = "USB";

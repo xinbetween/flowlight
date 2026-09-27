@@ -36,7 +36,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Sources</strong>
-          <a href="#capture">Capture</a><a href="#devices">Devices</a>
+          <a href="#capture">Capture</a><a href="#coverage">Coverage</a><a href="#devices">Devices</a>
         </div>
         <div class="toc-group">
           <strong>Settings and data</strong>
@@ -368,6 +368,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
         needs no filter and works alongside them.
         See <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">the developer guide</a> for how it's built.</p>
+
+      <h2 id="coverage">Coverage: what Flowlight can't account for</h2>
+      <p>Every other screen answers what happened. <strong>Coverage</strong> answers what you would not have been told, which is what
+        decides how much the other screens are worth. It asks three questions per app, because they fail independently.</p>
+      <p><strong>Was it seen?</strong> The Network Extension sees each flow as it opens. The nettop sampler reads counters once a
+        second, so a connection that opens and closes between two readings — a DNS lookup, a fast API call, a script that runs curl
+        and exits — is missing entirely. That is a gap no percentage can express, so it is stated in words rather than scored.</p>
+      <p><strong>Was it named?</strong> The share of that app's <em>bytes</em> that went to a destination with a hostname rather than
+        a bare address. Bytes, not connections: one unnamed connection carrying a gigabyte is a bigger hole than a hundred carrying a
+        kilobyte each, and counting connections ranks them the other way round.</p>
+      <p><strong>Was it readable?</strong> Whether HTTPS inspection decrypted anything of that app's traffic. Four answers, and only
+        one is a gap: it is being read; it never reached the proxy; it is on the never-inspect list, which is a choice you made; or
+        inspection is off, which is a setting rather than a per-app failure.</p>
+      <p><strong>What no engine sees at all</strong> is listed on the screen rather than left to this page: traffic from before
+        capture started, system services that content filters are never shown, apps that pin their certificates, QUIC the proxy is
+        never offered, and an agent's local MCP server talking to it over a pipe. None of that appears anywhere in Flowlight, so it is
+        absent from these figures too — a coverage number that counted only what it could see would be a reassurance rather than a
+        fact.</p>
 
       <h2 id="devices">Devices: Bluetooth, USB and external storage</h2>
       <p>A Mac sends and receives over more than TCP and UDP. The <strong>Devices</strong> screen covers the rest, and it is off
