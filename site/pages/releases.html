@@ -13,7 +13,22 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.9.0</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.9.1</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Inspect it from the row you found it on.</strong> Right-click an app or a destination in
+            Live, Reports or AI Agents and Inspect opens already looking at it, instead of changing screen and
+            retyping the name. The subject lands in the search field rather than a hidden filter, so you can
+            widen it, narrow it or clear it without going back.</li>
+          <li><strong>Updates work again.</strong> 0.8.2 made the updater refuse a download it couldn't verify —
+            correct, except that no release had ever published the checksum file it looks for. The checksums
+            were being written into the release notes, where nothing can read them. They are published as an
+            asset now, the file is attached to 0.9.0 as well so 0.8.2 can update, and a release that doesn't
+            carry it fails to publish rather than shipping something nobody can install.</li>
+        </ul>
+        <p><a href="https://github.com/{{repo}}/releases/tag/v0.9.1">Downloads and checksums →</a></p>
+      </section>
+      <section class="release">
+        <header><h2>0.9.0</h2><time datetime="2026-09-27">September 27, 2026</time></header>
         <ul>
           <li><strong>A new screen: Coverage.</strong> Every other screen says what happened. This one says what
             you would not have been told — per app, and separately for each of the three ways it can go wrong.

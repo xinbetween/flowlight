@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.1, macOS 15 or later.
 
  On this page
 
@@ -726,7 +726,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1286,8 +1286,24 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.9.0
+ 0.9.1
 September 27, 2026Latest
+
+ Inspect it from the row you found it on. Right-click an app or a destination in
+ Live, Reports or AI Agents and Inspect opens already looking at it, instead of changing screen and
+ retyping the name. The subject lands in the search field rather than a hidden filter, so you can
+ widen it, narrow it or clear it without going back.
+
+ Updates work again. 0.8.2 made the updater refuse a download it couldn't verify —
+ correct, except that no release had ever published the checksum file it looks for. The checksums
+ were being written into the release notes, where nothing can read them. They are published as an
+ asset now, the file is attached to 0.9.0 as well so 0.8.2 can update, and a release that doesn't
+ carry it fails to publish rather than shipping something nobody can install.
+
+ Downloads and checksums →
+
+ 0.9.0
+September 27, 2026
 
  A new screen: Coverage. Every other screen says what happened. This one says what
  you would not have been told — per app, and separately for each of the three ways it can go wrong.
