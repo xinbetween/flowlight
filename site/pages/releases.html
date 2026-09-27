@@ -13,7 +13,43 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.9.1</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.9.3</h2><time datetime="2026-09-27">September 27, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>A budget for HTTPS inspection.</strong> Recorded bodies are the most sensitive thing
+            Flowlight holds, and what protected them was a guess at which headers carry credentials. A guess is
+            the wrong shape for this: it can only know the headers somebody thought of, and when it is wrong it
+            writes a secret to disk under a promise that it wouldn't. Headers are now kept because they are on a
+            list, not discarded because they looked dangerous. The old behaviour is still offered — reading an
+            unfamiliar API means seeing headers nobody has allowed yet — and a third option keeps no header
+            values at all. Whatever you choose, header names and value lengths survive. Hiding the header
+            altogether would be the quieter lie: it would show a shorter request than the one that actually happened,
+            and nothing on screen would say so.</li>
+          <li><strong>Limits you set, rather than limits you hope for.</strong> Words of your own mark a header
+            as a credential whatever a vendor calls it. A daily per-app ceiling caps recorded bodies, and past
+            it the exchange is still recorded — time, host, path, status, headers — with only the bodies
+            dropped and a note saying why. Retention is a setting. And inspection now ends by itself after
+            eight hours, because "until somebody remembers" left the most sensitive mode in the app running
+            long after the reason for it had passed.</li>
+          <li><strong>Two sentences that were not true.</strong> The Advanced panel said recorded requests were
+            kept for three days and credential headers were never stored. The period had become a setting, and
+            what happens to a credential is that its length is stored instead. That line is now generated from
+            the settings, so it cannot drift from them again.</li>
+          <li><strong>An agent is no longer renamed by its own updates.</strong> Claude Code was appearing as
+            <code>2.1.260</code>, <code>2.1.267</code>, <code>2.1.283</code> — a new identity on every release,
+            each with its own allowlist, baselines and history. The executable's path names it correctly, but
+            that path cannot be read once a process has exited, and the fallback was the filename — which, for
+            an installer that keeps one file per release, is the version. A version is never accepted as an
+            identity now, the real name is remembered from the times the path was readable, and a one-time
+            repair merges the identities already recorded, adding their traffic together rather than letting
+            one overwrite another.</li>
+          <li><strong>Inspecting one app shows that app.</strong> "Inspect …'s Traffic" put the name in the
+            search field, and that search reads response bodies too — so asking for one agent's traffic returned
+            every page whose HTML happened to mention it. It scopes now, with a chip you can remove.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.9.1</h2><time datetime="2026-09-27">September 27, 2026</time></header>
         <ul>
           <li><strong>Inspect it from the row you found it on.</strong> Right-click an app or a destination in
             Live, Reports or AI Agents and Inspect opens already looking at it, instead of changing screen and
