@@ -448,6 +448,23 @@ Planned, in order:
   is encrypted, exactly which fields travel and whether any of them are headers — the same disclosure Flowlight
   demands of everything else it watches, applied to itself.
 
+- **1.0 — What an agent did besides the network.** Flowlight can say that Claude Code uploaded 40 MB to an
+  unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration
+  story: a file leaving is a read followed by a send, and only the send is visible today. This would record
+  what an agent's tools opened, wrote and spawned, and line it up against the connections that followed —
+  *read the private key, then talked to paste.example* as one finding rather than two screens.
+
+  It is not a resource monitor. CPU, memory and energy per process are Activity Monitor's job, done well and
+  built into the Mac already; the only number of that kind worth having here is "this agent was busy while you
+  were away", which belongs beside the away-activity alert rather than in a tab of its own.
+
+  **Two things gate it, both stated here rather than discovered later.** Per-process file attribution on macOS
+  needs the EndpointSecurity framework, whose entitlement Apple grants on request and review — not a
+  checkbox — and which only works from a system extension. And it would put far more sensitive material in
+  Flowlight's hands than network metadata ever did, so the inspection budget in 0.9.2 stops being a nicety and
+  becomes the thing that has to exist first. A tool that asks you not to monitor it has to deserve that twice
+  over when it can see every file you open.
+
 Later, no version yet:
 
 - **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification, agent

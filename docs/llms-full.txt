@@ -1044,6 +1044,8 @@ e.g. Wireshark
 
  What leaves the Mac, before it leaves 0.9.4Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.
 
+ What an agent did besides the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
+
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
 
  Privacy
