@@ -1034,6 +1034,18 @@ e.g. Wireshark
 
  Flowlight watches, explains and refuses today. This is the order the rest is being built in.
 
+ Coverage, stated rather than assumed 0.9.0Per app: watched by the extension, decrypted by the proxy, named only by DNS or SNI, or not covered at all — and why, with the fix where there is one. A tool that claims completeness is worth less than one you can trust about its own limits.
+
+ A threat model, written down 0.9.1What Flowlight defends against and what it doesn't, on one page: software misbehaving in the open, not software with root. Monitoring, not prevention, said beside every mention of blocking. Plus a security contact, and fonts served from here rather than from Google.
+
+ A budget for inspection 0.9.2Recorded bodies are the most sensitive thing Flowlight holds. A header allowlist instead of a denylist, patterns of your own, an option to keep no headers at all, per-app ceilings, and a session that expires by itself.
+
+ Show me what this rule would have done 0.9.3Replay the last day against a rule and list what it would have refused, before it refuses anything. The data is already there; it has only ever explained the past.
+
+ What leaves the Mac, before it leaves 0.9.4Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.
+
+ What an agent did besides the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
+
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
 
  Privacy
