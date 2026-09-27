@@ -808,6 +808,12 @@
 "Filter" = "篩選";
 "Showing the largest %@. Filter the report to see the rest." = "顯示最大的 %@。請篩選報告以查看其餘項目。";
 
+/* UI/InspectMenuItems.swift */
+"Inspect Traffic to %@" = "檢查前往 %@ 的流量";
+"Inspect %@'s Traffic" = "檢查 %@ 的流量";
+"Opens Inspect with the selected name in the search field. Only traffic that went through the proxy can be shown." = "開啟「檢查」，並把所選名稱填入搜尋欄。只能顯示經過代理伺服器的流量。";
+"Opens Inspect. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show." = "開啟「檢查」。HTTPS 檢查已關閉，尚未解密任何內容，因此不會有內容可顯示。";
+
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "尚未檢查任何內容";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "會遵循系統代理伺服器設定的 App — 瀏覽器、大多數 Mac App — 會自己出現在這裡。命令列代理不會：它們需要從受檢查的「終端機」取得環境變數。";

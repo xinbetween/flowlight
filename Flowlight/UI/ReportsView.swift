@@ -535,6 +535,8 @@ struct ReportsView: View {
                     Button(L("Show Only %@", node.appName ?? bundleID)) { var f = filter; f.bundleID = bundleID; filter = f }
                 }
                 Divider()
+                InspectMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
+                                 host: node.kind == .domain || node.kind == .ip ? node.title : nil)
                 FocusMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
                                host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
                 RuleMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,

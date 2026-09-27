@@ -144,6 +144,7 @@ struct AgentsView: View {
         .contextMenu(forSelectionType: AgentSummary.ID.self) { ids in
             if let id = ids.first {
                 Button(L("Show Traffic in Reports")) { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
+                InspectMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 Divider()
                 RuleMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))

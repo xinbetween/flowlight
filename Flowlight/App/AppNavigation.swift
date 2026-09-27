@@ -128,6 +128,7 @@ struct ReportRequest: Equatable {
 final class AppNavigation: ObservableObject {
     @Published var selection: SidebarItem = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
     @Published var reportRequest: ReportRequest?
+    @Published var inspectRequest: InspectRequest?
     @Published var ruleRequest: RuleRequest?
 
     /// Opens the Rules screen with this rule in the editor, unsaved. Writing a rule from a table row should land
@@ -141,4 +142,20 @@ final class AppNavigation: ObservableObject {
         reportRequest = ReportRequest(filter: filter, granularity: granularity, end: end)
         selection = .reports
     }
+
+    /// Open Inspect already looking at one app, host or address.
+    ///
+    /// Inspect searches one field across hosts, paths, app names, tools and bodies, so "show me this row's
+    /// traffic" is that field pre-filled rather than a second filtering mechanism. It also means the search
+    /// stays visible and editable: someone who arrives here can widen or narrow it without going back.
+    func showInspect(search: String) {
+        inspectRequest = InspectRequest(search: search)
+        selection = .inspect
+    }
+}
+
+/// A request from another screen to open Inspect scoped to something.
+struct InspectRequest: Equatable {
+    var search: String
+    var id = UUID()
 }

@@ -808,6 +808,12 @@
 "Filter" = "絞り込み";
 "Showing the largest %@. Filter the report to see the rest." = "上位の %@ を表示しています。残りを見るにはレポートを絞り込んでください。";
 
+/* UI/InspectMenuItems.swift */
+"Inspect Traffic to %@" = "%@ へのトラフィックをインスペクト";
+"Inspect %@'s Traffic" = "%@ のトラフィックをインスペクト";
+"Opens Inspect with the selected name in the search field. Only traffic that went through the proxy can be shown." = "選択した名前を検索フィールドに入れた状態で「インスペクト」を開きます。表示できるのはプロキシを通ったトラフィックだけです。";
+"Opens Inspect. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show." = "「インスペクト」を開きます。HTTPS インスペクションはオフで、まだ何も復号されていないため、表示されるものはありません。";
+
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "まだ何もインスペクトしていません";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "システムのプロキシ設定に従うアプリ（ブラウザや多くの Mac アプリ）は、自動的にここに現れます。コマンドラインのエージェントは現れません。インスペクト用のターミナルの環境変数が必要です。";

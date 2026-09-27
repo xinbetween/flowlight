@@ -808,6 +808,12 @@
 "Filter" = "Filtrar";
 "Showing the largest %@. Filter the report to see the rest." = "Se muestran los %@ mayores. Filtra el informe para ver el resto.";
 
+/* UI/InspectMenuItems.swift */
+"Inspect Traffic to %@" = "Inspeccionar el tráfico hacia %@";
+"Inspect %@'s Traffic" = "Inspeccionar el tráfico de %@";
+"Opens Inspect with the selected name in the search field. Only traffic that went through the proxy can be shown." = "Abre «Inspeccionar» con el nombre seleccionado en el campo de búsqueda. Solo puede mostrarse el tráfico que pasó por el proxy.";
+"Opens Inspect. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show." = "Abre «Inspeccionar». La inspección HTTPS está desactivada: aún no se ha descifrado nada, así que no habrá nada que mostrar.";
+
 /* UI/InspectView.swift */
 "Nothing inspected yet" = "Aún no se ha inspeccionado nada";
 "Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal." = "Las apps que siguen el proxy del sistema —navegadores y la mayoría de las apps del Mac— aparecen aquí por sí solas. Los agentes de línea de comandos no: necesitan el entorno de un Terminal inspeccionado.";
