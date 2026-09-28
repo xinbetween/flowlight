@@ -1404,3 +1404,21 @@
 "Edit" = "编辑";
 "On" = "开启";
 "Settings" = "设置";
+
+/* 0.9.6 MCP domains */
+"in a config file" = "在配置文件中";
+"called from this Mac" = "从这台 Mac 调用";
+"declared to the provider" = "已向提供方声明";
+"contacted by the server" = "由服务器连接";
+"Domains (%lld)" = "域名（%lld）";
+"Rules are recorded but not enforced in this capture mode." = "在此捕获模式下，规则只会被记录，不会执行。";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "这个代理还没有哪个 MCP 服务器有域名：从不接触网络的本地服务器没有域名，远程服务器则在被配置或被调用之后出现。";
+"Block for %@" = "仅对 %@ 阻止";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "对 %@ 以及它启动的工具拒绝这个主机。这台 Mac 上的其他一切都不受影响。";
+"Block everywhere" = "对所有应用阻止";
+"Refuse this host for every app on this Mac." = "对这台 Mac 上的每个应用拒绝这个主机。";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "连接它的是提供方，不是你的 Mac；这里的规则够不到它。";
+"Block %@ (MCP)" = "阻止 %@（MCP）";
+"Block %@ for %@ (MCP)" = "阻止 %2$@ 访问 %1$@（MCP）";
+
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "过滤器 %@ 版已经安装，但在你重新启动 Mac 之前，macOS 仍然保留着上一个版本。重新启动即可完成更新。在那之前，Flowlight 会用采样器继续捕获。";

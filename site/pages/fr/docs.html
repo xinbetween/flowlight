@@ -134,6 +134,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>L’attribution se fait par processus&nbsp;: Flowlight ne peut pas dire quel appel d’outil, au sein d’un serveur MCP de longue durée, a ouvert une connexion.</p>
 
+      <p><strong>Tous les domaines que joignent ses serveurs MCP.</strong> Un serveur MCP touche le réseau de quatre façons différentes, et
+        Flowlight apprend chacune d’elles ailleurs&nbsp;: une URL dans un fichier de configuration, un point de terminaison auquel le proxy
+        d’inspection a vu ce Mac parler JSON-RPC, un connecteur que l’agent a déclaré à son fournisseur de modèle dans le corps de la requête, ou de
+        simples appels qu’un processus serveur local a passés lui-même. Sous <strong>Serveurs MCP</strong>, dans le détail d’un agent, ils sont
+        listés comme un seul ensemble, chaque domaine étiqueté selon celle des quatre d’où il est connu. Un domaine qui porte plusieurs étiquettes
+        est un fait plus fort qu’un domaine qui n’en porte qu’une&nbsp;: déclaré dans un fichier de configuration <em>et</em> réellement contacté en
+        dit plus que l’un ou l’autre seul, tandis qu’un domaine seulement configuré n’a jamais été joint, et qu’un domaine seulement observé n’était
+        écrit nulle part où vous auriez pu le lire.</p>
+      <p>Chaque domaine propose deux refus&nbsp;: <strong>pour cet agent</strong>, ce qui couvre l’agent et les outils qu’il lance, ou
+        <strong>partout</strong>, ce qui couvre toutes les apps du Mac. Les deux écrivent une règle ordinaire, si bien que le flux des violations
+        les signale et que l’éditeur de règles les explique — et, parce que ce sont des règles ordinaires, la simulation de l’éditeur vous dira ce
+        que l’une d’elles aurait refusé avant que vous ne l’activiez.</p>
+      <p>Un type de domaine n’a pas de boutons. Un connecteur que le fournisseur de modèle joint de lui-même — déclaré dans le corps de la requête
+        et contacté du côté du fournisseur — ne touche jamais ce Mac, si bien qu’aucune règle d’ici ne peut l’atteindre. La ligne le dit, plutôt que
+        d’offrir un refus qui ne ferait discrètement rien. Si ce même hôte est aussi configuré en local ou contacté depuis ce Mac, les refus
+        apparaissent, parce qu’il y a alors quelque chose à refuser. Un serveur local qui ne parle que par un tube n’apporte aucun domaine, pour la
+        même raison qu’il n’apparaît nulle part ailleurs&nbsp;: ce n’est pas du trafic réseau.</p>
+
       <h2 id="agent-configuration">Configuration des agents&nbsp;: ce que Flowlight lit sur votre Mac</h2>
       <p>Les capacités d’un agent sont écrites dans des fichiers&nbsp;: les skills qu’il peut charger, les sous-agents et les commandes slash qu’il définit, les
         <strong>hooks</strong> qui exécutent des commandes shell sur événement, les règles de permission qu’on lui a données, et les serveurs MCP qu’il démarre. Flowlight

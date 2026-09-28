@@ -542,6 +542,16 @@ struct AgentDetail: View {
                                 ForEach(unusedServers, id: \.server.name) { entry in
                                     ConfiguredServerRow(server: entry.server, scope: entry.scope)
                                 }
+                                // After the servers, because the question "what can I stop it reaching?" only
+                                // arises once you have seen what it is.
+                                if !servers.isEmpty || !unusedServers.isEmpty {
+                                    Divider().padding(.vertical, 4)
+                                    MCPDomainsSection(
+                                        agent: agent,
+                                        entries: MCPDomains.collect(seen: servers,
+                                                                    configured: unusedServers.map(\.server),
+                                                                    destinations: agent.otherDestinations))
+                                }
                             }
                             .padding(.trailing, 6)
                         }

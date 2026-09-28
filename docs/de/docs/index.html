@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Dokumentation</p>
     <h1>Flowlight benutzen</h1>
-    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.5, macOS 15 oder neuer.</p>
+    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.6, macOS 15 oder neuer.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Auf dieser Seite">
@@ -187,6 +187,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         werden über den Hostnamen in ihrer URL erkannt und nicht konfigurierte Server über bekannte Paketnamen wie
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>Die Zuordnung ist prozessgenau: Welcher einzelne Tool-Aufruf innerhalb eines lange laufenden MCP-Servers eine Verbindung geöffnet hat, kann Flowlight nicht sagen.</p>
+
+      <p><strong>Jede Domain, die seine MCP-Server erreichen.</strong> Ein MCP-Server berührt das Netzwerk auf vier verschiedene Arten, und
+        Flowlight erfährt jede davon woanders: eine URL in einer Konfigurationsdatei, ein Endpunkt, an dem der Inspektions-Proxy diesen Mac JSON-RPC
+        sprechen sah, ein Connector, den der Agent im Body der Anfrage seinem Modellanbieter gemeldet hat, oder ganz gewöhnliche Aufrufe, die ein
+        lokaler Serverprozess selbst gemacht hat. Unter <strong>MCP-Server</strong> im Detail eines Agenten stehen sie als eine einzige Menge, jede
+        Domain beschriftet damit, aus welcher der vier Quellen sie bekannt ist. Eine Domain mit mehreren Beschriftungen ist eine stärkere Aussage
+        als eine mit nur einer: in einer Konfigurationsdatei deklariert <em>und</em> tatsächlich kontaktiert sagt mehr als jedes für sich, während
+        eine nur konfigurierte Domain nie erreicht wurde und eine nur beobachtete nirgends aufgeschrieben stand, wo du sie hättest lesen können.</p>
+      <p>Jede Domain bietet zwei Verweigerungen an: <strong>für diesen Agenten</strong>, was den Agenten und die von ihm gestarteten Tools
+        abdeckt, oder <strong>überall</strong>, was jede App auf dem Mac abdeckt. Beide schreiben eine ganz gewöhnliche Regel, sodass der
+        Verstoß-Verlauf sie meldet und der Regeleditor sie erklärt – und weil es gewöhnliche Regeln sind, sagt dir die Simulation im Editor, was
+        eine davon verweigert hätte, bevor du sie einschaltest.</p>
+      <p>Eine Art von Domain hat keine Knöpfe. Ein Connector, den der Modellanbieter von sich aus erreicht – im Body der Anfrage deklariert und
+        von der Seite des Anbieters aus kontaktiert –, berührt diesen Mac überhaupt nicht, also kann keine Regel hier ihn erreichen. Die Zeile sagt
+        das, statt eine Verweigerung anzubieten, die still und leise nichts täte. Ist derselbe Host auch lokal konfiguriert oder von diesem Mac aus
+        kontaktiert worden, erscheinen die Verweigerungen, denn dann gibt es etwas zu verweigern. Ein lokaler Server, der nur über eine Pipe
+        spricht, steuert gar keine Domain bei, aus demselben Grund, aus dem er sonst nirgends auftaucht: Das ist kein Netzwerkverkehr.</p>
 
       <h2 id="agent-configuration">Agenten-Konfiguration: was Flowlight auf deinem Mac liest</h2>
       <p>Was ein Agent kann, steht in Dateien: die Skills, die er laden kann, die Subagenten und Slash-Befehle, die er definiert, die
@@ -705,7 +722,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.5 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.9.6 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

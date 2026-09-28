@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">문서</p>
     <h1>Flowlight 사용하기</h1>
-    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.9.5, macOS 15 이상.</p>
+    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.9.6, macOS 15 이상.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="이 페이지 안에서">
@@ -186,6 +186,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         맞춰 알아냅니다. 원격 MCP 서버는 URL의 호스트 이름으로, 설정에 없는 서버는
         <code>@modelcontextprotocol/server-github</code>처럼 알아볼 수 있는 패키지 이름으로 맞춥니다.</p>
       <p>귀속은 프로세스 단위입니다. 오래 떠 있는 MCP 서버 안에서 어떤 개별 도구 호출이 연결을 열었는지는 Flowlight가 알 수 없습니다.</p>
+
+      <p><strong>MCP 서버가 닿는 모든 도메인.</strong> MCP 서버는 네 가지 방식으로 네트워크에 닿고, Flowlight는 그 각각을 서로 다른
+        곳에서 알아냅니다. 설정 파일에 적힌 URL, 검사 프록시가 이 Mac이 JSON-RPC로 말하는 것을 지켜본 엔드포인트, 에이전트가 요청
+        본문에서 자기 모델 제공업체에 선언한 커넥터, 그리고 로컬 서버 프로세스가 스스로 낸 평범한 호출입니다. 에이전트 상세의
+        <strong>MCP 서버</strong>에 이들이 한 묶음으로 나열되고, 도메인마다 넷 중 어느 쪽에서 알게 된 것인지 표시가 붙습니다. 표시를
+        여러 개 단 도메인은 하나만 단 도메인보다 더 강한 사실입니다. 설정 파일에 적혀 있고 <em>게다가</em> 실제로 연결까지 되었다는
+        것은 둘 중 하나보다 더 많은 것을 말해 줍니다. 설정만 되어 있는 도메인은 한 번도 닿은 적이 없고, 관찰만 된 도메인은 미리
+        읽어 볼 수 있는 어디에도 적혀 있지 않았습니다.</p>
+      <p>도메인마다 거부하는 방법이 두 가지입니다. <strong>이 에이전트에 대해</strong>는 에이전트와 그것이 시작하는 도구를 덮고,
+        <strong>어디서나</strong>는 이 Mac의 모든 앱을 덮습니다. 둘 다 평범한 규칙을 씁니다. 그래서 <strong>위반 기록</strong>이 그것을
+        보고하고 규칙 편집기가 그것을 설명하며, 평범한 규칙이기 때문에 편집기의 시뮬레이션이 규칙을 켜기 전에 그것이 무엇을 거부했을지
+        알려 줍니다.</p>
+      <p>버튼이 붙지 않는 도메인이 한 종류 있습니다. 모델 제공업체가 스스로 닿는 커넥터입니다(요청 본문에 선언되고 제공업체 쪽에서
+        연결됩니다). 그런 커넥터는 이 Mac을 전혀 거치지 않으므로 여기서 만든 어떤 규칙도 그것에 닿을 수 없습니다. 그래서 그 행은
+        아무 일도 하지 않을 거부를 조용히 내미는 대신 그렇다고 말합니다. 같은 호스트가 이 Mac에 설정되어 있거나 이 Mac에서 연결된
+        적도 있다면 거부 버튼이 나타납니다. 그때는 거부할 것이 있기 때문입니다. 파이프로만 이야기하는 로컬 서버는 도메인을 하나도
+        내놓지 않습니다. 다른 어디에도 나타나지 않는 것과 같은 이유로, 그것은 네트워크 트래픽이 아니기 때문입니다.</p>
 
       <h2 id="agent-configuration">에이전트 설정: Flowlight가 Mac에서 읽는 것</h2>
       <p>에이전트가 할 수 있는 일은 파일에 적혀 있습니다. 불러올 수 있는 스킬, 스스로 정의한 서브에이전트와 슬래시 명령,
@@ -698,7 +715,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.9.5 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.9.6 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>

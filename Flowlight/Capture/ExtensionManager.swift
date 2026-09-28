@@ -32,7 +32,22 @@ final class ExtensionManager: NSObject, ObservableObject {
         var appVersion: String = ""
         /// Whether a re-activation was started to put the two back in step.
         var repairing = false
+        /// Older copies macOS is holding until the Mac restarts.
+        ///
+        /// This is the state that looked for a long time like a version bug and is not one. After several
+        /// updates, `systemextensionsctl` shows the matching build `activated enabled` and the previous ones
+        /// `terminated waiting to uninstall on reboot`. The version check is then perfectly correct — nothing is
+        /// stale, so nothing is repaired — while macOS, which runs one content filter at a time, has not started
+        /// the new one. The app redials an extension that cannot answer until a restart, six times, and falls
+        /// back to the sampler without ever saying why.
+        var awaitingReboot: [String] = []
         var installedDescription: String { installed.isEmpty ? L("unknown") : installed.joined(separator: ", ") }
+        /// True when the build that matches this app is installed and enabled, but older ones are still queued
+        /// for removal — which is the case a restart fixes and nothing else does.
+        var needsRestart: Bool {
+            !awaitingReboot.isEmpty && !appVersion.isEmpty
+                && installed.contains { ExtensionVersion.compare($0, appVersion) == .orderedSame }
+        }
     }
 
     @Published private(set) var state: State = .unknown
@@ -176,10 +191,14 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
     nonisolated func request(_ request: OSSystemExtensionRequest, foundProperties properties: [OSSystemExtensionProperties]) {
         // Only the enabled copies count. A disabled one holds nothing and replacing it would quietly switch the
         // filter back on for someone who turned it off on purpose.
-        let installed = properties.filter(\.isEnabled).map(\.bundleShortVersion)
+        let installed = properties.filter { $0.isEnabled && !$0.isUninstalling }.map(\.bundleShortVersion)
+        // Copies macOS has terminated and is holding until a restart. They still occupy the one content-filter
+        // slot, so the enabled build is installed without being the one running.
+        let awaitingReboot = properties.filter(\.isUninstalling).map(\.bundleShortVersion)
         Task { @MainActor in
             let appVersion = Self.appVersion
-            self.versionCheckResult = VersionCheck(installed: installed, appVersion: appVersion)
+            self.versionCheckResult = VersionCheck(installed: installed, appVersion: appVersion,
+                                                   awaitingReboot: awaitingReboot)
             guard ExtensionVersion.isStale(installed: installed, appVersion: appVersion) else { return }
             self.versionCheckResult.repairing = true
             self.state = .installing

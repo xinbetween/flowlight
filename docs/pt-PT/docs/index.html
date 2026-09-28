@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentação</p>
     <h1>Usar o Flowlight</h1>
-    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.9.5, macOS 15 ou posterior.</p>
+    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.9.6, macOS 15 ou posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Nesta página">
@@ -187,6 +187,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         são identificados pelo nome de anfitrião no seu URL, e os servidores não configurados por nomes de pacote reconhecíveis, como
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>A atribuição é por processo: o Flowlight não consegue dizer qual foi a chamada de ferramenta individual que abriu uma ligação dentro de um servidor MCP de longa duração.</p>
+
+      <p><strong>Todos os domínios que os seus servidores MCP alcançam.</strong> Um servidor MCP toca a rede de quatro maneiras diferentes, e o
+        Flowlight aprende cada uma delas noutro sítio: um URL num ficheiro de configuração, um endpoint que o proxy de inspeção viu este Mac a
+        falar JSON-RPC, um conector que o agente declarou ao seu fornecedor de modelos no corpo do pedido, ou as chamadas vulgares que um
+        processo de servidor local fez por si próprio. Em <strong>Servidores MCP</strong>, no detalhe de um agente, aparecem listados como um
+        só conjunto, cada domínio etiquetado com aquela das quatro por onde é conhecido. Um domínio que traz várias etiquetas é um facto mais
+        forte do que um que traz só uma: declarado num ficheiro de configuração <em>e</em> efetivamente contactado diz mais do que qualquer uma
+        das duas coisas sozinha, ao passo que um domínio apenas configurado nunca foi alcançado, e um domínio apenas observado nunca ficou
+        escrito em lado nenhum onde o pudesse ter lido.</p>
+      <p>Cada domínio oferece duas recusas: <strong>para este agente</strong>, que abrange o agente e as ferramentas que ele inicia, ou
+        <strong>em todo o lado</strong>, que abrange todas as apps do Mac. Ambas escrevem uma regra como qualquer outra, por isso o
+        <strong>fluxo de violações</strong> comunica-as e o editor de regras explica-as — e, por serem regras como as outras, a simulação no
+        editor dir-lhe-á o que uma delas teria recusado antes de a ativar.</p>
+      <p>Há um tipo de domínio que não tem botões. Um conector que o fornecedor de modelos alcança por si próprio — declarado no corpo do
+        pedido e contactado do lado do fornecedor — nunca chega a tocar neste Mac, por isso nenhuma regra daqui lhe chega. A linha di-lo, em
+        vez de oferecer uma recusa que, em silêncio, não faria nada. Se esse mesmo anfitrião também estiver configurado localmente ou tiver
+        sido contactado a partir deste Mac, as recusas aparecem, porque aí já há alguma coisa a recusar. Um servidor local que só fala por um
+        pipe não contribui com nenhum domínio, pela mesma razão por que não aparece em mais lado nenhum: isso não é tráfego de rede.</p>
 
       <h2 id="agent-configuration">Configuração dos agentes: o que o Flowlight lê no seu Mac</h2>
       <p>As capacidades de um agente estão escritas em ficheiros: as skills que pode carregar, os subagentes e os comandos de barra que define, os
@@ -700,7 +718,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quem contribui para o Flowlight. O Flowlight é software livre, publicado sob a <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versão 0.9.5 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
+      <span>Versão 0.9.6 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
     </div>
   </div>
 </footer>

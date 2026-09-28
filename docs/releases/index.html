@@ -55,7 +55,40 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.9.5</h2><time datetime="2026-09-28">September 28, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.9.6</h2><time datetime="2026-09-28">September 28, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Every domain an MCP server reaches.</strong> An MCP server touches the network four
+            different ways, and Flowlight already learned each of them somewhere different: a URL in a config
+            file, an endpoint the proxy watched this Mac speak JSON-RPC to, a connector declared to the model
+            provider in the request body, and ordinary calls a local server process made itself. All four were
+            being collected; none was offered as something you could act on. They are one list now, under
+            <strong>MCP servers</strong> in an agent's detail, each domain labelled with which of the four it is
+            known from — and a domain carrying several labels is a stronger fact than one carrying a single
+            label, since configured <em>and</em> contacted says more than either alone.</li>
+          <li><strong>Two ways to refuse each one.</strong> For that agent and the tools it starts, or for every
+            app on the Mac — different decisions, and the difference is invisible once a rule exists, so both are
+            offered where the choice is made rather than one being discovered later in the rule editor. Both
+            write ordinary rules, so the violations feed reports them and the simulation from 0.9.4 will say what
+            one would have refused before it refuses anything.</li>
+          <li><strong>The extension stops asking you to wait for something that cannot happen.</strong> Reported
+            three times as "the filter stops working after an update", and each time the version check was
+            examined and found correct. It was. After several updates macOS holds the superseded copies until
+            you restart — <code>activated enabled</code> for the build that matches the app, <code>terminated
+            waiting to uninstall on reboot</code> for the rest — and because it runs one content filter at a
+            time, the matching build is installed without being the one running. Nothing is stale, so nothing is
+            repaired, and the app redialled an extension that could not answer until a restart, six times, then
+            fell back to the sampler without naming the one thing that fixes it. It now recognises that state
+            and says to restart.</li>
+          <li><strong>Except where a rule could not reach.</strong> A connector the provider reaches on its own
+            never touches this Mac, so that row explains why instead of offering a refusal that would quietly do
+            nothing. The moment the same host is also configured locally or contacted from this Mac, the buttons
+            appear. A local server that only ever speaks over a pipe contributes no domain at all, for the same
+            reason it appears nowhere else: that is not network traffic.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.9.5</h2><time datetime="2026-09-28">September 28, 2026</time></header>
         <ul>
           <li><strong>What leaves the Mac, before it leaves.</strong> Flowlight asks every app on your Mac to
             say what it sends and where. The export is the one place Flowlight itself sends anything
@@ -873,7 +906,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.5 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.9.6 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

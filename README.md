@@ -426,6 +426,7 @@ Shipped:
 - [x] A budget for HTTPS inspection: header allowlist, per-app ceilings, a session that expires (0.9.3)
 - [x] Show me what this rule would have done: replay recorded traffic against a rule before it refuses anything (0.9.4)
 - [x] What leaves the Mac, before it leaves: the export discloses its destination, transport and exact fields (0.9.5)
+- [x] Every domain an MCP server reaches, with one-click refusal for the agent or the whole Mac (0.9.6)
 - [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
   no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see

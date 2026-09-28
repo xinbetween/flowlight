@@ -1404,3 +1404,22 @@
 "%lld fields, in cleartext to %@." = "%lld Felder, im Klartext an %@.";
 "Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nichts, was die HTTPS-Inspektion aufzeichnet, kann in einen Export gelangen: keine Header von Anfragen oder Antworten, keine Bodys, keine Tool-Aufrufe, kein entschlüsselter Austausch. Manche der oben aufgeführten Felder reisen im Umschlag des Formats selbst statt als benannter Schlüssel; das ändert, wo sie in Ihrem Collector auftauchen, nicht ob sie hinausgehen.";
 "Flowlight will ask again if any of this changes." = "Flowlight fragt erneut, wenn sich hiervon etwas ändert.";
+
+
+/* 0.9.6 MCP domains */
+"in a config file" = "in einer Konfigdatei";
+"called from this Mac" = "von diesem Mac aufgerufen";
+"declared to the provider" = "dem Anbieter gemeldet";
+"contacted by the server" = "vom Server kontaktiert";
+"Domains (%lld)" = "Domains (%lld)";
+"Rules are recorded but not enforced in this capture mode." = "Regeln werden in diesem Erfassungsmodus aufgezeichnet, aber nicht durchgesetzt.";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "Noch hat kein MCP-Server dieses Agenten eine Domain – lokale Server, die nie ins Netzwerk gehen, haben keine, und ein entfernter erscheint, sobald er konfiguriert oder aufgerufen wird.";
+"Block for %@" = "Für %@ blockieren";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "Diesen Host für %@ und die von ihm gestarteten Tools verweigern. Alles andere auf diesem Mac bleibt unberührt.";
+"Block everywhere" = "Überall blockieren";
+"Refuse this host for every app on this Mac." = "Diesen Host für jede App auf diesem Mac verweigern.";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "Der Anbieter verbindet sich damit, nicht Ihr Mac – eine Regel hier kann es nicht erreichen.";
+"Block %@ (MCP)" = "%@ blockieren (MCP)";
+"Block %@ for %@ (MCP)" = "%@ für %@ blockieren (MCP)";
+
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "Version %@ des Filters ist installiert, aber macOS hält die vorherige Version noch fest, bis Sie den Mac neu starten. Starten Sie neu, um das Update abzuschließen. Bis dahin erfasst Flowlight mit dem Sampler.";
