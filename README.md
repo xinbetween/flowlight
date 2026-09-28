@@ -426,19 +426,13 @@ Shipped:
 - [x] A budget for HTTPS inspection: header allowlist, per-app ceilings, a session that expires (0.9.3)
 - [x] Show me what this rule would have done: replay recorded traffic against a rule before it refuses anything (0.9.4)
 - [x] What leaves the Mac, before it leaves: the export discloses its destination, transport and exact fields (0.9.5)
+- [x] Every domain an MCP server reaches, with one-click refusal for the agent or the whole Mac (0.9.6)
 - [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
   no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
-
-- **0.9.6 — Every domain an MCP server reaches.** An MCP server touches the network four different ways, and
-  each is learned somewhere else: a URL in a config file, an endpoint the inspection proxy watched, a connector
-  declared to the model provider in the request body, or calls a local server process made itself. The AI Agents
-  screen lists them as one set, says which of the four it knows each domain from, and offers to refuse it for
-  that agent or for the whole Mac. The exception is a connector the provider reaches on its own: that traffic
-  never touches this Mac, so the row explains why instead of offering a button that would do nothing.
 
 - **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
   unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration

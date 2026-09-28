@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.6, macOS 15 or later.
 
  On this page
 
@@ -824,7 +824,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1163,8 +1163,6 @@ e.g. Wireshark
  Flowlight watches, explains and refuses today — monitoring rather than prevention, as the
  threat model sets out. This is the order the rest is being built in.
 
- Every domain an MCP server reaches 0.9.6An MCP server touches the network four different ways, and each is learned somewhere else: a URL in a config file, an endpoint the proxy watched, a connector declared to the model provider, or calls a local server made itself. The AI Agents screen will list them as one set, say which of the four it knows each from, and offer to refuse a domain for that agent or for the whole Mac — except the ones the provider reaches on its own, which no rule here can touch, and those rows will say so instead of offering a button that does nothing.
-
  What an agent did off the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
 
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
@@ -1383,8 +1381,32 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.9.5
+ 0.9.6
 September 28, 2026Latest
+
+ Every domain an MCP server reaches. An MCP server touches the network four
+ different ways, and Flowlight already learned each of them somewhere different: a URL in a config
+ file, an endpoint the proxy watched this Mac speak JSON-RPC to, a connector declared to the model
+ provider in the request body, and ordinary calls a local server process made itself. All four were
+ being collected; none was offered as something you could act on. They are one list now, under
+ MCP servers in an agent's detail, each domain labelled with which of the four it is
+ known from — and a domain carrying several labels is a stronger fact than one carrying a single
+ label, since configured and contacted says more than either alone.
+
+ Two ways to refuse each one. For that agent and the tools it starts, or for every
+ app on the Mac — different decisions, and the difference is invisible once a rule exists, so both are
+ offered where the choice is made rather than one being discovered later in the rule editor. Both
+ write ordinary rules, so the violations feed reports them and the simulation from 0.9.4 will say what
+ one would have refused before it refuses anything.
+
+ Except where a rule could not reach. A connector the provider reaches on its own
+ never touches this Mac, so that row explains why instead of offering a refusal that would quietly do
+ nothing. The moment the same host is also configured locally or contacted from this Mac, the buttons
+ appear. A local server that only ever speaks over a pipe contributes no domain at all, for the same
+ reason it appears nowhere else: that is not network traffic.
+
+ 0.9.5
+September 28, 2026
 
  What leaves the Mac, before it leaves. Flowlight asks every app on your Mac to
  say what it sends and where. The export is the one place Flowlight itself sends anything

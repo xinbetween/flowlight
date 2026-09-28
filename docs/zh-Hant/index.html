@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hant", "name": "Flowlight", "description": "Flowlight 是開放原始碼的 macOS App 層級網路監控工具，看得見每個 App 的連線，也看得清 AI 代理、工具與 MCP 伺服器。", "url": "https://flowlight.xinbetween.com/zh-Hant/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.5", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hant/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hant", "name": "Flowlight", "description": "Flowlight 是開放原始碼的 macOS App 層級網路監控工具，看得見每個 App 的連線，也看得清 AI 代理、工具與 MCP 伺服器。", "url": "https://flowlight.xinbetween.com/zh-Hant/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.6", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hant/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳至內容</a>
@@ -75,7 +75,7 @@
             在 GitHub 上加星
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">拷貝</button></p>
-          <p class="meta-row"><span>v0.9.5</span><span>macOS 15+</span><span>通用架構</span><span>GPL-3.0</span><span>無遙測</span></p>
+          <p class="meta-row"><span>v0.9.6</span><span>macOS 15+</span><span>通用架構</span><span>GPL-3.0</span><span>無遙測</span></p>
         </div>
       </div>
 
@@ -402,7 +402,6 @@
           這是監控，不是防護。其餘的部分會按這個順序做下去。</p>
       </div>
       <div class="privacy">
-        <div><strong>MCP 伺服器連到的每一個網域 <span class="tag">0.9.6</span></strong><p>一台 MCP 伺服器接觸網路有四種不同的方式，每一種都是從不同的地方得知的：設定檔裡的一個 URL、代理伺服器看過的一個端點、向模型供應商宣告的一個連接器，或是本機伺服器自己發出的呼叫。「AI 代理」畫面會把它們列成同一份清單，說明每個網域是從這四種的哪一種知道的，並提供把某個網域對這個代理或對整台 Mac 拒絕的選項 — 只有供應商自己去連的那些是例外，那段流量完全不會碰到這台 Mac，這裡的規則也就碰不到它，所以那一行會直接寫明，而不是給一個什麼都不做的按鈕。</p></div>
         <div><strong>代理除了連網還做了什麼 <span class="tag">1.0</span></strong><p>一個檔案的外流是一次讀取加一次傳送，而今天只看得見傳送。把代理的工具開了什麼、寫了什麼、啟動了什麼記錄下來，就能讓<em>讀取了私密金鑰，然後連上了 paste.example</em>變成一項發現，而不是兩個畫面。它不是資源監視器：CPU 和記憶體是活動監視器的事。這需要 Apple 的 EndpointSecurity 授權，也需要上面那份檢查預算先存在。</p></div>
         <div><strong>先 Linux，再 Windows</strong><p>分析核心是可移植的 Swift，擷取部分不是。先出一個帶本機網頁介面的 Linux 常駐程式，基於 eBPF 而不是 macOS 的 API。</p></div>
       </div>
@@ -615,7 +614,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.9.5 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.9.6 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>
