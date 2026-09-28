@@ -1382,3 +1382,25 @@
 "Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept." = "Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept.";
 "Restart the timer" = "Restart the timer";
 
+
+/* 0.9.5 export disclosure */
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it.";
+"Before anything leaves this Mac" = "Before anything leaves this Mac";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight.";
+"Where it goes" = "Where it goes";
+"Collector" = "Collector";
+"Encrypted in transit (HTTPS)." = "Encrypted in transit (HTTPS).";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "Not encrypted. Everything below crosses the network in the clear, readable by anything on the path.";
+"What is attached to the request" = "What is attached to the request";
+"No headers." = "No headers.";
+"value kept in the Keychain, not shown" = "value kept in the Keychain, not shown";
+"once per request" = "once per request";
+"Exactly these %lld fields" = "Exactly these %lld fields";
+"Nothing HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nothing HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave.";
+"Flowlight will ask again if the destination or the fields change." = "Flowlight will ask again if the destination or the fields change.";
+"Send This" = "Send This";
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "What would leave this Mac has changed since you approved it. Nothing is being sent.";
+"Review What Would Be Sent…" = "Review What Would Be Sent…";
+
+"%lld fields, encrypted to %@." = "%lld fields, encrypted to %@.";
+"%lld fields, in cleartext to %@." = "%lld fields, in cleartext to %@.";

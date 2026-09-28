@@ -26,6 +26,7 @@ struct ExportSettingsTab: View {
     @State private var showPreview = false
     @State private var preview = ""
     @State private var loadingPreview = false
+    @State private var pendingDisclosure: ExportDisclosure?
 
     private struct HeaderRow: Identifiable, Equatable {
         let id = UUID()
@@ -39,6 +40,7 @@ struct ExportSettingsTab: View {
     var body: some View {
         Form {
             switchSection
+            approvalLapsed
             endpointSection
             headerSection
             contentSection
@@ -49,14 +51,38 @@ struct ExportSettingsTab: View {
         .formStyle(.grouped)
         .frame(height: 700)
         .onAppear(perform: loadHeaders)
+        .sheet(item: $pendingDisclosure) { disclosure in
+            ExportDisclosureSheet(disclosure: disclosure) {
+                ExportDisclosure.approve(disclosure)
+                exporter.setEnabled(true)
+            }
+        }
         .sheet(isPresented: $showPreview) { previewSheet }
     }
 
     // MARK: Sections
 
+    /// Shown when an export is on but what would leave no longer matches what was approved.
+    @ViewBuilder private var approvalLapsed: some View {
+        let current = ExportDisclosure.build(configuration: config, headers: ExportSecrets.load())
+        if exporter.enabled, !ExportDisclosure.isApproved(current) {
+            Section {
+                Label(L("What would leave this Mac has changed since you approved it. Nothing is being sent."),
+                      systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                Button(L("Review What Would Be Sent…")) { pendingDisclosure = current }
+            }
+        }
+    }
+
     private var switchSection: some View {
         Section {
-            Toggle(isOn: Binding(get: { exporter.enabled }, set: { exporter.setEnabled($0) })) {
+            // Turning it on opens the disclosure rather than starting the export. The switch only moves once
+            // the sheet is approved, so the on position always means "you have seen what leaves".
+            Toggle(isOn: Binding(get: { exporter.enabled }, set: { on in
+                guard on else { return exporter.setEnabled(false) }
+                pendingDisclosure = ExportDisclosure.build(configuration: config, headers: ExportSecrets.load())
+            })) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Send to my collector"))
                     Text(exporter.enabled

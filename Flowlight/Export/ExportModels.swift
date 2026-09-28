@@ -211,6 +211,37 @@ struct ExportConfiguration: Equatable, Sendable {
 
     var endpointURL: URL? { ExportEndpoint.base(endpoint) }
 
+    /// Exactly which keys this configuration puts on the wire.
+    ///
+    /// The Settings tab lists every field that *can* leave; this is the subset that *will*, given what is
+    /// switched on. They are different questions, and the disclosure shown before the first row leaves has to
+    /// answer the second one — telling someone about twenty-eight possible fields when their settings send
+    /// nineteen is a disclosure they have to do arithmetic on.
+    ///
+    /// A field is listed when its data travels, not when its name appears. OTLP carries the counters and the
+    /// timestamp inside its data points rather than as named attributes, so `bytes_sent` is not a literal key
+    /// there — but the bytes still leave the Mac, and a list that omitted them because of an envelope detail
+    /// would be answering about JSON shape rather than about exposure.
+    var enabledFields: [ExportField] {
+        var travelling: Set<ExportField> = [.serviceName, .serviceVersion]
+        if includeHostName { travelling.insert(.hostName) }
+        if includeRollups {
+            travelling.formUnion([.appBundleID, .appName, .serverAddress, .serverPort, .peerAddress,
+                                  .protocolName, .ioDirection, .destinationOwner, .destinationASN,
+                                  .agentID, .agentName, .mcpServer, .channel,
+                                  .bytesReceived, .bytesSent, .flows, .intervalSeconds, .time])
+        }
+        if includeAlerts {
+            travelling.formUnion([.appBundleID, .appName, .eventName, .alertKind, .alertID,
+                                  .severity, .message, .time])
+        }
+        // `type` names the kind of record, which only the line-delimited format needs: OTLP tells metrics and
+        // logs apart by which endpoint the request went to.
+        if mode == .ndjson, !travelling.isEmpty { travelling.insert(.type) }
+        // Declaration order, so the list reads the same way as the Settings tab.
+        return ExportField.allCases.filter(travelling.contains)
+    }
+
     /// Off until it is switched on, pointed somewhere real, and asked for at least one kind of record. Three
     /// separate conditions because the switch is the only one a user thinks about, and the other two are how a
     /// half-configured export stays silent instead of erroring in the background.

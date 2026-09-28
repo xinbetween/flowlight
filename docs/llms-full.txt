@@ -673,6 +673,22 @@ open build/Build/Products/Release/Flowlight.app
  arriving sooner; and Test connection proves the endpoint answers, not that it validated your credentials —
  the "last successful export" line is the honest signal.
 
+ Before anything leaves this Mac. Flowlight asks every app on your Mac to say what it sends and where. The
+ export is the one place Flowlight itself sends anything substantial, so the same disclosure applies to it. Turning the switch
+ on does not start an export: it opens a page that names the collector, says in plain words whether the connection is
+ encrypted or whether everything crosses the network readable by anything on the path, lists exactly the fields your settings
+ will send with a sentence explaining each, and names any headers attached to the request. Header values are never
+ shown — they live in the Keychain, and a screen that printed a token to prove it was being sent would be the thing it warns
+ about.
+
+ Approval is tied to what was disclosed, not to the act of agreeing once. Change the destination, switch the host name on,
+ add a header, start sending alerts as well as rollups — and Flowlight stops and asks again, because what leaves is no longer
+ what you agreed to. Rotating a token does not ask again: the value was never part of the disclosure. Switching the export off
+ withdraws the approval entirely, so turning it back on is a fresh decision against whatever the settings say by then.
+
+ The check sits at the point the bytes would leave, not only in the settings screen, so a future screen that forgets to ask
+ cannot send anyway.
+
  Your data
 
  Everything lives in ~/Library/Application Support/Flowlight/traffic.sqlite. Per-second rows are kept 6 hours
