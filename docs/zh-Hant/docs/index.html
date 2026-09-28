@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.9.4，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.9.5，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -547,6 +547,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         更頻繁，資料並不會更早到；另外，<strong>「測試連線」</strong>證明的是端點有回應，不是它驗證過你的憑證 —
         「上次成功匯出」那一行才是誠實的訊號。</p>
 
+      <p><strong>在任何東西離開這台 Mac 之前。</strong>Flowlight 要求你 Mac 上的每個 App 說明它送出什麼、送到哪裡。
+        匯出是 Flowlight 自己唯一會送出實質內容的地方，所以同一套揭露也適用於它。把開關打開並不會開始匯出，它打開的是一頁說明：
+        寫明收集器是誰，用直白的話講清連線是否加密，還是所有內容都會以路徑上任何東西都讀得到的狀態經過網路，
+        把你的設定將要送出的欄位逐個列出、每個都附上一句解釋，並寫出附加在請求上的標頭名稱。
+        標頭的<em>值</em>永遠不會顯示 — 它們存放在鑰匙串裡，而一個為了證明權杖正在被送出就把它印出來的畫面，正是它所警告的那種東西。</p>
+      <p>核准綁定的是被揭露的內容，而不是曾經同意過這件事。改掉目標、把 HTTPS 換成不加密的 HTTP、改掉格式、把主機名稱打開、加入一個標頭、
+        在彙總資料之外也開始送出警示 — Flowlight 就會停下來再問一次，因為送出去的東西已經不是你同意過的了。更換權杖不會再問：
+        那個值從來就不是揭露的一部分。把匯出關掉會完全撤回核准，所以再次打開是一次新的決定，對照的是那時設定裡寫著的內容。</p>
+      <p>這道檢查位在位元組將要離開的那個點上，而不是只在設定畫面裡 — 所以就算將來有個畫面忘了詢問，它也照樣送不出去。</p>
+
       <h2 id="data">你的資料</h2>
       <p>所有資料都在 <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>。每秒的資料列保留 6 小時
         （可調整）、分鐘資料列 14 天、小時資料列 400 天、每日資料列永久保留，警示 90 天。
@@ -668,7 +678,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.9.4 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.9.5 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

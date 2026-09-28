@@ -512,6 +512,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
         spesso senza che i dati arrivino prima; e <strong>Prova connessione</strong> dimostra che l'endpoint risponde, non che ha convalidato le tue credenziali:
         la riga «ultima esportazione riuscita» è il segnale onesto.</p>
 
+      <p><strong>Prima che qualcosa lasci questo Mac.</strong> Flowlight chiede a ogni app del tuo Mac di dire che cosa invia e dove.
+        L'esportazione è l'unico punto in cui Flowlight stesso invia qualcosa di sostanziale, quindi le si applica la stessa
+        dichiarazione. Attivare l'interruttore non avvia un'esportazione: apre una pagina che indica il collector, dice a parole chiare
+        se la connessione è cifrata o se tutto attraversa la rete in chiaro, leggibile da qualsiasi cosa si trovi sul percorso, elenca
+        esattamente i campi che le tue impostazioni invieranno con una frase che spiega ciascuno, e indica il nome di ogni intestazione
+        allegata alla richiesta. I <em>valori</em> delle intestazioni non vengono mai mostrati: stanno nel portachiavi, e una schermata
+        che stampasse un token per dimostrare che viene inviato sarebbe proprio ciò da cui mette in guardia.</p>
+      <p>L'approvazione è legata a ciò che è stato dichiarato, non al fatto di aver acconsentito una volta. Cambia la destinazione,
+        passa da HTTPS a HTTP non cifrato, cambia il formato, attiva il nome host, aggiungi un'intestazione, comincia a inviare gli
+        avvisi oltre alle aggregazioni — e Flowlight si ferma e chiede di nuovo, perché ciò che esce non è più ciò che hai accettato.
+        Ruotare un token non fa chiedere di nuovo: il valore non è mai stato parte della dichiarazione. Disattivare l'esportazione
+        ritira completamente l'approvazione, quindi riattivarla è una decisione nuova, rispetto a quello che dicono le impostazioni in
+        quel momento.</p>
+      <p>Il controllo si trova nel punto in cui i byte uscirebbero, non solo nella schermata delle impostazioni, così una schermata
+        futura che si dimenticasse di chiedere non può comunque inviare nulla.</p>
+
       <h2 id="data">I tuoi dati</h2>
       <p>Tutto si trova in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Le righe al secondo vengono conservate 6 ore
         (regolabile), quelle al minuto 14 giorni, quelle orarie 400 giorni, quelle giornaliere a tempo indeterminato e gli avvisi 90 giorni.

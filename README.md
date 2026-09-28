@@ -425,17 +425,13 @@ Shipped:
 - [x] Inspect an app or destination from the row you found it on (0.9.1)
 - [x] A budget for HTTPS inspection: header allowlist, per-app ceilings, a session that expires (0.9.3)
 - [x] Show me what this rule would have done: replay recorded traffic against a rule before it refuses anything (0.9.4)
+- [x] What leaves the Mac, before it leaves: the export discloses its destination, transport and exact fields (0.9.5)
 - [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
   no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
 Planned, in order:
-
-- **0.9.5 — What leaves the Mac, before it leaves.** The OpenTelemetry export sends recorded traffic to a
-  collector someone typed in. Before the first row goes, it should show the destination, whether the connection
-  is encrypted, exactly which fields travel and whether any of them are headers — the same disclosure Flowlight
-  demands of everything else it watches, applied to itself.
 
 - **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
   unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration

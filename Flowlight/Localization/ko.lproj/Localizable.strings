@@ -241,6 +241,7 @@
 "The collector answered HTTP %lld: %@" = "컬렉터 응답: HTTP %lld — %@";
 "No endpoint. Type the address of your collector first." = "엔드포인트가 없습니다. 먼저 컬렉터 주소를 입력하세요.";
 "Couldn't read the rollups to export: %@" = "내보낼 집계를 읽을 수 없습니다: %@";
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "전송하지 않았습니다. 이 Mac을 떠날 내용이 승인한 때와 달라졌습니다. 설정 › 내보내기에서 확인하세요.";
 "Couldn't build the payload: %@" = "페이로드를 만들 수 없습니다: %@";
 "%@ accepted an empty OTLP request." = "%@에서 빈 OTLP 요청을 수락했습니다.";
 "%@ accepted one test line." = "%@에서 테스트 한 줄을 수락했습니다.";
@@ -252,6 +253,26 @@
 "%lld rollups and 1 alert" = "집계 %lld건과 알림 1건";
 "%lld rollups and %lld alerts" = "집계 %lld건과 알림 %lld건";
 "# A sample of %@ from your own data. Nothing here has been sent." = "# 사용자 데이터에서 뽑은 %@ 샘플입니다. 여기 있는 내용은 전송되지 않았습니다.";
+
+/* Export/ExportDisclosure.swift */
+"%lld fields, encrypted to %@." = "필드 %lld개를 암호화하여 %@에 보냅니다.";
+"%lld fields, in cleartext to %@." = "필드 %lld개를 평문으로 %@에 보냅니다.";
+
+/* Export/ExportDisclosureSheet.swift */
+"Before anything leaves this Mac" = "이 Mac에서 무언가 나가기 전에";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight는 이 Mac의 모든 앱에 무엇을 어디로 보내는지 밝히라고 요구합니다. 이 화면은 Flowlight 자신에 대한 그 고지입니다.";
+"Where it goes" = "어디로 가는지";
+"Collector" = "컬렉터";
+"Encrypted in transit (HTTPS)." = "전송 중 암호화됩니다 (HTTPS).";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "암호화되지 않습니다. 아래의 모든 것이 평문으로 네트워크를 지나가며, 경로에 있는 무엇이든 읽을 수 있습니다.";
+"What is attached to the request" = "요청에 함께 붙는 것";
+"No headers." = "헤더 없음.";
+"value kept in the Keychain, not shown" = "값은 키체인에 보관되며 표시하지 않습니다";
+"once per request" = "요청당 한 번";
+"Exactly these %lld fields" = "정확히 이 %lld개 필드";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 검사가 기록한 것은 어느 것도 내보내기에 닿을 수 없습니다. 요청과 응답의 헤더도, 본문도, 도구 호출도, 복호화된 교환도 없습니다. 위 필드 중 일부는 이름이 붙은 키가 아니라 형식 자체의 봉투 안에 담겨 이동하므로, 컬렉터에서 어디에 나타나는지가 달라질 뿐 나가는지 여부가 달라지지는 않습니다.";
+"Flowlight will ask again if any of this changes." = "이 가운데 무엇이든 바뀌면 Flowlight가 다시 묻습니다.";
+"Send This" = "이대로 보내기";
 
 /* Export/ExportModels.swift */
 "OpenTelemetry (OTLP/HTTP, JSON)" = "OpenTelemetry (OTLP/HTTP, JSON)";
@@ -285,6 +306,8 @@
 "The alert's sentence, exactly as Flowlight's Alerts screen shows it." = "Flowlight 알림 화면에 표시되는 문장 그대로입니다.";
 
 /* Export/ExportSettingsView.swift */
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "이 Mac을 떠날 내용이 승인한 때와 달라졌습니다. 아무것도 전송하지 않습니다.";
+"Review What Would Be Sent…" = "보낼 내용 다시 확인…";
 "Send to my collector" = "내 컬렉터로 보내기";
 "On. Flowlight is sending to the endpoint below." = "켬. Flowlight가 아래 엔드포인트로 보내고 있습니다.";
 "Off. Nothing about your traffic leaves this Mac." = "끔. 트래픽에 관한 어떤 것도 이 Mac을 떠나지 않습니다.";

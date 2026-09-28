@@ -84,6 +84,10 @@ final class ExportController: ObservableObject {
         } else {
             queue = ExportQueue()
             nextAttempt = nil
+            // Switching off withdraws the approval. Turning it on again is a fresh decision, and the endpoint
+            // or the field set may have been edited in between — inheriting the old consent would make the
+            // disclosure a formality someone passed once.
+            ExportDisclosure.withdraw()
         }
         defaults.set(on, forKey: ExportConfiguration.Keys.enabled)
         lastError = nil
@@ -213,6 +217,13 @@ final class ExportController: ObservableObject {
 
     private func send(_ batch: ExportBatch, config: ExportConfiguration) async {
         guard let base = config.endpointURL else { return }
+        // Checked here, not only in the settings screen. This is the last point before bytes leave the Mac, and
+        // a disclosure enforced by the UI alone is one a future screen can forget to show.
+        guard ExportDisclosure.isApproved(ExportDisclosure.build(configuration: config, headers: ExportSecrets.load())) else {
+            lastError = L("Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it.")
+            objectWillChange.send()
+            return
+        }
         let resource = self.resource
         var remainder = ExportBatch()
         var failure: String?

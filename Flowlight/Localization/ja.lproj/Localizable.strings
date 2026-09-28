@@ -1381,3 +1381,26 @@
 "Edit" = "編集";
 "On" = "オン";
 "Settings" = "設定";
+
+
+/* 0.9.5 export disclosure */
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "送信していません: 承認したときから、この Mac から出る内容が変わっています。設定 › 書き出し を開いて確認してください。";
+"Before anything leaves this Mac" = "この Mac から何かが出ていく前に";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight は、この Mac のすべてのアプリに、何をどこへ送るのかを明かすよう求めています。これはその Flowlight 自身の分です。";
+"Where it goes" = "どこへ送られるか";
+"Collector" = "コレクター";
+"Encrypted in transit (HTTPS)." = "転送中は暗号化されます（HTTPS）。";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "暗号化されません。下に挙げたものはすべて平文でネットワークを流れ、経路上のあらゆるものから読み取れます。";
+"What is attached to the request" = "リクエストに付けられるもの";
+"No headers." = "ヘッダはありません。";
+"value kept in the Keychain, not shown" = "値はキーチェーンに保存され、表示しません";
+"once per request" = "リクエストごとに 1 回";
+"Exactly these %lld fields" = "これら %lld 個のフィールドだけ";
+"Send This" = "これを送信";
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "承認したときから、この Mac から出る内容が変わっています。何も送信していません。";
+"Review What Would Be Sent…" = "送信される内容を確認…";
+
+"%lld fields, encrypted to %@." = "%lld 個のフィールド、暗号化して %@ へ。";
+"%lld fields, in cleartext to %@." = "%lld 個のフィールド、平文で %@ へ。";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS インスペクションが記録した内容が書き出しに入ることはありません。リクエストとレスポンスのヘッダ、本文、ツール呼び出し、復号したやり取りは含まれません。上に挙げたフィールドのうち一部は、名前付きのキーでなく形式そのものの外枠に入って運ばれます。変わるのはコレクターでの現れ方であって、出ていくかどうかではありません。";
+"Flowlight will ask again if any of this changes." = "このいずれかが変わると、Flowlight はもう一度確認します。";

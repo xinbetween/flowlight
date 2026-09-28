@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.5, macOS 15 or later.
 
  On this page
 
@@ -673,6 +673,23 @@ open build/Build/Products/Release/Flowlight.app
  arriving sooner; and Test connection proves the endpoint answers, not that it validated your credentials —
  the "last successful export" line is the honest signal.
 
+ Before anything leaves this Mac. Flowlight asks every app on your Mac to say what it sends and where. The
+ export is the one place Flowlight itself sends anything substantial, so the same disclosure applies to it. Turning the switch
+ on does not start an export: it opens a page that names the collector, says in plain words whether the connection is
+ encrypted or whether everything crosses the network readable by anything on the path, lists exactly the fields your settings
+ will send with a sentence explaining each, and names any headers attached to the request. Header values are never
+ shown — they live in the Keychain, and a screen that printed a token to prove it was being sent would be the thing it warns
+ about.
+
+ Approval is tied to what was disclosed, not to the act of agreeing once. Change the destination, switch from HTTPS to plain HTTP,
+ change the format, switch the host name on, add a header, start sending alerts as well as rollups — and Flowlight stops
+ and asks again, because what leaves is no longer
+ what you agreed to. Rotating a token does not ask again: the value was never part of the disclosure. Switching the export off
+ withdraws the approval entirely, so turning it back on is a fresh decision against whatever the settings say by then.
+
+ The check sits at the point the bytes would leave, not only in the settings screen, so a future screen that forgets to ask
+ cannot send anyway.
+
  Your data
 
  Everything lives in ~/Library/Application Support/Flowlight/traffic.sqlite. Per-second rows are kept 6 hours
@@ -788,7 +805,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1127,8 +1144,6 @@ e.g. Wireshark
  Flowlight watches, explains and refuses today — monitoring rather than prevention, as the
  threat model sets out. This is the order the rest is being built in.
 
- What leaves the Mac, before it leaves 0.9.5Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.
-
  What an agent did off the network 1.0A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make read the private key, then talked to paste.example one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.
 
  Linux, then WindowsThe analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.
@@ -1347,8 +1362,30 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.9.4
+ 0.9.5
 September 28, 2026Latest
+
+ What leaves the Mac, before it leaves. Flowlight asks every app on your Mac to
+ say what it sends and where. The export is the one place Flowlight itself sends anything
+ substantial, and it used to start the moment a switch was flipped. Turning it on now opens a page
+ first: the collector's address, whether the connection is encrypted or whether everything crosses
+ the network readable by anything on the path, exactly the fields your settings will send with a
+ sentence explaining each, and the names of any headers on the request. Header values are never
+ shown — they live in the Keychain, and a screen that printed a token to prove it was being sent
+ would be the thing it warns about.
+
+ Approving one thing does not approve another. The approval is tied to what was
+ disclosed, not to having once agreed: change the collector, switch the host name on, add a header,
+ start sending alerts as well as rollups, and Flowlight stops and asks again, because what leaves is
+ no longer what you agreed to. Rotating a token does not ask again — the value was never part of the
+ disclosure. Switching the export off withdraws the approval, so turning it back on is a fresh
+ decision against whatever the settings say by then.
+
+ The check is where the bytes would leave, not only in the settings screen, so a
+ future screen that forgets to ask cannot send anyway.
+
+ 0.9.4
+September 28, 2026
 
  Show me what this rule would have done. A rule that refuses connections is easy
  to write and frightening to switch on, because the first thing you normally learn about one is what
