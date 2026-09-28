@@ -9,7 +9,7 @@ final class CertificateAuthorityTests: XCTestCase {
         let ca = CertificateAuthority(directory: dir)
         try ca.ensure()
         XCTAssertTrue(ca.exists)
-        XCTAssertNotNil(ca.fingerprint)
+        XCTAssertNotNil(ca.caCertificate(), "the certificate just written should parse back")
         let bundle = try String(contentsOf: ca.bundleURL, encoding: .utf8)
         XCTAssertTrue(bundle.contains(try String(contentsOf: ca.caCertificateURL, encoding: .utf8)))
 

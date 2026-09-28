@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Security
 
@@ -113,6 +112,11 @@ final class CertificateAuthority: @unchecked Sendable {
         try Self.openssl(["x509", "-req", "-in", csr.path, "-CA", caCertificateURL.path, "-CAkey", caKeyURL.path,
                           "-set_serial", String(UInt64.random(in: 1...UInt64(Int64.max))), "-days", "397", "-sha256",
                           "-extfile", ext.path, "-extensions", "v3_leaf", "-out", pem.path])
+        // The legacy PKCS #12 algorithms are Apple's requirement, not a preference: SecPKCS12Import cannot read
+        // the AES-256-CBC/PBKDF2 format OpenSSL 3 writes by default, so asking for anything stronger produces a
+        // blob macOS refuses to import. The weakness is bounded — the file lives in a temporary directory for
+        // the length of one import and is never a credential at rest — but it is a deliberate choice, and
+        // without this note it reads as an oversight.
         try Self.openssl(["pkcs12", "-export", "-inkey", leafKeyURL.path, "-in", pem.path, "-certfile", caCertificateURL.path,
                           "-certpbe", "PBE-SHA1-3DES", "-keypbe", "PBE-SHA1-3DES", "-macalg", "sha1",
                           "-passout", "pass:\(Self.p12Password)", "-out", p12.path])
@@ -133,7 +137,10 @@ final class CertificateAuthority: @unchecked Sendable {
 
     // MARK: Trust
 
-    private func caCertificate() -> SecCertificate? {
+    /// The CA certificate, parsed back from disk. Not private: a test needs to ask whether it can be read,
+    /// and before this it asked by taking a SHA-1 of it — which is how the only use of a weak hash in this
+    /// file came to exist.
+    func caCertificate() -> SecCertificate? {
         guard let pem = try? String(contentsOf: caCertificateURL, encoding: .utf8) else { return nil }
         let body = pem.components(separatedBy: "\n").filter { !$0.hasPrefix("-----") }.joined()
         guard let der = Data(base64Encoded: body) else { return nil }
@@ -145,13 +152,6 @@ final class CertificateAuthority: @unchecked Sendable {
         guard let cert = caCertificate() else { return false }
         var settings: CFArray?
         return SecTrustSettingsCopyTrustSettings(cert, .user, &settings) == errSecSuccess
-    }
-
-    /// SHA-1 fingerprint, as the `security` tool prints it.
-    var fingerprint: String? {
-        guard let cert = caCertificate() else { return nil }
-        let der = SecCertificateCopyData(cert) as Data
-        return Insecure.SHA1.hash(data: der).map { String(format: "%02X", $0) }.joined()
     }
 
     /// Adds the certificate to the login keychain and marks it trusted for TLS, for this user only.
@@ -206,8 +206,17 @@ final class CertificateAuthority: @unchecked Sendable {
     func remove() {
         if exists {
             _ = Self.run("/usr/bin/security", ["remove-trusted-cert", caCertificateURL.path])
-            if let fingerprint {
-                _ = Self.run("/usr/bin/security", ["delete-certificate", "-Z", fingerprint])
+            // Deleted through the Security framework, by reference, the same way `setTrusted` adds it.
+            // It used to shell out to `security delete-certificate -Z <hash>`, and that `-Z` is why this file
+            // computed a SHA-1 of the certificate — a hash chosen by the command-line tool's interface rather
+            // than by us, standing in for the identity of the thing being deleted. CodeQL flagged it the first
+            // time the Swift was actually analysed. Passing the certificate itself removes the question: no
+            // hash, no collision to reason about, and one less shell-out on the path that tidies up after
+            // inspection.
+            if let cert = caCertificate() {
+                let query: [String: Any] = [kSecClass as String: kSecClassCertificate, kSecValueRef as String: cert]
+                let deleted = SecItemDelete(query as CFDictionary)
+                assert(deleted == errSecSuccess || deleted == errSecItemNotFound, "unexpected keychain status \(deleted)")
             }
         }
         lock.lock(); identities.removeAll(); lock.unlock()
