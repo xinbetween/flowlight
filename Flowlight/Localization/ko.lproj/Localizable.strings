@@ -270,7 +270,7 @@
 "value kept in the Keychain, not shown" = "값은 키체인에 보관되며 표시하지 않습니다";
 "once per request" = "요청당 한 번";
 "Exactly these %lld fields" = "정확히 이 %lld개 필드";
-"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 검사가 기록한 것은 어느 것도 내보내기에 닿을 수 없습니다. 요청과 응답의 헤더도, 본문도, 도구 호출도, 복호화된 교환도 없습니다. 위 필드 중 일부는 이름이 붙은 키가 아니라 형식 자체의 봉투 안에 담겨 이동하므로, 컬렉터에서 어디에 나타나는지가 달라질 뿐 나가는지 여부가 달라지지는 않습니다.";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 검사가 기록한 것은 어느 것도 내보내기에 닿을 수 없습니다. 요청과 응답의 헤더도, 본문도, 도구 호출도, 복호화된 교환도 없습니다. 위 필드 중 일부는 이름이 붙은 키가 아니라 형식 자체의 봉투 안에 담겨 이동하므로, 컬렉터에서 어디에 나타나는지가 달라질 뿐 나가는지 여부가 달라지지는 않습니다.";
 "Flowlight will ask again if any of this changes." = "이 가운데 무엇이든 바뀌면 Flowlight가 다시 묻습니다.";
 "Send This" = "이대로 보내기";
 

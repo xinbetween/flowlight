@@ -270,7 +270,7 @@
 "value kept in the Keychain, not shown" = "valor guardado no porta-chaves, não é mostrado";
 "once per request" = "uma vez por pedido";
 "Exactly these %lld fields" = "Exatamente estes %lld campos";
-"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nada do que a inspeção HTTPS registe pode chegar a uma exportação: nem cabeçalhos de pedido ou de resposta, nem corpos, nem chamadas de ferramentas, nem trocas desencriptadas. Alguns dos campos acima viajam dentro do próprio envelope do formato em vez de como uma chave com nome, o que muda onde aparecem no seu coletor, não se saem ou não.";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nada do que a inspeção HTTPS registe pode chegar a uma exportação: nem cabeçalhos de pedido ou de resposta, nem corpos, nem chamadas de ferramentas, nem trocas desencriptadas. Alguns dos campos acima viajam dentro do próprio envelope do formato em vez de como uma chave com nome, o que muda onde aparecem no seu coletor, não se saem ou não.";
 "Flowlight will ask again if any of this changes." = "O Flowlight volta a perguntar se algo disto mudar.";
 "Send This" = "Enviar isto";
 

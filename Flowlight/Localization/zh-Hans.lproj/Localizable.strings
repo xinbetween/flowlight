@@ -270,7 +270,7 @@
 "value kept in the Keychain, not shown" = "值保存在钥匙串中，不予显示";
 "once per request" = "每个请求一次";
 "Exactly these %lld fields" = "正好是这 %lld 个字段";
-"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 检查记录的内容一概无法进入导出：没有请求或响应的标头，没有正文，没有工具调用，没有解密后的交互。上面这些字段中有一部分装在格式自身的信封里传输，而不是作为一个具名键，这改变的是它们在你的收集器里出现的位置，而不是它们会不会离开。";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 检查记录的内容一概无法进入导出：没有请求或响应的标头，没有正文，没有工具调用，没有解密后的交互。上面这些字段中有一部分装在格式自身的信封里传输，而不是作为一个具名键，这改变的是它们在你的收集器里出现的位置，而不是它们会不会离开。";
 "Flowlight will ask again if any of this changes." = "这里的任何一项发生变化，Flowlight 都会再问一次。";
 "Send This" = "就发送这些";
 
