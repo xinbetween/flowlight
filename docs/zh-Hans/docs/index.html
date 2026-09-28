@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">文档</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">从第一次启动到调整代理规则，需要的都在这里。Flowlight 0.9.3，macOS 15 或更高版本。</p>
+    <p class="lede">从第一次启动到调整代理规则，需要的都在这里。Flowlight 0.9.4，macOS 15 或更高版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本页内容">
@@ -368,6 +368,21 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>第二个标签页是<strong>违规流水</strong>：每一条由规则判定的连接，带上应用、它要去哪里、是哪条
         规则判定的，以及那究竟是一次拒绝，还是一次放它通过的例外。</p>
 
+      <p><strong>它本来会做什么。</strong>阻止的规则写起来容易，打开却让人害怕，因为你通常最先了解到的是它
+        弄坏了什么——而且是后来才知道的，从别处某个东西失败上知道的。规则编辑器先回答这个问题：它拿记录
+        下来的流量，对照你正在写的这条规则重放一遍，在任何东西被拒绝之前就列出哪些会不一样。“对照期间”有四个
+        可选，最长到“最近 2 周”。规则必须先指明一个应用或一个目标——两者都不指明的规则会判定这台
+        Mac 上的每一个连接，Flowlight 不会写下它。</p>
+      <p>它报告的是<em>变化</em>，而不是匹配的数量。如果你已有的某条规则已经在拒绝那些流量，再加一条同样
+        拒绝它们的规则就什么都不会改变，说“本来会拒绝 4,000 个连接”也不是实话——所以每一条记录下来的连接
+        都会被判定两次，一次用你现有的规则，一次加上这条新的，只有结果不同的那些才会被列出来。为了在一条
+        宽泛的阻止里开出例外而写的允许规则，从另一面报告同一件事：它本来会放什么通过。</p>
+      <p>有两个细节决定这个数字能不能信。时段是按流量发生的那个时刻判定的，所以一条针对工作日晚间的
+        规则报告的是它在工作日晚间本来会拒绝什么，而不是那些流量如果发生在现在会被拒绝什么。而空的结果
+        会区分“什么都不会改变。这段期间有 1,240 个连接，没有一个受到影响”和“这段期间没有记录下来的流量
+        可供对照”——同一张空列表，意思正好相反，而其中只有一个说这条规则是安全的。界面还会说出它能看到
+        的最早的流量：一条只对照了两小时历史的规则，就是只对照了两小时历史。</p>
+
       <h2 id="allowlists">允许列表</h2>
       <p>在<strong>AI 代理</strong>里选中一个代理，用它详情里的<strong>允许列表</strong>指定它可以连接哪里。输入域名
         （含子域名）、IP 地址或 CIDR 地址段，或者选一个预设：GitHub、npm、PyPI、Homebrew、Docker Hub、Rust crates、Go modules 或
@@ -377,7 +392,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         允许列表只警告：见<a href="#blocking">拒绝连接</a>。</p>
 
       <h2 id="blocking">拒绝连接</h2>
-      <p>允许列表默认只警告。为某个代理打开<strong>拒绝列表之外的连接</strong>，它就会真的
+      <p>允许列表默认只警告。为某个代理打开<strong>阻止未获允许的连接</strong>，它就会真的
         拒绝：连接被丢弃，并有一条警报记录下被拒绝的内容，带<strong>从现在起允许……</strong>一键把它加入
         列表。代理的下一次尝试就会通过。</p>
       <p><strong>它需要网络扩展。</strong>拒绝一条连接意味着站在它的路径上，而 nettop 采样器
@@ -647,7 +662,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
-      <span>版本 0.9.3 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+      <span>版本 0.9.4 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
     </div>
   </div>
 </footer>

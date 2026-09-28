@@ -424,6 +424,7 @@ Shipped:
 - [x] Coverage: what Flowlight can't account for, per app (0.9.0)
 - [x] Inspect an app or destination from the row you found it on (0.9.1)
 - [x] A budget for HTTPS inspection: header allowlist, per-app ceilings, a session that expires (0.9.3)
+- [x] Show me what this rule would have done: replay recorded traffic against a rule before it refuses anything (0.9.4)
 - [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
   no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
@@ -431,10 +432,6 @@ Shipped:
 
 Planned, in order:
 
-- **0.9.4 — Show me what this rule would have done.** A rule that refuses connections is easy to write and
-  frightening to switch on, because the first thing you learn about it is what it breaks. Simulation replays the
-  last day of recorded traffic against a rule and lists what it would have refused, before it refuses anything.
-  The data is already there; it has only ever been used to explain the past.
 - **0.9.5 — What leaves the Mac, before it leaves.** The OpenTelemetry export sends recorded traffic to a
   collector someone typed in. Before the first row goes, it should show the destination, whether the connection
   is encrypted, exactly which fields travel and whether any of them are headers — the same disclosure Flowlight

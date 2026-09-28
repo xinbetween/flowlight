@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.3, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.4, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -385,6 +385,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Le second onglet est le <strong>flux des violations</strong>&nbsp;: chaque connexion qu’une règle a tranchée, avec l’app, sa destination, quelle
         règle a tranché et s’il s’agissait d’un refus ou d’une exception qui l’a laissée passer.</p>
 
+      <p><strong>Ce qu’elle aurait fait.</strong> Une règle de blocage est facile à écrire et effrayante à activer, parce que la première
+        chose que l’on apprend d’ordinaire à son sujet, c’est ce qu’elle a cassé — et on l’apprend plus tard, parce que quelque chose
+        échoue ailleurs. L’éditeur de règles y répond d’abord&nbsp;: il rejoue le trafic enregistré sur la règle que vous êtes en train
+        d’écrire et liste ce qui aurait changé, avant que quoi que ce soit ne soit refusé. Choisissez l’une des quatre périodes, jusqu’aux
+        deux dernières semaines. La règle doit d’abord nommer une app ou une destination — une règle qui ne nomme ni l’une ni l’autre
+        déciderait de toutes les connexions du Mac, et Flowlight ne l’écrira pas.</p>
+      <p>Elle signale un <em>changement</em>, pas une correspondance. Si une règle que vous avez déjà refuse ce trafic, en ajouter une
+        autre qui le refuse aussi ne change rien, et dire «&nbsp;refuserait 4&nbsp;000 connexions&nbsp;» serait faux — donc chaque
+        connexion enregistrée est tranchée deux fois, une fois avec vos règles en l’état et une fois avec la nouvelle ajoutée, et seules
+        celles qui ressortent différemment sont listées. Une règle d’autorisation écrite pour tailler une exception dans un blocage large
+        signale la même chose depuis l’autre côté&nbsp;: ce qu’elle laisserait passer.</p>
+      <p>Deux détails décident si l’on peut se fier au nombre. Les horaires sont évalués au moment où le trafic a eu lieu&nbsp;: une règle
+        pour les soirs de semaine indique donc ce qu’elle aurait refusé ces soirs-là, et non ce qu’elle refuserait si ce trafic avait lieu
+        maintenant. Et un résultat vide distingue «&nbsp;n’aurait rien changé, sur 1&nbsp;240 connexions&nbsp;» de «&nbsp;aucun trafic
+        enregistré sur cette période pour faire le test&nbsp;» — la même liste vide, des sens opposés, et un seul des deux dit que la
+        règle est sans danger. L’écran nomme aussi le trafic le plus ancien qu’il a pu voir&nbsp;: une règle testée sur deux heures
+        d’historique a été testée sur deux heures d’historique.</p>
+
       <h2 id="allowlists">Listes d’autorisation</h2>
       <p>Sélectionnez un agent dans <strong>Agents IA</strong> et utilisez <strong>Liste d’autorisation</strong> dans son détail pour dire où il peut se connecter. Saisissez des domaines
         (sous-domaines inclus), des adresses IP ou des plages CIDR, ou choisissez un préréglage&nbsp;: GitHub, npm, PyPI, Homebrew, Docker Hub, crates Rust, modules Go ou
@@ -394,7 +412,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         jusqu’à ce que vous lui disiez le contraire&nbsp;: voyez <a href="#blocking">Refuser des connexions</a>.</p>
 
       <h2 id="blocking">Refuser des connexions</h2>
-      <p>Une liste d’autorisation avertit par défaut. Activez <strong>Refuser les connexions hors de la liste</strong> pour un agent et elle les
+      <p>Une liste d’autorisation avertit par défaut. Activez <strong>Bloquer les connexions non autorisées</strong> pour un agent et elle les
         refusera aussi&nbsp;: la connexion est abandonnée et une alerte consigne ce qui a été refusé, avec <strong>Autoriser … désormais</strong> pour l’ajouter
         à la liste en un clic. La tentative suivante de l’agent passe.</p>
       <p><strong>Cela nécessite l’extension réseau.</strong> Refuser une connexion suppose de se trouver sur son chemin, ce que l’échantillonneur nettop
@@ -670,7 +688,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.3 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.9.4 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>
