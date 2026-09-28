@@ -261,8 +261,13 @@ enum HeaderRedaction {
         "keep-alive", "x-request-id", "x-correlation-id", "x-session-duration", "content-signature-algorithm",
     ]
 
-    static func isSecret(_ name: String) -> Bool {
+    static func isSecret(_ name: String, extraPatterns: [String] = []) -> Bool {
         let lower = name.lowercased()
+        // Checked first, ahead of `notSecret`: a word the user typed is an instruction about their own headers,
+        // and the built-in exception list was written without their vendor in mind. Anything else would let a
+        // guess made here overrule a fact stated there.
+        let extra = extraPatterns.map { $0.lowercased() }.filter { !$0.isEmpty }
+        if extra.contains(where: { lower.contains($0) }) { return true }
         if notSecret.contains(lower) { return false }
         if secretNames.contains(lower) { return true }
         // Word-ish boundaries, so `x-api-key` and `x_auth_token` match while `monkey` and `authority` don't.
@@ -271,14 +276,25 @@ enum HeaderRedaction {
         return secretWords.contains { $0.contains("-") && lower.contains($0) }
     }
 
-    static func redact(_ headers: [HTTPHeader]) -> [HTTPHeader] {
+    /// Applies the budget to a set of headers. Names always survive — what a request sent is part of reading it,
+    /// and a name on its own is not the secret. Only values are withheld, and always with their length, so the
+    /// screen says "something was here" rather than quietly showing a shorter request than the one that happened.
+    static func redact(_ headers: [HTTPHeader], budget: InspectionBudget = InspectionBudget()) -> [HTTPHeader] {
         headers.map { header in
             let name = header.name.lowercased()
-            guard isSecret(name) else { return header }
-            // Keep the scheme ("Bearer") so the kind of credential is still visible.
+            let keep: Bool
+            switch budget.headerPolicy {
+            case .allowlist: keep = budget.allowedHeaders.contains(name)
+            case .redactSecrets: keep = !isSecret(name, extraPatterns: budget.extraRedactionPatterns)
+            case .none: keep = false
+            }
+            guard !keep else { return header }
+            // Keep the scheme ("Bearer") so the kind of credential is still visible — but not under `.none`,
+            // where the whole point is that no value is kept, and a scheme is a value.
             let scheme = header.value.split(separator: " ").first.map(String.init)
-            let keepScheme = name.hasSuffix("authorization") && header.value.contains(" ") ? scheme.map { $0 + " " } ?? "" : ""
-            return HTTPHeader(name: header.name, value: "\(keepScheme)••• redacted (\(header.value.count) characters)")
+            let keepScheme = budget.headerPolicy != .none && name.hasSuffix("authorization") && header.value.contains(" ")
+                ? scheme.map { $0 + " " } ?? "" : ""
+            return HTTPHeader(name: header.name, value: keepScheme + "••• " + L("not kept (%lld characters)", header.value.count))
         }
     }
 }

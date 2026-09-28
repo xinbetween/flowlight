@@ -242,14 +242,40 @@ open build/Build/Products/Release/Flowlight.app</pre>
         e avviali da lì. In <strong>Avanzate</strong> puoi decifrare solo gli agenti IA invece di tutte le app, modificare l'elenco di quelli mai decifrati, copiare
         la configurazione shell per una shell, oppure rimuovere il certificato e tutto ciò che è stato registrato.</p>
       <p>Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password (modifica l'elenco in Configura). Le app che applicano il pinning dei certificati possono rifiutare il
-        certificato di Flowlight; Flowlight lo rileva e le inoltra cifrate. Chiavi API, cookie e altre intestazioni con credenziali vengono sostituite con la loro
-        lunghezza prima che qualsiasi cosa venga memorizzata — riconosciute per nome e per le parole nel nome, cosa che intercetta la grafia particolare
-        di un fornitore ma non può promettere di intercettarle tutte —, le richieste registrate vengono conservate 3 giorni e <strong>Rimuovi certificato e dati registrati</strong> elimina il certificato, la sua
+        certificato di Flowlight; Flowlight lo rileva e le inoltra cifrate. Per impostazione predefinita, i valori delle intestazioni vengono conservati solo quando
+        l'intestazione è una che consenti, e tutto il resto viene sostituito dalla sua lunghezza prima che qualsiasi cosa venga memorizzata — le richieste registrate vengono conservate per il tempo che imposti e <strong>Rimuovi certificato e dati registrati</strong> elimina il certificato, la sua
         impostazione di attendibilità e tutto ciò che è stato registrato. L'ispezione è solo HTTP/1.1 (Flowlight lo richiede a entrambe le parti) e non è disponibile in modalità demo.</p>
 
+      <p><strong>Cosa può conservare l'ispezione.</strong> I corpi registrati sono la cosa più delicata che Flowlight conserva e, fino alla 0.9.3,
+        l'unica cosa che li proteggeva era una supposizione su quali intestazioni portino credenziali. Una supposizione ha la forma sbagliata per
+        questo: può conoscere solo le intestazioni a cui qualcuno ha pensato, e fallisce in silenzio: il fallimento è un segreto scritto sul disco
+        da un software che aveva promesso di non farlo. Avanzate ora fissa dei limiti invece di affidarsi alla supposizione.</p>
+      <ul>
+        <li><strong>Le intestazioni si conservano perché sono consentite, non si scartano perché sembravano pericolose.</strong> Per impostazione
+          predefinita si conservano i valori di un elenco di intestazioni che non portano mai credenziali — tipi di contenuto, lunghezze, limiti di frequenza, versioni di API —
+          e ogni altro valore viene sostituito dalla sua lunghezza. Il comportamento di prima resta disponibile, perché leggere un'API sconosciuta
+          significa vedere intestazioni che nessuno ha ancora pensato di consentire: adesso è una scelta e non l'unica possibilità. Una terza opzione non conserva
+          alcun valore di intestazione.</li>
+        <li><strong>I nomi sopravvivono sempre.</strong> Qualunque sia la politica, puoi vedere quali intestazioni sono state inviate e quanto era lungo
+          ogni valore. Nascondere del tutto l'intestazione sarebbe la menzogna più silenziosa: mostra una richiesta più corta di quella
+          che è avvenuta davvero, e nulla sullo schermo lo direbbe.</li>
+        <li><strong>Parole tue</strong> segnano un'intestazione come credenziale qualunque sia il suo nome, per un fornitore la cui grafia l'elenco
+          integrato non conosce. Una parola che aggiungi vince sulle eccezioni integrate.</li>
+        <li><strong>Un limite giornaliero per app</strong> sui corpi registrati. Oltre quel limite lo scambio viene comunque registrato — ora, host, percorso,
+          stato, intestazioni — e vengono scartati solo i corpi, con una nota che spiega perché. Un corpo che manca è una lacuna che puoi vedere; uno
+          scambio che manca sembra che non sia mai avvenuto. Zero significa nessun limite.</li>
+        <li><strong>Una sessione che finisce da sé</strong>, otto ore per impostazione predefinita. L'ispezione restava attiva finché qualcuno non se ne
+          ricordava, il che faceva della modalità più delicata dell'app quella con più probabilità di restare accesa dopo che il motivo per cui era
+          stata accesa era passato. La schermata mostra quando si fermerà e ti lascia far ripartire l'orologio. Puoi comunque
+          scegliere di farla restare attiva finché non la disattivi tu: in quel caso resta attiva anche dopo un riavvio, e l'impostazione lo dice.</li>
+      </ul>
+      <p>La riga in fondo ad Avanzate è generata da queste impostazioni invece di essere scritta a mano, così non può più discostarsene
+        come faceva quella fissata nel codice che la precedeva.</p>
+
       <p><strong>Come arrivarci da una riga.</strong> Fai clic destro su un'app o su una destinazione in In diretta, Rapporti o Agenti IA e scegli
-        <strong>Ispeziona il traffico di …</strong>: Ispeziona si apre con quel nome già nel campo di ricerca. Che sia il campo di ricerca e non un
-        filtro nascosto è voluto — puoi allargarlo, restringerlo o svuotarlo senza tornare da dove sei partito. Può comparire solo il traffico che è
+        <strong>Ispeziona il traffico di …</strong>: Ispeziona si apre mostrando solo quell'app, o solo quella destinazione, con un'etichetta che lo dice
+        e che puoi rimuovere con un clic. Delimita invece di cercare — una versione precedente metteva il nome nel campo di ricerca, che cerca anche nei
+        corpi delle risposte, così chiedere il traffico di un agente restituiva ogni pagina il cui HTML si limitava a menzionarlo. Può comparire solo il traffico che è
         passato dal proxy, quindi una riga che sai essere attiva può comunque non mostrare nulla qui.</p>
 
       <h2 id="mocks">Risposte simulate</h2>

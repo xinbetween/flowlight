@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.3, macOS 15 or later.
 
  On this page
 
@@ -341,15 +341,45 @@ open build/Build/Products/Release/Flowlight.app
  the shell setup for one shell, or remove the certificate and everything recorded.
 
  Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
- Flowlight certificate; Flowlight notices and passes them through encrypted. API keys, cookies and other credential headers are replaced with their
- length before anything is stored — matched by name and by the words in the name, which catches a vendor's own spelling but
- cannot promise to catch every one — recorded requests are kept 3 days, and Remove Certificate & Recorded Data deletes the certificate, its trust
+ Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
+ allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
 
+ What inspection may keep. Recorded bodies are the most sensitive thing Flowlight holds, and until 0.9.3
+ the only thing protecting them was a guess at which headers carry credentials. A guess is the wrong shape for this: it can
+ only know the headers somebody thought of, and it fails silently — the failure being a secret written to disk by
+ software that promised not to. Advanced now sets limits instead of relying on the guess.
+
+ Headers are kept because they are allowed, not discarded because they looked dangerous. The default
+ keeps the values of a list of headers that never carry credentials — content types, lengths, rate limits, API versions —
+ and replaces every other value with its length. The old behaviour is still offered, because reading an unfamiliar API
+ means seeing headers nobody has thought to allow yet; it is a choice now rather than the only one. A third option keeps no
+ header values at all.
+
+ Names always survive. Whatever the policy, you can see which headers were sent and how long each value
+ was. Hiding the header altogether would be the quieter lie: it would show a shorter request than the one that
+ actually happened, and nothing on screen would say so.
+
+ Words of your own mark a header as a credential whatever it is called, for a vendor whose spelling the
+ built-in list doesn't know. A word you add wins over the built-in exceptions.
+
+ A daily ceiling per app on recorded bodies. Past it the exchange is still recorded — time, host, path,
+ status, headers — and only the bodies are dropped, with a note saying why. A missing body is a gap you can see; a missing
+ exchange looks like nothing happened. Zero means no ceiling.
+
+ A session that ends by itself, eight hours by default. Inspection used to run until somebody
+ remembered, which meant the most sensitive mode in the app was the one most likely to be left on after the reason for it
+ had passed. The screen shows when it will stop and lets you restart the clock. You can still choose to have it run
+ until you switch it off, in which case it keeps running across restarts, and the setting says so.
+
+ The line at the bottom of Advanced is generated from those settings rather than written out, so it cannot drift from
+ them the way its hardcoded predecessor did.
+
  Getting here from a row. Right-click an app or a destination in Live, Reports or AI Agents and
- choose Inspect …'s Traffic: Inspect opens with that name already in the search field. It is the search
- field rather than a hidden filter on purpose — you can widen it, narrow it or clear it without going back to where you
- started. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.
+ choose Inspect …'s Traffic: Inspect opens showing only that app, or only that destination, with a chip
+ saying so that you can remove in one click. It scopes rather than searches — an earlier version put the name in the search
+ field, which also searches response bodies, so asking for one agent's traffic returned every page whose HTML happened to
+ mention it. Only traffic that went through the proxy can appear, so a row you know is busy may still show nothing here.
 
  Mock responses
 
@@ -739,7 +769,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1078,8 +1108,6 @@ e.g. Wireshark
  Flowlight watches, explains and refuses today — monitoring rather than prevention, as the
  threat model sets out. This is the order the rest is being built in.
 
- A budget for inspection 0.9.3Recorded bodies are the most sensitive thing Flowlight holds. A header allowlist instead of a denylist, patterns of your own, an option to keep no headers at all, per-app ceilings, and a session that expires by itself.
-
  Show me what this rule would have done 0.9.4Replay the last day against a rule and list what it would have refused, before it refuses anything. The data is already there; it has only ever explained the past.
 
  What leaves the Mac, before it leaves 0.9.5Before the first row reaches a collector: the destination, whether it's encrypted, which fields travel and whether any are headers — the disclosure Flowlight demands of everything else, applied to itself.
@@ -1302,8 +1330,46 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.9.1
+ 0.9.3
 September 27, 2026Latest
+
+ A budget for HTTPS inspection. Recorded bodies are the most sensitive thing
+ Flowlight holds, and what protected them was a guess at which headers carry credentials. A guess is
+ the wrong shape for this: it can only know the headers somebody thought of, and when it is wrong it
+ writes a secret to disk under a promise that it wouldn't. Headers are now kept because they are on a
+ list, not discarded because they looked dangerous. The old behaviour is still offered — reading an
+ unfamiliar API means seeing headers nobody has allowed yet — and a third option keeps no header
+ values at all. Whatever you choose, header names and value lengths survive. Hiding the header
+ altogether would be the quieter lie: it would show a shorter request than the one that actually happened,
+ and nothing on screen would say so.
+
+ Limits you set, rather than limits you hope for. Words of your own mark a header
+ as a credential whatever a vendor calls it. A daily per-app ceiling caps recorded bodies, and past
+ it the exchange is still recorded — time, host, path, status, headers — with only the bodies
+ dropped and a note saying why. Retention is a setting. And inspection now ends by itself after
+ eight hours, because "until somebody remembers" left the most sensitive mode in the app running
+ long after the reason for it had passed.
+
+ Two sentences that were not true. The Advanced panel said recorded requests were
+ kept for three days and credential headers were never stored. The period had become a setting, and
+ what happens to a credential is that its length is stored instead. That line is now generated from
+ the settings, so it cannot drift from them again.
+
+ An agent is no longer renamed by its own updates. Claude Code was appearing as
+ 2.1.260, 2.1.267, 2.1.283 — a new identity on every release,
+ each with its own allowlist, baselines and history. The executable's path names it correctly, but
+ that path cannot be read once a process has exited, and the fallback was the filename — which, for
+ an installer that keeps one file per release, is the version. A version is never accepted as an
+ identity now, the real name is remembered from the times the path was readable, and a one-time
+ repair merges the identities already recorded, adding their traffic together rather than letting
+ one overwrite another.
+
+ Inspecting one app shows that app. "Inspect …'s Traffic" put the name in the
+ search field, and that search reads response bodies too — so asking for one agent's traffic returned
+ every page whose HTML happened to mention it. It scopes now, with a chip you can remove.
+
+ 0.9.1
+September 27, 2026
 
  Inspect it from the row you found it on. Right-click an app or a destination in
  Live, Reports or AI Agents and Inspect opens already looking at it, instead of changing screen and

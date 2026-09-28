@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-de", "name": "Flowlight", "description": "Flowlight ist Open-Source-Netzwerküberwachung für macOS – app-genau, mit dem tiefsten Blick auf KI-Agenten, ihre Tools und MCP-Server.", "url": "https://flowlight.xinbetween.com/de/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/de/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-de", "name": "Flowlight", "description": "Flowlight ist Open-Source-Netzwerküberwachung für macOS – app-genau, mit dem tiefsten Blick auf KI-Agenten, ihre Tools und MCP-Server.", "url": "https://flowlight.xinbetween.com/de/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.9.3", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/de/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Zum Inhalt springen</a>
@@ -75,7 +75,7 @@
             Stern auf GitHub
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Kopieren</button></p>
-          <p class="meta-row"><span>v0.9.1</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>Keine Telemetrie</span></p>
+          <p class="meta-row"><span>v0.9.3</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>Keine Telemetrie</span></p>
         </div>
       </div>
 
@@ -404,7 +404,6 @@
           <a href="../de/threat-model/">Bedrohungsmodell</a> darlegt. In dieser Reihenfolge entsteht der Rest.</p>
       </div>
       <div class="privacy">
-        <div><strong>Ein Budget für die Inspektion <span class="tag">0.9.3</span></strong><p>Aufgezeichnete Bodys sind das Sensibelste, was Flowlight aufbewahrt. Eine Erlaubnisliste für Header statt einer Sperrliste, eigene Muster, die Möglichkeit, gar keine Header zu behalten, Obergrenzen pro App und eine Sitzung, die von selbst abläuft.</p></div>
         <div><strong>Zeig mir, was diese Regel getan hätte <span class="tag">0.9.4</span></strong><p>Spiele den letzten Tag gegen eine Regel durch und lass auflisten, was sie verweigert hätte, bevor sie überhaupt etwas verweigert. Die Daten sind schon da; sie haben bisher immer nur die Vergangenheit erklärt.</p></div>
         <div><strong>Was den Mac verlässt, bevor es ihn verlässt <span class="tag">0.9.5</span></strong><p>Bevor die erste Zeile einen Collector erreicht: das Ziel, ob es verschlüsselt ist, welche Felder mitreisen und ob Header darunter sind – die Offenlegung, die Flowlight von allem anderen verlangt, auf sich selbst angewandt.</p></div>
         <div><strong>Was ein Agent außerhalb des Netzwerks getan hat <span class="tag">1.0</span></strong><p>Eine Datei, die hinausgeht, ist erst ein Lesen und dann ein Senden, und sichtbar ist heute nur das Senden. Aufzuzeichnen, was die Tools eines Agenten geöffnet, geschrieben und gestartet haben, würde aus <em>hat den privaten Schlüssel gelesen und dann mit paste.example gesprochen</em> einen Befund machen statt zwei Bildschirme. Kein Ressourcenmonitor: CPU und Speicher sind die Aufgabe der Aktivitätsanzeige. Braucht Apples EndpointSecurity-Berechtigung, und das Inspektionsbudget von oben muss zuerst existieren.</p></div>
@@ -619,7 +618,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.1 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.9.3 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

@@ -89,6 +89,7 @@ final class TrafficMonitor: ObservableObject {
 
     init() {
         AnomalySettings.registerDefaults()
+        InspectionBudget.registerDefaults()
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
         do {
             if DemoData.isEnabled {

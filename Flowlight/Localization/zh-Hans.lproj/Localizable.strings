@@ -336,6 +336,29 @@
 "Couldn't save to the Keychain: %@" = "无法保存到钥匙串：%@";
 "error %lld" = "错误 %lld";
 
+/* Inspection/HTTPStream.swift */
+"not kept (%lld characters)" = "未保留（%lld 个字符）";
+
+/* Inspection/InspectionBudget.swift */
+"Keep only headers I allow" = "只保留我允许的标头";
+"Keep everything except credentials" = "除凭据外全部保留";
+"Keep no header values" = "不保留任何标头值";
+"The safest of the three: a header nobody has thought about yet is hidden rather than stored." = "三者中最安全的一种：还没有人想到过的标头会被隐去，而不是被存下来。";
+"Matches names and words against a built-in list. Useful for reading an unfamiliar API, but a credential under a name nothing recognises is recorded." = "按名称、也按名称中的词与内置列表比对。读一个陌生的 API 时很有用，但放在没人认得的名字底下的凭据会被记录下来。";
+"Names are still recorded, so you can see which headers were sent without keeping any of their values." = "名称仍会记录，所以你能看到发送了哪些标头，而不保留它们的任何值。";
+"Only the %lld header names you allow keep their values; the rest are replaced by their length." = "只有你允许的 %lld 个标头名称会保留值，其余都会被替换为它们的长度。";
+"Headers that look like credentials are replaced by their length — a heuristic, not a guarantee." = "看起来像凭据的标头会被替换为它们的长度 —— 这是一种启发式判断，不是保证。";
+"No header values are kept at all." = "完全不保留任何标头值。";
+"Recorded requests are kept for 1 day." = "记录的请求保留 1 天。";
+"Recorded requests are kept for %lld days." = "记录的请求保留 %lld 天。";
+"Bodies are no longer kept once an app has recorded %@ in a day." = "当一个应用在一天内已经记录了 %@ 之后，就不再保留正文。";
+"Inspection turns itself off after %lld minutes." = "检查会在 %lld 分钟后自动关闭。";
+"Inspection turns itself off after 1 hour." = "检查会在 1 小时后自动关闭。";
+"Inspection turns itself off after %lld hours." = "检查会在 %lld 小时后自动关闭。";
+"Inspection turns itself off after %lld hours %lld minutes." = "检查会在 %lld 小时 %lld 分钟后自动关闭。";
+"%lld minutes" = "%lld 分钟";
+"%lld hours" = "%lld 小时";
+
 /* Inspection/InspectionController.swift */
 "AI agents and their tools" = "AI 代理及其工具";
 "Every app that uses the proxy" = "所有使用代理服务器的应用";
@@ -354,6 +377,13 @@
 "No network services found." = "未找到网络服务。";
 "Couldn't change the proxy settings: %@" = "无法更改代理设置：%@";
 "unknown error" = "未知错误";
+"Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept." = "按照“高级”中的设置，检查在 %lld 分钟后自动关闭了。记录的请求仍会保留。";
+"Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept." = "按照“高级”中的设置，检查在 1 小时后自动关闭了。记录的请求仍会保留。";
+"Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept." = "按照“高级”中的设置，检查在 %lld 小时后自动关闭了。记录的请求仍会保留。";
+"Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept." = "按照“高级”中的设置，检查在 %lld 小时 %lld 分钟后自动关闭了。记录的请求仍会保留。";
+
+/* Inspection/InspectionRecorder.swift */
+"Bodies not kept: this app reached its daily inspection budget." = "未保留正文：此应用已达到它的每日检查额度。";
 
 /* Inspection/LLMFacts.swift */
 "only %lld tools enabled" = "仅启用了 %lld 个工具";
@@ -864,7 +894,6 @@
 "Environment variables that send one shell's tools through Flowlight" = "让某个 shell 中的工具经由 Flowlight 的环境变量";
 "Show Certificate in Finder" = "在 Finder 中显示证书";
 "Remove Certificate & Recorded Data…" = "移除证书与记录的数据…";
-"Recorded requests are kept for 3 days. API keys, cookies and other credential headers are never stored." = "记录的请求保留 3 天。API 密钥、cookie 以及其他凭据标头从不保存。";
 "Advanced" = "高级";
 "Mock responses" = "模拟响应";
 "1 on" = "1 条已开启";
@@ -898,6 +927,29 @@
 "No body" = "没有正文";
 "pid %lld" = "pid %lld";
 "%@ s" = "%@ 秒";
+"Showing only traffic from %@" = "仅显示来自 %@ 的流量";
+"Showing only traffic to %@" = "仅显示到 %@ 的流量";
+"Show every inspected request again" = "重新显示所有被检查的请求";
+
+/* UI/InspectionBudgetView.swift */
+"What inspection may keep" = "检查可以保留什么";
+"Recorded bodies are the most sensitive thing Flowlight holds. These are the limits on them." = "记录下来的正文是 Flowlight 保存的最敏感的内容。以下是对它们的限制。";
+"Headers kept in full" = "完整保留的标头";
+"x-my-header" = "x-my-header";
+"No headers are allowed, so no header values are kept. The names are still recorded." = "允许列表为空，因此不保留任何标头值。名称仍会记录。";
+"Also treat as credentials" = "也视为凭据";
+"A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know." = "名称中含有其中任一个词的标头，无论它还叫什么，都会被替换为它的长度。用于内置列表不认识的某家厂商自己的写法。";
+"x-acme-licence" = "x-acme-licence";
+"Daily limit on recorded bodies, per app, in MB" = "记录正文的每日上限（每个应用，MB）";
+"Past that limit, the exchange is still recorded — time, host, path, status and headers — and only its bodies are dropped." = "超过这个上限之后，交互本身仍会被记录 —— 时间、主机、路径、状态和标头 —— 只有它的正文会被丢弃。";
+"0 means no ceiling. An agent that resends a long conversation every turn can record a great deal in an afternoon." = "0 表示没有上限。每一轮都把一长段对话重新发一遍的代理，一个下午就能记录下非常多的内容。";
+"Days to keep recorded requests" = "记录的请求保留天数";
+"Applied as soon as you change it, not only at the next cleanup." = "改动会立即生效，而不是只在下一次清理时生效。";
+"Turn inspection off automatically" = "自动关闭检查";
+"Never — only when I turn it off" = "从不 —— 只在我手动关闭时";
+"Inspection will turn off at %@" = "检查将在 %@ 关闭";
+"Restart the timer" = "重新开始计时";
+"Inspection will run until you switch it off, including across restarts." = "检查会一直运行，直到你自己关掉它，重启之后也是如此。";
 
 /* UI/JSONTreeView.swift */
 "no match" = "没有匹配项";
@@ -1089,6 +1141,23 @@
 "Refuse %1$@ requests from %2$@ to %3$@." = "拒绝 %2$@ 发往 %3$@ 的 %1$@ 请求。";
 "Allow %1$@ requests from %2$@ to %3$@." = "允许 %2$@ 发往 %3$@ 的 %1$@ 请求。";
 "anywhere" = "任何目标";
+"What it would have done" = "它本来会做什么";
+
+/* UI/RuleSimulationView.swift */
+"Test against" = "对照期间";
+"The last day" = "最近 1 天";
+"The last 3 days" = "最近 3 天";
+"The last week" = "最近 1 周";
+"The last 2 weeks" = "最近 2 周";
+"Nothing simulated yet." = "还没有模拟过。";
+"Name an app or a destination first." = "请先指定一个应用或一个目标。";
+"No recorded traffic in this period to test against." = "这段期间没有记录下来的流量可供对照。";
+"Would have changed nothing. %lld connections in this period, none of them affected." = "什么都不会改变。这段期间有 %lld 个连接，没有一个受到影响。";
+"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "在 %2$lld 个连接中，本来会拒绝来自 %3$lld 个应用的 %1$lld 个，共 %4$@。";
+"Would have allowed %lld connections that are refused today." = "本来会允许 %lld 个如今被拒绝的连接。";
+"%lld×" = "%lld×";
+"and %lld more" = "还有 %lld 项";
+"Tested against traffic back to %@." = "对照了追溯到 %@ 的流量。";
 
 /* UI/RulesView.swift */
 "What they did" = "它们做了什么";

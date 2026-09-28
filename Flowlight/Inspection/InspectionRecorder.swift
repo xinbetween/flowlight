@@ -141,6 +141,9 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     var storeLimit = 2 << 20
     var proxyPort: () -> UInt16? = { nil }
     var onExchange: (HTTPExchange) -> Void = { _ in }
+    /// The limits in force, read fresh per exchange so tightening them applies to the next request rather than
+    /// the next launch. Loosening them never reaches what is already on disk, which is the safe direction.
+    nonisolated(unsafe) var budget: @Sendable () -> InspectionBudget = { InspectionBudget() }
 
     private var flows: [UUID: FlowState] = [:]
     private let lookupQueue = DispatchQueue(label: "flowlight.inspect.owner", qos: .utility)
@@ -218,18 +221,31 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                                           outputSize: activity.output?.count ?? 0))
             }
             let llm = LLMFactsReader.facts(request: request.body.data, response: responseBody.data, host: flow.host)
-            let (requestBody, requestCut) = clip(request.body)
-            let (responseData, responseCut) = clip(responseBody)
+            let limits = budget()
+            var (requestBody, requestCut) = clip(request.body)
+            var (responseData, responseCut) = clip(responseBody)
+            // The ceiling drops bodies, never the exchange. What happened stays on the screen; only the part
+            // that made it expensive to keep goes, and `note` says so rather than leaving an unexplained blank.
+            var budgetNote: String?
+            if overDailyCeiling(bytes: Int64(requestBody.count + responseData.count), app: owner.bundleID.isEmpty ? owner.appName : owner.bundleID,
+                                on: finished, limits: limits) {
+                requestBody = Data(); responseData = Data()
+                requestCut = request.body.wireSize > 0
+                responseCut = responseBody.wireSize > 0
+                budgetNote = L("Bodies not kept: this app reached its daily inspection budget.")
+            }
+            let notes = [note, budgetNote].compactMap { $0 }
             let exchange = HTTPExchange(
                 id: nil, started: request.started, duration: finished.timeIntervalSince(request.started), scheme: flow.scheme,
                 host: flow.host, port: flow.port, method: request.head.method, path: request.head.target, status: responseHead?.status,
-                requestHeaders: HeaderRedaction.redact(request.head.headers), requestBody: requestBody,
+                requestHeaders: HeaderRedaction.redact(request.head.headers, budget: limits), requestBody: requestBody,
                 requestSize: request.body.wireSize, requestTruncated: requestCut,
-                responseHeaders: HeaderRedaction.redact(responseHead?.headers ?? []), responseBody: responseData,
+                responseHeaders: HeaderRedaction.redact(responseHead?.headers ?? [], budget: limits), responseBody: responseData,
                 responseSize: responseBody.wireSize, responseTruncated: responseCut,
                 contentType: responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
-                toolResults: results, mcp: mcp, llm: llm, note: note, mockRule: request.mock, guardrail: request.guardrail)
+                toolResults: results, mcp: mcp, llm: llm, note: notes.isEmpty ? nil : notes.joined(separator: " "),
+                mockRule: request.mock, guardrail: request.guardrail)
             onExchange(exchange)
         }
     }
@@ -246,6 +262,26 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
 
     private func clip(_ body: HTTPBody) -> (Data, Bool) {
         body.data.count > storeLimit ? (body.data.prefix(storeLimit), true) : (body.data, body.truncated)
+    }
+
+    /// Body bytes kept per app since the day turned over. Emit-queue only, like `mcpNames`.
+    private var bodyBytesToday: [String: Int64] = [:]
+    private var tallyDay = Calendar.current.startOfDay(for: Date())
+
+    /// Whether this exchange's bodies would put the app past its budget for the day.
+    ///
+    /// The exchange that crosses the line is the first one refused rather than the last one kept: a ceiling that
+    /// admits one more request of any size is not a ceiling. The count is not persisted, so a relaunch starts the
+    /// day's tally again — a limit that survives restarts would need the database, and a budget nobody can reset
+    /// by quitting the app is a worse failure than one that is occasionally generous.
+    private func overDailyCeiling(bytes: Int64, app: String, on date: Date, limits: InspectionBudget) -> Bool {
+        guard limits.dailyBodyBytesPerApp > 0, !app.isEmpty else { return false }
+        let day = Calendar.current.startOfDay(for: date)
+        if day != tallyDay { tallyDay = day; bodyBytesToday.removeAll() }
+        let used = bodyBytesToday[app] ?? 0
+        guard used + bytes <= limits.dailyBodyBytesPerApp else { return true }
+        bodyBytesToday[app] = used + bytes
+        return false
     }
 
     private var owners: [UInt16: (owner: Owner, at: Date)] = [:]

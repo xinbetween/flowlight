@@ -41,16 +41,28 @@ final class ProcessLookup: @unchecked Sendable {
             info = Info(bundleID: id, name: app.localizedName ?? id, path: path)
         } else {
             var name = ProcessNaming.displayName(fromPathComponents: components.map(String.init))
+            // The path was readable, so this is the chance to learn what a version-shaped filename belongs to.
+            // The next time the same executable is seen without a path, that is the only thing that can answer.
+            if let filename = components.last.map(String.init), !name.isEmpty {
+                ProcessNaming.remember(version: filename, as: name)
+            }
             if name.isEmpty {
                 var nameBuf = [CChar](repeating: 0, count: 256)
                 proc_name(pid, &nameBuf, UInt32(nameBuf.count))
-                name = String(cString: nameBuf)
+                // `proc_name` is the filename, which for a one-file-per-release installer is the version.
+                name = ProcessNaming.identity(fromFilename: String(cString: nameBuf), pid: pid)
             }
             if name.isEmpty { name = "pid \(pid)" }
             // The bundle id stays the executable's own name, because rules and history are keyed by it.
             info = Info(bundleID: name, name: ProcessNaming.friendlyName(executable: name), path: path)
         }
-        lock.lock(); cache[pid] = (info, Date()); lock.unlock()
+        lock.lock()
+        if ProcessNaming.isVersion(info.name) || info.name.hasPrefix("pid "), let previous = cache[pid]?.info,
+           !ProcessNaming.isVersion(previous.name), !previous.name.hasPrefix("pid ") {
+            info = previous          // keep the better answer we already had for this pid
+        }
+        cache[pid] = (info, Date())
+        lock.unlock()
         return info
     }
 }

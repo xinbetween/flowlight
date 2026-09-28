@@ -15,17 +15,17 @@ struct InspectMenuItems: View {
     var host: String?
 
     var body: some View {
-        // What Inspect searches is text across hosts, paths, app names, tools and bodies — so the subject with
-        // the best chance of matching goes in. A host is more specific than an app name and less likely to
-        // collide with a word inside a body, so it wins when the row names both.
+        // These scope the list rather than search it. The first version put the name in the search field, which
+        // also searches response bodies — so "Inspect Claude Code's Traffic" returned every GitHub page whose
+        // HTML contains those two words, and the app whose traffic you asked for was nowhere in it.
         // The destination form. Named separately from the app form below because in English the two differ
         // only by word order, which tells a translator nothing about which is which.
         if let host, !host.isEmpty {
-            Button(L("Inspect Traffic to %@", host)) { nav.showInspect(search: host) }
+            Button(L("Inspect Traffic to %@", host)) { nav.showInspect(host: host) }
                 .help(helpText)
         }
         if let app, !app.name.isEmpty {
-            Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(search: app.name) }
+            Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app) }
                 .help(helpText)
         }
     }

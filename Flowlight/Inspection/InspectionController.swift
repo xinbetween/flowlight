@@ -16,9 +16,10 @@ final class InspectionController: ObservableObject {
         static let port = "inspection.port"
         static let scope = "inspection.scope"
         static let neverInspect = "inspection.neverInspect"
-        static let retentionDays = "inspection.retentionDays"
         static let systemProxy = "inspection.systemProxy"
         static let mockRules = "inspection.mockRules"
+        /// When the running session was switched on, so its end survives a relaunch.
+        static let sessionStarted = "inspection.sessionStarted"
     }
 
     /// Hosts that are never decrypted, even when routed through the proxy: Apple services (many pin certificates and
@@ -48,6 +49,7 @@ final class InspectionController: ObservableObject {
     private let ca = CertificateAuthority.shared
     private weak var db: TrafficDatabase?
     private var pruneTimer: Timer?
+    private var sessionTimer: Timer?
     var onRecorded: () -> Void = {}
     /// The rules that refuse a request rather than a whole connection — the ones that name a path or a method,
     /// which only the proxy can see. Read fresh on every connection, so a rule written now applies to the next
@@ -63,10 +65,11 @@ final class InspectionController: ObservableObject {
     init() {
         UserDefaults.standard.register(defaults: [
             Keys.enabled: false, Keys.port: 8877, Keys.scope: Scope.all.rawValue,
-            Keys.neverInspect: Self.defaultNeverInspect, Keys.retentionDays: 3, Keys.systemProxy: false,
+            Keys.neverInspect: Self.defaultNeverInspect, Keys.systemProxy: false,
         ])
         proxy.observer = recorder
         recorder.proxyPort = { [proxy] in proxy.port }
+        recorder.budget = { InspectionBudget.load() }
         proxy.onStateChange = { [weak self, proxy] message in
             Task { @MainActor in
                 self?.running = proxy.port != nil
@@ -219,6 +222,25 @@ final class InspectionController: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: Keys.neverInspect); objectWillChange.send() }
     }
 
+    /// What inspection is allowed to keep. Tightening it applies to the next request; it cannot reach back into
+    /// what is already recorded, which is why `retentionDays` and Remove Recorded Data exist as well.
+    var budget: InspectionBudget {
+        get { InspectionBudget.load() }
+        set {
+            newValue.save()
+            objectWillChange.send()
+            // A shorter retention has to take effect now rather than at the next hourly sweep, or the setting
+            // reads as a promise the app has not kept yet.
+            prune()
+            scheduleSessionExpiry()
+        }
+    }
+
+    /// When the current session turns itself off, or nil if it runs until switched off by hand.
+    @Published private(set) var sessionEndsAt: Date?
+    /// Said once, after the session ended on its own. Not `lastError`: nothing went wrong.
+    @Published var sessionNote: String?
+
     /// Canned answers for chosen endpoints, in the order they're tried. Kept in UserDefaults as JSON like
     /// `neverInspect`: they're settings rather than history, the proxy reads them before the database is open, and
     /// "remove everything Flowlight recorded" mustn't quietly throw away a rule someone wrote.
@@ -249,6 +271,62 @@ final class InspectionController: ObservableObject {
             Task { @MainActor in self?.prune() }
         }
         prune()
+        scheduleSessionExpiry()
+    }
+
+    // MARK: The session ends by itself
+
+    /// Inspection used to run until somebody remembered to turn it off, which meant the most sensitive mode in the
+    /// app was the one most likely to be left on after the reason for it had passed. It now has an end, and the
+    /// end is visible on screen rather than implied — a countdown you can see is a countdown you can extend on
+    /// purpose, where a silent one would just look like inspection breaking.
+    private func scheduleSessionExpiry() {
+        sessionTimer?.invalidate()
+        sessionTimer = nil
+        let minutes = budget.sessionMinutes
+        guard enabled, running, minutes > 0 else {
+            sessionEndsAt = nil
+            UserDefaults.standard.removeObject(forKey: Keys.sessionStarted)
+            return
+        }
+        // The clock runs from when inspection was switched on, not from now, so changing an unrelated setting
+        // cannot quietly buy another eight hours.
+        let started = (UserDefaults.standard.object(forKey: Keys.sessionStarted) as? Date) ?? Date()
+        UserDefaults.standard.set(started, forKey: Keys.sessionStarted)
+        let ends = started.addingTimeInterval(Double(minutes) * 60)
+        sessionEndsAt = ends
+        guard ends > Date() else { return expireSession() }
+        sessionTimer = Timer.scheduledTimer(withTimeInterval: ends.timeIntervalSinceNow, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.expireSession() }
+        }
+    }
+
+    private func expireSession() {
+        sessionTimer?.invalidate()
+        sessionTimer = nil
+        sessionEndsAt = nil
+        UserDefaults.standard.removeObject(forKey: Keys.sessionStarted)
+        guard enabled else { return }
+        enabled = false
+        // Four whole sentences rather than one with the period handed in. This is the last string that composed
+        // a duration it could not see, and the worst one to leave: it is what someone reads immediately after
+        // inspection stopped without being asked, so it is the moment a half-translated sentence does most harm.
+        let total = budget.sessionMinutes, hours = total / 60, minutes = total % 60
+        if hours == 0 {
+            sessionNote = L("Inspection turned itself off after %lld minutes, as set in Advanced. Recorded requests are kept.", minutes)
+        } else if minutes == 0 {
+            sessionNote = hours == 1
+                ? L("Inspection turned itself off after 1 hour, as set in Advanced. Recorded requests are kept.")
+                : L("Inspection turned itself off after %lld hours, as set in Advanced. Recorded requests are kept.", hours)
+        } else {
+            sessionNote = L("Inspection turned itself off after %lld hours %lld minutes, as set in Advanced. Recorded requests are kept.", hours, minutes)
+        }
+    }
+
+    /// Start the session again from now, for another full period.
+    func extendSession() {
+        UserDefaults.standard.set(Date(), forKey: Keys.sessionStarted)
+        scheduleSessionExpiry()
     }
 
     /// Everything the simple switch does: create the certificate, trust it, start the proxy and route apps through it.
@@ -345,7 +423,7 @@ final class InspectionController: ObservableObject {
     }
 
     private func prune() {
-        let days = max(1, UserDefaults.standard.integer(forKey: Keys.retentionDays))
+        let days = budget.retentionDays
         db?.async { try $0.pruneExchanges(olderThan: Date().addingTimeInterval(-Double(days) * 86400)) }
     }
 
