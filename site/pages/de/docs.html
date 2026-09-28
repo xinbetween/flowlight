@@ -514,6 +514,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
         früher ankommen; und <strong>Verbindung testen</strong> belegt, dass der Endpunkt antwortet, nicht dass er deine Zugangsdaten geprüft hat –
         die Zeile „letzter erfolgreicher Export“ ist das ehrliche Signal.</p>
 
+      <p><strong>Bevor irgendetwas diesen Mac verlässt.</strong> Flowlight verlangt von jeder App auf deinem Mac, zu sagen, was sie
+        sendet und wohin. Der Export ist die eine Stelle, an der Flowlight selbst etwas Substanzielles sendet, also gilt dieselbe
+        Offenlegung auch für ihn. Den Schalter einzuschalten startet keinen Export: Es öffnet eine Seite, die den Collector benennt,
+        in klaren Worten sagt, ob die Verbindung verschlüsselt ist oder ob alles im Klartext über das Netzwerk läuft, lesbar für alles
+        auf dem Weg, genau die Felder auflistet, die deine Einstellungen senden werden – jedes mit einem Satz, der es erklärt –, und
+        die Namen aller Header nennt, die an die Anfrage gehängt werden. Header-<em>Werte</em> werden nie angezeigt – sie liegen im
+        Schlüsselbund, und eine Ansicht, die ein Token ausgibt, um zu beweisen, dass es gesendet wird, wäre genau das, wovor sie
+        warnt.</p>
+      <p>Die Freigabe hängt an dem, was offengelegt wurde, nicht daran, einmal zugestimmt zu haben. Ändere das Ziel, schalte den
+        Hostnamen ein, füge einen Header hinzu, sende Warnungen zusätzlich zu Rollups – und Flowlight hält an und fragt erneut, denn
+        was hinausgeht, ist nicht mehr das, dem du zugestimmt hast. Ein ausgetauschtes Token fragt nicht erneut: Der Wert war nie Teil
+        der Offenlegung. Den Export auszuschalten nimmt die Freigabe vollständig zurück; ihn wieder einzuschalten ist eine neue
+        Entscheidung, gemessen an dem, was die Einstellungen dann sagen.</p>
+      <p>Die Prüfung sitzt an der Stelle, an der die Bytes hinausgehen würden, nicht nur im Einstellungsbereich – eine künftige
+        Ansicht, die zu fragen vergisst, kann also trotzdem nichts senden.</p>
+
       <h2 id="data">Deine Daten</h2>
       <p>Alles liegt in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Sekundenzeilen werden 6 Stunden aufbewahrt
         (einstellbar), Minutenzeilen 14 Tage, Stundenzeilen 400 Tage, Tageszeilen dauerhaft und Warnungen 90 Tage.

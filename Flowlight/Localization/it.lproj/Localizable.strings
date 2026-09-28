@@ -1381,3 +1381,26 @@
 "Edit" = "Modifica";
 "On" = "Attivato";
 "Settings" = "Impostazioni";
+
+
+/* 0.9.5 export disclosure */
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "Non inviato: ciò che lascerebbe questo Mac è cambiato da quando l'hai approvato. Apri Impostazioni › Esportazione per rivederlo.";
+"Before anything leaves this Mac" = "Prima che qualcosa lasci questo Mac";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight chiede a ogni app di questo Mac di dire che cosa invia e dove. Questo è proprio quello, per Flowlight.";
+"Where it goes" = "Dove va";
+"Collector" = "Collector";
+"Encrypted in transit (HTTPS)." = "Cifrato in transito (HTTPS).";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "Non cifrato. Tutto ciò che segue attraversa la rete in chiaro, leggibile da qualsiasi cosa si trovi sul percorso.";
+"What is attached to the request" = "Che cosa è allegato alla richiesta";
+"No headers." = "Nessuna intestazione.";
+"value kept in the Keychain, not shown" = "valore conservato nel portachiavi, non mostrato";
+"once per request" = "una volta per richiesta";
+"Exactly these %lld fields" = "Esattamente questi %lld campi";
+"Send This" = "Invia questo";
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "Ciò che lascerebbe questo Mac è cambiato da quando l'hai approvato. Non viene inviato nulla.";
+"Review What Would Be Sent…" = "Rivedi cosa verrebbe inviato…";
+
+"%lld fields, encrypted to %@." = "%lld campi, cifrati verso %@.";
+"%lld fields, in cleartext to %@." = "%lld campi, in chiaro verso %@.";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nulla di ciò che registra l'ispezione HTTPS può arrivare a un'esportazione: nessuna intestazione di richiesta o risposta, nessun corpo, nessuna chiamata agli strumenti, nessuno scambio decifrato. Alcuni di questi campi viaggiano nella busta del formato stesso invece che come chiave con un nome, il che cambia dove compaiono nel tuo collector, non se escono.";
+"Flowlight will ask again if any of this changes." = "Flowlight lo chiederà di nuovo se cambia qualcosa di tutto questo.";

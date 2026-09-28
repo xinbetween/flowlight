@@ -71,14 +71,14 @@ struct ExportDisclosureSheet: View {
                         Text(L("Exactly these %lld fields", disclosure.fieldCount)).font(.headline)
                     }
                 } footer: {
-                    Text(L("Nothing HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave."))
+                    Text(L("Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             .formStyle(.grouped)
 
             HStack {
-                Text(L("Flowlight will ask again if the destination or the fields change."))
+                Text(L("Flowlight will ask again if any of this changes."))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)

@@ -1396,11 +1396,11 @@
 "value kept in the Keychain, not shown" = "value kept in the Keychain, not shown";
 "once per request" = "once per request";
 "Exactly these %lld fields" = "Exactly these %lld fields";
-"Nothing HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nothing HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave.";
-"Flowlight will ask again if the destination or the fields change." = "Flowlight will ask again if the destination or the fields change.";
 "Send This" = "Send This";
 "What would leave this Mac has changed since you approved it. Nothing is being sent." = "What would leave this Mac has changed since you approved it. Nothing is being sent.";
 "Review What Would Be Sent…" = "Review What Would Be Sent…";
 
 "%lld fields, encrypted to %@." = "%lld fields, encrypted to %@.";
 "%lld fields, in cleartext to %@." = "%lld fields, in cleartext to %@.";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave.";
+"Flowlight will ask again if any of this changes." = "Flowlight will ask again if any of this changes.";

@@ -1381,3 +1381,26 @@
 "Edit" = "Editar";
 "On" = "Activado";
 "Settings" = "Ajustes";
+
+
+/* 0.9.5 export disclosure */
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "No se ha enviado: lo que saldría de este Mac ha cambiado desde que lo aprobaste. Abre Ajustes › Exportación para revisarlo.";
+"Before anything leaves this Mac" = "Antes de que algo salga de este Mac";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight pide a todas las apps de este Mac que digan qué envían y adónde. Esto es eso mismo, aplicado a Flowlight.";
+"Where it goes" = "Adónde va";
+"Collector" = "Colector";
+"Encrypted in transit (HTTPS)." = "Cifrado en tránsito (HTTPS).";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "Sin cifrar. Todo lo de abajo cruza la red en claro, legible por cualquier cosa que esté en el camino.";
+"What is attached to the request" = "Qué se adjunta a la petición";
+"No headers." = "Sin cabeceras.";
+"value kept in the Keychain, not shown" = "el valor se queda en el llavero, no se muestra";
+"once per request" = "una vez por petición";
+"Exactly these %lld fields" = "Exactamente estos %lld campos";
+"Send This" = "Enviar esto";
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "Lo que saldría de este Mac ha cambiado desde que lo aprobaste. No se está enviando nada.";
+"Review What Would Be Sent…" = "Revisar qué se enviaría…";
+
+"%lld fields, encrypted to %@." = "%lld campos, cifrados a %@.";
+"%lld fields, in cleartext to %@." = "%lld campos, en claro a %@.";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nada de lo que registra la inspección HTTPS puede llegar a una exportación: ni cabeceras de peticiones o respuestas, ni cuerpos, ni llamadas a herramientas, ni intercambios descifrados. Algunos de estos campos viajan dentro del propio sobre del formato en lugar de como una clave con nombre, lo que cambia dónde aparecen en tu colector, no si salen.";
+"Flowlight will ask again if any of this changes." = "Flowlight volverá a preguntar si cambia cualquiera de estas cosas.";
