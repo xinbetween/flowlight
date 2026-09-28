@@ -71,7 +71,7 @@ struct ExportDisclosureSheet: View {
                         Text(L("Exactly these %lld fields", disclosure.fieldCount)).font(.headline)
                     }
                 } footer: {
-                    Text(L("Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave."))
+                    Text(L("Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

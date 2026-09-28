@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.9.4, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.9.5, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -572,8 +572,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         will send with a sentence explaining each, and names any headers attached to the request. Header <em>values</em> are never
         shown — they live in the Keychain, and a screen that printed a token to prove it was being sent would be the thing it warns
         about.</p>
-      <p>Approval is tied to what was disclosed, not to the act of agreeing once. Change the destination, switch the host name on,
-        add a header, start sending alerts as well as rollups — and Flowlight stops and asks again, because what leaves is no longer
+      <p>Approval is tied to what was disclosed, not to the act of agreeing once. Change the destination, switch from HTTPS to plain HTTP,
+        change the format, switch the host name on, add a header, start sending alerts as well as rollups — and Flowlight stops
+        and asks again, because what leaves is no longer
         what you agreed to. Rotating a token does not ask again: the value was never part of the disclosure. Switching the export off
         withdraws the approval entirely, so turning it back on is a fresh decision against whatever the settings say by then.</p>
       <p>The check sits at the point the bytes would leave, not only in the settings screen, so a future screen that forgets to ask
@@ -701,7 +702,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.4 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.9.5 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

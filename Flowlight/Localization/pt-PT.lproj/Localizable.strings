@@ -241,6 +241,7 @@
 "The collector answered HTTP %lld: %@" = "O coletor respondeu HTTP %lld: %@";
 "No endpoint. Type the address of your collector first." = "Sem endpoint. Escreva primeiro o endereço do seu coletor.";
 "Couldn't read the rollups to export: %@" = "Não foi possível ler as agregações a exportar: %@";
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "Não enviado: o que sairia deste Mac mudou desde que o aprovou. Abra Definições › Exportação para o rever.";
 "Couldn't build the payload: %@" = "Não foi possível construir o payload: %@";
 "%@ accepted an empty OTLP request." = "%@ aceitou um pedido OTLP vazio.";
 "%@ accepted one test line." = "%@ aceitou uma linha de teste.";
@@ -252,6 +253,26 @@
 "%lld rollups and 1 alert" = "%lld agregações e 1 alerta";
 "%lld rollups and %lld alerts" = "%lld agregações e %lld alertas";
 "# A sample of %@ from your own data. Nothing here has been sent." = "# Uma amostra de %@ dos seus próprios dados. Nada aqui foi enviado.";
+
+/* Export/ExportDisclosure.swift */
+"%lld fields, encrypted to %@." = "%lld campos, encriptados para %@.";
+"%lld fields, in cleartext to %@." = "%lld campos, em claro para %@.";
+
+/* Export/ExportDisclosureSheet.swift */
+"Before anything leaves this Mac" = "Antes de algo sair deste Mac";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "O Flowlight pede a todas as apps deste Mac que digam o que enviam e para onde. Isto é exatamente isso, para o próprio Flowlight.";
+"Where it goes" = "Para onde vai";
+"Collector" = "Coletor";
+"Encrypted in transit (HTTPS)." = "Encriptado em trânsito (HTTPS).";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "Não encriptado. Tudo o que está abaixo atravessa a rede em claro, legível por qualquer coisa que esteja no caminho.";
+"What is attached to the request" = "O que vai anexado ao pedido";
+"No headers." = "Sem cabeçalhos.";
+"value kept in the Keychain, not shown" = "valor guardado no porta-chaves, não é mostrado";
+"once per request" = "uma vez por pedido";
+"Exactly these %lld fields" = "Exatamente estes %lld campos";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nada do que a inspeção HTTPS registe pode chegar a uma exportação: nem cabeçalhos de pedido ou de resposta, nem corpos, nem chamadas de ferramentas, nem trocas desencriptadas. Alguns dos campos acima viajam dentro do próprio envelope do formato em vez de como uma chave com nome, o que muda onde aparecem no seu coletor, não se saem ou não.";
+"Flowlight will ask again if any of this changes." = "O Flowlight volta a perguntar se algo disto mudar.";
+"Send This" = "Enviar isto";
 
 /* Export/ExportModels.swift */
 "OpenTelemetry (OTLP/HTTP, JSON)" = "OpenTelemetry (OTLP/HTTP, JSON)";
@@ -285,6 +306,8 @@
 "The alert's sentence, exactly as Flowlight's Alerts screen shows it." = "A frase do alerta, exatamente como o ecrã Alertas do Flowlight a mostra.";
 
 /* Export/ExportSettingsView.swift */
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "O que sairia deste Mac mudou desde que o aprovou. Nada está a ser enviado.";
+"Review What Would Be Sent…" = "Rever o que seria enviado…";
 "Send to my collector" = "Enviar para o meu coletor";
 "On. Flowlight is sending to the endpoint below." = "Ativado. O Flowlight está a enviar para o endpoint abaixo.";
 "Off. Nothing about your traffic leaves this Mac." = "Desativado. Nada sobre o seu tráfego sai deste Mac.";

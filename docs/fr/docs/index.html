@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.4, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.9.5, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -567,6 +567,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
         arrivent plus tôt&nbsp;; et <strong>Tester la connexion</strong> prouve que le point de terminaison répond, pas qu’il a validé vos identifiants —
         la ligne «&nbsp;dernière exportation réussie&nbsp;» est le signal honnête.</p>
 
+      <p><strong>Avant que quoi que ce soit ne quitte ce Mac.</strong> Flowlight demande à chaque app de votre Mac de dire ce qu’elle
+        envoie et où. L’exportation est le seul endroit où Flowlight lui-même envoie quelque chose de substantiel&nbsp;: la même
+        déclaration s’applique donc à elle. Activer l’interrupteur ne démarre pas une exportation&nbsp;: cela ouvre une page qui nomme
+        le collecteur, dit en toutes lettres si la connexion est chiffrée ou si tout traverse le réseau en clair, lisible par tout ce
+        qui se trouve sur le chemin, liste exactement les champs que vos réglages enverront avec une phrase expliquant chacun d’eux, et
+        nomme les en-têtes joints à la requête. Les <em>valeurs</em> des en-têtes ne sont jamais affichées&nbsp;: elles vivent dans le
+        trousseau, et un écran qui imprimerait un jeton pour prouver qu’il est bien envoyé serait précisément ce contre quoi il
+        avertit.</p>
+      <p>L’approbation porte sur ce qui a été déclaré, pas sur le fait d’avoir accepté une fois. Changez la destination, activez le nom
+        d’hôte, ajoutez un en-tête, mettez-vous à envoyer les alertes en plus des agrégats — et Flowlight s’arrête et redemande, parce
+        que ce qui part n’est plus ce que vous avez accepté. Renouveler un jeton ne fait pas redemander&nbsp;: la valeur n’a jamais
+        fait partie de la déclaration. Désactiver l’exportation retire entièrement l’approbation&nbsp;; la réactiver est donc une
+        décision neuve, face à ce que disent les réglages à ce moment-là.</p>
+      <p>Le contrôle se trouve à l’endroit où les octets partiraient, pas seulement dans l’écran des réglages&nbsp;: un futur écran qui
+        oublierait de demander ne peut donc pas envoyer pour autant.</p>
+
       <h2 id="data">Vos données</h2>
       <p>Tout vit dans <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Les lignes par seconde sont conservées 6 heures
         (réglable), les lignes à la minute 14 jours, les lignes horaires 400 jours, les lignes quotidiennes indéfiniment, et les alertes 90 jours.
@@ -688,7 +704,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.4 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.9.5 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

@@ -241,6 +241,7 @@
 "The collector answered HTTP %lld: %@" = "收集器返回了 HTTP %lld：%@";
 "No endpoint. Type the address of your collector first." = "没有端点。请先输入你的收集器地址。";
 "Couldn't read the rollups to export: %@" = "无法读取要导出的汇总：%@";
+"Not sent: what would leave this Mac has changed since you approved it. Open Settings › Export to review it." = "未发送：自你批准以来，将要离开这台 Mac 的内容已经改变。请打开“设置”›“导出”查看。";
 "Couldn't build the payload: %@" = "无法构建请求内容：%@";
 "%@ accepted an empty OTLP request." = "%@ 接受了一个空的 OTLP 请求。";
 "%@ accepted one test line." = "%@ 接受了一行测试数据。";
@@ -252,6 +253,26 @@
 "%lld rollups and 1 alert" = "%lld 条汇总和 1 条警报";
 "%lld rollups and %lld alerts" = "%lld 条汇总和 %lld 条警报";
 "# A sample of %@ from your own data. Nothing here has been sent." = "# 取自你自己数据的 %@ 样本。这里的内容都没有被发送。";
+
+/* Export/ExportDisclosure.swift */
+"%lld fields, encrypted to %@." = "%lld 个字段，加密发送到 %@。";
+"%lld fields, in cleartext to %@." = "%lld 个字段，以明文发送到 %@。";
+
+/* Export/ExportDisclosureSheet.swift */
+"Before anything leaves this Mac" = "在任何内容离开这台 Mac 之前";
+"Flowlight asks every app on this Mac to say what it sends and where. This is that, for Flowlight." = "Flowlight 要求这台 Mac 上的每个应用说明它发送什么、发往哪里。这一页就是 Flowlight 对自己的说明。";
+"Where it goes" = "发往哪里";
+"Collector" = "收集器";
+"Encrypted in transit (HTTPS)." = "传输过程已加密（HTTPS）。";
+"Not encrypted. Everything below crosses the network in the clear, readable by anything on the path." = "未加密。下面的所有内容都会以明文经过网络，路径上的任何东西都能读取。";
+"What is attached to the request" = "随请求一起附上的内容";
+"No headers." = "没有标头。";
+"value kept in the Keychain, not shown" = "值保存在钥匙串中，不予显示";
+"once per request" = "每个请求一次";
+"Exactly these %lld fields" = "正好是这 %lld 个字段";
+"Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of these travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS 检查记录的内容一概无法进入导出：没有请求或响应的标头，没有正文，没有工具调用，没有解密后的交互。上面这些字段中有一部分装在格式自身的信封里传输，而不是作为一个具名键，这改变的是它们在你的收集器里出现的位置，而不是它们会不会离开。";
+"Flowlight will ask again if any of this changes." = "这里的任何一项发生变化，Flowlight 都会再问一次。";
+"Send This" = "就发送这些";
 
 /* Export/ExportModels.swift */
 "OpenTelemetry (OTLP/HTTP, JSON)" = "OpenTelemetry（OTLP/HTTP，JSON）";
@@ -285,6 +306,8 @@
 "The alert's sentence, exactly as Flowlight's Alerts screen shows it." = "警报的文字，与 Flowlight“警报”界面显示的完全一致。";
 
 /* Export/ExportSettingsView.swift */
+"What would leave this Mac has changed since you approved it. Nothing is being sent." = "自你批准以来，将要离开这台 Mac 的内容已经改变。当前没有发送任何东西。";
+"Review What Would Be Sent…" = "重新确认将要发送的内容…";
 "Send to my collector" = "发送到我的收集器";
 "On. Flowlight is sending to the endpoint below." = "已开启。Flowlight 正在向下方的端点发送。";
 "Off. Nothing about your traffic leaves this Mac." = "已关闭。你的流量信息不会离开这台 Mac。";
