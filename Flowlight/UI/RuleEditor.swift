@@ -105,6 +105,13 @@ struct RuleEditor: View {
                 Section {
                     TextField(L("Name"), text: $rule.name, prompt: Text(RuleWords.title(rule)))
                 }
+
+                // Last, because it answers a question you can only ask once the rule says something — and
+                // because the first thing anyone should learn about a blocking rule is what it would break,
+                // rather than finding out from something failing later.
+                Section(L("What it would have done")) {
+                    RuleSimulationView(rule: rule)
+                }
             }
             .formStyle(.grouped)
 
