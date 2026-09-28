@@ -520,10 +520,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         allegata alla richiesta. I <em>valori</em> delle intestazioni non vengono mai mostrati: stanno nel portachiavi, e una schermata
         che stampasse un token per dimostrare che viene inviato sarebbe proprio ciò da cui mette in guardia.</p>
       <p>L'approvazione è legata a ciò che è stato dichiarato, non al fatto di aver acconsentito una volta. Cambia la destinazione,
-        attiva il nome host, aggiungi un'intestazione, comincia a inviare gli avvisi oltre alle aggregazioni — e Flowlight si ferma e
-        chiede di nuovo, perché ciò che esce non è più ciò che hai accettato. Ruotare un token non fa chiedere di nuovo: il valore non
-        è mai stato parte della dichiarazione. Disattivare l'esportazione ritira completamente l'approvazione, quindi riattivarla è una
-        decisione nuova, rispetto a quello che dicono le impostazioni in quel momento.</p>
+        passa da HTTPS a HTTP non cifrato, cambia il formato, attiva il nome host, aggiungi un'intestazione, comincia a inviare gli
+        avvisi oltre alle aggregazioni — e Flowlight si ferma e chiede di nuovo, perché ciò che esce non è più ciò che hai accettato.
+        Ruotare un token non fa chiedere di nuovo: il valore non è mai stato parte della dichiarazione. Disattivare l'esportazione
+        ritira completamente l'approvazione, quindi riattivarla è una decisione nuova, rispetto a quello che dicono le impostazioni in
+        quel momento.</p>
       <p>Il controllo si trova nel punto in cui i byte uscirebbero, non solo nella schermata delle impostazioni, così una schermata
         futura che si dimenticasse di chiedere non può comunque inviare nulla.</p>
 

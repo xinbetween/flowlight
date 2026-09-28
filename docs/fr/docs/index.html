@@ -575,11 +575,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         nomme les en-têtes joints à la requête. Les <em>valeurs</em> des en-têtes ne sont jamais affichées&nbsp;: elles vivent dans le
         trousseau, et un écran qui imprimerait un jeton pour prouver qu’il est bien envoyé serait précisément ce contre quoi il
         avertit.</p>
-      <p>L’approbation porte sur ce qui a été déclaré, pas sur le fait d’avoir accepté une fois. Changez la destination, activez le nom
-        d’hôte, ajoutez un en-tête, mettez-vous à envoyer les alertes en plus des agrégats — et Flowlight s’arrête et redemande, parce
-        que ce qui part n’est plus ce que vous avez accepté. Renouveler un jeton ne fait pas redemander&nbsp;: la valeur n’a jamais
-        fait partie de la déclaration. Désactiver l’exportation retire entièrement l’approbation&nbsp;; la réactiver est donc une
-        décision neuve, face à ce que disent les réglages à ce moment-là.</p>
+      <p>L’approbation porte sur ce qui a été déclaré, pas sur le fait d’avoir accepté une fois. Changez la destination, passez de
+        HTTPS à du HTTP non chiffré, changez le format, activez le nom d’hôte, ajoutez un en-tête, mettez-vous à envoyer les alertes en
+        plus des agrégats — et Flowlight s’arrête et redemande, parce que ce qui part n’est plus ce que vous avez accepté. Renouveler un
+        jeton ne fait pas redemander&nbsp;: la valeur n’a jamais fait partie de la déclaration. Désactiver l’exportation retire
+        entièrement l’approbation&nbsp;; la réactiver est donc une décision neuve, face à ce que disent les réglages à ce moment-là.</p>
       <p>Le contrôle se trouve à l’endroit où les octets partiraient, pas seulement dans l’écran des réglages&nbsp;: un futur écran qui
         oublierait de demander ne peut donc pas envoyer pour autant.</p>
 
