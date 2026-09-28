@@ -88,7 +88,7 @@ extension FeatureGuide {
             id: "allowlists", title: "Agent allowlists",
             summary: "\"Claude Code may talk to GitHub and npm, nothing else.\" Anything else raises an alert, and with enforcement on the extension refuses the connection too.",
             steps: ["Open AI Agents and select the agent.", "Under Allowlist, add domains, addresses or ranges, or start from a preset.",
-                    "To refuse rather than warn, turn on Refuse connections outside the list."],
+                    "To refuse rather than warn, turn on Block connections that aren't allowed."],
             screen: .agents,
             caveats: ["Refusing needs the Network Extension. Local traffic, DNS, Apple services and Flowlight's own connections are never refused."],
             keywords: ["allowlist", "allow", "whitelist", "block agent", "enforce"]),
