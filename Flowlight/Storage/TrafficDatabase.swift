@@ -953,6 +953,32 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("DELETE FROM guardrails WHERE id = ?", [.text(id.uuidString)])
     }
 
+    // MARK: Rule simulation
+
+    /// Recorded traffic in the shape the rule engine judges, for answering "what would this rule have done".
+    ///
+    /// Read from the minute tier rather than the second tier: seconds are kept for hours and simulating against
+    /// them would answer for this morning only, while minutes reach back a fortnight. Grouped in SQL because the
+    /// interesting number is how many distinct things a rule touches, and a busy agent produces tens of thousands
+    /// of rows that collapse to a handful of destinations.
+    func flowsForSimulation(since: Date, limit: Int = 20000) throws -> [RuleSimulation.Flow] {
+        try conn.query("""
+            SELECT MAX(ts), bundle_id, app_name, agent_parent, domain, remote_ip, port,
+                   SUM(bytes_in + bytes_out), SUM(flows)
+            FROM agg_1m WHERE ts >= ?
+            GROUP BY bundle_id, agent_parent, domain, remote_ip, port
+            ORDER BY SUM(flows) DESC LIMIT ?
+            """, [.int(Int64(since.timeIntervalSince1970)), .int(Int64(limit))]) { row in
+            RuleSimulation.Flow(
+                when: Date(timeIntervalSince1970: Double(row.int(0))),
+                // The agent a flow belongs to is its parent when it has one — a tool an agent ran is the agent's
+                // traffic for the purposes of a rule about that agent.
+                agentKey: row.text(3).isEmpty ? row.text(1) : row.text(3),
+                bundleID: row.text(1), appName: row.text(2), host: row.text(4), ip: row.text(5),
+                port: UInt16(clamping: row.int(6)), bytes: row.int(7), connections: Int(row.int(8)))
+        }
+    }
+
     // MARK: HTTPS inspection
 
     func insertExchange(_ e: HTTPExchange) throws {

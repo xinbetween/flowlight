@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.9.3, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.9.4, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -385,6 +385,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>The second tab is the <strong>violations feed</strong>: every connection a rule decided, with the app, where it was headed, which
         rule decided it and whether that was a refusal or an exception letting it through.</p>
 
+      <p><strong>What it would have done.</strong> A blocking rule is easy to write and frightening to switch on, because the first
+        thing you normally learn about one is what it broke — and you learn it later, from something failing somewhere else. The rule
+        editor answers that first: it replays recorded traffic against the rule you are writing and lists what would have changed,
+        before anything is refused. Pick one of four periods, the longest being the last two weeks. The rule has to name an app or a
+        destination first — one that names neither would decide every connection on the Mac, and Flowlight will not write it.</p>
+      <p>It reports a <em>change</em>, not a match count. If a rule you already have refuses that traffic, adding another that also refuses
+        it changes nothing, and saying "would have refused 4,000 connections" would be untrue — so every recorded connection is decided
+        twice, once with your rules as they stand and once with the new one added, and only the ones that come out differently are
+        listed. An allow rule written to carve an exception out of a broad block reports the same thing from the other side: what it
+        would let through.</p>
+      <p>Two details that decide whether the number can be trusted. Schedules are judged at the time the traffic happened, so a rule
+        for weeknights reports what it would have refused on weeknights rather than what it would refuse if that traffic happened now.
+        And an empty result distinguishes "Would have changed nothing. 1,240 connections in this period, none of them
+        affected." from "No recorded traffic in this period to test against." — the same empty list, opposite meanings, and only one
+        of them says the rule is safe. The screen also names the oldest traffic it could see: a rule tested against two hours of
+        history has been tested against two hours of history.</p>
+
       <h2 id="allowlists">Allowlists</h2>
       <p>Select an agent in <strong>AI Agents</strong> and use <strong>Allowlist</strong> in its detail to say where it may connect. Enter domains
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
@@ -394,7 +411,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         until you tell it not to: see <a href="#blocking">Refusing connections</a>.</p>
 
       <h2 id="blocking">Refusing connections</h2>
-      <p>An allowlist warns by default. Turn on <strong>Refuse connections outside the list</strong> for an agent and it will also
+      <p>An allowlist warns by default. Turn on <strong>Block connections that aren't allowed</strong> for an agent and it will also
         refuse them: the connection is dropped and an alert records what was refused, with <strong>Allow … from Now On</strong> to add it
         to the list in one click. The agent's next attempt goes through.</p>
       <p><strong>It needs the Network Extension.</strong> Refusing a connection means sitting in its path, which the nettop sampler
@@ -670,7 +687,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.9.4 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

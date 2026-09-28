@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentazione</p>
     <h1>Usare Flowlight</h1>
-    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.9.3, macOS 15 o successivo.</p>
+    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.9.4, macOS 15 o successivo.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="In questa pagina">
@@ -384,6 +384,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Il secondo pannello è il <strong>flusso delle violazioni</strong>: ogni connessione decisa da una regola, con l'app, dove era diretta, quale
         regola ha deciso e se si è trattato di un rifiuto o di un'eccezione che l'ha lasciata passare.</p>
 
+      <p><strong>Cosa avrebbe fatto.</strong> Una regola di blocco è facile da scrivere e spaventosa da attivare, perché la prima cosa
+        che normalmente scopri di una regola così è che cosa ha rotto — e lo scopri dopo, da qualcosa che smette di funzionare altrove.
+        L'editor delle regole risponde prima a questo: riproduce il traffico registrato sulla regola che stai scrivendo ed elenca cosa
+        sarebbe cambiato, prima che venga rifiutato qualcosa. Scegli uno dei quattro periodi, fino alle ultime due settimane. La regola
+        deve prima indicare un'app o una destinazione — una che non indica né l'una né l'altra deciderebbe ogni connessione del Mac, e
+        Flowlight non la scriverà.</p>
+      <p>Segnala un <em>cambiamento</em>, non una corrispondenza. Se una regola che hai già rifiuta quel traffico, aggiungerne un'altra
+        che lo rifiuta anch'essa non cambia nulla, e dire «rifiuterebbe 4.000 connessioni» sarebbe falso: così ogni connessione
+        registrata viene decisa due volte, una con le tue regole come stanno e una con la nuova aggiunta, e vengono elencate solo quelle
+        che ne escono diverse. Una regola di consenso scritta per ritagliare un'eccezione dentro un blocco ampio segnala la stessa cosa
+        dall'altro lato: cosa lascerebbe passare.</p>
+      <p>Due dettagli decidono se del numero ci si può fidare. Gli orari sono valutati nel momento in cui il traffico è avvenuto, quindi
+        una regola per le sere infrasettimanali riferisce cosa avrebbe rifiutato in quelle sere, non cosa rifiuterebbe se quel traffico
+        avvenisse ora. E un risultato vuoto distingue «non avrebbe cambiato nulla, su 1.240 connessioni» da «nessun traffico registrato
+        in questo periodo su cui fare la prova»: lo stesso elenco vuoto, significati opposti, e solo uno dei due dice che la regola è
+        sicura. La schermata indica anche il traffico più vecchio che ha potuto vedere: una regola testata su due ore di storico è stata
+        testata su due ore di storico.</p>
+
       <h2 id="allowlists">Elenchi consentiti</h2>
       <p>Seleziona un agente in <strong>Agenti IA</strong> e usa <strong>Elenco consentiti</strong> nel suo dettaglio per dire dove può connettersi. Inserisci domini
         (sottodomini compresi), indirizzi IP o intervalli CIDR, oppure scegli una preimpostazione: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o
@@ -393,7 +411,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         finché non gli dici il contrario: vedi <a href="#blocking">Rifiutare le connessioni</a>.</p>
 
       <h2 id="blocking">Rifiutare le connessioni</h2>
-      <p>Per impostazione predefinita un elenco consentiti avvisa. Attiva <strong>Rifiuta le connessioni fuori dall'elenco</strong> per un agente e le
+      <p>Per impostazione predefinita un elenco consentiti avvisa. Attiva <strong>Blocca le connessioni non consentite</strong> per un agente e le
         rifiuterà anche: la connessione viene interrotta e un avviso registra cosa è stato rifiutato, con <strong>Consenti … da ora in poi</strong> per aggiungerlo
         all'elenco con un clic. Il tentativo successivo dell'agente passa.</p>
       <p><strong>Richiede l'estensione di rete.</strong> Rifiutare una connessione significa stare sul suo percorso, cosa che il campionatore nettop
@@ -669,7 +687,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versione 0.9.3 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+      <span>Versione 0.9.4 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
     </div>
   </div>
 </footer>

@@ -210,10 +210,10 @@
 "Extension connection invalidated" = "Verbindung zur Erweiterung ungültig geworden";
 "Extension connection interrupted" = "Verbindung zur Erweiterung unterbrochen";
 "Extension unreachable: %@" = "Erweiterung nicht erreichbar: %@";
-"Extension refused registration" = "Erweiterung hat die Registrierung abgewiesen";
+"Extension refused registration" = "Erweiterung hat die Registrierung verweigert";
 "Connected to filter extension %@" = "Mit Filtererweiterung %@ verbunden";
 "Connected to filter extension %@ — no traffic from it yet" = "Mit Filtererweiterung %@ verbunden – noch kein Datenverkehr von ihr";
-"macOS refused to start Flowlight's filter: %@" = "macOS hat den Start des Filters von Flowlight abgewiesen: %@";
+"macOS refused to start Flowlight's filter: %@" = "macOS hat den Start des Filters von Flowlight verweigert: %@";
 "Connected to the extension %@, but it isn't filtering" = "Mit der Erweiterung %@ verbunden, sie filtert aber nicht";
 "The filter couldn't start" = "Der Filter konnte nicht starten";
 
@@ -439,7 +439,7 @@
 "Connected to an address with no hostname" = "Mit einer Adresse ohne Hostnamen verbunden";
 "%lld not allowed" = "%lld nicht erlaubt";
 "All allowed" = "Alle erlaubt";
-"Unlisted destinations are refused, not only reported" = "Nicht gelistete Ziele werden abgewiesen, nicht nur gemeldet";
+"Unlisted destinations are refused, not only reported" = "Nicht gelistete Ziele werden verweigert, nicht nur gemeldet";
 "Off" = "Aus";
 "Only allow listed destinations" = "Nur gelistete Ziele erlauben";
 "Always allow its AI providers" = "KI-Anbieter des Agenten immer erlauben";
@@ -447,13 +447,13 @@
 "Let Flowlight block %@'s connections?" = "Soll Flowlight die Verbindungen von %@ blockieren?";
 "Block Unlisted Destinations" = "Nicht gelistete Ziele blockieren";
 "Cancel" = "Abbrechen";
-"Until now this allowlist only raised alerts. From here on, anything %@ or its tools contact that isn't listed will be refused, which can stop the agent from working. Local network, Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts." = "Bisher hat diese Erlaubnisliste nur Warnungen ausgelöst. Von jetzt an wird alles abgewiesen, was %@ oder seine Tools kontaktieren und was nicht gelistet ist – das kann den Agenten funktionsunfähig machen. Lokales Netzwerk, Apple-Dienste und der eigene Datenverkehr von Flowlight werden nie blockiert, und jede Abweisung erscheint unter „Warnungen“.";
+"Until now this allowlist only raised alerts. From here on, anything %@ or its tools contact that isn't listed will be refused, which can stop the agent from working. Local network, Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts." = "Bisher hat diese Erlaubnisliste nur Warnungen ausgelöst. Von jetzt an wird alles verweigert, was %@ oder seine Tools kontaktieren und was nicht gelistet ist – das kann den Agenten funktionsunfähig machen. Lokales Netzwerk, Apple-Dienste und der eigene Datenverkehr von Flowlight werden nie blockiert, und jede Verweigerung erscheint unter „Warnungen“.";
 "Remove %@" = "%@ entfernen";
 "github.com, 10.0.0.0/8…" = "github.com, 10.0.0.0/8…";
 "Add" = "Hinzufügen";
 "Presets" = "Vorgaben";
 "Enter a domain, IP address or CIDR range." = "Domain, IP-Adresse oder CIDR-Bereich eingeben.";
-"Anything else %@ or its tools contact is refused, and the refusal is listed in Alerts." = "Alles andere, was %@ oder seine Tools kontaktieren, wird abgewiesen, und die Abweisung wird unter „Warnungen“ gelistet.";
+"Anything else %@ or its tools contact is refused, and the refusal is listed in Alerts." = "Alles andere, was %@ oder seine Tools kontaktieren, wird verweigert, und die Verweigerung wird unter „Warnungen“ gelistet.";
 "Anything else %@ or its tools contact raises an alert. Flowlight doesn't block connections." = "Alles andere, was %@ oder seine Tools kontaktieren, löst eine Warnung aus. Flowlight blockiert keine Verbindungen.";
 "Tools & MCP servers" = "Tools & MCP-Server";
 "%lld failed" = "%lld fehlgeschlagen";
@@ -644,7 +644,7 @@
 "not entitled" = "nicht berechtigt";
 "in /Applications" = "in /Applications";
 "not in /Applications" = "nicht in /Applications";
-"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "Der Inhaltsfilter (NEFilterDataProvider) ordnet geeignete TCP- und UDP-Flows über Audit-Token ihren Quell-Apps zu, entnimmt TLS-SNI, HTTP-Host und DNS-Antworten und sendet Sekundenzusammenfassungen über XPC an diese App. Er erfordert die Berechtigung für die Netzwerkerweiterung (content-filter-provider-systemextension) in einem bezahlten Entwicklerteam, und die App muss im Programme-Ordner liegen. Er weist eine Verbindung nur dort ab, wo eine Regel es verlangt; ohne durchsetzende Regel meldet er und sonst nichts.";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "Der Inhaltsfilter (NEFilterDataProvider) ordnet geeignete TCP- und UDP-Flows über Audit-Token ihren Quell-Apps zu, entnimmt TLS-SNI, HTTP-Host und DNS-Antworten und sendet Sekundenzusammenfassungen über XPC an diese App. Er erfordert die Berechtigung für die Netzwerkerweiterung (content-filter-provider-systemextension) in einem bezahlten Entwicklerteam, und die App muss im Programme-Ordner liegen. Er verweigert eine Verbindung nur dort, wo eine Regel es verlangt; ohne durchsetzende Regel meldet er und sonst nichts.";
 "Captures short-lived eligible flows" = "Erfasst kurzlebige geeignete Flows";
 "macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports." = "macOS ruft den Filter auf, wenn eine geeignete Verbindung geöffnet wird, was kurze Anfragen besser abdeckt als eine periodische Abtastung. Datenverkehr von vor der Aktivierung ist nicht verfügbar, ein Teil des Systemverkehrs ist von Inhaltsfiltern ausgenommen, und die Byte-Zähler stammen aus den Statistikberichten des Filters.";
 "It keeps filtering after you quit Flowlight" = "Sie filtert weiter, nachdem Sie Flowlight beendet haben";
@@ -690,9 +690,9 @@
 "Blocking is on, but not in effect here" = "Blockieren ist ein, wirkt hier aber nicht";
 "Blocking needs the Network Extension" = "Blockieren benötigt die Netzwerkerweiterung";
 "Use the Network Extension" = "Netzwerkerweiterung verwenden";
-"This build isn't signed for the Network Extension, so nothing sits in the path of a connection to refuse it. Allowlists still raise alerts." = "Dieser Build ist nicht für die Netzwerkerweiterung signiert, deshalb sitzt nichts im Weg einer Verbindung, um sie abzuweisen. Erlaubnislisten lösen weiter Warnungen aus.";
-"The nettop sampler counts traffic after it has left the Mac — it can't refuse a connection. Allowlists still raise alerts." = "Der nettop-Sampler zählt Datenverkehr, nachdem er den Mac verlassen hat – er kann keine Verbindung abweisen. Erlaubnislisten lösen weiter Warnungen aus.";
-"macOS isn't letting Flowlight's filter run, so it can't refuse anything. Allowlists still raise alerts." = "macOS lässt den Filter von Flowlight nicht laufen, deshalb kann er nichts abweisen. Erlaubnislisten lösen weiter Warnungen aus.";
+"This build isn't signed for the Network Extension, so nothing sits in the path of a connection to refuse it. Allowlists still raise alerts." = "Dieser Build ist nicht für die Netzwerkerweiterung signiert, deshalb sitzt nichts im Weg einer Verbindung, um sie zu verweigern. Erlaubnislisten lösen weiter Warnungen aus.";
+"The nettop sampler counts traffic after it has left the Mac — it can't refuse a connection. Allowlists still raise alerts." = "Der nettop-Sampler zählt Datenverkehr, nachdem er den Mac verlassen hat – er kann keine Verbindung verweigern. Erlaubnislisten lösen weiter Warnungen aus.";
+"macOS isn't letting Flowlight's filter run, so it can't refuse anything. Allowlists still raise alerts." = "macOS lässt den Filter von Flowlight nicht laufen, deshalb kann er nichts verweigern. Erlaubnislisten lösen weiter Warnungen aus.";
 "Another content filter is active on this Mac" = "Auf diesem Mac ist ein anderer Inhaltsfilter aktiv";
 "%lld other content filters are active on this Mac" = "Auf diesem Mac sind %lld andere Inhaltsfilter aktiv";
 "macOS runs one content filter at a time. While this one is active, Flowlight's filter can install and connect but will never be handed any traffic — the Network Extension source will stay empty. The nettop sampler doesn't use a filter and works alongside it." = "macOS führt nur einen Inhaltsfilter zur Zeit aus. Solange dieser aktiv ist, kann sich der Filter von Flowlight installieren und verbinden, bekommt aber nie Datenverkehr übergeben – die Quelle „Netzwerkerweiterung“ bleibt leer. Der nettop-Sampler nutzt keinen Filter und arbeitet daneben.";
@@ -781,7 +781,7 @@
 
 /* UI/GuardrailsPane.swift */
 "HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet." = "Die HTTPS-Inspektion ist aus, deshalb kann Flowlight die Tool-Liste nicht lesen – noch wird hier nichts durchgesetzt.";
-"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "Ein Agent sendet bei jedem Zug seine gesamte Tool-Liste erneut. Ein hier ausgeschaltetes Tool wird aus dieser Liste entfernt, bevor das Modell es überhaupt sieht – es gibt also keine Abweisung, über die sich streiten ließe, und keine Wiederholungsschleife. Bei MCP-Servern, die über HTTP erreicht werden, wird ein abgewiesener Aufruf ebenfalls hier beantwortet, mit einem Satz, den das Modell lesen kann.";
+"An agent re-sends its whole tool list on every turn. Switching a tool off here removes it from that list before the model ever sees it — so there is no refusal to argue with and no retry loop. For MCP servers reached over HTTP, a refused call is answered here too, with a sentence the model can read." = "Ein Agent sendet bei jedem Zug seine gesamte Tool-Liste erneut. Ein hier ausgeschaltetes Tool wird aus dieser Liste entfernt, bevor das Modell es überhaupt sieht – es gibt also keine Verweigerung, über die sich streiten ließe, und keine Wiederholungsschleife. Bei MCP-Servern, die über HTTP erreicht werden, wird ein verweigerter Aufruf ebenfalls hier beantwortet, mit einem Satz, den das Modell lesen kann.";
 "Declared to the model · %lld" = "Dem Modell gemeldet · %lld";
 "every tool on this server" = "jedes Tool dieses Servers";
 "Allow %@" = "%@ erlauben";
@@ -789,9 +789,9 @@
 "Guardrails on %@" = "Schutzregeln für %@";
 "%lld times · last %@" = "%lld× · zuletzt %@";
 "never yet" = "noch nie";
-"Refuse a tool by name or pattern, e.g. write*" = "Tool nach Name oder Muster abweisen, z. B. write*";
+"Refuse a tool by name or pattern, e.g. write*" = "Tool nach Name oder Muster verweigern, z. B. write*";
 "This is not a sandbox." = "Das ist keine Sandbox.";
-"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "Ein abgewiesenes Tool wird dem Modell nicht mehr angeboten und nicht mehr beantwortet. Ein Agent, der noch eine Shell hat, kann von Hand tun, was das Tool getan hätte – Flowlight zeichnet das auf, verhindern kann es das nicht. Lokale MCP-Server sprechen über Pipes, die kein Proxy sehen kann: Dort kann Flowlight den eigenen Netzwerkverkehr des Servers beobachten, der ohnehin dem Agenten zugeordnet ist, der ihn gestartet hat, und anbieten, die Sperrliste des Agenten selbst zu schreiben.";
+"A refused tool stops being offered to the model and stops being answered. An agent that still has a shell can do by hand what the tool would have done — Flowlight will record that, but it can't stop it. Local MCP servers speak over pipes, which no proxy can see: what Flowlight can do there is watch the server's own network traffic, which is already attributed to the agent that started it, and offer to write the agent's own deny list." = "Ein verweigertes Tool wird dem Modell nicht mehr angeboten und nicht mehr beantwortet. Ein Agent, der noch eine Shell hat, kann von Hand tun, was das Tool getan hätte – Flowlight zeichnet das auf, verhindern kann es das nicht. Lokale MCP-Server sprechen über Pipes, die kein Proxy sehen kann: Dort kann Flowlight den eigenen Netzwerkverkehr des Servers beobachten, der ohnehin dem Agenten zugeordnet ist, der ihn gestartet hat, und anbieten, die Sperrliste des Agenten selbst zu schreiben.";
 "Copied" = "Kopiert";
 "Copy as a deny list" = "Als Sperrliste kopieren";
 "for `permissions.deny` in %@'s own settings — it takes effect when the agent restarts." = "für `permissions.deny` in den eigenen Einstellungen von %@ – wirkt, sobald der Agent neu startet.";
@@ -1128,17 +1128,17 @@
 "Gone when Flowlight quits, including a crash. Nothing is left behind in force." = "Verschwindet, wenn Flowlight beendet wird, auch bei einem Absturz. Es bleibt nichts in Kraft.";
 "Any path — or /v1/*" = "Jeder Pfad – oder /v1/*";
 "Answer with" = "Antworten mit";
-"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "Ein Pfad lässt sich nur dort abgleichen, wo die Anfrage lesbar ist, also bei HTTPS-Inspektion. Das macht diese Abweisung auch freundlicher: Der Agent erhält einen Status, den er lesen kann, statt einer Verbindung, die ohne Begründung abgebrochen ist.";
+"A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why." = "Ein Pfad lässt sich nur dort abgleichen, wo die Anfrage lesbar ist, also bei HTTPS-Inspektion. Das macht diese Verweigerung auch freundlicher: Der Agent erhält einen Status, den er lesen kann, statt einer Verbindung, die ohne Begründung abgebrochen ist.";
 "One URL rather than the whole host" = "Eine einzelne URL statt des ganzen Hosts";
 "Name an app or a destination — a rule that names neither would decide every connection on the Mac." = "Benennen Sie eine App oder ein Ziel – eine Regel, die keines von beidem benennt, würde über jede Verbindung auf dem Mac entscheiden.";
 "New Rule" = "Neue Regel";
 "Edit Rule" = "Regel bearbeiten";
-"Refused as a connection, before it is made" = "Als Verbindung abgewiesen, bevor sie zustande kommt";
+"Refused as a connection, before it is made" = "Als Verbindung verweigert, bevor sie zustande kommt";
 "Answered as a request, with a status the agent can read" = "Als Anfrage beantwortet, mit einem Status, den der Agent lesen kann";
 "anything" = "alles";
-"Refuse %1$@ reaching %2$@." = "Verbindung %1$@ → %2$@ abweisen.";
+"Refuse %1$@ reaching %2$@." = "Verbindung %1$@ → %2$@ verweigern.";
 "Allow %1$@ reaching %2$@." = "Verbindung %1$@ → %2$@ erlauben.";
-"Refuse %1$@ requests from %2$@ to %3$@." = "%1$@-Anfragen %2$@ → %3$@ abweisen.";
+"Refuse %1$@ requests from %2$@ to %3$@." = "%1$@-Anfragen %2$@ → %3$@ verweigern.";
 "Allow %1$@ requests from %2$@ to %3$@." = "%1$@-Anfragen %2$@ → %3$@ erlauben.";
 "anywhere" = "überall";
 "What it would have done" = "Was sie bewirkt hätte";
@@ -1153,8 +1153,8 @@
 "Name an app or a destination first." = "Geben Sie zuerst eine App oder ein Ziel an.";
 "No recorded traffic in this period to test against." = "In diesem Zeitraum ist kein Datenverkehr aufgezeichnet, gegen den getestet werden könnte.";
 "Would have changed nothing. %lld connections in this period, none of them affected." = "Hätte nichts geändert. %lld Verbindungen in diesem Zeitraum, keine davon betroffen.";
-"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "Hätte %lld von %lld Verbindungen abgewiesen, aus %lld Apps, insgesamt %@.";
-"Would have allowed %lld connections that are refused today." = "Hätte %lld Verbindungen erlaubt, die heute abgewiesen werden.";
+"Would have refused %lld of %lld connections, from %lld apps, %@ in all." = "Hätte %lld von %lld Verbindungen verweigert, aus %lld Apps, insgesamt %@.";
+"Would have allowed %lld connections that are refused today." = "Hätte %lld Verbindungen erlaubt, die heute verweigert werden.";
 "%lld×" = "%lld×";
 "and %lld more" = "und %lld weitere";
 "Tested against traffic back to %@." = "Getestet gegen Datenverkehr ab %@.";
@@ -1167,26 +1167,26 @@
 "Templates" = "Vorlagen";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "Regeln, die sich lohnen, nach Zweck gruppiert und mit den Hosts schon eingetragen";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "Eine Regel schreiben: App, Agent, Ziel oder URL, blockiert oder erlaubt";
-"Nothing is being refused. Click to start again now." = "Es wird nichts abgewiesen. Zum sofortigen Fortsetzen klicken.";
+"Nothing is being refused. Click to start again now." = "Es wird nichts verweigert. Zum sofortigen Fortsetzen klicken.";
 "10 minutes" = "10 Minuten";
 "1 hour" = "1 Stunde";
 "Until I resume" = "Bis ich fortsetze";
 "Pause Blocking" = "Blockieren pausieren";
 "Stand every rule down for a while, without deleting anything" = "Alle Regeln vorübergehend außer Kraft setzen, ohne etwas zu löschen";
-"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "Eine Regel wird beobachtet, aber nicht durchgesetzt. Nur die Netzwerkerweiterung sitzt im Datenpfad und kann eine Verbindung abweisen; der nettop-Sampler zählt Datenverkehr im Nachhinein. Wählen Sie unter „Erfassung“ die Netzwerkerweiterung, um diese Regeln durchzusetzen.";
-"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "%lld Regeln werden beobachtet, aber nicht durchgesetzt. Nur die Netzwerkerweiterung sitzt im Datenpfad und kann eine Verbindung abweisen; der nettop-Sampler zählt Datenverkehr im Nachhinein. Wählen Sie unter „Erfassung“ die Netzwerkerweiterung, um diese Regeln durchzusetzen.";
+"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "Eine Regel wird beobachtet, aber nicht durchgesetzt. Nur die Netzwerkerweiterung sitzt im Datenpfad und kann eine Verbindung verweigern; der nettop-Sampler zählt Datenverkehr im Nachhinein. Wählen Sie unter „Erfassung“ die Netzwerkerweiterung, um diese Regeln durchzusetzen.";
+"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "%lld Regeln werden beobachtet, aber nicht durchgesetzt. Nur die Netzwerkerweiterung sitzt im Datenpfad und kann eine Verbindung verweigern; der nettop-Sampler zählt Datenverkehr im Nachhinein. Wählen Sie unter „Erfassung“ die Netzwerkerweiterung, um diese Regeln durchzusetzen.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "Eine Regel wird beobachtet, aber nicht durchgesetzt – eine Regel, die einen Pfad benennt, lässt sich nur mit HTTPS-Inspektion abgleichen, und die ist aus.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld Regeln werden beobachtet, aber nicht durchgesetzt – eine Regel, die einen Pfad benennt, lässt sich nur mit HTTPS-Inspektion abgleichen, und die ist aus.";
 "In force" = "In Kraft";
 "Not in force" = "Nicht in Kraft";
-"Nothing is being refused until %@." = "Bis %@ wird nichts abgewiesen.";
+"Nothing is being refused until %@." = "Bis %@ wird nichts verweigert.";
 "Resume now" = "Jetzt fortsetzen";
 "No rules yet" = "Noch keine Regeln";
 "A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "Eine Regel benennt etwas – eine App, einen Agenten, ein Ziel oder eine URL – und sagt blockieren oder erlauben. Klicken Sie in Live, Berichten, KI-Agenten oder Inspizieren mit der rechten Maustaste auf eine Zeile, um eine Regel zu dem zu schreiben, was Sie gerade ansehen, oder beginnen Sie mit den Vorlagen: Dort stehen schon die Hosts, die eine Paketinstallation erreicht, und die, über die eine Datei den Mac verlässt.";
 "Browse Templates…" = "Vorlagen durchsuchen…";
 "Write One…" = "Eine schreiben…";
 "Nothing yet" = "Noch nichts";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Jede Verbindung, über die eine Regel entscheidet, landet hier: die Abweisungen und die Ausnahmen, die etwas durchlassen. Die zweite Hälfte hält die Frage „Warum kommt das hier durch?“ beantwortbar.";
+"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Jede Verbindung, über die eine Regel entscheidet, landet hier: die Verweigerungen und die Ausnahmen, die etwas durchlassen. Die zweite Hälfte hält die Frage „Warum kommt das hier durch?“ beantwortbar.";
 "Today" = "Heute";
 "Yesterday" = "Gestern";
 "A rule since deleted" = "Eine inzwischen gelöschte Regel";
@@ -1209,11 +1209,11 @@
 "preset" = "Vorgabe";
 "from an alert" = "aus einer Warnung";
 "allowed once" = "einmalig erlaubt";
-"Refused" = "Abgewiesen";
+"Refused" = "Verweigert";
 "Allowed by an exception" = "Durch eine Ausnahme erlaubt";
 "Connection" = "Verbindung";
-"Refused by the Network Extension, before the connection was made" = "Von der Netzwerkerweiterung abgewiesen, bevor die Verbindung zustande kam";
-"Refused by HTTPS inspection, which answered the request itself" = "Von der HTTPS-Inspektion abgewiesen, die die Anfrage selbst beantwortet hat";
+"Refused by the Network Extension, before the connection was made" = "Von der Netzwerkerweiterung verweigert, bevor die Verbindung zustande kam";
+"Refused by HTTPS inspection, which answered the request itself" = "Von der HTTPS-Inspektion verweigert, die die Anfrage selbst beantwortet hat";
 "Show the Rule…" = "Regel anzeigen…";
 "blocked" = "blockiert";
 "allowed" = "erlaubt";
@@ -1225,7 +1225,7 @@
 "Apply a Template" = "Vorlage anwenden";
 "%@ · in force at once" = "%@ · sofort in Kraft";
 "%@ · shown first" = "%@ · wird erst angezeigt";
-"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Jede schreibt gewöhnliche Regeln in die Liste, wo sie wie alles andere gelesen, ausgeschaltet oder gelöscht werden können. Verbindungen abzuweisen ist Aufgabe der Netzwerkerweiterung; ist in der Erfassung der nettop-Sampler gewählt, werden diese Regeln nur beobachtet statt durchgesetzt.";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Jede schreibt gewöhnliche Regeln in die Liste, wo sie wie alles andere gelesen, ausgeschaltet oder gelöscht werden können. Verbindungen zu verweigern ist Aufgabe der Netzwerkerweiterung; ist in der Erfassung der nettop-Sampler gewählt, werden diese Regeln nur beobachtet statt durchgesetzt.";
 "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "Optional. Leer gelassen gilt dies für alles auf dem Mac; eine genannte App schränkt es auf diese App und die von ihr gestarteten Tools ein.";
 "A domain, an IP address, or a range" = "Eine Domain, eine IP-Adresse oder ein Bereich";
 "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching." = "Diese benennen eine HTTP-Methode, daher kann nur die HTTPS-Inspektion sie durchsetzen. Ist sie aus, stehen sie beobachtend in der Liste.";
@@ -1240,7 +1240,7 @@
 "Expired" = "Abgelaufen";
 "Until %1$@ (%2$@)" = "Bis %1$@ (%2$@)";
 "Every day" = "Täglich";
-"Watching only — the Network Extension refuses connections, and it isn't running." = "Nur Beobachtung – Verbindungen weist die Netzwerkerweiterung ab, und die läuft nicht.";
+"Watching only — the Network Extension refuses connections, and it isn't running." = "Nur Beobachtung – Verbindungen verweigert die Netzwerkerweiterung, und die läuft nicht.";
 "Watching only — a path can only be matched by HTTPS inspection, and it is off." = "Nur Beobachtung – ein Pfad lässt sich nur mit HTTPS-Inspektion abgleichen, und die ist aus.";
 
 /* UI/SettingsView.swift */
@@ -1315,7 +1315,7 @@
 "Read-only" = "Nur Lesen";
 "The agent keeps its other tools, but can't run commands." = "Der Agent behält seine anderen Tools, kann aber keine Befehle ausführen.";
 "It can read and search, but not change anything." = "Er kann lesen und suchen, aber nichts ändern.";
-"Everything but reading and searching, refused." = "Alles außer Lesen und Suchen wird abgewiesen.";
+"Everything but reading and searching, refused." = "Alles außer Lesen und Suchen wird verweigert.";
 "Rust crates" = "Rust-Crates";
 "Go modules" = "Go-Module";
 "Network" = "Netzwerk";
