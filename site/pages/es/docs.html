@@ -331,6 +331,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>La segunda pestaña es el <strong>flujo de incumplimientos</strong>: cada conexión que decidió una regla, con la app, adónde iba, qué
         regla lo decidió y si fue un rechazo o una excepción que la dejó pasar.</p>
 
+      <p><strong>Qué habría hecho.</strong> Una regla de bloqueo es fácil de escribir y da miedo activarla, porque lo primero que
+        normalmente averiguas sobre una regla así es qué rompió —y lo averiguas más tarde, porque algo falla en otro sitio—. El editor de reglas
+        responde a eso antes: vuelve a pasar el tráfico registrado por la regla que estás escribiendo y enumera qué habría cambiado,
+        antes de que se rechace nada. Elige uno de cuatro periodos, hasta las últimas dos semanas. La regla tiene que nombrar primero
+        una app o un destino: una que no nombre ninguno decidiría todas las conexiones del Mac, y Flowlight no la escribirá.</p>
+      <p>Informa de un <em>cambio</em>, no de una coincidencia. Si una regla que ya tienes rechaza ese tráfico, añadir otra que también
+        lo rechace no cambia nada, y decir «habría rechazado 4.000 conexiones» sería falso: así que cada conexión registrada se decide
+        dos veces, una con tus reglas tal como están y otra con la nueva añadida, y solo se enumeran las que salen distinto. Una regla
+        de permiso escrita para recortar una excepción en un bloqueo amplio informa de lo mismo desde el otro lado: qué dejaría pasar.</p>
+      <p>Dos detalles deciden si puedes fiarte de la cifra. Los horarios se valoran en el momento en que ocurrió el tráfico, así que una
+        regla para las noches de entre semana informa de qué habría rechazado esas noches, no de qué rechazaría si ese tráfico ocurriera
+        ahora. Y un resultado vacío distingue «no habría cambiado nada, de 1.240 conexiones» de «no hay tráfico registrado en este
+        periodo con el que hacer la prueba»: la misma lista vacía, significados opuestos, y solo uno de los dos dice que la regla es
+        segura. La pantalla nombra también el tráfico más antiguo que pudo ver: una regla probada con dos horas de historial se ha
+        probado con dos horas de historial.</p>
+
       <h2 id="allowlists">Listas de permitidos</h2>
       <p>Selecciona un agente en <strong>Agentes de IA</strong> y usa <strong>Lista de permitidos</strong> en su detalle para indicar adónde puede conectar. Introduce dominios
         (subdominios incluidos), direcciones IP o rangos CIDR, o elige un preajuste: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o

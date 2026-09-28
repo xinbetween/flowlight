@@ -332,6 +332,25 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Der zweite Tab ist der <strong>Verstoß-Verlauf</strong>: jede Verbindung, über die eine Regel entschieden hat, mit der App, dem Ziel, welche
         Regel entschied und ob das eine Verweigerung war oder eine Ausnahme, die sie durchließ.</p>
 
+      <p><strong>Was sie bewirkt hätte.</strong> Eine Regel, die blockiert, ist leicht zu schreiben und beängstigend einzuschalten, denn
+        das Erste, was man normalerweise über eine solche Regel erfährt, ist, was sie kaputt gemacht hat – und man erfährt es später,
+        daran, dass irgendwo anders etwas nicht mehr funktioniert. Der Regeleditor beantwortet das vorweg: Er spielt aufgezeichneten
+        Datenverkehr gegen die Regel durch, die du gerade schreibst, und listet auf, was sich geändert hätte, bevor irgendetwas
+        verweigert wird. Wähle einen von vier Zeiträumen, bis zu den letzten zwei Wochen. Die Regel muss zuerst eine App oder ein Ziel
+        nennen – eine, die keines von beidem nennt, würde über jede Verbindung auf dem Mac entscheiden, und Flowlight schreibt sie nicht.</p>
+      <p>Sie meldet eine <em>Änderung</em>, keinen Treffer. Wenn eine Regel, die du schon hast, diesen Datenverkehr verweigert, ändert
+        eine weitere, die ihn ebenfalls verweigert, nichts, und „würde 4.000 Verbindungen verweigern“ wäre unwahr – also wird jede
+        aufgezeichnete Verbindung zweimal entschieden, einmal mit deinen Regeln, wie sie stehen, und einmal mit der neuen dazu, und
+        aufgelistet werden nur die, die dabei unterschiedlich ausgehen. Eine Regel, die erlaubt, um eine Ausnahme aus einer breiten
+        Sperre zu schneiden, meldet dasselbe von der anderen Seite: was sie durchlassen würde.</p>
+      <p>Zwei Details entscheiden darüber, ob der Zahl zu trauen ist. Zeitpläne werden zu dem Zeitpunkt beurteilt, an dem der
+        Datenverkehr stattfand, also meldet eine Regel für die Abende unter der Woche, was sie an diesen Abenden verweigert hätte, und
+        nicht, was sie verweigern würde, wenn dieser Datenverkehr jetzt stattfände. Und ein leeres Ergebnis unterscheidet „hätte nichts
+        geändert, von 1.240 Verbindungen“ von „in diesem Zeitraum ist kein Datenverkehr aufgezeichnet, gegen den getestet werden
+        könnte“ – dieselbe leere Liste, entgegengesetzte Bedeutungen, und nur eine von beiden sagt, dass die Regel sicher ist. Der
+        Bildschirm nennt außerdem den ältesten Datenverkehr, den er sehen konnte: Eine Regel, die gegen zwei Stunden Aufzeichnung
+        getestet wurde, ist gegen zwei Stunden Aufzeichnung getestet.</p>
+
       <h2 id="allowlists">Erlaubnislisten</h2>
       <p>Wähle einen Agenten in <strong>KI-Agenten</strong> und sage über <strong>Erlaubnisliste</strong> in seinem Detail, wohin er sich verbinden darf. Trage Domains
         (Subdomains inklusive), IP-Adressen oder CIDR-Bereiche ein oder nimm eine Vorlage: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go-Module oder
