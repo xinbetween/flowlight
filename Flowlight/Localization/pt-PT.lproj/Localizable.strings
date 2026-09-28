@@ -1404,3 +1404,19 @@
 "Edit" = "Editar";
 "On" = "Ativado";
 "Settings" = "Definições";
+
+/* 0.9.6 MCP domains */
+"in a config file" = "em ficheiro de configuração";
+"called from this Mac" = "chamado deste Mac";
+"declared to the provider" = "declarado ao fornecedor";
+"contacted by the server" = "contactado pelo servidor";
+"Domains (%lld)" = "Domínios (%lld)";
+"Rules are recorded but not enforced in this capture mode." = "Neste modo de captura, as regras são registadas mas não aplicadas.";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "Nenhum servidor MCP deste agente tem ainda um domínio — os servidores locais que nunca chegam à rede não têm nenhum, e um servidor remoto aparece assim que for configurado ou chamado.";
+"Block for %@" = "Bloquear para %@";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "Recusar este anfitrião a %@ e às ferramentas que ele inicia. Tudo o resto neste Mac fica inalterado.";
+"Block everywhere" = "Bloquear em todo o lado";
+"Refuse this host for every app on this Mac." = "Recusar este anfitrião a todas as apps deste Mac.";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "Quem se liga a isto é o fornecedor, não o seu Mac — uma regra aqui não lhe chega.";
+"Block %@ (MCP)" = "Bloquear %@ (MCP)";
+"Block %@ for %@ (MCP)" = "Bloquear %@ para %@ (MCP)";

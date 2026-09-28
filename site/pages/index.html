@@ -351,6 +351,7 @@ nav: home
           <a href="{{link:threat-model}}">threat model</a> sets out. This is the order the rest is being built in.</p>
       </div>
       <div class="privacy">
+        <div><strong>Every domain an MCP server reaches <span class="tag">0.9.6</span></strong><p>An MCP server touches the network four different ways, and each is learned somewhere else: a URL in a config file, an endpoint the proxy watched, a connector declared to the model provider, or calls a local server made itself. The AI Agents screen will list them as one set, say which of the four it knows each from, and offer to refuse a domain for that agent or for the whole Mac — except the ones the provider reaches on its own, which no rule here can touch, and those rows will say so instead of offering a button that does nothing.</p></div>
         <div><strong>What an agent did off the network <span class="tag">1.0</span></strong><p>A file leaving is a read and then a send, and only the send is visible today. Recording what an agent's tools opened, wrote and spawned would make <em>read the private key, then talked to paste.example</em> one finding instead of two screens. Not a resource monitor: CPU and memory are Activity Monitor's job. Needs Apple's EndpointSecurity entitlement, and needs the inspection budget above to exist first.</p></div>
         <div><strong>Linux, then Windows</strong><p>The analysis core is portable Swift; capture isn't. A Linux daemon with a local web UI comes first, on eBPF rather than macOS APIs.</p></div>
       </div>

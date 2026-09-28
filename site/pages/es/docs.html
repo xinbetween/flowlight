@@ -134,6 +134,24 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>La atribución es por proceso: Flowlight no puede saber qué llamada de herramienta concreta dentro de un servidor MCP de larga duración abrió una conexión.</p>
 
+      <p><strong>Todos los dominios a los que llegan sus servidores MCP.</strong> Un servidor MCP toca la red de cuatro maneras distintas, y
+        Flowlight se entera de cada una en un sitio diferente: una URL en un archivo de configuración, un endpoint al que el proxy de inspección vio
+        a este Mac hablar JSON-RPC, un conector que el agente declaró a su proveedor de modelos en el cuerpo de la petición, o llamadas corrientes
+        que un proceso servidor local hizo por su cuenta. En <strong>Servidores MCP</strong>, dentro del detalle del agente, se listan como un único
+        conjunto, con cada dominio etiquetado según de cuál de las cuatro se conoce. Un dominio con varias etiquetas es un hecho más fuerte que uno
+        con una sola: declarado en un archivo de configuración <em>y</em> contactado de verdad dice más que cualquiera de las dos cosas por
+        separado, mientras que un dominio solo configurado nunca se ha alcanzado, y uno solo observado no estaba escrito en ningún sitio donde
+        pudieras haberlo leído.</p>
+      <p>Cada dominio ofrece dos rechazos: <strong>para este agente</strong>, que cubre al agente y a las herramientas que arranca, o <strong>en
+        todas partes</strong>, que cubre todas las apps del Mac. Ambos escriben una regla corriente, así que el flujo de incumplimientos los informa
+        y el editor de reglas los explica — y, por ser reglas corrientes, la simulación del editor te dirá qué habría rechazado uno de ellos antes
+        de que lo actives.</p>
+      <p>Hay un tipo de dominio que no trae botones. Un conector al que el proveedor del modelo llega por su cuenta —declarado en el cuerpo de la
+        petición y contactado desde el lado del proveedor— no toca este Mac en absoluto, así que ninguna regla de aquí puede alcanzarlo. La fila lo
+        dice, en vez de ofrecer un rechazo que no haría nada sin avisar. Si ese mismo host también está configurado en local o se ha contactado
+        desde este Mac, los rechazos aparecen, porque entonces sí hay algo que rechazar. Un servidor local que solo habla por una tubería no aporta
+        ningún dominio, por la misma razón por la que no aparece en ningún otro sitio: eso no es tráfico de red.</p>
+
       <h2 id="agent-configuration">Configuración de los agentes: qué lee Flowlight en tu Mac</h2>
       <p>Las capacidades de un agente están escritas en archivos: las skills que puede cargar, los subagentes y los comandos de barra que define, los
         <strong>hooks</strong> que ejecutan comandos de shell cuando ocurre algo, las reglas de permisos que se le dieron y los servidores MCP que arranca. Flowlight

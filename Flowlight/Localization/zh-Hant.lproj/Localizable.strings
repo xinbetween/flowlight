@@ -1404,3 +1404,19 @@
 "Edit" = "編輯";
 "On" = "開啟";
 "Settings" = "設定";
+
+/* 0.9.6 MCP domains */
+"in a config file" = "在設定檔中";
+"called from this Mac" = "從這台 Mac 呼叫";
+"declared to the provider" = "已向供應商聲明";
+"contacted by the server" = "由伺服器連線";
+"Domains (%lld)" = "網域（%lld）";
+"Rules are recorded but not enforced in this capture mode." = "在這個擷取模式下，規則只會被記錄，不會執行。";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "這個代理還沒有任何 MCP 伺服器有網域 — 從不連上網路的本機伺服器沒有網域，而遠端伺服器會在被設定或被呼叫之後出現。";
+"Block for %@" = "僅對 %@ 封鎖";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "對 %@ 以及它啟動的工具拒絕這個主機。這台 Mac 上的其他一切都不受影響。";
+"Block everywhere" = "對所有 App 封鎖";
+"Refuse this host for every app on this Mac." = "對這台 Mac 上的每個 App 拒絕這個主機。";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "連到這裡的是供應商，不是你的 Mac — 這裡的規則碰不到它。";
+"Block %@ (MCP)" = "封鎖 %@（MCP）";
+"Block %@ for %@ (MCP)" = "封鎖 %2$@ 連線 %1$@（MCP）";

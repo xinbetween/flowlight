@@ -1404,3 +1404,19 @@
 "Edit" = "편집";
 "On" = "켬";
 "Settings" = "설정";
+
+/* 0.9.6 MCP domains */
+"in a config file" = "설정 파일에 있음";
+"called from this Mac" = "이 Mac에서 호출됨";
+"declared to the provider" = "제공업체에 선언됨";
+"contacted by the server" = "서버가 연결함";
+"Domains (%lld)" = "도메인 (%lld)";
+"Rules are recorded but not enforced in this capture mode." = "이 캡처 모드에서는 규칙이 기록만 되고 적용되지는 않습니다.";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "이 에이전트의 MCP 서버 중 아직 도메인이 있는 것은 없습니다. 네트워크에 전혀 닿지 않는 로컬 서버는 도메인이 없고, 원격 서버는 설정되거나 한 번 호출되면 나타납니다.";
+"Block for %@" = "%@에서만 차단";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "이 호스트를 %@에 대해 거부합니다. 그것이 시작하는 도구에도 적용되며, 이 Mac의 나머지에는 영향이 없습니다.";
+"Block everywhere" = "어디서나 차단";
+"Refuse this host for every app on this Mac." = "이 Mac의 모든 앱에 대해 이 호스트를 거부합니다.";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "여기에 연결하는 것은 사용자의 Mac이 아니라 제공업체입니다. 여기서 만든 규칙은 그 연결에 닿지 않습니다.";
+"Block %@ (MCP)" = "%@ 차단 (MCP)";
+"Block %@ for %@ (MCP)" = "%2$@의 %1$@ 차단 (MCP)";

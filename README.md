@@ -433,6 +433,13 @@ Shipped:
 
 Planned, in order:
 
+- **0.9.6 — Every domain an MCP server reaches.** An MCP server touches the network four different ways, and
+  each is learned somewhere else: a URL in a config file, an endpoint the inspection proxy watched, a connector
+  declared to the model provider in the request body, or calls a local server process made itself. The AI Agents
+  screen lists them as one set, says which of the four it knows each domain from, and offers to refuse it for
+  that agent or for the whole Mac. The exception is a connector the provider reaches on its own: that traffic
+  never touches this Mac, so the row explains why instead of offering a button that would do nothing.
+
 - **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
   unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration
   story: a file leaving is a read followed by a send, and only the send is visible today. This would record

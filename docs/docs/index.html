@@ -188,6 +188,23 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <code>@modelcontextprotocol/server-github</code>.</p>
       <p>Attribution is per process: Flowlight can't tell which individual tool call inside a long-running MCP server opened a connection.</p>
 
+      <p><strong>Every domain its MCP servers reach.</strong> An MCP server touches the network in four different ways, and Flowlight
+        learns each somewhere else: a URL in a configuration file, an endpoint the inspection proxy watched this Mac speak JSON-RPC
+        to, a connector the agent declared to its model provider in the request body, or ordinary calls a local server process made
+        itself. Under <strong>MCP servers</strong> in an agent's detail, they are listed as one set, each domain labelled with which
+        of the four it is known from. A domain carrying several labels is a stronger fact than one carrying a single label: declared
+        in a configuration file <em>and</em> actually contacted says more than either alone, while a domain only ever configured has
+        never been reached, and one only ever observed was never written down anywhere you could have read it.</p>
+      <p>Each domain offers two refusals: <strong>for this agent</strong>, which covers the agent and the tools it starts, or
+        <strong>everywhere</strong>, which covers every app on the Mac. Both write an ordinary rule, so the violations feed reports
+        them and the rule editor explains them — and because they are ordinary rules, the simulation in the editor will tell you what
+        one would have refused before you switch it on.</p>
+      <p>One kind of domain has no buttons. A connector the model provider reaches on its own — declared in the request body and
+        contacted from the provider's side — never touches this Mac at all, so no rule here can reach it. The row says so rather than
+        offering a refusal that would quietly do nothing. If that same host is also configured locally or contacted from this Mac,
+        the refusals appear, because then there is something to refuse. A local server that only ever speaks over a pipe contributes
+        no domain, for the same reason it appears nowhere else: that is not network traffic.</p>
+
       <h2 id="agent-configuration">Agent configuration: what Flowlight reads on your Mac</h2>
       <p>An agent's abilities are written down in files: the skills it can load, the subagents and slash commands it defines, the
         <strong>hooks</strong> that run shell commands on events, the permission rules it was given, and the MCP servers it starts. Flowlight

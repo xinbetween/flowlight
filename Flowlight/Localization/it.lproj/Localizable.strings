@@ -1404,3 +1404,20 @@
 "%lld fields, in cleartext to %@." = "%lld campi, in chiaro verso %@.";
 "Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "Nulla di ciò che registra l'ispezione HTTPS può arrivare a un'esportazione: nessuna intestazione di richiesta o risposta, nessun corpo, nessuna chiamata agli strumenti, nessuno scambio decifrato. Alcuni dei campi elencati sopra viaggiano nella busta del formato stesso invece che come chiave con un nome, il che cambia dove compaiono nel tuo collector, non se escono.";
 "Flowlight will ask again if any of this changes." = "Flowlight lo chiederà di nuovo se cambia qualcosa di tutto questo.";
+
+
+/* 0.9.6 MCP domains */
+"in a config file" = "in un file di config";
+"called from this Mac" = "chiamato da questo Mac";
+"declared to the provider" = "dichiarato al provider";
+"contacted by the server" = "contattato dal server";
+"Domains (%lld)" = "Domini (%lld)";
+"Rules are recorded but not enforced in this capture mode." = "In questa modalità di acquisizione le regole vengono registrate, ma non applicate.";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "Nessun server MCP di questo agente ha ancora un dominio — i server locali che non raggiungono mai la rete non ne hanno, e uno remoto compare non appena viene configurato o chiamato.";
+"Block for %@" = "Blocca per %@";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "Rifiuta questo host per %@ e per gli strumenti che avvia. Tutto il resto su questo Mac non cambia.";
+"Block everywhere" = "Blocca ovunque";
+"Refuse this host for every app on this Mac." = "Rifiuta questo host per ogni app su questo Mac.";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "A connettersi a questo è il provider, non il tuo Mac — una regola qui non può raggiungerlo.";
+"Block %@ (MCP)" = "Blocca %@ (MCP)";
+"Block %@ for %@ (MCP)" = "Blocca %@ per %@ (MCP)";

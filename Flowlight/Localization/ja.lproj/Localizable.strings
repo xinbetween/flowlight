@@ -1404,3 +1404,20 @@
 "%lld fields, in cleartext to %@." = "%lld 個のフィールド、平文で %@ へ。";
 "Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave." = "HTTPS インスペクションが記録した内容が書き出しに入ることはありません。リクエストとレスポンスのヘッダ、本文、ツール呼び出し、復号したやり取りは含まれません。上に挙げたフィールドのうち一部は、名前付きのキーでなく形式そのものの外枠に入って運ばれます。変わるのはコレクターでの現れ方であって、出ていくかどうかではありません。";
 "Flowlight will ask again if any of this changes." = "このいずれかが変わると、Flowlight はもう一度確認します。";
+
+
+/* 0.9.6 MCP domains */
+"in a config file" = "設定ファイル内";
+"called from this Mac" = "この Mac から呼び出し";
+"declared to the provider" = "プロバイダに宣言";
+"contacted by the server" = "サーバが接続";
+"Domains (%lld)" = "ドメイン（%lld）";
+"Rules are recorded but not enforced in this capture mode." = "このキャプチャモードでは、ルールは記録されますが適用されません。";
+"No MCP server on this agent has a domain yet — local servers that never reach the network have none, and a remote one appears once it is configured or called." = "このエージェントの MCP サーバには、まだドメインがありません。ネットワークに出ないローカルのサーバにはドメインがなく、リモートのサーバは設定されるか呼び出された時点で現れます。";
+"Block for %@" = "%@ に対してブロック";
+"Refuse this host for %@ and the tools it starts. Everything else on this Mac is unaffected." = "%@ と、それが起動するツールに対して、このホストを拒否します。この Mac のほかのものには影響しません。";
+"Block everywhere" = "どこでもブロック";
+"Refuse this host for every app on this Mac." = "この Mac のすべてのアプリに対して、このホストを拒否します。";
+"The provider connects to this, not your Mac — a rule here cannot reach it." = "これに接続するのはプロバイダであって、あなたの Mac ではありません。ここのルールでは届きません。";
+"Block %@ (MCP)" = "%@ をブロック（MCP）";
+"Block %@ for %@ (MCP)" = "%2$@ の %1$@ をブロック（MCP）";
