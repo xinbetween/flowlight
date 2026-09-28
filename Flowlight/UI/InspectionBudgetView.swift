@@ -26,7 +26,7 @@ struct InspectionBudgetSection: View {
 
             headerPolicy
             if inspection.budget.headerPolicy == .allowlist { allowedHeaders }
-            if inspection.budget.headerPolicy == .redactSecrets { extraWords }
+            if inspection.budget.headerPolicy == .redactSecrets { extraPatterns }
 
             Divider()
             ceilingAndRetention
@@ -75,14 +75,14 @@ struct InspectionBudgetSection: View {
         }
     }
 
-    private var extraWords: some View {
+    private var extraPatterns: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L("Also treat as credentials")).font(.caption.bold()).foregroundStyle(.secondary)
             Text(L("A header whose name contains one of these is replaced by its length, whatever else it is called. For a vendor whose spelling the built-in list doesn't know."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            chips(inspection.budget.extraSecretWords) { word in
+            chips(inspection.budget.extraRedactionPatterns) { word in
                 var next = inspection.budget
-                next.extraSecretWords.removeAll { $0 == word }
+                next.extraRedactionPatterns.removeAll { $0 == word }
                 inspection.budget = next
             }
             HStack {
@@ -175,9 +175,9 @@ struct InspectionBudgetSection: View {
 
     private func addWord() {
         let word = newWord.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !word.isEmpty, !inspection.budget.extraSecretWords.contains(word) else { return }
+        guard !word.isEmpty, !inspection.budget.extraRedactionPatterns.contains(word) else { return }
         var next = inspection.budget
-        next.extraSecretWords.append(word)
+        next.extraRedactionPatterns.append(word)
         inspection.budget = next
         newWord = ""
     }

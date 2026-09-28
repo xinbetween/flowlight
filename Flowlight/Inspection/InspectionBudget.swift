@@ -47,9 +47,14 @@ struct InspectionBudget: Sendable, Equatable {
 
     var headerPolicy: HeaderPolicy = .allowlist
     var allowedHeaders: Set<String> = Self.defaultAllowedHeaders
-    /// Extra words that mark a header as a credential, on top of the built-in list. Used by `redactSecrets`,
-    /// where the built-in list cannot know a particular vendor's spelling.
-    var extraSecretWords: [String] = []
+    /// Extra fragments that, found in a header's *name*, mark it as carrying a credential — on top of the
+    /// built-in list, which cannot know a particular vendor's spelling.
+    ///
+    /// Patterns, not secrets. The old name for this was `extraSecretWords`, which read as "words that are
+    /// secret" rather than "words that indicate one", and CodeQL misread it the same way a person would:
+    /// it reported storing them in UserDefaults as cleartext storage of credentials. The value is a list of
+    /// substrings like `entitlement`; nothing sensitive is kept here, and the name now says so.
+    var extraRedactionPatterns: [String] = []
     /// Bytes of request and response body kept per app per day. 0 means no ceiling.
     ///
     /// Over the ceiling, the exchange is still recorded — its time, host, path, status and headers — and only the
@@ -84,7 +89,7 @@ struct InspectionBudget: Sendable, Equatable {
     enum Keys {
         static let headerPolicy = "inspection.headerPolicy"
         static let allowedHeaders = "inspection.allowedHeaders"
-        static let extraSecretWords = "inspection.extraSecretWords"
+        static let extraRedactionPatterns = "inspection.extraRedactionPatterns"
         static let dailyBodyMBPerApp = "inspection.dailyBodyMBPerApp"
         static let retentionDays = "inspection.retentionDays"
         static let sessionMinutes = "inspection.sessionMinutes"
@@ -109,7 +114,7 @@ struct InspectionBudget: Sendable, Equatable {
         if let stored = defaults.array(forKey: Keys.allowedHeaders) as? [String] {
             budget.allowedHeaders = Set(stored.map { $0.lowercased() })
         }
-        budget.extraSecretWords = (defaults.array(forKey: Keys.extraSecretWords) as? [String]) ?? []
+        budget.extraRedactionPatterns = (defaults.array(forKey: Keys.extraRedactionPatterns) as? [String]) ?? []
         budget.dailyBodyBytesPerApp = Int64(max(0, defaults.integer(forKey: Keys.dailyBodyMBPerApp))) * 1_000_000
         budget.retentionDays = max(1, defaults.integer(forKey: Keys.retentionDays))
         budget.sessionMinutes = max(0, defaults.integer(forKey: Keys.sessionMinutes))
@@ -119,7 +124,7 @@ struct InspectionBudget: Sendable, Equatable {
     func save(_ defaults: UserDefaults = .standard) {
         defaults.set(headerPolicy.rawValue, forKey: Keys.headerPolicy)
         defaults.set(allowedHeaders.sorted(), forKey: Keys.allowedHeaders)
-        defaults.set(extraSecretWords, forKey: Keys.extraSecretWords)
+        defaults.set(extraRedactionPatterns, forKey: Keys.extraRedactionPatterns)
         defaults.set(Int(dailyBodyBytesPerApp / 1_000_000), forKey: Keys.dailyBodyMBPerApp)
         defaults.set(retentionDays, forKey: Keys.retentionDays)
         defaults.set(sessionMinutes, forKey: Keys.sessionMinutes)

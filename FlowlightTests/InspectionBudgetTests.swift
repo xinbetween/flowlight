@@ -87,7 +87,7 @@ final class InspectionBudgetTests: XCTestCase {
     func testAnAddedWordRedactsAVendorSpellingNothingKnows() {
         var budget = InspectionBudget()
         budget.headerPolicy = .redactSecrets
-        budget.extraSecretWords = ["entitlement"]
+        budget.extraRedactionPatterns = ["entitlement"]
         let result = HeaderRedaction.redact(headers([("X-Acme-Entitlement", "secret")]), budget: budget)
         XCTAssertEqual(value(result, "X-Acme-Entitlement")?.contains("secret"), false)
     }
@@ -97,7 +97,7 @@ final class InspectionBudgetTests: XCTestCase {
     func testAnAddedWordBeatsTheBuiltInException() {
         XCTAssertTrue(HeaderRedaction.notSecret.contains("x-request-id"), "precondition")
         XCTAssertFalse(HeaderRedaction.isSecret("x-request-id"))
-        XCTAssertTrue(HeaderRedaction.isSecret("x-request-id", extraWords: ["request-id"]))
+        XCTAssertTrue(HeaderRedaction.isSecret("x-request-id", extraPatterns: ["request-id"]))
     }
 
     func testTheDefaultAllowlistCarriesNothingTheDenylistCallsASecret() {
@@ -120,7 +120,7 @@ final class InspectionBudgetTests: XCTestCase {
         var budget = InspectionBudget()
         budget.headerPolicy = .none
         budget.allowedHeaders = ["content-type"]
-        budget.extraSecretWords = ["licence"]
+        budget.extraRedactionPatterns = ["licence"]
         budget.dailyBodyBytesPerApp = 25_000_000
         budget.retentionDays = 7
         budget.sessionMinutes = 120

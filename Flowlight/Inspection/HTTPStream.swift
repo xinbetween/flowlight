@@ -261,12 +261,12 @@ enum HeaderRedaction {
         "keep-alive", "x-request-id", "x-correlation-id", "x-session-duration", "content-signature-algorithm",
     ]
 
-    static func isSecret(_ name: String, extraWords: [String] = []) -> Bool {
+    static func isSecret(_ name: String, extraPatterns: [String] = []) -> Bool {
         let lower = name.lowercased()
         // Checked first, ahead of `notSecret`: a word the user typed is an instruction about their own headers,
         // and the built-in exception list was written without their vendor in mind. Anything else would let a
         // guess made here overrule a fact stated there.
-        let extra = extraWords.map { $0.lowercased() }.filter { !$0.isEmpty }
+        let extra = extraPatterns.map { $0.lowercased() }.filter { !$0.isEmpty }
         if extra.contains(where: { lower.contains($0) }) { return true }
         if notSecret.contains(lower) { return false }
         if secretNames.contains(lower) { return true }
@@ -285,7 +285,7 @@ enum HeaderRedaction {
             let keep: Bool
             switch budget.headerPolicy {
             case .allowlist: keep = budget.allowedHeaders.contains(name)
-            case .redactSecrets: keep = !isSecret(name, extraWords: budget.extraSecretWords)
+            case .redactSecrets: keep = !isSecret(name, extraPatterns: budget.extraRedactionPatterns)
             case .none: keep = false
             }
             guard !keep else { return header }
