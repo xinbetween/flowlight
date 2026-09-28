@@ -1421,3 +1421,5 @@
 "The provider connects to this, not your Mac — a rule here cannot reach it." = "A connettersi a questo è il provider, non il tuo Mac — una regola qui non può raggiungerlo.";
 "Block %@ (MCP)" = "Blocca %@ (MCP)";
 "Block %@ for %@ (MCP)" = "Blocca %@ per %@ (MCP)";
+
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "La versione %@ del filtro è installata, ma macOS trattiene ancora la versione precedente finché non riavvii il Mac. Riavvia per completare l'aggiornamento. Fino ad allora Flowlight acquisisce con il campionatore.";

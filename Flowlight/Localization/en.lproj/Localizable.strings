@@ -1421,3 +1421,4 @@
 "Block %@ (MCP)" = "Block %@ (MCP)";
 "Block %@ for %@ (MCP)" = "Block %@ for %@ (MCP)";
 
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler.";

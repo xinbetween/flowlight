@@ -400,7 +400,17 @@ final class TrafficMonitor: ObservableObject {
         guard let manager = ExtensionManager.current else { return }
         manager.matchExtensionToApp { [weak self] check in
             Task { @MainActor in
-                guard let self, check.repairing else { return }
+                guard let self else { return }
+                // Checked before `repairing`, because this is the case where nothing is stale and nothing will
+                // be repaired: the right build is installed and macOS is holding the previous ones until a
+                // restart. Redialling cannot help, so say what will and stop climbing the ladder.
+                if check.needsRestart {
+                    self.status = L("Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler.",
+                                    check.appVersion)
+                    self.fallBackToSampler()
+                    return
+                }
+                guard check.repairing else { return }
                 self.status = L("The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting.",
                                 check.installedDescription, check.appVersion)
                 (self.source as? ExtensionTrafficSource)?.versionRepairStarted()

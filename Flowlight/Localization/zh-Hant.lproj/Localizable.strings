@@ -1420,3 +1420,5 @@
 "The provider connects to this, not your Mac — a rule here cannot reach it." = "連到這裡的是供應商，不是你的 Mac — 這裡的規則碰不到它。";
 "Block %@ (MCP)" = "封鎖 %@（MCP）";
 "Block %@ for %@ (MCP)" = "封鎖 %2$@ 連線 %1$@（MCP）";
+
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "過濾器 %@ 版已經安裝，但在你重新啟動 Mac 之前，macOS 仍然保留著上一個版本。重新啟動就會完成更新。在那之前，Flowlight 會用取樣器繼續擷取。";

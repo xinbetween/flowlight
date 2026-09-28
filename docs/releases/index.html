@@ -70,6 +70,15 @@
             offered where the choice is made rather than one being discovered later in the rule editor. Both
             write ordinary rules, so the violations feed reports them and the simulation from 0.9.4 will say what
             one would have refused before it refuses anything.</li>
+          <li><strong>The extension stops asking you to wait for something that cannot happen.</strong> Reported
+            three times as "the filter stops working after an update", and each time the version check was
+            examined and found correct. It was. After several updates macOS holds the superseded copies until
+            you restart — <code>activated enabled</code> for the build that matches the app, <code>terminated
+            waiting to uninstall on reboot</code> for the rest — and because it runs one content filter at a
+            time, the matching build is installed without being the one running. Nothing is stale, so nothing is
+            repaired, and the app redialled an extension that could not answer until a restart, six times, then
+            fell back to the sampler without naming the one thing that fixes it. It now recognises that state
+            and says to restart.</li>
           <li><strong>Except where a rule could not reach.</strong> A connector the provider reaches on its own
             never touches this Mac, so that row explains why instead of offering a refusal that would quietly do
             nothing. The moment the same host is also configured locally or contacted from this Mac, the buttons

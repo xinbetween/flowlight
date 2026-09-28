@@ -1420,3 +1420,5 @@
 "The provider connects to this, not your Mac — a rule here cannot reach it." = "여기에 연결하는 것은 사용자의 Mac이 아니라 제공업체입니다. 여기서 만든 규칙은 그 연결에 닿지 않습니다.";
 "Block %@ (MCP)" = "%@ 차단 (MCP)";
 "Block %@ for %@ (MCP)" = "%2$@의 %1$@ 차단 (MCP)";
+
+"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "필터 %@ 버전이 설치되었지만, Mac을 다시 시작할 때까지 macOS는 이전 버전을 그대로 붙들고 있습니다. 업데이트를 마치려면 다시 시작하세요. 그때까지 Flowlight는 샘플러로 캡처합니다.";
