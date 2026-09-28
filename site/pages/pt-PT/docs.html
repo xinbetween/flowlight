@@ -338,17 +338,17 @@ open build/Build/Products/Release/Flowlight.app</pre>
         teria mudado, antes de algo ser recusado. Escolha um de quatro períodos, até «as últimas 2 semanas». A regra tem de indicar
         primeiro uma app ou um destino — uma que não indique nenhum dos dois decidiria todas as ligações neste Mac, e o Flowlight não
         a escreve.</p>
-      <p>O que comunica é uma <em>mudança</em>, não uma correspondência. Se uma regra que já tem recusa esse tráfego, acrescentar outra
-        que também o recusa não muda nada, e dizer «teria recusado 4000 ligações» seria falso — por isso cada ligação registada é
-        decidida duas vezes, uma com as suas regras tal como estão e outra com a nova acrescentada, e só as que saem diferentes são
-        listadas. Uma regra de permissão escrita para abrir uma exceção num bloqueio largo comunica o mesmo do outro lado: o que teria
-        deixado passar.</p>
+      <p>O que comunica é uma <em>mudança</em>, não uma contagem de correspondências. Se uma regra que já tem recusa esse tráfego,
+        acrescentar outra que também o recusa não muda nada, e dizer «teria recusado 4000 ligações» seria falso — por isso cada
+        ligação registada é decidida duas vezes, uma com as suas regras tal como estão e outra com a nova acrescentada, e só as que
+        saem diferentes são listadas. Uma regra de permissão escrita para abrir uma exceção num bloqueio largo comunica o mesmo do
+        outro lado: o que teria deixado passar.</p>
       <p>Dois detalhes que decidem se o número merece confiança. Os horários são julgados à hora a que o tráfego aconteceu, por isso uma
         regra para as noites de semana comunica o que teria recusado nas noites de semana, e não o que recusaria se esse tráfego
-        acontecesse agora. E um resultado vazio distingue «não teria mudado nada, em 1240 ligações» de «não há tráfego registado neste
-        período para testar» — a mesma lista vazia, sentidos opostos, e só um deles diz que a regra é segura. O ecrã indica também o
-        tráfego mais antigo que conseguiu ver: uma regra testada contra duas horas de histórico foi testada contra duas horas de
-        histórico.</p>
+        acontecesse agora. E um resultado vazio distingue «Não teria mudado nada. 1240 ligações neste período, nenhuma delas afetada.»
+        de «Não há tráfego registado neste período para testar.» — a mesma lista vazia, sentidos opostos, e só um deles diz que a regra
+        é segura. O ecrã indica também o tráfego mais antigo que conseguiu ver: uma regra testada contra duas horas de histórico foi
+        testada contra duas horas de histórico.</p>
 
       <h2 id="allowlists">Listas de permissões</h2>
       <p>Selecione um agente em <strong>Agentes de IA</strong> e use a <strong>Lista de permissões</strong> no seu detalhe para dizer onde pode ligar-se. Introduza domínios
@@ -359,7 +359,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         dizer o contrário: consulte <a href="#blocking">Recusar ligações</a>.</p>
 
       <h2 id="blocking">Recusar ligações</h2>
-      <p>Por predefinição, uma lista de permissões avisa. Ative <strong>Recusar as ligações fora da lista</strong> num agente e ele também as
+      <p>Por predefinição, uma lista de permissões avisa. Ative <strong>Bloquear as ligações que não são permitidas</strong> num agente e ele também as
         vai recusar: a ligação é cortada e um alerta regista o que foi recusado, com <strong>Permitir … de agora em diante</strong> para o acrescentar
         à lista num clique. A tentativa seguinte do agente passa.</p>
       <p><strong>Precisa da extensão de rede.</strong> Recusar uma ligação significa estar no seu caminho, o que o amostrador nettop
