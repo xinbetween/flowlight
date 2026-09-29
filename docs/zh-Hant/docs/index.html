@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.9.6，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.9.7，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -329,6 +329,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
           之後也會繼續執行，設定裡也會這麼寫明。</li>
       </ul>
       <p>「進階」底部那一行字不是寫死的，而是由這些設定產生的，所以它不會像它那個寫死在程式碼裡的前身一樣，和設定漸漸對不上。</p>
+
+      <p><strong>當啟動你的代理的是別的東西時。</strong>程式只在啟動時讀取一次代理伺服器設定，所以檢查看得到的，只有在設定已經就位的情況下啟動的代理。Flowlight 可以重新啟動一個 App，也可以開啟一個已經匯出好環境變數的終端機 — 但這都假定是一個人在終端機裡敲指令來啟動代理，而這樣做的人越來越少。啟動代理的，是比任何視窗都活得久的東西：一個工作階段管理器、一個看守它們的常駐程式、一個編輯器的擴充功能主機。這時候再開一個新的終端機也不會改變什麼，因為那個 shell 永遠不會是任何代理的父程序。</p>
+      <p>於是 Flowlight 從一個正在執行的代理往上走，跨過那些 shell，找出真正在啟動它們的東西。如果那是一個終端機，重新啟動就在<em>那個</em>終端機裡開啟，而不是在 Terminal.app 裡。如果是別的什麼，提供的選擇就變成重新啟動那個程序，並且設好代理伺服器環境，這樣它之後產生的代理就會繼承下來 — 重新啟動時用的是它原本執行的那條指令，因為帶子指令呼叫的程式，和只有名字的程式並不是同一個。</p>
+      <p>重新啟動它會結束它目前正在執行的每一個工作階段。這一點在你同意之前就說清楚，而不是事後才發現，而且無法避免：這件事的全部意義，正在於接替它的東西會以不同的環境啟動。它做不到的是觸及已經在執行的代理 — 它們的代理伺服器設定在啟動時就讀完了，現在什麼也改不了。</p>
 
       <p><strong>從一列直接過來。</strong>在即時、報告或 AI 代理裡按右鍵點一個 App 或一個目的地，選<strong>「檢查 … 的流量」</strong>：
         檢查會開啟，而且只顯示那個 App，或只顯示那個目的地，還會帶上一個說明這一點的標籤，點一下就能移除。它限定的是範圍，
@@ -691,7 +695,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.9.6 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.9.7 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

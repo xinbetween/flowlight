@@ -291,6 +291,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>La ligne en bas d’Avancé est générée à partir de ces réglages plutôt qu’écrite en dur, de sorte qu’elle ne peut plus s’en écarter
         comme le faisait celle qui l’a précédée.</p>
 
+      <p><strong>Quand autre chose lance vos agents.</strong> Un programme lit ses réglages de proxy une seule fois, à son lancement :
+        l’inspection ne peut donc voir qu’un agent lancé avec ces réglages définis. Flowlight sait relancer une app, ou ouvrir un terminal
+        où l’environnement est déjà exporté — mais cela suppose qu’une personne lance l’agent en le tapant dans un terminal, et c’est de
+        moins en moins le cas. Les agents sont lancés par quelque chose qui survit à toute fenêtre : un gestionnaire de sessions, un démon
+        qui les supervise, l’hôte d’extensions d’un éditeur. Un nouveau terminal ne change alors rien, car ce shell ne sera jamais le
+        parent d’un agent.</p>
+      <p>Flowlight remonte donc depuis un agent en cours d’exécution, enjambe les shells et trouve ce qui les lance réellement. Si c’est
+        un terminal, la relance s’ouvre dans <em>ce</em> terminal plutôt que dans Terminal.app. Si c’est autre chose, ce qui est proposé
+        devient de redémarrer ce processus-là, avec l’environnement du proxy défini, pour que les agents qu’il lancera ensuite en
+        héritent — relancé avec la commande même avec laquelle il tournait, car un programme invoqué avec une sous-commande n’est pas le
+        même que son nom nu.</p>
+      <p>Le redémarrer met fin à toutes les sessions qu’il exécute actuellement. C’est dit avant que vous n’acceptiez, et non découvert
+        après coup, et c’est inévitable : tout l’intérêt est que ce qui le remplace démarre avec un environnement différent. Ce qu’il ne
+        peut pas faire, c’est atteindre les agents déjà en cours — leurs réglages de proxy ont été lus au lancement, et plus rien ne peut
+        les changer.</p>
+
       <p><strong>Y arriver depuis une ligne.</strong> Faites un clic droit sur une app ou une destination dans En direct, Rapports ou Agents IA et
         choisissez <strong>Inspecter le trafic de …</strong>&nbsp;: Inspecter s’ouvre en n’affichant que cette app, ou que cette destination, avec une
         étiquette qui le dit et que vous retirez d’un clic. C’est un cadrage, non une recherche — une version antérieure mettait le nom dans le champ

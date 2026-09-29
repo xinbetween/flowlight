@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Dokumentation</p>
     <h1>Flowlight benutzen</h1>
-    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.6, macOS 15 oder neuer.</p>
+    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.9.7, macOS 15 oder neuer.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Auf dieser Seite">
@@ -343,6 +343,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
       <p>Die Zeile am unteren Rand von „Erweitert“ wird aus diesen Einstellungen erzeugt, statt ausgeschrieben zu sein, sodass sie nicht mehr
         von ihnen abweichen kann, wie es ihr fest eingebauter Vorgänger tat.</p>
+
+      <p><strong>Wenn etwas anderes deine Agenten startet.</strong> Ein Programm liest seine Proxy-Einstellungen nur einmal, beim Start,
+        deshalb kann die Inspektion nur einen Agenten sehen, der mit gesetzten Einstellungen gestartet wurde. Flowlight kann eine App neu
+        starten oder ein Terminal öffnen, in dem die Umgebung schon exportiert ist – aber das setzt voraus, dass ein Mensch den Agenten in
+        einem Terminal eintippt, und das tut immer seltener jemand. Agenten werden von etwas gestartet, das jedes Fenster überlebt: ein
+        Sitzungsmanager, ein überwachender Daemon, der Extension-Host eines Editors. Ein neues Terminal ändert dann nichts, weil diese
+        Shell niemals der Elternprozess eines Agenten sein wird.</p>
+      <p>Flowlight geht deshalb von einem laufenden Agenten nach oben, überspringt die Shells und findet heraus, was sie tatsächlich
+        startet. Ist das ein Terminal, öffnet der Neustart sich in <em>diesem</em> Terminal statt in Terminal.app. Ist es etwas anderes,
+        wird stattdessen angeboten, diesen Prozess neu zu starten, mit gesetzter Proxy-Umgebung, sodass die Agenten, die er danach
+        erzeugt, sie erben – erneut gestartet mit demselben Befehl, mit dem er lief, denn ein mit einem Unterbefehl aufgerufenes Programm
+        ist nicht dasselbe wie sein bloßer Name.</p>
+      <p>Ein Neustart beendet jede Sitzung, die gerade darin läuft. Das wird gesagt, bevor du zustimmst, und nicht hinterher entdeckt,
+        und es ist unvermeidlich: Der ganze Sinn ist ja, dass das, was an seine Stelle tritt, mit einer anderen Umgebung startet. Was er
+        nicht kann, ist die bereits laufenden Agenten erreichen – deren Proxy-Einstellungen wurden beim Start gelesen, und nichts kann
+        sie jetzt noch ändern.</p>
 
       <p><strong>Wie du von einer Zeile aus hierherkommst.</strong> Klicke in Live, Berichten oder KI-Agenten mit der rechten Maustaste auf eine App
         oder ein Ziel und wähle <strong>Datenverkehr von … inspizieren</strong>: Inspizieren öffnet sich und zeigt nur diese App oder nur dieses Ziel, mit
@@ -722,7 +738,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.6 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.9.7 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

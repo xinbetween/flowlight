@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentação</p>
     <h1>Usar o Flowlight</h1>
-    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.9.6, macOS 15 ou posterior.</p>
+    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.9.7, macOS 15 ou posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Nesta página">
@@ -345,6 +345,21 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
       <p>A linha no fundo de Avançado é gerada a partir dessas definições em vez de estar escrita, pelo que não pode afastar-se delas
         como se afastou a sua antecessora fixada no código.</p>
+
+      <p><strong>Quando é outra coisa que inicia os seus agentes.</strong> Um programa lê as definições de proxy uma só vez, quando
+        arranca, por isso a inspeção só consegue ver um agente que tenha sido lançado com elas definidas. O Flowlight sabe reiniciar uma
+        app, ou abrir um terminal com o ambiente já exportado — mas isso pressupõe que é uma pessoa que inicia o agente escrevendo num
+        terminal, e cada vez menos é assim. Os agentes são iniciados por algo que sobrevive a qualquer janela: um gestor de sessões, um
+        daemon que as supervisiona, o anfitrião de extensões de um editor. Um terminal novo não muda então nada, porque essa shell nunca
+        será o pai de nenhum agente.</p>
+      <p>Por isso o Flowlight sobe a partir de um agente em execução, passa por cima das shells e descobre o que os está realmente a
+        iniciar. Se for um terminal, o reinício abre <em>nesse</em> terminal em vez de no Terminal.app. Se for outra coisa qualquer, o que
+        passa a ser oferecido é reiniciar esse processo, com o ambiente do proxy definido, para que os agentes que ele criar a seguir o
+        herdem — iniciado de novo com o mesmo comando com que estava a correr, já que um programa invocado com um subcomando não é o mesmo
+        que o seu nome nu.</p>
+      <p>Reiniciá-lo termina todas as sessões que está a executar. Isso é dito antes de o aceitar, não descoberto depois, e é
+        inevitável: todo o sentido está em o que o substitui arrancar com um ambiente diferente. O que não consegue fazer é chegar aos
+        agentes que já estão a correr — as suas definições de proxy foram lidas no arranque, e nada as pode mudar agora.</p>
 
       <p><strong>Chegar aqui a partir de uma linha.</strong> Clique com o botão direito numa app ou num destino em Em direto, Relatórios ou Agentes de
         IA e escolha <strong>Inspecionar o tráfego de …</strong>: o Inspecionar abre a mostrar só essa app, ou só esse destino, com um chip a dizê-lo
@@ -718,7 +733,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quem contribui para o Flowlight. O Flowlight é software livre, publicado sob a <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versão 0.9.6 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
+      <span>Versão 0.9.7 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
     </div>
   </div>
 </footer>
