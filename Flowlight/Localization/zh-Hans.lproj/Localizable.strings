@@ -1422,3 +1422,10 @@
 "Block %@ for %@ (MCP)" = "阻止 %2$@ 访问 %1$@（MCP）";
 
 "Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "过滤器 %@ 版已经安装，但在你重新启动 Mac 之前，macOS 仍然保留着上一个版本。重新启动即可完成更新。在那之前，Flowlight 会用采样器继续捕获。";
+
+/* 0.9.7 relaunch through a supervisor */
+"%@ can't be started again automatically." = "%@ 无法自动重新启动。";
+"Restart %@ Through the Proxy" = "经由代理服务器重新启动 %@";
+"Restart %@ through the proxy?" = "经由代理服务器重新启动 %@？";
+"Restart and End Its Sessions" = "重新启动并结束其会话";
+"%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight." = "%@ 负责启动 %@，所以代理服务器设置必须送达 %@，而不是送进一个新窗口——现在打开的 shell 永远不会是任何代理的父进程。重新启动它会结束它当前运行的每一个会话，包括这一个。它会以同样的命令重新启动，并把 HTTPS 指向 Flowlight。";

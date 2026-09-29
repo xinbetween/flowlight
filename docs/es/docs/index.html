@@ -345,6 +345,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>La línea del final de Avanzado se genera a partir de esos ajustes en vez de estar escrita, así que no puede desviarse de ellos
         como sí lo hacía la que la precedía, fijada en el código.</p>
 
+      <p><strong>Cuando otra cosa inicia tus agentes.</strong> Un programa lee sus ajustes de proxy una sola vez, al arrancar, así que la
+        inspección solo puede ver un agente que se lanzó con ellos puestos. Flowlight puede reiniciar una app, o abrir un terminal con el
+        entorno ya exportado — pero eso da por hecho que una persona inicia el agente escribiendo en un terminal, y cada vez lo hace menos
+        gente. Los agentes los inicia algo que sobrevive a cualquier ventana: un gestor de sesiones, un demonio que las supervisa, el host
+        de extensiones de un editor. Un terminal nuevo no cambia entonces nada, porque ese shell nunca será el padre de ningún agente.</p>
+      <p>Así que Flowlight sube desde un agente en marcha, salta por encima de los shells y encuentra lo que de verdad los está iniciando.
+        Si eso es un terminal, el reinicio se abre en <em>ese</em> terminal y no en Terminal.app. Si es cualquier otra cosa, lo que se
+        ofrece pasa a ser reiniciar ese proceso, con el entorno del proxy puesto, para que los agentes que arranque después lo hereden —
+        iniciado de nuevo con el mismo comando con el que estaba corriendo, porque un programa invocado con un subcomando no es el mismo
+        que su nombre a secas.</p>
+      <p>Reiniciarlo termina todas las sesiones que tiene en marcha. Eso se dice antes de que lo aceptes, no se descubre después, y es
+        inevitable: todo el sentido está en que lo que lo sustituye arranque con un entorno distinto. Lo que no puede hacer es llegar a
+        los agentes que ya están en marcha — sus ajustes de proxy se leyeron al arrancar, y ya nada puede cambiarlos.</p>
+
       <p><strong>Cómo llegar aquí desde una fila.</strong> Haz clic derecho en una app o en un destino en En vivo, Informes o Agentes de IA y elige
         <strong>Inspeccionar el tráfico de …</strong>: Inspeccionar se abre mostrando solo esa app, o solo ese destino, con una etiqueta que lo indica y
         que puedes quitar con un clic. Delimita en lugar de buscar — una versión anterior ponía el nombre en el campo de búsqueda, que también busca en los

@@ -344,6 +344,21 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>La riga in fondo ad Avanzate è generata da queste impostazioni invece di essere scritta a mano, così non può più discostarsene
         come faceva quella fissata nel codice che la precedeva.</p>
 
+      <p><strong>Quando è qualcos'altro ad avviare i tuoi agenti.</strong> Un programma legge le impostazioni proxy una sola volta,
+        all'avvio, quindi l'ispezione può vedere solo un agente che è stato lanciato con quelle impostazioni. Flowlight sa riavviare
+        un'app, o aprire un terminale con l'ambiente già esportato — ma questo presuppone che sia una persona ad avviare l'agente
+        digitando in un terminale, e sempre più spesso non è così. Gli agenti vengono avviati da qualcosa che sopravvive a qualsiasi
+        finestra: un gestore di sessioni, un demone che le supervisiona, l'host delle estensioni di un editor. Un nuovo terminale allora
+        non cambia nulla, perché quella shell non sarà mai il padre di nessun agente.</p>
+      <p>Flowlight quindi risale da un agente in esecuzione, scavalca le shell e trova ciò che li sta davvero avviando. Se è un
+        terminale, il riavvio si apre in <em>quel</em> terminale anziché in Terminal.app. Se è qualsiasi altra cosa, quello che viene
+        offerto diventa riavviare quel processo, con l'ambiente del proxy impostato, così che gli agenti che genererà in seguito lo
+        ereditino — riavviato con lo stesso comando con cui stava girando, dato che un programma invocato con un sottocomando non è lo
+        stesso del suo nome nudo.</p>
+      <p>Riavviarlo chiude tutte le sessioni che sta eseguendo. Lo si dice prima che tu accetti, non lo si scopre dopo, ed è
+        inevitabile: tutto il senso sta nel fatto che ciò che lo sostituisce parte con un ambiente diverso. Quello che non può fare è
+        raggiungere gli agenti già in esecuzione — le loro impostazioni proxy sono state lette all'avvio, e ora nulla può cambiarle.</p>
+
       <p><strong>Come arrivarci da una riga.</strong> Fai clic destro su un'app o su una destinazione in In diretta, Rapporti o Agenti IA e scegli
         <strong>Ispeziona il traffico di …</strong>: Ispeziona si apre mostrando solo quell'app, o solo quella destinazione, con un'etichetta che lo dice
         e che puoi rimuovere con un clic. Delimita invece di cercare — una versione precedente metteva il nome nel campo di ricerca, che cerca anche nei
