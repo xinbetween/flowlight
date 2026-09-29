@@ -55,7 +55,28 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.9.6</h2><time datetime="2026-09-28">September 28, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.9.7</h2><time datetime="2026-09-28">September 28, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Relaunch works when something else starts your agents.</strong> A program reads its proxy
+            settings once, at launch, so inspection only sees an agent started with them set. Relaunching
+            assumed a person types in a terminal — but agents are increasingly started by something that
+            outlives any window: a session manager, a supervising daemon, an editor's extension host. Opening a
+            new terminal then changed nothing, because that shell will never be any agent's parent. The feature
+            appeared to work and did nothing.</li>
+          <li><strong>It now finds what actually starts them.</strong> Flowlight walks up from a running agent,
+            steps over the shells, and looks at what is above. A terminal means the relaunch opens in
+            <em>that</em> terminal rather than Terminal.app. Anything else means the offer becomes to restart
+            that process with the proxy environment set, so the agents it spawns afterwards inherit it —
+            restarted with the command it was actually running, since a daemon invoked with a subcommand is not
+            the same program as its bare name.</li>
+          <li><strong>And it says what that costs.</strong> Restarting a supervisor ends every session it is
+            running. That is stated before you agree, not discovered after. What it cannot do is reach agents
+            already running: their proxy settings were read at launch, and nothing changes them now.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.9.6</h2><time datetime="2026-09-28">September 28, 2026</time></header>
         <ul>
           <li><strong>Every domain an MCP server reaches.</strong> An MCP server touches the network four
             different ways, and Flowlight already learned each of them somewhere different: a URL in a config
@@ -906,7 +927,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.9.6 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.9.7 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

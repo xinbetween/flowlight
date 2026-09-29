@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.9.7, macOS 15 or later.
 
  On this page
 
@@ -393,6 +393,21 @@ open build/Build/Products/Release/Flowlight.app
 
  The line at the bottom of Advanced is generated from those settings rather than written out, so it cannot drift from
  them the way its hardcoded predecessor did.
+
+ When something else starts your agents. A program reads its proxy settings once, when it starts, so
+ inspection can only see an agent that was launched with them set. Flowlight can relaunch an app, or open a terminal with the
+ environment already exported — but that assumes a person starts the agent by typing in a terminal, and increasingly nobody
+ does. Agents are started by something that outlives any window: a session manager, a supervising daemon, an editor's
+ extension host. A new terminal then changes nothing, because that shell will never be any agent's parent.
+
+ So Flowlight walks up from a running agent, steps over the shells, and finds whatever is actually starting them. If that is a
+ terminal, the relaunch opens in that terminal rather than in Terminal.app. If it is anything else, the offer becomes
+ to restart that process instead, with the proxy environment set, so the agents it spawns afterwards inherit it — started again
+ with the same command it was running, since a supervisor invoked with a subcommand is not the same program as its bare name.
+
+ Restarting it ends every session it is currently running. That is said before you agree to it, not discovered afterwards,
+ and it is unavoidable: the entire point is that what replaces it starts with a different environment. What it cannot do is
+ reach the agents already running — their proxy settings were read at launch, and nothing can change them now.
 
  Getting here from a row. Right-click an app or a destination in Live, Reports or AI Agents and
  choose Inspect …'s Traffic: Inspect opens showing only that app, or only that destination, with a chip
@@ -824,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.9.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1381,8 +1396,29 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.9.6
+ 0.9.7
 September 28, 2026Latest
+
+ Relaunch works when something else starts your agents. A program reads its proxy
+ settings once, at launch, so inspection only sees an agent started with them set. Relaunching
+ assumed a person types in a terminal — but agents are increasingly started by something that
+ outlives any window: a session manager, a supervising daemon, an editor's extension host. Opening a
+ new terminal then changed nothing, because that shell will never be any agent's parent. The feature
+ appeared to work and did nothing.
+
+ It now finds what actually starts them. Flowlight walks up from a running agent,
+ steps over the shells, and looks at what is above. A terminal means the relaunch opens in
+ that terminal rather than Terminal.app. Anything else means the offer becomes to restart
+ that process with the proxy environment set, so the agents it spawns afterwards inherit it —
+ restarted with the command it was actually running, since a daemon invoked with a subcommand is not
+ the same program as its bare name.
+
+ And it says what that costs. Restarting a supervisor ends every session it is
+ running. That is stated before you agree, not discovered after. What it cannot do is reach agents
+ already running: their proxy settings were read at launch, and nothing changes them now.
+
+ 0.9.6
+September 28, 2026
 
  Every domain an MCP server reaches. An MCP server touches the network four
  different ways, and Flowlight already learned each of them somewhere different: a URL in a config

@@ -1059,6 +1059,12 @@ struct InspectionHint: View {
                     .controlSize(.small)
             } else if !seen {
                 HStack(spacing: 8) {
+                    // Offered first, because when something else is starting the agents it is the only one of
+                    // the three that changes anything: a new window is a shell no agent will ever descend from.
+                    if let supervisor, supervisor.kind == .supervisor {
+                        Button(L("Restart %@ Through the Proxy", supervisor.name)) { confirmingSupervisor = true }
+                            .controlSize(.small)
+                    }
                     if relaunchTarget != nil {
                         Button(L("Relaunch Through the Proxy")) { confirmingRelaunch = true }
                             .controlSize(.small)
@@ -1081,10 +1087,43 @@ struct InspectionHint: View {
             // The honest description of what this does, because it closes someone else's editor.
             Text(L("A program reads its proxy settings once, when it starts, so there is no way to route one that is already running. %@ is asked to quit — an unsaved document will refuse, and nothing is discarded — and started again with its HTTPS pointed at Flowlight.", agent))
         }
+        .confirmationDialog(supervisor.map { L("Restart %@ through the proxy?", $0.name) } ?? "",
+                            isPresented: $confirmingSupervisor, titleVisibility: .visible) {
+            Button(L("Restart and End Its Sessions"), role: .destructive) { restartSupervisor() }
+            Button(L("Cancel"), role: .cancel) { confirmingSupervisor = false }
+        } message: {
+            // Said outright, because it is the part someone would only discover by losing work to it.
+            Text(L("%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight.",
+                   supervisor?.name ?? "", agent, supervisor?.name ?? ""))
+        }
+    }
+
+    /// What is actually starting this agent, when it is something other than a terminal.
+    ///
+    /// Looked up from a live process rather than from the traffic rows: the question is what will start the
+    /// *next* agent, which a pid from an old flow cannot answer.
+    private var supervisor: AgentLauncher.Launcher? {
+        guard let pid = ProxyRelaunch.runningPID(bundleID: bundleID, name: agent) else { return nil }
+        let launcher = ProxyRelaunch.launcher(forAgentPID: pid)
+        // A terminal is not a supervisor, but knowing which one it is means the relaunch opens there instead
+        // of in Terminal.app.
+        ProxyRelaunch.rememberTerminal(launcher)
+        return launcher
+    }
+
+    private func restartSupervisor() {
+        confirmingSupervisor = false
+        relaunchError = nil
+        guard let supervisor else { return }
+        if let error = ProxyRelaunch.restartSupervisor(supervisor, environment: inspection.proxyEnvironment) {
+            relaunchError = error.localizedDescription
+        }
     }
 
     /// What starting this agent again would mean, if anything. An agent Flowlight only ever saw as traffic —
     /// no path, no name it recognises — has nothing to relaunch, and the terminal is the way in.
+    @State private var confirmingSupervisor = false
+
     private var relaunchTarget: ProxyRelaunch.Target? {
         ProxyRelaunch.target(bundleID: bundleID, name: agent, appPath: appPath)
     }

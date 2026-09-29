@@ -291,6 +291,19 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>The line at the bottom of Advanced is generated from those settings rather than written out, so it cannot drift from
         them the way its hardcoded predecessor did.</p>
 
+      <p><strong>When something else starts your agents.</strong> A program reads its proxy settings once, when it starts, so
+        inspection can only see an agent that was launched with them set. Flowlight can relaunch an app, or open a terminal with the
+        environment already exported — but that assumes a person starts the agent by typing in a terminal, and increasingly nobody
+        does. Agents are started by something that outlives any window: a session manager, a supervising daemon, an editor's
+        extension host. A new terminal then changes nothing, because that shell will never be any agent's parent.</p>
+      <p>So Flowlight walks up from a running agent, steps over the shells, and finds whatever is actually starting them. If that is a
+        terminal, the relaunch opens in <em>that</em> terminal rather than in Terminal.app. If it is anything else, the offer becomes
+        to restart that process instead, with the proxy environment set, so the agents it spawns afterwards inherit it — started again
+        with the same command it was running, since a supervisor invoked with a subcommand is not the same program as its bare name.</p>
+      <p>Restarting it ends every session it is currently running. That is said before you agree to it, not discovered afterwards,
+        and it is unavoidable: the entire point is that what replaces it starts with a different environment. What it cannot do is
+        reach the agents already running — their proxy settings were read at launch, and nothing can change them now.</p>
+
       <p><strong>Getting here from a row.</strong> Right-click an app or a destination in Live, Reports or AI Agents and
         choose <strong>Inspect …'s Traffic</strong>: Inspect opens showing only that app, or only that destination, with a chip
         saying so that you can remove in one click. It scopes rather than searches — an earlier version put the name in the search

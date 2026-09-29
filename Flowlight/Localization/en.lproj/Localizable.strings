@@ -1422,3 +1422,11 @@
 "Block %@ for %@ (MCP)" = "Block %@ for %@ (MCP)";
 
 "Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler.";
+
+/* 0.9.7 relaunch through a supervisor */
+"%@ can't be started again automatically." = "%@ can't be started again automatically.";
+"Restart %@ Through the Proxy" = "Restart %@ Through the Proxy";
+"Restart %@ through the proxy?" = "Restart %@ through the proxy?";
+"Restart and End Its Sessions" = "Restart and End Its Sessions";
+"%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight." = "%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight.";
+
