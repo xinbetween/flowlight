@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.9.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.10.0, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.9.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.10.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1396,8 +1396,29 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.10.0
+September 29, 2026Latest
+
+ Always monitor an agent, and keep seeing it after a restart. HTTPS inspection
+ only reads an agent once it has been pointed at the proxy, and a command-line agent you start
+ yourself goes straight past it. When a supported agent is reaching its provider directly, Flowlight
+ now offers to write the proxy into the agent's own settings — Claude Code's environment block,
+ Cursor's and Windsurf's http.proxy, Zed's proxy — so it routes through
+ Flowlight on every launch, not just the one you relaunched.
+
+ It can't leave an agent stranded. A settings file pointing at a proxy that isn't
+ listening would stop the agent reaching its API, so the routing is written only while the proxy is
+ up and removed when it stops or Flowlight quits. If Flowlight crashes and skips that cleanup, a
+ small background helper restores the file from a copy it staged beforehand — a single move, nothing
+ parsed — once it sees the app gone and the port dead. Every change is recorded so it can be undone
+ exactly, and a file Flowlight can't read is left untouched rather than overwritten.
+
+ And it says so when it didn't take. Some agents pin their certificates, or a
+ proxy set in your shell overrides the file. When Flowlight wrote the setting but still sees nothing
+ of the agent's traffic, it says that plainly instead of claiming success.
+
  0.9.7
-September 28, 2026Latest
+September 28, 2026
 
  Relaunch works when something else starts your agents. A program reads its proxy
  settings once, at launch, so inspection only sees an agent started with them set. Relaunching
