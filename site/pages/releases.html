@@ -13,7 +13,28 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.9.7</h2><time datetime="2026-09-28">September 28, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.10.0</h2><time datetime="2026-09-29">September 29, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Always monitor an agent, and keep seeing it after a restart.</strong> HTTPS inspection
+            only reads an agent once it has been pointed at the proxy, and a command-line agent you start
+            yourself goes straight past it. When a supported agent is reaching its provider directly, Flowlight
+            now offers to write the proxy into the agent's own settings — Claude Code's environment block,
+            Cursor's and Windsurf's <code>http.proxy</code>, Zed's <code>proxy</code> — so it routes through
+            Flowlight on every launch, not just the one you relaunched.</li>
+          <li><strong>It can't leave an agent stranded.</strong> A settings file pointing at a proxy that isn't
+            listening would stop the agent reaching its API, so the routing is written only while the proxy is
+            up and removed when it stops or Flowlight quits. If Flowlight crashes and skips that cleanup, a
+            small background helper restores the file from a copy it staged beforehand — a single move, nothing
+            parsed — once it sees the app gone and the port dead. Every change is recorded so it can be undone
+            exactly, and a file Flowlight can't read is left untouched rather than overwritten.</li>
+          <li><strong>And it says so when it didn't take.</strong> Some agents pin their certificates, or a
+            proxy set in your shell overrides the file. When Flowlight wrote the setting but still sees nothing
+            of the agent's traffic, it says that plainly instead of claiming success.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.9.7</h2><time datetime="2026-09-28">September 28, 2026</time></header>
         <ul>
           <li><strong>Relaunch works when something else starts your agents.</strong> A program reads its proxy
             settings once, at launch, so inspection only sees an agent started with them set. Relaunching

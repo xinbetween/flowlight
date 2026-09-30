@@ -1,11 +1,50 @@
 import Foundation
 
+/// How to route one agent through Flowlight by writing its own settings file, rather than by relaunching it with
+/// environment variables. Persisting the proxy into the file the agent reads on every start is what makes routing
+/// survive a restart the user did themselves — "always monitor" — instead of lasting only for a relaunched process.
+///
+/// Only agents whose documentation gives a settings-file way to set the proxy have a recipe. Following each agent's
+/// own docs, that is a small set: Claude Code (a JSON `env` block macOS applies to the session), and the editors that
+/// take a proxy URL as a JSON key (Cursor and Windsurf use VS Code's `http.proxy`; Zed uses `proxy`). The CLI agents
+/// (Codex, Gemini CLI, Aider, Goose, OpenCode, ZCode) and GitHub Copilot document proxy as environment-variable only,
+/// so they have no recipe and are routed by relaunching them with an environment instead (see `ProxyRelaunch`).
+struct ConfigRecipe: Sendable, Equatable {
+    /// The agent's settings file, relative to the user's home directory (e.g. `.claude/settings.json`).
+    var homeRelativePath: String
+    var shape: Shape
+
+    enum Shape: Sendable, Equatable {
+        /// Merge Flowlight's full proxy environment (proxy address *and* CA variables) into a nested `env` object —
+        /// the block the agent applies to its process. Claude Code.
+        case claudeEnvBlock
+        /// Set VS Code's top-level `"http.proxy"` key to the proxy address. These apps trust the system keychain, so
+        /// only the address is written; the CA is already trusted. Cursor, Windsurf.
+        case vscodeHTTPProxy
+        /// Set Zed's top-level `"proxy"` key to the proxy address; CA via the system keychain. Zed.
+        case zedProxy
+    }
+
+    /// Where to write and what: the container key to nest the values under (nil = the JSON root), and the string
+    /// keys/values themselves, resolved for a given proxy address and Flowlight environment.
+    func resolve(proxyURL: String, env: [String: String]) -> (container: String?, values: [String: String]) {
+        switch shape {
+        case .claudeEnvBlock: return ("env", env)
+        case .vscodeHTTPProxy: return (nil, ["http.proxy": proxyURL])
+        case .zedProxy: return (nil, ["proxy": proxyURL])
+        }
+    }
+}
+
 /// An AI agent or assistant Flowlight recognizes by name.
 struct KnownAgent: Sendable, Equatable {
     var name: String
     var vendor: String
     var bundleIDs: Set<String> = []
     var processNames: Set<String> = []
+    /// How to persist proxy routing into this agent's own settings, or nil when Flowlight can only route it by
+    /// relaunching it with an environment (see `ProxyRelaunch`).
+    var configRecipe: ConfigRecipe? = nil
 }
 
 /// Recognizes AI agents and LLM API traffic.
@@ -16,12 +55,16 @@ struct KnownAgent: Sendable, Equatable {
 enum AgentCatalog {
     static let agents: [KnownAgent] = [
         KnownAgent(name: "Claude", vendor: "Anthropic", bundleIDs: ["com.anthropic.claudefordesktop"]),
-        KnownAgent(name: "Claude Code", vendor: "Anthropic", processNames: ["claude", "claude-code"]),
+        KnownAgent(name: "Claude Code", vendor: "Anthropic", processNames: ["claude", "claude-code"],
+                   configRecipe: ConfigRecipe(homeRelativePath: ".claude/settings.json", shape: .claudeEnvBlock)),
         KnownAgent(name: "ChatGPT", vendor: "OpenAI", bundleIDs: ["com.openai.chat"]),
         KnownAgent(name: "Codex", vendor: "OpenAI", processNames: ["codex"]),
-        KnownAgent(name: "Cursor", vendor: "Anysphere", bundleIDs: ["com.todesktop.230313mzl4w4u92"], processNames: ["cursor", "cursor-agent"]),
-        KnownAgent(name: "Windsurf", vendor: "Codeium", bundleIDs: ["com.exafunction.windsurf"], processNames: ["windsurf"]),
-        KnownAgent(name: "Zed", vendor: "Zed Industries", bundleIDs: ["dev.zed.Zed"]),
+        KnownAgent(name: "Cursor", vendor: "Anysphere", bundleIDs: ["com.todesktop.230313mzl4w4u92"], processNames: ["cursor", "cursor-agent"],
+                   configRecipe: ConfigRecipe(homeRelativePath: "Library/Application Support/Cursor/User/settings.json", shape: .vscodeHTTPProxy)),
+        KnownAgent(name: "Windsurf", vendor: "Codeium", bundleIDs: ["com.exafunction.windsurf"], processNames: ["windsurf"],
+                   configRecipe: ConfigRecipe(homeRelativePath: "Library/Application Support/Windsurf/User/settings.json", shape: .vscodeHTTPProxy)),
+        KnownAgent(name: "Zed", vendor: "Zed Industries", bundleIDs: ["dev.zed.Zed"],
+                   configRecipe: ConfigRecipe(homeRelativePath: ".config/zed/settings.json", shape: .zedProxy)),
         KnownAgent(name: "GitHub Copilot", vendor: "GitHub", processNames: ["copilot", "copilot-language-server"]),
         KnownAgent(name: "Gemini CLI", vendor: "Google", processNames: ["gemini"]),
         KnownAgent(name: "Aider", vendor: "Aider", processNames: ["aider"]),

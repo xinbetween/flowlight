@@ -20,6 +20,9 @@ final class InspectionController: ObservableObject {
         static let mockRules = "inspection.mockRules"
         /// When the running session was switched on, so its end survives a relaunch.
         static let sessionStarted = "inspection.sessionStarted"
+        /// Names of the agents the user asked Flowlight to keep routed through the proxy by editing their own
+        /// settings files (see `SettingsEnforcer`), so it applies again on every launch without being asked.
+        static let monitoredAgents = "inspection.monitoredAgents"
     }
 
     /// Hosts that are never decrypted, even when routed through the proxy: Apple services (many pin certificates and
@@ -76,6 +79,9 @@ final class InspectionController: ObservableObject {
                 self?.port = proxy.port
                 ProxyAttribution.shared.proxyPort = proxy.port
                 if let message { self?.lastError = message }
+                // The proxy going up or down decides whether it is safe for a settings file to point at it, so the
+                // persisted routing is reconciled to that here rather than only when the switch is flipped.
+                self?.reconcileEnforcement()
             }
         }
         proxy.pacScript = { [proxy] in
@@ -266,6 +272,7 @@ final class InspectionController: ObservableObject {
     func attach(db: TrafficDatabase) {
         self.db = db
         guard !DemoData.isEnabled else { return }
+        reconcileEnforcementAtLaunch()
         apply()
         pruneTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.prune() }
@@ -420,6 +427,66 @@ final class InspectionController: ObservableObject {
         caExists = ca.exists
         trusted = caExists && ca.isTrustedAnywhere
         systemProxyOn = UserDefaults.standard.bool(forKey: Keys.systemProxy)
+    }
+
+    // MARK: Always monitor — persisting routing into agents' own settings
+
+    private var janitorInstalled = false
+
+    /// The known agents Flowlight can keep routed by editing their own settings file (those with a `configRecipe`),
+    /// so a tip has one list to offer and the UI one place to ask.
+    nonisolated static var monitorableAgents: [KnownAgent] { AgentCatalog.agents.filter { $0.configRecipe != nil } }
+
+    /// The agents the user asked Flowlight to always monitor. Setting it reconciles the on-disk enforcement now.
+    var monitoredAgents: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: Keys.monitoredAgents) ?? []) }
+        set {
+            UserDefaults.standard.set(Array(newValue).sorted(), forKey: Keys.monitoredAgents)
+            objectWillChange.send()
+            reconcileEnforcement()
+        }
+    }
+
+    /// Turn "always monitor" on or off for one agent Flowlight knows how to route this way.
+    func setAlwaysMonitor(_ on: Bool, agent name: String) {
+        var set = monitoredAgents
+        if on { set.insert(name) } else { set.remove(name) }
+        monitoredAgents = set
+    }
+
+    /// Bring the settings files in line with the current state. While the proxy is up and inspection is on, every
+    /// monitored agent's file is pointed at it; otherwise none is, because a file pointing at a proxy that isn't
+    /// listening would stop the agent reaching its API. Idempotent, so it is safe to call on every state change.
+    func reconcileEnforcement() {
+        guard !DemoData.isEnabled else { return }
+        let enforcer = SettingsEnforcer.shared
+        let monitored = monitoredAgents
+        let recipes: [(String, ConfigRecipe)] = AgentCatalog.agents
+            .filter { monitored.contains($0.name) }
+            .compactMap { agent in agent.configRecipe.map { (agent.name, $0) } }
+
+        if enabled, running, let port, !recipes.isEmpty {
+            let env = proxyEnvironment
+            let url = proxyURL
+            for (name, recipe) in recipes {
+                do { try enforcer.enforce(agent: name, recipe: recipe, proxyURL: url, env: env, proxyPort: port) }
+                catch { lastError = error.localizedDescription }
+            }
+            if !janitorInstalled { ProxyJanitor.install(manifestPath: enforcer.manifestURL.path); janitorInstalled = true }
+        } else {
+            enforcer.relaxAll()
+            if janitorInstalled { ProxyJanitor.uninstall(); janitorInstalled = false }
+        }
+    }
+
+    /// On launch, clear anything a previous run left enforced before the proxy is running again: a crash skips the
+    /// normal strip, so the file could still point at last run's dead proxy. Normal routing re-applies once the
+    /// proxy is up, through `reconcileEnforcement`.
+    func reconcileEnforcementAtLaunch() {
+        guard !DemoData.isEnabled else { return }
+        SettingsEnforcer.shared.relaxAll()
+        ProxyJanitor.uninstall()
+        janitorInstalled = false
     }
 
     private func prune() {

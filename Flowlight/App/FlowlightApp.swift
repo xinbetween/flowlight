@@ -1,9 +1,20 @@
 import SwiftUI
 
+/// Handles the one thing SwiftUI's scene lifecycle doesn't give cleanly: a hook that runs as the app quits, used to
+/// strip the proxy routing Flowlight persisted into agents' settings files so a clean quit never leaves one pointing
+/// at a proxy that is about to stop. A crash skips this; `ProxyJanitor` covers that.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        guard !FlowlightApp.runningTests else { return }
+        SettingsEnforcer.shared.relaxAll()
+    }
+}
+
 @main
 struct FlowlightApp: App {
     /// True while the XCTest bundle is being hosted by this app.
     static let runningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
 
     /// `.accessory` drops the Dock icon and the Cmd-Tab entry, which is the point of running in the background.
