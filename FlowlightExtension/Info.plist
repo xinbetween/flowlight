@@ -16,10 +16,15 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<!-- The extension's version is pinned here, on its OWN lifecycle, NOT $(MARKETING_VERSION). macOS runs one
+	     content filter at a time and holds superseded copies until a restart, so changing the extension's version
+	     on every app release forced a reboot each time. Kept fixed, an app-only update ships the version macOS
+	     already runs and replaces nothing. Bump these two ONLY when the FlowlightExtension binary itself changes
+	     (and expect one replacement when you do). Kept at the 0.10.1 values so upgrades from 0.10.1 need no reboot. -->
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>0.10.1</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>22</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>FLAppGroupIdentifier</key>
