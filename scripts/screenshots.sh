@@ -30,6 +30,7 @@ mkdir -p "$OUT"
 SHOTS=(
   "live:live::"
   "agents:agents:destinations:"
+  "always-monitor:agents:destinations:"
   "agent-detail:agents:calls:"
   "agent-tools:agents:tools:1600x622"
   "mcp-servers:agents:servers:1600x622"
@@ -42,8 +43,12 @@ capture() {
   local name="$1" screen="$2" tab="$3" size="${4:-$SIZE}"
   echo "  $name ($screen${tab:+ · $tab})"
   local w="${size%x*}" h="${size#*x}"
+  # The always-monitor shot asks for the representative "these agents are being monitored" banner, which real
+  # inspection state (absent under the demo database) would otherwise never show.
+  local banner=()
+  [ "$name" = "always-monitor" ] && banner=(-FLDemoBanner YES)
   open -n "$APP" --args -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example "${banner[@]}"
   sleep "${FL_WAIT:-14}"   # seeding 90 days of synthetic history, then the rollups it reads
   # A window that isn't key draws its close/minimise/zoom buttons grey, which is how every published
   # screenshot lost them. Bring it forward and let the redraw land before the shutter.

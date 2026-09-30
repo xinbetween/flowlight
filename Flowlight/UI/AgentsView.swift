@@ -63,7 +63,8 @@ struct AgentsView: View {
     private func content(height: CGFloat) -> some View {
         let roomy = height > 680
         return VStack(alignment: .leading, spacing: 12) {
-            AlwaysMonitorBanner(inspection: monitor.inspection, candidates: monitorCandidates)
+            AlwaysMonitorBanner(inspection: monitor.inspection, candidates: monitorCandidates,
+                                demo: DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLDemoBanner"))
             HStack {
                 if roomy {
                     Text(L("Observed AI agent activity, including destinations outside each agent's model provider."))
@@ -216,6 +217,9 @@ struct AgentsView: View {
 struct AlwaysMonitorBanner: View {
     @ObservedObject var inspection: InspectionController
     let candidates: [Candidate]
+    /// Marketing-screenshot mode: real inspection state doesn't exist under the demo database, so show a
+    /// representative banner with sample agents. Set only by the screenshot launch argument.
+    var demo: Bool = false
     @State private var dismissedSuggestions: Set<String> = []
     /// The monitored set the "monitoring" tip was last closed for. The tip shows whenever the current set differs
     /// from it — so closing hides it until the set changes (a new agent monitored), then it comes back on its own.
@@ -239,17 +243,44 @@ struct AlwaysMonitorBanner: View {
     }
 
     var body: some View {
-        let showSuggestions = inspection.enabled && inspection.running && !suggestions.isEmpty
-        let showMonitoring = inspection.enabled && !monitored.isEmpty && dismissedFor != Set(monitored)
-        if showSuggestions || showMonitoring {
-            VStack(alignment: .leading, spacing: 12) {
-                if showSuggestions { ForEach(suggestions, id: \.self) { name in suggestion(name) } }
-                if showMonitoring { monitoringTip }
+        if demo {
+            card { demoContent }
+        } else {
+            let showSuggestions = inspection.enabled && inspection.running && !suggestions.isEmpty
+            let showMonitoring = inspection.enabled && !monitored.isEmpty && dismissedFor != Set(monitored)
+            if showSuggestions || showMonitoring {
+                card {
+                    if showSuggestions { ForEach(suggestions, id: \.self) { name in suggestion(name) } }
+                    if showMonitoring { monitoringTip }
+                }
             }
+        }
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) { content() }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.25)))
+    }
+
+    /// A representative banner for the marketing screenshot: one agent to offer, two already monitored (one not yet
+    /// routed). Buttons are inert — nothing is really being monitored under the demo database.
+    private var demoContent: some View {
+        Group {
+            suggestion("Windsurf")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
+                    Text(L("Flowlight is keeping these agents routed through it on every launch."))
+                        .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                monitoredRow("Claude Code", notRouted: false)
+                monitoredRow("Cursor", notRouted: true)
+            }
         }
     }
 
@@ -269,18 +300,21 @@ struct AlwaysMonitorBanner: View {
                 .help(L("Hide this until the monitored agents change"))
             }
             ForEach(monitored, id: \.self) { name in
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles").font(.caption).foregroundStyle(.secondary)
-                    Text(name)
-                    if notRouted.contains(name) {
-                        Text(L("· not routed yet — it may pin its certificates, or a shell setting may override the file"))
-                            .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 8)
-                    Button(L("Stop Monitoring")) { inspection.setAlwaysMonitor(false, agent: name) }
-                        .controlSize(.small)
-                }
+                monitoredRow(name, notRouted: notRouted.contains(name)) { inspection.setAlwaysMonitor(false, agent: name) }
             }
+        }
+    }
+
+    private func monitoredRow(_ name: String, notRouted: Bool, stop: @escaping () -> Void = {}) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").font(.caption).foregroundStyle(.secondary)
+            Text(name)
+            if notRouted {
+                Text(L("· not routed yet — it may pin its certificates, or a shell setting may override the file"))
+                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button(L("Stop Monitoring"), action: stop).controlSize(.small)
         }
     }
 
