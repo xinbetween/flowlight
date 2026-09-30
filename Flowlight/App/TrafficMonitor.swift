@@ -381,7 +381,7 @@ final class TrafficMonitor: ObservableObject {
     /// ladder is reset and the status says what is happening rather than reporting silence.
     func extensionVersionRepairing(_ check: ExtensionManager.VersionCheck) {
         status = L("The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has.",
-                   check.installedDescription, check.appVersion)
+                   check.installedDescription, check.expectedVersion)
         if let extensionSource = source as? ExtensionTrafficSource {
             extensionSource.versionRepairStarted()
             // Replacing a system extension is macOS's business and takes as long as it takes. Sampling in the
@@ -406,13 +406,13 @@ final class TrafficMonitor: ObservableObject {
                 // restart. Redialling cannot help, so say what will and stop climbing the ladder.
                 if check.needsRestart {
                     self.status = L("Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler.",
-                                    check.appVersion)
+                                    check.expectedVersion)
                     self.fallBackToSampler()
                     return
                 }
                 guard check.repairing else { return }
                 self.status = L("The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting.",
-                                check.installedDescription, check.appVersion)
+                                check.installedDescription, check.expectedVersion)
                 (self.source as? ExtensionTrafficSource)?.versionRepairStarted()
             }
         }

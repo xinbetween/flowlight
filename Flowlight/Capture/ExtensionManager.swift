@@ -29,7 +29,10 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// extension — usually one, occasionally two while a replacement is pending.
     struct VersionCheck: Equatable {
         var installed: [String] = []
-        var appVersion: String = ""
+        /// The version the installed extension is expected to be: the version of the extension *embedded in this
+        /// app bundle*. It follows the extension's own lifecycle, not the app's — so an app update that doesn't
+        /// change the extension ships the same version macOS already runs, and macOS replaces nothing.
+        var expectedVersion: String = ""
         /// Whether a re-activation was started to put the two back in step.
         var repairing = false
         /// Older copies macOS is holding until the Mac restarts.
@@ -45,8 +48,8 @@ final class ExtensionManager: NSObject, ObservableObject {
         /// True when the build that matches this app is installed and enabled, but older ones are still queued
         /// for removal — which is the case a restart fixes and nothing else does.
         var needsRestart: Bool {
-            !awaitingReboot.isEmpty && !appVersion.isEmpty
-                && installed.contains { ExtensionVersion.compare($0, appVersion) == .orderedSame }
+            !awaitingReboot.isEmpty && !expectedVersion.isEmpty
+                && installed.contains { ExtensionVersion.compare($0, expectedVersion) == .orderedSame }
         }
     }
 
@@ -73,8 +76,25 @@ final class ExtensionManager: NSObject, ObservableObject {
     private var reinstalling = false
 
     /// This app's version — the one the extension it ships was built alongside.
-    static var appVersion: String {
+    nonisolated static var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
+
+    /// The version of the extension embedded in this app bundle — what the installed one should match.
+    ///
+    /// Read from the embedded `.systemextension` rather than assumed equal to the app's version, because the two are
+    /// deliberately decoupled: the extension carries its own version, bumped only when its code changes, so an app
+    /// update that leaves the extension alone ships the version macOS already runs and triggers no replacement — and
+    /// therefore no "restart to finish the update". Falls back to the app version if the embedded copy can't be read,
+    /// which is the old behaviour and errs towards not crying "stale".
+    nonisolated static var expectedExtensionVersion: String {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
+            .appendingPathComponent("\(FlowlightConstants.extensionBundleIdentifier).systemextension", isDirectory: true)
+        guard let bundle = Bundle(url: url),
+              let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !version.isEmpty else { return appVersion }
+        return version
     }
 
     /// Whether this build carries the content-filter entitlement (false for ad-hoc/local builds).
@@ -106,11 +126,11 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// `completion` is called once, when macOS has finished answering, with what it said. Capture uses it to
     /// report a repair it has just asked for rather than going quiet for another thirty seconds.
     func matchExtensionToApp(completion: ((VersionCheck) -> Void)? = nil) {
-        guard hasEntitlement, isInApplications else { completion?(VersionCheck(appVersion: Self.appVersion)); return }
+        guard hasEntitlement, isInApplications else { completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion)); return }
         // One at a time. The ladder in ExtensionRecovery asks for this once per session, but a user pressing
         // Refresh while it is in flight shouldn't start a second conversation with the same delegate.
-        guard versionCheck == nil else { completion?(VersionCheck(appVersion: Self.appVersion)); return }
-        versionCheckResult = VersionCheck(appVersion: Self.appVersion)
+        guard versionCheck == nil else { completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion)); return }
+        versionCheckResult = VersionCheck(expectedVersion: Self.expectedExtensionVersion)
         versionCheckCompletion = completion
         let request = OSSystemExtensionRequest.propertiesRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                  queue: .main)
@@ -135,9 +155,38 @@ final class ExtensionManager: NSObject, ObservableObject {
                 if let error { self.state = .failed(error.localizedDescription); return }
                 let manager = NEFilterManager.shared()
                 if manager.providerConfiguration == nil { self.state = .notInstalled }
-                else { self.state = manager.isEnabled ? .enabled : .disabled }
+                else if manager.isEnabled { self.state = .enabled; self.upgradeToNeedsRebootIfHeld() }
+                else { self.state = .disabled }
             }
         }
+    }
+
+    /// `NEFilterManager` says "enabled" whenever the filter's configuration is present and on — even when macOS is
+    /// actually running a previous copy that's holding the one content-filter slot until a restart, so nothing
+    /// arrives. That is the case a plain refresh would hide behind "Filter enabled". This confirms it against the
+    /// ground truth `systemextensionsctl` reports and upgrades the state to `.needsReboot`, which the Capture banner
+    /// turns into the restart-or-reinstall tip. Run after settling on `.enabled`, and only upgrades from it, so it
+    /// can't fight a state the user just changed.
+    private func upgradeToNeedsRebootIfHeld() {
+        Task { @MainActor in
+            let extensions = await SystemExtensionScan.read()
+            guard self.state == .enabled,
+                  Self.isHoldingSlotPendingReboot(extensions, expected: Self.expectedExtensionVersion) else { return }
+            self.state = .needsReboot
+        }
+    }
+
+    /// Whether the scan shows *our* previous copies holding the slot until a restart: the current build enabled and
+    /// at least one earlier copy "waiting to uninstall on reboot". This is the reliable signal — read from what
+    /// `systemextensionsctl list` actually prints — rather than the `OSSystemExtensionProperties` uninstalling flag,
+    /// which does not mark copies deferred to a reboot. Pure, so the decision is tested against parsed output.
+    nonisolated static func isHoldingSlotPendingReboot(_ extensions: [InstalledSystemExtension], expected: String) -> Bool {
+        let ours = extensions.filter(\.isOurs)
+        let rebootPending = ours.contains { $0.state.lowercased().contains("reboot") }
+        let currentEnabled = ours.contains {
+            $0.state.contains("activated") && ExtensionVersion.compare($0.version, expected) == .orderedSame
+        }
+        return rebootPending && currentEnabled
     }
 
     func activate() {
@@ -210,8 +259,8 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
         // slot, so the enabled build is installed without being the one running.
         let awaitingReboot = properties.filter(\.isUninstalling).map(\.bundleShortVersion)
         Task { @MainActor in
-            let appVersion = Self.appVersion
-            self.versionCheckResult = VersionCheck(installed: installed, appVersion: appVersion,
+            let expected = Self.expectedExtensionVersion
+            self.versionCheckResult = VersionCheck(installed: installed, expectedVersion: expected,
                                                    awaitingReboot: awaitingReboot)
             // The matching build is installed and enabled, but macOS is holding older copies until the Mac
             // restarts, and they still occupy the one content-filter slot. Nothing is stale, so no repair helps —
@@ -219,7 +268,7 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // message that matters with "reconnecting, try N of 6". A restart, or reinstalling the filter, is the
             // way out; the Capture screen offers both.
             if self.versionCheckResult.needsRestart { self.state = .needsReboot; return }
-            guard ExtensionVersion.isStale(installed: installed, appVersion: appVersion) else { return }
+            guard ExtensionVersion.isStale(installed: installed, appVersion: expected) else { return }
             self.versionCheckResult.repairing = true
             self.state = .installing
             self.activate()

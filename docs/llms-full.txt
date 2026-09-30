@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.10.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.11.1, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.10.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.11.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1396,8 +1396,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.10.1
+ 0.11.1
 September 30, 2026Latest
+
+ Updates no longer ask you to restart. macOS runs one network filter at a time and
+ holds the previous copies until the Mac restarts, so every update used to leave the new filter unable
+ to take the slot until a reboot. The filter now carries its own version, separate from the app's, so an
+ update that doesn't change the filter ships the version macOS is already running — nothing is replaced,
+ and there is nothing to restart for. Upgrading from 0.10.1 needs no restart at all.
+
+ When a restart or reinstall really is needed, Flowlight now knows — and says so. On
+ the rare update that does change the filter, the Capture screen reads the true state from the system and
+ shows the tip with a one-click Reinstall Filter (no restart) or the option to restart —
+ instead of silently counting failed reconnects. The previous check trusted a system flag that didn't
+ report copies held for a reboot, so the tip could stay hidden; it now reads the real state directly.
+
+ 0.10.1
+September 30, 2026
 
  After an update, Flowlight now tells you how to finish it. macOS runs one network
  filter at a time, and after an update it keeps the previous copies until they're cleared — one of them

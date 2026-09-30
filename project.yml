@@ -11,7 +11,7 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.10.1"
+    MARKETING_VERSION: "0.11.1"
     CURRENT_PROJECT_VERSION: "22"
 targets:
   Flowlight:
@@ -55,6 +55,10 @@ targets:
         CODE_SIGN_ENTITLEMENTS: FlowlightExtension/FlowlightExtension.entitlements
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
+        # The extension's version is pinned in FlowlightExtension/Info.plist, on its own lifecycle rather than the
+        # app's, so an app-only update replaces no extension and needs no restart. It is set there, not as a
+        # MARKETING_VERSION override here, because the release workflow reads MARKETING_VERSION out of this file and
+        # a second one would break its tag/version check.
     dependencies:
       - sdk: NetworkExtension.framework
   FlowlightTests:
