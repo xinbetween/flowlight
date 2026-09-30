@@ -169,6 +169,7 @@ struct CaptureView: View {
                         .font(.caption.monospaced()).foregroundStyle(.tertiary)
                 }
             }
+            if extensionManager.state == .needsReboot { rebootTip }
             if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
             if monitor.extensionFellBack {
                 CaptureNote(text: L("Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension."),
@@ -177,6 +178,26 @@ struct CaptureView: View {
             extensionButtons
         }
         .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 14)
+    }
+
+    /// Shown when the update landed but macOS is still running the previous filter because the superseded copies
+    /// hold the single content-filter slot until they are cleared. It names the two things that clear them —
+    /// reinstalling the filter (no restart), or restarting the Mac — rather than leaving someone watching the
+    /// redial counter that cannot succeed until one of them happens.
+    private var rebootTip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("The update installed, but macOS is still running the previous filter — it keeps the earlier copies until they're cleared, and one of them holds the slot the new filter needs."))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(L("Reinstall the filter to clear them now without restarting, or restart your Mac (Apple menu › Restart) to finish the update. Until then, Flowlight keeps capturing with the sampler."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button(L("Reinstall Filter")) { extensionManager.reinstall() }
+                .buttonStyle(.borderedProminent).controlSize(.small)
+                .disabled(!extensionManager.hasEntitlement)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.35)))
     }
 
     private var extensionButtons: some View {

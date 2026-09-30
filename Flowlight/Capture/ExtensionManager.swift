@@ -67,6 +67,10 @@ final class ExtensionManager: NSObject, ObservableObject {
     private var versionCheck: OSSystemExtensionRequest?
     private var versionCheckResult = VersionCheck()
     private var versionCheckCompletion: ((VersionCheck) -> Void)?
+    /// The in-flight deactivation, so its completion can be told apart from an activation's or a version check's.
+    private var deactivation: OSSystemExtensionRequest?
+    /// Set while `reinstall()` is deactivating, so the deactivation's completion re-activates instead of stopping.
+    private var reinstalling = false
 
     /// This app's version — the one the extension it ships was built alongside.
     static var appVersion: String {
@@ -151,8 +155,18 @@ final class ExtensionManager: NSObject, ObservableObject {
             let request = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                        queue: .main)
             request.delegate = self
+            self.deactivation = request
             OSSystemExtensionManager.shared.submitRequest(request)
         }
+    }
+
+    /// Uninstall the filter and install it again, without a restart. macOS runs one content filter at a time, and
+    /// after several updates the previous copies sit `terminated waiting to uninstall on reboot`, holding the slot
+    /// the current build should have. Deactivating drops those copies; activating brings the current build back —
+    /// into the slot this time. It is the alternative to restarting the Mac when it is holding the old filter.
+    func reinstall() {
+        reinstalling = true
+        deactivate()
     }
 
     func setFilterEnabled(_ enabled: Bool, completion: (() -> Void)? = nil) {
@@ -199,6 +213,12 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             let appVersion = Self.appVersion
             self.versionCheckResult = VersionCheck(installed: installed, appVersion: appVersion,
                                                    awaitingReboot: awaitingReboot)
+            // The matching build is installed and enabled, but macOS is holding older copies until the Mac
+            // restarts, and they still occupy the one content-filter slot. Nothing is stale, so no repair helps —
+            // make the state say so, authoritatively, rather than leaving the redial ladder to overwrite the one
+            // message that matters with "reconnecting, try N of 6". A restart, or reinstalling the filter, is the
+            // way out; the Capture screen offers both.
+            if self.versionCheckResult.needsRestart { self.state = .needsReboot; return }
             guard ExtensionVersion.isStale(installed: installed, appVersion: appVersion) else { return }
             self.versionCheckResult.repairing = true
             self.state = .installing
@@ -216,6 +236,14 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // Treating the two alike switched the filter on off the back of a background lookup, and did it
             // before the replacement it had just asked for was anywhere near installed.
             if self.versionCheck === request { self.finishVersionCheck(); return }
+            // A deactivation finishing: on its own it is an uninstall, but as the first half of `reinstall()` it is
+            // immediately followed by activation — that is the no-restart way to free the held content-filter slot.
+            if self.deactivation === request {
+                self.deactivation = nil
+                if result == .willCompleteAfterReboot { self.reinstalling = false; self.state = .needsReboot; return }
+                if self.reinstalling { self.reinstalling = false; self.activate() } else { self.refresh() }
+                return
+            }
             // macOS can accept a replacement and then hold it until the Mac restarts — usually because the
             // extension it is replacing is still running. Until then the old build keeps answering and the new
             // app cannot talk to it, so redialling, reinstalling and relaunching all fail the same way. Saying
@@ -231,6 +259,7 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // Same again: a properties request that fails says nothing about whether the filter is installed and
             // enabled. Reporting it as a failed installation replaced a true "Filter enabled" with a false one.
             if self.versionCheck === request { self.finishVersionCheck(); return }
+            if self.deactivation === request { self.deactivation = nil; self.reinstalling = false }
             self.state = .failed(error.localizedDescription)
         }
     }

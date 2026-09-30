@@ -33,6 +33,15 @@ final class ExtensionRebootTests: XCTestCase {
         XCTAssertFalse(check(installed: ["0.9.5"], awaiting: [], app: "0.9.5").needsRestart)
     }
 
+    /// The 0.10.0 upgrade, verbatim from `systemextensionsctl list`: the new build enabled, three previous ones
+    /// held for removal on reboot. It must be a restart problem, not a stale one — and "0.10.0" must sort after
+    /// "0.9.x" so the enabled build is recognised as the current one.
+    func testTheZeroTenUpgradeAsksForARestart() {
+        let state = check(installed: ["0.10.0/22"], awaiting: ["0.9.5/21", "0.9.7/21", "0.9.7/21"], app: "0.10.0")
+        XCTAssertTrue(state.needsRestart)
+        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.appVersion))
+    }
+
     /// A genuinely stale extension is a different fault with a different remedy: re-activation replaces it, and
     /// telling someone to restart instead would be advice that does not work.
     func testAStaleExtensionIsNotARestartProblem() {

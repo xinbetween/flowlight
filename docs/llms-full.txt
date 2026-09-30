@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.10.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.10.1, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.10.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.10.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1396,8 +1396,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.10.1
+September 30, 2026Latest
+
+ After an update, Flowlight now tells you how to finish it. macOS runs one network
+ filter at a time, and after an update it keeps the previous copies until they're cleared — one of them
+ holding the slot the new filter needs. The app knew this was a restart, not a fault, but the message
+ saying so was being overwritten by the reconnect counter, so the Capture screen just counted "try 4 of
+ 6" and fell back to the sampler without naming the fix.
+
+ It's a clear tip now, with a one-click way out. When macOS is holding the old
+ filter, Capture shows what happened and offers two remedies: Reinstall Filter, which
+ clears the old copies and starts the current one without a restart, or restarting your Mac. Until you
+ do either, Flowlight keeps capturing with the sampler.
+
  0.10.0
-September 29, 2026Latest
+September 29, 2026
 
  Always monitor an agent, and keep seeing it after a restart. HTTPS inspection
  only reads an agent once it has been pointed at the proxy, and a command-line agent you start
