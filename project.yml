@@ -55,6 +55,14 @@ targets:
         CODE_SIGN_ENTITLEMENTS: FlowlightExtension/FlowlightExtension.entitlements
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
+        # The extension carries its OWN version, deliberately decoupled from the app's (which the base settings
+        # bump every release). macOS runs one content filter at a time and holds the previous copies until a
+        # restart, so changing the extension's version on every app update forced a reboot each time. Pinned here,
+        # an app-only update ships the version macOS already runs — no replacement, no reboot. Bump these two ONLY
+        # when the FlowlightExtension binary itself changes (and expect one replacement when you do). Kept at the
+        # 0.10.1 values so upgrades from 0.10.1 need no reboot at all.
+        MARKETING_VERSION: "0.10.1"
+        CURRENT_PROJECT_VERSION: "22"
     dependencies:
       - sdk: NetworkExtension.framework
   FlowlightTests:

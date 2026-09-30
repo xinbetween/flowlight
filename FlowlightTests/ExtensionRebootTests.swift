@@ -18,14 +18,14 @@ import XCTest
 final class ExtensionRebootTests: XCTestCase {
 
     private func check(installed: [String], awaiting: [String], app: String) -> ExtensionManager.VersionCheck {
-        ExtensionManager.VersionCheck(installed: installed, appVersion: app, awaitingReboot: awaiting)
+        ExtensionManager.VersionCheck(installed: installed, expectedVersion: app, awaitingReboot: awaiting)
     }
 
     /// The exact state from the machine this was found on.
     func testTheReportedStateAsksForARestart() {
         let state = check(installed: ["0.9.5"], awaiting: ["0.9.4", "0.9.3", "0.9.1"], app: "0.9.5")
         XCTAssertTrue(state.needsRestart)
-        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.appVersion),
+        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion),
                        "nothing is stale here, which is exactly why the version check never fixed it")
     }
 
@@ -39,7 +39,46 @@ final class ExtensionRebootTests: XCTestCase {
     func testTheZeroTenUpgradeAsksForARestart() {
         let state = check(installed: ["0.10.0/22"], awaiting: ["0.9.5/21", "0.9.7/21", "0.9.7/21"], app: "0.10.0")
         XCTAssertTrue(state.needsRestart)
-        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.appVersion))
+        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
+    }
+
+    /// The permanent fix: the extension's version is pinned to its own lifecycle, so an app-only update ships the
+    /// version macOS already runs. Installed matches expected → nothing stale, no restart — no matter how far the
+    /// app's own version has moved on. This is the case that used to force a reboot on every single release.
+    func testAnAppOnlyUpdateNeedsNeitherRepairNorRestart() {
+        let state = check(installed: ["0.10.1/22"], awaiting: [], app: "0.10.1")
+        XCTAssertFalse(state.needsRestart)
+        XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
+    }
+
+    /// The version the installed extension is compared against is read from the extension embedded in the app
+    /// bundle, not assumed equal to the app's version. Empty would make every install look stale and re-activate
+    /// on a loop, so the read has to actually find it in the bundle that hosts these tests.
+    func testTheExpectedVersionIsReadFromTheEmbeddedExtension() {
+        XCTAssertFalse(ExtensionManager.expectedExtensionVersion.isEmpty)
+    }
+
+    /// The held-slot state, read from what `systemextensionsctl list` actually prints — the reliable signal, since
+    /// the OSSystemExtension uninstalling flag doesn't mark copies deferred to a reboot. Current build activated
+    /// enabled, an earlier one waiting to uninstall on reboot: that is a restart/reinstall situation.
+    func testHeldSlotIsDetectedFromTheScan() {
+        let output = [
+            "--- com.apple.system_extension.network_extension (Go to 'System Settings')",
+            "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]",
+            "\t\t38RJUJHKZS\tcom.flowlight.app.filter (0.9.7/21)\tFlowlight Filter\t[terminated waiting to uninstall on reboot]",
+            "*\t*\t38RJUJHKZS\tcom.flowlight.app.filter (0.10.1/22)\tFlowlight Filter\t[activated enabled]",
+        ].joined(separator: "\n")
+        XCTAssertTrue(ExtensionManager.isHoldingSlotPendingReboot(SystemExtensionScan.parse(output), expected: "0.10.1"))
+    }
+
+    /// A single healthy install is not a held slot — nothing is waiting to uninstall, so no tip.
+    func testAHealthyInstallIsNotHeld() {
+        let output = [
+            "--- com.apple.system_extension.network_extension (Go to 'System Settings')",
+            "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]",
+            "*\t*\t38RJUJHKZS\tcom.flowlight.app.filter (0.10.1/22)\tFlowlight Filter\t[activated enabled]",
+        ].joined(separator: "\n")
+        XCTAssertFalse(ExtensionManager.isHoldingSlotPendingReboot(SystemExtensionScan.parse(output), expected: "0.10.1"))
     }
 
     /// A genuinely stale extension is a different fault with a different remedy: re-activation replaces it, and
@@ -47,7 +86,7 @@ final class ExtensionRebootTests: XCTestCase {
     func testAStaleExtensionIsNotARestartProblem() {
         let state = check(installed: ["0.9.4"], awaiting: [], app: "0.9.5")
         XCTAssertFalse(state.needsRestart)
-        XCTAssertTrue(ExtensionVersion.isStale(installed: state.installed, appVersion: state.appVersion))
+        XCTAssertTrue(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
     }
 
     /// Both at once — an old build still enabled *and* others queued for removal. The repair is the stronger
@@ -55,7 +94,7 @@ final class ExtensionRebootTests: XCTestCase {
     func testAStaleExtensionWithLeftoversPrefersTheRepair() {
         let state = check(installed: ["0.9.4"], awaiting: ["0.9.1"], app: "0.9.5")
         XCTAssertFalse(state.needsRestart)
-        XCTAssertTrue(ExtensionVersion.isStale(installed: state.installed, appVersion: state.appVersion))
+        XCTAssertTrue(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
     }
 
     /// Knowing nothing is not knowing something is wrong. With no enabled copy at all there is nothing to say a
