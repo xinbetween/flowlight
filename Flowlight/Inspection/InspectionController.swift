@@ -467,8 +467,9 @@ final class InspectionController: ObservableObject {
 
         if enabled, running, let port, !recipes.isEmpty {
             let env = proxyEnvironment
+            let url = proxyURL
             for (name, recipe) in recipes {
-                do { try enforcer.enforce(agent: name, recipe: recipe, values: env, proxyPort: port) }
+                do { try enforcer.enforce(agent: name, recipe: recipe, proxyURL: url, env: env, proxyPort: port) }
                 catch { lastError = error.localizedDescription }
             }
             if !janitorInstalled { ProxyJanitor.install(manifestPath: enforcer.manifestURL.path); janitorInstalled = true }

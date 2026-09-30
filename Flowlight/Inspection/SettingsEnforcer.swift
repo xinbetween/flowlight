@@ -11,47 +11,63 @@ enum SettingsMerge {
         var prior: String?
     }
 
-    /// Merge `values` into the object at `envKey`, creating that object if it isn't there. Returns the new root,
-    /// what each key was before, and whether the env object had to be created (so undo can remove it again).
+    /// Merge `values` into the target dictionary — a nested object at `container`, or the JSON root itself when
+    /// `container` is nil (for settings that keep the proxy in a top-level key like `"http.proxy"`). Returns the new
+    /// root, what each key was before, and whether a nested container had to be created (so undo can remove it again).
     ///
-    /// Throws if `envKey` is present but isn't a string-to-string object: that is someone else's data in a shape
-    /// Flowlight doesn't understand, and the one thing it must never do is overwrite it.
-    static func apply(to root: [String: Any], envKey: String, values: [String: String]) throws
-        -> (root: [String: Any], entries: [Entry], createdEnv: Bool) {
+    /// Throws if a key Flowlight would set already holds something other than a string, or a named container isn't a
+    /// string-to-string object: that is someone else's data in a shape Flowlight doesn't understand, and the one thing
+    /// it must never do is overwrite it. Keys it doesn't touch are always preserved.
+    static func apply(to root: [String: Any], container: String?, values: [String: String]) throws
+        -> (root: [String: Any], entries: [Entry], createdContainer: Bool) {
         var root = root
-        var env: [String: String]
-        let createdEnv: Bool
-        switch root[envKey] {
-        case nil:
-            env = [:]; createdEnv = true
-        case let existing as [String: String]:
-            env = existing; createdEnv = false
-        case let existing as [String: Any]:
-            // JSONSerialization gives values as Any; accept it only if every value really is a string.
-            guard let strings = existing as? [String: String] else { throw EnforceError.envNotStrings }
-            env = strings; createdEnv = false
-        default:
-            throw EnforceError.envNotStrings
+        var target: [String: String] = [:]
+        var createdContainer = false
+        if let container {
+            switch root[container] {
+            case nil: createdContainer = true
+            case let existing as [String: String]: target = existing
+            case let existing as [String: Any]:
+                guard let strings = existing as? [String: String] else { throw EnforceError.envNotStrings }
+                target = strings
+            default: throw EnforceError.envNotStrings
+            }
+        } else {
+            // Top-level keys: read the prior value of only the keys we're about to set; everything else in the root
+            // is left untouched. A key we'd set that holds a non-string is refused rather than overwritten.
+            for key in values.keys {
+                switch root[key] {
+                case nil: break
+                case let value as String: target[key] = value
+                default: throw EnforceError.envNotStrings
+                }
+            }
         }
-        let entries = values.keys.sorted().map { Entry(key: $0, prior: env[$0]) }
-        for (key, value) in values { env[key] = value }
-        root[envKey] = env
-        return (root, entries, createdEnv)
+        let entries = values.keys.sorted().map { Entry(key: $0, prior: target[$0]) }
+        for (key, value) in values { target[key] = value }
+        if let container {
+            root[container] = target
+        } else {
+            for (key, value) in target { root[key] = value }
+        }
+        return (root, entries, createdContainer)
     }
 
-    /// Reverse `apply`: put every key back to its prior state, and remove the env object if Flowlight created it and
-    /// nothing else was added to it. Written to be safe to run more than once and even after the file was already
-    /// restored by other means (the crash janitor), so recovery paths can't fight each other.
-    static func revert(from root: [String: Any], envKey: String, entries: [Entry], createdEnv: Bool) -> [String: Any] {
+    /// Reverse `apply`: put every key back to its prior state, and remove a container Flowlight created if nothing
+    /// else was added to it. Safe to run more than once and even after the file was already restored by other means
+    /// (the crash janitor), so recovery paths can't fight each other.
+    static func revert(from root: [String: Any], container: String?, entries: [Entry], createdContainer: Bool) -> [String: Any] {
         var root = root
-        var env = (root[envKey] as? [String: String]) ?? [:]
-        for entry in entries {
-            if let prior = entry.prior { env[entry.key] = prior } else { env.removeValue(forKey: entry.key) }
-        }
-        if env.isEmpty && createdEnv {
-            root.removeValue(forKey: envKey)
+        if let container {
+            var target = (root[container] as? [String: String]) ?? [:]
+            for entry in entries {
+                if let prior = entry.prior { target[entry.key] = prior } else { target.removeValue(forKey: entry.key) }
+            }
+            if target.isEmpty && createdContainer { root.removeValue(forKey: container) } else { root[container] = target }
         } else {
-            root[envKey] = env
+            for entry in entries {
+                if let prior = entry.prior { root[entry.key] = prior } else { root.removeValue(forKey: entry.key) }
+            }
         }
         return root
     }
@@ -112,9 +128,10 @@ final class SettingsEnforcer: @unchecked Sendable {
     /// What Flowlight did to one agent's file, kept so it can be undone exactly.
     struct Record: Codable, Equatable {
         var livePath: String
-        var envKey: String
+        /// The JSON key the values were nested under, or nil when they were written at the root.
+        var container: String?
         var entries: [SettingsMerge.Entry]
-        var createdEnv: Bool
+        var createdContainer: Bool
         var fileExisted: Bool
         var cleanPath: String?
         var backupPath: String?
@@ -128,19 +145,22 @@ final class SettingsEnforcer: @unchecked Sendable {
 
     // MARK: Enforce / relax
 
-    /// Route one agent through the proxy by merging `values` into its settings file. Idempotent: re-applying keeps
-    /// the record of what was originally there and only refreshes the proxy values (the port may have changed).
-    func enforce(agent: String, recipe: ConfigRecipe, values: [String: String], proxyPort: UInt16) throws {
+    /// Route one agent through the proxy by writing it into its settings file, following the file's own shape. `env`
+    /// carries Flowlight's full proxy environment (used whole for Claude Code's env block); `proxyURL` is the address
+    /// written for the editors that take a single proxy key. Idempotent: re-applying keeps the record of what was
+    /// originally there and only refreshes the proxy values (the port may have changed).
+    func enforce(agent: String, recipe: ConfigRecipe, proxyURL: String, env: [String: String], proxyPort: UInt16) throws {
         try queue.sync {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let live = homeFile(recipe.homeRelativePath)
+            let (container, values) = recipe.resolve(proxyURL: proxyURL, env: env)
             var ledger = loadLedger()
 
             if var existing = ledger.records[agent] {
                 // Already enforced: don't recompute the prior state from a file we already changed, or we would
                 // record our own values as if they were the user's. Just refresh the proxy values in place.
                 let root = try readJSON(at: live) ?? [:]
-                let merged = try SettingsMerge.apply(to: root, envKey: recipe.envKey, values: values)
+                let merged = try SettingsMerge.apply(to: root, container: container, values: values)
                 try writeJSON(merged.root, to: live)
                 existing.livePath = live.path
                 existing.port = proxyPort
@@ -151,7 +171,7 @@ final class SettingsEnforcer: @unchecked Sendable {
 
             let fileExisted = FileManager.default.fileExists(atPath: live.path)
             let root = try readJSON(at: live) ?? [:]
-            let merged = try SettingsMerge.apply(to: root, envKey: recipe.envKey, values: values)
+            let merged = try SettingsMerge.apply(to: root, container: container, values: values)
 
             var backupPath: String?
             var cleanPath: String?
@@ -172,8 +192,8 @@ final class SettingsEnforcer: @unchecked Sendable {
 
             // Live file last, so the manifest only ever names a file whose clean copy is already staged.
             try writeJSON(merged.root, to: live)
-            ledger.records[agent] = Record(livePath: live.path, envKey: recipe.envKey, entries: merged.entries,
-                                           createdEnv: merged.createdEnv, fileExisted: fileExisted,
+            ledger.records[agent] = Record(livePath: live.path, container: container, entries: merged.entries,
+                                           createdContainer: merged.createdContainer, fileExisted: fileExisted,
                                            cleanPath: cleanPath, backupPath: backupPath, port: proxyPort)
             saveLedger(ledger)
         }
@@ -213,8 +233,8 @@ final class SettingsEnforcer: @unchecked Sendable {
         let clean = record.cleanPath.map { URL(fileURLWithPath: $0) }
         if let root = try? readJSON(at: live) {
             // Precise, JSON-aware undo of exactly the keys Flowlight set.
-            let reverted = SettingsMerge.revert(from: root, envKey: record.envKey, entries: record.entries,
-                                                createdEnv: record.createdEnv)
+            let reverted = SettingsMerge.revert(from: root, container: record.container, entries: record.entries,
+                                                createdContainer: record.createdContainer)
             if !record.fileExisted && reverted.isEmpty {
                 try? FileManager.default.removeItem(at: live)
             } else {
