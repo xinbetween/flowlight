@@ -5,7 +5,9 @@ import SwiftUI
 /// at a proxy that is about to stop. A crash skips this; `ProxyJanitor` covers that.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
-        guard !FlowlightApp.runningTests else { return }
+        // Not in tests (they share this process), and not in a demo or screenshot run: that is a throwaway instance
+        // with its own database, and it must never strip the enforcement the real running app owns.
+        guard !FlowlightApp.runningTests, !DemoData.isEnabled else { return }
         SettingsEnforcer.shared.relaxAll()
     }
 }
