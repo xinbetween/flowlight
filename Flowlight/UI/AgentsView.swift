@@ -164,6 +164,15 @@ struct AgentsView: View {
                 FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 Divider()
                 RuleMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
+                if let known = AgentCatalog.knownAgent(bundleID: id, appName: agents.first { $0.bundleID == id }?.name ?? id),
+                   known.configRecipe != nil {
+                    Divider()
+                    if monitor.inspection.monitoredAgents.contains(known.name) {
+                        Button(L("Stop Monitoring %@", known.name)) { monitor.inspection.setAlwaysMonitor(false, agent: known.name) }
+                    } else {
+                        Button(L("Always Monitor %@", known.name)) { monitor.inspection.setAlwaysMonitor(true, agent: known.name) }
+                    }
+                }
             }
         } primaryAction: { ids in
             if let id = ids.first { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
@@ -207,31 +216,71 @@ struct AgentsView: View {
 struct AlwaysMonitorBanner: View {
     @ObservedObject var inspection: InspectionController
     let candidates: [Candidate]
-    @State private var dismissed: Set<String> = []
+    @State private var dismissedSuggestions: Set<String> = []
+    /// The monitored set the "monitoring" tip was last closed for. The tip shows whenever the current set differs
+    /// from it — so closing hides it until the set changes (a new agent monitored), then it comes back on its own.
+    /// Keyed by the set rather than a flag so no separate change-watching is needed.
+    @State private var dismissedFor: Set<String> = []
 
     struct Candidate: Equatable { var name: String; var routed: Bool }
 
     /// Going direct, not yet asked to be monitored, and not dismissed this session: worth offering.
     private var suggestions: [String] {
-        candidates.filter { !$0.routed && !inspection.monitoredAgents.contains($0.name) && !dismissed.contains($0.name) }
+        candidates.filter { !$0.routed && !inspection.monitoredAgents.contains($0.name) && !dismissedSuggestions.contains($0.name) }
             .map(\.name)
     }
 
-    /// Asked to be monitored, but still nothing decrypted — the honest "we wrote the file, but it isn't routed" case.
-    private var unverified: [String] {
-        candidates.filter { !$0.routed && inspection.monitoredAgents.contains($0.name) }.map(\.name)
+    /// Every agent the user chose to always monitor, so the tip can always say what is being kept routed.
+    private var monitored: [String] { inspection.monitoredAgents.sorted() }
+
+    /// Monitored agents whose traffic still isn't being decrypted — the honest "written, but not routed" note.
+    private var notRouted: Set<String> {
+        Set(candidates.filter { !$0.routed && inspection.monitoredAgents.contains($0.name) }.map(\.name))
     }
 
     var body: some View {
-        if inspection.enabled, inspection.running, !(suggestions.isEmpty && unverified.isEmpty) {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(suggestions, id: \.self) { name in suggestion(name) }
-                ForEach(unverified, id: \.self) { name in stillNotRouted(name) }
+        let showSuggestions = inspection.enabled && inspection.running && !suggestions.isEmpty
+        let showMonitoring = inspection.enabled && !monitored.isEmpty && dismissedFor != Set(monitored)
+        if showSuggestions || showMonitoring {
+            VStack(alignment: .leading, spacing: 12) {
+                if showSuggestions { ForEach(suggestions, id: \.self) { name in suggestion(name) } }
+                if showMonitoring { monitoringTip }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.25)))
+        }
+    }
+
+    /// Always shown while agents are monitored, until closed by hand. Lists each one with a one-click stop, and
+    /// flags any that were written to their settings file but still aren't routed.
+    private var monitoringTip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
+                Text(L("Flowlight is keeping these agents routed through it on every launch."))
+                    .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button { dismissedFor = Set(monitored) } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .help(L("Hide this until the monitored agents change"))
+            }
+            ForEach(monitored, id: \.self) { name in
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles").font(.caption).foregroundStyle(.secondary)
+                    Text(name)
+                    if notRouted.contains(name) {
+                        Text(L("· not routed yet — it may pin its certificates, or a shell setting may override the file"))
+                            .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Button(L("Stop Monitoring")) { inspection.setAlwaysMonitor(false, agent: name) }
+                        .controlSize(.small)
+                }
+            }
         }
     }
 
@@ -246,22 +295,9 @@ struct AlwaysMonitorBanner: View {
                 HStack(spacing: 8) {
                     Button(L("Always Monitor %@", name)) { inspection.setAlwaysMonitor(true, agent: name) }
                         .controlSize(.small).buttonStyle(.borderedProminent)
-                    Button(L("Not Now")) { dismissed.insert(name) }
+                    Button(L("Not Now")) { dismissedSuggestions.insert(name) }
                         .controlSize(.small)
                 }
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func stillNotRouted(_ name: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("%@ is set to always monitor, but nothing of its traffic has been decrypted yet. It may pin its certificates, or a proxy set in your shell may be overriding its settings file.", name))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button(L("Stop Monitoring %@", name)) { inspection.setAlwaysMonitor(false, agent: name) }
-                    .controlSize(.small)
             }
             Spacer(minLength: 0)
         }
