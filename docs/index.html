@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app", "name": "Flowlight", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "url": "https://flowlight.xinbetween.com/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.11.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app", "name": "Flowlight", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "url": "https://flowlight.xinbetween.com/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.11.2", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -75,7 +75,7 @@
             Star on GitHub
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">Copy</button></p>
-          <p class="meta-row"><span>v0.11.1</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
+          <p class="meta-row"><span>v0.11.2</span><span>macOS 15+</span><span>Universal</span><span>GPL-3.0</span><span>No telemetry</span></p>
         </div>
       </div>
 
@@ -105,9 +105,17 @@
 
   <section class="shot" aria-label="Screenshot">
     <div class="wrap">
-      <div class="frame"><img src="assets/screenshots/agents.png?v=c3fae806" width="1600" height="994"
+      <div class="frame"><img src="assets/screenshots/agents.png?v=07308ba2" width="1600" height="1001"
         alt="Flowlight's AI Agents view. Claude Code, Cursor, Codex and a Python script are listed with their AI providers, traffic sent elsewhere and risk badges for SMTP, SSH, FTP, a large upload and a raw IP."></div>
       <p class="caption">The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.</p>
+    </div>
+  </section>
+
+  <section class="shot" aria-label="Screenshot">
+    <div class="wrap">
+      <div class="frame"><img src="assets/screenshots/always-monitor.png?v=85842932" width="1600" height="1001" loading="lazy"
+        alt="The AI Agents view offering to always monitor Windsurf, and confirming Flowlight is keeping Claude Code and Cursor routed through it on every launch, each with a one-click Stop Monitoring."></div>
+      <p class="caption">Always monitor an agent: Flowlight writes the proxy into the agent's own settings so it routes through on every launch, and says what it's keeping — stop any of it in a click. Shown with demo data.</p>
     </div>
   </section>
   <section class="band" id="use-cases">
@@ -372,16 +380,16 @@
           Mac. Start an agent from an inspected Terminal and supported HTTP traffic from the agent and its tools is decrypted, with tool calls the
           model asked for and the results that went back.</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="assets/screenshots/inspect.png?v=aae63a6f" width="1600" height="1003" loading="lazy"
         alt="Flowlight's Inspect view: a list of decrypted Claude Code requests with their tool calls, and the detail of curl's upload to paste.example, made by the Bash tool call that ran it, with the uploaded notes in the request body"></div>
         <figcaption><b>Where did my notes go?</b> curl's upload to paste.example, traced to the Bash command the model asked for, with the
           body it sent.</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="assets/screenshots/agent-tools.png?v=a387097f" width="1600" height="712" loading="lazy"
           alt="The Tools tab for Claude Code: Bash, Read and two MCP tools with descriptions and how often the model called each"></div>
           <figcaption><b>Every tool an agent offers the model.</b> Agents declare their tools on each turn, so Flowlight lists them all, with the
             ones the model actually used and the ones it never touched.</figcaption></figure>
-        <figure><div class="frame"><img src="assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="assets/screenshots/mcp-servers.png?v=72600c84" width="1600" height="712" loading="lazy"
           alt="The MCP servers tab for Codex: a sentry server marked via provider, its URL, approval set to never, allowed tools and the tools it offers"></div>
           <figcaption><b>Including the ones you can't see on the wire.</b> When an agent asks the provider to connect to an MCP server, that traffic
             never reaches your Mac. Its request does, so the server, its URL, its approval setting and its tools still show up.</figcaption></figure>
@@ -427,7 +435,7 @@
 
   <section class="band" id="agent-detail" aria-label="Agent detail screenshot">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="assets/screenshots/agent-detail.png?v=f7bcda77" width="1600" height="1001" loading="lazy"
         alt="Claude Code's detail in Flowlight: Tools and MCP servers with call counts and one failure, an allowlist, and the Tool calls tab listing a failed git push, a curl upload to paste.example with its response and request, npm install, a GitHub issue, a docs search and a file read, each with its result"></div>
         <figcaption><b>One agent, every tool call.</b> Traffic from the git, curl and MCP servers Claude Code started counts as Claude Code's.
           With HTTPS inspection on, the <em>Tool calls</em> tab shows what the model asked for, what came back, and the requests each tool made:
@@ -437,10 +445,10 @@
 
   <section class="band" aria-label="More screenshots">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="assets/screenshots/reports.png?v=dafc9b18" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="assets/screenshots/reports.png?v=912576d1" width="1600" height="1001" loading="lazy"
         alt="Reports view with hourly received and sent bars and donut charts of apps, destinations and protocols"></div>
         <figcaption><b>Reports.</b> Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.</figcaption></figure>
-      <figure><div class="frame"><img src="assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="assets/screenshots/alerts.png?v=2510ccee" width="1600" height="1001" loading="lazy"
         alt="Alerts view listing agent exfiltration, email, FTP, while-away and traffic spike alerts"></div>
         <figcaption><b>Alerts.</b> Each one names the app, the destination and the number that tripped it.</figcaption></figure>
     </div>
@@ -617,7 +625,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.11.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.11.2 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

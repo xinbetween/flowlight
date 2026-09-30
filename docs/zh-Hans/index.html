@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hans", "name": "Flowlight", "description": "Flowlight 是面向 macOS 的开源应用级网络监控工具，能看清每个应用的连接去向，尤其看得清 AI 代理、它们的工具和 MCP 服务器。", "url": "https://flowlight.xinbetween.com/zh-Hans/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.11.1", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hans/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app-zh-Hans", "name": "Flowlight", "description": "Flowlight 是面向 macOS 的开源应用级网络监控工具，能看清每个应用的连接去向，尤其看得清 AI 代理、它们的工具和 MCP 服务器。", "url": "https://flowlight.xinbetween.com/zh-Hans/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.11.2", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/zh-Hans/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
@@ -75,7 +75,7 @@
             在 GitHub 上加星
           </a>
           <p class="brew"><code>brew install --cask xinbetween/tap/flowlight</code><button type="button" class="copy" data-copy="brew install --cask xinbetween/tap/flowlight">拷贝</button></p>
-          <p class="meta-row"><span>v0.11.1</span><span>macOS 15+</span><span>通用架构</span><span>GPL-3.0</span><span>无遥测</span></p>
+          <p class="meta-row"><span>v0.11.2</span><span>macOS 15+</span><span>通用架构</span><span>GPL-3.0</span><span>无遥测</span></p>
         </div>
       </div>
 
@@ -105,7 +105,7 @@
 
   <section class="shot" aria-label="截图">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/agents.png?v=c3fae806" width="1600" height="994"
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=07308ba2" width="1600" height="1001"
         alt="Flowlight 的 AI 代理视图。Claude Code、Cursor、Codex 和一个 Python 脚本逐行列出，显示各自的 AI 提供方、发往别处的流量，以及 SMTP、SSH、FTP、大量上传和裸 IP 的风险标记。"></div>
       <p class="caption">AI 代理视图：每个代理的模型提供方，以及它联系过的其他一切。图中为演示数据。</p>
     </div>
@@ -369,16 +369,16 @@
         <p class="lede">默认关闭。打开后，Flowlight 会成为一个本地代理，使用在你 Mac 上生成的专属证书颁发机构。
           从受检查的终端启动代理，代理及其工具的受支持 HTTP 流量就会被解密，并附上模型请求的工具调用和返回的结果。</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=4a7a2ce7" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=aae63a6f" width="1600" height="1003" loading="lazy"
         alt="Flowlight 的检查视图：一列已解密的 Claude Code 请求及其工具调用，以及 curl 向 paste.example 上传的详情——由运行它的那次 Bash 工具调用发起，请求体里正是上传的笔记"></div>
         <figcaption><b>我的笔记去哪了？</b>curl 向 paste.example 的上传，一路追到模型要求执行的那条 Bash 命令，
           连它发出的请求体一起。</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=2dd743f6" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=a387097f" width="1600" height="712" loading="lazy"
           alt="Claude Code 的工具标签页：Bash、Read 和两个 MCP 工具，附带说明以及模型各自调用了多少次"></div>
           <figcaption><b>代理提供给模型的每一个工具。</b>代理每一轮都会声明自己的工具，所以 Flowlight 把它们全部列出，
             并区分模型真正用过的和从未碰过的。</figcaption></figure>
-        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=0e34adfb" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=72600c84" width="1600" height="712" loading="lazy"
           alt="Codex 的 MCP 服务器标签页：一个标为“经由提供方”的 sentry 服务器，以及它的 URL、设为“从不”的审批、允许的工具和它提供的工具"></div>
           <figcaption><b>连线路上看不到的那些也算。</b>当代理请求提供方去连接某个 MCP 服务器时，那段流量根本不会经过你的 Mac。
             但它的请求会，所以这个服务器、它的 URL、它的审批设置和它的工具依然会出现。</figcaption></figure>
@@ -424,7 +424,7 @@
 
   <section class="band" id="agent-detail" aria-label="代理详情截图">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=d9dd8e0f" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=f7bcda77" width="1600" height="1001" loading="lazy"
         alt="Flowlight 里 Claude Code 的详情：带调用次数和一次失败的工具与 MCP 服务器、一个允许列表，以及工具调用标签页，里面列出一次失败的 git push、一次 curl 向 paste.example 的上传及其响应和请求、npm install、一个 GitHub issue、一次文档搜索和一次文件读取，每项都带结果"></div>
         <figcaption><b>一个代理，每一次工具调用。</b>Claude Code 启动的 git、curl 和 MCP 服务器产生的流量都算作 Claude Code 的。
           打开 HTTPS 检查后，<em>工具调用</em>标签页会显示模型要求了什么、返回了什么，以及每个工具发出的请求：
@@ -434,10 +434,10 @@
 
   <section class="band" aria-label="更多截图">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=dafc9b18" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=912576d1" width="1600" height="1001" loading="lazy"
         alt="报告视图，含每小时接收与发送的柱状图，以及应用、目标和协议的环形图"></div>
         <figcaption><b>报告。</b>从秒到年的缩放、三种分组方式，几百个应用也读得清的图表。</figcaption></figure>
-      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=b61d6fd7" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=2510ccee" width="1600" height="1001" loading="lazy"
         alt="警报视图，列出代理外泄、邮件、FTP、你离开时活动和流量突增等警报"></div>
         <figcaption><b>警报。</b>每一条都点明应用、目标和触发它的那个数字。</figcaption></figure>
     </div>
@@ -613,7 +613,7 @@ open Flowlight.app --args -FLDemo YES</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
-      <span>版本 0.11.1 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+      <span>版本 0.11.2 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
     </div>
   </div>
 </footer>
