@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.11.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.11.3, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.11.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.11.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1398,8 +1398,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.11.2
+ 0.11.3
 September 30, 2026Latest
+
+ A demo run no longer touches your real monitoring. Quitting Flowlight strips the
+ proxy it wrote into a monitored agent's settings, so the agent works without it — but that strip was
+ also running when a throwaway demo or screenshot instance quit, which could quietly switch off the
+ monitoring the real app had set up. It now leaves real enforcement alone.
+
+ 0.11.2
+September 30, 2026
 
  See what's being monitored, and change it in a click. When Flowlight is keeping an
  agent routed through it by writing the proxy into that agent's own settings, the AI Agents screen now
