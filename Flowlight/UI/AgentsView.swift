@@ -37,6 +37,21 @@ struct AgentsView: View {
 
     private var selected: AgentSummary? { agents.first { $0.id == selection } ?? agents.first }
 
+    /// The agents "always monitor" could offer to keep routed: known agents Flowlight can edit safely (they have a
+    /// `configRecipe`) that are talking to an LLM provider, each paired with whether any of their traffic is actually
+    /// being decrypted this window. The banner turns this into a suggestion or a "still not routed" note by comparing
+    /// it against which agents are already monitored.
+    private var monitorCandidates: [AlwaysMonitorBanner.Candidate] {
+        var routedByName: [String: Bool] = [:]
+        for agent in agents {
+            guard let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: agent.name),
+                  known.configRecipe != nil, !agent.providers.isEmpty else { continue }
+            routedByName[known.name] = (routedByName[known.name] ?? false) || inspectedAgents.contains(agent.bundleID)
+        }
+        return routedByName.map { AlwaysMonitorBanner.Candidate(name: $0.key, routed: $0.value) }
+            .sorted { $0.name < $1.name }
+    }
+
     var body: some View {
         GeometryReader { geometry in
             content(height: geometry.size.height)
@@ -48,6 +63,7 @@ struct AgentsView: View {
     private func content(height: CGFloat) -> some View {
         let roomy = height > 680
         return VStack(alignment: .leading, spacing: 12) {
+            AlwaysMonitorBanner(inspection: monitor.inspection, candidates: monitorCandidates)
             HStack {
                 if roomy {
                     Text(L("Observed AI agent activity, including destinations outside each agent's model provider."))
@@ -178,6 +194,77 @@ struct AgentsView: View {
         agentAlerts = alerts.filter { AnomalyEngine.Kind.agentKinds.contains($0.kind) || ids.contains($0.bundleID) && $0.severity >= 2 }.count
         if selection == nil || !ids.contains(selection!) { selection = built.first?.id }
         loaded = true
+    }
+}
+
+/// The one-click way to keep a supported agent routed through Flowlight for good.
+///
+/// When inspection is on but a known, editable agent (today: Claude Code) is reaching its model provider directly —
+/// its traffic isn't being decrypted — this offers to add the proxy to the agent's own settings file, so it routes
+/// through Flowlight on every launch without being relaunched by hand. It is honest about the two ways this can sit:
+/// a suggestion for an agent going direct, and a "still not routed" note for one already asked-for but not yet seen
+/// (it may pin its certificates, or a shell variable may be overriding the file).
+struct AlwaysMonitorBanner: View {
+    @ObservedObject var inspection: InspectionController
+    let candidates: [Candidate]
+    @State private var dismissed: Set<String> = []
+
+    struct Candidate: Equatable { var name: String; var routed: Bool }
+
+    /// Going direct, not yet asked to be monitored, and not dismissed this session: worth offering.
+    private var suggestions: [String] {
+        candidates.filter { !$0.routed && !inspection.monitoredAgents.contains($0.name) && !dismissed.contains($0.name) }
+            .map(\.name)
+    }
+
+    /// Asked to be monitored, but still nothing decrypted — the honest "we wrote the file, but it isn't routed" case.
+    private var unverified: [String] {
+        candidates.filter { !$0.routed && inspection.monitoredAgents.contains($0.name) }.map(\.name)
+    }
+
+    var body: some View {
+        if inspection.enabled, inspection.running, !(suggestions.isEmpty && unverified.isEmpty) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(suggestions, id: \.self) { name in suggestion(name) }
+                ForEach(unverified, id: \.self) { name in stillNotRouted(name) }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.08)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.25)))
+        }
+    }
+
+    private func suggestion(_ name: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "bolt.horizontal.circle").foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("%@ is reaching its model provider directly, so Flowlight can't see what it sends.", name))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(L("Always monitor it to add the proxy to %@'s own settings, so it routes through Flowlight on every launch. Flowlight removes this again when inspection is off.", name))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(L("Always Monitor %@", name)) { inspection.setAlwaysMonitor(true, agent: name) }
+                        .controlSize(.small).buttonStyle(.borderedProminent)
+                    Button(L("Not Now")) { dismissed.insert(name) }
+                        .controlSize(.small)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func stillNotRouted(_ name: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("%@ is set to always monitor, but nothing of its traffic has been decrypted yet. It may pin its certificates, or a proxy set in your shell may be overriding its settings file.", name))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Button(L("Stop Monitoring %@", name)) { inspection.setAlwaysMonitor(false, agent: name) }
+                    .controlSize(.small)
+            }
+            Spacer(minLength: 0)
+        }
     }
 }
 

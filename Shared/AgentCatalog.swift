@@ -1,11 +1,28 @@
 import Foundation
 
+/// How to route one agent through Flowlight by writing its own settings file, rather than by relaunching it with
+/// environment variables. Persisting the proxy into the file the agent reads on every start is what makes routing
+/// survive a restart the user did themselves — "always monitor" — instead of lasting only for a relaunched process.
+///
+/// Only agents whose settings format Flowlight can edit safely have a recipe. Today that is the ones that keep a
+/// JSON file with a block of environment variables (Claude Code's `~/.claude/settings.json`, whose `env` block macOS
+/// applies to the session). Others (Codex's `config.toml`) can be added as data once their format is supported.
+struct ConfigRecipe: Sendable, Equatable {
+    /// The agent's settings file, relative to the user's home directory (e.g. `.claude/settings.json`).
+    var homeRelativePath: String
+    /// The top-level JSON key holding the environment block Flowlight merges the proxy variables into.
+    var envKey: String
+}
+
 /// An AI agent or assistant Flowlight recognizes by name.
 struct KnownAgent: Sendable, Equatable {
     var name: String
     var vendor: String
     var bundleIDs: Set<String> = []
     var processNames: Set<String> = []
+    /// How to persist proxy routing into this agent's own settings, or nil when Flowlight can only route it by
+    /// relaunching it with an environment (see `ProxyRelaunch`).
+    var configRecipe: ConfigRecipe? = nil
 }
 
 /// Recognizes AI agents and LLM API traffic.
@@ -16,7 +33,8 @@ struct KnownAgent: Sendable, Equatable {
 enum AgentCatalog {
     static let agents: [KnownAgent] = [
         KnownAgent(name: "Claude", vendor: "Anthropic", bundleIDs: ["com.anthropic.claudefordesktop"]),
-        KnownAgent(name: "Claude Code", vendor: "Anthropic", processNames: ["claude", "claude-code"]),
+        KnownAgent(name: "Claude Code", vendor: "Anthropic", processNames: ["claude", "claude-code"],
+                   configRecipe: ConfigRecipe(homeRelativePath: ".claude/settings.json", envKey: "env")),
         KnownAgent(name: "ChatGPT", vendor: "OpenAI", bundleIDs: ["com.openai.chat"]),
         KnownAgent(name: "Codex", vendor: "OpenAI", processNames: ["codex"]),
         KnownAgent(name: "Cursor", vendor: "Anysphere", bundleIDs: ["com.todesktop.230313mzl4w4u92"], processNames: ["cursor", "cursor-agent"]),
