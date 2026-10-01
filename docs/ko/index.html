@@ -57,37 +57,6 @@
     <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">다운로드</a>
   </div>
 </header>
-<style>
-  /* Home page only: force the dark palette (the same values site.css already uses for dark), the gradient
-     headline, and a lightweight ambient glow. The glow animates transform only, so it runs on the compositor
-     and costs effectively nothing — no canvas, no requestAnimationFrame. Layout is otherwise unchanged. */
-  :root {
-    --ground:#0d0f16; --surface:#151824; --surface-2:#1c2030; --ink:#eef0f6; --muted:#a3a9bb; --faint:#737a8f;
-    --line:#262b3b; --accent:#9085e9; --accent-ink:#0d0f16; --received:#4a93ea; --sent:#e5723f;
-    --critical:#ec6a62; --warning:#e0a13a; --log-bg:#090b11; --log-line:#1d2130;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.35); color-scheme:dark;
-  }
-  .hero { position: relative; overflow: hidden; }
-  .hero > .wrap { position: relative; z-index: 1; }
-  .hero::before {
-    content: ""; position: absolute; inset: -25% -12%; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(42vw 44vh at 22% 26%, rgba(144,133,233,.20), transparent 62%),
-      radial-gradient(40vw 40vh at 80% 16%, rgba(74,147,234,.14), transparent 64%),
-      radial-gradient(36vw 36vh at 62% 84%, rgba(229,114,63,.09), transparent 64%);
-    animation: hero-drift 28s ease-in-out infinite alternate;
-    will-change: transform;
-  }
-  @keyframes hero-drift {
-    from { transform: translate3d(-2%, -1%, 0) scale(1); }
-    to   { transform: translate3d(2%, 2%, 0) scale(1.07); }
-  }
-  h1 .flow {
-    background: linear-gradient(100deg, var(--accent) 2%, var(--received) 42%, var(--muted) 66%, var(--sent) 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  @media (prefers-reduced-motion: reduce) { .hero::before { animation: none; } }
-</style>
 <main id="main">
   <section class="hero">
     <div class="wrap">
