@@ -124,7 +124,8 @@ struct AgentsView: View {
     }
 
     private var table: some View {
-        Table(agents.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
+        let maxAI = agents.map(\.ai.total).max() ?? 1
+        return Table(agents.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
             TableColumn(L("Agent"), value: \.name) { agent in
                 HStack(spacing: 8) {
                     AppIconView(path: agent.appPath, size: 20)
@@ -140,7 +141,15 @@ struct AgentsView: View {
                 Text(agent.providers.map(\.name).joined(separator: ", ")).lineLimit(1).foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 130)
-            TableColumn(L("AI traffic"), value: \.aiTotal) { Text(ByteFormat.string($0.ai.total)).monospacedDigit() }.width(80)
+            TableColumn(L("AI traffic"), value: \.aiTotal) { agent in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ByteFormat.string(agent.ai.total)).monospacedDigit()
+                    if agent.ai.total > 0 {
+                        TrafficBar(fraction: Double(agent.ai.total) / Double(max(maxAI, 1)), color: FL.received)
+                    }
+                }
+            }
+            .width(min: 96, ideal: 120)
             TableColumn(L("Other hosts"), value: \.otherCount) { Text("\($0.otherCount)").monospacedDigit() }.width(70)
             TableColumn(L("Sent elsewhere"), value: \.egressOut) { agent in
                 Text(ByteFormat.string(agent.egress.bytesOut)).monospacedDigit()
@@ -258,11 +267,10 @@ struct AlwaysMonitorBanner: View {
     }
 
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) { content() }
-            .padding(12)
+        VStack(alignment: .leading, spacing: Spacing.m) { content() }
+            .padding(Spacing.m)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.08)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.25)))
+            .flCard(accent: true)
     }
 
     /// A representative banner for the marketing screenshot: one agent to offer, two already monitored (one not yet
@@ -272,7 +280,7 @@ struct AlwaysMonitorBanner: View {
             suggestion("Windsurf")
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
+                    Image(systemName: "checkmark.shield.fill").foregroundStyle(FL.good)
                     Text(L("Flowlight is keeping these agents routed through it on every launch."))
                         .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
@@ -289,7 +297,7 @@ struct AlwaysMonitorBanner: View {
     private var monitoringTip: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
+                Image(systemName: "checkmark.shield.fill").foregroundStyle(FL.good)
                 Text(L("Flowlight is keeping these agents routed through it on every launch."))
                     .font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
@@ -311,7 +319,7 @@ struct AlwaysMonitorBanner: View {
             Text(name)
             if notRouted {
                 Text(L("· not routed yet — it may pin its certificates, or a shell setting may override the file"))
-                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             Button(L("Stop Monitoring"), action: stop).controlSize(.small)
@@ -320,7 +328,7 @@ struct AlwaysMonitorBanner: View {
 
     private func suggestion(_ name: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "bolt.horizontal.circle").foregroundStyle(Color.accentColor)
+            Image(systemName: "bolt.horizontal.circle").foregroundStyle(FL.accent)
             VStack(alignment: .leading, spacing: 6) {
                 Text(L("%@ is reaching its model provider directly, so Flowlight can't see what it sends.", name))
                     .fixedSize(horizontal: false, vertical: true)
@@ -351,23 +359,18 @@ struct RiskBadges: View {
                 badge(proto.uppercased(), icon: icon(for: ProtocolCatalog.category(of: proto)), color: TrafficColors.anomaly)
             }
             if agent.hasLargeUpload {
-                badge(L("Large upload"), icon: "arrow.up.doc", color: .orange)
+                badge(L("Large upload"), icon: "arrow.up.doc", color: FL.warning)
                     .help(L("%@ sent to hosts that aren't AI providers", ByteFormat.string(agent.egress.bytesOut)))
             }
             if agent.hasUnnamedHost {
-                badge(L("Raw IP"), icon: "questionmark.circle", color: .orange)
+                badge(L("Raw IP"), icon: "questionmark.circle", color: FL.warning)
                     .help(L("Connected to an address with no hostname"))
             }
         }
     }
 
     private func badge(_ text: String, icon: String, color: Color) -> some View {
-        Label(text, systemImage: icon)
-            .font(.caption2.bold())
-            .labelStyle(.titleAndIcon)
-            .padding(.horizontal, 5).padding(.vertical, 1)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
+        FLPill(text: text, systemImage: icon, color: color)
     }
 
     private func icon(for category: ProtocolCategory) -> String {
@@ -405,10 +408,10 @@ struct AllowlistStatus: View {
                     Label(L("%lld not allowed", violations), systemImage: "xmark.octagon.fill")
                         .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
                 } else {
-                    Label(L("All allowed"), systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(.green)
+                    Label(L("All allowed"), systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(FL.good)
                 }
                 if policy.enforce {
-                    Image(systemName: "shield.lefthalf.filled").font(.caption2).foregroundStyle(.orange)
+                    Image(systemName: "shield.lefthalf.filled").font(.caption2).foregroundStyle(FL.warning)
                         .help(L("Unlisted destinations are refused, not only reported"))
                 }
             }
@@ -460,7 +463,7 @@ struct AllowlistEditor: View {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(policy.patterns, id: \.self) { pattern in
                             HStack(spacing: 4) {
-                                Image(systemName: "checkmark").font(.caption2).foregroundStyle(.green)
+                                Image(systemName: "checkmark").font(.caption2).foregroundStyle(FL.good)
                                 Text(pattern).font(.caption.monospaced()).lineLimit(1)
                                 Spacer()
                                 Button { var p = policy; p.patterns.removeAll { $0 == pattern }; save(p) } label: {
@@ -554,7 +557,7 @@ struct AgentDetail: View {
                         ForEach(toolCalls.prefix(6)) { usage in
                             Button { tab = .calls } label: {
                                 HStack {
-                                    Image(systemName: usage.isMCP ? "puzzlepiece.extension" : "wrench.and.screwdriver").foregroundStyle(.purple)
+                                    Image(systemName: usage.isMCP ? "puzzlepiece.extension" : "wrench.and.screwdriver").foregroundStyle(FL.tool)
                                         .frame(width: 16)
                                     Text(usage.name).lineLimit(1)
                                     Spacer()
@@ -815,7 +818,7 @@ struct AgentDetail: View {
     private func destinationRow(_ d: AgentDestination) -> some View {
         HStack(spacing: 6) {
             Image(systemName: d.isSensitive ? "exclamationmark.shield.fill" : d.isUnnamed ? "questionmark.circle" : "globe")
-                .foregroundStyle(d.isSensitive ? TrafficColors.anomaly : d.isUnnamed ? .orange : .secondary)
+                .foregroundStyle(d.isSensitive ? TrafficColors.anomaly : d.isUnnamed ? FL.warning : .secondary)
             Text(d.label).lineLimit(1).truncationMode(.middle)
             if d.isUnnamed && d.label != d.ip { Text(d.ip).foregroundStyle(.secondary) }
             Text(d.protocols.joined(separator: ", ") + (d.ports.isEmpty ? "" : " · " + d.ports))
@@ -882,7 +885,7 @@ struct ToolActivityRow: View {
             HStack(spacing: 6) {
                 outcomeIcon
                 Image(systemName: activity.call.mcpServer == nil ? "wrench.and.screwdriver" : "puzzlepiece.extension")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(FL.tool)
                 Text(activity.call.displayName).bold()
                 Spacer()
                 Text(activity.at, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
@@ -920,7 +923,7 @@ struct ToolActivityRow: View {
 
     @ViewBuilder private var outcomeIcon: some View {
         switch activity.outcome {
-        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help(L("Completed"))
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(FL.good).help(L("Completed"))
         case .error: Image(systemName: "xmark.octagon.fill").foregroundStyle(TrafficColors.anomaly).help(L("The tool reported an error"))
         case .pending: Image(systemName: "circle.dotted").foregroundStyle(.secondary).help(L("No result seen yet"))
         }
@@ -934,7 +937,7 @@ struct DeclaredToolRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: icon).foregroundStyle(used > 0 ? .purple : .secondary).frame(width: 14)
+            Image(systemName: icon).foregroundStyle(used > 0 ? FL.tool : .secondary).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(tool.name).bold(used > 0)
@@ -974,7 +977,7 @@ struct MCPServerRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: "puzzlepiece.extension").foregroundStyle(.purple)
+                Image(systemName: "puzzlepiece.extension").foregroundStyle(FL.tool)
                 Text(server.name).bold()
                 if let version = server.version { Text(version).foregroundStyle(.secondary) }
                 Text(kindLabel)
@@ -1125,7 +1128,7 @@ struct AgentSetupBar: View {
                 HStack(spacing: 8) {
                     Text(summary).foregroundStyle(.secondary)
                     Spacer()
-                    if store.isStale { Text(L("out of date")).foregroundStyle(.orange) }
+                    if store.isStale { Text(L("out of date")).foregroundStyle(FL.warning) }
                     Button(L("Rescan")) { store.refresh(force: true) }.controlSize(.small)
                     Button(L("Add project folder…")) { pickFolder() }.controlSize(.small)
                 }
@@ -1230,7 +1233,7 @@ struct InspectionHint: View {
                         .controlSize(.small)
                 }
                 if let relaunchError {
-                    Text(relaunchError).font(.caption).foregroundStyle(.orange)
+                    Text(relaunchError).font(.caption).foregroundStyle(FL.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

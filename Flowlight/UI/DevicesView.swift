@@ -261,7 +261,7 @@ private struct DeviceRow: View {
     }
 
     private var glyph: some View {
-        let tint: Color = device.connected ? .green : .secondary
+        let tint: Color = device.connected ? FL.good : .secondary
         return Image(systemName: device.kind.icon)
             .font(.caption.weight(.semibold))
             .foregroundStyle(tint)
@@ -272,7 +272,7 @@ private struct DeviceRow: View {
 
     private var state: some View {
         HStack(spacing: 5) {
-            LiveDot(color: device.connected ? .green : .secondary, active: device.connected, size: 6)
+            LiveDot(color: device.connected ? FL.good : .secondary, active: device.connected, size: 6)
             Text(stateWord)
                 .font(.caption)
                 .foregroundStyle(device.connected ? HierarchicalShapeStyle.secondary : .tertiary)
@@ -351,10 +351,10 @@ private struct DeviceEventRow: View {
 
     private var tint: Color {
         switch event.change {
-        case .connected: return .green
+        case .connected: return FL.good
         case .disconnected: return .secondary
         case .appeared: return .blue
-        case .removed: return .orange
+        case .removed: return FL.warning
         }
     }
 }

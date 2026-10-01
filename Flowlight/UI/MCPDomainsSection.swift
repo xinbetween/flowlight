@@ -20,7 +20,7 @@ struct MCPDomainsSection: View {
                     // Said here as well as on the Rules screen: a button that writes a rule nothing can carry
                     // out should not look like a button that stops traffic.
                     Text(L("Rules are recorded but not enforced in this capture mode."))
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(FL.warning)
                 }
             }
             if entries.isEmpty {

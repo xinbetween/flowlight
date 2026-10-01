@@ -19,7 +19,7 @@ struct MockRulesSection: View {
             if !inspection.enabled {
                 Label(L("HTTPS inspection is off, so nothing is decrypted and no rule can answer anything yet."),
                       systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }
 
             if inspection.mockRules.isEmpty {

@@ -46,7 +46,7 @@ struct UpdateView: View {
                 ProgressView(L("Preparing the update. Flowlight will quit and reopen…")).controlSize(.small)
             }
             if case .failed(let message) = updater.state {
-                Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(FL.warning)
             }
 
             HStack {

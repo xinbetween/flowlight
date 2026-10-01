@@ -22,7 +22,7 @@ struct GuardrailsPane: View {
                 if !monitor.inspection.enabled {
                     Label(L("HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet."),
                           systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                        .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
                 }
 
                 presets

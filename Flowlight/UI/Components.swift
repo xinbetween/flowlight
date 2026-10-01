@@ -42,7 +42,7 @@ struct AppIconView: View {
                     .font(.system(size: size * 0.55, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(width: size, height: size)
-                    .background(LinearGradient(colors: [.indigo, .purple], startPoint: .top, endPoint: .bottom),
+                    .background(LinearGradient(colors: [.indigo, FL.tool], startPoint: .top, endPoint: .bottom),
                                 in: RoundedRectangle(cornerRadius: size * 0.22))
                     .accessibilityHidden(true)
             }
@@ -63,26 +63,36 @@ struct StatTile: View {
     var title: String
     var value: String
     var systemImage: String
-    var tint: Color = .accentColor
+    var tint: Color = FL.accent
+    /// A real trend for this figure, when the screen has one. Drawn as a sparkline; omitted otherwise.
+    var trend: [Double]? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: systemImage).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title2.monospacedDigit().weight(.semibold)).foregroundStyle(tint)
-                .lineLimit(1).minimumScaleFactor(0.6)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Label(title, systemImage: systemImage)
+                .labelStyle(.titleAndIcon)
+                .font(.caption).foregroundStyle(FL.muted)
+            Text(value)
+                .font(.system(size: 25, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(tint)
+                .lineLimit(1).minimumScaleFactor(0.5)
                 .contentTransition(.numericText())
                 .motion(Motion.value, value: value)
+            if let trend, trend.count > 1 {
+                Sparkline(points: trend, color: tint).frame(height: 20).opacity(0.9)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+        .padding(Spacing.m)
+        .flCard()
     }
 }
 
+/// Traffic direction and anomaly, pointed at the brand tokens so every call site (there are many) refreshes at once.
 enum TrafficColors {
-    static let inbound = Color.blue
-    static let outbound = Color.orange
-    static let anomaly = Color.red
+    static let inbound = FL.received
+    static let outbound = FL.sent
+    static let anomaly = FL.critical
 }
 
 /// Opens the first window at the size of the screen, so everything Flowlight shows has room. It runs once: after

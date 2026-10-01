@@ -35,7 +35,7 @@ struct SettingsView: View {
                 Toggle(L("Launch at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                     .task { launchAtLogin = SMAppService.mainApp.status == .enabled }
-                if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(.red) }
+                if let loginItemError { Text(loginItemError).font(.caption).foregroundStyle(FL.critical) }
                 Toggle(isOn: $backgroundOnly) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L("Run in the background"))

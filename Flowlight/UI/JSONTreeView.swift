@@ -28,7 +28,7 @@ struct BodyView: View {
                     let count = matchingLines.count
                     Text(count == 0 ? L("no match")
                          : count == 1 ? L("%lld matching line", count) : L("%lld matching lines", count))
-                        .font(.caption).foregroundStyle(count == 0 ? .secondary : Color.accentColor)
+                        .font(.caption).foregroundStyle(count == 0 ? .secondary : FL.accent)
                     if count > 0, mode == "tree", isStructured {
                         Button(L("Show")) { mode = "raw" }
                             .controlSize(.small)
@@ -93,7 +93,7 @@ struct BodyView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 1)
                     .background(line.range(of: term, options: .caseInsensitive) != nil
-                                ? Color.accentColor.opacity(0.10) : Color.clear)
+                                ? FL.accent.opacity(0.10) : Color.clear)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -219,7 +219,7 @@ struct JSONNodeView: View {
             .frame(width: 12)
             if let key {
                 (Text(keyStyle == .key ? key : keyStyle == .index ? "[\(key)]" : key)
-                    .foregroundStyle(keyStyle == .key ? Color.accentColor : .secondary)
+                    .foregroundStyle(keyStyle == .key ? FL.accent : .secondary)
                     .fontWeight(keyStyle == .event ? .semibold : .regular)
                  + Text(":").foregroundStyle(.tertiary))
             }

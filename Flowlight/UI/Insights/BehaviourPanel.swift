@@ -43,7 +43,7 @@ struct BehaviourPanel: View {
                 }
                 ForEach(finding.signals) { signal in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Image(systemName: icon(signal.kind)).font(.caption2).foregroundStyle(.orange)
+                        Image(systemName: icon(signal.kind)).font(.caption2).foregroundStyle(FL.warning)
                             .frame(width: 12)
                         Text(signal.detail).font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

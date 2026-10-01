@@ -136,7 +136,7 @@ struct DonutCard: View {
                         EntityGlyph(entity: slice.entity)
                         Text(slice.entity.kind == .other ? L("%@ more…", insight.hiddenCount.formatted()) : slice.entity.label)
                             .lineLimit(1).truncationMode(.middle)
-                            .foregroundStyle(slice.entity.kind == .other ? Color.accentColor : .primary)
+                            .foregroundStyle(slice.entity.kind == .other ? FL.accent : .primary)
                         Spacer(minLength: 4)
                         Text(ByteFormat.string(metric.value(slice.counters))).monospacedDigit().foregroundStyle(.secondary)
                         Text(ShareFormat.string(slice.share))

@@ -57,7 +57,7 @@ struct RuleSimulationView: View {
                       result.connectionsConsidered),
                   systemImage: result.connectionsConsidered == 0 ? "questionmark.circle" : "checkmark.circle")
                 .font(.callout)
-                .foregroundStyle(result.connectionsConsidered == 0 ? Color.secondary : Color.green)
+                .foregroundStyle(result.connectionsConsidered == 0 ? Color.secondary : FL.good)
         } else if !result.refusals.isEmpty {
             Label(L("Would have refused %lld of %lld connections, from %lld apps, %@ in all.",
                     result.connectionsRefused, result.connectionsConsidered, result.appsAffected,
@@ -67,7 +67,7 @@ struct RuleSimulationView: View {
         } else {
             Label(L("Would have allowed %lld connections that are refused today.", result.permits.reduce(0) { $0 + $1.connections }),
                   systemImage: "checkmark.shield")
-                .font(.callout).foregroundStyle(.green)
+                .font(.callout).foregroundStyle(FL.good)
         }
     }
 
@@ -76,7 +76,7 @@ struct RuleSimulationView: View {
             ForEach(result.changes.prefix(12)) { change in
                 HStack(spacing: 8) {
                     Image(systemName: change.refused ? "xmark.circle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(change.refused ? .orange : .green)
+                        .foregroundStyle(change.refused ? FL.warning : FL.good)
                         .imageScale(.small)
                     Text(change.appName).frame(minWidth: 120, alignment: .leading)
                     Text(change.destination).font(.caption.monospaced()).foregroundStyle(.secondary)
