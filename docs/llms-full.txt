@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.12.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.0, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.12.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1398,8 +1398,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.0
+October 1, 2026Latest
+
+ Change a request on its way out. A new kind of rule edits a matching outgoing
+ request before it reaches the server — add or replace a header, pin a field in the JSON body, or strip
+ one — then lets it continue. It's the mock feature's sibling: where a mock answers a request, this one
+ rewrites it and forwards it. Matched the same way, by host, path and method.
+
+ Where it lives. "Modify requests" sits beside "Mock responses" in the inspection
+ setup. Like a mock, it only touches requests Flowlight decrypts, and the change is recorded on the
+ request so it's never mistaken for what the server actually received.
+
  0.12.0
-September 30, 2026Latest
+September 30, 2026
 
  A refreshed interface, on one design system. Flowlight now draws from a single set of
  tokens — a brand palette that resolves for light and dark, consistent spacing, and shared surfaces — so

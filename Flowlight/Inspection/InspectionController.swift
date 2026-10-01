@@ -18,6 +18,8 @@ final class InspectionController: ObservableObject {
         static let neverInspect = "inspection.neverInspect"
         static let systemProxy = "inspection.systemProxy"
         static let mockRules = "inspection.mockRules"
+        /// Rules that rewrite an outgoing request's headers or JSON body before it is forwarded (see `RewriteRule`).
+        static let rewriteRules = "inspection.rewriteRules"
         /// When the running session was switched on, so its end survives a relaunch.
         static let sessionStarted = "inspection.sessionStarted"
         /// Names of the agents the user asked Flowlight to keep routed through the proxy by editing their own
@@ -93,6 +95,7 @@ final class InspectionController: ObservableObject {
              UserDefaults.standard.stringArray(forKey: Keys.neverInspect) ?? Self.defaultNeverInspect)
         }
         let mockRules = { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
+        let rewriteRules = { Self.decodeRewriteRules(UserDefaults.standard.data(forKey: Keys.rewriteRules)) }
         // A rule refusing a request is answered by the same machinery that gives a mock its canned response, and
         // it goes first: a block someone wrote has to outrank a mock they left switched on.
         let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
@@ -116,30 +119,44 @@ final class InspectionController: ObservableObject {
         proxy.interventions = { [weak self, recorder, proxy] host, clientPort in
             guard let self else { return nil }
             let guardrails = self.guardrails()
-            guard !guardrails.isEmpty else { return nil }
+            let rewrites = RewriteRules.matching(rewriteRules(), host: host)
             let owner = recorder.owner(clientPort: clientPort, proxyPort: proxy.port)
             let agent = owner.agent ?? owner.bundleID
-            guard GuardrailBook.any(guardrails, agent: agent) else { return nil }
+            let guardsApply = !guardrails.isEmpty && GuardrailBook.any(guardrails, agent: agent)
+            // Hold the request only when something would act on it: a guardrail for this agent, or a rewrite rule
+            // for this host. Everything else streams untouched.
+            guard guardsApply || !rewrites.isEmpty else { return nil }
             return { [weak self] head, bytes in
-                guard let self, let body = Self.body(of: bytes) else { return nil }
+                guard let self else { return nil }
                 let server = owner.mcpServer
-                // A call to an MCP server over HTTP, answered here rather than forwarded.
-                if let refusal = GuardrailEngine.refuse(jsonrpc: body, guardrails: guardrails, agent: agent, server: server) {
+                // A guardrail that answers an MCP call locally short-circuits — nothing goes upstream to rewrite.
+                if guardsApply, let body = Self.body(of: bytes),
+                   let refusal = GuardrailEngine.refuse(jsonrpc: body, guardrails: guardrails, agent: agent, server: server) {
                     self.report(refusal.guardrail, subject: refusal.subject, owner: owner, host: host,
                                 port: UInt16(clamping: 443), method: head.method, engine: .request)
-                    let answer = MockRule(id: refusal.guardrail.id, name: refusal.guardrail.title, host: host,
-                                          path: "*", status: 200, body: refusal.body, blocked: true)
-                    return .answer(answer)
+                    return .answer(MockRule(id: refusal.guardrail.id, name: refusal.guardrail.title, host: host,
+                                            path: "*", status: 200, body: refusal.body, blocked: true))
                 }
-                // The declaration, which is the lever that means the model is never offered the tool at all.
-                guard let filtered = GuardrailEngine.filter(request: body, guardrails: guardrails, agent: agent) else {
-                    return nil
+                var current = bytes
+                var notes: [String] = []
+                // Guardrails first — strip refused tools from the declaration — so a rewrite acts on the filtered body.
+                if guardsApply, let body = Self.body(of: current),
+                   let filtered = GuardrailEngine.filter(request: body, guardrails: guardrails, agent: agent) {
+                    current = Self.reframe(current, body: filtered.body)
+                    self.report(guardrails.first { g in filtered.removed.contains { g.refuses(agent: agent, server: server, tool: $0) } },
+                                subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
+                                port: UInt16(clamping: 443), method: head.method, engine: .request)
+                    notes.append(L("Removed %@", filtered.removed.joined(separator: ", ")))
                 }
-                self.report(guardrails.first { g in filtered.removed.contains { g.refuses(agent: agent, server: server, tool: $0) } },
-                            subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
-                            port: UInt16(clamping: 443), method: head.method, engine: .request)
-                return .replace(Self.reframe(bytes, body: filtered.body),
-                                note: L("Removed %@", filtered.removed.joined(separator: ", ")))
+                // Then the user's rewrite rules — header and JSON-body edits.
+                let path = head.target.split(separator: "?").first.map(String.init) ?? "/"
+                if !rewrites.isEmpty,
+                   let edited = RewriteRules.apply(rewrites, to: current, host: host, method: head.method, path: path) {
+                    current = edited.data
+                    notes.append(edited.note)
+                }
+                guard !notes.isEmpty else { return nil }
+                return .replace(current, note: notes.joined(separator: " · "))
             }
         }
         proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
@@ -160,6 +177,8 @@ final class InspectionController: ObservableObject {
             // A host someone wrote a mock rule for is decrypted whatever the scope says: a rule can only answer a
             // request Flowlight can read, and "my mock didn't fire" is a bad afternoon.
             guard answersFor(host, clientPort).isEmpty else { answer(true); return }
+            // Same for a host with a rewrite rule: it can only edit a request Flowlight can read.
+            guard RewriteRules.matching(rewriteRules(), host: host).isEmpty else { answer(true); return }
             guard scope == .agents else { answer(true); return }
             decide.async {
                 answer(recorder.owner(clientPort: clientPort, proxyPort: proxy.port).agent != nil)
@@ -265,6 +284,24 @@ final class InspectionController: ObservableObject {
     nonisolated static func decodeMockRules(_ data: Data?) -> [MockRule] {
         guard let data else { return [] }
         return (try? JSONDecoder().decode([MockRule].self, from: data)) ?? []
+    }
+
+    /// Rules that rewrite outgoing requests. Stored like mocks: settings, not history, so "remove everything
+    /// Flowlight recorded" leaves them alone.
+    var rewriteRules: [RewriteRule] {
+        get { Self.decodeRewriteRules(UserDefaults.standard.data(forKey: Keys.rewriteRules)) }
+        set {
+            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Keys.rewriteRules)
+            objectWillChange.send()
+        }
+    }
+
+    /// How many rewrite rules are live, so a request quietly being changed isn't mistaken for the server's own reply.
+    var activeRewriteRules: Int { rewriteRules.filter(\.enabled).count }
+
+    nonisolated static func decodeRewriteRules(_ data: Data?) -> [RewriteRule] {
+        guard let data else { return [] }
+        return (try? JSONDecoder().decode([RewriteRule].self, from: data)) ?? []
     }
 
     var configuredPort: UInt16 { UInt16(clamping: max(1024, UserDefaults.standard.integer(forKey: Keys.port))) }
