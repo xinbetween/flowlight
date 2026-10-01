@@ -5,29 +5,37 @@ nav: home
 -->
 <style>
   /* Home page only: force the dark palette (the same values site.css already uses for dark), the gradient
-     headline, and the ambient hero flow canvas. Layout is otherwise unchanged. */
+     headline, and a lightweight ambient glow. The glow animates transform only, so it runs on the compositor
+     and costs effectively nothing — no canvas, no requestAnimationFrame. Layout is otherwise unchanged. */
   :root {
     --ground:#0d0f16; --surface:#151824; --surface-2:#1c2030; --ink:#eef0f6; --muted:#a3a9bb; --faint:#737a8f;
     --line:#262b3b; --accent:#9085e9; --accent-ink:#0d0f16; --received:#4a93ea; --sent:#e5723f;
     --critical:#ec6a62; --warning:#e0a13a; --log-bg:#090b11; --log-line:#1d2130;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.35); color-scheme:dark;
   }
-  .hero { position: relative; }
+  .hero { position: relative; overflow: hidden; }
   .hero > .wrap { position: relative; z-index: 1; }
-  .hero-flow {
-    position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: .85;
-    -webkit-mask-image: linear-gradient(180deg, transparent, #000 10%, #000 74%, transparent);
-    mask-image: linear-gradient(180deg, transparent, #000 10%, #000 74%, transparent);
+  .hero::before {
+    content: ""; position: absolute; inset: -25% -12%; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(42vw 44vh at 22% 26%, rgba(144,133,233,.20), transparent 62%),
+      radial-gradient(40vw 40vh at 80% 16%, rgba(74,147,234,.14), transparent 64%),
+      radial-gradient(36vw 36vh at 62% 84%, rgba(229,114,63,.09), transparent 64%);
+    animation: hero-drift 28s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  @keyframes hero-drift {
+    from { transform: translate3d(-2%, -1%, 0) scale(1); }
+    to   { transform: translate3d(2%, 2%, 0) scale(1.07); }
   }
   h1 .flow {
     background: linear-gradient(100deg, var(--accent) 2%, var(--received) 42%, var(--muted) 66%, var(--sent) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  @media (prefers-reduced-motion: reduce) { .hero-flow { opacity: .5; } }
+  @media (prefers-reduced-motion: reduce) { .hero::before { animation: none; } }
 </style>
 <main id="main">
   <section class="hero">
-    <canvas class="hero-flow" aria-hidden="true"></canvas>
     <div class="wrap">
       <div>
         <p class="eyebrow">应用级网络洞察 · macOS 15+</p>
@@ -549,49 +557,5 @@ open Flowlight.app --args -FLDemo YES</pre>
       log.insertBefore(line(feed[i++ % feed.length]), log.firstChild);
       while (log.children.length > 12) log.removeChild(log.lastChild);
     }, 1900);
-  })();
-</script>
-<script>
-  // Hero flow field — ambient streams of light behind the headline, coloured like real traffic (received blue,
-  // sent orange, the odd flagged red), brightening through the centre. Static frame under reduced motion.
-  (function () {
-    var cv = document.querySelector('.hero-flow'); if (!cv) return;
-    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
-    var ctx = cv.getContext('2d'), W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1), lanes = [], parts = [], raf;
-    var COL = { in: '#4a93ea', out: '#e5723f', alert: '#ec6a62' };
-    function resize() {
-      var r = cv.getBoundingClientRect(); W = r.width; H = r.height;
-      cv.width = Math.max(1, W * DPR); cv.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      lanes = []; var N = W < 620 ? 5 : 8;
-      for (var i = 0; i < N; i++) { var y = H * (0.1 + 0.8 * (i / (N - 1 || 1))); lanes.push({ y: y, amp: 16 + Math.random() * 44, ph: Math.random() * 6.28 }); }
-    }
-    function laneY(l, x) { return l.y + Math.sin(x * 0.004 + l.ph) * l.amp; }
-    function spawn() {
-      if (parts.length > 90) return; var l = lanes[(Math.random() * lanes.length) | 0]; if (!l) return;
-      var roll = Math.random(), col = roll < 0.07 ? COL.alert : roll < 0.5 ? COL.in : COL.out;
-      parts.push({ l: l, x: -20, v: (0.9 + Math.random() * 1.5) * (W / 900 + 0.5), col: col, r: 1 + Math.random() * 1.8, a: 0 });
-    }
-    var lastW = 0;
-    function frame(t) {
-      ctx.clearRect(0, 0, W, H);
-      var g = ctx.createRadialGradient(W * 0.5, H * 0.45, 0, W * 0.5, H * 0.45, Math.max(W, H) * 0.5);
-      g.addColorStop(0, 'rgba(144,133,233,0.10)'); g.addColorStop(1, 'rgba(144,133,233,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      ctx.lineWidth = 1;
-      for (var i = 0; i < lanes.length; i++) { var l = lanes[i]; ctx.beginPath(); for (var x = 0; x <= W; x += 14) { var y = laneY(l, x); x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.strokeStyle = 'rgba(150,160,190,0.05)'; ctx.stroke(); }
-      for (var p = parts.length - 1; p >= 0; p--) {
-        var o = parts[p]; o.x += o.v; o.a = Math.min(1, o.a + 0.04); var yy = laneY(o.l, o.x); var glow = o.x > W * 0.4 && o.x < W * 0.6 ? 1.7 : 1;
-        ctx.globalAlpha = o.a * 0.9; ctx.beginPath(); ctx.arc(o.x, yy, o.r * glow, 0, 6.283); ctx.fillStyle = o.col; ctx.shadowColor = o.col; ctx.shadowBlur = 10 * glow; ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; if (o.x > W + 30) parts.splice(p, 1);
-      }
-      if (t - lastW > 90) { spawn(); if (Math.random() < 0.5) spawn(); lastW = t; }
-      raf = requestAnimationFrame(frame);
-    }
-    function start() {
-      resize();
-      if (reduce) { ctx.clearRect(0, 0, W, H); for (var i = 0; i < lanes.length; i++) { var l = lanes[i]; ctx.beginPath(); for (var x = 0; x <= W; x += 14) { var y = laneY(l, x); x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.strokeStyle = 'rgba(150,160,190,0.07)'; ctx.stroke(); } return; }
-      raf = requestAnimationFrame(frame);
-    }
-    var to; window.addEventListener('resize', function () { clearTimeout(to); to = setTimeout(function () { cancelAnimationFrame(raf); start(); }, 180); });
-    document.addEventListener('visibilitychange', function () { if (document.hidden) { cancelAnimationFrame(raf); } else if (!reduce) { raf = requestAnimationFrame(frame); } });
-    start();
   })();
 </script>
