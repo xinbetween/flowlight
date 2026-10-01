@@ -277,6 +277,7 @@ private struct InspectionSetup: View {
     @State private var confirmRemove = false
     @State private var showAdvanced = false
     @State private var showMocks = false
+    @State private var showRewrites = false
     @State private var confirmTurnOn = false
     @Environment(\.openURL) private var openURL
 
@@ -398,6 +399,19 @@ private struct InspectionSetup: View {
                     if inspection.activeMockRules > 0 {
                         Label(inspection.activeMockRules == 1 ? L("1 on") : L("%lld on", inspection.activeMockRules),
                               systemImage: "wand.and.stars")
+                            .font(.caption.bold()).foregroundStyle(FL.tool)
+                    }
+                }
+            }
+
+            DisclosureGroup(isExpanded: $showRewrites) {
+                RewriteRulesSection(inspection: inspection).padding(.top, 10)
+            } label: {
+                HStack(spacing: 8) {
+                    Text(L("Modify requests")).font(.headline)
+                    if inspection.activeRewriteRules > 0 {
+                        Label(inspection.activeRewriteRules == 1 ? L("1 on") : L("%lld on", inspection.activeRewriteRules),
+                              systemImage: "slider.horizontal.3")
                             .font(.caption.bold()).foregroundStyle(FL.tool)
                     }
                 }
