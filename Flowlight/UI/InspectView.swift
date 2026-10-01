@@ -49,7 +49,7 @@ private struct InspectContent: View {
                             if let diagnosis = inspection.diagnosis {
                                 Text(diagnosis)
                                     .font(.callout)
-                                    .foregroundStyle(inspection.diagnosisIsGood ? .secondary : Color.orange)
+                                    .foregroundStyle(inspection.diagnosisIsGood ? .secondary : FL.warning)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
@@ -123,7 +123,7 @@ private struct InspectContent: View {
 
     private var statusBar: some View {
         HStack(spacing: 10) {
-            Circle().fill(DemoData.isEnabled || inspection.running && inspection.trusted ? Color.green : Color.orange).frame(width: 8, height: 8)
+            Circle().fill(DemoData.isEnabled || inspection.running && inspection.trusted ? FL.good : FL.warning).frame(width: 8, height: 8)
             Text(statusText).font(.callout)
             // A mock left on looks exactly like an agent misbehaving, so it says so on every screen that shows
             // inspected traffic, not only in the setup page where it was switched on.
@@ -133,7 +133,7 @@ private struct InspectContent: View {
                                                           : L("%lld mock rules on", inspection.activeMockRules),
                           systemImage: "wand.and.stars")
                 }
-                .buttonStyle(.plain).font(.callout.bold()).foregroundStyle(.purple)
+                .buttonStyle(.plain).font(.callout.bold()).foregroundStyle(FL.tool)
                 .help(L("Flowlight is answering some requests itself instead of forwarding them. Click to review the rules."))
             }
             Spacer()
@@ -200,12 +200,12 @@ private struct InspectContent: View {
             TableColumn(L("Request")) { e in
                 VStack(alignment: .leading, spacing: 1) {
                     if e.note != nil {
-                        Label(L("Not inspected: %@", e.host), systemImage: "lock").foregroundStyle(.orange).lineLimit(1)
+                        Label(L("Not inspected: %@", e.host), systemImage: "lock").foregroundStyle(FL.warning).lineLimit(1)
                     } else {
                         HStack(spacing: 5) {
                             Text("\(e.method) \(e.host)").lineLimit(1)
                             if e.mockRule != nil {
-                                Label(L("Mocked"), systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(.purple)
+                                Label(L("Mocked"), systemImage: "wand.and.stars").font(.caption2.bold()).foregroundStyle(FL.tool)
                                     .labelStyle(.titleAndIcon)
                                     .help(L("Flowlight answered this itself; the request never reached %@", e.host))
                             }
@@ -222,7 +222,7 @@ private struct InspectContent: View {
             .width(min: 150, ideal: 220)
             TableColumn(L("Status")) { e in
                 Text(e.status.map(String.init) ?? "–").monospacedDigit()
-                    .foregroundStyle((e.status ?? 0) >= 400 ? .red : .primary)
+                    .foregroundStyle((e.status ?? 0) >= 400 ? FL.critical : .primary)
             }
             .width(min: 40, ideal: 46)
             TableColumn(L("Size")) { e in
@@ -231,7 +231,7 @@ private struct InspectContent: View {
             .width(min: 60, ideal: 68)
             TableColumn(L("Tool calls")) { e in
                 if !e.toolCalls.isEmpty {
-                    Text(e.toolCalls.map(\.displayName).joined(separator: ", ")).lineLimit(1).foregroundStyle(.purple)
+                    Text(e.toolCalls.map(\.displayName).joined(separator: ", ")).lineLimit(1).foregroundStyle(FL.tool)
                 } else if let id = e.id, let link = links[id] {
                     Text("← \(link.call.displayName): \(link.call.summary ?? "")").lineLimit(1).foregroundStyle(.secondary)
                         .help(L("Made by the tool the model asked for: %@", link.call.summary ?? link.call.input))
@@ -283,7 +283,7 @@ private struct InspectionSetup: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "lock.open.display").font(.system(size: 34)).foregroundStyle(Color.accentColor)
+                Image(systemName: "lock.open.display").font(.system(size: 34)).foregroundStyle(FL.accent)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L("HTTPS inspection")).font(.title2.bold())
                     Text(L("Inspect HTTP requests and responses for applications routed through Flowlight, including supported model tool calls. Flowlight uses a local proxy and a certificate authority created on this Mac. Inspection is off by default, and recorded data is stored locally."))
@@ -331,7 +331,7 @@ private struct InspectionSetup: View {
             }
 
             if let error = inspection.lastError {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(FL.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -398,7 +398,7 @@ private struct InspectionSetup: View {
                     if inspection.activeMockRules > 0 {
                         Label(inspection.activeMockRules == 1 ? L("1 on") : L("%lld on", inspection.activeMockRules),
                               systemImage: "wand.and.stars")
-                            .font(.caption.bold()).foregroundStyle(.purple)
+                            .font(.caption.bold()).foregroundStyle(FL.tool)
                     }
                 }
             }
@@ -420,7 +420,7 @@ private struct InspectionSetup: View {
 
     private func ready(_ text: String, ok: Bool) -> some View {
         Label(text, systemImage: ok ? "checkmark.circle.fill" : "circle.dotted")
-            .foregroundStyle(ok ? .green : .secondary)
+            .foregroundStyle(ok ? FL.good : .secondary)
     }
 
     private func add() {
@@ -459,13 +459,13 @@ private struct ExchangeDetail: View {
                 }
             }
             if let note = exchange.note {
-                Label(note, systemImage: "lock").foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                Label(note, systemImage: "lock").foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }
             if let mock = exchange.mockRule {
                 // The whole point of the feature is that this answer is a fiction; say so before anything below is read.
                 Label(L("Answered by Flowlight, not by %@ — mock rule “%@”. The request was never sent.", exchange.host, mock),
                       systemImage: "wand.and.stars")
-                    .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(FL.tool).fixedSize(horizontal: false, vertical: true)
             }
             if let guardrail = exchange.guardrail {
                 // The exchange really happened and really was sent — but not quite as the agent wrote it, and
@@ -526,7 +526,7 @@ private struct ExchangeDetail: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Image(systemName: m.isError ? "xmark.octagon.fill" : "puzzlepiece.extension")
-                                        .foregroundStyle(m.isError ? TrafficColors.anomaly : .purple)
+                                        .foregroundStyle(m.isError ? TrafficColors.anomaly : FL.tool)
                                     Text("\(m.server)\(m.version.map { " \($0)" } ?? "") · \(m.method)\(m.tool.map { " · \($0)" } ?? "")")
                                         .font(.callout.bold())
                                 }
@@ -591,7 +591,7 @@ private struct ExchangeDetail: View {
     private func resultView(_ result: ToolResult) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Label(result.isError ? L("Error") : L("Result"), systemImage: result.isError ? "xmark.octagon.fill" : "checkmark.circle.fill")
-                .font(.caption.bold()).foregroundStyle(result.isError ? TrafficColors.anomaly : .green)
+                .font(.caption.bold()).foregroundStyle(result.isError ? TrafficColors.anomaly : FL.good)
             Text(result.output.isEmpty ? L("(empty)") : result.output.trimmingCharacters(in: .whitespacesAndNewlines))
                 .font(.caption.monospaced()).lineLimit(6).textSelection(.enabled).foregroundStyle(.secondary)
             if result.outputSize > result.output.count {

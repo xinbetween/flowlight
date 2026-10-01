@@ -22,6 +22,7 @@ struct ContentView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
+            .tint(FL.accent)
             .safeAreaInset(edge: .bottom) {
               VStack(spacing: 0) {
                 if let update = updater.pendingUpdate {
@@ -30,7 +31,7 @@ struct ContentView: View {
                             .font(.caption.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                            .background(FL.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.chip))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -40,7 +41,7 @@ struct ContentView: View {
                 FocusBar()
                 Button { nav.selection = .capture } label: {
                     HStack(alignment: .top, spacing: 8) {
-                        LiveDot(color: monitor.isReceiving ? .green : .orange, active: monitor.isReceiving)
+                        LiveDot(color: monitor.isReceiving ? FL.good : FL.warning, active: monitor.isReceiving)
                             .padding(.top, 4)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(DemoData.isEnabled ? L("Demo data")

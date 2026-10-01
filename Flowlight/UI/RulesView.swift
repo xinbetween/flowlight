@@ -137,7 +137,7 @@ struct RulesView: View {
                 Label(L("Paused until %@", until.formatted(date: .omitted, time: .shortened)),
                       systemImage: "play.circle.fill")
             }
-            .tint(.orange)
+            .tint(FL.warning)
             .help(L("Nothing is being refused. Click to start again now."))
         } else {
             Menu {
@@ -224,7 +224,7 @@ struct RulesView: View {
     private var banner: some View {
         if store.isPaused, let until = store.pausedUntil {
             HStack(spacing: 8) {
-                Image(systemName: "pause.circle.fill").foregroundStyle(.orange)
+                Image(systemName: "pause.circle.fill").foregroundStyle(FL.warning)
                 Text(L("Nothing is being refused until %@.", until.formatted(date: .omitted, time: .shortened)))
                     .font(.callout)
                 Spacer(minLength: 8)
@@ -235,7 +235,7 @@ struct RulesView: View {
             .overlay(alignment: .bottom) { Divider() }
         } else if let warning = engineWarning {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "eye").foregroundStyle(.orange)
+                Image(systemName: "eye").foregroundStyle(FL.warning)
                 Text(warning).font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
@@ -388,7 +388,7 @@ private struct RuleRow: View {
                 .accessibilityLabel(L("More for %@", RuleWords.title(rule)))
             }
             if let limitation {
-                note(limitation, icon: "eye", tint: .orange)
+                note(limitation, icon: "eye", tint: FL.warning)
             }
             if !rule.isUsable {
                 note(L("Used up — a one-off allowance, already spent."), icon: "checkmark.circle", tint: .secondary)
@@ -411,8 +411,8 @@ private struct RuleRow: View {
     /// this is the mark the eye lands on first and a red hand over a rule that refuses nothing would be a lie.
     private var glyph: some View {
         let tint: Color = !rule.enabled ? .secondary
-            : limitation != nil ? .orange
-            : rule.action == .block ? .red : .green
+            : limitation != nil ? FL.warning
+            : rule.action == .block ? FL.critical : FL.good
         let symbol = limitation != nil && rule.enabled ? "eye.fill"
             : rule.action == .block ? "hand.raised.fill" : "checkmark.shield.fill"
         return Image(systemName: symbol)
@@ -504,7 +504,7 @@ private struct EventRow: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: event.action == .block ? "hand.raised.fill" : "checkmark.shield.fill")
                 .font(.caption)
-                .foregroundStyle(event.action == .block ? Color.red : Color.green)
+                .foregroundStyle(event.action == .block ? FL.critical : FL.good)
                 .frame(width: 14)
                 .padding(.top, 2)
                 .help(event.action == .block ? L("Refused") : L("Allowed by an exception"))
@@ -790,7 +790,7 @@ struct RuleTemplateLibrary: View {
             }
             if template.engines(for: filled).contains(.request) {
                 note(L("These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching."),
-                     icon: "eye", tint: .orange)
+                     icon: "eye", tint: FL.warning)
             }
             if let caveat = template.caveat {
                 note(caveat, icon: "exclamationmark.circle", tint: .secondary)
@@ -806,7 +806,7 @@ struct RuleTemplateLibrary: View {
                 Spacer()
                 if added.contains(template.id) {
                     Label(L("Added"), systemImage: "checkmark.circle.fill")
-                        .font(.caption).foregroundStyle(.green)
+                        .font(.caption).foregroundStyle(FL.good)
                 }
                 Button(rules.count > 1 ? L("Add %lld Rules", rules.count) : L("Add Rule")) {
                     add(rules)
@@ -851,7 +851,7 @@ struct RuleTemplateLibrary: View {
         VStack(alignment: .leading, spacing: 3) {
             ForEach(rules) { rule in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "hand.raised.fill").font(.caption2).foregroundStyle(.red.opacity(0.8))
+                    Image(systemName: "hand.raised.fill").font(.caption2).foregroundStyle(FL.critical.opacity(0.8))
                     Text(subjectLine(rule)).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 0)
                     if rule.schedule.kind != .always {

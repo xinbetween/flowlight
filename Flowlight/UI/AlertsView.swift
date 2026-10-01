@@ -43,7 +43,7 @@ struct AlertsView: View {
         Table(visible, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("", value: \.severity) { a in
                 Image(systemName: a.severity >= 3 ? "exclamationmark.octagon.fill" : a.severity == 2 ? "exclamationmark.triangle.fill" : "info.circle")
-                    .foregroundStyle(a.severity >= 3 ? .red : a.severity == 2 ? .orange : .secondary)
+                    .foregroundStyle(a.severity >= 3 ? FL.critical : a.severity == 2 ? FL.warning : .secondary)
                     .opacity(a.acknowledged ? 0.4 : 1)
                     .accessibilityLabel(a.severity >= 3 ? L("Critical") : a.severity == 2 ? L("Warning") : L("Info"))
             }

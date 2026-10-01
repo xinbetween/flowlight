@@ -64,10 +64,10 @@ private struct CoverageContent: View {
             VStack(alignment: .leading, spacing: 10) {
                 CaptureFact(icon: monitor.mode == .networkExtension && !monitor.extensionFellBack
                                 ? "checkmark.seal" : "exclamationmark.triangle",
-                            tint: monitor.mode == .networkExtension && !monitor.extensionFellBack ? .green : .orange,
+                            tint: monitor.mode == .networkExtension && !monitor.extensionFellBack ? FL.good : FL.warning,
                             title: captureTitle, detail: captureDetail)
                 CaptureFact(icon: inspection.enabled ? "checkmark.seal" : "info.circle",
-                            tint: inspection.enabled ? .green : .secondary,
+                            tint: inspection.enabled ? FL.good : .secondary,
                             title: inspection.enabled ? L("HTTPS inspection is on") : L("HTTPS inspection is off"),
                             detail: inspection.enabled
                                 ? L("What an app sent is readable only where the app was routed through the proxy. Anything else is counted and named, but its contents were never offered to Flowlight.")
@@ -143,7 +143,7 @@ private struct CoverageRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: coverage.isComplete ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(coverage.isComplete ? Color.green : .orange)
+                .foregroundStyle(coverage.isComplete ? FL.good : FL.warning)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {

@@ -289,7 +289,7 @@ struct ReportsView: View {
                 .buttonStyle(.plain).accessibilityLabel(L("Remove filter %@", text))
         }
         .padding(.horizontal, 8).padding(.vertical, 3)
-        .background(Color.accentColor.opacity(0.15), in: Capsule())
+        .background(FL.accent.opacity(0.15), in: Capsule())
     }
 
     private var summary: some View {
@@ -751,7 +751,7 @@ struct ShareBar: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.quaternary)
-                    Capsule().fill(Color.accentColor.opacity(0.8)).frame(width: max(2, geo.size.width * min(1, fraction)))
+                    Capsule().fill(FL.accent.opacity(0.8)).frame(width: max(2, geo.size.width * min(1, fraction)))
                 }
             }
             .frame(height: 5)

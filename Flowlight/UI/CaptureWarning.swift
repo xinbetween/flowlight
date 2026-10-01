@@ -45,7 +45,7 @@ struct CaptureGlyph: View {
 struct CaptureNote: View {
     var text: String
     var icon = "exclamationmark.triangle.fill"
-    var tint = Color.orange
+    var tint = FL.warning
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -93,7 +93,7 @@ struct CaptureWarningBanner: View {
     var body: some View {
         if let warning = monitor.captureWarning {
             HStack(alignment: .top, spacing: 12) {
-                CaptureGlyph(symbol: "exclamationmark.triangle.fill", tint: .orange)
+                CaptureGlyph(symbol: "exclamationmark.triangle.fill", tint: FL.warning)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("The Network Extension can't capture on this Mac"))
                         .font(.body.weight(.medium))
@@ -109,7 +109,7 @@ struct CaptureWarningBanner: View {
                 }
             }
             .padding(12)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            .background(FL.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 }
@@ -123,10 +123,10 @@ struct BlockingUnavailableNotice: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "shield.slash").font(.caption).foregroundStyle(.orange)
+            Image(systemName: "shield.slash").font(.caption).foregroundStyle(FL.warning)
             VStack(alignment: .leading, spacing: 3) {
                 Text(enforcing ? L("Blocking is on, but not in effect here") : L("Blocking needs the Network Extension"))
-                    .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                    .font(.caption.weight(.semibold)).foregroundStyle(FL.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(reason)
                     .font(.caption2).foregroundStyle(.secondary)
@@ -138,7 +138,7 @@ struct BlockingUnavailableNotice: View {
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+        .background(FL.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var reason: String {
@@ -160,7 +160,7 @@ struct OtherFiltersNotice: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            CaptureGlyph(symbol: "shield.lefthalf.filled", tint: .orange)
+            CaptureGlyph(symbol: "shield.lefthalf.filled", tint: FL.warning)
             VStack(alignment: .leading, spacing: 6) {
                 Text(filters.count == 1 ? L("Another content filter is active on this Mac")
                                         : L("%lld other content filters are active on this Mac", filters.count))
@@ -191,6 +191,6 @@ struct OtherFiltersNotice: View {
             }
         }
         .padding(12)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .background(FL.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
     }
 }

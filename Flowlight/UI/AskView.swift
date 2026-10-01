@@ -137,7 +137,7 @@ private struct AskContent: View {
             if let reason = ask.blockedReason {
                 HStack(spacing: 6) {
                     Label(reason, systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(FL.warning)
                     Button(L("Choose a provider…")) { showingSettings = true }
                         .buttonStyle(.link).font(.caption)
                     Spacer(minLength: 0)
@@ -201,7 +201,7 @@ private struct AskTurnView: View {
 
             if let error = turn.error {
                 Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(FL.warning)
                     .fixedSize(horizontal: false, vertical: true)
             } else if turn.answer.isEmpty && thinking {
                 HStack(spacing: 8) {
@@ -251,7 +251,7 @@ private struct AskTurnView: View {
             HStack(spacing: 6) {
                 Text(evidenceSummary)
                 if turn.calls.contains(where: \.failed) {
-                    Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.circle").foregroundStyle(FL.warning)
                 }
             }
             .font(.caption)
@@ -274,7 +274,7 @@ private struct AskTurnView: View {
                     HStack(spacing: 8) {
                         Image(systemName: call.failed ? "exclamationmark.circle" : "magnifyingglass")
                             .font(.caption)
-                            .foregroundStyle(call.failed ? Color.orange : .secondary)
+                            .foregroundStyle(call.failed ? FL.warning : .secondary)
                             .frame(width: 14)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(call.call.sentence).font(.caption.monospaced())
@@ -349,7 +349,7 @@ private struct AskSettingsSheet: View {
                     }
                 }
                 if let reason = OnDeviceAsk.readiness.explanation, ask.provider == .onDevice {
-                    Text(reason).font(.caption).foregroundStyle(.orange)
+                    Text(reason).font(.caption).foregroundStyle(FL.warning)
                 }
                 if ask.provider != .onDevice {
                     TextField(L("Endpoint"), text: Binding(get: { ask.endpoint }, set: { ask.endpoint = $0 }))
@@ -367,7 +367,7 @@ private struct AskSettingsSheet: View {
                           : L("Nothing leaves this Mac. The question, the queries and the answer all stay here."),
                           systemImage: ask.sendsOffDevice ? "cloud" : "lock")
                         .font(.caption)
-                        .foregroundStyle(ask.sendsOffDevice ? .orange : .secondary)
+                        .foregroundStyle(ask.sendsOffDevice ? FL.warning : .secondary)
                 }
             }
             .formStyle(.grouped)

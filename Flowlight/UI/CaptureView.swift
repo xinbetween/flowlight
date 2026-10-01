@@ -17,7 +17,7 @@ struct CaptureView: View {
     /// source that was chosen, and arriving from the one that stepped in when that source gave up.
     private var statusColor: Color {
         if monitor.extensionFellBack { return .yellow }
-        return monitor.isReceiving ? .green : .orange
+        return monitor.isReceiving ? FL.good : FL.warning
     }
 
     private var extensionDetailsVisible: Bool {
@@ -98,7 +98,7 @@ struct CaptureView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
                     .font(.body)
-                    .foregroundStyle(chosen ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(chosen ? AnyShapeStyle(FL.accent) : AnyShapeStyle(.tertiary))
                     .frame(width: 26, height: 26)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sourceName(mode)).font(.body.weight(.medium))
@@ -110,7 +110,7 @@ struct CaptureView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(chosen ? Color.accentColor.opacity(0.10) : .clear)
+            .background(chosen ? FL.accent.opacity(0.10) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -196,8 +196,8 @@ struct CaptureView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.35)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(FL.warning.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(FL.warning.opacity(0.35)))
     }
 
     private var extensionButtons: some View {
@@ -226,9 +226,9 @@ struct CaptureView: View {
 
     private var extensionTint: Color {
         switch extensionManager.state {
-        case .enabled: return .green
-        case .failed: return .red
-        case .awaitingApproval, .installing, .needsReboot: return .orange
+        case .enabled: return FL.good
+        case .failed: return FL.critical
+        case .awaitingApproval, .installing, .needsReboot: return FL.warning
         case .unknown, .notInstalled, .disabled: return .secondary
         }
     }
@@ -261,11 +261,11 @@ struct CaptureView: View {
             .font(.caption).foregroundStyle(.secondary)
             .prose()
             .frame(maxWidth: .infinity, alignment: .leading)
-            CaptureFact(icon: "checkmark.seal", tint: .green, title: L("Captures short-lived eligible flows"),
+            CaptureFact(icon: "checkmark.seal", tint: FL.good, title: L("Captures short-lived eligible flows"),
                         detail: L("macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports."))
             CaptureFact(icon: "info.circle", tint: .secondary, title: L("It keeps filtering after you quit Flowlight"),
                         detail: L("The system extension runs independently and remains active until you select Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit."))
-            CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
+            CaptureFact(icon: "exclamationmark.triangle", tint: FL.warning,
                         title: L("macOS runs one content filter at a time"),
                         detail: L("If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs."))
         }
@@ -281,7 +281,7 @@ struct CaptureView: View {
                 .foregroundStyle(.secondary)
                 .prose()
                 .frame(maxWidth: .infinity, alignment: .leading)
-            CaptureFact(icon: "exclamationmark.triangle", tint: .orange,
+            CaptureFact(icon: "exclamationmark.triangle", tint: FL.warning,
                         title: L("What it misses is whole connections, not bytes"),
                         detail: L("nettop reports running totals, and Flowlight records the difference between one second and the next — so a long transfer is counted exactly, however bursty it was. What never appears is anything that starts and finishes between two readings: a quick DNS lookup, a fast API call, a script that runs curl and exits. The extension sees those."))
         }
@@ -398,7 +398,7 @@ struct HostnameSection: View {
                     .font(.caption)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(FL.warning)
             HStack(spacing: 8) {
                 Button(CaptureAccess.isInstalled ? L("Run Setup Again…") : L("Enable Packet Capture…")) { run(.install) }
                     .controlSize(.small).disabled(working)
@@ -406,7 +406,7 @@ struct HostnameSection: View {
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+        .background(FL.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var ownerCard: some View {
@@ -438,9 +438,9 @@ struct HostnameSection: View {
 
     private var captureColor: Color {
         switch monitor.captureState {
-        case .running: return .green
-        case .noPermission, .stopped: return .orange
-        case .failed: return .red
+        case .running: return FL.good
+        case .noPermission, .stopped: return FL.warning
+        case .failed: return FL.critical
         }
     }
 
@@ -476,7 +476,7 @@ struct CaptureOnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
                 Image(systemName: "network.badge.shield.half.filled")
-                    .font(.system(size: 38)).foregroundStyle(Color.accentColor)
+                    .font(.system(size: 38)).foregroundStyle(FL.accent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("See which sites your apps talk to")).font(.title2.bold())
                     Text(L("Without this, most traffic shows only an IP address or network owner."))

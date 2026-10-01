@@ -9,7 +9,7 @@ struct FocusBar: View {
         Button { editing = true } label: {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: focus.isActive ? "scope" : "circle.dashed")
-                    .foregroundStyle(focus.isActive ? Color.accentColor : .secondary)
+                    .foregroundStyle(focus.isActive ? FL.accent : .secondary)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(focus.isActive ? L("Focus on") : L("Focus off")).font(.caption.bold())
@@ -89,7 +89,7 @@ struct FocusEditor: View {
             }
             if invalid {
                 Text(L("Enter a hostname, a domain or an IP address. Ranges like 10.0.0.0/8 aren't supported here."))
-                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }
 
             if adding == .app {

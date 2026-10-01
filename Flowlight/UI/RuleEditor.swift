@@ -119,7 +119,7 @@ struct RuleEditor: View {
                 if !rule.isComplete {
                     Label(L("Name an app or a destination — a rule that names neither would decide every connection on the Mac."),
                           systemImage: "exclamationmark.circle")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                        .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Button(L("Cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
@@ -144,9 +144,9 @@ struct RuleEditor: View {
             HStack(spacing: 10) {
                 Image(systemName: rule.action == .block ? "hand.raised.fill" : "checkmark.shield.fill")
                     .font(.callout.weight(.semibold))
-                    .foregroundStyle(rule.action == .block ? Color.red : Color.green)
+                    .foregroundStyle(rule.action == .block ? FL.critical : FL.good)
                     .frame(width: 28, height: 28)
-                    .background((rule.action == .block ? Color.red : Color.green).opacity(0.14),
+                    .background((rule.action == .block ? FL.critical : FL.good).opacity(0.14),
                                 in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(isNew ? L("New Rule") : L("Edit Rule")).font(.headline)
@@ -246,9 +246,9 @@ struct RuleEditor: View {
                 }
                 .buttonStyle(.borderless)
                 .font(.caption.weight(on ? .semibold : .regular))
-                .foregroundStyle(on ? Color.accentColor : Color.secondary)
+                .foregroundStyle(on ? FL.accent : Color.secondary)
                 .padding(.horizontal, 7).padding(.vertical, 4)
-                .background(on ? Color.accentColor.opacity(0.18) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .background(on ? FL.accent.opacity(0.18) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
             }
         }
     }
