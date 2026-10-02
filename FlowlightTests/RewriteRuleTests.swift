@@ -103,6 +103,83 @@ final class RewriteRuleTests: XCTestCase {
         XCTAssertTrue(parts(out).head.contains("X-Tag: 1"))
     }
 
+    // MARK: Form bodies
+
+    private let form = "Content-Type: application/x-www-form-urlencoded"
+
+    private func bodyForm(_ data: Data) -> [String: String] {
+        guard let sep = data.range(of: Data("\r\n\r\n".utf8)) else { return [:] }
+        let body = String(decoding: data[sep.upperBound...], as: UTF8.self)
+        var out: [String: String] = [:]
+        for part in body.components(separatedBy: "&") where !part.isEmpty {
+            let halves = part.components(separatedBy: "=")
+            let name = (halves.first ?? "").removingPercentEncoding ?? ""
+            let value = halves.dropFirst().joined(separator: "=")
+                .replacingOccurrences(of: "+", with: " ").removingPercentEncoding ?? ""
+            out[name] = value
+        }
+        return out
+    }
+
+    /// The reported case: a form field set to a URL, the value percent-encoded, Content-Length reframed. This is
+    /// what the "Set stockApi = http://localhost/admin" rule did nothing for, because the body is a form, not JSON.
+    func testFormSetEncodesValue() throws {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .set, path: "stockApi", value: "http://localhost/admin")])
+        let out = try XCTUnwrap(apply(rule, request("POST", "/product/stock", headers: [form],
+                                                    body: "stockApi=http%3A%2F%2Fstock.example.net%3A8080%2Fcheck"),
+                                      path: "/product/stock"))
+        XCTAssertEqual(bodyForm(out)["stockApi"], "http://localhost/admin")
+        // The value is percent-encoded on the wire, and Content-Length agrees with the final body.
+        XCTAssertTrue(parts(out).body.contains("http%3A%2F%2Flocalhost%2Fadmin"))
+        let declared = parts(out).head.first { $0.lowercased().hasPrefix("content-length:") }?
+            .components(separatedBy: ": ").last.flatMap { Int($0) }
+        let sep = try XCTUnwrap(out.range(of: Data("\r\n\r\n".utf8)))
+        XCTAssertEqual(declared, out.distance(from: sep.upperBound, to: out.endIndex))
+    }
+
+    /// Set adds a field that was not there, leaving the others in place and in order.
+    func testFormSetAppendsNewField() throws {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .set, path: "role", value: "admin")])
+        let out = try XCTUnwrap(apply(rule, request("POST", "/login", headers: [form], body: "user=alice&pass=x"), path: "/login"))
+        XCTAssertEqual(bodyForm(out)["user"], "alice")
+        XCTAssertEqual(bodyForm(out)["pass"], "x")
+        XCTAssertEqual(bodyForm(out)["role"], "admin")
+    }
+
+    /// Remove drops a field; removing one that is not there is no change.
+    func testFormRemove() throws {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .remove, path: "csrf")])
+        let out = try XCTUnwrap(apply(rule, request("POST", "/login", headers: [form], body: "user=alice&csrf=tok"), path: "/login"))
+        XCTAssertNil(bodyForm(out)["csrf"])
+        XCTAssertEqual(bodyForm(out)["user"], "alice")
+
+        let miss = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .remove, path: "nope")])
+        XCTAssertNil(apply(miss, request("POST", "/login", headers: [form], body: "user=alice"), path: "/login"))
+    }
+
+    /// Set replaces the first pair of a repeated field and leaves the rest, rather than collapsing them.
+    func testFormSetReplacesInPlaceKeepingOrder() throws {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .set, path: "tag", value: "z")])
+        let out = try XCTUnwrap(apply(rule, request("POST", "/x", headers: [form], body: "tag=a&tag=b&keep=1"), path: "/x"))
+        let body = String(decoding: out[(out.range(of: Data("\r\n\r\n".utf8))!.upperBound)...], as: UTF8.self)
+        XCTAssertEqual(body, "tag=z&tag=b&keep=1")
+    }
+
+    /// Without the form Content-Type, a body shaped like a form is still left untouched — the header is the signal.
+    func testFormBodyWithoutContentTypeIsNotTouched() {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .set, path: "a", value: "2")])
+        XCTAssertNil(apply(rule, request("POST", "/x", body: "a=1&b=2"), path: "/x"))
+    }
+
+    /// A charset parameter after the media type does not stop it being recognised as a form.
+    func testFormContentTypeWithCharset() throws {
+        let rule = RewriteRule(host: "api.example.com", body: [BodyEdit(op: .set, path: "a", value: "2")])
+        let out = try XCTUnwrap(apply(rule, request("POST", "/x",
+                                                    headers: ["Content-Type: application/x-www-form-urlencoded; charset=utf-8"],
+                                                    body: "a=1"), path: "/x"))
+        XCTAssertEqual(bodyForm(out)["a"], "2")
+    }
+
     // MARK: Matching
 
     /// A rule for another host, method or path doesn't touch the request.
