@@ -23,6 +23,8 @@ private struct InspectContent: View {
     /// it is as visible and as removable as a search term, which is what the search field was chosen for.
     @State private var scopeApp: (id: String, name: String)?
     @State private var scopeHost: String?
+    @State private var potentialHarmOnly = false
+    @State private var assessments: [Int64: RiskAssessment] = [:]
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
     /// A rule prefilled from a recorded exchange, waiting in the editor.
@@ -84,13 +86,19 @@ private struct InspectContent: View {
             search = request.search
             scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
             scopeHost = request.host
+            potentialHarmOnly = request.potentialHarmOnly
             nav.inspectRequest = nil
+        }
+        .onChange(of: monitor.localRiskVersion) {
+            // A retained finding is deliberately hidden when the feature is off. Do not leave the visible filter
+            // applied then, or a person would see an unexplained empty request list.
+            if !LocalRiskSettings.isActive { potentialHarmOnly = false }
         }
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
         }
-        .task(id: LoadKey(version: monitor.inspectionVersion, search: search, window: window, enabled: inspection.enabled,
-                          focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
+        .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, search: search, window: window,
+                          enabled: inspection.enabled, potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
@@ -98,16 +106,21 @@ private struct InspectContent: View {
     }
 
     private struct LoadKey: Equatable {
-        var version: Int; var search: String; var window: AgentWindow; var enabled: Bool; var focus: FocusScope
-        var app: String?; var host: String?
+        var version: Int; var localRiskVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
+        var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
     }
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
         let app = scopeApp?.id, host = scopeHost
-        exchanges = (try? await monitor.read {
+        let loaded = (try? await monitor.read {
             try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host)
         }) ?? []
+        let risk = (try? await monitor.read {
+            try $0.localRiskAssessments(exchangeIDs: loaded.compactMap(\.id))
+        }) ?? [:]
+        assessments = risk
+        exchanges = potentialHarmOnly ? loaded.filter { $0.id.flatMap { risk[$0] }?.isPotentialHarm == true } : loaded
         // `-FLInspectSelect paste.example`, so the published screenshot always shows the same request rather
         // than whichever one a click happened to land on.
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
@@ -137,6 +150,13 @@ private struct InspectContent: View {
                 .help(L("Flowlight is answering some requests itself instead of forwarding them. Click to review the rules."))
             }
             Spacer()
+            Toggle(isOn: $potentialHarmOnly) {
+                Label(L("Potential harm"), systemImage: "exclamationmark.triangle")
+            }
+            .toggleStyle(.button)
+            .disabled(!LocalRiskSettings.isActive)
+            .help(LocalRiskSettings.isActive ? L("Show only medium and high local risk assessments")
+                                             : L("Turn on Local risk analysis in Reports or Settings to use this filter"))
             Picker(L("Window"), selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
             }
@@ -162,14 +182,16 @@ private struct InspectContent: View {
     /// The scope arrived at from another screen, shown so it can be seen and dropped. Without it a filtered list
     /// is indistinguishable from a quiet one, which is the way this feature first went wrong.
     @ViewBuilder private var scopeChip: some View {
-        if scopeApp != nil || scopeHost != nil {
+        if scopeApp != nil || scopeHost != nil || potentialHarmOnly {
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal.decrease.circle.fill").foregroundStyle(.tint)
-                Text(scopeApp.map { L("Showing only traffic from %@", $0.name) } ?? L("Showing only traffic to %@", scopeHost ?? ""))
+                Text(potentialHarmOnly ? L("Showing only requests with medium or high potential harm")
+                                       : (scopeApp.map { L("Showing only traffic from %@", $0.name) } ?? L("Showing only traffic to %@", scopeHost ?? "")))
                     .font(.callout)
                 Button {
                     scopeApp = nil
                     scopeHost = nil
+                    potentialHarmOnly = false
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                 }
@@ -220,6 +242,10 @@ private struct InspectContent: View {
                 }
             }
             .width(min: 150, ideal: 220)
+            TableColumn(L("Potential harm")) { e in
+                RiskBadge(assessment: e.id.flatMap { assessments[$0] })
+            }
+            .width(min: 76, ideal: 96)
             TableColumn(L("Status")) { e in
                 Text(e.status.map(String.init) ?? "–").monospacedDigit()
                     .foregroundStyle((e.status ?? 0) >= 400 ? FL.critical : .primary)
@@ -259,8 +285,8 @@ private struct InspectContent: View {
 
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
-            ExchangeDetail(exchange: selected, cause: selected.id.flatMap { links[$0] }, results: results, highlight: search,
-                           mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) })
+            ExchangeDetail(exchange: selected, assessment: selected.id.flatMap { assessments[$0] }, cause: selected.id.flatMap { links[$0] },
+                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) })
                 .id(selected.id)
         } else {
             ContentUnavailableView(L("Select a request"), systemImage: "doc.text.magnifyingglass")
@@ -449,6 +475,7 @@ private struct InspectionSetup: View {
 private struct ExchangeDetail: View {
     @EnvironmentObject var monitor: TrafficMonitor
     let exchange: HTTPExchange
+    var assessment: RiskAssessment?
     var cause: ToolCallLinks.Link?
     var results: [String: ToolResult] = [:]
     /// The toolbar's search term, so matches inside a body are marked where they appear.
@@ -471,6 +498,9 @@ private struct ExchangeDetail: View {
                             .help(L("Answer this endpoint from Flowlight instead of letting the request through"))
                     }
                 }
+            }
+            if LocalRiskSettings.isActive {
+                PotentialHarmCard(assessment: assessment)
             }
             if let note = exchange.note {
                 Label(note, systemImage: "lock").foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)

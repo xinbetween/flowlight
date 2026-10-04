@@ -51,6 +51,12 @@ nav: privacy
         in the name, so <code>X-Access-Key</code> is caught as well. That is a heuristic, not a guarantee: a header carrying a secret
         under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; <strong>Remove Certificate &amp; Recorded
         Data</strong> deletes the certificate, its trust setting and every recorded request.</p>
+      <p><strong>Optional local risk analysis.</strong> When you turn this separate setting on, Flowlight may send a bounded,
+        redacted description of an eligible already-recorded request to Apple's on-device model. It does not send data to
+        Flowlight, Apple or any other network service, and it never supplies request or response bodies, header values,
+        cookies, credential values or tool arguments. Scores are advisory only: they do not block, change, alert on or export
+        a request. Turning the setting off hides retained scores; <strong>Clear analyses</strong> removes only those derived local
+        scores and explanations, not the captured requests.</p>
 
       <h2 id="requests">Network requests the app makes</h2>
       <table>

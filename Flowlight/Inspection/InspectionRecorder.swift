@@ -242,7 +242,9 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 requestSize: request.body.wireSize, requestTruncated: requestCut,
                 responseHeaders: HeaderRedaction.redact(responseHead?.headers ?? [], budget: limits), responseBody: responseData,
                 responseSize: responseBody.wireSize, responseTruncated: responseCut,
-                contentType: responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
+                // The request's media type is the relevant one for post-capture risk triage. A response type can
+                // be an unrelated JSON/error envelope and would make an opaque upload look safely textual.
+                contentType: request.head.value("Content-Type") ?? responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
                 toolResults: results, mcp: mcp, llm: llm, note: notes.isEmpty ? nil : notes.joined(separator: " "),
                 mockRule: request.mock, guardrail: request.guardrail)

@@ -56,6 +56,8 @@ final class InspectionController: ObservableObject {
     private var pruneTimer: Timer?
     private var sessionTimer: Timer?
     var onRecorded: () -> Void = {}
+    /// Wakes post-capture local analysis only after the exchange and any derived job are durable.
+    var onLocalRiskCandidate: () -> Void = {}
     /// The rules that refuse a request rather than a whole connection — the ones that name a path or a method,
     /// which only the proxy can see. Read fresh on every connection, so a rule written now applies to the next
     /// request rather than the next launch.
@@ -191,9 +193,17 @@ final class InspectionController: ObservableObject {
             guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil else { return }
             guard let self else { return }
             Task { @MainActor in
-                self.db?.async { try $0.insertExchange(exchange) }
-                self.recordedCount += 1
-                self.onRecorded()
+                // Capture is committed first. The database transaction optionally creates a tiny derived candidate;
+                // the wake below schedules later work and never waits for model inference on the recorder path.
+                self.db?.async { [weak self] db in
+                    _ = try db.insertExchange(exchange, enqueueLocalRisk: LocalRiskSettings.enabled)
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.recordedCount += 1
+                        self.onRecorded()
+                        self.onLocalRiskCandidate()
+                    }
+                }
             }
         }
         refreshStatus()

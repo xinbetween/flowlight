@@ -367,6 +367,23 @@ final class TrafficDatabase: @unchecked Sendable {
             content_type TEXT NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
             agent TEXT NOT NULL, agent_name TEXT NOT NULL, mcp_server TEXT NOT NULL, tool_calls TEXT NOT NULL, note TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS http_exchanges_ts ON http_exchanges (ts);
+        -- Derived, local-only analysis. It intentionally stores a bounded redacted candidate and result instead of
+        -- adding interpretation fields to immutable capture rows or re-saving any request/response body.
+        CREATE TABLE IF NOT EXISTS local_risk_assessments (
+            exchange_id INTEGER PRIMARY KEY,
+            analyzer_version INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT '',
+            confidence REAL,
+            summary TEXT NOT NULL DEFAULT '',
+            evidence TEXT NOT NULL,
+            model_evidence_ids TEXT NOT NULL DEFAULT '[]',
+            candidate TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            scored_at REAL
+        );
+        CREATE INDEX IF NOT EXISTS local_risk_assessments_state_created ON local_risk_assessments (state, created_at);
+        CREATE INDEX IF NOT EXISTS local_risk_assessments_severity_created ON local_risk_assessments (severity, created_at);
         """)
         // Added with blocking: the destination a refused connection was headed for, so its alert can offer to
         // allow it without parsing the sentence back out of `detail`.
@@ -981,22 +998,196 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: HTTPS inspection
 
-    func insertExchange(_ e: HTTPExchange) throws {
-        let encoder = JSONEncoder()
-        func json<T: Encodable>(_ v: T) -> String { (try? encoder.encode(v)).map { String(decoding: $0, as: UTF8.self) } ?? "[]" }
+    /// Inserts raw capture and, when deterministic triage finds enough independent evidence, creates its separate
+    /// derived job in the same transaction. This returns before any model work begins.
+    func insertExchange(_ e: HTTPExchange, enqueueLocalRisk: Bool = false) throws -> Int64 {
+        try conn.transaction {
+            let encoder = JSONEncoder()
+            func json<T: Encodable>(_ v: T) -> String { (try? encoder.encode(v)).map { String(decoding: $0, as: UTF8.self) } ?? "[]" }
+            try conn.run("""
+                INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
+                    req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
+                    agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
+                      .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
+                      .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
+                      .text(json(e.responseHeaders)), .blob(e.responseBody), .int(Int64(e.responseSize)), .int(e.responseTruncated ? 1 : 0),
+                      .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
+                      .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
+                      .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
+                      .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? "")])
+            let id = try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
+            if enqueueLocalRisk, LocalRiskSettings.enabled {
+                var stored = e
+                stored.id = id
+                if let candidate = LocalRiskTriage.candidate(for: stored) {
+                    try enqueueLocalRiskCandidate(candidate)
+                }
+            }
+        }
+        return try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
+    }
+
+    private func enqueueLocalRiskCandidate(_ candidate: RiskCandidate) throws {
+        // Keep the durable backlog bounded. Capture remains complete either way; an excess candidate simply stays
+        // unassessed instead of allowing a long offline session to turn into an unbounded model queue.
+        let outstanding = try conn.query("SELECT COUNT(*) FROM local_risk_assessments WHERE state IN ('pending', 'processing', 'deferred')",
+                                         map: { $0.int(0) }).first ?? 0
+        guard outstanding < 200 else { return }
+        let data = try JSONEncoder().encode(candidate)
+        let evidence = try JSONEncoder().encode(candidate.evidence)
+        let now = Date().timeIntervalSince1970
         try conn.run("""
-            INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
-                req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
-                  .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
-                  .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
-                  .text(json(e.responseHeaders)), .blob(e.responseBody), .int(Int64(e.responseSize)), .int(e.responseTruncated ? 1 : 0),
-                  .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
-                  .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
-                  .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
-                  .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? "")])
+            INSERT INTO local_risk_assessments (exchange_id, analyzer_version, state, evidence, candidate, created_at)
+            VALUES (?,?,?,?,?,?)
+            ON CONFLICT(exchange_id) DO UPDATE SET
+                analyzer_version = excluded.analyzer_version,
+                state = CASE WHEN local_risk_assessments.analyzer_version < excluded.analyzer_version THEN 'pending'
+                             ELSE local_risk_assessments.state END,
+                evidence = CASE WHEN local_risk_assessments.analyzer_version < excluded.analyzer_version THEN excluded.evidence
+                                ELSE local_risk_assessments.evidence END,
+                candidate = CASE WHEN local_risk_assessments.analyzer_version < excluded.analyzer_version THEN excluded.candidate
+                                 ELSE local_risk_assessments.candidate END
+            """, [.int(candidate.exchangeID), .int(Int64(candidate.analyzerVersion)), .text(RiskAssessmentState.pending.rawValue),
+                  .text(String(decoding: evidence, as: UTF8.self)), .text(String(decoding: data, as: UTF8.self)), .double(now)])
+    }
+
+    func localRiskAssessments(exchangeIDs: [Int64], visibleOnly: Bool = true) throws -> [Int64: RiskAssessment] {
+        guard !exchangeIDs.isEmpty, !visibleOnly || LocalRiskSettings.isActive else { return [:] }
+        let marks = Array(repeating: "?", count: exchangeIDs.count).joined(separator: ",")
+        let values = exchangeIDs.map(SQLValue.int)
+        let rows = try conn.query("""
+            SELECT exchange_id, analyzer_version, state, severity, confidence, summary, evidence, model_evidence_ids, candidate, created_at, scored_at
+            FROM local_risk_assessments WHERE exchange_id IN (\(marks))
+            """, values) { row in decodeLocalRiskAssessment(row) }
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.exchangeID, $0) })
+    }
+
+    func localRiskCounts(since: Date, to: Date? = nil, filter: TrafficFilter = .none,
+                         visibleOnly: Bool = true) throws -> RiskAssessmentCounts {
+        guard !visibleOnly || LocalRiskSettings.isActive else { return .init() }
+        var clause = "e.ts >= ?"
+        var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
+        if let to { clause += " AND e.ts <= ?"; values.append(.double(to.timeIntervalSince1970)) }
+        if let app = filter.bundleID, !app.isEmpty { clause += " AND e.bundle_id = ?"; values.append(.text(app)) }
+        if let host = filter.domain, !host.isEmpty { clause += " AND (e.host = ? OR e.host LIKE ?)"; values += [.text(host), .text("%." + host)] }
+        if let suffix = filter.domainSuffix, !suffix.isEmpty { clause += " AND (e.host = ? OR e.host LIKE ?)"; values += [.text(suffix), .text("%." + suffix)] }
+        if !filter.focus.bundleIDs.isEmpty {
+            clause += " AND e.bundle_id IN (\(Array(repeating: "?", count: filter.focus.bundleIDs.count).joined(separator: ",")))"
+            values += filter.focus.bundleIDs.map { .text($0) }
+        }
+        if !filter.focus.hosts.isEmpty {
+            let names = filter.focus.hosts.filter { !AgentPolicy.isIPAddress($0) }
+            if names.isEmpty { clause += " AND 0" }
+            else {
+                clause += " AND (" + Array(repeating: "(e.host = ? OR e.host LIKE ?)", count: names.count).joined(separator: " OR ") + ")"
+                for name in names { values += [.text(name), .text("%." + name)] }
+            }
+        }
+        return try conn.query("""
+            SELECT
+                SUM(CASE WHEN r.state = 'scored' AND r.severity = 'medium' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN r.state = 'scored' AND r.severity = 'high' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN r.state != 'scored' THEN 1 ELSE 0 END)
+            FROM local_risk_assessments r JOIN http_exchanges e ON e.id = r.exchange_id WHERE \(clause)
+            """, values) { row in
+                RiskAssessmentCounts(medium: Int(row.int(0)), high: Int(row.int(1)), unassessed: Int(row.int(2)))
+            }.first ?? .init()
+    }
+
+    func claimNextLocalRiskAssessment() throws -> RiskAssessment? {
+        var claimed: RiskAssessment?
+        try conn.transaction {
+            guard let id = try conn.query("""
+                SELECT exchange_id FROM local_risk_assessments
+                WHERE state IN ('pending', 'deferred') ORDER BY created_at ASC LIMIT 1
+                """, map: { $0.int(0) }).first else { return }
+            try conn.run("UPDATE local_risk_assessments SET state = 'processing' WHERE exchange_id = ? AND state IN ('pending', 'deferred')", [.int(id)])
+            guard conn.changes == 1 else { return }
+            claimed = try conn.query("""
+                SELECT exchange_id, analyzer_version, state, severity, confidence, summary, evidence, model_evidence_ids, candidate, created_at, scored_at
+                FROM local_risk_assessments WHERE exchange_id = ?
+                """, [.int(id)]) { row in decodeLocalRiskAssessment(row) }.first
+        }
+        return claimed
+    }
+
+    func recoverLocalRiskClaims() throws {
+        try conn.run("UPDATE local_risk_assessments SET state = 'deferred' WHERE state = 'processing'")
+    }
+
+    func deferLocalRiskAssessment(exchangeID: Int64) throws {
+        try conn.run("UPDATE local_risk_assessments SET state = 'deferred' WHERE exchange_id = ? AND state = 'processing'", [.int(exchangeID)])
+    }
+
+    func completeLocalRiskAssessment(exchangeID: Int64, result: LocalRiskProviderResult) throws {
+        switch result {
+        case .scored(let verdict):
+            guard let severity = RiskSeverity(rawValue: verdict.severity), (0...1).contains(verdict.confidence),
+                  verdict.summary.count <= 500, verdict.evidenceIDs.count <= 8 else {
+                try markLocalRiskState(exchangeID: exchangeID, state: .failed, summary: L("The local model returned an invalid analysis."))
+                return
+            }
+            let candidate = try localRiskCandidate(exchangeID: exchangeID)
+            let available = Set(candidate.evidence.map(\.id))
+            guard Set(verdict.evidenceIDs).isSubset(of: available) else {
+                try markLocalRiskState(exchangeID: exchangeID, state: .failed, summary: L("The local model cited evidence that was not supplied."))
+                return
+            }
+            try conn.run("""
+                UPDATE local_risk_assessments SET state = ?, severity = ?, confidence = ?, summary = ?, model_evidence_ids = ?, scored_at = ?
+                WHERE exchange_id = ?
+                """, [.text(RiskAssessmentState.scored.rawValue), .text(severity.rawValue), .double(verdict.confidence),
+                      .text(verdict.summary), .text(String(decoding: try JSONEncoder().encode(verdict.evidenceIDs), as: UTF8.self)),
+                      .double(Date().timeIntervalSince1970), .int(exchangeID)])
+        case .unavailable(let reason):
+            try markLocalRiskState(exchangeID: exchangeID, state: .unavailable, summary: reason)
+        case .deferred(let reason):
+            try markLocalRiskState(exchangeID: exchangeID, state: .deferred, summary: reason)
+        case .failed(let reason):
+            try markLocalRiskState(exchangeID: exchangeID, state: .failed, summary: reason)
+        }
+    }
+
+    private func markLocalRiskState(exchangeID: Int64, state: RiskAssessmentState, summary: String) throws {
+        try conn.run("UPDATE local_risk_assessments SET state = ?, summary = ?, scored_at = ? WHERE exchange_id = ?",
+                     [.text(state.rawValue), .text(String(summary.prefix(500))), .double(Date().timeIntervalSince1970), .int(exchangeID)])
+    }
+
+    private func localRiskCandidate(exchangeID: Int64) throws -> RiskCandidate {
+        guard let text = try conn.query("SELECT candidate FROM local_risk_assessments WHERE exchange_id = ?", [.int(exchangeID)], map: { $0.text(0) }).first,
+              let candidate = try? JSONDecoder().decode(RiskCandidate.self, from: Data(text.utf8)) else {
+            throw SQLiteError.step("Missing local risk candidate")
+        }
+        return candidate
+    }
+
+    private func decodeLocalRiskAssessment(_ row: SQLRow) -> RiskAssessment {
+        let decoder = JSONDecoder()
+        let evidence = (try? decoder.decode([RiskEvidence].self, from: Data(row.text(6).utf8))) ?? []
+        let IDs = (try? decoder.decode([String].self, from: Data(row.text(7).utf8))) ?? []
+        let fallback = RiskCandidate(exchangeID: row.int(0), analyzerVersion: Int(row.int(1)), method: "", destinationClass: "", pathCategory: "",
+                                     contentTypeCategory: "", requestBytes: 0, responseBytes: 0, requestTruncated: false, responseTruncated: false,
+                                     appKind: "", hasAgent: false, hasMCP: false, toolNames: [], safeHeaderNames: [], evidence: evidence)
+        let candidate = (try? decoder.decode(RiskCandidate.self, from: Data(row.text(8).utf8))) ?? fallback
+        return RiskAssessment(exchangeID: row.int(0), analyzerVersion: Int(row.int(1)),
+                              state: RiskAssessmentState(rawValue: row.text(2)) ?? .failed,
+                              severity: RiskSeverity(rawValue: row.text(3)), confidence: row.isNull(4) ? nil : row.double(4),
+                              summary: row.text(5).nilIfEmpty, evidence: evidence, modelEvidenceIDs: IDs,
+                              createdAt: Date(timeIntervalSince1970: row.double(9)),
+                              scoredAt: row.isNull(10) ? nil : Date(timeIntervalSince1970: row.double(10)), candidate: candidate)
+    }
+
+    func enqueueRecentLocalRiskCandidates(limit: Int) throws {
+        let rows = try exchanges(since: Date().addingTimeInterval(-24 * 3600), limit: limit)
+        for exchange in rows where exchange.id != nil {
+            if let candidate = LocalRiskTriage.candidate(for: exchange) { try enqueueLocalRiskCandidate(candidate) }
+        }
+    }
+
+    func clearLocalRiskAssessments() throws {
+        try conn.run("DELETE FROM local_risk_assessments")
     }
 
     /// Exchanges newest first, without bodies (they're loaded one at a time with `exchangeBodies`).
@@ -1068,11 +1259,18 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     func pruneExchanges(olderThan cutoff: Date) throws {
-        try conn.run("DELETE FROM http_exchanges WHERE ts < ?", [.double(cutoff.timeIntervalSince1970)])
+        try conn.transaction {
+            try conn.run("DELETE FROM local_risk_assessments WHERE exchange_id IN (SELECT id FROM http_exchanges WHERE ts < ?)",
+                         [.double(cutoff.timeIntervalSince1970)])
+            try conn.run("DELETE FROM http_exchanges WHERE ts < ?", [.double(cutoff.timeIntervalSince1970)])
+        }
     }
 
     func deleteAllExchanges() throws {
-        try conn.run("DELETE FROM http_exchanges")
+        try conn.transaction {
+            try conn.run("DELETE FROM local_risk_assessments")
+            try conn.run("DELETE FROM http_exchanges")
+        }
     }
 
     // MARK: IP owners
@@ -1177,7 +1375,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments"] {
                 try conn.run("DELETE FROM \(t)")
             }
         }

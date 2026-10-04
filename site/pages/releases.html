@@ -13,7 +13,18 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.13.1</h2><time datetime="2026-10-03">October 3, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.13.2</h2><time datetime="2026-10-03">October 3, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Optional local potential-harm analysis.</strong> After an inspected request is safely recorded,
+            Flowlight can use Apple’s on-device model to score meaningful candidates and explain the supplied evidence.
+            It is local-only, asynchronous and advisory: it never blocks, changes, alerts on or exports traffic. Turn it
+            on in Reports or Settings › Detection; turn it off to hide retained findings, or Clear analyses to remove only
+            the derived scores and explanations.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.13.1</h2><time datetime="2026-10-03">October 3, 2026</time></header>
         <ul>
           <li><strong>Rewrite form requests too.</strong> Request-modification rules now change fields in
             <code>application/x-www-form-urlencoded</code> bodies, not only JSON. Set a field to a URL, text or

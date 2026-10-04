@@ -62,8 +62,13 @@ final class TrafficMonitor: ObservableObject {
     let ask = AskController()
     /// Bumps when inspection records new exchanges, so the Inspect view can refresh.
     @Published private(set) var inspectionVersion = 0
+    /// Bumps after a derived assessment changes, keeping the request list and Reports independent from capture reloads.
+    @Published private(set) var localRiskVersion = 0
     /// Read-only connection for UI queries.
     private let readDB: TrafficDatabase
+    private lazy var localRisk = LocalRiskCoordinator(db: db, provider: OnDeviceRiskProvider()) { [weak self] in
+        Task { @MainActor in self?.localRiskVersion += 1 }
+    }
     let activity = ActivityMonitor()
     private let engine: AnomalyEngine
     private var source: TrafficSource?
@@ -89,6 +94,7 @@ final class TrafficMonitor: ObservableObject {
 
     init() {
         AnomalySettings.registerDefaults()
+        LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
         do {
@@ -137,7 +143,12 @@ final class TrafficMonitor: ObservableObject {
         }
         activity.start()
         inspection.onRecorded = { [weak self] in self?.inspectionVersion += 1 }
+        inspection.onLocalRiskCandidate = { [weak self] in
+            guard let self else { return }
+            Task { await self.localRisk.wake() }
+        }
         inspection.attach(db: db)
+        Task { await localRisk.recover() }
         rules.onChange = { [weak self] set in self?.source?.setRules(set) }
         rules.attach(db: db)
         // A rule that names a path is carried out by the proxy, which reads its list fresh on every connection.
@@ -588,6 +599,7 @@ final class TrafficMonitor: ObservableObject {
 
     func runMaintenance() {
         let retentionHours = UserDefaults.standard.double(forKey: AnomalySettings.Keys.retentionHours)
+        Task { await localRisk.recover() }
         db.async { [engine, weak self] db in
             var retention = TrafficDatabase.Retention()
             retention.seconds = max(1, retentionHours) * 3600
@@ -609,6 +621,30 @@ final class TrafficMonitor: ObservableObject {
         db.async { [weak self] db in
             let count = try db.unacknowledgedAlertCount(focus: scope)
             Task { @MainActor in self?.unacknowledgedAlerts = count }
+        }
+    }
+
+    func setLocalRiskEnabled(_ enabled: Bool) {
+        guard LocalRiskSettings.canAnalyze || !enabled else { return }
+        UserDefaults.standard.set(enabled, forKey: LocalRiskSettings.Keys.enabled)
+        localRiskVersion += 1
+        Task { [localRisk] in
+            if enabled && LocalRiskSettings.canAnalyze { await localRisk.recover() }
+            else { await localRisk.stop() }
+        }
+    }
+
+    func analyzeRecentInspectedRequests() {
+        Task { await localRisk.backfillRecent() }
+    }
+
+    func clearLocalRiskAnalyses() {
+        Task { [weak self, db] in
+            db.async { db in
+                try db.clearLocalRiskAssessments()
+                Task { @MainActor in self?.localRiskVersion += 1 }
+            }
+            await self?.localRisk.stop()
         }
     }
 
