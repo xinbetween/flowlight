@@ -109,7 +109,7 @@ final class LocalRiskAnalysisTests: XCTestCase {
                                                        enqueueLocalRisk: true) }
         let provider = FakeProvider()
         let done = expectation(description: "assessment persisted")
-        let worker = LocalRiskCoordinator(db: db, provider: provider) { done.fulfill() }
+        let worker = LocalRiskCoordinator(db: db, provider: provider, isAvailable: { true }) { done.fulfill() }
         await worker.wake()
         await fulfillment(of: [done], timeout: 2)
         let assessment = try db.sync { try $0.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id] }
