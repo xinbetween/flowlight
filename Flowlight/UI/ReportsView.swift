@@ -70,40 +70,16 @@ struct ReportsView: View {
     private var grandTotal: Int64 { max(1, series.reduce(0) { $0 + $1.total }) }
 
     var body: some View {
-        Group {
-            if lowerMode == .charts {
-                // Charts stack taller than the window, so the whole report scrolls.
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                        lowerModeBar
-                        InsightsPanel(snapshot: insights, registries: registries, metric: metric, granularity: granularity,
-                                      scopeName: scopeName, onSelect: narrow)
-                            .overlay { if insights.dimensions.isEmpty && !loading { emptyCharts } }
-                    }
-                    .padding()
-                }
-            } else if lowerMode == .behaviour {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                        lowerModeBar
-                        BehaviourPanel(findings: behaviour, period: granularity.periodName) { finding in
-                            filter = TrafficFilter(bundleID: finding.bundleID)
-                            lowerMode = .breakdown
-                        }
-                    }
-                    .padding()
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    header
-                    lowerModeBar
-                    table
-                }
-                .padding()
+        GeometryReader { _ in
+            switch lowerMode {
+            case .charts: chartsContent
+            case .behaviour: behaviourContent
+            case .breakdown: breakdownContent
             }
         }
+        // The Local Risk card made the old intrinsic report taller than the split view. Give every mode the real
+        // detail viewport so the table takes the remaining height instead of pushing the report header under the bar.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(L("Reports"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, IP, port"))
         .toolbar {
@@ -161,6 +137,48 @@ struct ReportsView: View {
     }
 
     // MARK: Sections
+
+    /// Charts and behaviour scroll as a single report; the breakdown keeps its controls above a table that fills
+    /// only the remaining viewport. Keeping the three modes concrete also avoids a giant conditional SwiftUI type.
+    private var chartsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                lowerModeBar
+                InsightsPanel(snapshot: insights, registries: registries, metric: metric, granularity: granularity,
+                              scopeName: scopeName, onSelect: narrow)
+                    .overlay { if insights.dimensions.isEmpty && !loading { emptyCharts } }
+            }
+            .padding()
+        }
+    }
+
+    private var behaviourContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                lowerModeBar
+                BehaviourPanel(findings: behaviour, period: granularity.periodName) { finding in
+                    filter = TrafficFilter(bundleID: finding.bundleID)
+                    lowerMode = .breakdown
+                }
+            }
+            .padding()
+        }
+    }
+
+    private var breakdownContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+                .layoutPriority(1)
+            lowerModeBar
+                .layoutPriority(1)
+            table
+                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
 
     @ViewBuilder
     private var header: some View {
