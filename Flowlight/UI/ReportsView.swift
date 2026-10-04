@@ -104,6 +104,9 @@ struct ReportsView: View {
                 .padding()
             }
         }
+        // The report's summary cards use flexible widths, so the conditional root must claim the split-view detail
+        // viewport. Otherwise SwiftUI can lay the intrinsic content outside the sidebar/titlebar-safe region.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(L("Reports"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, IP, port"))
         .toolbar {
