@@ -156,12 +156,15 @@ enum LocalRiskSettings {
         UserDefaults.standard.bool(forKey: Keys.enabled)
     }
 
-    /// Active only where the required on-device model can actually run. UI queries use this so an unavailable Mac
-    /// never presents retained contextual findings as current analysis.
-    static var enabled: Bool { preferenceEnabled && canAnalyze }
+    /// Whether Flowlight should durably queue an eligible post-capture candidate. A temporary unavailable model
+    /// leaves this intent alone so the candidate can resume only after the local model becomes ready.
+    static var enabled: Bool { preferenceEnabled }
 
     static var readiness: OnDeviceAsk.Readiness { OnDeviceAsk.readiness }
     static var canAnalyze: Bool { readiness == .ready }
+    /// What screens expose. On a Mac without the model, retained analysis stays invisible and the switch is shown
+    /// disabled and off rather than looking like a working choice.
+    static var isActive: Bool { preferenceEnabled && canAnalyze }
 }
 
 /// Pure, conservative triage. It produces only evidence supported by captured metadata, never a conclusion that a
@@ -275,14 +278,18 @@ enum LocalRiskTriage {
 actor LocalRiskCoordinator {
     private let db: TrafficDatabase
     private let provider: any LocalRiskProviding
+    private let isAvailable: @Sendable () -> Bool
     private var worker: Task<Void, Never>?
     /// Identifies the current task so a cancelled older run cannot clear a newer worker after a quick off/on.
     private var workerID: UUID?
     private let onChange: @Sendable () -> Void
 
-    init(db: TrafficDatabase, provider: any LocalRiskProviding, onChange: @escaping @Sendable () -> Void) {
+    init(db: TrafficDatabase, provider: any LocalRiskProviding,
+         isAvailable: @escaping @Sendable () -> Bool = { LocalRiskSettings.canAnalyze },
+         onChange: @escaping @Sendable () -> Void) {
         self.db = db
         self.provider = provider
+        self.isAvailable = isAvailable
         self.onChange = onChange
     }
 
@@ -324,7 +331,7 @@ actor LocalRiskCoordinator {
         while !Task.isCancelled && LocalRiskSettings.enabled {
             // Do not consume queued work while Apple Intelligence is downloading, disabled, or otherwise not ready.
             // Maintenance will wake this worker again when the exact same readiness gate becomes available.
-            guard LocalRiskSettings.canAnalyze else { break }
+            guard isAvailable() else { break }
             guard let assessment = try? db.sync({ try $0.claimNextLocalRiskAssessment() }) else { break }
             let result = await provider.assess(assessment.candidate)
             guard !Task.isCancelled, LocalRiskSettings.enabled else {

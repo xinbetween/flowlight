@@ -1054,7 +1054,7 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     func localRiskAssessments(exchangeIDs: [Int64], visibleOnly: Bool = true) throws -> [Int64: RiskAssessment] {
-        guard !exchangeIDs.isEmpty, !visibleOnly || LocalRiskSettings.enabled else { return [:] }
+        guard !exchangeIDs.isEmpty, !visibleOnly || LocalRiskSettings.isActive else { return [:] }
         let marks = Array(repeating: "?", count: exchangeIDs.count).joined(separator: ",")
         let values = exchangeIDs.map(SQLValue.int)
         let rows = try conn.query("""
@@ -1066,7 +1066,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func localRiskCounts(since: Date, to: Date? = nil, filter: TrafficFilter = .none,
                          visibleOnly: Bool = true) throws -> RiskAssessmentCounts {
-        guard !visibleOnly || LocalRiskSettings.enabled else { return .init() }
+        guard !visibleOnly || LocalRiskSettings.isActive else { return .init() }
         var clause = "e.ts >= ?"
         var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
         if let to { clause += " AND e.ts <= ?"; values.append(.double(to.timeIntervalSince1970)) }

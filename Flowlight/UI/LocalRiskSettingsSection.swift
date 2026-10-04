@@ -7,7 +7,7 @@ struct LocalRiskSettingsSection: View {
     private var enabled: Binding<Bool> {
         // This reflects active analysis, not a saved preference that cannot work on this Mac. The control is then
         // unmistakably off and disabled until Apple Intelligence becomes ready.
-        Binding(get: { LocalRiskSettings.enabled }, set: { monitor.setLocalRiskEnabled($0) })
+        Binding(get: { LocalRiskSettings.isActive }, set: { monitor.setLocalRiskEnabled($0) })
     }
 
     var body: some View {
@@ -31,7 +31,7 @@ struct LocalRiskSettingsSection: View {
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
 
-            if LocalRiskSettings.enabled {
+            if LocalRiskSettings.isActive {
                 Button(L("Analyze recent inspected requests")) { monitor.analyzeRecentInspectedRequests() }
                     .help(L("Queues at most 100 recent eligible requests; captured traffic stays available immediately."))
             }

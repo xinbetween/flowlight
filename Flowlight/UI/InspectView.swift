@@ -92,7 +92,7 @@ private struct InspectContent: View {
         .onChange(of: monitor.localRiskVersion) {
             // A retained finding is deliberately hidden when the feature is off. Do not leave the visible filter
             // applied then, or a person would see an unexplained empty request list.
-            if !LocalRiskSettings.enabled { potentialHarmOnly = false }
+            if !LocalRiskSettings.isActive { potentialHarmOnly = false }
         }
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
@@ -154,8 +154,8 @@ private struct InspectContent: View {
                 Label(L("Potential harm"), systemImage: "exclamationmark.triangle")
             }
             .toggleStyle(.button)
-            .disabled(!LocalRiskSettings.enabled)
-            .help(LocalRiskSettings.enabled ? L("Show only medium and high local risk assessments")
+            .disabled(!LocalRiskSettings.isActive)
+            .help(LocalRiskSettings.isActive ? L("Show only medium and high local risk assessments")
                                              : L("Turn on Local risk analysis in Reports or Settings to use this filter"))
             Picker(L("Window"), selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
@@ -499,7 +499,7 @@ private struct ExchangeDetail: View {
                     }
                 }
             }
-            if LocalRiskSettings.enabled {
+            if LocalRiskSettings.isActive {
                 PotentialHarmCard(assessment: assessment)
             }
             if let note = exchange.note {

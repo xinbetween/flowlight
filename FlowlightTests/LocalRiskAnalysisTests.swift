@@ -7,7 +7,9 @@ final class LocalRiskAnalysisTests: XCTestCase {
     override func setUp() {
         super.setUp()
         url = FileManager.default.temporaryDirectory.appendingPathComponent("local-risk-\(UUID()).sqlite")
-        UserDefaults.standard.set(false, forKey: LocalRiskSettings.Keys.enabled)
+        // Storage tests exercise durable opt-in behavior independently from whatever Foundation Models availability
+        // the CI runner happens to report.
+        UserDefaults.standard.set(true, forKey: LocalRiskSettings.Keys.enabled)
     }
 
     override func tearDown() {
@@ -90,17 +92,14 @@ final class LocalRiskAnalysisTests: XCTestCase {
         XCTAssertNil(try db.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id])
     }
 
-    func testCoordinatorLeavesCandidatePendingWhenTheOnDeviceModelIsUnavailable() async throws {
+    func testCoordinatorDoesNotClaimWhenAvailabilityGateIsOff() async throws {
         let db = try database()
-        UserDefaults.standard.set(true, forKey: LocalRiskSettings.Keys.enabled)
         let id = try db.insertExchange(exchange(tools: [ToolCall(source: .anthropic, callID: "1", name: "Bash", mcpServer: nil, input: "", summary: nil)]),
                                        enqueueLocalRisk: true)
-        let worker = LocalRiskCoordinator(db: db, provider: FakeProvider()) {}
+        let worker = LocalRiskCoordinator(db: db, provider: FakeProvider(), isAvailable: { false }) {}
         await worker.wake()
         try? await Task.sleep(for: .milliseconds(30))
-        if !LocalRiskSettings.canAnalyze {
-            XCTAssertEqual(try db.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id]?.state, .pending)
-        }
+        XCTAssertEqual(try db.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id]?.state, .pending)
     }
 
     func testCoordinatorScoresOnePersistedCandidate() async throws {

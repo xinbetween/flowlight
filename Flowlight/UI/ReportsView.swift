@@ -192,7 +192,7 @@ struct ReportsView: View {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
             VStack(alignment: .leading, spacing: 3) {
                 Text(L("Potential harm")).font(.callout.bold())
-                if LocalRiskSettings.enabled {
+                if LocalRiskSettings.isActive {
                     if localRiskCounts.totalPotentialHarm > 0 {
                         Text(L("%lld medium or high local assessment%@ in this window.", localRiskCounts.totalPotentialHarm,
                                localRiskCounts.totalPotentialHarm == 1 ? "" : "s"))
@@ -212,12 +212,12 @@ struct ReportsView: View {
                 }
             }
             Spacer()
-            Toggle(isOn: Binding(get: { LocalRiskSettings.enabled }, set: { monitor.setLocalRiskEnabled($0) })) {
+            Toggle(isOn: Binding(get: { LocalRiskSettings.isActive }, set: { monitor.setLocalRiskEnabled($0) })) {
                 Text(L("Local risk analysis"))
             }
             .toggleStyle(.switch)
             .disabled(!LocalRiskSettings.canAnalyze)
-            if LocalRiskSettings.enabled && localRiskCounts.totalPotentialHarm > 0 {
+            if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0 {
                 Button(L("Show in Inspect")) { nav.showInspect(search: "", potentialHarmOnly: true) }
             }
         }

@@ -629,7 +629,7 @@ final class TrafficMonitor: ObservableObject {
         UserDefaults.standard.set(enabled, forKey: LocalRiskSettings.Keys.enabled)
         localRiskVersion += 1
         Task { [localRisk] in
-            if enabled { await localRisk.recover() }
+            if enabled && LocalRiskSettings.canAnalyze { await localRisk.recover() }
             else { await localRisk.stop() }
         }
     }
