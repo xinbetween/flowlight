@@ -48,6 +48,7 @@ struct ReportsView: View {
     @State private var registries: [InsightDimension: ColorRegistry] = [:]
     /// Apps whose destinations stand out from the rest of this report. Rebuilt from the same breakdown rows.
     @State private var behaviour: [AppBehaviour] = []
+    @State private var localRiskCounts = RiskAssessmentCounts()
 
     enum LowerMode: String, CaseIterable, Identifiable {
         case breakdown, charts, behaviour
@@ -128,7 +129,7 @@ struct ReportsView: View {
             }
         }
         .task(id: ReloadKey(granularity: granularity, end: followNow ? nil : endDate, filter: scoped, version: monitor.dataVersion,
-                            mode: lowerMode, metric: metric)) {
+                            localRiskVersion: monitor.localRiskVersion, mode: lowerMode, metric: metric)) {
             await reload()
         }
         .task(id: granularity) {
@@ -155,7 +156,7 @@ struct ReportsView: View {
     }
 
     private struct ReloadKey: Equatable {
-        var granularity: Granularity; var end: Date?; var filter: TrafficFilter; var version: Int
+        var granularity: Granularity; var end: Date?; var filter: TrafficFilter; var version: Int; var localRiskVersion: Int
         var mode: LowerMode; var metric: InsightMetric
     }
 
@@ -166,6 +167,7 @@ struct ReportsView: View {
         controls
         if !filter.isEmpty { filterChips }
         coverageNotice
+        localRiskSummary
         summary
         chart
     }
@@ -182,6 +184,46 @@ struct ReportsView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .help(L("Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs."))
+    }
+
+    @ViewBuilder
+    private var localRiskSummary: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(L("Potential harm")).font(.callout.bold())
+                if LocalRiskSettings.enabled {
+                    if localRiskCounts.totalPotentialHarm > 0 {
+                        Text(L("%lld medium or high local assessment%@ in this window.", localRiskCounts.totalPotentialHarm,
+                               localRiskCounts.totalPotentialHarm == 1 ? "" : "s"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text(L("No medium or high local assessments in this window. Requests without an assessment are not being called safe."))
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if localRiskCounts.unassessed > 0 {
+                        Text(L("%lld eligible request%@ did not receive a contextual verdict.", localRiskCounts.unassessed,
+                               localRiskCounts.unassessed == 1 ? "" : "s"))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(L("Local risk analysis is off. Retained local findings are hidden until you turn it back on."))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            Toggle(isOn: Binding(get: { LocalRiskSettings.enabled }, set: { monitor.setLocalRiskEnabled($0) })) {
+                Text(L("Local risk analysis"))
+            }
+            .toggleStyle(.switch)
+            .disabled(!LocalRiskSettings.canAnalyze)
+            if LocalRiskSettings.enabled && localRiskCounts.totalPotentialHarm > 0 {
+                Button(L("Show in Inspect")) { nav.showInspect(search: "", potentialHarmOnly: true) }
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+        .help(LocalRiskSettings.readiness.explanation ?? L("On-device-only, advisory scoring after capture. It does not block or change traffic."))
     }
 
     private var lowerModeBar: some View {
@@ -701,14 +743,15 @@ struct ReportsView: View {
         let wantsCharts = lowerMode == .charts
         do {
             let wantsBehaviour = lowerMode == .behaviour
-            let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?, [BreakdownRow]) in
+            let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?, [BreakdownRow], RiskAssessmentCounts) in
                 let series = try db.series(g, from: from, to: to, filter: f)
                 let breakdown = try db.breakdown(g, from: from, to: to, filter: f)
                 let behaviourRows = wantsBehaviour ? try db.appDestinationRows(g, from: from, to: to, filter: f) : []
-                guard wantsCharts else { return (series, breakdown, nil, behaviourRows) }
+                let risk = try db.localRiskCounts(since: from, to: to, filter: f)
+                guard wantsCharts else { return (series, breakdown, nil, behaviourRows, risk) }
                 let snapshot = try InsightsBuilder.load(db: db, dimensions: InsightDimension.available(for: f), series: series,
                                                         metric: m, granularity: g, from: from, to: to, filter: f)
-                return (series, breakdown, snapshot, behaviourRows)
+                return (series, breakdown, snapshot, behaviourRows, risk)
             }
             guard g == granularity, f == scoped, m == metric else { return } // a newer request superseded this one
             if let snapshot = result.2 {
@@ -726,6 +769,7 @@ struct ReportsView: View {
             // Not result.1: those rows stop at breakdownLimit, and an app past the cap would silently never be
             // considered. This asks for every app's destinations on their own, which is a much smaller result.
             behaviour = DestinationProfile.analyse(result.3)
+            localRiskCounts = result.4
             nodes = TrafficNode.tree(from: result.1, grouping: grouping, base: f)
             if hovered != nil { hovered = series.first { $0.date == hovered?.date } }
         } catch {

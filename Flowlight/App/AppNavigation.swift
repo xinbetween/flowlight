@@ -148,8 +148,8 @@ final class AppNavigation: ObservableObject {
     /// Inspect searches one field across hosts, paths, app names, tools and bodies, so "show me this row's
     /// traffic" is that field pre-filled rather than a second filtering mechanism. It also means the search
     /// stays visible and editable: someone who arrives here can widen or narrow it without going back.
-    func showInspect(search: String) {
-        inspectRequest = InspectRequest(search: search)
+    func showInspect(search: String, potentialHarmOnly: Bool = false) {
+        inspectRequest = InspectRequest(search: search, potentialHarmOnly: potentialHarmOnly)
         selection = .inspect
     }
 
@@ -158,8 +158,9 @@ final class AppNavigation: ObservableObject {
     /// The first version of this put the name in the search field, which reads well — visible, editable — but
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
-    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil) {
-        inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host)
+    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil, potentialHarmOnly: Bool = false) {
+        inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
+                                       potentialHarmOnly: potentialHarmOnly)
         selection = .inspect
     }
 }
@@ -168,8 +169,10 @@ final class AppNavigation: ObservableObject {
 struct InspectRequest: Equatable {
     var search: String
     /// The app to scope to, and the name to show on the chip that says so.
-    var appID: String?
-    var appName: String?
-    var host: String?
+    var appID: String? = nil
+    var appName: String? = nil
+    var host: String? = nil
+    /// Explicitly displayed and removable in Inspect; Reports uses it for the potential-harm drill-in.
+    var potentialHarmOnly = false
     var id = UUID()
 }

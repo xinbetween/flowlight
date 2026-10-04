@@ -61,7 +61,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.13.1, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.13.2, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -317,6 +317,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
         allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
         setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.</p>
+      <p><strong>Local risk analysis is separate and off by default.</strong> In Reports or Settings › Detection, you can ask
+        Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
+        bounded redacted description — never request or response bodies, header values, cookies, credentials or tool arguments —
+        and nothing leaves the Mac. The result is a potential-harm hint, not proof of intent: Flowlight never blocks, changes,
+        alerts on or exports a request because of it. Inspect labels requests with a contextual severity when there is one;
+        <em>Not assessed</em> never means safe. Turn it off to hide retained results, or use Clear analyses to delete only the
+        derived scores and explanations.</p>
 
       <p><strong>What inspection may keep.</strong> Recorded bodies are the most sensitive thing Flowlight holds, and until 0.9.3
         the only thing protecting them was a guess at which headers carry credentials. A guess is the wrong shape for this: it can
@@ -732,7 +739,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.13.1 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.13.2 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

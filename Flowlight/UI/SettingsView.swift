@@ -2,6 +2,7 @@ import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
+    @EnvironmentObject var monitor: TrafficMonitor
     typealias K = AnomalySettings.Keys
     @AppStorage(K.sigma) private var sigma = 3.0
     @AppStorage(K.learningHours) private var learningHours = 24.0
@@ -27,6 +28,7 @@ struct SettingsView: View {
     // form put blocking IPC on the main thread at 1 Hz for the life of the process.
     @State private var launchAtLogin = false
     @State private var loginItemError: String?
+    @State private var showClearLocalRiskConfirmation = false
 
     var body: some View {
         TabView {
@@ -88,6 +90,7 @@ struct SettingsView: View {
                     Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent(L("App idle for at least"), value: L("%lld min", Int(idleMinutes))) }
                     Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent(L("Uploading more than"), value: L("%@ MB/min", idleUploadMB.formatted())) }
                 }
+                LocalRiskSettingsSection(showClearConfirmation: $showClearLocalRiskConfirmation)
             }
             .formStyle(.grouped)
             .frame(height: 640)
@@ -109,6 +112,11 @@ struct SettingsView: View {
                 .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
         }
         .frame(width: 500)
+        .confirmationDialog(L("Clear local analyses?"), isPresented: $showClearLocalRiskConfirmation, titleVisibility: .visible) {
+            Button(L("Clear analyses"), role: .destructive) { monitor.clearLocalRiskAnalyses() }
+        } message: {
+            Text(L("This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place."))
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

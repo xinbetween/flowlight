@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.2, macOS 15 or later.
 
  On this page
 
@@ -363,6 +363,14 @@ open build/Build/Products/Release/Flowlight.app
  Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
  allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
+
+ Local risk analysis is separate and off by default. In Reports or Settings › Detection, you can ask
+ Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
+ bounded redacted description — never request or response bodies, header values, cookies, credentials or tool arguments —
+ and nothing leaves the Mac. The result is a potential-harm hint, not proof of intent: Flowlight never blocks, changes,
+ alerts on or exports a request because of it. Inspect labels requests with a contextual severity when there is one;
+ Not assessed never means safe. Turn it off to hide retained results, or use Clear analyses to delete only the
+ derived scores and explanations.
 
  What inspection may keep. Recorded bodies are the most sensitive thing Flowlight holds, and until 0.9.3
  the only thing protecting them was a guess at which headers carry credentials. A guess is the wrong shape for this: it can
@@ -839,7 +847,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1342,6 +1350,13 @@ Privacy
  under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; Remove Certificate & Recorded
  Data deletes the certificate, its trust setting and every recorded request.
 
+ Optional local risk analysis. When you turn this separate setting on, Flowlight may send a bounded,
+ redacted description of an eligible already-recorded request to Apple's on-device model. It does not send data to
+ Flowlight, Apple or any other network service, and it never supplies request or response bodies, header values,
+ cookies, credential values or tool arguments. Scores are advisory only: they do not block, change, alert on or export
+ a request. Turning the setting off hides retained scores; Clear analyses removes only those derived local
+ scores and explanations, not the captured requests.
+
  Network requests the app makes
 
  RequestSent toWhat it containsWhen
@@ -1398,8 +1413,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.13.1
+ 0.13.2
 October 3, 2026Latest
+
+ Optional local potential-harm analysis. After an inspected request is safely recorded,
+ Flowlight can use Apple’s on-device model to score meaningful candidates and explain the supplied evidence.
+ It is local-only, asynchronous and advisory: it never blocks, changes, alerts on or exports traffic. Turn it
+ on in Reports or Settings › Detection; turn it off to hide retained findings, or Clear analyses to remove only
+ the derived scores and explanations.
+
+ 0.13.1
+October 3, 2026
 
  Rewrite form requests too. Request-modification rules now change fields in
  application/x-www-form-urlencoded bodies, not only JSON. Set a field to a URL, text or
