@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.1, macOS 15 or later.
 
  On this page
 
@@ -839,7 +839,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1398,8 +1398,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.1
+October 3, 2026Latest
+
+ Rewrite form requests too. Request-modification rules now change fields in
+ application/x-www-form-urlencoded bodies, not only JSON. Set a field to a URL, text or
+ value and Flowlight encodes it as a browser would; remove a field and it is omitted. The request's
+ Content-Length is recalculated before it goes upstream.
+
  0.13.0
-October 1, 2026Latest
+October 1, 2026
 
  Change a request on its way out. A new kind of rule edits a matching outgoing
  request before it reaches the server — add or replace a header, pin a field in the JSON body, or strip
