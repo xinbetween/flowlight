@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.3, macOS 15 or later.
 
  On this page
 
@@ -847,7 +847,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1413,8 +1413,15 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.3
+October 4, 2026Latest
+
+ Reports stays in its pane. The Reports screen now claims the full detail area before
+ laying out its selected view, so its controls, summary, chart, tabs and table stay clear of the sidebar
+ and unified title bar at every window size.
+
  0.13.2
-October 3, 2026Latest
+October 3, 2026
 
  Optional local potential-harm analysis. After an inspected request is safely recorded,
  Flowlight can use Apple’s on-device model to score meaningful candidates and explain the supplied evidence.
