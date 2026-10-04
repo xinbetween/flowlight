@@ -55,7 +55,17 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.13.0</h2><time datetime="2026-10-01">October 1, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.13.1</h2><time datetime="2026-10-03">October 3, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Rewrite form requests too.</strong> Request-modification rules now change fields in
+            <code>application/x-www-form-urlencoded</code> bodies, not only JSON. Set a field to a URL, text or
+            value and Flowlight encodes it as a browser would; remove a field and it is omitted. The request's
+            Content-Length is recalculated before it goes upstream.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.13.0</h2><time datetime="2026-10-01">October 1, 2026</time></header>
         <ul>
           <li><strong>Change a request on its way out.</strong> A new kind of rule edits a matching outgoing
             request before it reaches the server — add or replace a header, pin a field in the JSON body, or strip
@@ -1026,7 +1036,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.13.0 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.13.1 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

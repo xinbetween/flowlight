@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Modify requests: rules that edit an outgoing request's headers or JSON body before it's forwarded. Sits with the
+/// Modify requests: rules that edit an outgoing request's headers or body (JSON or form) before it's forwarded. Sits with the
 /// rest of inspection setup — a rule can only change a request Flowlight decrypts.
 struct RewriteRulesSection: View {
     @ObservedObject var inspection: InspectionController
@@ -9,7 +9,7 @@ struct RewriteRulesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("Change a request on its way out — add or replace a header, pin a field in the JSON body, or strip one — and let it continue to the server. Like a mock, but it edits the request instead of answering it."))
+            Text(L("Change a request on its way out — add or replace a header, pin a field in the JSON or form body, or strip one — and let it continue to the server. Like a mock, but it edits the request instead of answering it."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Label(L("Only requests Flowlight decrypts can be rewritten, and only buffered ones — bodies up to a few megabytes. Tunnelled, pinned, chunked or streamed uploads pass through untouched."),
                   systemImage: "info.circle")
@@ -155,7 +155,7 @@ struct RewriteRuleEditor: View {
 
             // Body edits
             VStack(alignment: .leading, spacing: 6) {
-                Text(L("JSON body")).font(.caption.bold()).foregroundStyle(.secondary)
+                Text(L("Request body")).font(.caption.bold()).foregroundStyle(.secondary)
                 ForEach($rule.body) { $edit in
                     HStack(spacing: 6) {
                         Picker("", selection: $edit.op) {
@@ -171,7 +171,7 @@ struct RewriteRuleEditor: View {
                     }
                 }
                 Button(L("Add body edit")) { rule.body.append(BodyEdit()) }.controlSize(.small)
-                Text(L("Dotted path into the JSON object (metadata.user). A value that is valid JSON (0.7, true, {\"a\":1}) is used as-is; anything else is a string. Only requests with a JSON body are changed."))
+                Text(L("For a JSON body, a dotted path into the object (metadata.user); a value that is valid JSON (0.7, true, {\"a\":1}) is used as-is, anything else is a string. For a form body (application/x-www-form-urlencoded), the field name, taken whole, set to the text as typed. Only requests with one of those two bodies are changed."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
 
