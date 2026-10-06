@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.7, macOS 15 or later.
 
  On this page
 
@@ -847,7 +847,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1413,8 +1413,15 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.13.6
+ 0.13.7
 October 6, 2026Latest
+
+ Current-Xcode signed packaging. Flowlight now packages the manually Developer-ID-signed
+ app directly from its successful archive. This avoids Xcode 26’s unsupported export path for macOS archives
+ containing a system extension, while retaining the same notarization and Gatekeeper checks.
+
+ 0.13.6
+October 6, 2026
 
  Reliable Developer ID export on current Xcode. Flowlight’s signed release export now uses
  the archive’s manual Developer ID signing configuration directly, replacing an obsolete export option that
