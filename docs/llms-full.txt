@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.6, macOS 15 or later.
 
  On this page
 
@@ -847,7 +847,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1413,8 +1413,16 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.13.5
+ 0.13.6
 October 6, 2026Latest
+
+ Reliable Developer ID export on current Xcode. Flowlight’s signed release export now uses
+ the archive’s manual Developer ID signing configuration directly, replacing an obsolete export option that
+ Xcode 26 rejects. This keeps notarization and Gatekeeper verification available for the response-transform
+ release.
+
+ 0.13.5
+October 6, 2026
 
  Modify a real response before the app receives it. Create a response-transform rule from
  Inspect, then use synchronous JavaScript to change eligible JSON or UTF-8 text responses after their origin

@@ -27,7 +27,8 @@ cat > "$OPTIONS" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>method</key><string>developer-id</string>
+    <!-- Xcode 26 derives the distribution method from the archive's manual Developer ID signature. Supplying the
+         former developer-id method causes exportArchive to reject the options for this macOS/system-extension archive. -->
     <key>teamID</key><string>$TEAM_ID</string>
     <key>signingStyle</key><string>manual</string>
     <key>signingCertificate</key><string>Developer ID Application</string>
