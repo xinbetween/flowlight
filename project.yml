@@ -11,8 +11,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.13.4"
-    CURRENT_PROJECT_VERSION: "25"
+    MARKETING_VERSION: "0.13.5"
+    CURRENT_PROJECT_VERSION: "26"
 targets:
   Flowlight:
     type: application
@@ -37,9 +37,25 @@ targets:
         copy:
           destination: plugins
           subpath: ../Library/SystemExtensions
+      - target: FlowlightResponseScriptHelper
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
+          subpath: ../Library/Helpers
       - sdk: libsqlite3.tbd
       - sdk: NetworkExtension.framework
       - sdk: SystemExtensions.framework
+  FlowlightResponseScriptHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - FlowlightResponseScriptHelper
+    settings:
+      base:
+        PRODUCT_NAME: FlowlightResponseScriptHelper
+    dependencies:
+      - sdk: JavaScriptCore.framework
   FlowlightExtension:
     type: system-extension
     platform: macOS

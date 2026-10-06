@@ -29,14 +29,17 @@ private struct InspectContent: View {
     @State private var showSetup = false
     /// A rule prefilled from a recorded exchange, waiting in the editor.
     @State private var mockDraft: MockRule?
+    /// A response-transform rule is created only after its selected exchange's stored response has been read.
+    @State private var responseTransformDraft: ResponseTransformDraft?
     /// Setup was opened to look at the mock rules, so it opens on them.
     @State private var openMocks = false
+    @State private var openResponseTransforms = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
                 ScrollView {
-                    InspectionSetup(inspection: inspection, openMocks: openMocks, done: { showSetup = false })
+                    InspectionSetup(inspection: inspection, openMocks: openMocks, openResponseTransforms: openResponseTransforms, done: { showSetup = false })
                         .padding(.bottom, 20)
                 }
             } else {
@@ -97,6 +100,9 @@ private struct InspectContent: View {
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
         }
+        .sheet(item: $responseTransformDraft) { draft in
+            ResponseTransformRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.responseTransformRules.append($0) }
+        }
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, search: search, window: window,
                           enabled: inspection.enabled, potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
             // Coalesce bursts of new exchanges.
@@ -108,6 +114,22 @@ private struct InspectContent: View {
     private struct LoadKey: Equatable {
         var version: Int; var localRiskVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
         var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
+    }
+
+    private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
+        !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil && exchange.status != nil && !exchange.responseTruncated
+    }
+
+    private func prepareResponseTransform(from exchange: HTTPExchange) {
+        Task {
+            let body: Data?
+            if let id = exchange.id {
+                body = try? await monitor.read { try $0.exchangeBodies(id: id)?.response }
+            } else {
+                body = nil
+            }
+            responseTransformDraft = ResponseTransformDraft(exchange: exchange, responseBody: body)
+        }
     }
 
     private func load() async {
@@ -236,6 +258,11 @@ private struct InspectContent: View {
                                     .foregroundStyle(.teal).labelStyle(.titleAndIcon)
                                     .help(L("A guardrail changed this request before it left: %@", guardrail))
                             }
+                            if let transform = e.responseTransform {
+                                Label(L("Response modified"), systemImage: "arrow.left.arrow.right").font(.caption2.bold())
+                                    .foregroundStyle(.purple).labelStyle(.titleAndIcon)
+                                    .help(L("%@ answered, then Flowlight changed the response using %@ before the app received it", e.host, transform))
+                            }
                         }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
@@ -268,6 +295,9 @@ private struct InspectContent: View {
         .contextMenu(forSelectionType: HTTPExchange.ID.self) { ids in
             if !DemoData.isEnabled, let id = ids.first, let e = exchanges.first(where: { $0.id == id }), e.note == nil {
                 Button(L("Mock This Endpoint…")) { mockDraft = MockRule(mocking: e) }
+                if canModifyResponse(e) {
+                    Button(L("Modify This Response…")) { prepareResponseTransform(from: e) }
+                }
                 Divider()
                 // Inspect is the one screen that can offer a URL rather than a whole host, because it is the one
                 // place the path was ever visible.
@@ -286,7 +316,8 @@ private struct InspectContent: View {
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
             ExchangeDetail(exchange: selected, assessment: selected.id.flatMap { assessments[$0] }, cause: selected.id.flatMap { links[$0] },
-                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) })
+                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) },
+                           modifyResponse: canModifyResponse(selected) ? { prepareResponseTransform(from: selected) } : nil)
                 .id(selected.id)
         } else {
             ContentUnavailableView(L("Select a request"), systemImage: "doc.text.magnifyingglass")
@@ -298,12 +329,14 @@ private struct InspectContent: View {
 private struct InspectionSetup: View {
     @ObservedObject var inspection: InspectionController
     var openMocks = false
+    var openResponseTransforms = false
     var done: () -> Void
     @State private var newPattern = ""
     @State private var confirmRemove = false
     @State private var showAdvanced = false
     @State private var showMocks = false
     @State private var showRewrites = false
+    @State private var showResponseTransforms = false
     @State private var confirmTurnOn = false
     @Environment(\.openURL) private var openURL
 
@@ -442,6 +475,19 @@ private struct InspectionSetup: View {
                     }
                 }
             }
+
+            DisclosureGroup(isExpanded: $showResponseTransforms) {
+                ResponseTransformRulesSection(inspection: inspection).padding(.top, 10)
+            } label: {
+                HStack(spacing: 8) {
+                    Text(L("Modify responses")).font(.headline)
+                    if inspection.activeResponseTransformRules > 0 {
+                        Label(inspection.activeResponseTransformRules == 1 ? L("1 on") : L("%lld on", inspection.activeResponseTransformRules),
+                              systemImage: "arrow.left.arrow.right")
+                            .font(.caption.bold()).foregroundStyle(FL.tool)
+                    }
+                }
+            }
         }
         .measured(Measure.prose)
         .confirmationDialog(L("macOS will ask you twice"), isPresented: $confirmTurnOn) {
@@ -455,7 +501,11 @@ private struct InspectionSetup: View {
         } message: {
             Text(L("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request."))
         }
-        .onAppear { inspection.refreshStatus(); showMocks = showMocks || openMocks }
+        .onAppear {
+            inspection.refreshStatus()
+            showMocks = showMocks || openMocks
+            showResponseTransforms = showResponseTransforms || openResponseTransforms
+        }
     }
 
     private func ready(_ text: String, ok: Bool) -> some View {
@@ -482,6 +532,8 @@ private struct ExchangeDetail: View {
     var highlight: String = ""
     /// Starts a mock rule from this request, when mocking is available (it isn't in demo mode).
     var mockThis: (() -> Void)?
+    /// Starts a response transform from this real upstream exchange.
+    var modifyResponse: (() -> Void)?
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
     @State private var headersOpen: Bool?
@@ -496,6 +548,10 @@ private struct ExchangeDetail: View {
                     if let mockThis, exchange.note == nil, exchange.mockRule == nil {
                         Button(L("Mock This…"), action: mockThis).buttonStyle(.link).font(.caption)
                             .help(L("Answer this endpoint from Flowlight instead of letting the request through"))
+                    }
+                    if let modifyResponse {
+                        Button(L("Modify This Response…"), action: modifyResponse).buttonStyle(.link).font(.caption)
+                            .help(L("Let the request reach %@, then change its eligible response before this app receives it", exchange.host))
                     }
                 }
             }
@@ -517,6 +573,11 @@ private struct ExchangeDetail: View {
                 Label(L("A guardrail changed this request before it left: %@. Everything below is what %@ was actually sent.",
                         guardrail, exchange.host), systemImage: "shield.lefthalf.filled")
                     .foregroundStyle(.teal).fixedSize(horizontal: false, vertical: true)
+            }
+            if let transform = exchange.responseTransform {
+                Label(L("%@ answered this request. Flowlight then changed the response with “%@” before the app received it.",
+                        exchange.host, transform), systemImage: "arrow.left.arrow.right")
+                    .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
             }
             if let cause {
                 GroupBox(L("Made by a tool call")) {

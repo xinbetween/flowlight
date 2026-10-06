@@ -20,6 +20,8 @@ final class InspectionController: ObservableObject {
         static let mockRules = "inspection.mockRules"
         /// Rules that rewrite an outgoing request's headers or JSON body before it is forwarded (see `RewriteRule`).
         static let rewriteRules = "inspection.rewriteRules"
+        /// Scripts that change eligible upstream responses after the origin answered (see `ResponseTransformRule`).
+        static let responseTransformRules = "inspection.responseTransformRules"
         /// When the running session was switched on, so its end survives a relaunch.
         static let sessionStarted = "inspection.sessionStarted"
         /// Names of the agents the user asked Flowlight to keep routed through the proxy by editing their own
@@ -98,6 +100,7 @@ final class InspectionController: ObservableObject {
         }
         let mockRules = { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
         let rewriteRules = { Self.decodeRewriteRules(UserDefaults.standard.data(forKey: Keys.rewriteRules)) }
+        let responseTransforms = { Self.decodeResponseTransformRules(UserDefaults.standard.data(forKey: Keys.responseTransformRules)) }
         // A rule refusing a request is answered by the same machinery that gives a mock its canned response, and
         // it goes first: a block someone wrote has to outrank a mock they left switched on.
         let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
@@ -161,6 +164,25 @@ final class InspectionController: ObservableObject {
                 return .replace(current, note: notes.joined(separator: " · "))
             }
         }
+        proxy.responseInterventions = { flow in
+            let rules = ResponseTransformRules.matching(responseTransforms(), host: flow.host)
+            guard !rules.isEmpty else { return nil }
+            return ResponseGate.Intervention(
+                transform: { context, responseHead, responseBody in
+                    let applicable = ResponseTransformRules.applicable(rules, host: flow.host, method: context.head.method, path: context.head.target)
+                    guard !applicable.isEmpty else { return nil }
+                    // The runner fails open: an unavailable helper, invalid script, bad output, or timeout leaves the
+                    // upstream bytes untouched instead of making an application fail because its diagnostic rule did.
+                    guard let replacement = ResponseScriptRunner.shared.transform(rules: applicable,
+                                                                                   request: ResponseTransformRequest(head: context.head, host: flow.host, scheme: flow.scheme, port: flow.port),
+                                                                                   responseHead: responseHead, responseBody: responseBody) else { return nil }
+                    return ResponseGate.Replacement(body: replacement.body, note: replacement.note)
+                },
+                shouldTransform: { context in
+                    !ResponseTransformRules.applicable(rules, host: flow.host, method: context.head.method, path: context.head.target).isEmpty
+                }
+            )
+        }
         proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
             guard rule.blocked, let refused = (self?.requestRules() ?? []).first(where: { $0.id == rule.id }) else { return }
             let owner = recorder.owner(clientPort: flow.clientPort, proxyPort: proxy.port)
@@ -179,8 +201,9 @@ final class InspectionController: ObservableObject {
             // A host someone wrote a mock rule for is decrypted whatever the scope says: a rule can only answer a
             // request Flowlight can read, and "my mock didn't fire" is a bad afternoon.
             guard answersFor(host, clientPort).isEmpty else { answer(true); return }
-            // Same for a host with a rewrite rule: it can only edit a request Flowlight can read.
+            // Same for a host with a rewrite or response-transform rule: it can only edit bytes Flowlight can read.
             guard RewriteRules.matching(rewriteRules(), host: host).isEmpty else { answer(true); return }
+            guard ResponseTransformRules.matching(responseTransforms(), host: host).isEmpty else { answer(true); return }
             guard scope == .agents else { answer(true); return }
             decide.async {
                 answer(recorder.owner(clientPort: clientPort, proxyPort: proxy.port).agent != nil)
@@ -190,7 +213,7 @@ final class InspectionController: ObservableObject {
             // Plain-HTTP requests reach the recorder regardless of scope; keep only what the scope allows.
             let (scope, _) = scopeAndList()
             // A mocked exchange is always kept: an answer Flowlight invented has to be visible wherever it lands.
-            guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil else { return }
+            guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil || exchange.responseTransform != nil else { return }
             guard let self else { return }
             Task { @MainActor in
                 // Capture is committed first. The database transaction optionally creates a tiny derived candidate;
@@ -312,6 +335,23 @@ final class InspectionController: ObservableObject {
     nonisolated static func decodeRewriteRules(_ data: Data?) -> [RewriteRule] {
         guard let data else { return [] }
         return (try? JSONDecoder().decode([RewriteRule].self, from: data)) ?? []
+    }
+
+    /// Scripts that change a real server response before the client sees it. Like other inspection rules, these are
+    /// settings rather than captured traffic and survive clearing the inspection database.
+    var responseTransformRules: [ResponseTransformRule] {
+        get { Self.decodeResponseTransformRules(UserDefaults.standard.data(forKey: Keys.responseTransformRules)) }
+        set {
+            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Keys.responseTransformRules)
+            objectWillChange.send()
+        }
+    }
+
+    var activeResponseTransformRules: Int { responseTransformRules.filter(\.enabled).count }
+
+    nonisolated static func decodeResponseTransformRules(_ data: Data?) -> [ResponseTransformRule] {
+        guard let data else { return [] }
+        return (try? JSONDecoder().decode([ResponseTransformRule].self, from: data)) ?? []
     }
 
     var configuredPort: UInt16 { UInt16(clamping: max(1024, UserDefaults.standard.integer(forKey: Keys.port))) }
