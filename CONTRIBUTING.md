@@ -44,40 +44,52 @@ Internals are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Branches and releases
 
-Work happens on a feature branch, lands on the release branch, and reaches `main` when the release is
-published. `main` is what has shipped, not what is being built.
+Every release follows this non-negotiable sequence:
 
-```sh
-git switch -c feature/relaunch-through-proxy main   # start from main
-git rebase main                                     # keep it current — rebase, never merge main in
-
-git switch -c release/0.8.0 main                    # opened when a release starts collecting
-git merge --ff-only feature/relaunch-through-proxy  # features land here
-# last commit on the branch: version bump, release notes, rebuilt docs/
-
-git push -u origin release/0.8.0
-gh pr create --base main --title "Flowlight 0.8.0"  # its checks run while the release builds
-git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0   # signs, notarizes, publishes
-gh pr merge --merge --delete-branch                                # last: main and the site catch up
+```text
+feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main
 ```
 
-**Rebase feature branches, don't merge into them.** A rebase keeps the branch a straight line of your own
-commits, so the release branch takes it with `--ff-only` and the merge request reads as the change rather
-than as a tangle of merges.
+`main` is what has shipped, not what is being built. Start each feature from it and rebase it onto it; never merge
+`main` into a feature branch. The release branch gathers the finished work and carries the version, release notes and
+rebuilt site until the release is public.
 
-**The merge request comes before the tag** so the release's whole diff is reviewed and its checks are green
-before anything is signed. **The merge comes after the release** so the site never announces a download that
-doesn't exist: `docs/` is served from `main` and its Download button points at
-`releases/latest/download/Flowlight.dmg`. The version bump can't simply land later either — CI requires
-`docs/` to match `site/`, and the site build reads `MARKETING_VERSION`, so the version and the rebuilt site
-travel in one commit.
+```sh
+git switch -c feature/relaunch-through-proxy main
+# work, test, then keep current with: git rebase main
 
-CI enforces the ordering rather than trusting anyone to remember: on `main` it fails when the newest version
-on the releases page is ahead of the newest published release. It does not run that check on a release
-branch, since carrying the next version is that branch's job.
+git switch -c release/0.13.4 main
+git merge --ff-only feature/relaunch-through-proxy
+# final release commit: MARKETING_VERSION/CURRENT_PROJECT_VERSION, site/pages/releases.html, rebuilt docs/
 
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) has the rest: the dry run, the signing secrets and
-what the release workflow does.
+git push -u origin release/0.13.4
+gh pr create --base main --title "Flowlight 0.13.4"
+# wait for review and every required PR check to pass
+
+git tag -a v0.13.4 -m "Flowlight 0.13.4"
+git push origin v0.13.4
+# cancel the automatic publish run, then exercise the immutable tag first:
+gh workflow run Release --ref v0.13.4 -f dry_run=true
+# inspect the successful signed/notarized/Gatekeeper dry run, then publish from the same tag:
+gh workflow run Release --ref v0.13.4
+# verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
+gh pr merge --merge --delete-branch
+```
+
+**Tags are immutable.** Never retag, force-push or move a version after it has been pushed. If a tag is wrong or a
+release needs another change, bump the patch version and begin a new release branch and tag.
+
+**The PR precedes the tag, and the merge follows publication.** Review and green checks protect the exact tree that
+will be signed. Publishing before merging keeps the GitHub Pages site from announcing a download that does not exist:
+`docs/` is served from `main`, its Download button resolves to the latest GitHub release, CI requires `docs/` to match
+`site/`, and the site builder reads `MARKETING_VERSION`.
+
+A tag push starts `release.yml`; cancel that automatic publication before it reaches its publish step and dispatch the
+dry run from the immutable tag. A dry run must prove tests, signing, notarization and Gatekeeper verification before a
+production dispatch is allowed. After production succeeds, verify the release page and downloaded DMG, PKG and
+`SHA256SUMS.txt` checksums, then merge the release PR into `main`.
+
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) documents the signing inputs and workflow internals.
 
 ## License
 
