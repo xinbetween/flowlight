@@ -463,7 +463,31 @@ Later, no version yet:
 ## Contributing
 
 Issues and PRs are welcome. Adding an agent, an LLM provider or a protocol is a one-line change plus a test. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) for local setup and contribution guidance.
+
+### Release workflow
+
+Releases are deliberately not ordinary merges. `main` represents published software, while a release branch carries the
+new version and generated site until a downloadable, verified build exists. Every release follows this order:
+
+```text
+feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main
+```
+
+1. Branch a feature from `main`, test it, and rebase it onto current `main` rather than merging `main` into it.
+2. Fast-forward finished features into `release/<version>` and make one final release commit containing the version bump,
+   release entry in `site/pages/releases.html`, and regenerated `docs/` website output.
+3. Push the release branch and open a PR to `main`. Do not tag until it has been reviewed and every required check is
+   green.
+4. Create and push an annotated `v<version>` tag on that exact release commit. Tags are immutable: never retag, move or
+   force-push one. If it is wrong, issue the next patch release instead.
+5. Run the signed/notarized/Gatekeeper **dry run from that tag** before production publication. Then publish from the
+   same tag.
+6. Verify the GitHub release and its DMG, PKG and `SHA256SUMS.txt` assets/checksums. Only then merge the release PR into
+   `main`, allowing GitHub Pages to advertise the downloadable release.
+
+The full commands, signing prerequisites and CI behavior live in [CONTRIBUTING.md](CONTRIBUTING.md#branches-and-releases)
+and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches).
 
 ```
 Shared/              models, XPC contract, protocol classifier + catalog, SNI/HTTP/DNS parsers

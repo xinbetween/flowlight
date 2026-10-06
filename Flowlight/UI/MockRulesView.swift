@@ -97,10 +97,13 @@ struct MockRulesSection: View {
 
 /// One rule, edited in a sheet. Everything a canned answer needs and nothing else.
 struct MockRuleEditor: View {
+    private enum Tab: Hashable { case request, response }
+
     @State var rule: MockRule
     var isNew: Bool
     var save: (MockRule) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var tab: Tab = .request
     @State private var headerText = ""
     @State private var statusText = ""
     @State private var delayText = ""
@@ -114,63 +117,19 @@ struct MockRuleEditor: View {
                     Text(L("Name")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                     TextField(L("Optional, e.g. “GitHub is down”"), text: $rule.name)
                 }
-                GridRow {
-                    Text(L("Host")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        TextField(L("api.example.com"), text: $rule.host)
-                        Text(L("Exactly that host. Write *.example.com to cover the domain and its subdomains."))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                GridRow {
-                    Text(L("Path")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        TextField(L("/v1/*"), text: $rule.path)
-                        Text(L("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?."))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                GridRow {
-                    Text(L("Method")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    Picker("", selection: Binding(get: { rule.method.isEmpty ? "ANY" : rule.method.uppercased() },
-                                                  set: { rule.method = $0 == "ANY" ? "" : $0 })) {
-                        ForEach(MockRule.methods, id: \.self) { Text($0).tag($0) }
-                    }
-                    .labelsHidden().frame(width: 130)
-                }
-                Divider().gridCellUnsizedAxes(.horizontal)
-                GridRow {
-                    Text(L("Status")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        TextField("500", text: $statusText).frame(width: 70)
-                            .onChange(of: statusText) { _, new in
-                                if let code = Int(new.filter(\.isNumber)), (100...599).contains(code) { rule.status = code }
-                            }
-                        Text(MockRule.reason(rule.status)).font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Text(L("Delay")).foregroundStyle(.secondary)
-                        TextField("0", text: $delayText).frame(width: 60)
-                            .onChange(of: delayText) { _, new in rule.delay = min(300, max(0, Double(new) ?? 0)) }
-                        Text(L("seconds")).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                GridRow(alignment: .top) {
-                    Text(L("Headers")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        TextEditor(text: $headerText)
-                            .font(.caption.monospaced()).frame(height: 54)
-                            .border(.quaternary)
-                            .onChange(of: headerText) { _, new in rule.headers = MockRule.parseHeaders(new) }
-                        Text(L("One Name: value per line. Content-Length and Connection are written by Flowlight."))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                GridRow(alignment: .top) {
-                    Text(L("Body")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                    TextEditor(text: $rule.body)
-                        .font(.caption.monospaced()).frame(height: 120)
-                        .border(.quaternary)
-                }
+            }
+
+            Picker("", selection: $tab) {
+                Text(L("Request")).tag(Tab.request)
+                Text(L("Response")).tag(Tab.response)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if tab == .request {
+                requestFields
+            } else {
+                responseFields
             }
 
             if rule.delay > 0 {
@@ -193,6 +152,72 @@ struct MockRuleEditor: View {
             headerText = MockRule.headerText(rule.headers)
             statusText = String(rule.status)
             delayText = rule.delay == 0 ? "" : String(rule.delay)
+        }
+    }
+
+    private var requestFields: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+            GridRow {
+                Text(L("Host")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField(L("api.example.com"), text: $rule.host)
+                    Text(L("Exactly that host. Write *.example.com to cover the domain and its subdomains."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            GridRow {
+                Text(L("Path")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField(L("/v1/*"), text: $rule.path)
+                    Text(L("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            GridRow {
+                Text(L("Method")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                Picker("", selection: Binding(get: { rule.method.isEmpty ? "ANY" : rule.method.uppercased() },
+                                              set: { rule.method = $0 == "ANY" ? "" : $0 })) {
+                    ForEach(MockRule.methods, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden().frame(width: 130)
+            }
+        }
+    }
+
+    private var responseFields: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+            GridRow {
+                Text(L("Status")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    TextField("500", text: $statusText).frame(width: 70)
+                        .onChange(of: statusText) { _, new in
+                            if let code = Int(new.filter(\.isNumber)), (100...599).contains(code) { rule.status = code }
+                        }
+                    Text(MockRule.reason(rule.status)).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(L("Delay")).foregroundStyle(.secondary)
+                    TextField("0", text: $delayText).frame(width: 60)
+                        .onChange(of: delayText) { _, new in rule.delay = min(300, max(0, Double(new) ?? 0)) }
+                    Text(L("seconds")).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            GridRow(alignment: .top) {
+                Text(L("Headers")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextEditor(text: $headerText)
+                        .font(.caption.monospaced()).frame(height: 54)
+                        .border(.quaternary)
+                        .onChange(of: headerText) { _, new in rule.headers = MockRule.parseHeaders(new) }
+                    Text(L("One Name: value per line. Content-Length and Connection are written by Flowlight."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            GridRow(alignment: .top) {
+                Text(L("Body")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextEditor(text: $rule.body)
+                    .font(.caption.monospaced()).frame(height: 120)
+                    .border(.quaternary)
+            }
         }
     }
 

@@ -322,33 +322,40 @@ cannot be downloaded until signing and notarization finish. `docs/` also has to 
 commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump and the rebuilt site
 cannot be separated. Keeping both off `main` until the release exists is what the branch is for.
 
-Every release goes **branch → merge request → release → merge**:
+Every release follows the mandatory sequence **feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main**:
 
 ```sh
-git switch -c feature/relaunch-through-proxy main   # start from main
-git rebase main                                     # keep it current — rebase, never merge main in
+git switch -c feature/relaunch-through-proxy main
+# work, test, then keep current with: git rebase main
 
-git switch -c release/0.8.0 main
-git merge --ff-only feature/relaunch-through-proxy  # features land on the release branch
-# last commit: version bump, release notes in site/pages/releases.html, rebuilt docs/
+git switch -c release/0.13.4 main
+git merge --ff-only feature/relaunch-through-proxy
+# final release commit: MARKETING_VERSION/CURRENT_PROJECT_VERSION, site/pages/releases.html, rebuilt docs/
 
-git push -u origin release/0.8.0
-gh pr create --base main --title "Flowlight 0.8.0"  # checks run while the release builds
-git tag -a v0.8.0 -m "Flowlight 0.8.0" && git push origin v0.8.0
-gh pr merge --merge --delete-branch                 # last: main and the site catch up
-```
+git push -u origin release/0.13.4
+gh pr create --base main --title "Flowlight 0.13.4"
+# wait for review and every required PR check to pass
 
-The merge request comes before the tag so the release's whole diff is reviewed and green before anything is
-signed; the merge comes after the release so the site can only ever describe something downloadable.
-
-A tag push starts `release.yml` on its own. To dry-run first — build, sign, notarize and verify without
-publishing — cancel that run and dispatch it explicitly, then dispatch again without the flag:
-
-```sh
+git tag -a v0.13.4 -m "Flowlight 0.13.4"
+git push origin v0.13.4
+# cancel the automatic publish run, then exercise the immutable tag first:
 gh run cancel <id>
-gh workflow run Release --ref v0.8.0 -f dry_run=true
-gh workflow run Release --ref v0.8.0
+gh workflow run Release --ref v0.13.4 -f dry_run=true
+# inspect the successful signed/notarized/Gatekeeper dry run, then publish from the same tag:
+gh workflow run Release --ref v0.13.4
+# verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
+gh pr merge --merge --delete-branch
 ```
+
+The PR comes before the tag so the release's whole diff is reviewed and green before anything is signed; the merge
+comes after publication so the site can only ever describe something downloadable. **Tags are immutable:** never retag,
+force-push or move a pushed version. If a tag is wrong or a release needs another change, bump the patch version and
+begin a new release branch and tag.
+
+A tag push starts `release.yml` automatically. Cancel that run before it publishes, then dispatch the signed dry run
+from the immutable tag. The dry run must build, sign, notarize and pass Gatekeeper verification before production
+publication is allowed. After production succeeds, verify the GitHub release page and downloaded DMG, PKG and
+`SHA256SUMS.txt` checksums before merging the release PR.
 
 ## Releasing from CI
 
