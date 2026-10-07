@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.8, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1419,8 +1419,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.8
+October 7, 2026Latest
+
+ Faithful static mocks from inspected traffic. Mock This Endpoint now prepopulates
+ retained, redacted request and response headers as editable key/value rows. Response text and JSON are
+ ready to edit; binary payloads are shown as validated hexadecimal and replayed byte-for-byte. Captured
+ request details remain reference-only, so matching still depends only on host, path and method and a
+ matching mock never reaches the origin.
+
+ Cleaner upgrade prompts. After a clean quit and relaunch, Flowlight checks for a
+ newer non-skipped version and opens its existing Software Update window when one is available. Automatic
+ updates remain optional, background failures stay quiet, and every download is still verified before use.
+
+ More discoverable, lighter site. The website now publishes fuller social and structured
+ metadata, validates canonical and alternate-language pages more rigorously, and keeps its home-page
+ connection log static instead of running a continuous animation.
+
  0.13.7
-October 6, 2026Latest
+October 6, 2026
 
  Current-Xcode signed packaging. Flowlight now packages the manually Developer-ID-signed
  app directly from its successful archive. This avoids Xcode 26’s unsupported export path for macOS archives

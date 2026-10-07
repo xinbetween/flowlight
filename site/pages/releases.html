@@ -13,7 +13,24 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.13.7</h2><time datetime="2026-10-06">October 6, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.13.8</h2><time datetime="2026-10-07">October 7, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Faithful static mocks from inspected traffic.</strong> Mock This Endpoint now prepopulates
+            retained, redacted request and response headers as editable key/value rows. Response text and JSON are
+            ready to edit; binary payloads are shown as validated hexadecimal and replayed byte-for-byte. Captured
+            request details remain reference-only, so matching still depends only on host, path and method and a
+            matching mock never reaches the origin.</li>
+          <li><strong>Cleaner upgrade prompts.</strong> After a clean quit and relaunch, Flowlight checks for a
+            newer non-skipped version and opens its existing Software Update window when one is available. Automatic
+            updates remain optional, background failures stay quiet, and every download is still verified before use.</li>
+          <li><strong>More discoverable, lighter site.</strong> The website now publishes fuller social and structured
+            metadata, validates canonical and alternate-language pages more rigorously, and keeps its home-page
+            connection log static instead of running a continuous animation.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.13.7</h2><time datetime="2026-10-06">October 6, 2026</time></header>
         <ul>
           <li><strong>Current-Xcode signed packaging.</strong> Flowlight now packages the manually Developer-ID-signed
             app directly from its successful archive. This avoids Xcode 26’s unsupported export path for macOS archives
