@@ -75,6 +75,7 @@ final class MockRuleMatchingTests: XCTestCase {
             requestTruncated: false, responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
             contentType: "", pid: 1, bundleID: "b", appName: "a", agent: nil, agentName: nil, mcpServer: nil, toolCalls: [])
         let prefilled = MockRule(mocking: exchange)
+        XCTAssertEqual(prefilled.name, "Mock POST api.example.com/v1/items")
         XCTAssertEqual(prefilled.host, "api.example.com")
         XCTAssertEqual(prefilled.path, "/v1/items")   // the query is dropped: it rarely identifies the endpoint
         XCTAssertEqual(prefilled.method, "POST")

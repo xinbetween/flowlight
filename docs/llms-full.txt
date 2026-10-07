@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.7, macOS 15 or later.
 
  On this page
 
@@ -847,7 +847,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1413,8 +1413,39 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.7
+October 6, 2026Latest
+
+ Current-Xcode signed packaging. Flowlight now packages the manually Developer-ID-signed
+ app directly from its successful archive. This avoids Xcode 26’s unsupported export path for macOS archives
+ containing a system extension, while retaining the same notarization and Gatekeeper checks.
+
+ 0.13.6
+October 6, 2026
+
+ Reliable Developer ID export on current Xcode. Flowlight’s signed release export now uses
+ the archive’s manual Developer ID signing configuration directly, replacing an obsolete export option that
+ Xcode 26 rejects. This keeps notarization and Gatekeeper verification available for the response-transform
+ release.
+
+ 0.13.5
+October 6, 2026
+
+ Modify a real response before the app receives it. Create a response-transform rule from
+ Inspect, then use synchronous JavaScript to change eligible JSON or UTF-8 text responses after their origin
+ server answers. The request still reaches the origin; Flowlight clearly records when a rule changed the
+ client-visible response.
+
+ Safe, scoped scripting. Scripts receive the current method, URL, public request headers and
+ response value only. Credential headers and secret query values are withheld. Streaming, chunked, compressed,
+ oversized and unsupported responses pass through byte-for-byte, and any script error or timeout fails open.
+
+ Start from the exact endpoint. Both response transforms and static mocks now prefill a useful
+ rule name, host, path and method from the selected request. Response transforms also choose a JSON or text
+ starter function and show redacted captured context without retaining its bodies in settings.
+
  0.13.4
-October 5, 2026Latest
+October 5, 2026
 
  Mock requests and responses separately. The Mock This Endpoint editor now has Request
  and Response tabs: match by host, path and method in one place, then configure the local status, delay,

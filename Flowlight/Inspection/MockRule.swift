@@ -39,8 +39,10 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
 
     /// A rule prefilled from a recorded exchange, so "mock this" starts from the request that was actually made.
     init(mocking exchange: HTTPExchange) {
+        let endpoint = exchange.path.split(separator: "?").first.map(String.init) ?? "/"
+        name = "Mock \(exchange.method.uppercased()) \(exchange.host)\(endpoint)"
         host = exchange.host
-        path = exchange.path.split(separator: "?").first.map(String.init) ?? "/"
+        path = endpoint
         method = exchange.method
         status = 500
         body = #"{"error": "mocked by Flowlight"}"#

@@ -32,6 +32,9 @@ protocol ProxyObserver: AnyObject {
     /// The request whose bytes come next left with something taken out of it — a guardrail removing tools an
     /// agent is not allowed to use. What is recorded is what the server was sent, which is what happened.
     func flow(_ flow: ProxyFlow, guardedBy note: String)
+    /// The upstream response bytes that come next were changed before the client received them. This is deliberately
+    /// distinct from a mock (which never contacted the origin) and a guardrail (which changed the request).
+    func flow(_ flow: ProxyFlow, responseTransformedBy note: String)
 }
 
 /// A local HTTP proxy on 127.0.0.1 that can decrypt HTTPS for inspection.
@@ -65,6 +68,9 @@ final class InspectionProxy: @unchecked Sendable {
     /// Asked once per connection: is there anything that would want to read, change or answer whole requests on
     /// it? Nil means every request on this connection streams untouched, which is what almost all of them do.
     var interventions: (_ host: String, _ clientPort: UInt16) -> ((ProxyRequestHead, Data) -> MockGate.Intervention?)? = { _, _ in nil }
+    /// Response transforms are separate from request interventions: their gate observes only bytes actually sent
+    /// upstream and can replace a bounded upstream response before it reaches both the client and recorder.
+    var responseInterventions: (_ flow: ProxyFlow) -> ResponseGate.Intervention? = { _ in nil }
     /// Served at http://127.0.0.1:<port>/proxy.pac.
     var pacScript: () -> String = { "function FindProxyForURL(url, host) { return \"DIRECT\"; }" }
     var onStateChange: (String?) -> Void = { _ in }
@@ -321,10 +327,30 @@ final class InspectionProxy: @unchecked Sendable {
         let intervene = interventions(flow.host, flow.clientPort)
         let gate = mocks.isEmpty && intervene == nil ? nil : MockGate(host: flow.host, rules: mocks)
         gate?.intervene = intervene
+        let responseTransform = responseInterventions(flow)
+        let responseGate = responseTransform.map { ResponseGate(transform: $0.transform, shouldTransform: $0.shouldTransform) }
         let fromClient: (Data) -> Data = { [weak self] data in
             guard let self else { return data }
-            guard let gate else { self.observer?.flow(flow, clientSent: data); return data }
-            return self.apply(gate.clientSent(data), flow: flow, client: client)
+            guard let gate else {
+                self.observer?.flow(flow, clientSent: data)
+                responseGate?.clientSent(data)
+                return data
+            }
+            let onward = self.apply(gate.clientSent(data), flow: flow, client: client)
+            responseGate?.clientSent(onward)
+            return onward
+        }
+        let fromServer: (Data) -> Data = { [weak self] data in
+            guard let self else { return data }
+            guard let responseGate else { self.observer?.flow(flow, serverSent: data); return data }
+            let actions = responseGate.serverSent(data)
+            var onward = Data()
+            for (bytes, note) in actions {
+                if let note { self.observer?.flow(flow, responseTransformedBy: note) }
+                self.observer?.flow(flow, serverSent: bytes)
+                onward.append(bytes)
+            }
+            return onward
         }
         var ended = false
         let finish: (String?) -> Void = { [weak self] note in
@@ -343,7 +369,7 @@ final class InspectionProxy: @unchecked Sendable {
                     if !onward.isEmpty { upstream.send(content: onward, completion: .idempotent) }
                 }
                 self.pump(client, into: upstream, tap: fromClient) { finish(nil) }
-                self.pump(upstream, into: client, tap: { self.observer?.flow(flow, serverSent: $0); return $0 }) { finish(nil) }
+                self.pump(upstream, into: client, tap: fromServer) { finish(nil) }
             case .failed(let error):
                 finish("Couldn't reach \(flow.host): \(error.localizedDescription)")
             case .waiting(let error):
