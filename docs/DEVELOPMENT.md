@@ -181,6 +181,10 @@ agent can be shown an API that fails, stalls or replies with something odd. Rule
   server had sent it, so pairing, parsing and storage are unchanged. Flowlight writes `Content-Length`,
   `Connection: close` and `X-Flowlight-Mock` itself — a mock whose framing disagreed with its body would hang the
   client rather than test it — and strips CR/LF from rule-supplied headers so a rule can't forge a second response.
+- **Draft versus rule data.** **Mock This…** reads only retained body blobs and already-redacted stored headers into a
+  temporary editor draft. Request headers and payload are reference-only and never become match criteria or durable
+  preferences. The saved response is deliberate rule data: text is encoded as UTF-8, binary bytes as validated hex,
+  and the rule remains in `inspection.mockRules` until removed even after captured traffic is cleared.
 - **A mocked exchange says so**: the rule's name goes in `HTTPExchange.mockRule` (column `mock_rule`, an in-place
   `ALTER`), not in `note`, which means "nothing was inspected". Inspect badges the row and leads the detail pane
   with the fact that the request was never sent, and the active rule count sits in the status bar — a mock left on

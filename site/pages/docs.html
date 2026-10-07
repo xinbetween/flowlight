@@ -329,6 +329,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li><strong>Method</strong> matches one verb, or any.</li>
         <li>Rules are ordered and the first enabled match answers. Each switches on and off on its own.</li>
       </ul>
+      <p><strong>Mock This…</strong> starts from the headers and bodies that Flowlight has already retained. Captured request details are
+        reference only: they do not add matching conditions and are not saved with the rule. Text and JSON can be edited directly;
+        binary bodies are shown as hexadecimal bytes. Saving keeps the response as a mock rule until you remove it, even if you later
+        clear captured traffic.</p>
       <p>A mocked exchange is recorded like any other and marked <strong>Mocked</strong> in the list, with the detail pane saying it was
         answered by Flowlight rather than by the host, and naming the rule. You can always tell later what was real.</p>
       <p>Two things worth knowing. Only traffic Flowlight decrypts can be mocked, so the endpoint has to be going through HTTPS
@@ -570,9 +574,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <strong>Capture › Clear all data</strong> deletes it.</p>
 
       <h2 id="updates">Updates</h2>
-      <p>When a new version appears, Flowlight tells you with a notification and a badge in the sidebar rather than interrupting what you're
-        doing; clicking either opens the update window. A check you start yourself opens it straight away.</p>
-      <p>Flowlight checks GitHub for a new release on launch and once a day, and <strong>Check for Updates…</strong> is in the app
+      <p>After you quit Flowlight cleanly and launch it again, a newly found version opens the update window. At other times,
+        Flowlight uses a notification and sidebar badge rather than interrupting what you're doing; clicking either opens the same
+        window. A check you start yourself opens it straight away.</p>
+      <p>Flowlight checks GitHub after a clean relaunch and once a day, and <strong>Check for Updates…</strong> is in the app
         and menu bar menus. <strong>Download</strong> fetches the disk image to Downloads and checks it against the release's published SHA-256. Nothing is installed
         until you choose: <strong>Quit &amp; Install</strong> closes Flowlight, replaces it with the new version and reopens it, keeping your history and
         settings. <strong>Install Later</strong> keeps you working. If Flowlight was installed with the <code>.pkg</code>, macOS asks for an administrator

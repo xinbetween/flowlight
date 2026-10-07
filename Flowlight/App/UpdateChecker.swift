@@ -70,6 +70,27 @@ enum VersionCompare {
     }
 }
 
+/// The one-shot clean-exit marker that decides whether the next automatic launch check should promote a discovered
+/// update. Kept separate from networking so the lifecycle decision is testable without contacting GitHub.
+enum UpdateLaunchPolicy {
+    static let cleanRelaunchKey = "updates.pendingCleanRelaunchCheck"
+
+    static func markCleanExit(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: cleanRelaunchKey)
+    }
+
+    /// Reads and clears the marker before any network work, so one clean exit produces at most one promoted check.
+    static func consumeCleanRelaunch(defaults: UserDefaults = .standard) -> Bool {
+        let pending = defaults.bool(forKey: cleanRelaunchKey)
+        defaults.removeObject(forKey: cleanRelaunchKey)
+        return pending
+    }
+
+    static func shouldCheckAtLaunch(cleanRelaunch: Bool, lastCheck: Date?, now: Date = Date()) -> Bool {
+        cleanRelaunch || lastCheck.map { now.timeIntervalSince($0) >= 12 * 3600 } ?? true
+    }
+}
+
 /// Checks GitHub Releases for a newer Flowlight and fetches the disk image on request.
 /// It makes one anonymous HTTPS request per check (no cookies, no identifiers beyond what any
 /// request carries: IP address and a `Flowlight/<version>` user agent), and it can be turned off.
@@ -99,6 +120,8 @@ final class UpdateChecker: ObservableObject {
     let repository: String
     private var timer: Timer?
     private var downloadTask: Task<Void, Never>?
+    /// Fixture seam for release metadata only; downloads always use the private ephemeral session below.
+    private let releaseTransport: (@Sendable (URL) async throws -> (Data, URLResponse))?
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -108,9 +131,11 @@ final class UpdateChecker: ObservableObject {
         return URLSession(configuration: config)
     }()
 
-    init(bundle: Bundle = .main) {
+    init(bundle: Bundle = .main,
+         releaseTransport: (@Sendable (URL) async throws -> (Data, URLResponse))? = nil) {
         currentVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         repository = bundle.object(forInfoDictionaryKey: "FLUpdateRepository") as? String ?? "xinbetween/flowlight"
+        self.releaseTransport = releaseTransport
         UserDefaults.standard.register(defaults: [Keys.automatic: true])
     }
 
@@ -133,12 +158,16 @@ final class UpdateChecker: ObservableObject {
 
     func start() {
         guard !DemoData.isEnabled else { return }
+        // Consume before checking the preference: a clean exit belongs to this launch, not a later launch after
+        // automatic updates happen to be turned back on.
+        let cleanRelaunch = UpdateLaunchPolicy.consumeCleanRelaunch()
         schedule()
         guard automatic else { return }
-        // Shortly after launch, unless we checked within the last 12 hours.
-        if let lastCheck, Date().timeIntervalSince(lastCheck) < 12 * 3600 { return }
+        // A clean quit followed by relaunch gets one fresh, promoted check. Ordinary launches stay quiet when a
+        // recent successful check exists; both wait for the primary UI and capture setup to settle first.
+        guard UpdateLaunchPolicy.shouldCheckAtLaunch(cleanRelaunch: cleanRelaunch, lastCheck: lastCheck) else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
-            Task { await self?.check(userInitiated: false) }
+            Task { await self?.check(userInitiated: false, promoteIfAvailable: cleanRelaunch) }
         }
     }
 
@@ -150,7 +179,7 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
-    func check(userInitiated: Bool) async {
+    func check(userInitiated: Bool, promoteIfAvailable: Bool = false) async {
         switch state {
         case .downloading, .ready, .installing:
             if userInitiated { showWindow = true }
@@ -160,7 +189,12 @@ final class UpdateChecker: ObservableObject {
         state = .checking
         do {
             let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
-            let (data, response) = try await session.data(from: url)
+            let (data, response): (Data, URLResponse)
+            if let releaseTransport {
+                (data, response) = try await releaseTransport(url)
+            } else {
+                (data, response) = try await session.data(from: url)
+            }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard code == 200 else { throw code == 404 ? UpdateError.noRelease : UpdateError.badResponse(code) }
             let release = try AppRelease.parse(data)
@@ -174,7 +208,9 @@ final class UpdateChecker: ObservableObject {
                     // A background check doesn't interrupt what you're doing: it notifies, and the sidebar shows a
                     // badge. The notification is posted once per version.
                     let defaults = UserDefaults.standard
-                    if defaults.string(forKey: Keys.notified) != pending.version {
+                    if promoteIfAvailable {
+                        showWindow = true
+                    } else if defaults.string(forKey: Keys.notified) != pending.version {
                         defaults.set(pending.version, forKey: Keys.notified)
                         Notifier.postUpdate(version: pending.version, summary: ReleaseNotes.headline(pending.notes))
                     }

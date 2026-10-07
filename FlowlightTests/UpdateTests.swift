@@ -1,7 +1,58 @@
+import Foundation
 import XCTest
 @testable import Flowlight
 
 final class UpdateTests: XCTestCase {
+    private var skippedVersion: Any?
+    private var notifiedVersion: Any?
+    private var lastCheck: Any?
+
+    override func setUp() {
+        super.setUp()
+        let defaults = UserDefaults.standard
+        skippedVersion = defaults.object(forKey: UpdateChecker.Keys.skipped)
+        notifiedVersion = defaults.object(forKey: UpdateChecker.Keys.notified)
+        lastCheck = defaults.object(forKey: UpdateChecker.Keys.lastCheck)
+        defaults.removeObject(forKey: UpdateChecker.Keys.skipped)
+        defaults.removeObject(forKey: UpdateChecker.Keys.notified)
+        defaults.removeObject(forKey: UpdateChecker.Keys.lastCheck)
+    }
+
+    override func tearDown() {
+        let defaults = UserDefaults.standard
+        restore(skippedVersion, forKey: UpdateChecker.Keys.skipped, defaults: defaults)
+        restore(notifiedVersion, forKey: UpdateChecker.Keys.notified, defaults: defaults)
+        restore(lastCheck, forKey: UpdateChecker.Keys.lastCheck, defaults: defaults)
+        super.tearDown()
+    }
+
+    private func restore(_ value: Any?, forKey key: String, defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+        if let value { defaults.set(value, forKey: key) }
+    }
+
+    @MainActor
+    private func fixtureChecker(version: String) -> (checker: UpdateChecker, version: String) {
+        let json = """
+        {"tag_name":"v\(version)","name":"Flowlight \(version)","body":"Fixture release","html_url":"https://example.invalid/releases/v\(version)","draft":false,"prerelease":false,"assets":[]}
+        """
+        let data = Data(json.utf8)
+        let response = HTTPURLResponse(url: URL(string: "https://api.github.com/repos/xinbetween/flowlight/releases/latest")!,
+                                       statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (UpdateChecker(releaseTransport: { _ in (data, response) }), version)
+    }
+
+    @MainActor
+    private func currentVersion() -> String {
+        UpdateChecker().currentVersion
+    }
+
+    @MainActor
+    private func nextMajorVersion() -> String {
+        let major = Int(currentVersion().split(separator: ".").first ?? "0") ?? 0
+        return "\(major + 1).0.0"
+    }
+
     func testVersionComparison() {
         XCTAssertTrue(VersionCompare.isNewer("0.1.2", than: "0.1.1"))
         XCTAssertTrue(VersionCompare.isNewer("0.10.0", than: "0.9.9"), "numeric, not lexical")
@@ -20,6 +71,72 @@ final class UpdateTests: XCTestCase {
         XCTAssertEqual(VersionCompare.checksum(for: "Flowlight.dmg", in: sums), "aa08b1c5a971ab55fa37142cc6b09df5086a770efa4988225f9731e59a1179ed")
         XCTAssertNil(VersionCompare.checksum(for: "Other.dmg", in: sums))
         XCTAssertEqual(VersionCompare.checksum(for: "Flowlight.dmg", in: "ABCD *Flowlight.dmg"), "abcd", "binary-mode marker")
+    }
+
+    func testCleanRelaunchPolicyConsumesItsOneShotMarker() {
+        let suite = "update-policy-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertFalse(UpdateLaunchPolicy.consumeCleanRelaunch(defaults: defaults))
+        UpdateLaunchPolicy.markCleanExit(defaults: defaults)
+        XCTAssertTrue(UpdateLaunchPolicy.consumeCleanRelaunch(defaults: defaults))
+        XCTAssertFalse(UpdateLaunchPolicy.consumeCleanRelaunch(defaults: defaults), "a clean exit promotes only one next launch")
+    }
+
+    func testCleanRelaunchBypassesTheNormalLaunchThrottle() {
+        let now = Date()
+        XCTAssertFalse(UpdateLaunchPolicy.shouldCheckAtLaunch(cleanRelaunch: false, lastCheck: now, now: now))
+        XCTAssertTrue(UpdateLaunchPolicy.shouldCheckAtLaunch(cleanRelaunch: true, lastCheck: now, now: now))
+        XCTAssertTrue(UpdateLaunchPolicy.shouldCheckAtLaunch(cleanRelaunch: false, lastCheck: now.addingTimeInterval(-12 * 3600), now: now))
+    }
+
+    @MainActor
+    func testCleanRelaunchPromotionOpensWindowForNewerRelease() async {
+        let release = await fixtureChecker(version: nextMajorVersion())
+
+        await release.checker.check(userInitiated: false, promoteIfAvailable: true)
+
+        guard case .available(let available) = release.checker.state else {
+            return XCTFail("newer release should be available")
+        }
+        XCTAssertEqual(available.version, release.version)
+        XCTAssertTrue(release.checker.showWindow)
+    }
+
+    @MainActor
+    func testCleanRelaunchPromotionSkipsSkippedRelease() async {
+        let release = await fixtureChecker(version: nextMajorVersion())
+        UserDefaults.standard.set(release.version, forKey: UpdateChecker.Keys.skipped)
+
+        await release.checker.check(userInitiated: false, promoteIfAvailable: true)
+
+        guard case .available = release.checker.state else {
+            return XCTFail("skipped newer release should still be available")
+        }
+        XCTAssertNil(release.checker.pendingUpdate)
+        XCTAssertFalse(release.checker.showWindow)
+    }
+
+    @MainActor
+    func testCleanRelaunchPromotionDoesNotOpenForCurrentRelease() async {
+        let checker = await fixtureChecker(version: currentVersion())
+
+        await checker.checker.check(userInitiated: false, promoteIfAvailable: true)
+
+        XCTAssertEqual(checker.checker.state, .upToDate)
+        XCTAssertFalse(checker.checker.showWindow)
+    }
+
+    @MainActor
+    func testCleanRelaunchPromotionDoesNotOpenWhenReleaseLookupFails() async {
+        let checker = UpdateChecker { _ in throw URLError(.notConnectedToInternet) }
+
+        await checker.check(userInitiated: false, promoteIfAvailable: true)
+
+        guard case .failed = checker.state else {
+            return XCTFail("a failed release lookup should report failure")
+        }
+        XCTAssertFalse(checker.showWindow)
     }
 
     func testReleaseNotesAreReadable() {

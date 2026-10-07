@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // with its own database, and it must never strip the enforcement the real running app owns.
         guard !FlowlightApp.runningTests, !DemoData.isEnabled else { return }
         SettingsEnforcer.shared.relaxAll()
+        UpdateLaunchPolicy.markCleanExit()
     }
 }
 

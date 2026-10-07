@@ -196,7 +196,12 @@ def structured_data(meta, body, lang="en", docs_url=f"{DOMAIN}/docs/#install"):
     publisher = {"@type": "Organization", "@id": f"{DOMAIN}/#publisher", "name": "xinbetween",
                  "url": f"{DOMAIN}/", "logo": f"{DOMAIN}/assets/icon.png",
                  "sameAs": [f"https://github.com/{REPO}"]}
-    graph = [site, publisher]
+    page = {"@type": "WebPage", "@id": f"{DOMAIN}{path}#webpage", "url": f"{DOMAIN}{path}",
+            "name": title, "description": desc, "inLanguage": lang, "isPartOf": {"@id": site["@id"]}}
+    if meta.get("source"):
+        page["dateModified"] = last_changed(meta["source"])
+
+    graph = [site, publisher, page]
 
     if path == localized("/", lang):
         graph.append({
@@ -241,12 +246,13 @@ def plain(markup):
     return html.unescape(re.sub(r"\s+", " ", text)).strip()
 
 def document(meta, body, root, css_href, inline_css=None, index=True, lang="en", locale="en", alt="",
-             docs_url=f"{DOMAIN}/docs/#install"):
+             alternate_locales=(), docs_url=f"{DOMAIN}/docs/#install"):
     title, desc, path = meta["title"], meta["description"], meta["path"]
     style = f"<style>{inline_css}</style>" if inline_css else f'<link rel="stylesheet" href="{css_href}">'
     # A page that isn't a destination shouldn't be one in search results either.
     robots = "" if index else '<meta name="robots" content="noindex, follow">\n'
     canonical = f'<link rel="canonical" href="{DOMAIN}{path}">\n' if index else ""
+    locale_alternates = "".join(f'<meta property="og:locale:alternate" content="{value}">\n' for value in alternate_locales)
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
@@ -257,14 +263,19 @@ def document(meta, body, root, css_href, inline_css=None, index=True, lang="en",
 {robots}{canonical}{alt}<meta property="og:type" content="website">
 <meta property="og:site_name" content="Flowlight">
 <meta property="og:locale" content="{locale}">
-<meta property="og:title" content="{html.escape(title)}">
+{locale_alternates}<meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="{DOMAIN}{path}">
 <meta property="og:image" content="{DOMAIN}/assets/social-card.png">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{html.escape(title)}">
+<meta name="twitter:description" content="{html.escape(desc)}">
+<meta name="twitter:image" content="{DOMAIN}/assets/social-card.png">
+<meta name="twitter:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
 <meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="{root}assets/icon.png">
@@ -362,9 +373,11 @@ def build():
             full = fill(header + body + footer, ctx)
             dest = OUT / path.strip("/") / "index.html" if path != "/" else OUT / "index.html"
             dest.parent.mkdir(parents=True, exist_ok=True)
+            locales = [table[l].get("lang.locale", l) for l in order if l != lang and (stem, l) in sources]
             dest.write_text(document(meta, full, root, f"{root}assets/site.css?v={css_version}",
                                      lang=table[lang].get("lang.html", lang),
                                      locale=table[lang].get("lang.locale", lang), alt=alt,
+                                     alternate_locales=locales,
                                      docs_url=f"{DOMAIN}{where('docs', lang) if 'docs' in english else '/docs/'}#install"))
             pages.append((meta, body, lang))
             if path == "/":
