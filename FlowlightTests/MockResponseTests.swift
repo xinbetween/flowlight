@@ -87,9 +87,44 @@ final class MockRuleMatchingTests: XCTestCase {
         XCTAssertTrue(rule.enabled)
         XCTAssertEqual(rule.path, "*")
         XCTAssertEqual(rule.status, 500)
+        XCTAssertEqual(rule.bodyEncoding, .text, "old rules remain UTF-8 text")
         XCTAssertEqual(rule.delay, 0)
         let roundTrip = try JSONDecoder().decode([MockRule].self, from: JSONEncoder().encode([rule]))
         XCTAssertEqual(roundTrip, [rule])
+    }
+
+    func testDraftUsesStoredRedactedContextAndRepresentsBinaryAsHex() {
+        let exchange = HTTPExchange(
+            id: 1, started: Date(), duration: 0, scheme: "https", host: "api.example.com", port: 443, method: "POST",
+            path: "/v1/items?token=ignored", status: 201,
+            requestHeaders: [HTTPHeader(name: "Authorization", value: "Bearer ••• not kept (12 characters)"),
+                             HTTPHeader(name: "Accept", value: "application/json")], requestBody: Data(), requestSize: 2,
+            requestTruncated: false, responseHeaders: [HTTPHeader(name: "Content-Type", value: "application/octet-stream")],
+            responseBody: Data(), responseSize: 3, responseTruncated: false, contentType: "", pid: 1, bundleID: "b", appName: "a",
+            agent: nil, agentName: nil, mcpServer: nil, toolCalls: []
+        )
+        let draft = MockRuleDraft(exchange: exchange, requestBody: Data(#"{"ok":true}"#.utf8), responseBody: Data([0, 0xFE, 0xFF]))
+        XCTAssertEqual(draft.rule.status, 201)
+        XCTAssertEqual(draft.rule.path, "/v1/items")
+        XCTAssertEqual(draft.requestHeaders, exchange.requestHeaders)
+        XCTAssertEqual(draft.requestBody.text, #"{"ok":true}"#)
+        XCTAssertEqual(draft.rule.bodyEncoding, .hex)
+        XCTAssertEqual(draft.rule.body, "00FEFF")
+        XCTAssertEqual(draft.rule.bodyData, Data([0, 0xFE, 0xFF]))
+    }
+
+    func testTruncatedCapturedBodiesAreNotUsedAsMockResponses() {
+        var exchange = HTTPExchange(
+            id: 1, started: Date(), duration: 0, scheme: "https", host: "api.example.com", port: 443, method: "POST",
+            path: "/v1/items", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: true,
+            responseHeaders: [], responseBody: Data(), responseSize: 2, responseTruncated: true, contentType: "", pid: 1,
+            bundleID: "b", appName: "a", agent: nil, agentName: nil, mcpServer: nil, toolCalls: []
+        )
+        let draft = MockRuleDraft(exchange: exchange, requestBody: Data("partial".utf8), responseBody: Data("no".utf8))
+        XCTAssertNotNil(draft.requestBody.unavailableReason)
+        XCTAssertNotNil(draft.responseBodyNote)
+        XCTAssertEqual(draft.rule.body, #"{"error": "mocked by Flowlight"}"#)
+        exchange.responseTruncated = false
     }
 }
 
@@ -131,6 +166,18 @@ final class MockResponseBytesTests: XCTestCase {
         let headers = MockRule.parseHeaders("Retry-After: 30\nX-Empty:\nnot a header\n: novalue")
         XCTAssertEqual(headers, [HTTPHeader(name: "Retry-After", value: "30"), HTTPHeader(name: "X-Empty", value: "")])
         XCTAssertEqual(MockRule.headerText(headers), "Retry-After: 30\nX-Empty: ")
+    }
+
+    func testHexBodyRoundTripsAndWritesBinaryLength() {
+        let rule = MockRule(host: "a.test", status: 200, body: "00 FE\nFF", bodyEncoding: .hex)
+        XCTAssertEqual(rule.bodyData, Data([0, 0xFE, 0xFF]))
+        let bytes = rule.responseBytes()
+        XCTAssertTrue(bytes.starts(with: Data("HTTP/1.1 200 OK\r\n".utf8)))
+        XCTAssertTrue(String(decoding: bytes, as: UTF8.self).contains("Content-Type: application/octet-stream\r\n"))
+        XCTAssertTrue(String(decoding: bytes, as: UTF8.self).contains("Content-Length: 3\r\n"))
+        XCTAssertEqual(bytes.suffix(3), Data([0, 0xFE, 0xFF]))
+        XCTAssertNil(MockRule.bodyData("0FG", encoding: .hex))
+        XCTAssertNil(MockRule.bodyData("0", encoding: .hex))
     }
 }
 

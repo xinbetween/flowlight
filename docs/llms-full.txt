@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.13.8, macOS 15 or later.
 
  On this page
 
@@ -439,6 +439,11 @@ open build/Build/Products/Release/Flowlight.app
 
  Rules are ordered and the first enabled match answers. Each switches on and off on its own.
 
+ Mock This… starts from the headers and bodies that Flowlight has already retained. Captured request details are
+ reference only: they do not add matching conditions and are not saved with the rule. Text and JSON can be edited directly;
+ binary bodies are shown as hexadecimal bytes. Saving keeps the response as a mock rule until you remove it, even if you later
+ clear captured traffic.
+
  A mocked exchange is recorded like any other and marked Mocked in the list, with the detail pane saying it was
  answered by Flowlight rather than by the host, and naming the rule. You can always tell later what was real.
 
@@ -740,10 +745,11 @@ open build/Build/Products/Release/Flowlight.app
 
  Updates
 
- When a new version appears, Flowlight tells you with a notification and a badge in the sidebar rather than interrupting what you're
- doing; clicking either opens the update window. A check you start yourself opens it straight away.
+ After you quit Flowlight cleanly and launch it again, a newly found version opens the update window. At other times,
+ Flowlight uses a notification and sidebar badge rather than interrupting what you're doing; clicking either opens the same
+ window. A check you start yourself opens it straight away.
 
- Flowlight checks GitHub for a new release on launch and once a day, and Check for Updates… is in the app
+ Flowlight checks GitHub after a clean relaunch and once a day, and Check for Updates… is in the app
  and menu bar menus. Download fetches the disk image to Downloads and checks it against the release's published SHA-256. Nothing is installed
  until you choose: Quit & Install closes Flowlight, replaces it with the new version and reopens it, keeping your history and
  settings. Install Later keeps you working. If Flowlight was installed with the .pkg, macOS asks for an administrator
@@ -847,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.13.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1361,7 +1367,7 @@ Privacy
 
  RequestSent toWhat it containsWhen
 
- Update checkapi.github.comA standard HTTPS request for the latest release; GitHub sees your IP address and the Flowlight/<version> user agentOn launch and daily, from 0.1.2. Off switch in Settings › General
+ Update checkapi.github.comA standard HTTPS request for the latest release; GitHub sees your IP address and the Flowlight/<version> user agentAfter a clean quit and relaunch, and daily. Off switch in Settings › General
 
  Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
 
@@ -1413,8 +1419,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.13.8
+October 7, 2026Latest
+
+ Faithful static mocks from inspected traffic. Mock This Endpoint now prepopulates
+ retained, redacted request and response headers as editable key/value rows. Response text and JSON are
+ ready to edit; binary payloads are shown as validated hexadecimal and replayed byte-for-byte. Captured
+ request details remain reference-only, so matching still depends only on host, path and method and a
+ matching mock never reaches the origin.
+
+ Cleaner upgrade prompts. After a clean quit and relaunch, Flowlight checks for a
+ newer non-skipped version and opens its existing Software Update window when one is available. Automatic
+ updates remain optional, background failures stay quiet, and every download is still verified before use.
+
+ More discoverable, lighter site. The website now publishes fuller social and structured
+ metadata, validates canonical and alternate-language pages more rigorously, and keeps its home-page
+ connection log static instead of running a continuous animation.
+
  0.13.7
-October 6, 2026Latest
+October 6, 2026
 
  Current-Xcode signed packaging. Flowlight now packages the manually Developer-ID-signed
  app directly from its successful archive. This avoids Xcode 26’s unsupported export path for macOS archives

@@ -95,7 +95,8 @@ struct MockRulesSection: View {
     }
 }
 
-/// One rule, edited in a sheet. Everything a canned answer needs and nothing else.
+/// One rule, edited in a sheet. Captured request information is reference material only; the matcher remains host,
+/// path and method, while the response is the durable mock setting.
 struct MockRuleEditor: View {
     private enum Tab: Hashable { case request, response }
 
@@ -104,9 +105,23 @@ struct MockRuleEditor: View {
     var save: (MockRule) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var tab: Tab = .request
-    @State private var headerText = ""
+    @State private var requestHeaders: [MockHeaderRow]
+    @State private var responseHeaders: [MockHeaderRow]
+    @State private var requestBody: MockBodyDraft
+    private var responseBodyNote: String?
     @State private var statusText = ""
     @State private var delayText = ""
+
+    init(rule: MockRule, isNew: Bool, draft: MockRuleDraft? = nil, save: @escaping (MockRule) -> Void) {
+        _rule = State(initialValue: draft?.rule ?? rule)
+        self.isNew = isNew
+        self.save = save
+        _requestHeaders = State(initialValue: (draft?.requestHeaders ?? []).map(MockHeaderRow.init))
+        _responseHeaders = State(initialValue: (draft?.rule.headers ?? rule.headers).map(MockHeaderRow.init))
+        _requestBody = State(initialValue: draft?.requestBody ?? MockBodyDraft(text: "", encoding: .text, byteCount: 0,
+                                                                                unavailableReason: L("No captured request body.")))
+        responseBodyNote = draft?.responseBodyNote
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -126,11 +141,10 @@ struct MockRuleEditor: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            if tab == .request {
-                requestFields
-            } else {
-                responseFields
+            ScrollView {
+                if tab == .request { requestFields } else { responseFields }
             }
+            .frame(maxHeight: 410)
 
             if rule.delay > 0 {
                 Label(L("The request waits %@ before it's answered. Clients with their own timeout will give up first, which is usually the point.",
@@ -143,81 +157,84 @@ struct MockRuleEditor: View {
                 Spacer()
                 Button(isNew ? L("Add Rule") : L("Save")) { save(cleaned()); dismiss() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(rule.host.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(rule.host.trimmingCharacters(in: .whitespaces).isEmpty || !rule.hasValidBody)
             }
         }
         .padding(20)
-        .frame(width: 560)
+        .frame(width: 660)
         .onAppear {
-            headerText = MockRule.headerText(rule.headers)
             statusText = String(rule.status)
             delayText = rule.delay == 0 ? "" : String(rule.delay)
         }
     }
 
     private var requestFields: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
-            GridRow {
-                Text(L("Host")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    TextField(L("api.example.com"), text: $rule.host)
-                    Text(L("Exactly that host. Write *.example.com to cover the domain and its subdomains."))
-                        .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text(L("Host")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        TextField(L("api.example.com"), text: $rule.host)
+                        Text(L("Exactly that host. Write *.example.com to cover the domain and its subdomains."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(L("Path")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        TextField(L("/v1/*"), text: $rule.path)
+                        Text(L("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(L("Method")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    Picker("", selection: Binding(get: { rule.method.isEmpty ? "ANY" : rule.method.uppercased() },
+                                                  set: { rule.method = $0 == "ANY" ? "" : $0 })) {
+                        ForEach(MockRule.methods, id: \.self) { Text($0).tag($0) }
+                    }
+                    .labelsHidden().frame(width: 130)
                 }
             }
-            GridRow {
-                Text(L("Path")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    TextField(L("/v1/*"), text: $rule.path)
-                    Text(L("A glob: * matches any run of characters. The query string is ignored unless the pattern contains a ?."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            GridRow {
-                Text(L("Method")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                Picker("", selection: Binding(get: { rule.method.isEmpty ? "ANY" : rule.method.uppercased() },
-                                              set: { rule.method = $0 == "ANY" ? "" : $0 })) {
-                    ForEach(MockRule.methods, id: \.self) { Text($0).tag($0) }
-                }
-                .labelsHidden().frame(width: 130)
-            }
+            Divider()
+            Label(L("Captured request details are reference only. They do not change what this mock matches and are not saved with the rule."),
+                  systemImage: "info.circle")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            MockHeaderRows(rows: $requestHeaders, emptyMessage: L("No captured request headers."))
+            BodyEditor(title: L("Request payload"), text: $requestBody.text, encoding: $requestBody.encoding,
+                       unavailableReason: requestBody.unavailableReason, editable: false)
         }
     }
 
     private var responseFields: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
-            GridRow {
-                Text(L("Status")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    TextField("500", text: $statusText).frame(width: 70)
-                        .onChange(of: statusText) { _, new in
-                            if let code = Int(new.filter(\.isNumber)), (100...599).contains(code) { rule.status = code }
-                        }
-                    Text(MockRule.reason(rule.status)).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(L("Delay")).foregroundStyle(.secondary)
-                    TextField("0", text: $delayText).frame(width: 60)
-                        .onChange(of: delayText) { _, new in rule.delay = min(300, max(0, Double(new) ?? 0)) }
-                    Text(L("seconds")).font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text(L("Status")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        TextField("500", text: $statusText).frame(width: 70)
+                            .onChange(of: statusText) { _, new in
+                                if let code = Int(new.filter(\.isNumber)), (100...599).contains(code) { rule.status = code }
+                            }
+                        Text(MockRule.reason(rule.status)).font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Text(L("Delay")).foregroundStyle(.secondary)
+                        TextField("0", text: $delayText).frame(width: 60)
+                            .onChange(of: delayText) { _, new in rule.delay = min(300, max(0, Double(new) ?? 0)) }
+                        Text(L("seconds")).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
-            GridRow(alignment: .top) {
-                Text(L("Headers")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    TextEditor(text: $headerText)
-                        .font(.caption.monospaced()).frame(height: 54)
-                        .border(.quaternary)
-                        .onChange(of: headerText) { _, new in rule.headers = MockRule.parseHeaders(new) }
-                    Text(L("One Name: value per line. Content-Length and Connection are written by Flowlight."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            MockHeaderRows(rows: $responseHeaders, emptyMessage: L("No response headers yet."))
+            BodyEditor(title: L("Response body"), text: $rule.body, encoding: $rule.bodyEncoding,
+                       unavailableReason: responseBodyNote, editable: true)
+            if !rule.hasValidBody {
+                Label(L("Binary mock bodies must contain complete hexadecimal byte pairs."), systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.warning)
             }
-            GridRow(alignment: .top) {
-                Text(L("Body")).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                TextEditor(text: $rule.body)
-                    .font(.caption.monospaced()).frame(height: 120)
-                    .border(.quaternary)
-            }
+            Label(L("Saving keeps this response as a mock rule until you remove it, even if captured traffic is later cleared."),
+                  systemImage: "archivebox")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -229,8 +246,97 @@ struct MockRuleEditor: View {
         copy.path = copy.path.trimmingCharacters(in: .whitespaces)
         if copy.path.isEmpty { copy.path = "*" }
         copy.method = copy.method.trimmingCharacters(in: .whitespaces).uppercased()
-        copy.headers = MockRule.parseHeaders(headerText)
+        copy.headers = responseHeaders.compactMap { row in
+            let name = MockRule.headerSafe(row.name)
+            guard !name.isEmpty else { return nil }
+            return HTTPHeader(name: name, value: MockRule.headerSafe(row.value))
+        }
         return copy
+    }
+}
+
+private struct MockHeaderRow: Identifiable, Equatable {
+    var id = UUID()
+    var name = ""
+    var value = ""
+
+    init() {}
+    init(_ header: HTTPHeader) { name = header.name; value = header.value }
+}
+
+private struct MockHeaderRows: View {
+    @Binding var rows: [MockHeaderRow]
+    var emptyMessage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(L("Headers")).font(.caption.bold()).foregroundStyle(.secondary)
+                Spacer()
+                Button { rows.append(MockHeaderRow()) } label: { Label(L("Add Header"), systemImage: "plus") }
+                    .controlSize(.small)
+            }
+            if rows.isEmpty {
+                Text(emptyMessage).font(.caption).foregroundStyle(.tertiary)
+            }
+            ForEach($rows) { $row in
+                HStack(alignment: .top, spacing: 6) {
+                    TextField(L("Name"), text: $row.name).frame(width: 150)
+                    AdaptiveMockText(text: $row.value).frame(maxWidth: .infinity)
+                    Button { rows.removeAll { $0.id == row.id } } label: { Image(systemName: "minus.circle.fill") }
+                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .accessibilityLabel(L("Remove header"))
+                }
+            }
+            Text(L("Content-Length, Connection and Transfer-Encoding are written by Flowlight."))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct BodyEditor: View {
+    var title: String
+    @Binding var text: String
+    @Binding var encoding: MockBodyEncoding
+    var unavailableReason: String?
+    var editable: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(title).font(.caption.bold()).foregroundStyle(.secondary)
+                if encoding == .hex { Label(L("Binary · hexadecimal"), systemImage: "doc.text") .font(.caption).foregroundStyle(.secondary) }
+            }
+            if let unavailableReason {
+                Label(unavailableReason, systemImage: "info.circle")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                AdaptiveMockText(text: $text, forceMultiline: encoding == .hex)
+                    .disabled(!editable)
+                if encoding == .hex {
+                    Text(L("Each pair of hexadecimal characters is one byte. Flowlight writes the original bytes."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct AdaptiveMockText: View {
+    @Binding var text: String
+    var forceMultiline = false
+    private var multiline: Bool { forceMultiline || text.count > 80 || text.contains(where: \.isNewline) }
+
+    var body: some View {
+        Group {
+            if multiline {
+                TextEditor(text: $text)
+                    .font(.caption.monospaced()).frame(minHeight: forceMultiline ? 100 : 54, maxHeight: forceMultiline ? 180 : 100)
+                    .border(.quaternary)
+            } else {
+                TextField("", text: $text).font(.caption.monospaced())
+            }
+        }
     }
 }
 

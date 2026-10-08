@@ -27,8 +27,8 @@ private struct InspectContent: View {
     @State private var assessments: [Int64: RiskAssessment] = [:]
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
-    /// A rule prefilled from a recorded exchange, waiting in the editor.
-    @State private var mockDraft: MockRule?
+    /// A rule plus safe, temporary captured context waiting in the mock editor.
+    @State private var mockDraft: MockRuleDraft?
     /// A response-transform rule is created only after its selected exchange's stored response has been read.
     @State private var responseTransformDraft: ResponseTransformDraft?
     /// Setup was opened to look at the mock rules, so it opens on them.
@@ -98,7 +98,7 @@ private struct InspectContent: View {
             if !LocalRiskSettings.isActive { potentialHarmOnly = false }
         }
         .sheet(item: $mockDraft) { draft in
-            MockRuleEditor(rule: draft, isNew: true) { inspection.mockRules.append($0) }
+            MockRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.mockRules.append($0) }
         }
         .sheet(item: $responseTransformDraft) { draft in
             ResponseTransformRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.responseTransformRules.append($0) }
@@ -118,6 +118,18 @@ private struct InspectContent: View {
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
         !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil && exchange.status != nil && !exchange.responseTruncated
+    }
+
+    private func prepareMock(from exchange: HTTPExchange) {
+        Task {
+            let bodies: (request: Data, response: Data)?
+            if let id = exchange.id {
+                bodies = try? await monitor.read { try $0.exchangeBodies(id: id) }
+            } else {
+                bodies = nil
+            }
+            mockDraft = MockRuleDraft(exchange: exchange, requestBody: bodies?.request, responseBody: bodies?.response)
+        }
     }
 
     private func prepareResponseTransform(from exchange: HTTPExchange) {
@@ -294,7 +306,7 @@ private struct InspectContent: View {
         }
         .contextMenu(forSelectionType: HTTPExchange.ID.self) { ids in
             if !DemoData.isEnabled, let id = ids.first, let e = exchanges.first(where: { $0.id == id }), e.note == nil {
-                Button(L("Mock This Endpoint…")) { mockDraft = MockRule(mocking: e) }
+                Button(L("Mock This Endpoint…")) { prepareMock(from: e) }
                 if canModifyResponse(e) {
                     Button(L("Modify This Response…")) { prepareResponseTransform(from: e) }
                 }
@@ -316,7 +328,7 @@ private struct InspectContent: View {
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
             ExchangeDetail(exchange: selected, assessment: selected.id.flatMap { assessments[$0] }, cause: selected.id.flatMap { links[$0] },
-                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { mockDraft = MockRule(mocking: selected) },
+                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { prepareMock(from: selected) },
                            modifyResponse: canModifyResponse(selected) ? { prepareResponseTransform(from: selected) } : nil)
                 .id(selected.id)
         } else {

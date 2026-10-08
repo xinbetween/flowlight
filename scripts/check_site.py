@@ -8,7 +8,7 @@ roadmap still advertising what you can already download. None of that stops the 
 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
-import re, sys, pathlib, collections
+import re, sys, pathlib, collections, json
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -32,6 +32,11 @@ HELP_ANCHOR = re.compile(r'case \.(\w+): return "([\w-]+)"')
 SIDEBAR = re.compile(r"enum SidebarItem[^{]*\{\s*case ([\w, ]+)")
 ROW = re.compile(r"<tr><td>(?:<a[^>]*>)?([^<]+)(?:</a>)?</td><td>\u2318(.)</td>")
 H1 = re.compile(r"<h1[ >]")
+TITLE = re.compile(r"<title>([^<]+)</title>", re.I)
+META = re.compile(r'<meta\s+(?:name|property)="([^"]+)"\s+content="([^"]*)"', re.I)
+CANONICAL = re.compile(r'<link\s+rel="canonical"\s+href="([^"]+)"', re.I)
+ALTERNATE = re.compile(r'<link\s+rel="alternate"\s+hreflang="([^"]+)"\s+href="([^"]+)"', re.I)
+JSON_LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S | re.I)
 
 
 def version_key(text):
@@ -200,6 +205,76 @@ def problems():
         count = len(H1.findall(page.read_text()))
         if count != 1:
             found.append(f"{page.relative_to(ROOT)}: {count} <h1> elements, expected 1")
+
+    # 13. SEO metadata is generated centrally. Keeping its structural contract here means a template change cannot
+    # quietly publish pages that look fine in a browser but have no usable search/social identity.
+    expected_social = {"og:type", "og:site_name", "og:locale", "og:title", "og:description", "og:url", "og:image",
+                       "og:image:type", "og:image:width", "og:image:height", "og:image:alt", "twitter:card",
+                       "twitter:title", "twitter:description", "twitter:image", "twitter:image:alt"}
+    indexed = [page for page in PAGES if page.name != "404.html"]
+    canonicals = {}
+    for page in PAGES:
+        text = page.read_text()
+        if not TITLE.search(text) or not TITLE.search(text).group(1).strip():
+            found.append(f"{page.relative_to(ROOT)}: missing non-empty <title>")
+        metadata = dict(META.findall(text))
+        if not metadata.get("description", "").strip():
+            found.append(f"{page.relative_to(ROOT)}: missing non-empty meta description")
+        is_indexed = page in indexed
+        canonical = CANONICAL.findall(text)
+        if is_indexed:
+            expected = "https://flowlight.xinbetween.com/" + ("" if page == OUT / "index.html" else str(page.relative_to(OUT).parent) + "/")
+            if canonical != [expected]:
+                found.append(f"{page.relative_to(ROOT)}: canonical must be exactly {expected}")
+            canonicals[page] = expected
+            missing = sorted(expected_social - set(metadata))
+            if missing:
+                found.append(f"{page.relative_to(ROOT)}: missing social metadata {', '.join(missing)}")
+            elif metadata["og:url"] != expected or metadata["og:title"] != TITLE.search(text).group(1) or metadata["og:description"] != metadata["description"]:
+                found.append(f"{page.relative_to(ROOT)}: Open Graph URL/title/description disagree with page metadata")
+        elif canonical:
+            found.append(f"{page.relative_to(ROOT)}: noindex page must not have a canonical URL")
+
+        for raw in JSON_LD.findall(text):
+            try:
+                graph = json.loads(raw).get("@graph", [])
+            except json.JSONDecodeError as error:
+                found.append(f"{page.relative_to(ROOT)}: invalid JSON-LD: {error.msg}")
+                continue
+            kinds = {node.get("@type") for node in graph}
+            if is_indexed and "WebPage" not in kinds:
+                found.append(f"{page.relative_to(ROOT)}: JSON-LD has no WebPage node")
+            is_home = page.name == "index.html" and (page.parent == OUT or page.parent.name in LANGS)
+            if is_home and "SoftwareApplication" not in kinds:
+                found.append(f"{page.relative_to(ROOT)}: home JSON-LD has no SoftwareApplication node")
+            if not is_home and is_indexed and "BreadcrumbList" not in kinds:
+                found.append(f"{page.relative_to(ROOT)}: page JSON-LD has no BreadcrumbList node")
+
+        if is_indexed:
+            alternates = dict(ALTERNATE.findall(text))
+            if alternates and "x-default" not in alternates:
+                found.append(f"{page.relative_to(ROOT)}: hreflang cluster has no x-default")
+            for lang, href in alternates.items():
+                if lang == "x-default":
+                    continue
+                target = next((candidate for candidate, url in canonicals.items() if url == href), None)
+                if target is not None and lang not in dict(ALTERNATE.findall(target.read_text())):
+                    found.append(f"{page.relative_to(ROOT)}: hreflang {lang} is not reciprocal")
+
+    # 14. The sitemap names exactly the pages allowed to be indexed, and robots advertises that sitemap.
+    sitemap = (OUT / "sitemap.xml").read_text()
+    sitemap_urls = set(re.findall(r"<loc>([^<]+)</loc>", sitemap))
+    if sitemap_urls != set(canonicals.values()):
+        found.append("docs/sitemap.xml: URLs do not exactly match canonical indexable pages")
+    robots = (OUT / "robots.txt").read_text()
+    if "Sitemap: https://flowlight.xinbetween.com/sitemap.xml" not in robots:
+        found.append("docs/robots.txt: missing or incorrect sitemap declaration")
+
+    # 15. The home is intentionally static/lightweight. A loop here has previously caused real-machine jank.
+    for source in sorted((ROOT / "site/pages").glob("**/index.html")):
+        source_text = source.read_text()
+        if re.search(r"\b(setInterval|setTimeout|requestAnimationFrame)\s*\(", source_text):
+            found.append(f"{source.relative_to(ROOT)}: home page has recurring JavaScript animation")
 
     return found
 

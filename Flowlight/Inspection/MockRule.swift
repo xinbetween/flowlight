@@ -1,5 +1,41 @@
 import Foundation
 
+/// How a saved mock body is represented in preferences. Text is emitted as UTF-8; hex is a lossless editable
+/// representation of arbitrary captured bytes.
+enum MockBodyEncoding: String, Codable, Equatable, Sendable {
+    case text
+    case hex
+}
+
+/// Captured body data shown while authoring a mock. This is draft-only data: it is never part of rule matching and
+/// request values are never written into the mock-rule preferences.
+struct MockBodyDraft: Equatable, Sendable {
+    var text: String
+    var encoding: MockBodyEncoding
+    var byteCount: Int
+    var unavailableReason: String?
+
+    static func captured(_ data: Data?, truncated: Bool, side: String) -> MockBodyDraft {
+        if truncated {
+            return MockBodyDraft(text: "", encoding: .text, byteCount: 0,
+                                 unavailableReason: L("The captured %@ body was truncated, so Flowlight cannot show it as a complete value.", side))
+        }
+        guard let data else {
+            return MockBodyDraft(text: "", encoding: .text, byteCount: 0,
+                                 unavailableReason: L("The captured %@ body is unavailable.", side))
+        }
+        switch BodyContent.classify(data) {
+        case .binary:
+            return MockBodyDraft(text: MockRule.hex(data), encoding: .hex, byteCount: data.count, unavailableReason: nil)
+        case .empty:
+            return MockBodyDraft(text: "", encoding: .text, byteCount: 0, unavailableReason: nil)
+        default:
+            return MockBodyDraft(text: String(decoding: data, as: UTF8.self), encoding: .text,
+                                 byteCount: data.count, unavailableReason: nil)
+        }
+    }
+}
+
 /// A canned answer for one endpoint: "reply to `POST api.example.com/v1/items` with a 503, after eight seconds".
 ///
 /// It exists to watch an agent cope with an API that fails, stalls or answers with something odd, without breaking
@@ -21,6 +57,8 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     var status = 500
     var headers: [HTTPHeader] = []
     var body = ""
+    /// Old rules decode as text. Hex lets a mock replay a captured binary response without corrupting it as UTF-8.
+    var bodyEncoding: MockBodyEncoding = .text
     /// Seconds to wait before answering, so "the API stalls" is testable. The recorded exchange shows the wait as
     /// its duration.
     var delay: Double = 0
@@ -49,11 +87,11 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     }
 
     init(id: UUID = UUID(), enabled: Bool = true, name: String = "", host: String = "", path: String = "*",
-         method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "", delay: Double = 0,
-         blocked: Bool = false) {
+         method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "",
+         bodyEncoding: MockBodyEncoding = .text, delay: Double = 0, blocked: Bool = false) {
         self.id = id; self.enabled = enabled; self.name = name; self.host = host; self.path = path
-        self.method = method; self.status = status; self.headers = headers; self.body = body; self.delay = delay
-        self.blocked = blocked
+        self.method = method; self.status = status; self.headers = headers; self.body = body
+        self.bodyEncoding = bodyEncoding; self.delay = delay; self.blocked = blocked
     }
 }
 
@@ -71,8 +109,33 @@ extension MockRule {
         status = try c.decodeIfPresent(Int.self, forKey: .status) ?? 500
         headers = try c.decodeIfPresent([HTTPHeader].self, forKey: .headers) ?? []
         body = try c.decodeIfPresent(String.self, forKey: .body) ?? ""
+        bodyEncoding = try c.decodeIfPresent(MockBodyEncoding.self, forKey: .bodyEncoding) ?? .text
         delay = try c.decodeIfPresent(Double.self, forKey: .delay) ?? 0
         blocked = try c.decodeIfPresent(Bool.self, forKey: .blocked) ?? false
+    }
+}
+
+/// A selected recorded exchange plus the safe, temporary context needed to author a static mock.
+struct MockRuleDraft: Identifiable, Equatable, Sendable {
+    var id: UUID { rule.id }
+    var rule: MockRule
+    var requestHeaders: [HTTPHeader]
+    var requestBody: MockBodyDraft
+    var responseBodyNote: String?
+
+    init(exchange: HTTPExchange, requestBody: Data?, responseBody: Data?) {
+        var rule = MockRule(mocking: exchange)
+        rule.status = exchange.status ?? rule.status
+        rule.headers = exchange.responseHeaders
+        let capturedResponse = MockBodyDraft.captured(responseBody, truncated: exchange.responseTruncated, side: L("response"))
+        if capturedResponse.unavailableReason == nil {
+            rule.body = capturedResponse.text
+            rule.bodyEncoding = capturedResponse.encoding
+        }
+        self.rule = rule
+        requestHeaders = exchange.requestHeaders
+        self.requestBody = MockBodyDraft.captured(requestBody, truncated: exchange.requestTruncated, side: L("request"))
+        responseBodyNote = capturedResponse.unavailableReason
     }
 }
 
@@ -105,6 +168,34 @@ enum MockRules {
 // MARK: The answer
 
 extension MockRule {
+    /// The bytes Flowlight writes for the configured body. Hex ignores whitespace so a wrapped editor remains easy
+    /// to read, but every remaining character must form a complete hexadecimal byte.
+    static func bodyData(_ body: String, encoding: MockBodyEncoding) -> Data? {
+        switch encoding {
+        case .text:
+            return Data(body.utf8)
+        case .hex:
+            let digits = body.filter { !$0.isWhitespace }
+            guard digits.count.isMultiple(of: 2) else { return nil }
+            var data = Data()
+            var index = digits.startIndex
+            while index < digits.endIndex {
+                let next = digits.index(index, offsetBy: 2)
+                guard let byte = UInt8(digits[index..<next], radix: 16) else { return nil }
+                data.append(byte)
+                index = next
+            }
+            return data
+        }
+    }
+
+    static func hex(_ data: Data) -> String {
+        data.map { String(format: "%02X", $0) }.joined()
+    }
+
+    var bodyData: Data? { Self.bodyData(body, encoding: bodyEncoding) }
+    var hasValidBody: Bool { bodyData != nil }
+
     /// The canned response as it goes on the wire.
     ///
     /// Flowlight writes the framing headers itself: a mock whose `Content-Length` disagreed with its body would
@@ -112,7 +203,7 @@ extension MockRule {
     /// so there's no real response behind this one to keep a reused connection in step with.
     func responseBytes() -> Data {
         let bodyAllowed = status != 204 && status != 304 && !(100..<200).contains(status)
-        let payload = bodyAllowed ? Data(body.utf8) : Data()
+        let payload = bodyAllowed ? (bodyData ?? Data()) : Data()
         var text = "HTTP/1.1 \(status) \(Self.reason(status))\r\n"
         let written = Set(["content-length", "connection", "transfer-encoding"])
         for header in headers {
@@ -121,7 +212,12 @@ extension MockRule {
             text += "\(name): \(Self.headerSafe(header.value))\r\n"
         }
         if bodyAllowed, !headers.contains(where: { $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame }) {
-            text += "Content-Type: \(body.hasPrefix("{") || body.hasPrefix("[") ? "application/json" : "text/plain; charset=utf-8")\r\n"
+            let type: String
+            switch bodyEncoding {
+            case .hex: type = "application/octet-stream"
+            case .text: type = body.hasPrefix("{") || body.hasPrefix("[") ? "application/json" : "text/plain; charset=utf-8"
+            }
+            text += "Content-Type: \(type)\r\n"
         }
         if bodyAllowed { text += "Content-Length: \(payload.count)\r\n" }
         // Named in the response as well as in Flowlight, so an app or a log elsewhere on the Mac can also tell that

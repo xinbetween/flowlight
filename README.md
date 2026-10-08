@@ -110,9 +110,12 @@ on your Mac. For supported HTTP traffic routed through the proxy, it records hea
 
 ### Mock responses
 Answer a chosen host, path and method with your own status, headers, body and delay, to see how an agent copes when
-an API fails or returns something odd. The request is never sent. Mocked exchanges are recorded and clearly marked,
-so a session read later still shows what was real. Needs HTTPS inspection, since only decrypted traffic can be
-answered — and a mock changes the reply, not whether the connection can be made.
+an API fails or returns something odd. **Mock This…** pre-fills retained, redacted headers and payloads: request data
+is reference-only, while the response can be edited as text/JSON or lossless hexadecimal for binary bytes. Saving
+persists only the matcher and authored response rule; it remains until removed even if captured traffic is cleared.
+The request is never sent. Mocked exchanges are recorded and clearly marked, so a session read later still shows what
+was real. Needs HTTPS inspection, since only decrypted traffic can be answered — and a mock changes the reply, not
+whether the connection can be made.
 
 ### Reports at any zoom
 - Second, minute, hour, day, week, month and year views. Click a bar to zoom in.
@@ -308,8 +311,10 @@ same local database.
    Releases are signed and notarized, so it opens straight away.
    Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
 2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
-   Flowlight checks for new releases daily. It downloads and verifies an update, then asks before it quits to install
-   it and reopen (Flowlight › Check for Updates…). Updating by hand? Quit Flowlight before dragging the new version in.
+   After a clean quit and relaunch, Flowlight checks GitHub for a new release and opens its update window when one is
+   available; it also checks daily. The check is optional in Settings, and any download is verified before Flowlight
+   asks to quit and install it (Flowlight › Check for Updates…). Updating by hand? Quit Flowlight before dragging the
+   new version in.
 3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
    for your password once). Network-owner lookups are on by default and can be turned off there or in Capture.
 
