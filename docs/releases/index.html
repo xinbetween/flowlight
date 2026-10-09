@@ -61,7 +61,21 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.14.0</h2><time datetime="2026-10-09">October 9, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.14.1</h2><time datetime="2026-10-09">October 9, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Install local plugin packages.</strong> Settings › Plugins can now import and export Flowlight plugin
+            manifest packages, keep installed plugins split by official or third-party publisher, and reject packages that
+            try to reuse a reserved built-in plugin ID.</li>
+          <li><strong>Configure and maintain plugin records.</strong> Plugin packages can store local string key/value
+            configuration, installed packages can be removed with their retained findings, and built-in plugins preserve
+            enable/configuration state while the app updates their manifest metadata.</li>
+          <li><strong>Backfill advisory findings.</strong> The Plugins tab can rerun official built-in rules over retained
+            inspected exchanges so newly enabled or updated plugins can annotate recent history without recapturing traffic.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.14.0</h2><time datetime="2026-10-09">October 9, 2026</time></header>
         <ul>
           <li><strong>Official inspection plugins.</strong> Flowlight now derives advisory plugin findings from inspected
             exchanges after capture, redaction and attribution. The first official built-ins cover large uploads,
@@ -1141,7 +1155,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.14.0 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.14.1 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
