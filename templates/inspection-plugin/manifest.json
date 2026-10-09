@@ -1,0 +1,14 @@
+{
+  "id": "thirdparty.example-guardrails",
+  "name": "Example Guardrails",
+  "version": "0.1.0",
+  "kind": "llmMCP",
+  "enabled": true,
+  "source": "installed",
+  "publisher": "thirdParty",
+  "guardrailProvider": "custom",
+  "description": "Example advisory findings for inspected LLM and MCP activity.",
+  "ruleVersion": 1,
+  "privacySummary": "Uses provider names, tool names, MCP server names, request sizes and redacted evidence only.",
+  "capabilities": ["annotate", "suggestGuardrail"]
+}

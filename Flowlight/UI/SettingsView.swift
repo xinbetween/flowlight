@@ -108,6 +108,9 @@ struct SettingsView: View {
             .frame(height: 150)
             .tabItem { Label(L("Storage"), systemImage: "internaldrive") }
 
+            PluginSettingsView()
+                .tabItem { Label(L("Plugins"), systemImage: "puzzlepiece.extension") }
+
             ExportSettingsTab()
                 .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
         }

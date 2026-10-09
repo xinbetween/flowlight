@@ -1302,6 +1302,123 @@ Questions
 
 ---
 
+# Flowlight plugins
+URL: https://flowlight.xinbetween.com/plugins/
+
+Plugins
+
+ Write inspection plugins
+
+ Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; third-party plugins use the same manifest shape.
+
+ On this page
+
+ Model
+ Trust boundaryManifestFindings
+
+ Guardrails
+ ProvidersTemplate packageReview checklist
+
+ The trust boundary
+
+ Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.
+
+ The first shipped plugins are official built-ins. The template package below is for designing third-party or official add-on packs against the manifest and finding format while the installed plugin loader is still being hardened.
+
+ Manifest
+
+ A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.
+
+{
+ "id": "official.presidio-pii",
+ "name": "Presidio PII",
+ "version": "1.0.0",
+ "kind": "llmMCP",
+ "enabled": true,
+ "source": "installed",
+ "publisher": "official",
+ "guardrailProvider": "presidio",
+ "description": "Flags requests that should be reviewed by a PII masking policy.",
+ "ruleVersion": 1,
+ "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
+ "capabilities": ["annotate", "suggestGuardrail"]
+}
+
+ FieldValuesMeaning
+
+ kindtraffic, llmMCPWhether the plugin describes ordinary inspected HTTP or model/tool/MCP activity.
+
+ publisherofficial, thirdPartyOfficial plugins are released by Flowlight; third-party plugins are authored outside the project.
+
+ sourcebuiltIn, installedBuilt-in plugins ship in the app. Installed plugins come from a package.
+
+ capabilitiesannotate, suggestGuardrailCapabilities are advisory; enforcement still uses Flowlight rules and guardrails.
+
+ Findings
+
+ A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
+
+{
+ "severity": "medium",
+ "title": "High-risk tool available",
+ "summary": "Claude Code declared Bash. Add a guardrail if this tool should be refused.",
+ "evidence": [
+ { "label": "Tool", "value": "Bash" },
+ { "label": "Provider", "value": "Flowlight" }
+ ],
+ "suggestedGuardrail": {
+ "agent": "claude",
+ "server": "",
+ "tool": "Bash",
+ "origin": "observed"
+ }
+}
+
+ Supported guardrail providers
+
+ Official and third-party plugins can declare the guardrail provider they model. Declaring a provider does not send traffic to that provider or enable enforcement on its own; it is a label for the policy semantics and review path.
+
+ ProviderUse
+
+ PresidioPII detection and masking.
+
+ BedrockAWS Bedrock guardrails.
+
+ LakeraContent moderation.
+
+ AporiaCustom guardrails.
+
+ NomaNoma Security policies.
+
+ PANW Prisma AIRSPrisma AIRS guardrails.
+
+ CustomYour own guardrail implementation.
+
+ Template package
+
+ The starter package lives at templates/inspection-plugin. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins.
+
+cp -R templates/inspection-plugin my-flowlight-plugin
+cd my-flowlight-plugin
+python3 -m json.tool manifest.json
+python3 validate.py
+
+ The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
+
+ Review checklist
+
+ The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.
+
+ Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.
+
+ Provider-side MCP connector findings say local network rules cannot reach provider-run calls.
+
+ Failures are fail-open: capture remains complete and no finding is better than blocking capture.
+
+ The privacy summary is specific enough that a user can tell what data the plugin needs.
+
+---
+
 # Flowlight privacy
 URL: https://flowlight.xinbetween.com/privacy/
 

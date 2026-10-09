@@ -1,0 +1,27 @@
+[
+  {
+    "severity": "medium",
+    "title": "High-risk tool available",
+    "summary": "The agent declared a shell-like tool. Add a guardrail if this tool should be refused.",
+    "evidence": [
+      { "label": "Tool", "value": "Bash" },
+      { "label": "Provider", "value": "Flowlight" }
+    ],
+    "suggestedGuardrail": {
+      "agent": "claude",
+      "server": "",
+      "tool": "Bash",
+      "origin": "observed"
+    }
+  },
+  {
+    "severity": "low",
+    "title": "Provider-run MCP connector",
+    "summary": "The model provider offered an MCP connector. Local network rules cannot block provider-side calls unless the same host is also contacted locally.",
+    "evidence": [
+      { "label": "Provider", "value": "Anthropic" },
+      { "label": "Connector", "value": "github" },
+      { "label": "Approval", "value": "always" }
+    ]
+  }
+]

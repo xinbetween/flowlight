@@ -25,6 +25,7 @@ private struct InspectContent: View {
     @State private var scopeHost: String?
     @State private var potentialHarmOnly = false
     @State private var assessments: [Int64: RiskAssessment] = [:]
+    @State private var pluginFindings: [Int64: [PluginFinding]] = [:]
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
     /// A rule plus safe, temporary captured context waiting in the mock editor.
@@ -103,8 +104,9 @@ private struct InspectContent: View {
         .sheet(item: $responseTransformDraft) { draft in
             ResponseTransformRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.responseTransformRules.append($0) }
         }
-        .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, search: search, window: window,
-                          enabled: inspection.enabled, potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
+        .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
+                          search: search, window: window, enabled: inspection.enabled,
+                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
@@ -112,7 +114,7 @@ private struct InspectContent: View {
     }
 
     private struct LoadKey: Equatable {
-        var version: Int; var localRiskVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
+        var version: Int; var localRiskVersion: Int; var pluginVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
         var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
     }
 
@@ -150,10 +152,15 @@ private struct InspectContent: View {
         let loaded = (try? await monitor.read {
             try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host)
         }) ?? []
+        let ids = loaded.compactMap(\.id)
         let risk = (try? await monitor.read {
-            try $0.localRiskAssessments(exchangeIDs: loaded.compactMap(\.id))
+            try $0.localRiskAssessments(exchangeIDs: ids)
+        }) ?? [:]
+        let findings = (try? await monitor.read {
+            try $0.pluginFindings(exchangeIDs: ids)
         }) ?? [:]
         assessments = risk
+        pluginFindings = findings
         exchanges = potentialHarmOnly ? loaded.filter { $0.id.flatMap { risk[$0] }?.isPotentialHarm == true } : loaded
         // `-FLInspectSelect paste.example`, so the published screenshot always shows the same request rather
         // than whichever one a click happened to land on.
@@ -285,6 +292,10 @@ private struct InspectContent: View {
                 RiskBadge(assessment: e.id.flatMap { assessments[$0] })
             }
             .width(min: 76, ideal: 96)
+            TableColumn(L("Plugins")) { e in
+                PluginFindingBadge(findings: e.id.flatMap { pluginFindings[$0] } ?? [])
+            }
+            .width(min: 58, ideal: 68)
             TableColumn(L("Status")) { e in
                 Text(e.status.map(String.init) ?? "–").monospacedDigit()
                     .foregroundStyle((e.status ?? 0) >= 400 ? FL.critical : .primary)
@@ -327,8 +338,10 @@ private struct InspectContent: View {
 
     @ViewBuilder private var detail: some View {
         if let selected = exchanges.first(where: { $0.id == selection }) {
-            ExchangeDetail(exchange: selected, assessment: selected.id.flatMap { assessments[$0] }, cause: selected.id.flatMap { links[$0] },
-                           results: results, highlight: search, mockThis: DemoData.isEnabled ? nil : { prepareMock(from: selected) },
+            ExchangeDetail(exchange: selected, assessment: selected.id.flatMap { assessments[$0] },
+                           pluginFindings: selected.id.flatMap { pluginFindings[$0] } ?? [],
+                           cause: selected.id.flatMap { links[$0] }, results: results, highlight: search,
+                           mockThis: DemoData.isEnabled ? nil : { prepareMock(from: selected) },
                            modifyResponse: canModifyResponse(selected) ? { prepareResponseTransform(from: selected) } : nil)
                 .id(selected.id)
         } else {
@@ -533,11 +546,105 @@ private struct InspectionSetup: View {
     }
 }
 
+private struct PluginFindingBadge: View {
+    var findings: [PluginFinding]
+
+    var body: some View {
+        if findings.isEmpty {
+            Text(L("None")).font(.caption2).foregroundStyle(.tertiary)
+        } else {
+            Label("\(findings.count)", systemImage: topSeverity.symbol)
+                .labelStyle(.titleAndIcon)
+                .font(.caption2.bold())
+                .foregroundStyle(topSeverity.color)
+                .help(findings.map(\.title).joined(separator: " · "))
+        }
+    }
+
+    private var topSeverity: PluginFinding.Severity {
+        findings.map(\.severity).max(by: { $0.rank < $1.rank }) ?? .info
+    }
+}
+
+private struct PluginFindingsCard: View {
+    var findings: [PluginFinding]
+    var addGuardrail: (Guardrail) -> Void
+
+    var body: some View {
+        if !findings.isEmpty {
+            GroupBox(L("Plugins")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(findings) { finding in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Label(finding.title, systemImage: finding.severity.symbol)
+                                    .font(.callout.bold()).foregroundStyle(finding.severity.color)
+                                Spacer()
+                                Text(finding.kind.title).font(.caption2.bold()).foregroundStyle(.secondary)
+                            }
+                            Text(finding.summary).font(.caption).fixedSize(horizontal: false, vertical: true)
+                            if !finding.evidence.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    ForEach(Array(finding.evidence.enumerated()), id: \.offset) { _, evidence in
+                                        Text("\(evidence.label): \(evidence.value)")
+                                            .font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(3)
+                                    }
+                                }
+                            }
+                            HStack(spacing: 6) {
+                                Text(L("%@ · %@", finding.pluginID, finding.pluginVersion))
+                                    .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                                if let guardrail = finding.suggestedGuardrail {
+                                    Spacer()
+                                    Button(L("Add Guardrail")) { addGuardrail(guardrail) }
+                                        .buttonStyle(.link).font(.caption)
+                                        .help(L("Save this as a normal Flowlight guardrail"))
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        if finding.id != findings.last?.id { Divider() }
+                    }
+                    Text(L("Plugin findings are advisory. They did not block or change this request."))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+        }
+    }
+}
+
+private extension PluginFinding.Severity {
+    var rank: Int {
+        switch self { case .info: return 0; case .low: return 1; case .medium: return 2; case .high: return 3 }
+    }
+
+    var symbol: String {
+        switch self {
+        case .info: return "info.circle"
+        case .low: return "exclamationmark.circle"
+        case .medium: return "exclamationmark.triangle.fill"
+        case .high: return "xmark.octagon.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .info: return .secondary
+        case .low: return FL.warning
+        case .medium: return .orange
+        case .high: return FL.critical
+        }
+    }
+}
+
 /// One request and response: tool calls first, then headers and bodies.
 private struct ExchangeDetail: View {
     @EnvironmentObject var monitor: TrafficMonitor
     let exchange: HTTPExchange
     var assessment: RiskAssessment?
+    var pluginFindings: [PluginFinding] = []
     var cause: ToolCallLinks.Link?
     var results: [String: ToolResult] = [:]
     /// The toolbar's search term, so matches inside a body are marked where they appear.
@@ -570,6 +677,7 @@ private struct ExchangeDetail: View {
             if LocalRiskSettings.isActive {
                 PotentialHarmCard(assessment: assessment)
             }
+            PluginFindingsCard(findings: pluginFindings) { monitor.guardrails.save($0) }
             if let note = exchange.note {
                 Label(note, systemImage: "lock").foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }

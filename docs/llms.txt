@@ -7,6 +7,7 @@
 - [About Flowlight](https://flowlight.xinbetween.com/about/): Why Flowlight exists, the principles it's built on, and who makes it.
 - [Flowlight documentation](https://flowlight.xinbetween.com/docs/): Install Flowlight, name your traffic, read the views, tune the AI agent rules, and uninstall cleanly.
 - [Flowlight for macOS](https://flowlight.xinbetween.com/): Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.
+- [Flowlight plugins](https://flowlight.xinbetween.com/plugins/): How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.
 - [Flowlight privacy](https://flowlight.xinbetween.com/privacy/): What Flowlight records, where it is stored, and which external services the app contacts.
 - [Flowlight releases](https://flowlight.xinbetween.com/releases/): Release notes for every version of Flowlight.
 - [Flowlight threat model](https://flowlight.xinbetween.com/threat-model/): What Flowlight defends against, what it cannot, and why — monitoring rather than prevention.

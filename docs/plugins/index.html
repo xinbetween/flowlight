@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowlight plugins</title>
+<meta name="description" content="How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.">
+<link rel="canonical" href="https://flowlight.xinbetween.com/plugins/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flowlight">
+<meta property="og:locale" content="en">
+<meta property="og:title" content="Flowlight plugins">
+<meta property="og:description" content="How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.">
+<meta property="og:url" content="https://flowlight.xinbetween.com/plugins/">
+<meta property="og:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flowlight plugins">
+<meta name="twitter:description" content="How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.">
+<meta name="twitter:image" content="https://flowlight.xinbetween.com/assets/social-card.png">
+<meta name="twitter:image:alt" content="Flowlight — application-aware network monitoring for macOS, with focused visibility into AI agents">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f16" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+
+<link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-09"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+    <nav class="nav-links" aria-label="Site">
+      <a href="../#agents">AI agents</a>
+      <a href="../docs/">Docs</a>
+      <a href="../plugins/" aria-current="page">Plugins</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../threat-model/">Threat model</a>
+      <a href="../releases/">Releases</a>
+      <a href="../about/">About</a>
+      <a href="https://github.com/xinbetween/flowlight">GitHub</a>
+    </nav>
+    <details class="lang">
+      <summary aria-label="Language" title="Language"><span class="lang-current"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg><span class="lang-name">English</span><svg class="lang-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary>
+      <div class="lang-menu"><span lang="en" aria-current="true">English</span><a href="../de/" hreflang="de" lang="de">Deutsch</a><a href="../es/" hreflang="es" lang="es">Español</a><a href="../fr/" hreflang="fr" lang="fr">Français</a><a href="../it/" hreflang="it" lang="it">Italiano</a><a href="../pt-PT/" hreflang="pt-PT" lang="pt-PT">Português</a><a href="../ja/" hreflang="ja" lang="ja">日本語</a><a href="../zh-Hans/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a href="../zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a><a href="../ko/" hreflang="ko" lang="ko">한국어</a></div>
+    </details>
+    <a class="btn btn-primary btn-sm" href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download</a>
+  </div>
+</header>
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Plugins</p>
+    <h1>Write inspection plugins</h1>
+    <p class="lede">Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; third-party plugins use the same manifest shape.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="On this page">
+      <details class="toc-sheet" open>
+        <summary>On this page</summary>
+        <div class="toc-group">
+          <strong>Model</strong>
+          <a href="#trust">Trust boundary</a><a href="#manifest">Manifest</a><a href="#findings">Findings</a>
+        </div>
+        <div class="toc-group">
+          <strong>Guardrails</strong>
+          <a href="#providers">Providers</a><a href="#template">Template package</a><a href="#review">Review checklist</a>
+        </div>
+      </details>
+    </nav>
+    <article class="prose">
+      <h2 id="trust">The trust boundary</h2>
+      <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
+      <p>The first shipped plugins are official built-ins. The template package below is for designing third-party or official add-on packs against the manifest and finding format while the installed plugin loader is still being hardened.</p>
+
+      <h2 id="manifest">Manifest</h2>
+      <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.</p>
+<pre>{
+  "id": "official.presidio-pii",
+  "name": "Presidio PII",
+  "version": "1.0.0",
+  "kind": "llmMCP",
+  "enabled": true,
+  "source": "installed",
+  "publisher": "official",
+  "guardrailProvider": "presidio",
+  "description": "Flags requests that should be reviewed by a PII masking policy.",
+  "ruleVersion": 1,
+  "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
+  "capabilities": ["annotate", "suggestGuardrail"]
+}</pre>
+      <table>
+        <tr><th>Field</th><th>Values</th><th>Meaning</th></tr>
+        <tr><td><code>kind</code></td><td><code>traffic</code>, <code>llmMCP</code></td><td>Whether the plugin describes ordinary inspected HTTP or model/tool/MCP activity.</td></tr>
+        <tr><td><code>publisher</code></td><td><code>official</code>, <code>thirdParty</code></td><td>Official plugins are released by Flowlight; third-party plugins are authored outside the project.</td></tr>
+        <tr><td><code>source</code></td><td><code>builtIn</code>, <code>installed</code></td><td>Built-in plugins ship in the app. Installed plugins come from a package.</td></tr>
+        <tr><td><code>capabilities</code></td><td><code>annotate</code>, <code>suggestGuardrail</code></td><td>Capabilities are advisory; enforcement still uses Flowlight rules and guardrails.</td></tr>
+      </table>
+
+      <h2 id="findings">Findings</h2>
+      <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
+<pre>{
+  "severity": "medium",
+  "title": "High-risk tool available",
+  "summary": "Claude Code declared Bash. Add a guardrail if this tool should be refused.",
+  "evidence": [
+    { "label": "Tool", "value": "Bash" },
+    { "label": "Provider", "value": "Flowlight" }
+  ],
+  "suggestedGuardrail": {
+    "agent": "claude",
+    "server": "",
+    "tool": "Bash",
+    "origin": "observed"
+  }
+}</pre>
+
+      <h2 id="providers">Supported guardrail providers</h2>
+      <p>Official and third-party plugins can declare the guardrail provider they model. Declaring a provider does not send traffic to that provider or enable enforcement on its own; it is a label for the policy semantics and review path.</p>
+      <table>
+        <tr><th>Provider</th><th>Use</th></tr>
+        <tr><td>Presidio</td><td>PII detection and masking.</td></tr>
+        <tr><td>Bedrock</td><td>AWS Bedrock guardrails.</td></tr>
+        <tr><td>Lakera</td><td>Content moderation.</td></tr>
+        <tr><td>Aporia</td><td>Custom guardrails.</td></tr>
+        <tr><td>Noma</td><td>Noma Security policies.</td></tr>
+        <tr><td>PANW Prisma AIRS</td><td>Prisma AIRS guardrails.</td></tr>
+        <tr><td>Custom</td><td>Your own guardrail implementation.</td></tr>
+      </table>
+
+      <h2 id="template">Template package</h2>
+      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins.</p>
+<pre>cp -R templates/inspection-plugin my-flowlight-plugin
+cd my-flowlight-plugin
+python3 -m json.tool manifest.json
+python3 validate.py</pre>
+      <p>The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
+
+      <h2 id="review">Review checklist</h2>
+      <ul>
+        <li>The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.</li>
+        <li>Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.</li>
+        <li>Provider-side MCP connector findings say local network rules cannot reach provider-run calls.</li>
+        <li>Failures are fail-open: capture remains complete and no finding is better than blocking capture.</li>
+        <li>The privacy summary is specific enough that a user can tell what data the plugin needs.</li>
+      </ul>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="../"><img src="../assets/icon.png" alt="">Flowlight</a>
+        <p>Application-aware network monitoring for macOS, with focused visibility into AI agents.</p>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg">Download for macOS</a></li>
+        <li><a href="../docs/#install">Install with Homebrew</a></li>
+        <li><a href="../releases/">Release notes</a></li>
+        <li><a href="../docs/">Documentation</a></li>
+      </ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/xinbetween/flowlight">Source code</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/CONTRIBUTING.md">Contributing</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/issues">Report an issue</a></li>
+      </ul></div>
+      <div><h4>Trust</h4><ul>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">License (GPL-3.0)</a></li>
+        <li><a href="../about/">About</a></li>
+      </ul></div>
+      <div><h4>For AI agents</h4><ul>
+        <li><a href="../llms.txt">llms.txt</a></li>
+        <li><a href="../llms-full.txt">llms-full.txt</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
+        <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
+      <span>Version 0.13.8 · Not affiliated with Apple or any AI provider named on this site.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  // Copy buttons for the install command. Falls back to selecting the text when the clipboard isn't available.
+  document.querySelectorAll("button.copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.textContent = "Copied";
+        button.setAttribute("data-copied", "");
+        setTimeout(function () { button.textContent = "Copy"; button.removeAttribute("data-copied"); }, 1600);
+      };
+      var text = button.getAttribute("data-copy");
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, select); } else { select(); }
+      function select() {
+        var range = document.createRange();
+        range.selectNodeContents(button.parentNode.querySelector("code"));
+        var selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+  });
+
+  // The table of contents starts collapsed on a phone. It is marked open in the markup so that without
+  // JavaScript — or on a desktop, where the summary is hidden — it is simply a list.
+  (function () {
+    var sheet = document.querySelector(".toc-sheet");
+    if (sheet && matchMedia("(max-width: 900px)").matches) sheet.removeAttribute("open");
+  })();
+
+  // Sections reveal as they come into view — once each, never on the way back up, and never for anyone who has
+  // asked for less motion. Without IntersectionObserver nothing is hidden in the first place, so the page reads
+  // exactly the same.
+  (function () {
+    var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches || !("IntersectionObserver" in window)) return;
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    if (!targets.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("shown");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    targets.forEach(function (target) {
+      target.classList.add("reveal");
+      observer.observe(target);
+    });
+  })();
+
+  // The language menu closes when the pointer goes elsewhere, the way a menu should.
+  (function () {
+    var menu = document.querySelector("details.lang");
+    if (!menu) return;
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  })();
+</script>
+
+</body>
+</html>

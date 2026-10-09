@@ -56,6 +56,8 @@ final class TrafficMonitor: ObservableObject {
     let rules = RuleStore()
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
     let guardrails = GuardrailStore()
+    /// Advisory inspection plugins: official built-ins first, installed third-party packs later.
+    let plugins = PluginStore()
     /// Channels that aren't the network: Bluetooth, USB. Both off until switched on.
     let devices = DeviceStore()
     /// Questions in plain language, answered from the recorded history.
@@ -157,6 +159,7 @@ final class TrafficMonitor: ObservableObject {
             Task { @MainActor in self?.rules.record([event]) }
         }
         guardrails.attach(db: db)
+        plugins.attach(db: db)
         devices.attach(db: db)
         ask.attach(db: readDB)
         ask.environment = { [weak self] in self?.askEnvironment() ?? .empty }
@@ -636,6 +639,10 @@ final class TrafficMonitor: ObservableObject {
 
     func analyzeRecentInspectedRequests() {
         Task { await localRisk.backfillRecent() }
+    }
+
+    func clearPluginFindings() {
+        plugins.clearFindings()
     }
 
     func clearLocalRiskAnalyses() {

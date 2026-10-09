@@ -384,6 +384,28 @@ final class TrafficDatabase: @unchecked Sendable {
         );
         CREATE INDEX IF NOT EXISTS local_risk_assessments_state_created ON local_risk_assessments (state, created_at);
         CREATE INDEX IF NOT EXISTS local_risk_assessments_severity_created ON local_risk_assessments (severity, created_at);
+        CREATE TABLE IF NOT EXISTS plugins (
+            id TEXT PRIMARY KEY,
+            manifest TEXT NOT NULL,
+            enabled INTEGER NOT NULL,
+            updated INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS plugin_findings (
+            id TEXT PRIMARY KEY,
+            exchange_id INTEGER NOT NULL,
+            plugin_id TEXT NOT NULL,
+            plugin_version TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            evidence TEXT NOT NULL,
+            suggested_guardrail TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            UNIQUE(exchange_id, plugin_id, title)
+        );
+        CREATE INDEX IF NOT EXISTS plugin_findings_exchange ON plugin_findings (exchange_id);
+        CREATE INDEX IF NOT EXISTS plugin_findings_plugin_created ON plugin_findings (plugin_id, created_at);
         """)
         // Added with blocking: the destination a refused connection was headed for, so its alert can offer to
         // allow it without parsing the sentence back out of `detail`.
@@ -974,6 +996,86 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("DELETE FROM guardrails WHERE id = ?", [.text(id.uuidString)])
     }
 
+    // MARK: Plugins
+
+    func loadPluginManifests() throws -> [PluginManifest] {
+        let rows = try conn.query("SELECT manifest, enabled FROM plugins ORDER BY updated") { ($0.text(0), $0.int(1) != 0) }
+        return rows.compactMap { text, enabled in
+            guard var manifest = try? JSONDecoder().decode(PluginManifest.self, from: Data(text.utf8)) else { return nil }
+            manifest.enabled = enabled
+            return manifest
+        }
+    }
+
+    func savePluginManifest(_ manifest: PluginManifest) throws {
+        let json = String(decoding: try JSONEncoder().encode(manifest), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO plugins (id, manifest, enabled, updated) VALUES (?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET manifest = excluded.manifest, enabled = excluded.enabled, updated = excluded.updated
+            """, [.text(manifest.id), .text(json), .int(manifest.enabled ? 1 : 0), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    func setPluginEnabled(id: String, enabled: Bool) throws {
+        if var manifest = try loadPluginManifests().first(where: { $0.id == id }) {
+            manifest.enabled = enabled
+            try savePluginManifest(manifest)
+        } else if var manifest = PluginEngine.builtInManifests.first(where: { $0.id == id }) {
+            manifest.enabled = enabled
+            try savePluginManifest(manifest)
+        }
+    }
+
+    func insertPluginFindings(_ findings: [PluginFindingDraft], forExchangeID exchangeID: Int64) throws {
+        guard !findings.isEmpty else { return }
+        let encoder = JSONEncoder()
+        for draft in findings {
+            let finding = draft.materialize(exchangeID: exchangeID)
+            let evidence = String(decoding: try encoder.encode(finding.evidence), as: UTF8.self)
+            let guardrail: String
+            if let suggested = finding.suggestedGuardrail {
+                guardrail = String(decoding: try encoder.encode(suggested), as: UTF8.self)
+            } else {
+                guardrail = ""
+            }
+            try conn.run("""
+                INSERT OR IGNORE INTO plugin_findings (id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """, [.text(finding.id), .int(exchangeID), .text(finding.pluginID), .text(finding.pluginVersion), .text(finding.kind.rawValue),
+                      .text(finding.severity.rawValue), .text(finding.title), .text(String(finding.summary.prefix(500))), .text(evidence),
+                      .text(guardrail), .double(finding.createdAt.timeIntervalSince1970)])
+        }
+    }
+
+    func pluginFindings(exchangeIDs: [Int64], visibleOnly: Bool = true) throws -> [Int64: [PluginFinding]] {
+        guard !exchangeIDs.isEmpty else { return [:] }
+        let manifests = try loadPluginManifests()
+        let enabled = Dictionary(uniqueKeysWithValues: PluginEngine.mergedManifests(manifests).map { ($0.id, $0.enabled) })
+        let marks = Array(repeating: "?", count: exchangeIDs.count).joined(separator: ",")
+        let values = exchangeIDs.map(SQLValue.int)
+        let rows = try conn.query("""
+            SELECT id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, created_at
+            FROM plugin_findings WHERE exchange_id IN (\(marks)) ORDER BY created_at ASC, title ASC
+            """, values) { row in decodePluginFinding(row) }
+        let visible = visibleOnly ? rows.filter { enabled[$0.pluginID] ?? true } : rows
+        return Dictionary(grouping: visible, by: \.exchangeID)
+    }
+
+    func clearPluginFindings() throws {
+        try conn.run("DELETE FROM plugin_findings")
+    }
+
+    private func decodePluginFinding(_ row: SQLRow) -> PluginFinding {
+        let decoder = JSONDecoder()
+        let evidence = (try? decoder.decode([PluginEvidence].self, from: Data(row.text(8).utf8))) ?? []
+        let guardrailText = row.text(9)
+        let guardrail = guardrailText.isEmpty ? nil : try? decoder.decode(Guardrail.self, from: Data(guardrailText.utf8))
+        return PluginFinding(id: row.text(0), exchangeID: row.int(1), pluginID: row.text(2), pluginVersion: row.text(3),
+                             kind: PluginManifest.Kind(rawValue: row.text(4)) ?? .traffic,
+                             severity: PluginFinding.Severity(rawValue: row.text(5)) ?? .info,
+                             title: row.text(6), summary: row.text(7), evidence: evidence, suggestedGuardrail: guardrail,
+                             createdAt: Date(timeIntervalSince1970: row.double(10)))
+    }
+
     // MARK: Rule simulation
 
     /// Recorded traffic in the shape the rule engine judges, for answering "what would this rule have done".
@@ -1002,9 +1104,10 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: HTTPS inspection
 
-    /// Inserts raw capture and, when deterministic triage finds enough independent evidence, creates its separate
-    /// derived job in the same transaction. This returns before any model work begins.
+    /// Inserts raw capture and, when deterministic triage or plugin rules find bounded evidence, creates separate
+    /// derived rows in the same transaction. This returns before any model work begins.
     func insertExchange(_ e: HTTPExchange, enqueueLocalRisk: Bool = false) throws -> Int64 {
+        var insertedID: Int64 = 0
         try conn.transaction {
             let encoder = JSONEncoder()
             func json<T: Encodable>(_ v: T) -> String { (try? encoder.encode(v)).map { String(decoding: $0, as: UTF8.self) } ?? "[]" }
@@ -1021,16 +1124,23 @@ final class TrafficDatabase: @unchecked Sendable {
                       .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
                       .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
                       .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? ""), .text(e.responseTransform ?? "")])
-            let id = try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
-            if enqueueLocalRisk, LocalRiskSettings.enabled {
-                var stored = e
-                stored.id = id
-                if let candidate = LocalRiskTriage.candidate(for: stored) {
-                    try enqueueLocalRiskCandidate(candidate)
+            insertedID = try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
+            var stored = e
+            stored.id = insertedID
+            if enqueueLocalRisk, LocalRiskSettings.enabled, let candidate = LocalRiskTriage.candidate(for: stored) {
+                try enqueueLocalRiskCandidate(candidate)
+            }
+            do {
+                let manifests = PluginEngine.mergedManifests(try loadPluginManifests())
+                for manifest in manifests where PluginEngine.builtInManifests.contains(where: { $0.id == manifest.id }) {
+                    try savePluginManifest(manifest)
                 }
+                try insertPluginFindings(PluginEngine.evaluate(stored, manifests: manifests), forExchangeID: insertedID)
+            } catch {
+                appLog.error("plugin evaluation skipped: \(String(describing: error), privacy: .public)")
             }
         }
-        return try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
+        return insertedID
     }
 
     private func enqueueLocalRiskCandidate(_ candidate: RiskCandidate) throws {
@@ -1267,6 +1377,8 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.transaction {
             try conn.run("DELETE FROM local_risk_assessments WHERE exchange_id IN (SELECT id FROM http_exchanges WHERE ts < ?)",
                          [.double(cutoff.timeIntervalSince1970)])
+            try conn.run("DELETE FROM plugin_findings WHERE exchange_id IN (SELECT id FROM http_exchanges WHERE ts < ?)",
+                         [.double(cutoff.timeIntervalSince1970)])
             try conn.run("DELETE FROM http_exchanges WHERE ts < ?", [.double(cutoff.timeIntervalSince1970)])
         }
     }
@@ -1274,6 +1386,7 @@ final class TrafficDatabase: @unchecked Sendable {
     func deleteAllExchanges() throws {
         try conn.transaction {
             try conn.run("DELETE FROM local_risk_assessments")
+            try conn.run("DELETE FROM plugin_findings")
             try conn.run("DELETE FROM http_exchanges")
         }
     }
@@ -1380,7 +1493,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings"] {
                 try conn.run("DELETE FROM \(t)")
             }
         }
