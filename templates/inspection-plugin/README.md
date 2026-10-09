@@ -1,6 +1,6 @@
 # Flowlight Inspection Plugin Template
 
-This template describes an advisory Flowlight inspection plugin package. The first app release with plugins ships official built-in Swift plugins only; this package is the authoring shape for official add-on packs and future installed third-party plugins.
+This template describes an advisory Flowlight inspection plugin package. Flowlight can import and export this manifest shape today; installed packages are visible and configurable, while executable plugin logic remains limited to official built-in Swift rules until the sandbox phase.
 
 ## Trust boundary
 
@@ -10,7 +10,7 @@ Evidence must be bounded and redacted. Do not include raw request or response bo
 
 ## Files
 
-- `manifest.json`: plugin identity, publisher category, guardrail provider, privacy summary and capabilities.
+- `manifest.json`: plugin identity, publisher category, guardrail provider, privacy summary, optional `configuration` string map and capabilities.
 - `findings.example.json`: sample findings the plugin may produce.
 - `validate.py`: local schema and privacy sanity checks for the template package.
 

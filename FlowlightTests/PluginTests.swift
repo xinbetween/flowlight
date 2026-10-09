@@ -82,10 +82,65 @@ final class PluginTests: XCTestCase {
                                       description: "Detects and masks PII.", privacySummary: "Uses redacted inspection metadata.")
         manifest.source = .installed
         manifest.publisher = .official
+        manifest.configuration = ["policy": "default"]
         let data = try JSONEncoder().encode(manifest)
         let decoded = try JSONDecoder().decode(PluginManifest.self, from: data)
         XCTAssertEqual(decoded.publisher, .official)
         XCTAssertEqual(decoded.guardrailProvider, .presidio)
+        XCTAssertEqual(decoded.configuration["policy"], "default")
         XCTAssertEqual(PluginManifest.GuardrailProvider.prismaAIRS.title, "PANW Prisma AIRS")
+    }
+
+    func testPluginPackageAcceptsBareManifestAndWrappedPackage() throws {
+        let bare = Data(#"{"id":"thirdparty.test","name":"Test","version":"0.1.0","kind":"traffic","source":"installed","publisher":"thirdParty","guardrailProvider":"custom","description":"Test plugin.","privacySummary":"Uses metadata only.","capabilities":["annotate"]}"#.utf8)
+        let decodedBare = try JSONDecoder().decode(PluginPackage.self, from: bare)
+        XCTAssertEqual(decodedBare.manifest.id, "thirdparty.test")
+
+        let wrapped = try JSONEncoder().encode(PluginPackage(manifest: decodedBare.manifest))
+        let decodedWrapped = try JSONDecoder().decode(PluginPackage.self, from: wrapped)
+        XCTAssertEqual(decodedWrapped.manifest.id, "thirdparty.test")
+    }
+
+    @MainActor
+    func testPluginStoreRejectsReservedBuiltInPackageID() {
+        let store = PluginStore()
+        let data = Data(#"{"id":"traffic.large-upload","name":"Pretend","version":"0.1.0","kind":"traffic","source":"installed","publisher":"thirdParty","guardrailProvider":"custom","description":"Pretend plugin.","privacySummary":"Uses metadata only.","capabilities":["annotate"]}"#.utf8)
+        let exp = expectation(description: "import completes")
+        store.attach(db: try! database())
+        store.importPackage(data: data) { result in
+            if case .failure(let error as PluginPackageError) = result {
+                XCTAssertEqual(error, .reservedBuiltInID)
+            } else {
+                XCTFail("expected reserved built-in ID rejection")
+            }
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 2)
+    }
+
+    func testInstalledPluginConfigurationAndRemovalPersist() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.example", name: "Example", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Example plugin.", privacySummary: "Uses metadata only.")
+        try db.savePluginManifest(manifest)
+        try db.updatePluginConfiguration(id: manifest.id, configuration: ["mode": "audit"])
+        manifest = try XCTUnwrap(db.loadPluginManifests().first { $0.id == "thirdparty.example" })
+        XCTAssertEqual(manifest.configuration["mode"], "audit")
+
+        try db.deleteInstalledPlugin(id: manifest.id)
+        XCTAssertNil(try db.loadPluginManifests().first { $0.id == "thirdparty.example" })
+    }
+
+    func testBackfillRecreatesBuiltInFindingsForRetainedExchanges() throws {
+        let db = try database()
+        let id = try db.insertExchange(exchange())
+        XCTAssertFalse(try db.pluginFindings(exchangeIDs: [id]).isEmpty)
+        try db.clearPluginFindings()
+        XCTAssertTrue(try db.pluginFindings(exchangeIDs: [id], visibleOnly: false).isEmpty)
+        let count = try db.backfillPluginFindings(pluginID: "traffic.large-upload")
+        XCTAssertEqual(count, 1)
+        let findings = try db.pluginFindings(exchangeIDs: [id], visibleOnly: false)
+        XCTAssertEqual(findings[id]?.map(\.pluginID), ["traffic.large-upload"])
     }
 }
