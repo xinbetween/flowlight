@@ -13,7 +13,24 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.13.8</h2><time datetime="2026-10-07">October 7, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.14.0</h2><time datetime="2026-10-09">October 9, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Official inspection plugins.</strong> Flowlight now derives advisory plugin findings from inspected
+            exchanges after capture, redaction and attribution. The first official built-ins cover large uploads,
+            destructive-looking HTTP requests, credential-like header names, direct HTTP MCP activity, provider-run MCP
+            connectors and high-risk LLM tools.</li>
+          <li><strong>Common guardrail suggestions.</strong> LLM/MCP plugin findings can suggest normal Flowlight guardrails
+            for risky tools, but enforcement still lives in the existing Guardrails system and only starts when you save
+            or enable one. Supported provider labels now include Presidio, Bedrock, Lakera, Aporia, Noma, PANW Prisma AIRS
+            and Custom.</li>
+          <li><strong>A plugin authoring path.</strong> Settings has a Plugins tab, Inspect shows plugin findings on recorded
+            exchanges, the site documents plugin manifests and evidence limits, and <code>templates/inspection-plugin</code>
+            gives authors a local starter package and validator.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.13.8</h2><time datetime="2026-10-07">October 7, 2026</time></header>
         <ul>
           <li><strong>Faithful static mocks from inspected traffic.</strong> Mock This Endpoint now prepopulates
             retained, redacted request and response headers as editable key/value rows. Response text and JSON are

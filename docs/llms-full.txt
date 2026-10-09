@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.13.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.14.0, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.13.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.14.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1536,8 +1536,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.14.0
+October 9, 2026Latest
+
+ Official inspection plugins. Flowlight now derives advisory plugin findings from inspected
+ exchanges after capture, redaction and attribution. The first official built-ins cover large uploads,
+ destructive-looking HTTP requests, credential-like header names, direct HTTP MCP activity, provider-run MCP
+ connectors and high-risk LLM tools.
+
+ Common guardrail suggestions. LLM/MCP plugin findings can suggest normal Flowlight guardrails
+ for risky tools, but enforcement still lives in the existing Guardrails system and only starts when you save
+ or enable one. Supported provider labels now include Presidio, Bedrock, Lakera, Aporia, Noma, PANW Prisma AIRS
+ and Custom.
+
+ A plugin authoring path. Settings has a Plugins tab, Inspect shows plugin findings on recorded
+ exchanges, the site documents plugin manifests and evidence limits, and templates/inspection-plugin
+ gives authors a local starter package and validator.
+
  0.13.8
-October 7, 2026Latest
+October 7, 2026
 
  Faithful static mocks from inspected traffic. Mock This Endpoint now prepopulates
  retained, redacted request and response headers as editable key/value rows. Response text and JSON are
