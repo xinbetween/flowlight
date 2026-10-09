@@ -1,0 +1,105 @@
+<!--
+title: Flowlight plugins
+description: How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.
+path: /plugins/
+nav: plugins
+-->
+<main id="main">
+  <section class="page-head"><div class="wrap">
+    <p class="eyebrow">Plugins</p>
+    <h1>Write inspection plugins</h1>
+    <p class="lede">Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; third-party plugins use the same manifest shape.</p>
+  </div></section>
+  <div class="wrap prose-wrap">
+    <nav class="toc" aria-label="On this page">
+      <details class="toc-sheet" open>
+        <summary>On this page</summary>
+        <div class="toc-group">
+          <strong>Model</strong>
+          <a href="#trust">Trust boundary</a><a href="#manifest">Manifest</a><a href="#findings">Findings</a>
+        </div>
+        <div class="toc-group">
+          <strong>Guardrails</strong>
+          <a href="#providers">Providers</a><a href="#template">Template package</a><a href="#review">Review checklist</a>
+        </div>
+      </details>
+    </nav>
+    <article class="prose">
+      <h2 id="trust">The trust boundary</h2>
+      <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
+      <p>The first shipped plugins are official built-ins. The template package below is for designing third-party or official add-on packs against the manifest and finding format while the installed plugin loader is still being hardened.</p>
+
+      <h2 id="manifest">Manifest</h2>
+      <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.</p>
+<pre>{
+  "id": "official.presidio-pii",
+  "name": "Presidio PII",
+  "version": "1.0.0",
+  "kind": "llmMCP",
+  "enabled": true,
+  "source": "installed",
+  "publisher": "official",
+  "guardrailProvider": "presidio",
+  "description": "Flags requests that should be reviewed by a PII masking policy.",
+  "ruleVersion": 1,
+  "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
+  "capabilities": ["annotate", "suggestGuardrail"]
+}</pre>
+      <table>
+        <tr><th>Field</th><th>Values</th><th>Meaning</th></tr>
+        <tr><td><code>kind</code></td><td><code>traffic</code>, <code>llmMCP</code></td><td>Whether the plugin describes ordinary inspected HTTP or model/tool/MCP activity.</td></tr>
+        <tr><td><code>publisher</code></td><td><code>official</code>, <code>thirdParty</code></td><td>Official plugins are released by Flowlight; third-party plugins are authored outside the project.</td></tr>
+        <tr><td><code>source</code></td><td><code>builtIn</code>, <code>installed</code></td><td>Built-in plugins ship in the app. Installed plugins come from a package.</td></tr>
+        <tr><td><code>capabilities</code></td><td><code>annotate</code>, <code>suggestGuardrail</code></td><td>Capabilities are advisory; enforcement still uses Flowlight rules and guardrails.</td></tr>
+      </table>
+
+      <h2 id="findings">Findings</h2>
+      <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
+<pre>{
+  "severity": "medium",
+  "title": "High-risk tool available",
+  "summary": "Claude Code declared Bash. Add a guardrail if this tool should be refused.",
+  "evidence": [
+    { "label": "Tool", "value": "Bash" },
+    { "label": "Provider", "value": "Flowlight" }
+  ],
+  "suggestedGuardrail": {
+    "agent": "claude",
+    "server": "",
+    "tool": "Bash",
+    "origin": "observed"
+  }
+}</pre>
+
+      <h2 id="providers">Supported guardrail providers</h2>
+      <p>Official and third-party plugins can declare the guardrail provider they model. Declaring a provider does not send traffic to that provider or enable enforcement on its own; it is a label for the policy semantics and review path.</p>
+      <table>
+        <tr><th>Provider</th><th>Use</th></tr>
+        <tr><td>Presidio</td><td>PII detection and masking.</td></tr>
+        <tr><td>Bedrock</td><td>AWS Bedrock guardrails.</td></tr>
+        <tr><td>Lakera</td><td>Content moderation.</td></tr>
+        <tr><td>Aporia</td><td>Custom guardrails.</td></tr>
+        <tr><td>Noma</td><td>Noma Security policies.</td></tr>
+        <tr><td>PANW Prisma AIRS</td><td>Prisma AIRS guardrails.</td></tr>
+        <tr><td>Custom</td><td>Your own guardrail implementation.</td></tr>
+      </table>
+
+      <h2 id="template">Template package</h2>
+      <p>The starter package lives at <a href="https://github.com/{{repo}}/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins.</p>
+<pre>cp -R templates/inspection-plugin my-flowlight-plugin
+cd my-flowlight-plugin
+python3 -m json.tool manifest.json
+python3 validate.py</pre>
+      <p>The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
+
+      <h2 id="review">Review checklist</h2>
+      <ul>
+        <li>The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.</li>
+        <li>Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.</li>
+        <li>Provider-side MCP connector findings say local network rules cannot reach provider-run calls.</li>
+        <li>Failures are fail-open: capture remains complete and no finding is better than blocking capture.</li>
+        <li>The privacy summary is specific enough that a user can tell what data the plugin needs.</li>
+      </ul>
+    </article>
+  </div>
+</main>
