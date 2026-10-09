@@ -38,10 +38,17 @@ struct PluginSettingsView: View {
         } message: {
             Text(L("Recorded requests, response bodies, rules, guardrails, and plugin enable settings stay in place."))
         }
-        .confirmationDialog(L("Remove installed plugin?"), item: $removing, titleVisibility: .visible) { plugin in
-            Button(L("Remove %@", plugin.name), role: .destructive) { monitor.plugins.removeInstalled(plugin) }
-        } message: { plugin in
-            Text(L("%@ and its retained findings will be removed. Built-in plugins cannot be removed.", plugin.name))
+        .confirmationDialog(L("Remove installed plugin?"), isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
+            if let plugin = removing {
+                Button(L("Remove %@", plugin.name), role: .destructive) {
+                    monitor.plugins.removeInstalled(plugin)
+                    removing = nil
+                }
+            }
+        } message: {
+            if let plugin = removing {
+                Text(L("%@ and its retained findings will be removed. Built-in plugins cannot be removed.", plugin.name))
+            }
         }
         .sheet(item: $configuring) { plugin in
             PluginConfigurationSheet(plugin: plugin) { configuration in
