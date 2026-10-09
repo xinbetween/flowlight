@@ -136,9 +136,9 @@
       <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.</p>
 <pre>cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-python3 -m json.tool manifest.json
-python3 validate.py</pre>
-      <p>The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
+node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
+node validate.js</pre>
+      <p>The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
 
       <h2 id="review">Review checklist</h2>
       <ul>

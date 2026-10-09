@@ -1400,10 +1400,10 @@ Plugins
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-python3 -m json.tool manifest.json
-python3 validate.py
+node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
+node validate.js
 
- The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
+ The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
 
  Review checklist
 

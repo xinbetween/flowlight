@@ -12,7 +12,7 @@ Evidence must be bounded and redacted. Do not include raw request or response bo
 
 - `manifest.json`: plugin identity, publisher category, guardrail provider, privacy summary, optional `configuration` string map and capabilities.
 - `findings.example.json`: sample findings the plugin may produce.
-- `validate.py`: local schema and privacy sanity checks for the template package.
+- `validate.js`: local schema and privacy sanity checks for the template package.
 
 ## Supported guardrail providers
 
@@ -28,5 +28,5 @@ Evidence must be bounded and redacted. Do not include raw request or response bo
 ## Validate
 
 ```sh
-python3 validate.py
+node validate.js
 ```
