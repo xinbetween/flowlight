@@ -27,7 +27,7 @@ nav: plugins
     <article class="prose">
       <h2 id="trust">The trust boundary</h2>
       <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
-      <p>The first shipped plugins are official built-ins. The template package below is for designing third-party or official add-on packs against the manifest and finding format while the installed plugin loader is still being hardened.</p>
+      <p>Flowlight can import and export local plugin manifest packages from Settings. Installed packages are visible and configurable today; execution remains limited to official built-in rules until sandboxed advisory plugins ship.</p>
 
       <h2 id="manifest">Manifest</h2>
       <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.</p>
@@ -85,12 +85,12 @@ nav: plugins
       </table>
 
       <h2 id="template">Template package</h2>
-      <p>The starter package lives at <a href="https://github.com/{{repo}}/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins.</p>
+      <p>The starter package lives at <a href="https://github.com/{{repo}}/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.</p>
 <pre>cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-python3 -m json.tool manifest.json
-python3 validate.py</pre>
-      <p>The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
+node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
+node validate.js</pre>
+      <p>The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
 
       <h2 id="review">Review checklist</h2>
       <ul>

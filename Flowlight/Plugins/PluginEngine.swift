@@ -38,7 +38,7 @@ enum PluginEngine {
         let enabled = Dictionary(uniqueKeysWithValues: manifests.map { ($0.id, $0.enabled) })
         let context = PluginContext(exchange: exchange)
         return builtInRules.flatMap { rule -> [PluginFindingDraft] in
-            guard enabled[rule.manifest.id] ?? rule.manifest.enabled else { return [] }
+            guard enabled[rule.manifest.id] == true else { return [] }
             return rule.evaluate(context)
         }
     }
@@ -48,8 +48,10 @@ enum PluginEngine {
         for builtIn in builtInManifests {
             if var existing = byID[builtIn.id] {
                 let enabled = existing.enabled
+                let configuration = existing.configuration
                 existing = builtIn
                 existing.enabled = enabled
+                existing.configuration = configuration
                 byID[builtIn.id] = existing
             } else {
                 byID[builtIn.id] = builtIn

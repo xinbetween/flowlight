@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.14.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.14.1, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.14.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.14.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1323,7 +1323,7 @@ Plugins
 
  Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.
 
- The first shipped plugins are official built-ins. The template package below is for designing third-party or official add-on packs against the manifest and finding format while the installed plugin loader is still being hardened.
+ Flowlight can import and export local plugin manifest packages from Settings. Installed packages are visible and configurable today; execution remains limited to official built-in rules until sandboxed advisory plugins ship.
 
  Manifest
 
@@ -1396,14 +1396,14 @@ Plugins
 
  Template package
 
- The starter package lives at templates/inspection-plugin. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins.
+ The starter package lives at templates/inspection-plugin. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-python3 -m json.tool manifest.json
-python3 validate.py
+node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
+node validate.js
 
- The validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
+ The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
 
  Review checklist
 
@@ -1536,8 +1536,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.14.0
+ 0.14.1
 October 9, 2026Latest
+
+ Install local plugin packages. Settings › Plugins can now import and export Flowlight plugin
+ manifest packages, keep installed plugins split by official or third-party publisher, and reject packages that
+ try to reuse a reserved built-in plugin ID.
+
+ Configure and maintain plugin records. Plugin packages can store local string key/value
+ configuration, installed packages can be removed with their retained findings, and built-in plugins preserve
+ enable/configuration state while the app updates their manifest metadata.
+
+ Backfill advisory findings. The Plugins tab can rerun official built-in rules over retained
+ inspected exchanges so newly enabled or updated plugins can annotate recent history without recapturing traffic.
+
+ 0.14.0
+October 9, 2026
 
  Official inspection plugins. Flowlight now derives advisory plugin findings from inspected
  exchanges after capture, redaction and attribution. The first official built-ins cover large uploads,

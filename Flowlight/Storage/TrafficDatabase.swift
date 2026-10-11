@@ -1025,6 +1025,41 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    func updatePluginConfiguration(id: String, configuration: [String: String]) throws {
+        guard var manifest = try loadPluginManifests().first(where: { $0.id == id }) else { return }
+        manifest.configuration = configuration
+        try savePluginManifest(manifest)
+    }
+
+    func deleteInstalledPlugin(id: String) throws {
+        guard let manifest = try loadPluginManifests().first(where: { $0.id == id }), manifest.source == .installed else { return }
+        try conn.transaction {
+            try conn.run("DELETE FROM plugin_findings WHERE plugin_id = ?", [.text(id)])
+            try conn.run("DELETE FROM plugins WHERE id = ?", [.text(id)])
+        }
+    }
+
+    @discardableResult
+    func backfillPluginFindings(pluginID: String? = nil, since: Date = Date().addingTimeInterval(-14 * 86400), limit: Int = 500) throws -> Int {
+        let manifests = PluginEngine.mergedManifests(try loadPluginManifests())
+        let active = pluginID.map { id in manifests.filter { $0.id == id } } ?? manifests
+        let builtInIDs = Set(PluginEngine.builtInManifests.map(\.id))
+        let evaluable = active.filter { builtInIDs.contains($0.id) }
+        guard !evaluable.isEmpty else { return 0 }
+        let exchanges = try exchanges(since: since, limit: limit)
+        var inserted = 0
+        try conn.transaction {
+            if let pluginID { try conn.run("DELETE FROM plugin_findings WHERE plugin_id = ?", [.text(pluginID)]) }
+            else { try conn.run("DELETE FROM plugin_findings WHERE plugin_id IN (\(Array(repeating: "?", count: builtInIDs.count).joined(separator: ",")))", builtInIDs.map(SQLValue.text)) }
+            for exchange in exchanges {
+                let before = conn.changes
+                try insertPluginFindings(PluginEngine.evaluate(exchange, manifests: evaluable), forExchangeID: exchange.id ?? 0)
+                inserted += max(0, conn.changes - before)
+            }
+        }
+        return inserted
+    }
+
     func insertPluginFindings(_ findings: [PluginFindingDraft], forExchangeID exchangeID: Int64) throws {
         guard !findings.isEmpty else { return }
         let encoder = JSONEncoder()

@@ -14,6 +14,7 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     var ruleVersion: Int = 1
     var privacySummary: String
     var capabilities: [Capability] = [.annotate]
+    var configuration: [String: String] = [:]
 
     enum Kind: String, Codable, Sendable { case traffic, llmMCP }
     enum Source: String, Codable, Sendable { case builtIn, installed }
@@ -38,7 +39,8 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
 
     init(id: String, name: String, version: String, kind: Kind, enabled: Bool = true, source: Source = .builtIn,
          publisher: Publisher = .official, guardrailProvider: GuardrailProvider = .flowlight, description: String,
-         ruleVersion: Int = 1, privacySummary: String, capabilities: [Capability] = [.annotate]) {
+         ruleVersion: Int = 1, privacySummary: String, capabilities: [Capability] = [.annotate],
+         configuration: [String: String] = [:]) {
         self.id = id
         self.name = name
         self.version = version
@@ -51,10 +53,11 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         self.ruleVersion = ruleVersion
         self.privacySummary = privacySummary
         self.capabilities = capabilities
+        self.configuration = configuration
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities
+        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities, configuration
     }
 
     init(from decoder: Decoder) throws {
@@ -71,7 +74,26 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         ruleVersion = try values.decodeIfPresent(Int.self, forKey: .ruleVersion) ?? 1
         privacySummary = try values.decode(String.self, forKey: .privacySummary)
         capabilities = try values.decodeIfPresent([Capability].self, forKey: .capabilities) ?? [.annotate]
+        configuration = try values.decodeIfPresent([String: String].self, forKey: .configuration) ?? [:]
     }
+}
+
+struct PluginPackage: Codable, Equatable, Sendable {
+    var manifest: PluginManifest
+
+    init(manifest: PluginManifest) {
+        self.manifest = manifest
+    }
+
+    init(from decoder: Decoder) throws {
+        if let package = try? decoder.container(keyedBy: CodingKeys.self), package.contains(.manifest) {
+            manifest = try package.decode(PluginManifest.self, forKey: .manifest)
+        } else {
+            manifest = try PluginManifest(from: decoder)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case manifest }
 }
 
 struct PluginEvidence: Codable, Equatable, Sendable {
