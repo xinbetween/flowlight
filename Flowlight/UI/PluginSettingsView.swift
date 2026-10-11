@@ -23,7 +23,7 @@ struct PluginSettingsView: View {
                     Text(message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             } footer: {
-                Text(L("Import reads a local plugin manifest package and stores it as installed metadata. Until sandboxed plugins ship, installed packages are visible and configurable but only Flowlight built-ins create findings."))
+                Text(L("Import reads a local plugin manifest package. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only; failures are ignored so capture stays complete."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             pluginSection(L("Official"), plugins: monitor.plugins.officialPlugins,
@@ -145,6 +145,7 @@ private struct PluginSettingsRow: View {
                         PluginPill(plugin.kind.title)
                         PluginPill(plugin.guardrailProvider.title)
                         PluginPill(plugin.source.title)
+                        if !plugin.script.isEmpty { PluginPill(L("JavaScript")) }
                         if plugin.capabilities.contains(.suggestGuardrail) { PluginPill(L("Suggests guardrails")) }
                     }
                     Text(plugin.description).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

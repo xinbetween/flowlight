@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const root = __dirname;
 const kinds = new Set(['traffic', 'llmMCP']);
@@ -46,26 +47,80 @@ function checkManifest(manifest) {
       requireCondition(typeof value === 'string', `configuration ${key} must be a string`);
     }
   }
+  if (manifest.script !== undefined) {
+    requireCondition(typeof manifest.script === 'string', 'script must be a string');
+    requireCondition(Buffer.byteLength(manifest.script, 'utf8') <= 128 * 1024, 'script must be 128 KB or smaller');
+  }
 }
 
-function checkFindings(findings) {
-  requireCondition(Array.isArray(findings), 'findings.example.json must be an array');
+function checkFindings(findings, source = 'findings') {
+  requireCondition(Array.isArray(findings), `${source} must be an array`);
   findings.forEach((finding, index) => {
-    requireCondition(severities.has(finding.severity), `finding ${index} has unsupported severity`);
+    requireCondition(severities.has(finding.severity), `${source} ${index} has unsupported severity`);
     for (const key of ['title', 'summary', 'evidence']) {
-      requireCondition(Object.prototype.hasOwnProperty.call(finding, key), `finding ${index} missing ${key}`);
+      requireCondition(Object.prototype.hasOwnProperty.call(finding, key), `${source} ${index} missing ${key}`);
     }
-    requireCondition(finding.title.length <= 120, `finding ${index} title is too long`);
-    requireCondition(finding.summary.length <= 500, `finding ${index} summary is too long`);
-    requireCondition(Array.isArray(finding.evidence) && finding.evidence.length <= 8, `finding ${index} evidence must be a short array`);
-    requireCondition(!secretPattern.test(JSON.stringify(finding)), `finding ${index} appears to contain a secret-like value`);
+    requireCondition(finding.title.length <= 120, `${source} ${index} title is too long`);
+    requireCondition(finding.summary.length <= 500, `${source} ${index} summary is too long`);
+    requireCondition(Array.isArray(finding.evidence) && finding.evidence.length <= 8, `${source} ${index} evidence must be a short array`);
+    requireCondition(!secretPattern.test(JSON.stringify(finding)), `${source} ${index} appears to contain a secret-like value`);
     finding.evidence.forEach(evidence => {
-      requireCondition((evidence.label || '').length <= 80, `finding ${index} evidence label is too long`);
-      requireCondition((evidence.value || '').length <= 240, `finding ${index} evidence value is too long`);
+      requireCondition((evidence.label || '').length <= 80, `${source} ${index} evidence label is too long`);
+      requireCondition((evidence.value || '').length <= 240, `${source} ${index} evidence value is too long`);
     });
   });
 }
 
-checkManifest(load('manifest.json'));
-checkFindings(load('findings.example.json'));
+function sampleContext() {
+  return {
+    manifest: load('manifest.json'),
+    exchange: {
+      method: 'POST',
+      scheme: 'https',
+      host: 'api.anthropic.com',
+      port: 443,
+      path: '/v1/messages',
+      status: 200,
+      requestHeaderNames: ['content-type', 'authorization'],
+      responseHeaderNames: ['content-type'],
+      requestSize: 8192,
+      responseSize: 16384,
+      requestTruncated: false,
+      responseTruncated: false,
+      contentType: 'application/json',
+      bundleID: 'com.anthropic.claudecode',
+      appName: 'Claude Code',
+      agent: 'claude',
+      agentName: 'Claude Code',
+      mcpServer: null,
+      toolCalls: [{ source: 'anthropic', name: 'Bash', mcpServer: null }],
+      mcp: [],
+      llm: {
+        provider: 'anthropic',
+        model: 'claude-test',
+        declaredTools: [{ name: 'Bash', kind: 'function', server: null }],
+        connectors: [{ label: 'github', provider: 'Anthropic', approval: 'always', authorized: true }],
+        stopReason: null,
+        errorType: null
+      }
+    }
+  };
+}
+
+function runScript(manifest) {
+  if (!manifest.script) return;
+  const pluginFile = fs.readFileSync(path.join(root, 'plugin.js'), 'utf8');
+  requireCondition(manifest.script.trim() === pluginFile.trim(), 'manifest script should match plugin.js');
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(manifest.script, sandbox, { timeout: 250 });
+  requireCondition(typeof sandbox.evaluate === 'function', 'script must define evaluate(context)');
+  const findings = sandbox.evaluate(sampleContext());
+  checkFindings(findings, 'script finding');
+}
+
+const manifest = load('manifest.json');
+checkManifest(manifest);
+checkFindings(load('findings.example.json'), 'sample finding');
+runScript(manifest);
 console.log('ok');

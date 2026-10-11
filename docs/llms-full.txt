@@ -1323,11 +1323,11 @@ Plugins
 
  Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.
 
- Flowlight can import and export local plugin manifest packages from Settings. Installed packages are visible and configurable today; execution remains limited to official built-in rules until sandboxed advisory plugins ship.
+ Flowlight can import and export local plugin manifest packages from Settings. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only, then return advisory findings through the same local findings surface as official built-ins.
 
  Manifest
 
- A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.
+ A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, whether it can suggest guardrails, and optionally the JavaScript evaluate(context) script to run.
 
 {
  "id": "official.presidio-pii",
@@ -1341,7 +1341,8 @@ Plugins
  "description": "Flags requests that should be reviewed by a PII masking policy.",
  "ruleVersion": 1,
  "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
- "capabilities": ["annotate", "suggestGuardrail"]
+ "capabilities": ["annotate", "suggestGuardrail"],
+ "script": "function evaluate(context) { return []; }"
 }
 
  FieldValuesMeaning
@@ -1355,6 +1356,8 @@ Plugins
  capabilitiesannotate, suggestGuardrailCapabilities are advisory; enforcement still uses Flowlight rules and guardrails.
 
  Findings
+
+ A JavaScript plugin defines a synchronous evaluate(context) function. Flowlight passes context.manifest and a sanitized context.exchange containing method, host, path without query, header names, byte counts, app and agent labels, declared tools, MCP activity and provider connector metadata. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.
 
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
@@ -1396,7 +1399,7 @@ Plugins
 
  Template package
 
- The starter package lives at templates/inspection-plugin. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.
+ The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin

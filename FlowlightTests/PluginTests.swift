@@ -83,12 +83,17 @@ final class PluginTests: XCTestCase {
         manifest.source = .installed
         manifest.publisher = .official
         manifest.configuration = ["policy": "default"]
+        manifest.script = "function evaluate(context) { return []; }"
         let data = try JSONEncoder().encode(manifest)
         let decoded = try JSONDecoder().decode(PluginManifest.self, from: data)
         XCTAssertEqual(decoded.publisher, .official)
         XCTAssertEqual(decoded.guardrailProvider, .presidio)
         XCTAssertEqual(decoded.configuration["policy"], "default")
+        XCTAssertEqual(decoded.script, "function evaluate(context) { return []; }")
         XCTAssertEqual(PluginManifest.GuardrailProvider.prismaAIRS.title, "PANW Prisma AIRS")
+
+        let legacy = Data(#"{"id":"legacy.plugin","name":"Legacy","version":"0.1.0","kind":"traffic","description":"Legacy plugin.","privacySummary":"Metadata only."}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(PluginManifest.self, from: legacy).script, "")
     }
 
     func testPluginPackageAcceptsBareManifestAndWrappedPackage() throws {
@@ -142,5 +147,47 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(count, 1)
         let findings = try db.pluginFindings(exchangeIDs: [id], visibleOnly: false)
         XCTAssertEqual(findings[id]?.map(\.pluginID), ["traffic.large-upload"])
+    }
+
+    func testInstalledJavaScriptPluginProducesBoundedFinding() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.js", name: "JS", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses metadata only.")
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'low',
+            title: 'JS saw host',
+            summary: context.exchange.appName + ' contacted ' + context.exchange.host,
+            evidence: [
+              { label: 'Host', value: context.exchange.host },
+              { label: 'Headers', value: context.exchange.requestHeaderNames.join(', ') }
+            ]
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange())
+        let findings = try db.pluginFindings(exchangeIDs: [id])
+        let finding = try XCTUnwrap(findings[id]?.first { $0.pluginID == "thirdparty.js" })
+        XCTAssertEqual(finding.title, "JS saw host")
+        let text = ([finding.title, finding.summary] + finding.evidence.map(\.value)).joined(separator: "\n")
+        XCTAssertFalse(text.contains("secret-token"))
+        XCTAssertFalse(text.contains("secret-key"))
+        XCTAssertFalse(text.contains("do-not-leak"))
+    }
+
+    func testBrokenJavaScriptPluginFailsOpenAfterExchangeInsertion() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.broken", name: "Broken", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Broken plugin.", privacySummary: "Uses metadata only.")
+        manifest.script = "function evaluate(context) { while (true) {} }"
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange())
+        let findings = try db.pluginFindings(exchangeIDs: [id])
+        XCTAssertNotNil(findings[id]?.first { $0.pluginID == "traffic.large-upload" })
+        XCTAssertNil(findings[id]?.first { $0.pluginID == "thirdparty.broken" })
     }
 }

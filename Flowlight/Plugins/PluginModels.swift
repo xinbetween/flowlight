@@ -15,6 +15,7 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     var privacySummary: String
     var capabilities: [Capability] = [.annotate]
     var configuration: [String: String] = [:]
+    var script: String = ""
 
     enum Kind: String, Codable, Sendable { case traffic, llmMCP }
     enum Source: String, Codable, Sendable { case builtIn, installed }
@@ -40,7 +41,7 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     init(id: String, name: String, version: String, kind: Kind, enabled: Bool = true, source: Source = .builtIn,
          publisher: Publisher = .official, guardrailProvider: GuardrailProvider = .flowlight, description: String,
          ruleVersion: Int = 1, privacySummary: String, capabilities: [Capability] = [.annotate],
-         configuration: [String: String] = [:]) {
+         configuration: [String: String] = [:], script: String = "") {
         self.id = id
         self.name = name
         self.version = version
@@ -54,10 +55,11 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         self.privacySummary = privacySummary
         self.capabilities = capabilities
         self.configuration = configuration
+        self.script = script
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities, configuration
+        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities, configuration, script
     }
 
     init(from decoder: Decoder) throws {
@@ -75,6 +77,7 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         privacySummary = try values.decode(String.self, forKey: .privacySummary)
         capabilities = try values.decodeIfPresent([Capability].self, forKey: .capabilities) ?? [.annotate]
         configuration = try values.decodeIfPresent([String: String].self, forKey: .configuration) ?? [:]
+        script = try values.decodeIfPresent(String.self, forKey: .script) ?? ""
     }
 }
 
