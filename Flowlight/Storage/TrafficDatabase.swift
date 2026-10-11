@@ -1043,14 +1043,15 @@ final class TrafficDatabase: @unchecked Sendable {
     func backfillPluginFindings(pluginID: String? = nil, since: Date = Date().addingTimeInterval(-14 * 86400), limit: Int = 500) throws -> Int {
         let manifests = PluginEngine.mergedManifests(try loadPluginManifests())
         let active = pluginID.map { id in manifests.filter { $0.id == id } } ?? manifests
-        let builtInIDs = Set(PluginEngine.builtInManifests.map(\.id))
-        let evaluable = active.filter { builtInIDs.contains($0.id) }
+        let evaluable = active.filter { $0.source == .builtIn || (!$0.script.isEmpty && $0.source == .installed) }
         guard !evaluable.isEmpty else { return 0 }
         let exchanges = try exchanges(since: since, limit: limit)
         var inserted = 0
         try conn.transaction {
             if let pluginID { try conn.run("DELETE FROM plugin_findings WHERE plugin_id = ?", [.text(pluginID)]) }
-            else { try conn.run("DELETE FROM plugin_findings WHERE plugin_id IN (\(Array(repeating: "?", count: builtInIDs.count).joined(separator: ",")))", builtInIDs.map(SQLValue.text)) }
+            else if !evaluable.isEmpty {
+                try conn.run("DELETE FROM plugin_findings WHERE plugin_id IN (\(Array(repeating: "?", count: evaluable.count).joined(separator: ",")))", evaluable.map { .text($0.id) })
+            }
             for exchange in exchanges {
                 let before = conn.changes
                 try insertPluginFindings(PluginEngine.evaluate(exchange, manifests: evaluable), forExchangeID: exchange.id ?? 0)
@@ -1170,12 +1171,25 @@ final class TrafficDatabase: @unchecked Sendable {
                 for manifest in manifests where PluginEngine.builtInManifests.contains(where: { $0.id == manifest.id }) {
                     try savePluginManifest(manifest)
                 }
-                try insertPluginFindings(PluginEngine.evaluate(stored, manifests: manifests), forExchangeID: insertedID)
+                try insertPluginFindings(PluginEngine.evaluateBuiltIns(stored, manifests: manifests), forExchangeID: insertedID)
             } catch {
                 appLog.error("plugin evaluation skipped: \(String(describing: error), privacy: .public)")
             }
         }
+        evaluateInstalledPluginScripts(exchangeID: insertedID, exchange: e)
         return insertedID
+    }
+
+    private func evaluateInstalledPluginScripts(exchangeID: Int64, exchange: HTTPExchange) {
+        do {
+            let manifests = PluginEngine.mergedManifests(try loadPluginManifests()).filter { $0.source == .installed && !$0.script.isEmpty }
+            guard !manifests.isEmpty else { return }
+            var stored = exchange
+            stored.id = exchangeID
+            try insertPluginFindings(PluginScriptRunner.shared.evaluate(exchange: stored, manifests: manifests), forExchangeID: exchangeID)
+        } catch {
+            appLog.error("installed plugin evaluation skipped: \(String(describing: error), privacy: .public)")
+        }
     }
 
     private func enqueueLocalRiskCandidate(_ candidate: RiskCandidate) throws {

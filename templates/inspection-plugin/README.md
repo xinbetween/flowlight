@@ -1,6 +1,6 @@
 # Flowlight Inspection Plugin Template
 
-This template describes an advisory Flowlight inspection plugin package. Flowlight can import and export this manifest shape today; installed packages are visible and configurable, while executable plugin logic remains limited to official built-in Swift rules until the sandbox phase.
+This template describes an advisory Flowlight inspection plugin package. Flowlight can import and export this manifest shape, run installed JavaScript advisory plugins in a short-lived sandbox, and show returned findings beside official built-in plugin findings.
 
 ## Trust boundary
 
@@ -8,11 +8,18 @@ Plugins run after an inspected HTTP exchange has been recorded locally. They can
 
 Evidence must be bounded and redacted. Do not include raw request or response bodies, prompts, completions, header values, credentials, full tool inputs, or unredacted query strings.
 
+## JavaScript contract
+
+Define a synchronous `evaluate(context)` function. Flowlight passes `context.manifest` and `context.exchange`; the exchange contains method, host, path without query, header names, byte counts, app/agent labels, declared tools and MCP connector metadata. It does not contain request bodies, response bodies, header values, prompts, completions or full tool inputs.
+
+Return up to 8 findings. Each finding uses `severity`, `title`, `summary`, bounded `evidence`, and an optional `suggestedGuardrail` with `agent`, `server`, `tool` or `resource`. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout. Failures produce no findings.
+
 ## Files
 
-- `manifest.json`: plugin identity, publisher category, guardrail provider, privacy summary, optional `configuration` string map and capabilities.
+- `manifest.json`: plugin identity, publisher category, guardrail provider, privacy summary, optional `configuration` string map, capabilities and embedded script.
+- `plugin.js`: the readable source for `evaluate(context)`; keep it in sync with `manifest.script` before publishing.
 - `findings.example.json`: sample findings the plugin may produce.
-- `validate.js`: local schema and privacy sanity checks for the template package.
+- `validate.js`: local schema, script and privacy sanity checks for the template package.
 
 ## Supported guardrail providers
 

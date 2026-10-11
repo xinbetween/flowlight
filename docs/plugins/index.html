@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=b43fcec5">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-09"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-10"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -75,10 +75,10 @@
     <article class="prose">
       <h2 id="trust">The trust boundary</h2>
       <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
-      <p>Flowlight can import and export local plugin manifest packages from Settings. Installed packages are visible and configurable today; execution remains limited to official built-in rules until sandboxed advisory plugins ship.</p>
+      <p>Flowlight can import and export local plugin manifest packages from Settings. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only, then return advisory findings through the same local findings surface as official built-ins.</p>
 
       <h2 id="manifest">Manifest</h2>
-      <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, and whether it can suggest guardrails.</p>
+      <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, whether it can suggest guardrails, and optionally the JavaScript <code>evaluate(context)</code> script to run.</p>
 <pre>{
   "id": "official.presidio-pii",
   "name": "Presidio PII",
@@ -91,7 +91,8 @@
   "description": "Flags requests that should be reviewed by a PII masking policy.",
   "ruleVersion": 1,
   "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
-  "capabilities": ["annotate", "suggestGuardrail"]
+  "capabilities": ["annotate", "suggestGuardrail"],
+  "script": "function evaluate(context) { return []; }"
 }</pre>
       <table>
         <tr><th>Field</th><th>Values</th><th>Meaning</th></tr>
@@ -102,6 +103,7 @@
       </table>
 
       <h2 id="findings">Findings</h2>
+      <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing method, host, path without query, header names, byte counts, app and agent labels, declared tools, MCP activity and provider connector metadata. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
       <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
 <pre>{
   "severity": "medium",
@@ -133,7 +135,7 @@
       </table>
 
       <h2 id="template">Template package</h2>
-      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.</p>
+      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, <code>plugin.js</code>, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.</p>
 <pre>cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
 node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
