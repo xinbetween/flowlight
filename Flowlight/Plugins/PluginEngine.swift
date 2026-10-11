@@ -35,6 +35,10 @@ enum PluginEngine {
     static var builtInManifests: [PluginManifest] { builtInRules.map(\.manifest) }
 
     static func evaluate(_ exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {
+        evaluateBuiltIns(exchange, manifests: manifests) + PluginScriptRunner.shared.evaluate(exchange: exchange, manifests: manifests)
+    }
+
+    static func evaluateBuiltIns(_ exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {
         let enabled = Dictionary(uniqueKeysWithValues: manifests.map { ($0.id, $0.enabled) })
         let context = PluginContext(exchange: exchange)
         return builtInRules.flatMap { rule -> [PluginFindingDraft] in

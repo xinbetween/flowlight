@@ -13,11 +13,13 @@ struct PluginBackfillResult: Sendable {
 enum PluginPackageError: LocalizedError, Equatable {
     case reservedBuiltInID
     case invalidID
+    case scriptTooLarge
 
     var errorDescription: String? {
         switch self {
         case .reservedBuiltInID: return L("Installed plugin IDs cannot reuse a built-in plugin ID.")
         case .invalidID: return L("Plugin IDs must contain only letters, numbers, dots, underscores, and hyphens.")
+        case .scriptTooLarge: return L("Plugin scripts must be 128 KB or smaller.")
         }
     }
 }
@@ -72,6 +74,7 @@ final class PluginStore: ObservableObject {
                 var manifest = try JSONDecoder().decode(PluginPackage.self, from: data).manifest
                 guard manifest.id.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil else { throw PluginPackageError.invalidID }
                 guard !PluginEngine.builtInManifests.contains(where: { $0.id == manifest.id }) else { throw PluginPackageError.reservedBuiltInID }
+                guard manifest.script.lengthOfBytes(using: .utf8) <= PluginScriptRunner.maxScriptBytes else { throw PluginPackageError.scriptTooLarge }
                 manifest.source = .installed
                 if manifest.publisher != .official { manifest.publisher = .thirdParty }
                 if manifest.capabilities.isEmpty { manifest.capabilities = [.annotate] }
