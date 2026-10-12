@@ -9,6 +9,10 @@ const sources = new Set(['builtIn', 'installed']);
 const publishers = new Set(['official', 'thirdParty']);
 const providers = new Set(['flowlight', 'presidio', 'bedrock', 'lakera', 'aporia', 'noma', 'prismaAIRS', 'custom']);
 const capabilities = new Set(['annotate', 'suggestGuardrail']);
+const permissions = new Set(['trafficMetadata', 'headerNames', 'appIdentity', 'llmMetadata', 'mcpMetadata', 'suggestGuardrail']);
+const privacyCategories = new Set(['metadataOnly', 'headerNames', 'appIdentity', 'toolNames', 'mcpMetadata', 'guardrailSuggestions']);
+const channels = new Set(['builtIn', 'local', 'community', 'official']);
+const reviewStatuses = new Set(['builtIn', 'unsigned', 'verifiedOfficial', 'verifiedCommunity', 'rejected']);
 const severities = new Set(['info', 'low', 'medium', 'high']);
 const secretPattern = /(sk-[A-Za-z0-9_-]{8,}|bearer\s+\S+|api[_-]?key\s*[:=]|secret\s*[:=]|token\s*[:=])/i;
 
@@ -41,6 +45,32 @@ function checkManifest(manifest) {
   requireCondition(Array.isArray(manifest.capabilities), 'manifest capabilities must be an array');
   requireCondition(manifest.capabilities.every(capability => capabilities.has(capability)), 'unsupported capability');
   requireCondition(manifest.privacySummary.length <= 500, 'privacySummary should stay concise');
+  if (manifest.schemaVersion !== undefined) {
+    requireCondition(Number.isInteger(manifest.schemaVersion) && manifest.schemaVersion >= 1, 'schemaVersion must be a positive integer');
+  }
+  if (manifest.permissions !== undefined) {
+    requireCondition(Array.isArray(manifest.permissions), 'permissions must be an array');
+    requireCondition(manifest.permissions.every(permission => permissions.has(permission)), 'unsupported permission');
+    if (manifest.capabilities.includes('suggestGuardrail')) {
+      requireCondition(manifest.permissions.includes('suggestGuardrail'), 'suggestGuardrail capability must declare suggestGuardrail permission');
+    }
+  }
+  if (manifest.privacy !== undefined) {
+    requireCondition(isPlainObject(manifest.privacy), 'privacy must be an object');
+    requireCondition(Array.isArray(manifest.privacy.categories), 'privacy.categories must be an array');
+    requireCondition(manifest.privacy.categories.length > 0, 'privacy.categories must not be empty');
+    requireCondition(manifest.privacy.categories.every(category => privacyCategories.has(category)), 'unsupported privacy category');
+    requireCondition(typeof (manifest.privacy.summary || '') === 'string', 'privacy.summary must be a string');
+  }
+  if (manifest.provenance !== undefined) {
+    requireCondition(isPlainObject(manifest.provenance), 'provenance must be an object');
+    if (manifest.provenance.distributionChannel !== undefined) {
+      requireCondition(channels.has(manifest.provenance.distributionChannel), 'unsupported distributionChannel');
+    }
+    if (manifest.provenance.reviewStatus !== undefined) {
+      requireCondition(reviewStatuses.has(manifest.provenance.reviewStatus), 'unsupported reviewStatus');
+    }
+  }
   if (manifest.configuration !== undefined) {
     requireCondition(isPlainObject(manifest.configuration), 'configuration must be an object');
     for (const [key, value] of Object.entries(manifest.configuration)) {

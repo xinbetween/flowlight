@@ -1,29 +1,5 @@
 import Foundation
 
-struct PluginImportResult: Sendable {
-    var manifest: PluginManifest
-    var installed: Bool
-}
-
-struct PluginBackfillResult: Sendable {
-    var pluginID: String?
-    var findingCount: Int
-}
-
-enum PluginPackageError: LocalizedError, Equatable {
-    case reservedBuiltInID
-    case invalidID
-    case scriptTooLarge
-
-    var errorDescription: String? {
-        switch self {
-        case .reservedBuiltInID: return L("Installed plugin IDs cannot reuse a built-in plugin ID.")
-        case .invalidID: return L("Plugin IDs must contain only letters, numbers, dots, underscores, and hyphens.")
-        case .scriptTooLarge: return L("Plugin scripts must be 128 KB or smaller.")
-        }
-    }
-}
-
 @MainActor
 final class PluginStore: ObservableObject {
     @Published private(set) var manifests: [PluginManifest] = []
@@ -67,17 +43,17 @@ final class PluginStore: ObservableObject {
         version += 1
     }
 
-    func importPackage(data: Data, completion: @escaping @MainActor (Result<PluginImportResult, Error>) -> Void) {
+    func reviewPackage(data: Data) throws -> PluginPackageReview {
+        try PluginPackageVerifier.review(data: data)
+    }
+
+    func installReviewedPackage(_ review: PluginPackageReview, completion: @escaping @MainActor (Result<PluginImportResult, Error>) -> Void) {
         guard let db else { return }
         db.async { [weak self] db in
             do {
-                var manifest = try JSONDecoder().decode(PluginPackage.self, from: data).manifest
-                guard manifest.id.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil else { throw PluginPackageError.invalidID }
-                guard !PluginEngine.builtInManifests.contains(where: { $0.id == manifest.id }) else { throw PluginPackageError.reservedBuiltInID }
-                guard manifest.script.lengthOfBytes(using: .utf8) <= PluginScriptRunner.maxScriptBytes else { throw PluginPackageError.scriptTooLarge }
+                var manifest = review.manifest
                 manifest.source = .installed
-                if manifest.publisher != .official { manifest.publisher = .thirdParty }
-                if manifest.capabilities.isEmpty { manifest.capabilities = [.annotate] }
+                manifest.enabled = true
                 try db.savePluginManifest(manifest)
                 let merged = PluginEngine.mergedManifests(try db.loadPluginManifests())
                 Task { @MainActor in
@@ -91,10 +67,21 @@ final class PluginStore: ObservableObject {
         }
     }
 
+    func importPackage(data: Data, completion: @escaping @MainActor (Result<PluginImportResult, Error>) -> Void) {
+        do {
+            installReviewedPackage(try reviewPackage(data: data), completion: completion)
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
     func exportPackage(_ manifest: PluginManifest) throws -> Data {
+        var copy = manifest
+        copy.enabled = true
+        copy.configuration = [:]
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(PluginPackage(manifest: manifest))
+        return try encoder.encode(PluginPackage(manifest: copy))
     }
 
     func removeInstalled(_ manifest: PluginManifest) {

@@ -29,7 +29,7 @@ final class PluginScriptRunner: @unchecked Sendable {
             "mode": "plugin",
             "script": manifest.script,
             "manifest": manifestPayload(manifest),
-            "context": contextPayload(exchange),
+            "context": contextPayload(exchange, permissions: Set(manifest.permissions)),
         ]
         guard JSONSerialization.isValidJSONObject(input),
               let encoded = try? JSONSerialization.data(withJSONObject: input), encoded.count <= Self.maxInputBytes,
@@ -107,41 +107,55 @@ final class PluginScriptRunner: @unchecked Sendable {
             "publisher": manifest.publisher.rawValue,
             "guardrailProvider": manifest.guardrailProvider.rawValue,
             "capabilities": manifest.capabilities.map(\.rawValue),
+            "permissions": manifest.permissions.map(\.rawValue),
+            "privacy": [
+                "categories": manifest.privacy.categories.map(\.rawValue),
+                "summary": manifest.privacy.summary,
+            ],
             "configuration": manifest.configuration,
         ]
     }
 
-    private func contextPayload(_ exchange: HTTPExchange) -> [String: Any] {
+    private func contextPayload(_ exchange: HTTPExchange, permissions: Set<PluginPermission>) -> [String: Any] {
         func value<T>(_ optional: T?) -> Any { optional ?? NSNull() }
-        var context: [String: Any] = [
-            "method": exchange.method,
-            "scheme": exchange.scheme,
-            "host": exchange.host,
-            "port": exchange.port,
-            "path": exchange.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? exchange.path,
-            "status": value(exchange.status),
-            "requestHeaderNames": exchange.requestHeaders.map { $0.name },
-            "responseHeaderNames": exchange.responseHeaders.map { $0.name },
-            "requestSize": exchange.requestSize,
-            "responseSize": exchange.responseSize,
-            "requestTruncated": exchange.requestTruncated,
-            "responseTruncated": exchange.responseTruncated,
-            "contentType": exchange.contentType,
-            "bundleID": exchange.bundleID,
-            "appName": exchange.appName,
-            "agent": value(exchange.agent),
-            "agentName": value(exchange.agentName),
-            "mcpServer": value(exchange.mcpServer),
-            "toolCalls": exchange.toolCalls.map { tool in
+        var context: [String: Any] = [:]
+        if permissions.contains(.trafficMetadata) {
+            context.merge([
+                "method": exchange.method,
+                "scheme": exchange.scheme,
+                "host": exchange.host,
+                "port": exchange.port,
+                "path": exchange.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? exchange.path,
+                "status": value(exchange.status),
+                "requestSize": exchange.requestSize,
+                "responseSize": exchange.responseSize,
+                "requestTruncated": exchange.requestTruncated,
+                "responseTruncated": exchange.responseTruncated,
+                "contentType": exchange.contentType,
+            ]) { current, _ in current }
+        }
+        if permissions.contains(.headerNames) {
+            context["requestHeaderNames"] = exchange.requestHeaders.map { $0.name }
+            context["responseHeaderNames"] = exchange.responseHeaders.map { $0.name }
+        }
+        if permissions.contains(.appIdentity) {
+            context["bundleID"] = exchange.bundleID
+            context["appName"] = exchange.appName
+            context["agent"] = value(exchange.agent)
+            context["agentName"] = value(exchange.agentName)
+            context["mcpServer"] = value(exchange.mcpServer)
+        }
+        if permissions.contains(.mcpMetadata) {
+            context["toolCalls"] = exchange.toolCalls.map { tool in
                 ["source": tool.source.rawValue, "name": tool.name, "mcpServer": value(tool.mcpServer)]
-            },
-            "mcp": exchange.mcp.map { activity in
+            }
+            context["mcp"] = exchange.mcp.map { activity in
                 ["server": activity.server, "endpoint": activity.endpoint, "method": activity.method,
                  "tool": value(activity.tool), "tools": value(activity.tools), "version": value(activity.version),
                  "isError": activity.isError]
-            },
-        ]
-        if let llm = exchange.llm {
+            }
+        }
+        if permissions.contains(.llmMetadata), let llm = exchange.llm {
             context["llm"] = [
                 "provider": llm.provider.rawValue,
                 "model": value(llm.model),

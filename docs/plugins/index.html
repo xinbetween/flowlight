@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-11"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-12"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -56,7 +56,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Plugins</p>
     <h1>Write inspection plugins</h1>
-    <p class="lede">Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; third-party plugins use the same manifest shape.</p>
+    <p class="lede">Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; community plugins use reviewable manifests with provenance, permissions and privacy disclosures.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -64,7 +64,7 @@
         <summary>On this page</summary>
         <div class="toc-group">
           <strong>Model</strong>
-          <a href="#trust">Trust boundary</a><a href="#manifest">Manifest</a><a href="#findings">Findings</a>
+          <a href="#trust">Trust boundary</a><a href="#manifest">Manifest</a><a href="#provenance">Provenance</a><a href="#findings">Findings</a>
         </div>
         <div class="toc-group">
           <strong>Guardrails</strong>
@@ -75,35 +75,44 @@
     <article class="prose">
       <h2 id="trust">The trust boundary</h2>
       <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
-      <p>Flowlight can import and export local plugin manifest packages from Settings. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only, then return advisory findings through the same local findings surface as official built-ins.</p>
+      <p>Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.</p>
 
       <h2 id="manifest">Manifest</h2>
-      <p>A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, whether it can suggest guardrails, and optionally the JavaScript <code>evaluate(context)</code> script to run.</p>
+      <p>A manifest tells Flowlight what the plugin is, who publishes it, what sanitized metadata it uses, whether it can suggest guardrails, and optionally the JavaScript <code>evaluate(context)</code> script to run.</p>
 <pre>{
-  "id": "official.presidio-pii",
-  "name": "Presidio PII",
-  "version": "1.0.0",
+  "id": "thirdparty.example-guardrails",
+  "name": "Example Guardrails",
+  "version": "0.1.0",
   "kind": "llmMCP",
-  "enabled": true,
   "source": "installed",
-  "publisher": "official",
-  "guardrailProvider": "presidio",
-  "description": "Flags requests that should be reviewed by a PII masking policy.",
+  "publisher": "thirdParty",
+  "guardrailProvider": "custom",
+  "description": "Example advisory findings for inspected LLM and MCP activity.",
   "ruleVersion": 1,
-  "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
+  "schemaVersion": 1,
+  "privacySummary": "Uses provider names, tool names, MCP server names, request sizes and redacted evidence only.",
+  "privacy": {
+    "categories": ["metadataOnly", "toolNames", "mcpMetadata", "guardrailSuggestions"],
+    "summary": "Uses sanitized metadata only."
+  },
+  "permissions": ["trafficMetadata", "appIdentity", "llmMetadata", "mcpMetadata", "suggestGuardrail"],
   "capabilities": ["annotate", "suggestGuardrail"],
   "script": "function evaluate(context) { return []; }"
 }</pre>
       <table>
         <tr><th>Field</th><th>Values</th><th>Meaning</th></tr>
         <tr><td><code>kind</code></td><td><code>traffic</code>, <code>llmMCP</code></td><td>Whether the plugin describes ordinary inspected HTTP or model/tool/MCP activity.</td></tr>
-        <tr><td><code>publisher</code></td><td><code>official</code>, <code>thirdParty</code></td><td>Official plugins are released by Flowlight; third-party plugins are authored outside the project.</td></tr>
-        <tr><td><code>source</code></td><td><code>builtIn</code>, <code>installed</code></td><td>Built-in plugins ship in the app. Installed plugins come from a package.</td></tr>
+        <tr><td><code>publisher</code></td><td><code>official</code>, <code>thirdParty</code></td><td>Official status is trusted only when package provenance verifies; unsigned packages are treated as third-party.</td></tr>
+        <tr><td><code>permissions</code></td><td><code>trafficMetadata</code>, <code>headerNames</code>, <code>appIdentity</code>, <code>llmMetadata</code>, <code>mcpMetadata</code>, <code>suggestGuardrail</code></td><td>Which sanitized metadata families the plugin expects. These are not mutation powers.</td></tr>
         <tr><td><code>capabilities</code></td><td><code>annotate</code>, <code>suggestGuardrail</code></td><td>Capabilities are advisory; enforcement still uses Flowlight rules and guardrails.</td></tr>
       </table>
 
+      <h2 id="provenance">Provenance and package review</h2>
+      <p>Installed packages may include a detached P-256 <code>signature</code> envelope next to the manifest. Flowlight binds the plugin ID, version, rule version, publisher identity, permissions, privacy categories and script digest to the reviewed package. If those values change, the package needs review again.</p>
+      <p>Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as <code>enabled</code> and <code>configuration</code> are not part of the signed payload, so toggling a plugin or changing local metadata does not invalidate package identity.</p>
+
       <h2 id="findings">Findings</h2>
-      <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing method, host, path without query, header names, byte counts, app and agent labels, declared tools, MCP activity and provider connector metadata. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
+      <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing only the metadata families declared in <code>permissions</code>. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
       <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
 <pre>{
   "severity": "medium",
@@ -135,20 +144,20 @@
       </table>
 
       <h2 id="template">Template package</h2>
-      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, <code>plugin.js</code>, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.</p>
+      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, <code>plugin.js</code>, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins and Flowlight will show the review sheet before installation.</p>
 <pre>cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
 node validate.js</pre>
-      <p>The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.</p>
+      <p>The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, permissions, privacy categories, evidence size limits and the absence of common secret-looking values in sample findings.</p>
 
       <h2 id="review">Review checklist</h2>
       <ul>
         <li>The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.</li>
         <li>Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.</li>
+        <li>Permissions match the sanitized metadata the script actually reads.</li>
         <li>Provider-side MCP connector findings say local network rules cannot reach provider-run calls.</li>
         <li>Failures are fail-open: capture remains complete and no finding is better than blocking capture.</li>
-        <li>The privacy summary is specific enough that a user can tell what data the plugin needs.</li>
+        <li>The privacy summary and categories are specific enough that a user can tell what data the plugin needs.</li>
       </ul>
     </article>
   </div>
