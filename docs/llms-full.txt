@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.14.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.14.3, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.14.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.14.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1551,8 +1551,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.14.3
+October 12, 2026Latest
+
+ Review community plugins before install. Imported plugin packages now open a review sheet with
+ provenance, signature status, publisher category, permissions, privacy categories, package digest and script digest
+ before anything is saved.
+
+ Bind plugin trust to signed package contents. Flowlight can verify detached P-256 package signatures
+ against trusted publisher keys, rejects tampered signed packages, keeps unsigned local packages clearly labelled, and
+ prevents unsigned packages from claiming official provenance.
+
+ Declare and enforce sanitized plugin permissions. Plugin manifests now describe which metadata families
+ they use, and installed JavaScript receives only those sanitized context sections while remaining advisory and fail-open.
+ The template, validator, localization catalogs and plugin docs now match the new review contract.
+
  0.14.2
-October 11, 2026Latest
+October 11, 2026
 
  Run installed advisory JavaScript plugins. Installed plugin packages can now include a
  synchronous evaluate(context) script. Flowlight runs it out of process with an empty environment,
