@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.14.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.14.2, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.14.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.14.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1539,8 +1539,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.14.2
+October 11, 2026Latest
+
+ Run installed advisory JavaScript plugins. Installed plugin packages can now include a
+ synchronous evaluate(context) script. Flowlight runs it out of process with an empty environment,
+ a size limit, timeout and sanitized metadata only, then stores bounded advisory findings locally.
+
+ Keep capture fail-open. Official built-in plugin rules still run in the fast insert path, while
+ installed JavaScript plugins run only after the inspected exchange is durable. Script errors, invalid output or
+ timeouts produce no findings and never block capture.
+
+ Improve plugin authoring and mobile site polish. The plugin template now includes
+ plugin.js, a JavaScript validator that executes the sample contract locally, and updated site docs.
+ The mobile home hero keeps its eyebrow and metadata row on one line.
+
  0.14.1
-October 9, 2026Latest
+October 9, 2026
 
  Install local plugin packages. Settings › Plugins can now import and export Flowlight plugin
  manifest packages, keep installed plugins split by official or third-party publisher, and reject packages that

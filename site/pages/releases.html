@@ -13,7 +13,22 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.14.1</h2><time datetime="2026-10-09">October 9, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.14.2</h2><time datetime="2026-10-11">October 11, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Run installed advisory JavaScript plugins.</strong> Installed plugin packages can now include a
+            synchronous <code>evaluate(context)</code> script. Flowlight runs it out of process with an empty environment,
+            a size limit, timeout and sanitized metadata only, then stores bounded advisory findings locally.</li>
+          <li><strong>Keep capture fail-open.</strong> Official built-in plugin rules still run in the fast insert path, while
+            installed JavaScript plugins run only after the inspected exchange is durable. Script errors, invalid output or
+            timeouts produce no findings and never block capture.</li>
+          <li><strong>Improve plugin authoring and mobile site polish.</strong> The plugin template now includes
+            <code>plugin.js</code>, a JavaScript validator that executes the sample contract locally, and updated site docs.
+            The mobile home hero keeps its eyebrow and metadata row on one line.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.14.1</h2><time datetime="2026-10-09">October 9, 2026</time></header>
         <ul>
           <li><strong>Install local plugin packages.</strong> Settings › Plugins can now import and export Flowlight plugin
             manifest packages, keep installed plugins split by official or third-party publisher, and reject packages that
