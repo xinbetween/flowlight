@@ -1309,12 +1309,12 @@ Plugins
 
  Write inspection plugins
 
- Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; third-party plugins use the same manifest shape.
+ Plugins turn inspected exchanges into local advisory findings. Official Flowlight plugins cover common traffic and LLM/MCP guardrail patterns; community plugins use reviewable manifests with provenance, permissions and privacy disclosures.
 
  On this page
 
  Model
- Trust boundaryManifestFindings
+ Trust boundaryManifestProvenanceFindings
 
  Guardrails
  ProvidersTemplate packageReview checklist
@@ -1323,24 +1323,29 @@ Plugins
 
  Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.
 
- Flowlight can import and export local plugin manifest packages from Settings. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only, then return advisory findings through the same local findings surface as official built-ins.
+ Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.
 
  Manifest
 
- A manifest tells Flowlight what the plugin is, who publishes it, what kind of inspected data it uses, whether it can suggest guardrails, and optionally the JavaScript evaluate(context) script to run.
+ A manifest tells Flowlight what the plugin is, who publishes it, what sanitized metadata it uses, whether it can suggest guardrails, and optionally the JavaScript evaluate(context) script to run.
 
 {
- "id": "official.presidio-pii",
- "name": "Presidio PII",
- "version": "1.0.0",
+ "id": "thirdparty.example-guardrails",
+ "name": "Example Guardrails",
+ "version": "0.1.0",
  "kind": "llmMCP",
- "enabled": true,
  "source": "installed",
- "publisher": "official",
- "guardrailProvider": "presidio",
- "description": "Flags requests that should be reviewed by a PII masking policy.",
+ "publisher": "thirdParty",
+ "guardrailProvider": "custom",
+ "description": "Example advisory findings for inspected LLM and MCP activity.",
  "ruleVersion": 1,
- "privacySummary": "Uses header names, sizes, tool names and bounded redacted evidence only.",
+ "schemaVersion": 1,
+ "privacySummary": "Uses provider names, tool names, MCP server names, request sizes and redacted evidence only.",
+ "privacy": {
+ "categories": ["metadataOnly", "toolNames", "mcpMetadata", "guardrailSuggestions"],
+ "summary": "Uses sanitized metadata only."
+ },
+ "permissions": ["trafficMetadata", "appIdentity", "llmMetadata", "mcpMetadata", "suggestGuardrail"],
  "capabilities": ["annotate", "suggestGuardrail"],
  "script": "function evaluate(context) { return []; }"
 }
@@ -1349,15 +1354,21 @@ Plugins
 
  kindtraffic, llmMCPWhether the plugin describes ordinary inspected HTTP or model/tool/MCP activity.
 
- publisherofficial, thirdPartyOfficial plugins are released by Flowlight; third-party plugins are authored outside the project.
+ publisherofficial, thirdPartyOfficial status is trusted only when package provenance verifies; unsigned packages are treated as third-party.
 
- sourcebuiltIn, installedBuilt-in plugins ship in the app. Installed plugins come from a package.
+ permissionstrafficMetadata, headerNames, appIdentity, llmMetadata, mcpMetadata, suggestGuardrailWhich sanitized metadata families the plugin expects. These are not mutation powers.
 
  capabilitiesannotate, suggestGuardrailCapabilities are advisory; enforcement still uses Flowlight rules and guardrails.
 
+ Provenance and package review
+
+ Installed packages may include a detached P-256 signature envelope next to the manifest. Flowlight binds the plugin ID, version, rule version, publisher identity, permissions, privacy categories and script digest to the reviewed package. If those values change, the package needs review again.
+
+ Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as enabled and configuration are not part of the signed payload, so toggling a plugin or changing local metadata does not invalidate package identity.
+
  Findings
 
- A JavaScript plugin defines a synchronous evaluate(context) function. Flowlight passes context.manifest and a sanitized context.exchange containing method, host, path without query, header names, byte counts, app and agent labels, declared tools, MCP activity and provider connector metadata. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.
+ A JavaScript plugin defines a synchronous evaluate(context) function. Flowlight passes context.manifest and a sanitized context.exchange containing only the metadata families declared in permissions. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.
 
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
@@ -1399,14 +1410,13 @@ Plugins
 
  Template package
 
- The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings, a policy checklist and fixtures for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins, then export it again to share the stored package shape.
+ The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins and Flowlight will show the review sheet before installation.
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
-node -e "JSON.parse(require('fs').readFileSync('manifest.json'))"
 node validate.js
 
- The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, evidence size limits and the absence of common secret-looking values in sample findings.
+ The JavaScript validator is deliberately local and boring: it checks manifest fields, provider names, capability names, permissions, privacy categories, evidence size limits and the absence of common secret-looking values in sample findings.
 
  Review checklist
 
@@ -1414,11 +1424,13 @@ node validate.js
 
  Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.
 
+ Permissions match the sanitized metadata the script actually reads.
+
  Provider-side MCP connector findings say local network rules cannot reach provider-run calls.
 
  Failures are fail-open: capture remains complete and no finding is better than blocking capture.
 
- The privacy summary is specific enough that a user can tell what data the plugin needs.
+ The privacy summary and categories are specific enough that a user can tell what data the plugin needs.
 
 ---
 

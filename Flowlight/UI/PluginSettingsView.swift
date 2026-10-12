@@ -8,6 +8,7 @@ struct PluginSettingsView: View {
     @State private var message: String?
     @State private var configuring: PluginManifest?
     @State private var removing: PluginManifest?
+    @State private var pendingReview: PluginPackageReview?
 
     var body: some View {
         Form {
@@ -23,7 +24,7 @@ struct PluginSettingsView: View {
                     Text(message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             } footer: {
-                Text(L("Import reads a local plugin manifest package. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only; failures are ignored so capture stays complete."))
+                Text(L("Import reviews provenance, permissions, privacy summary, and script digests before installation. Installed JavaScript plugins run in a short-lived sandbox with sanitized metadata only; failures are ignored so capture stays complete."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             pluginSection(L("Official"), plugins: monitor.plugins.officialPlugins,
@@ -56,6 +57,19 @@ struct PluginSettingsView: View {
                 message = L("Saved configuration for %@.", plugin.name)
             }
         }
+        .sheet(item: $pendingReview) { review in
+            PluginPackageReviewSheet(review: review) { accepted in
+                if accepted {
+                    monitor.plugins.installReviewedPackage(review) { result in
+                        switch result {
+                        case .success(let imported): message = L("Installed %@.", imported.manifest.name)
+                        case .failure(let error): message = L("Import failed: %@", error.localizedDescription)
+                        }
+                    }
+                }
+                pendingReview = nil
+            }
+        }
     }
 
     private func pluginSection(_ title: String, plugins: [PluginManifest], empty: String) -> some View {
@@ -85,17 +99,12 @@ struct PluginSettingsView: View {
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.prompt = L("Import")
+        panel.prompt = L("Review")
         panel.message = L("Choose a Flowlight inspection plugin manifest or package JSON file.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
-            monitor.plugins.importPackage(data: data) { result in
-                switch result {
-                case .success(let imported): message = L("Installed %@.", imported.manifest.name)
-                case .failure(let error): message = L("Import failed: %@", error.localizedDescription)
-                }
-            }
+            pendingReview = try monitor.plugins.reviewPackage(data: data)
         } catch {
             message = L("Import failed: %@", error.localizedDescription)
         }
@@ -121,7 +130,7 @@ struct PluginSettingsView: View {
             switch result {
             case .success(let result):
                 message = plugin.map { L("Backfilled %@: %lld findings.", $0.name, result.findingCount) }
-                    ?? L("Backfilled built-in plugins: %lld findings.", result.findingCount)
+                    ?? L("Backfilled plugin findings: %lld findings.", result.findingCount)
             case .failure(let error): message = L("Backfill failed: %@", error.localizedDescription)
             }
         }
@@ -145,6 +154,7 @@ private struct PluginSettingsRow: View {
                         PluginPill(plugin.kind.title)
                         PluginPill(plugin.guardrailProvider.title)
                         PluginPill(plugin.source.title)
+                        PluginPill(plugin.provenance.reviewStatus.title)
                         if !plugin.script.isEmpty { PluginPill(L("JavaScript")) }
                         if plugin.capabilities.contains(.suggestGuardrail) { PluginPill(L("Suggests guardrails")) }
                     }
@@ -152,6 +162,10 @@ private struct PluginSettingsRow: View {
                     Text(plugin.privacySummary).font(.caption2).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
                     Text(L("%@ · v%@ · rule v%lld", plugin.publisher.title, plugin.version, plugin.ruleVersion))
                         .font(.caption2).foregroundStyle(.tertiary)
+                    if !plugin.provenance.packageDigest.isEmpty {
+                        Text(L("Package %@ · Script %@", plugin.provenance.packageDigest.shortDigest, plugin.provenance.scriptDigest.shortDigest))
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
                     if !plugin.configuration.isEmpty {
                         Text(L("Configured: %@", plugin.configuration.keys.sorted().joined(separator: ", ")))
                             .font(.caption2).foregroundStyle(.tertiary)
@@ -168,6 +182,87 @@ private struct PluginSettingsRow: View {
             .font(.caption)
         }
         .padding(.vertical, 2)
+    }
+}
+
+private struct PluginPackageReviewSheet: View {
+    var review: PluginPackageReview
+    var close: (Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L("Review Plugin Package")).font(.headline)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(review.manifest.name).font(.callout.bold())
+                    PluginPill(review.signatureStatus.title)
+                    PluginPill(review.manifest.kind.title)
+                    if !review.manifest.script.isEmpty { PluginPill(L("JavaScript")) }
+                }
+                Text(review.manifest.description).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(review.manifest.privacySummary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Divider()
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                reviewRow(L("Plugin ID"), review.manifest.id)
+                reviewRow(L("Version"), review.manifest.version)
+                reviewRow(L("Publisher"), review.manifest.publisher.title)
+                reviewRow(L("Provider"), review.manifest.guardrailProvider.title)
+                reviewRow(L("Channel"), review.manifest.provenance.distributionChannel.title)
+                reviewRow(L("Package digest"), review.packageDigest.shortDigest)
+                reviewRow(L("Script digest"), review.scriptDigest.shortDigest)
+            }
+            GroupBox(L("Permissions")) {
+                FlowPillLine(items: review.manifest.permissions.map(\.title))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            GroupBox(L("Privacy")) {
+                FlowPillLine(items: review.manifest.privacy.categories.map(\.title))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !review.warnings.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(review.warnings, id: \.self) { warning in
+                        Text(warning).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            Text(L("Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(L("Cancel")) { close(false) }
+                Button(L("Install")) { close(true) }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 620)
+    }
+
+    private func reviewRow(_ key: String, _ value: String) -> some View {
+        GridRow {
+            Text(key).font(.caption).foregroundStyle(.secondary)
+            Text(value.isEmpty ? L("Not declared") : value).font(.caption).textSelection(.enabled)
+        }
+    }
+}
+
+private struct FlowPillLine: View {
+    var items: [String]
+
+    var body: some View {
+        WrappingHStack(items: items) { item in PluginPill(item) }
+    }
+}
+
+private struct WrappingHStack<Item: Hashable, Content: View>: View {
+    var items: [Item]
+    var content: (Item) -> Content
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(items, id: \.self) { item in content(item) }
+        }
     }
 }
 
@@ -253,5 +348,12 @@ private extension PluginManifest.Source {
         case .builtIn: return L("Built-in")
         case .installed: return L("Installed")
         }
+    }
+}
+
+private extension String {
+    var shortDigest: String {
+        guard count > 12 else { return self }
+        return String(prefix(12))
     }
 }

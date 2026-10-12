@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import Flowlight
 
@@ -100,10 +101,87 @@ final class PluginTests: XCTestCase {
         let bare = Data(#"{"id":"thirdparty.test","name":"Test","version":"0.1.0","kind":"traffic","source":"installed","publisher":"thirdParty","guardrailProvider":"custom","description":"Test plugin.","privacySummary":"Uses metadata only.","capabilities":["annotate"]}"#.utf8)
         let decodedBare = try JSONDecoder().decode(PluginPackage.self, from: bare)
         XCTAssertEqual(decodedBare.manifest.id, "thirdparty.test")
+        XCTAssertNil(decodedBare.signature)
+        XCTAssertEqual(decodedBare.packageVersion, 1)
 
         let wrapped = try JSONEncoder().encode(PluginPackage(manifest: decodedBare.manifest))
         let decodedWrapped = try JSONDecoder().decode(PluginPackage.self, from: wrapped)
         XCTAssertEqual(decodedWrapped.manifest.id, "thirdparty.test")
+    }
+
+    func testUnsignedPackageReviewNormalizesOfficialClaimToThirdParty() throws {
+        var manifest = PluginManifest(id: "thirdparty.unsigned", name: "Unsigned", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .official, guardrailProvider: .custom,
+                                      description: "Unsigned plugin.", privacySummary: "Uses metadata only.")
+        manifest.script = "function evaluate(context) { return []; }"
+        let data = try JSONEncoder().encode(PluginPackage(manifest: manifest))
+        let review = try PluginPackageVerifier.review(data: data)
+        XCTAssertEqual(review.signatureStatus, .unsigned)
+        XCTAssertEqual(review.manifest.publisher, .thirdParty)
+        XCTAssertEqual(review.manifest.provenance.reviewStatus, .unsigned)
+        XCTAssertFalse(review.packageDigest.isEmpty)
+        XCTAssertFalse(review.scriptDigest.isEmpty)
+        XCTAssertFalse(review.approvalFingerprint.isEmpty)
+        XCTAssertTrue(review.warnings.joined(separator: "\n").contains("cannot claim official"))
+    }
+
+    func testSignedCommunityPackageReviewBindsDigestAndApproval() throws {
+        var manifest = PluginManifest(id: "thirdparty.signed", name: "Signed", version: "0.1.0", kind: .llmMCP,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Signed plugin.", privacySummary: "Uses metadata only.",
+                                      capabilities: [.annotate, .suggestGuardrail],
+                                      permissions: [.trafficMetadata, .llmMetadata, .suggestGuardrail],
+                                      privacy: PluginPrivacyDisclosure(categories: [.metadataOnly, .toolNames, .guardrailSuggestions], summary: "Metadata only."))
+        manifest.script = "function evaluate(context) { return []; }"
+        let privateKey = P256.Signing.PrivateKey()
+        let signer = PluginTrustedSigner(keyID: "test-community-v1", publisher: .thirdParty, publisherName: "Test Community",
+                                         channel: .community, publicKeyPEM: privateKey.publicKey.pemRepresentation)
+        let package = try PluginPackageVerifier.signedPackage(manifest: manifest, keyID: signer.keyID, privateKey: privateKey)
+        let review = try PluginPackageVerifier.review(data: JSONEncoder().encode(package), trustedSigners: [signer])
+        XCTAssertEqual(review.signatureStatus, .verifiedCommunity)
+        XCTAssertEqual(review.manifest.publisher, .thirdParty)
+        XCTAssertEqual(review.manifest.provenance.signingKeyID, "test-community-v1")
+        XCTAssertTrue(review.manifest.permissions.contains(.suggestGuardrail))
+        XCTAssertEqual(review.manifest.provenance.packageDigest, review.packageDigest)
+        XCTAssertEqual(review.manifest.provenance.approvalFingerprint, review.approvalFingerprint)
+    }
+
+    func testSignedPackageRejectsTamperedManifest() throws {
+        var manifest = PluginManifest(id: "thirdparty.tamper", name: "Tamper", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Signed plugin.", privacySummary: "Uses metadata only.")
+        manifest.script = "function evaluate(context) { return []; }"
+        let privateKey = P256.Signing.PrivateKey()
+        let signer = PluginTrustedSigner(keyID: "test-community-v1", publisher: .thirdParty, publisherName: "Test Community",
+                                         channel: .community, publicKeyPEM: privateKey.publicKey.pemRepresentation)
+        var package = try PluginPackageVerifier.signedPackage(manifest: manifest, keyID: signer.keyID, privateKey: privateKey)
+        package.manifest.script = "function evaluate(context) { return [{ severity: 'high', title: 'Changed', summary: 'Changed', evidence: [] }]; }"
+        XCTAssertThrowsError(try PluginPackageVerifier.review(data: JSONEncoder().encode(package), trustedSigners: [signer])) { error in
+            XCTAssertEqual(error as? PluginPackageError, .invalidSignature)
+        }
+    }
+
+    func testPermissionFilteringRemovesHeaderNamesFromJavaScriptContext() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.permissions", name: "Permissions", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses traffic metadata only.",
+                                      permissions: [.trafficMetadata], privacy: PluginPrivacyDisclosure(categories: [.metadataOnly], summary: "Metadata only."))
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'low',
+            title: 'Permission check',
+            summary: context.exchange.requestHeaderNames === undefined ? 'headers hidden' : 'headers visible',
+            evidence: [{ label: 'Headers', value: String(context.exchange.requestHeaderNames) }]
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange())
+        let finding = try XCTUnwrap(try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == "thirdparty.permissions" })
+        XCTAssertEqual(finding.summary, "headers hidden")
+        XCTAssertFalse(finding.evidence.map(\.value).joined().contains("Authorization"))
     }
 
     @MainActor

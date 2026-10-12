@@ -1,5 +1,15 @@
 import Foundation
 
+struct PluginImportResult: Sendable {
+    var manifest: PluginManifest
+    var installed: Bool
+}
+
+struct PluginBackfillResult: Sendable {
+    var pluginID: String?
+    var findingCount: Int
+}
+
 /// Advisory plugin definitions and findings. Plugins do not alter traffic; they add derived context to inspected exchanges.
 struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     var id: String
@@ -16,6 +26,10 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     var capabilities: [Capability] = [.annotate]
     var configuration: [String: String] = [:]
     var script: String = ""
+    var schemaVersion: Int = 1
+    var permissions: [PluginPermission] = PluginPermission.defaultMetadata
+    var privacy: PluginPrivacyDisclosure = PluginPrivacyDisclosure()
+    var provenance: PluginProvenance = PluginProvenance()
 
     enum Kind: String, Codable, Sendable { case traffic, llmMCP }
     enum Source: String, Codable, Sendable { case builtIn, installed }
@@ -41,7 +55,9 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
     init(id: String, name: String, version: String, kind: Kind, enabled: Bool = true, source: Source = .builtIn,
          publisher: Publisher = .official, guardrailProvider: GuardrailProvider = .flowlight, description: String,
          ruleVersion: Int = 1, privacySummary: String, capabilities: [Capability] = [.annotate],
-         configuration: [String: String] = [:], script: String = "") {
+         configuration: [String: String] = [:], script: String = "", schemaVersion: Int = 1,
+         permissions: [PluginPermission] = PluginPermission.defaultMetadata,
+         privacy: PluginPrivacyDisclosure = PluginPrivacyDisclosure(), provenance: PluginProvenance = PluginProvenance()) {
         self.id = id
         self.name = name
         self.version = version
@@ -56,10 +72,14 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         self.capabilities = capabilities
         self.configuration = configuration
         self.script = script
+        self.schemaVersion = schemaVersion
+        self.permissions = permissions
+        self.privacy = privacy
+        self.provenance = provenance
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities, configuration, script
+        case id, name, version, kind, enabled, source, publisher, guardrailProvider, description, ruleVersion, privacySummary, capabilities, configuration, script, schemaVersion, permissions, privacy, provenance
     }
 
     init(from decoder: Decoder) throws {
@@ -78,25 +98,172 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
         capabilities = try values.decodeIfPresent([Capability].self, forKey: .capabilities) ?? [.annotate]
         configuration = try values.decodeIfPresent([String: String].self, forKey: .configuration) ?? [:]
         script = try values.decodeIfPresent(String.self, forKey: .script) ?? ""
+        schemaVersion = try values.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        permissions = try values.decodeIfPresent([PluginPermission].self, forKey: .permissions) ?? PluginPermission.defaultMetadata
+        privacy = try values.decodeIfPresent(PluginPrivacyDisclosure.self, forKey: .privacy) ?? PluginPrivacyDisclosure()
+        provenance = try values.decodeIfPresent(PluginProvenance.self, forKey: .provenance) ?? PluginProvenance()
+    }
+}
+
+/// What sanitized metadata a plugin declares it uses. These are not mutation powers.
+enum PluginPermission: String, Codable, CaseIterable, Sendable {
+    case trafficMetadata
+    case headerNames
+    case appIdentity
+    case llmMetadata
+    case mcpMetadata
+    case suggestGuardrail
+
+    static let defaultMetadata: [PluginPermission] = [.trafficMetadata, .headerNames, .appIdentity, .llmMetadata, .mcpMetadata]
+
+    var title: String {
+        switch self {
+        case .trafficMetadata: return L("Traffic metadata")
+        case .headerNames: return L("Header names")
+        case .appIdentity: return L("App identity")
+        case .llmMetadata: return L("LLM metadata")
+        case .mcpMetadata: return L("MCP metadata")
+        case .suggestGuardrail: return L("Suggest guardrails")
+        }
+    }
+}
+
+struct PluginPrivacyDisclosure: Codable, Equatable, Sendable {
+    var categories: [Category]
+    var summary: String
+
+    init(categories: [Category] = [.metadataOnly], summary: String = "") {
+        self.categories = categories
+        self.summary = summary
+    }
+
+    enum Category: String, Codable, CaseIterable, Sendable {
+        case metadataOnly
+        case headerNames
+        case appIdentity
+        case toolNames
+        case mcpMetadata
+        case guardrailSuggestions
+
+        var title: String {
+            switch self {
+            case .metadataOnly: return L("Metadata only")
+            case .headerNames: return L("Header names")
+            case .appIdentity: return L("App identity")
+            case .toolNames: return L("Tool names")
+            case .mcpMetadata: return L("MCP metadata")
+            case .guardrailSuggestions: return L("Guardrail suggestions")
+            }
+        }
+    }
+}
+
+struct PluginProvenance: Codable, Equatable, Sendable {
+    var packageDigest: String
+    var scriptDigest: String
+    var sourceURL: String
+    var repositoryURL: String
+    var distributionChannel: DistributionChannel
+    var publisherName: String
+    var signingKeyID: String
+    var signedAt: String
+    var reviewStatus: ReviewStatus
+    var reviewerNote: String
+    var approvalFingerprint: String
+
+    init(packageDigest: String = "", scriptDigest: String = "", sourceURL: String = "", repositoryURL: String = "",
+         distributionChannel: DistributionChannel = .local, publisherName: String = "", signingKeyID: String = "",
+         signedAt: String = "", reviewStatus: ReviewStatus = .unsigned, reviewerNote: String = "", approvalFingerprint: String = "") {
+        self.packageDigest = packageDigest
+        self.scriptDigest = scriptDigest
+        self.sourceURL = sourceURL
+        self.repositoryURL = repositoryURL
+        self.distributionChannel = distributionChannel
+        self.publisherName = publisherName
+        self.signingKeyID = signingKeyID
+        self.signedAt = signedAt
+        self.reviewStatus = reviewStatus
+        self.reviewerNote = reviewerNote
+        self.approvalFingerprint = approvalFingerprint
+    }
+
+    enum DistributionChannel: String, Codable, Sendable {
+        case builtIn, local, community, official
+
+        var title: String {
+            switch self {
+            case .builtIn: return L("Built-in")
+            case .local: return L("Local file")
+            case .community: return L("Community")
+            case .official: return L("Official")
+            }
+        }
+    }
+
+    enum ReviewStatus: String, Codable, Sendable {
+        case builtIn, unsigned, verifiedOfficial, verifiedCommunity, rejected
+
+        var title: String {
+            switch self {
+            case .builtIn: return L("Built-in")
+            case .unsigned: return L("Unsigned local")
+            case .verifiedOfficial: return L("Verified official")
+            case .verifiedCommunity: return L("Verified community")
+            case .rejected: return L("Rejected")
+            }
+        }
+    }
+}
+
+struct PluginSignature: Codable, Equatable, Sendable {
+    var algorithm: String
+    var keyID: String
+    var signedAt: String
+    var value: String
+
+    init(algorithm: String = "p256-sha256", keyID: String, signedAt: String = "", value: String) {
+        self.algorithm = algorithm
+        self.keyID = keyID
+        self.signedAt = signedAt
+        self.value = value
     }
 }
 
 struct PluginPackage: Codable, Equatable, Sendable {
     var manifest: PluginManifest
+    var signature: PluginSignature?
+    var packageVersion: Int
 
-    init(manifest: PluginManifest) {
+    init(manifest: PluginManifest, signature: PluginSignature? = nil, packageVersion: Int = 1) {
         self.manifest = manifest
+        self.signature = signature
+        self.packageVersion = packageVersion
     }
 
     init(from decoder: Decoder) throws {
         if let package = try? decoder.container(keyedBy: CodingKeys.self), package.contains(.manifest) {
             manifest = try package.decode(PluginManifest.self, forKey: .manifest)
+            signature = try package.decodeIfPresent(PluginSignature.self, forKey: .signature)
+            packageVersion = try package.decodeIfPresent(Int.self, forKey: .packageVersion) ?? 1
         } else {
             manifest = try PluginManifest(from: decoder)
+            signature = nil
+            packageVersion = 1
         }
     }
 
-    private enum CodingKeys: String, CodingKey { case manifest }
+    private enum CodingKeys: String, CodingKey { case manifest, signature, packageVersion }
+}
+
+struct PluginPackageReview: Identifiable, Equatable, Sendable {
+    var id: String { approvalFingerprint }
+    var manifest: PluginManifest
+    var signatureStatus: PluginProvenance.ReviewStatus
+    var packageDigest: String
+    var scriptDigest: String
+    var approvalFingerprint: String
+    var warnings: [String]
+    var signature: PluginSignature?
 }
 
 struct PluginEvidence: Codable, Equatable, Sendable {
