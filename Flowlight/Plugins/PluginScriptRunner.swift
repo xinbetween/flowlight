@@ -82,20 +82,42 @@ final class PluginScriptRunner: @unchecked Sendable {
                   !label.isEmpty, !value.isEmpty else { return nil }
             return PluginEvidence(label, value)
         }
-        let guardrail = suggestedGuardrail(from: object["suggestedGuardrail"], exchange: exchange)
+        let maySuggest = manifest.capabilities.contains(.suggestGuardrail) && manifest.permissions.contains(.suggestGuardrail)
+        let guardrail = maySuggest ? suggestedGuardrail(from: object["suggestedGuardrail"], exchange: exchange) : nil
+        let rule = maySuggest ? suggestedRule(from: object["suggestedRule"], exchange: exchange) : nil
         return PluginFindingDraft(pluginID: manifest.id, pluginVersion: manifest.version, kind: manifest.kind, severity: severity,
-                                  title: title, summary: summary, evidence: evidence, suggestedGuardrail: guardrail)
+                                  title: title, summary: summary, evidence: evidence,
+                                  suggestedGuardrail: guardrail, suggestedRule: rule)
     }
 
     private func suggestedGuardrail(from value: Any?, exchange: HTTPExchange) -> Guardrail? {
         guard let object = value as? [String: Any] else { return nil }
-        var guardrail = Guardrail(agent: object["agent"] as? String ?? exchange.agent ?? "",
-                                  server: object["server"] as? String ?? "",
-                                  tool: object["tool"] as? String ?? "",
+        var guardrail = Guardrail(agent: limited(object["agent"], fallback: exchange.agent ?? "", count: 120),
+                                  server: limited(object["server"], count: 120),
+                                  tool: limited(object["tool"], count: 120),
                                   origin: .observed)
-        guardrail.resource = object["resource"] as? String ?? ""
-        guardrail.name = String((object["name"] as? String ?? "").prefix(120))
+        guardrail.resource = limited(object["resource"], count: 240)
+        guardrail.name = limited(object["name"], count: 120)
         return guardrail.isComplete ? guardrail : nil
+    }
+
+    private func suggestedRule(from value: Any?, exchange: HTTPExchange) -> Rule? {
+        guard let object = value as? [String: Any] else { return nil }
+        let action = Rule.Action(rawValue: limited(object["action"], fallback: "block", count: 20)) ?? .block
+        let destination = limited(object["destination"], fallback: exchange.host, count: 240)
+        var rule = Rule(action: action,
+                        app: limited(object["app"], fallback: exchange.agent ?? exchange.bundleID, count: 160),
+                        destination: AgentPolicy.normalize(destination) ?? destination.lowercased(),
+                        path: limited(object["path"], count: 240),
+                        method: limited(object["method"], count: 20).uppercased(),
+                        origin: .alert)
+        if let status = object["status"] as? Int { rule.status = min(max(status, 400), 599) }
+        rule.name = limited(object["name"], count: 120)
+        return rule.isComplete ? rule : nil
+    }
+
+    private func limited(_ value: Any?, fallback: String = "", count: Int = 120) -> String {
+        String(((value as? String) ?? fallback).trimmingCharacters(in: .whitespacesAndNewlines).prefix(count))
     }
 
     private func manifestPayload(_ manifest: PluginManifest) -> [String: Any] {

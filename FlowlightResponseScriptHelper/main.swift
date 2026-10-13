@@ -91,6 +91,25 @@ func cleanGuardrail(_ value: Any?) -> [String: String]? {
     ]
 }
 
+func cleanRule(_ value: Any?) -> [String: Any]? {
+    guard let object = value as? [String: Any] else { return nil }
+    let action = object["action"] as? String ?? "block"
+    guard action == "block" || action == "allow" else { return nil }
+    let app = object["app"] as? String ?? ""
+    let destination = object["destination"] as? String ?? ""
+    guard !app.isEmpty || !destination.isEmpty else { return nil }
+    var clean: [String: Any] = [
+        "action": action,
+        "app": String(app.prefix(160)),
+        "destination": String(destination.prefix(240)),
+        "path": String((object["path"] as? String ?? "").prefix(240)),
+        "method": String((object["method"] as? String ?? "").prefix(20)),
+        "name": String((object["name"] as? String ?? "").prefix(120)),
+    ]
+    if let status = object["status"] as? Int { clean["status"] = min(max(status, 400), 599) }
+    return clean
+}
+
 func runPlugin(_ object: [String: Any]) {
     guard let script = object["script"] as? String,
           validScript(script),
@@ -124,6 +143,9 @@ func runPlugin(_ object: [String: Any]) {
         ]
         if let guardrail = cleanGuardrail(finding["suggestedGuardrail"]) {
             clean["suggestedGuardrail"] = guardrail
+        }
+        if let rule = cleanRule(finding["suggestedRule"]) {
+            clean["suggestedRule"] = rule
         }
         return clean
     }

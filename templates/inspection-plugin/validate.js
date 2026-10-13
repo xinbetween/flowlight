@@ -98,6 +98,17 @@ function checkFindings(findings, source = 'findings') {
       requireCondition((evidence.label || '').length <= 80, `${source} ${index} evidence label is too long`);
       requireCondition((evidence.value || '').length <= 240, `${source} ${index} evidence value is too long`);
     });
+    if (finding.suggestedRule !== undefined) {
+      requireCondition(isPlainObject(finding.suggestedRule), `${source} ${index} suggestedRule must be an object`);
+      requireCondition(['block', 'allow'].includes(finding.suggestedRule.action || 'block'), `${source} ${index} suggestedRule action must be block or allow`);
+      requireCondition((finding.suggestedRule.app || finding.suggestedRule.destination), `${source} ${index} suggestedRule must name an app or destination`);
+      for (const key of ['app', 'destination', 'path', 'method', 'name']) {
+        requireCondition(typeof (finding.suggestedRule[key] || '') === 'string', `${source} ${index} suggestedRule ${key} must be a string`);
+      }
+      if (finding.suggestedRule.status !== undefined) {
+        requireCondition(Number.isInteger(finding.suggestedRule.status) && finding.suggestedRule.status >= 400 && finding.suggestedRule.status <= 599, `${source} ${index} suggestedRule status must be 400-599`);
+      }
+    }
   });
 }
 

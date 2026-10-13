@@ -1535,6 +1535,7 @@
 "Modify responses" = "Modify responses";
 "Add Guardrail" = "Add Guardrail";
 "Save this as a normal Flowlight guardrail" = "Save this as a normal Flowlight guardrail";
+"Save this as a normal Flowlight rule" = "Save this as a normal Flowlight rule";
 "Plugin findings are advisory. They did not block or change this request." = "Plugin findings are advisory. They did not block or change this request.";
 "Let the request reach %@, then change its eligible response before this app receives it" = "Let the request reach %@, then change its eligible response before this app receives it";
 "%@ answered this request. Flowlight then changed the response with “%@” before the app received it." = "%@ answered this request. Flowlight then changed the response with “%@” before the app received it.";

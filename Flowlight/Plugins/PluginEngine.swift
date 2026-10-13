@@ -67,9 +67,10 @@ enum PluginEngine {
 
 private extension InspectionPluginRule {
     func finding(_ severity: PluginFinding.Severity, _ title: String, _ summary: String,
-                 _ evidence: [PluginEvidence], suggestedGuardrail: Guardrail? = nil) -> PluginFindingDraft {
+                 _ evidence: [PluginEvidence], suggestedGuardrail: Guardrail? = nil, suggestedRule: Rule? = nil) -> PluginFindingDraft {
         PluginFindingDraft(pluginID: manifest.id, pluginVersion: manifest.version, kind: manifest.kind, severity: severity,
-                           title: title, summary: summary, evidence: evidence, suggestedGuardrail: suggestedGuardrail)
+                           title: title, summary: summary, evidence: evidence,
+                           suggestedGuardrail: suggestedGuardrail, suggestedRule: suggestedRule)
     }
 }
 

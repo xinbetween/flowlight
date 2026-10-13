@@ -287,6 +287,7 @@ struct PluginFinding: Codable, Identifiable, Equatable, Sendable {
     var summary: String
     var evidence: [PluginEvidence]
     var suggestedGuardrail: Guardrail?
+    var suggestedRule: Rule?
     var createdAt: Date
 
     enum Severity: String, Codable, Sendable, CaseIterable { case info, low, medium, high }
@@ -301,12 +302,13 @@ struct PluginFindingDraft: Equatable, Sendable {
     var summary: String
     var evidence: [PluginEvidence]
     var suggestedGuardrail: Guardrail?
+    var suggestedRule: Rule?
 
     func materialize(exchangeID: Int64, createdAt: Date = Date()) -> PluginFinding {
         let stable = [String(exchangeID), pluginID, title].joined(separator: "|")
         return PluginFinding(id: StablePluginID.make(stable), exchangeID: exchangeID, pluginID: pluginID, pluginVersion: pluginVersion,
                              kind: kind, severity: severity, title: title, summary: summary, evidence: evidence,
-                             suggestedGuardrail: suggestedGuardrail, createdAt: createdAt)
+                             suggestedGuardrail: suggestedGuardrail, suggestedRule: suggestedRule, createdAt: createdAt)
     }
 }
 
