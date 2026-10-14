@@ -1321,13 +1321,13 @@ Plugins
 
  The trust boundary
 
- Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails or rules for the user to apply, but it does not block, rewrite, mock, or transform traffic by itself.
+ Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest reviewed Flowlight actions that open existing editors, but it does not block, rewrite, mock, transform, or save settings by itself.
 
  Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.
 
  Manifest
 
- A manifest tells Flowlight what the plugin is, who publishes it, what sanitized metadata it uses, whether it can suggest guardrails, and optionally the JavaScript evaluate(context) script to run.
+ A manifest tells Flowlight what the plugin is, who publishes it, what sanitized metadata it uses, whether it can suggest reviewed actions, and optionally the JavaScript evaluate(context) script to run.
 
 {
  "id": "thirdparty.example-guardrails",
@@ -1345,8 +1345,8 @@ Plugins
  "categories": ["metadataOnly", "toolNames", "mcpMetadata", "guardrailSuggestions"],
  "summary": "Uses sanitized metadata only."
  },
- "permissions": ["trafficMetadata", "appIdentity", "llmMetadata", "mcpMetadata", "suggestGuardrail"],
- "capabilities": ["annotate", "suggestGuardrail"],
+ "permissions": ["trafficMetadata", "appIdentity", "llmMetadata", "mcpMetadata", "suggestAction"],
+ "capabilities": ["annotate", "suggestAction"],
  "script": "function evaluate(context) { return []; }"
 }
 
@@ -1356,9 +1356,9 @@ Plugins
 
  publisherofficial, thirdPartyOfficial status is trusted only when package provenance verifies; unsigned packages are treated as third-party.
 
- permissionstrafficMetadata, headerNames, appIdentity, llmMetadata, mcpMetadata, suggestGuardrailWhich sanitized metadata families the plugin expects. These are not mutation powers.
+ permissionstrafficMetadata, headerNames, appIdentity, llmMetadata, mcpMetadata, suggestActionWhich sanitized metadata families the plugin expects. These are not mutation powers.
 
- capabilitiesannotate, suggestGuardrailCapabilities are advisory; enforcement still uses Flowlight rules and guardrails.
+ capabilitiesannotate, suggestActionCapabilities are advisory; enforcement still uses Flowlight rules, guardrails, mock, rewrite and transform editors.
 
  Provenance and package review
 
@@ -1372,7 +1372,7 @@ Plugins
 
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
- When a manifest declares the suggestGuardrail capability and permission, a finding can also include a suggestedGuardrail or suggestedRule. Flowlight stores those as inert suggestions; the Inspect view saves them only when the user clicks the normal Add action.
+ When a manifest declares the suggestAction capability and permission, a finding can also include suggestedActions. Flowlight stores those as inert suggestions; Inspect opens the matching editor and saves only when the user reviews and clicks Save.
 
 {
  "severity": "medium",
@@ -1382,13 +1382,18 @@ Plugins
  { "label": "Tool", "value": "Bash" },
  { "label": "Provider", "value": "Flowlight" }
  ],
- "suggestedGuardrail": {
- "agent": "claude",
- "server": "",
- "tool": "Bash",
- "origin": "observed"
+ "suggestedActions": [
+ {
+ "kind": "guardrail",
+ "title": "Review guardrail",
+ "reason": "Refuse this tool only after reviewing the normal Flowlight guardrail.",
+ "guardrail": { "agent": "claude", "server": "", "tool": "Bash" }
  },
- "suggestedRule": {
+ {
+ "kind": "networkRule",
+ "title": "Review Claude API traffic",
+ "reason": "Create a normal Flowlight rule if this endpoint should be refused.",
+ "networkRule": {
  "action": "block",
  "app": "claude",
  "destination": "api.example.com",
@@ -1397,6 +1402,8 @@ Plugins
  "status": 403,
  "name": "Review Claude API traffic"
  }
+ }
+ ]
 }
 
  Supported guardrail providers

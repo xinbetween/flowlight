@@ -1489,7 +1489,6 @@
 "App identity" = "App identity";
 "LLM metadata" = "LLM metadata";
 "MCP metadata" = "MCP metadata";
-"Suggest guardrails" = "Suggest guardrails";
 "Metadata only" = "Metadata only";
 "Tool names" = "Tool names";
 "Guardrail suggestions" = "Guardrail suggestions";
@@ -1535,8 +1534,6 @@
 "Modify requests" = "Modify requests";
 "Modify responses" = "Modify responses";
 "Add Guardrail" = "Add Guardrail";
-"Save this as a normal Flowlight guardrail" = "Save this as a normal Flowlight guardrail";
-"Save this as a normal Flowlight rule" = "Save this as a normal Flowlight rule";
 "Plugin findings are advisory. They did not block or change this request." = "Plugin findings are advisory. They did not block or change this request.";
 "Let the request reach %@, then change its eligible response before this app receives it" = "Let the request reach %@, then change its eligible response before this app receives it";
 "%@ answered this request. Flowlight then changed the response with “%@” before the app received it." = "%@ answered this request. Flowlight then changed the response with “%@” before the app received it.";
@@ -1567,7 +1564,6 @@
 "Content-Length, Connection and Transfer-Encoding are written by Flowlight." = "Content-Length, Connection and Transfer-Encoding are written by Flowlight.";
 "Binary · hexadecimal" = "Binary · hexadecimal";
 "Each pair of hexadecimal characters is one byte. Flowlight writes the original bytes." = "Each pair of hexadecimal characters is one byte. Flowlight writes the original bytes.";
-"Plugins add advisory findings to inspected exchanges. They do not block, rewrite, or send traffic anywhere by themselves." = "Plugins add advisory findings to inspected exchanges. They do not block, rewrite, or send traffic anywhere by themselves.";
 "Import Package…" = "Import Package…";
 "Backfill Findings" = "Backfill Findings";
 "Clear plugin findings…" = "Clear plugin findings…";
@@ -1590,7 +1586,6 @@
 "Backfilled plugin findings: %lld findings." = "Backfilled plugin findings: %lld findings.";
 "Backfill failed: %@" = "Backfill failed: %@";
 "JavaScript" = "JavaScript";
-"Suggests guardrails" = "Suggests guardrails";
 "%@ · v%@ · rule v%lld" = "%@ · v%@ · rule v%lld";
 "Package %@ · Script %@" = "Package %@ · Script %@";
 "Configured: %@" = "Configured: %@";
@@ -1605,7 +1600,6 @@
 "Package digest" = "Package digest";
 "Script digest" = "Script digest";
 "Permissions" = "Permissions";
-"Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic.";
 "Install" = "Install";
 "Not declared" = "Not declared";
 "Configure %@" = "Configure %@";
@@ -1651,3 +1645,32 @@
 "Clear local analyses?" = "Clear local analyses?";
 "Clear analyses" = "Clear analyses";
 "This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place." = "This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place.";
+
+"Suggest reviewed actions" = "Suggest reviewed actions";
+"Review guardrail" = "Review guardrail";
+"Plugin suggested a normal Flowlight guardrail." = "Plugin suggested a normal Flowlight guardrail.";
+"Review rule" = "Review rule";
+"Plugin suggested a normal Flowlight rule." = "Plugin suggested a normal Flowlight rule.";
+"Plugin suggested a reviewed Flowlight action." = "Plugin suggested a reviewed Flowlight action.";
+"Review mock" = "Review mock";
+"Review rewrite" = "Review rewrite";
+"Review transform" = "Review transform";
+"Optional" = "Optional";
+"Any server" = "Any server";
+"Any tool" = "Any tool";
+"Resource" = "Resource";
+"Any resource" = "Any resource";
+"Saving creates a normal Flowlight guardrail. The plugin cannot save or enforce it by itself." = "Saving creates a normal Flowlight guardrail. The plugin cannot save or enforce it by itself.";
+"Review Guardrail" = "Review Guardrail";
+"Review Rule" = "Review Rule";
+"Review Mock" = "Review Mock";
+"Review Rewrite" = "Review Rewrite";
+"Review Transform" = "Review Transform";
+"Open this suggestion as a normal Flowlight guardrail before saving" = "Open this suggestion as a normal Flowlight guardrail before saving";
+"Open this suggestion as a normal Flowlight rule before saving" = "Open this suggestion as a normal Flowlight rule before saving";
+"Open this suggestion in the mock response editor before saving" = "Open this suggestion in the mock response editor before saving";
+"Open this suggestion in the request rewrite editor before saving" = "Open this suggestion in the request rewrite editor before saving";
+"Open this suggestion in the response transform editor before saving" = "Open this suggestion in the response transform editor before saving";
+"Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves." = "Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves.";
+"Suggests reviewed actions" = "Suggests reviewed actions";
+"Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";

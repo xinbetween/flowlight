@@ -1488,7 +1488,6 @@
 "App identity" = "待翻译：App identity";
 "LLM metadata" = "待翻译：LLM metadata";
 "MCP metadata" = "待翻译：MCP metadata";
-"Suggest guardrails" = "待翻译：Suggest guardrails";
 "Metadata only" = "待翻译：Metadata only";
 "Tool names" = "待翻译：Tool names";
 "Guardrail suggestions" = "待翻译：Guardrail suggestions";
@@ -1534,8 +1533,6 @@
 "Modify requests" = "待翻译：Modify requests";
 "Modify responses" = "待翻译：Modify responses";
 "Add Guardrail" = "待翻译：Add Guardrail";
-"Save this as a normal Flowlight guardrail" = "待翻译：Save this as a normal Flowlight guardrail";
-"Save this as a normal Flowlight rule" = "待翻译：Save this as a normal Flowlight rule";
 "Plugin findings are advisory. They did not block or change this request." = "待翻译：Plugin findings are advisory. They did not block or change this request.";
 "Let the request reach %@, then change its eligible response before this app receives it" = "待翻译：Let the request reach %@, then change its eligible response before this app receives it";
 "%@ answered this request. Flowlight then changed the response with “%@” before the app received it." = "待翻译：%@ answered this request. Flowlight then changed the response with “%@” before the app received it.";
@@ -1566,7 +1563,6 @@
 "Content-Length, Connection and Transfer-Encoding are written by Flowlight." = "待翻译：Content-Length, Connection and Transfer-Encoding are written by Flowlight.";
 "Binary · hexadecimal" = "待翻译：Binary · hexadecimal";
 "Each pair of hexadecimal characters is one byte. Flowlight writes the original bytes." = "待翻译：Each pair of hexadecimal characters is one byte. Flowlight writes the original bytes.";
-"Plugins add advisory findings to inspected exchanges. They do not block, rewrite, or send traffic anywhere by themselves." = "待翻译：Plugins add advisory findings to inspected exchanges. They do not block, rewrite, or send traffic anywhere by themselves.";
 "Import Package…" = "待翻译：Import Package…";
 "Backfill Findings" = "待翻译：Backfill Findings";
 "Clear plugin findings…" = "待翻译：Clear plugin findings…";
@@ -1589,7 +1585,6 @@
 "Backfilled plugin findings: %lld findings." = "待翻译：Backfilled plugin findings: %lld findings.";
 "Backfill failed: %@" = "待翻译：Backfill failed: %@";
 "JavaScript" = "JavaScript";
-"Suggests guardrails" = "待翻译：Suggests guardrails";
 "%@ · v%@ · rule v%lld" = "待翻译：%@ · v%@ · rule v%lld";
 "Package %@ · Script %@" = "待翻译：Package %@ · Script %@";
 "Configured: %@" = "待翻译：Configured: %@";
@@ -1604,7 +1599,6 @@
 "Package digest" = "待翻译：Package digest";
 "Script digest" = "待翻译：Script digest";
 "Permissions" = "Permissions";
-"Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic." = "待翻译：Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic.";
 "Install" = "Install";
 "Not declared" = "待翻译：Not declared";
 "Configure %@" = "待翻译：Configure %@";
@@ -1650,3 +1644,32 @@
 "Clear local analyses?" = "待翻译：Clear local analyses?";
 "Clear analyses" = "待翻译：Clear analyses";
 "This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place." = "待翻译：This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place.";
+
+"Suggest reviewed actions" = "待翻译：Suggest reviewed actions";
+"Review guardrail" = "待翻译：Review guardrail";
+"Plugin suggested a normal Flowlight guardrail." = "待翻译：Plugin suggested a normal Flowlight guardrail.";
+"Review rule" = "待翻译：Review rule";
+"Plugin suggested a normal Flowlight rule." = "待翻译：Plugin suggested a normal Flowlight rule.";
+"Plugin suggested a reviewed Flowlight action." = "待翻译：Plugin suggested a reviewed Flowlight action.";
+"Review mock" = "待翻译：Review mock";
+"Review rewrite" = "待翻译：Review rewrite";
+"Review transform" = "待翻译：Review transform";
+"Optional" = "Optional";
+"Any server" = "待翻译：Any server";
+"Any tool" = "待翻译：Any tool";
+"Resource" = "Resource";
+"Any resource" = "待翻译：Any resource";
+"Saving creates a normal Flowlight guardrail. The plugin cannot save or enforce it by itself." = "待翻译：Saving creates a normal Flowlight guardrail. The plugin cannot save or enforce it by itself.";
+"Review Guardrail" = "待翻译：Review Guardrail";
+"Review Rule" = "待翻译：Review Rule";
+"Review Mock" = "待翻译：Review Mock";
+"Review Rewrite" = "待翻译：Review Rewrite";
+"Review Transform" = "待翻译：Review Transform";
+"Open this suggestion as a normal Flowlight guardrail before saving" = "待翻译：Open this suggestion as a normal Flowlight guardrail before saving";
+"Open this suggestion as a normal Flowlight rule before saving" = "待翻译：Open this suggestion as a normal Flowlight rule before saving";
+"Open this suggestion in the mock response editor before saving" = "待翻译：Open this suggestion in the mock response editor before saving";
+"Open this suggestion in the request rewrite editor before saving" = "待翻译：Open this suggestion in the request rewrite editor before saving";
+"Open this suggestion in the response transform editor before saving" = "待翻译：Open this suggestion in the response transform editor before saving";
+"Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves." = "待翻译：Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves.";
+"Suggests reviewed actions" = "待翻译：Suggests reviewed actions";
+"Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "待翻译：Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";

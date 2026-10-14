@@ -7,12 +7,18 @@
       { "label": "Tool", "value": "Bash" },
       { "label": "Provider", "value": "Flowlight" }
     ],
-    "suggestedGuardrail": {
-      "agent": "claude",
-      "server": "",
-      "tool": "Bash",
-      "origin": "observed"
-    }
+    "suggestedActions": [
+      {
+        "kind": "guardrail",
+        "title": "Review guardrail",
+        "reason": "Refuse this tool only after reviewing the normal Flowlight guardrail.",
+        "guardrail": {
+          "agent": "claude",
+          "server": "",
+          "tool": "Bash"
+        }
+      }
+    ]
   },
   {
     "severity": "low",
@@ -23,14 +29,21 @@
       { "label": "Connector", "value": "github" },
       { "label": "Approval", "value": "always" }
     ],
-    "suggestedRule": {
-      "action": "block",
-      "app": "claude",
-      "destination": "api.github.com",
-      "path": "",
-      "method": "",
-      "status": 403,
-      "name": "Review provider connector traffic"
-    }
+    "suggestedActions": [
+      {
+        "kind": "networkRule",
+        "title": "Review provider connector traffic",
+        "reason": "Use this only if the same host is contacted locally by an app or agent.",
+        "networkRule": {
+          "action": "block",
+          "app": "claude",
+          "destination": "api.github.com",
+          "path": "",
+          "method": "",
+          "status": 403,
+          "name": "Review provider connector traffic"
+        }
+      }
+    ]
   }
 ]

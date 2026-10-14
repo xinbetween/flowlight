@@ -28,8 +28,14 @@ private struct InspectContent: View {
     @State private var pluginFindings: [Int64: [PluginFinding]] = [:]
     @State private var window: AgentWindow = .day
     @State private var showSetup = false
+    /// Plugin-originated guardrails are reviewed before they become settings.
+    @State private var guardrailReview: GuardrailReview?
+    /// Plugin-originated network rules are reviewed in the normal rule editor.
+    @State private var ruleReview: RuleReview?
     /// A rule plus safe, temporary captured context waiting in the mock editor.
     @State private var mockDraft: MockRuleDraft?
+    /// A rewrite rule plus safe, temporary captured context waiting in the rewrite editor.
+    @State private var rewriteDraft: RewriteRuleDraft?
     /// A response-transform rule is created only after its selected exchange's stored response has been read.
     @State private var responseTransformDraft: ResponseTransformDraft?
     /// Setup was opened to look at the mock rules, so it opens on them.
@@ -98,8 +104,17 @@ private struct InspectContent: View {
             // applied then, or a person would see an unexplained empty request list.
             if !LocalRiskSettings.isActive { potentialHarmOnly = false }
         }
+        .sheet(item: $guardrailReview) { review in
+            GuardrailReviewSheet(review: review) { monitor.guardrails.save($0) }
+        }
+        .sheet(item: $ruleReview) { review in
+            RuleEditor(rule: review.rule, isNew: true) { monitor.rules.save($0) }
+        }
         .sheet(item: $mockDraft) { draft in
             MockRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.mockRules.append($0) }
+        }
+        .sheet(item: $rewriteDraft) { draft in
+            RewriteRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.rewriteRules.append($0) }
         }
         .sheet(item: $responseTransformDraft) { draft in
             ResponseTransformRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.responseTransformRules.append($0) }
@@ -143,6 +158,51 @@ private struct InspectContent: View {
                 body = nil
             }
             responseTransformDraft = ResponseTransformDraft(exchange: exchange, responseBody: body)
+        }
+    }
+
+    private func reviewPluginAction(_ action: PluginSuggestedAction, for exchange: HTTPExchange) {
+        switch action.kind {
+        case .guardrail:
+            guard let guardrail = action.guardrail else { return }
+            guardrailReview = GuardrailReview(action: action, guardrail: guardrail)
+        case .networkRule:
+            guard let rule = action.networkRule else { return }
+            ruleReview = RuleReview(rule: rule)
+        case .mockResponse:
+            guard let suggestion = action.mock else { return }
+            Task {
+                let bodies: (request: Data, response: Data)?
+                if let id = exchange.id {
+                    bodies = try? await monitor.read { try $0.exchangeBodies(id: id) }
+                } else {
+                    bodies = nil
+                }
+                var draft = MockRuleDraft(exchange: exchange, requestBody: bodies?.request, responseBody: bodies?.response)
+                draft.rule.apply(suggestion)
+                mockDraft = draft
+            }
+        case .requestRewrite:
+            guard let suggestion = action.rewrite else { return }
+            var rule = RewriteRule(name: suggestion.name, host: suggestion.host, path: suggestion.path, method: suggestion.method,
+                                   headers: suggestion.headers, body: suggestion.body)
+            if rule.host.isEmpty { rule.host = exchange.host }
+            if rule.path.isEmpty { rule.path = exchange.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? "/" }
+            if rule.method.isEmpty { rule.method = exchange.method }
+            rewriteDraft = RewriteRuleDraft(exchange: exchange, rule: rule)
+        case .responseTransform:
+            guard let suggestion = action.responseTransform else { return }
+            Task {
+                let body: Data?
+                if let id = exchange.id {
+                    body = try? await monitor.read { try $0.exchangeBodies(id: id)?.response }
+                } else {
+                    body = nil
+                }
+                var draft = ResponseTransformDraft(exchange: exchange, responseBody: body)
+                draft.rule.apply(suggestion)
+                responseTransformDraft = draft
+            }
         }
     }
 
@@ -342,7 +402,8 @@ private struct InspectContent: View {
                            pluginFindings: selected.id.flatMap { pluginFindings[$0] } ?? [],
                            cause: selected.id.flatMap { links[$0] }, results: results, highlight: search,
                            mockThis: DemoData.isEnabled ? nil : { prepareMock(from: selected) },
-                           modifyResponse: canModifyResponse(selected) ? { prepareResponseTransform(from: selected) } : nil)
+                           modifyResponse: canModifyResponse(selected) ? { prepareResponseTransform(from: selected) } : nil,
+                           reviewPluginAction: { reviewPluginAction($0, for: selected) })
                 .id(selected.id)
         } else {
             ContentUnavailableView(L("Select a request"), systemImage: "doc.text.magnifyingglass")
@@ -546,6 +607,74 @@ private struct InspectionSetup: View {
     }
 }
 
+private struct GuardrailReview: Identifiable {
+    var id = UUID()
+    var action: PluginSuggestedAction
+    var guardrail: Guardrail
+}
+
+private struct RuleReview: Identifiable {
+    var id = UUID()
+    var rule: Rule
+}
+
+private extension MockRule {
+    mutating func apply(_ suggestion: PluginSuggestedAction.MockSuggestion) {
+        if !suggestion.name.isEmpty { name = suggestion.name }
+        if !suggestion.host.isEmpty { host = suggestion.host }
+        if !suggestion.path.isEmpty { path = suggestion.path }
+        if !suggestion.method.isEmpty { method = suggestion.method }
+        status = suggestion.status
+        delay = suggestion.delay
+        if !suggestion.headers.isEmpty { headers = suggestion.headers }
+        if !suggestion.body.isEmpty {
+            body = suggestion.body
+            bodyEncoding = .text
+        }
+    }
+}
+
+private extension ResponseTransformRule {
+    mutating func apply(_ suggestion: PluginSuggestedAction.ResponseTransformSuggestion) {
+        if !suggestion.name.isEmpty { name = suggestion.name }
+        if !suggestion.host.isEmpty { host = suggestion.host }
+        if !suggestion.path.isEmpty { path = suggestion.path }
+        if !suggestion.method.isEmpty { method = suggestion.method }
+        if !suggestion.script.isEmpty { script = suggestion.script }
+    }
+}
+
+private struct GuardrailReviewSheet: View {
+    @State var review: GuardrailReview
+    var save: (Guardrail) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L("Review guardrail")).font(.title3.bold())
+            Text(review.action.reason).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow { Text(L("Name")).gridColumnAlignment(.trailing).foregroundStyle(.secondary); TextField(L("Optional"), text: $review.guardrail.name) }
+                GridRow { Text(L("Agent")).gridColumnAlignment(.trailing).foregroundStyle(.secondary); TextField(L("Any agent"), text: $review.guardrail.agent) }
+                GridRow { Text(L("Server")).gridColumnAlignment(.trailing).foregroundStyle(.secondary); TextField(L("Any server"), text: $review.guardrail.server) }
+                GridRow { Text(L("Tool")).gridColumnAlignment(.trailing).foregroundStyle(.secondary); TextField(L("Any tool"), text: $review.guardrail.tool) }
+                GridRow { Text(L("Resource")).gridColumnAlignment(.trailing).foregroundStyle(.secondary); TextField(L("Any resource"), text: $review.guardrail.resource) }
+            }
+            Label(L("Saving creates a normal Flowlight guardrail. The plugin cannot save or enforce it by itself."), systemImage: "info.circle")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button(L("Cancel"), role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(L("Add Guardrail")) { save(review.guardrail); dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!review.guardrail.isComplete)
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+    }
+}
+
 private struct PluginFindingBadge: View {
     var findings: [PluginFinding]
 
@@ -568,8 +697,7 @@ private struct PluginFindingBadge: View {
 
 private struct PluginFindingsCard: View {
     var findings: [PluginFinding]
-    var addGuardrail: (Guardrail) -> Void
-    var addRule: (Rule) -> Void
+    var reviewAction: (PluginSuggestedAction) -> Void
 
     var body: some View {
         if !findings.isEmpty {
@@ -595,18 +723,13 @@ private struct PluginFindingsCard: View {
                             HStack(spacing: 6) {
                                 Text(L("%@ · %@", finding.pluginID, finding.pluginVersion))
                                     .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
-                                if finding.suggestedGuardrail != nil || finding.suggestedRule != nil {
+                                if !finding.suggestedActions.isEmpty {
                                     Spacer()
                                 }
-                                if let guardrail = finding.suggestedGuardrail {
-                                    Button(L("Add Guardrail")) { addGuardrail(guardrail) }
+                                ForEach(finding.suggestedActions) { action in
+                                    Button(action.buttonTitle) { reviewAction(action) }
                                         .buttonStyle(.link).font(.caption)
-                                        .help(L("Save this as a normal Flowlight guardrail"))
-                                }
-                                if let rule = finding.suggestedRule {
-                                    Button(L("Add Rule")) { addRule(rule) }
-                                        .buttonStyle(.link).font(.caption)
-                                        .help(L("Save this as a normal Flowlight rule"))
+                                        .help(action.helpText)
                                 }
                             }
                         }
@@ -619,6 +742,28 @@ private struct PluginFindingsCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(4)
             }
+        }
+    }
+}
+
+private extension PluginSuggestedAction {
+    var buttonTitle: String {
+        switch kind {
+        case .guardrail: return L("Review Guardrail")
+        case .networkRule: return L("Review Rule")
+        case .mockResponse: return L("Review Mock")
+        case .requestRewrite: return L("Review Rewrite")
+        case .responseTransform: return L("Review Transform")
+        }
+    }
+
+    var helpText: String {
+        switch kind {
+        case .guardrail: return L("Open this suggestion as a normal Flowlight guardrail before saving")
+        case .networkRule: return L("Open this suggestion as a normal Flowlight rule before saving")
+        case .mockResponse: return L("Open this suggestion in the mock response editor before saving")
+        case .requestRewrite: return L("Open this suggestion in the request rewrite editor before saving")
+        case .responseTransform: return L("Open this suggestion in the response transform editor before saving")
         }
     }
 }
@@ -661,6 +806,8 @@ private struct ExchangeDetail: View {
     var mockThis: (() -> Void)?
     /// Starts a response transform from this real upstream exchange.
     var modifyResponse: (() -> Void)?
+    /// Opens a normal Flowlight editor for a plugin-suggested action.
+    var reviewPluginAction: ((PluginSuggestedAction) -> Void)?
     @State private var bodies: (request: Data, response: Data)?
     @State private var tab = 0
     @State private var headersOpen: Bool?
@@ -685,7 +832,7 @@ private struct ExchangeDetail: View {
             if LocalRiskSettings.isActive {
                 PotentialHarmCard(assessment: assessment)
             }
-            PluginFindingsCard(findings: pluginFindings, addGuardrail: { monitor.guardrails.save($0) }, addRule: { monitor.rules.save($0) })
+            PluginFindingsCard(findings: pluginFindings, reviewAction: { action in reviewPluginAction?(action) })
             if let note = exchange.note {
                 Label(note, systemImage: "lock").foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }
