@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.14.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.14.4, macOS 15 or later.
 
  On this page
 
@@ -853,7 +853,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.14.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.14.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1562,8 +1562,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.14.4
+October 14, 2026Latest
+
+ Turn plugin findings into reviewable rules. Plugin findings can now suggest normal Flowlight
+ rules as inert actions next to guardrail suggestions, so a user can save an inspected rule through the existing
+ Rules system instead of giving plugins a direct enforcement path.
+
+ Gate enforcement suggestions by manifest permission. Installed JavaScript can return rule or
+ guardrail suggestions only when the plugin declares the suggestGuardrail capability and permission;
+ otherwise the finding stays advisory-only.
+
+ Document the rule suggestion contract. The inspection plugin template, validator and public
+ plugin docs now cover suggestedRule fields, bounded validation, and the unchanged fail-open runtime
+ boundary.
+
  0.14.3
-October 12, 2026Latest
+October 12, 2026
 
  Review community plugins before install. Imported plugin packages now open a review sheet with
  provenance, signature status, publisher category, permissions, privacy categories, package digest and script digest
