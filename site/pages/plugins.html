@@ -26,7 +26,7 @@ nav: plugins
     </nav>
     <article class="prose">
       <h2 id="trust">The trust boundary</h2>
-      <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.</p>
+      <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails or rules for the user to apply, but it does not block, rewrite, mock, or transform traffic by itself.</p>
       <p>Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.</p>
 
       <h2 id="manifest">Manifest</h2>
@@ -66,6 +66,7 @@ nav: plugins
       <h2 id="findings">Findings</h2>
       <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing only the metadata families declared in <code>permissions</code>. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
       <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
+      <p>When a manifest declares the <code>suggestGuardrail</code> capability and permission, a finding can also include a <code>suggestedGuardrail</code> or <code>suggestedRule</code>. Flowlight stores those as inert suggestions; the Inspect view saves them only when the user clicks the normal Add action.</p>
 <pre>{
   "severity": "medium",
   "title": "High-risk tool available",
@@ -79,6 +80,15 @@ nav: plugins
     "server": "",
     "tool": "Bash",
     "origin": "observed"
+  },
+  "suggestedRule": {
+    "action": "block",
+    "app": "claude",
+    "destination": "api.example.com",
+    "path": "/v1/messages",
+    "method": "POST",
+    "status": 403,
+    "name": "Review Claude API traffic"
   }
 }</pre>
 

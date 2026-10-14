@@ -1321,7 +1321,7 @@ Plugins
 
  The trust boundary
 
- Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails, but it does not block, rewrite, mock, or transform traffic by itself.
+ Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest ordinary Flowlight guardrails or rules for the user to apply, but it does not block, rewrite, mock, or transform traffic by itself.
 
  Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.
 
@@ -1372,6 +1372,8 @@ Plugins
 
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
+ When a manifest declares the suggestGuardrail capability and permission, a finding can also include a suggestedGuardrail or suggestedRule. Flowlight stores those as inert suggestions; the Inspect view saves them only when the user clicks the normal Add action.
+
 {
  "severity": "medium",
  "title": "High-risk tool available",
@@ -1385,6 +1387,15 @@ Plugins
  "server": "",
  "tool": "Bash",
  "origin": "observed"
+ },
+ "suggestedRule": {
+ "action": "block",
+ "app": "claude",
+ "destination": "api.example.com",
+ "path": "/v1/messages",
+ "method": "POST",
+ "status": 403,
+ "name": "Review Claude API traffic"
  }
 }
 

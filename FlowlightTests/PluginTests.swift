@@ -184,6 +184,70 @@ final class PluginTests: XCTestCase {
         XCTAssertFalse(finding.evidence.map(\.value).joined().contains("Authorization"))
     }
 
+    func testJavaScriptEnforcementSuggestionsRequireDeclaredCapability() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.no-suggest", name: "No Suggest", version: "0.1.0", kind: .llmMCP,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses metadata only.",
+                                      capabilities: [.annotate], permissions: [.trafficMetadata, .llmMetadata])
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'medium',
+            title: 'Suggestion without capability',
+            summary: 'This should stay advisory only.',
+            evidence: [{ label: 'Host', value: context.exchange.host }],
+            suggestedGuardrail: { agent: 'agent', tool: 'Bash' },
+            suggestedRule: { action: 'block', app: 'agent', destination: 'api.example.test' }
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange(requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == "thirdparty.no-suggest" })
+        XCTAssertNil(finding.suggestedGuardrail)
+        XCTAssertNil(finding.suggestedRule)
+    }
+
+    func testJavaScriptPluginCanSuggestNormalRuleWhenDeclared() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.rule-suggest", name: "Rule Suggest", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses metadata only.",
+                                      capabilities: [.annotate, .suggestGuardrail], permissions: [.trafficMetadata, .appIdentity, .suggestGuardrail])
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'medium',
+            title: 'Suggest rule',
+            summary: 'Suggest a normal Flowlight rule for the inspected endpoint.',
+            evidence: [{ label: 'Host', value: context.exchange.host }],
+            suggestedRule: {
+              action: 'block',
+              app: context.exchange.agent || context.exchange.bundleID,
+              destination: context.exchange.host,
+              path: context.exchange.path,
+              method: context.exchange.method,
+              status: 451,
+              name: 'Review inspected endpoint'
+            }
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange(method: "POST", path: "/v1/messages?token=secret", requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == "thirdparty.rule-suggest" })
+        let rule = try XCTUnwrap(finding.suggestedRule)
+        XCTAssertEqual(rule.action, .block)
+        XCTAssertEqual(rule.app, "agent")
+        XCTAssertEqual(rule.destination, "api.example.test")
+        XCTAssertEqual(rule.path, "/v1/messages")
+        XCTAssertEqual(rule.method, "POST")
+        XCTAssertEqual(rule.status, 451)
+        XCTAssertEqual(rule.origin, .alert)
+        XCTAssertTrue(rule.isComplete)
+    }
+
     @MainActor
     func testPluginStoreRejectsReservedBuiltInPackageID() {
         let store = PluginStore()

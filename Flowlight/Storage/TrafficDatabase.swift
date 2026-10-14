@@ -407,6 +407,10 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE INDEX IF NOT EXISTS plugin_findings_exchange ON plugin_findings (exchange_id);
         CREATE INDEX IF NOT EXISTS plugin_findings_plugin_created ON plugin_findings (plugin_id, created_at);
         """)
+        let pluginFindingColumns = Set(try conn.query("PRAGMA table_info(plugin_findings)") { $0.text(1) })
+        if !pluginFindingColumns.contains("suggested_rule") {
+            try conn.execute("ALTER TABLE plugin_findings ADD COLUMN suggested_rule TEXT NOT NULL DEFAULT ''")
+        }
         // Added with blocking: the destination a refused connection was headed for, so its alert can offer to
         // allow it without parsing the sentence back out of `detail`.
         let alertColumns = Set(try conn.query("PRAGMA table_info(alerts)") { $0.text(1) })
@@ -1073,12 +1077,18 @@ final class TrafficDatabase: @unchecked Sendable {
             } else {
                 guardrail = ""
             }
+            let rule: String
+            if let suggested = finding.suggestedRule {
+                rule = String(decoding: try encoder.encode(suggested), as: UTF8.self)
+            } else {
+                rule = ""
+            }
             try conn.run("""
-                INSERT OR IGNORE INTO plugin_findings (id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                INSERT OR IGNORE INTO plugin_findings (id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, suggested_rule, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """, [.text(finding.id), .int(exchangeID), .text(finding.pluginID), .text(finding.pluginVersion), .text(finding.kind.rawValue),
                       .text(finding.severity.rawValue), .text(finding.title), .text(String(finding.summary.prefix(500))), .text(evidence),
-                      .text(guardrail), .double(finding.createdAt.timeIntervalSince1970)])
+                      .text(guardrail), .text(rule), .double(finding.createdAt.timeIntervalSince1970)])
         }
     }
 
@@ -1089,7 +1099,7 @@ final class TrafficDatabase: @unchecked Sendable {
         let marks = Array(repeating: "?", count: exchangeIDs.count).joined(separator: ",")
         let values = exchangeIDs.map(SQLValue.int)
         let rows = try conn.query("""
-            SELECT id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, created_at
+            SELECT id, exchange_id, plugin_id, plugin_version, kind, severity, title, summary, evidence, suggested_guardrail, suggested_rule, created_at
             FROM plugin_findings WHERE exchange_id IN (\(marks)) ORDER BY created_at ASC, title ASC
             """, values) { row in decodePluginFinding(row) }
         let visible = visibleOnly ? rows.filter { enabled[$0.pluginID] ?? true } : rows
@@ -1105,11 +1115,14 @@ final class TrafficDatabase: @unchecked Sendable {
         let evidence = (try? decoder.decode([PluginEvidence].self, from: Data(row.text(8).utf8))) ?? []
         let guardrailText = row.text(9)
         let guardrail = guardrailText.isEmpty ? nil : try? decoder.decode(Guardrail.self, from: Data(guardrailText.utf8))
+        let ruleText = row.text(10)
+        let rule = ruleText.isEmpty ? nil : try? decoder.decode(Rule.self, from: Data(ruleText.utf8))
         return PluginFinding(id: row.text(0), exchangeID: row.int(1), pluginID: row.text(2), pluginVersion: row.text(3),
                              kind: PluginManifest.Kind(rawValue: row.text(4)) ?? .traffic,
                              severity: PluginFinding.Severity(rawValue: row.text(5)) ?? .info,
-                             title: row.text(6), summary: row.text(7), evidence: evidence, suggestedGuardrail: guardrail,
-                             createdAt: Date(timeIntervalSince1970: row.double(10)))
+                             title: row.text(6), summary: row.text(7), evidence: evidence,
+                             suggestedGuardrail: guardrail, suggestedRule: rule,
+                             createdAt: Date(timeIntervalSince1970: row.double(11)))
     }
 
     // MARK: Rule simulation

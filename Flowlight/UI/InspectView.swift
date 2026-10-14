@@ -569,6 +569,7 @@ private struct PluginFindingBadge: View {
 private struct PluginFindingsCard: View {
     var findings: [PluginFinding]
     var addGuardrail: (Guardrail) -> Void
+    var addRule: (Rule) -> Void
 
     var body: some View {
         if !findings.isEmpty {
@@ -594,11 +595,18 @@ private struct PluginFindingsCard: View {
                             HStack(spacing: 6) {
                                 Text(L("%@ · %@", finding.pluginID, finding.pluginVersion))
                                     .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
-                                if let guardrail = finding.suggestedGuardrail {
+                                if finding.suggestedGuardrail != nil || finding.suggestedRule != nil {
                                     Spacer()
+                                }
+                                if let guardrail = finding.suggestedGuardrail {
                                     Button(L("Add Guardrail")) { addGuardrail(guardrail) }
                                         .buttonStyle(.link).font(.caption)
                                         .help(L("Save this as a normal Flowlight guardrail"))
+                                }
+                                if let rule = finding.suggestedRule {
+                                    Button(L("Add Rule")) { addRule(rule) }
+                                        .buttonStyle(.link).font(.caption)
+                                        .help(L("Save this as a normal Flowlight rule"))
                                 }
                             }
                         }
@@ -677,7 +685,7 @@ private struct ExchangeDetail: View {
             if LocalRiskSettings.isActive {
                 PotentialHarmCard(assessment: assessment)
             }
-            PluginFindingsCard(findings: pluginFindings) { monitor.guardrails.save($0) }
+            PluginFindingsCard(findings: pluginFindings, addGuardrail: { monitor.guardrails.save($0) }, addRule: { monitor.rules.save($0) })
             if let note = exchange.note {
                 Label(note, systemImage: "lock").foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
             }

@@ -4,7 +4,7 @@ This template describes an advisory Flowlight inspection plugin package. Flowlig
 
 ## Trust boundary
 
-Plugins run after an inspected HTTP exchange has been recorded locally. They can add findings and suggest normal Flowlight guardrails, but they do not block, rewrite, mock, transform, upload, or export traffic by themselves.
+Plugins run after an inspected HTTP exchange has been recorded locally. They can add findings and suggest normal Flowlight guardrails or rules for the user to apply, but they do not block, rewrite, mock, transform, upload, or export traffic by themselves.
 
 Evidence must be bounded and redacted. Do not include raw request or response bodies, prompts, completions, header values, credentials, full tool inputs, or unredacted query strings.
 
@@ -20,7 +20,7 @@ Evidence must be bounded and redacted. Do not include raw request or response bo
 
 Define a synchronous `evaluate(context)` function. Flowlight passes `context.manifest` and `context.exchange`; the exchange contains only the sanitized metadata allowed by the plugin's declared permissions. It never contains request bodies, response bodies, header values, prompts, completions or full tool inputs.
 
-Return up to 8 findings. Each finding uses `severity`, `title`, `summary`, bounded `evidence`, and an optional `suggestedGuardrail` with `agent`, `server`, `tool` or `resource`. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout. Failures produce no findings.
+Return up to 8 findings. Each finding uses `severity`, `title`, `summary`, bounded `evidence`, and optional suggestions. `suggestedGuardrail` can name `agent`, `server`, `tool` or `resource`; `suggestedRule` can name a normal Flowlight `block` or `allow` rule with `app`, `destination`, `path`, `method`, `status` and `name`. Suggestions appear as user-reviewed actions and require the `suggestGuardrail` capability and permission. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout. Failures produce no findings.
 
 ## Files
 

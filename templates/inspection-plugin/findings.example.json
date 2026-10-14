@@ -22,6 +22,15 @@
       { "label": "Provider", "value": "Anthropic" },
       { "label": "Connector", "value": "github" },
       { "label": "Approval", "value": "always" }
-    ]
+    ],
+    "suggestedRule": {
+      "action": "block",
+      "app": "claude",
+      "destination": "api.github.com",
+      "path": "",
+      "method": "",
+      "status": 403,
+      "name": "Review provider connector traffic"
+    }
   }
 ]
