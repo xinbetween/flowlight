@@ -13,7 +13,22 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.14.3</h2><time datetime="2026-10-12">October 12, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.14.4</h2><time datetime="2026-10-14">October 14, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Turn plugin findings into reviewable rules.</strong> Plugin findings can now suggest normal Flowlight
+            rules as inert actions next to guardrail suggestions, so a user can save an inspected rule through the existing
+            Rules system instead of giving plugins a direct enforcement path.</li>
+          <li><strong>Gate enforcement suggestions by manifest permission.</strong> Installed JavaScript can return rule or
+            guardrail suggestions only when the plugin declares the <code>suggestGuardrail</code> capability and permission;
+            otherwise the finding stays advisory-only.</li>
+          <li><strong>Document the rule suggestion contract.</strong> The inspection plugin template, validator and public
+            plugin docs now cover <code>suggestedRule</code> fields, bounded validation, and the unchanged fail-open runtime
+            boundary.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.14.3</h2><time datetime="2026-10-12">October 12, 2026</time></header>
         <ul>
           <li><strong>Review community plugins before install.</strong> Imported plugin packages now open a review sheet with
             provenance, signature status, publisher category, permissions, privacy categories, package digest and script digest
