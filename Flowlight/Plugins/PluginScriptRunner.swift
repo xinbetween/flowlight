@@ -82,12 +82,55 @@ final class PluginScriptRunner: @unchecked Sendable {
                   !label.isEmpty, !value.isEmpty else { return nil }
             return PluginEvidence(label, value)
         }
-        let maySuggest = manifest.capabilities.contains(.suggestGuardrail) && manifest.permissions.contains(.suggestGuardrail)
-        let guardrail = maySuggest ? suggestedGuardrail(from: object["suggestedGuardrail"], exchange: exchange) : nil
-        let rule = maySuggest ? suggestedRule(from: object["suggestedRule"], exchange: exchange) : nil
+        let maySuggest = canSuggestActions(manifest)
+        let actions = maySuggest ? suggestedActions(from: object["suggestedActions"], exchange: exchange) : []
+        let legacyGuardrail = maySuggest ? suggestedGuardrail(from: object["suggestedGuardrail"], exchange: exchange) : nil
+        let legacyRule = maySuggest ? suggestedRule(from: object["suggestedRule"], exchange: exchange) : nil
+        let normalizedActions = actions.isEmpty ? legacyActions(guardrail: legacyGuardrail, rule: legacyRule) : actions
+        let guardrail = legacyGuardrail ?? normalizedActions.compactMap(\.guardrail).first
+        let rule = legacyRule ?? normalizedActions.compactMap(\.networkRule).first
         return PluginFindingDraft(pluginID: manifest.id, pluginVersion: manifest.version, kind: manifest.kind, severity: severity,
                                   title: title, summary: summary, evidence: evidence,
-                                  suggestedGuardrail: guardrail, suggestedRule: rule)
+                                  suggestedGuardrail: guardrail, suggestedRule: rule, suggestedActions: normalizedActions)
+    }
+
+    private func canSuggestActions(_ manifest: PluginManifest) -> Bool {
+        (manifest.capabilities.contains(.suggestAction) || manifest.capabilities.contains(.suggestGuardrail)) &&
+            (manifest.permissions.contains(.suggestAction) || manifest.permissions.contains(.suggestGuardrail))
+    }
+
+    private func legacyActions(guardrail: Guardrail?, rule: Rule?) -> [PluginSuggestedAction] {
+        var actions: [PluginSuggestedAction] = []
+        if let guardrail { actions.append(.legacy(guardrail: guardrail)) }
+        if let rule { actions.append(.legacy(rule: rule)) }
+        return actions
+    }
+
+    private func suggestedActions(from value: Any?, exchange: HTTPExchange) -> [PluginSuggestedAction] {
+        guard let raw = value as? [[String: Any]] else { return [] }
+        return raw.prefix(4).compactMap { object in
+            guard let kindText = object["kind"] as? String,
+                  let kind = PluginSuggestedAction.Kind(rawValue: kindText) else { return nil }
+            let title = limited(object["title"], fallback: defaultActionTitle(kind), count: 120)
+            let reason = limited(object["reason"], fallback: L("Plugin suggested a reviewed Flowlight action."), count: 240)
+            switch kind {
+            case .guardrail:
+                guard let guardrail = suggestedGuardrail(from: object["guardrail"], exchange: exchange) else { return nil }
+                return PluginSuggestedAction(kind: kind, title: title, reason: reason, guardrail: guardrail)
+            case .networkRule:
+                guard let rule = suggestedRule(from: object["networkRule"], exchange: exchange) else { return nil }
+                return PluginSuggestedAction(kind: kind, title: title, reason: reason, networkRule: rule)
+            case .mockResponse:
+                guard let mock = suggestedMock(from: object["mock"], exchange: exchange) else { return nil }
+                return PluginSuggestedAction(kind: kind, title: title, reason: reason, mock: mock)
+            case .requestRewrite:
+                guard let rewrite = suggestedRewrite(from: object["rewrite"], exchange: exchange) else { return nil }
+                return PluginSuggestedAction(kind: kind, title: title, reason: reason, rewrite: rewrite)
+            case .responseTransform:
+                guard let transform = suggestedResponseTransform(from: object["responseTransform"], exchange: exchange) else { return nil }
+                return PluginSuggestedAction(kind: kind, title: title, reason: reason, responseTransform: transform)
+            }
+        }
     }
 
     private func suggestedGuardrail(from value: Any?, exchange: HTTPExchange) -> Guardrail? {
@@ -114,6 +157,94 @@ final class PluginScriptRunner: @unchecked Sendable {
         if let status = object["status"] as? Int { rule.status = min(max(status, 400), 599) }
         rule.name = limited(object["name"], count: 120)
         return rule.isComplete ? rule : nil
+    }
+
+    private func suggestedMock(from value: Any?, exchange: HTTPExchange) -> PluginSuggestedAction.MockSuggestion? {
+        guard let object = value as? [String: Any] else { return nil }
+        var suggestion = PluginSuggestedAction.MockSuggestion()
+        suggestion.name = limited(object["name"], count: 120)
+        suggestion.host = limited(object["host"], fallback: exchange.host, count: 240).lowercased()
+        suggestion.path = limited(object["path"], fallback: pathOnly(exchange.path), count: 240)
+        suggestion.method = limited(object["method"], fallback: exchange.method, count: 20).uppercased()
+        suggestion.status = clampedInt(object["status"], fallback: exchange.status ?? 500, range: 100...599)
+        suggestion.delay = clampedDouble(object["delay"], fallback: 0, range: 0...300)
+        suggestion.headers = suggestedHeaders(from: object["headers"])
+        suggestion.body = limited(object["body"], count: 4096)
+        return suggestion.host.isEmpty ? nil : suggestion
+    }
+
+    private func suggestedRewrite(from value: Any?, exchange: HTTPExchange) -> PluginSuggestedAction.RewriteSuggestion? {
+        guard let object = value as? [String: Any] else { return nil }
+        let headers = suggestedHeaderEdits(from: object["headers"])
+        let body = suggestedBodyEdits(from: object["body"])
+        guard !headers.isEmpty || !body.isEmpty else { return nil }
+        return PluginSuggestedAction.RewriteSuggestion(name: limited(object["name"], count: 120),
+                                                       host: limited(object["host"], fallback: exchange.host, count: 240).lowercased(),
+                                                       path: limited(object["path"], fallback: pathOnly(exchange.path), count: 240),
+                                                       method: limited(object["method"], fallback: exchange.method, count: 20).uppercased(),
+                                                       headers: headers, body: body)
+    }
+
+    private func suggestedResponseTransform(from value: Any?, exchange: HTTPExchange) -> PluginSuggestedAction.ResponseTransformSuggestion? {
+        guard let object = value as? [String: Any] else { return nil }
+        let script = limited(object["script"], count: 4096)
+        guard !script.isEmpty else { return nil }
+        return PluginSuggestedAction.ResponseTransformSuggestion(name: limited(object["name"], count: 120),
+                                                                 host: limited(object["host"], fallback: exchange.host, count: 240).lowercased(),
+                                                                 path: limited(object["path"], fallback: pathOnly(exchange.path), count: 240),
+                                                                 method: limited(object["method"], fallback: exchange.method, count: 20).uppercased(),
+                                                                 script: script)
+    }
+
+    private func suggestedHeaders(from value: Any?) -> [HTTPHeader] {
+        let raw = (value as? [[String: Any]]) ?? []
+        return raw.prefix(16).compactMap { object in
+            let name = MockRule.headerSafe(limited(object["name"], count: 120))
+            guard !name.isEmpty else { return nil }
+            return HTTPHeader(name: name, value: MockRule.headerSafe(limited(object["value"], count: 240)))
+        }
+    }
+
+    private func suggestedHeaderEdits(from value: Any?) -> [HeaderEdit] {
+        let raw = (value as? [[String: Any]]) ?? []
+        return raw.prefix(16).compactMap { object in
+            let name = MockRule.headerSafe(limited(object["name"], count: 120))
+            guard !name.isEmpty else { return nil }
+            let op = HeaderEdit.Op(rawValue: limited(object["op"], fallback: "set", count: 20)) ?? .set
+            return HeaderEdit(op: op, name: name, value: MockRule.headerSafe(limited(object["value"], count: 240)))
+        }
+    }
+
+    private func suggestedBodyEdits(from value: Any?) -> [BodyEdit] {
+        let raw = (value as? [[String: Any]]) ?? []
+        return raw.prefix(16).compactMap { object in
+            let path = limited(object["path"], count: 160)
+            guard !path.isEmpty else { return nil }
+            let op = BodyEdit.Op(rawValue: limited(object["op"], fallback: "set", count: 20)) ?? .set
+            return BodyEdit(op: op, path: path, value: limited(object["value"], count: 4096))
+        }
+    }
+
+    private func defaultActionTitle(_ kind: PluginSuggestedAction.Kind) -> String {
+        switch kind {
+        case .guardrail: return L("Review guardrail")
+        case .networkRule: return L("Review rule")
+        case .mockResponse: return L("Review mock")
+        case .requestRewrite: return L("Review rewrite")
+        case .responseTransform: return L("Review transform")
+        }
+    }
+
+    private func pathOnly(_ path: String) -> String {
+        path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+    }
+
+    private func clampedInt(_ value: Any?, fallback: Int, range: ClosedRange<Int>) -> Int {
+        min(max((value as? Int) ?? fallback, range.lowerBound), range.upperBound)
+    }
+
+    private func clampedDouble(_ value: Any?, fallback: Double, range: ClosedRange<Double>) -> Double {
+        min(max((value as? Double) ?? fallback, range.lowerBound), range.upperBound)
     }
 
     private func limited(_ value: Any?, fallback: String = "", count: Int = 120) -> String {

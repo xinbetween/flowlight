@@ -11,12 +11,16 @@ function evaluate(context) {
         { label: 'Tool', value: tool.name },
         { label: 'Provider', value: context.exchange.llm.provider }
       ],
-      suggestedGuardrail: {
-        agent: context.exchange.agent || '',
-        server: tool.server || '',
-        tool: tool.name,
-        origin: 'observed'
-      }
+      suggestedActions: [{
+        kind: 'guardrail',
+        title: 'Review guardrail',
+        reason: 'Refuse this tool only after reviewing the normal Flowlight guardrail.',
+        guardrail: {
+          agent: context.exchange.agent || '',
+          server: tool.server || '',
+          tool: tool.name
+        }
+      }]
     });
   }
 
@@ -30,7 +34,19 @@ function evaluate(context) {
         { label: 'Provider', value: connector.provider },
         { label: 'Connector', value: connector.label },
         { label: 'Approval', value: connector.approval || 'unspecified' }
-      ]
+      ],
+      suggestedActions: [{
+        kind: 'networkRule',
+        title: 'Review provider connector traffic',
+        reason: 'Use this only if the same host is contacted locally by an app or agent.',
+        networkRule: {
+          action: 'block',
+          app: context.exchange.agent || context.exchange.bundleID || '',
+          destination: 'api.github.com',
+          status: 403,
+          name: 'Review provider connector traffic'
+        }
+      }]
     });
   }
 

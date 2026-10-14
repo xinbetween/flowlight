@@ -246,6 +246,77 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(rule.status, 451)
         XCTAssertEqual(rule.origin, .alert)
         XCTAssertTrue(rule.isComplete)
+        XCTAssertEqual(finding.suggestedActions.first?.kind, .networkRule)
+    }
+
+    func testJavaScriptPluginCanSuggestReviewedActionsWhenDeclared() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.actions", name: "Actions", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses metadata only.",
+                                      capabilities: [.annotate, .suggestAction], permissions: [.trafficMetadata, .appIdentity, .suggestAction])
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'medium',
+            title: 'Suggest reviewed actions',
+            summary: 'Suggest reviewed editor handoffs.',
+            evidence: [{ label: 'Host', value: context.exchange.host }],
+            suggestedActions: [
+              {
+                kind: 'mockResponse',
+                title: 'Review mock outage',
+                reason: 'Exercise retry handling.',
+                mock: { host: context.exchange.host, path: context.exchange.path, method: context.exchange.method, status: 503, delay: 2, body: '{"error":"try later"}' }
+              },
+              {
+                kind: 'requestRewrite',
+                title: 'Review rewrite',
+                reason: 'Pin a safe option.',
+                rewrite: { host: context.exchange.host, path: context.exchange.path, method: context.exchange.method, body: [{ op: 'set', path: 'metadata.safe', value: 'true' }] }
+              },
+              {
+                kind: 'responseTransform',
+                title: 'Review transform',
+                reason: 'Remove a noisy response field.',
+                responseTransform: { host: context.exchange.host, path: context.exchange.path, method: context.exchange.method, script: 'function modifyResponse(args) { return args.responseJSON; }' }
+              }
+            ]
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange(method: "POST", path: "/v1/messages?token=secret", requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == "thirdparty.actions" })
+        XCTAssertEqual(finding.suggestedActions.map(\.kind), [.mockResponse, .requestRewrite, .responseTransform])
+        XCTAssertEqual(finding.suggestedActions[0].mock?.path, "/v1/messages")
+        XCTAssertEqual(finding.suggestedActions[0].mock?.status, 503)
+        XCTAssertEqual(finding.suggestedActions[1].rewrite?.body.first?.path, "metadata.safe")
+        XCTAssertEqual(finding.suggestedActions[2].responseTransform?.script, "function modifyResponse(args) { return args.responseJSON; }")
+    }
+
+    func testMalformedReviewedActionIsDroppedButFindingPersists() throws {
+        let db = try database()
+        var manifest = PluginManifest(id: "thirdparty.bad-action", name: "Bad Action", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "JS plugin.", privacySummary: "Uses metadata only.",
+                                      capabilities: [.annotate, .suggestAction], permissions: [.trafficMetadata, .suggestAction])
+        manifest.script = """
+        function evaluate(context) {
+          return [{
+            severity: 'low',
+            title: 'Malformed action',
+            summary: 'The finding should survive.',
+            evidence: [{ label: 'Host', value: context.exchange.host }],
+            suggestedActions: [{ kind: 'requestRewrite', title: 'Bad rewrite', rewrite: { headers: [], body: [] } }]
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange(requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == "thirdparty.bad-action" })
+        XCTAssertEqual(finding.title, "Malformed action")
+        XCTAssertTrue(finding.suggestedActions.isEmpty)
     }
 
     @MainActor

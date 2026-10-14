@@ -121,6 +121,7 @@ enum PluginPackageVerifier {
 
     private static func normalizedPermissions(_ manifest: PluginManifest) -> [PluginPermission] {
         var set = Set(manifest.permissions.isEmpty ? PluginPermission.defaultMetadata : manifest.permissions)
+        if manifest.capabilities.contains(.suggestAction) { set.insert(.suggestAction) }
         if manifest.capabilities.contains(.suggestGuardrail) { set.insert(.suggestGuardrail) }
         return PluginPermission.allCases.filter { set.contains($0) }
     }

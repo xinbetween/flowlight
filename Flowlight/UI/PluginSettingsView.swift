@@ -13,7 +13,7 @@ struct PluginSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text(L("Plugins add advisory findings to inspected exchanges. They do not block, rewrite, or send traffic anywhere by themselves."))
+                Text(L("Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(L("Import Package…"), action: importPackage)
@@ -156,7 +156,9 @@ private struct PluginSettingsRow: View {
                         PluginPill(plugin.source.title)
                         PluginPill(plugin.provenance.reviewStatus.title)
                         if !plugin.script.isEmpty { PluginPill(L("JavaScript")) }
-                        if plugin.capabilities.contains(.suggestGuardrail) { PluginPill(L("Suggests guardrails")) }
+                        if plugin.capabilities.contains(.suggestAction) || plugin.capabilities.contains(.suggestGuardrail) {
+                            PluginPill(L("Suggests reviewed actions"))
+                        }
                     }
                     Text(plugin.description).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text(plugin.privacySummary).font(.caption2).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
@@ -227,7 +229,7 @@ private struct PluginPackageReviewSheet: View {
                     }
                 }
             }
-            Text(L("Plugins are advisory. Installing this package does not let it block, rewrite, upload, or export traffic."))
+            Text(L("Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()

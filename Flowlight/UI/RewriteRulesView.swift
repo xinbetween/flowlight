@@ -96,8 +96,16 @@ struct RewriteRulesSection: View {
 struct RewriteRuleEditor: View {
     @State var rule: RewriteRule
     var isNew: Bool
+    var draft: RewriteRuleDraft?
     var save: (RewriteRule) -> Void
     @Environment(\.dismiss) private var dismiss
+
+    init(rule: RewriteRule, isNew: Bool, draft: RewriteRuleDraft? = nil, save: @escaping (RewriteRule) -> Void) {
+        _rule = State(initialValue: draft?.rule ?? rule)
+        self.isNew = isNew
+        self.draft = draft
+        self.save = save
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -127,6 +135,18 @@ struct RewriteRuleEditor: View {
                         ForEach(RewriteRule.methods, id: \.self) { Text($0).tag($0) }
                     }
                     .labelsHidden().frame(width: 130)
+                }
+            }
+
+            if let draft {
+                GroupBox(L("Captured request context")) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(draft.method) \(draft.url)").font(.caption.monospaced()).textSelection(.enabled)
+                        if !draft.requestHeaders.isEmpty {
+                            Text(draft.requestHeaders.map { "\($0.name): \($0.value)" }.joined(separator: "\n"))
+                                .font(.caption.monospaced()).textSelection(.enabled).lineLimit(5).foregroundStyle(.secondary)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 

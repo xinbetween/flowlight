@@ -106,8 +106,125 @@ func cleanRule(_ value: Any?) -> [String: Any]? {
         "method": String((object["method"] as? String ?? "").prefix(20)),
         "name": String((object["name"] as? String ?? "").prefix(120)),
     ]
-    if let status = object["status"] as? Int { clean["status"] = min(max(status, 400), 599) }
+    if let status = intValue(object["status"]) { clean["status"] = min(max(status, 400), 599) }
     return clean
+}
+
+func cleanSuggestedActions(_ value: Any?) -> [[String: Any]] {
+    let raw = (value as? [[String: Any]]) ?? []
+    let kinds = Set(["guardrail", "networkRule", "mockResponse", "requestRewrite", "responseTransform"])
+    return raw.prefix(4).compactMap { action in
+        guard let kind = action["kind"] as? String, kinds.contains(kind) else { return nil }
+        var clean: [String: Any] = [
+            "kind": kind,
+            "title": String((action["title"] as? String ?? "").prefix(120)),
+            "reason": String((action["reason"] as? String ?? "").prefix(240)),
+        ]
+        switch kind {
+        case "guardrail":
+            guard let guardrail = cleanGuardrail(action["guardrail"]) else { return nil }
+            clean["guardrail"] = guardrail
+        case "networkRule":
+            guard let rule = cleanRule(action["networkRule"]) else { return nil }
+            clean["networkRule"] = rule
+        case "mockResponse":
+            guard let mock = cleanMock(action["mock"]) else { return nil }
+            clean["mock"] = mock
+        case "requestRewrite":
+            guard let rewrite = cleanRewrite(action["rewrite"]) else { return nil }
+            clean["rewrite"] = rewrite
+        case "responseTransform":
+            guard let transform = cleanResponseTransform(action["responseTransform"]) else { return nil }
+            clean["responseTransform"] = transform
+        default:
+            return nil
+        }
+        return clean
+    }
+}
+
+func cleanMock(_ value: Any?) -> [String: Any]? {
+    guard let object = value as? [String: Any] else { return nil }
+    let host = object["host"] as? String ?? ""
+    guard !host.isEmpty else { return nil }
+    return [
+        "name": String((object["name"] as? String ?? "").prefix(120)),
+        "host": String(host.prefix(240)),
+        "path": String((object["path"] as? String ?? "").prefix(240)),
+        "method": String((object["method"] as? String ?? "").prefix(20)),
+        "status": min(max(intValue(object["status"]) ?? 500, 100), 599),
+        "delay": min(max(doubleValue(object["delay"]) ?? 0, 0), 300),
+        "headers": cleanHeaders(object["headers"]),
+        "body": String((object["body"] as? String ?? "").prefix(4096)),
+    ]
+}
+
+func cleanRewrite(_ value: Any?) -> [String: Any]? {
+    guard let object = value as? [String: Any] else { return nil }
+    let headers = cleanHeaderEdits(object["headers"])
+    let body = cleanBodyEdits(object["body"])
+    guard !headers.isEmpty || !body.isEmpty else { return nil }
+    return [
+        "name": String((object["name"] as? String ?? "").prefix(120)),
+        "host": String((object["host"] as? String ?? "").prefix(240)),
+        "path": String((object["path"] as? String ?? "").prefix(240)),
+        "method": String((object["method"] as? String ?? "").prefix(20)),
+        "headers": headers,
+        "body": body,
+    ]
+}
+
+func cleanResponseTransform(_ value: Any?) -> [String: String]? {
+    guard let object = value as? [String: Any], let script = object["script"] as? String, !script.isEmpty else { return nil }
+    return [
+        "name": String((object["name"] as? String ?? "").prefix(120)),
+        "host": String((object["host"] as? String ?? "").prefix(240)),
+        "path": String((object["path"] as? String ?? "").prefix(240)),
+        "method": String((object["method"] as? String ?? "").prefix(20)),
+        "script": String(script.prefix(4096)),
+    ]
+}
+
+func cleanHeaders(_ value: Any?) -> [[String: String]] {
+    let raw = (value as? [[String: Any]]) ?? []
+    return raw.prefix(16).compactMap { header in
+        guard let name = header["name"] as? String, !name.isEmpty else { return nil }
+        return ["name": String(name.prefix(120)), "value": String((header["value"] as? String ?? "").prefix(240))]
+    }
+}
+
+func cleanHeaderEdits(_ value: Any?) -> [[String: String]] {
+    let raw = (value as? [[String: Any]]) ?? []
+    let ops = Set(["set", "add", "remove"])
+    return raw.prefix(16).compactMap { edit in
+        guard let name = edit["name"] as? String, !name.isEmpty else { return nil }
+        let op = edit["op"] as? String ?? "set"
+        guard ops.contains(op) else { return nil }
+        return ["op": op, "name": String(name.prefix(120)), "value": String((edit["value"] as? String ?? "").prefix(240))]
+    }
+}
+
+func cleanBodyEdits(_ value: Any?) -> [[String: String]] {
+    let raw = (value as? [[String: Any]]) ?? []
+    let ops = Set(["set", "remove"])
+    return raw.prefix(16).compactMap { edit in
+        guard let path = edit["path"] as? String, !path.isEmpty else { return nil }
+        let op = edit["op"] as? String ?? "set"
+        guard ops.contains(op) else { return nil }
+        return ["op": op, "path": String(path.prefix(160)), "value": String((edit["value"] as? String ?? "").prefix(4096))]
+    }
+}
+
+func intValue(_ value: Any?) -> Int? {
+    if let int = value as? Int { return int }
+    if let double = value as? Double { return Int(double) }
+    return nil
+}
+
+func doubleValue(_ value: Any?) -> Double? {
+    if let double = value as? Double { return double }
+    if let int = value as? Int { return Double(int) }
+    return nil
 }
 
 func runPlugin(_ object: [String: Any]) {
@@ -146,6 +263,10 @@ func runPlugin(_ object: [String: Any]) {
         }
         if let rule = cleanRule(finding["suggestedRule"]) {
             clean["suggestedRule"] = rule
+        }
+        let actions = cleanSuggestedActions(finding["suggestedActions"])
+        if !actions.isEmpty {
+            clean["suggestedActions"] = actions
         }
         return clean
     }

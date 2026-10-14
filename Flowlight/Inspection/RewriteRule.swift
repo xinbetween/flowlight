@@ -90,6 +90,27 @@ struct RewriteRule: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// A selected recorded exchange plus safe request context for reviewing a request-rewrite suggestion.
+struct RewriteRuleDraft: Identifiable, Equatable, Sendable {
+    var id: UUID { rule.id }
+    var rule: RewriteRule
+    var method: String
+    var url: String
+    var requestHeaders: [HTTPHeader]
+
+    init(exchange: HTTPExchange, rule: RewriteRule? = nil) {
+        self.rule = rule ?? RewriteRule(name: "Rewrite \(exchange.method.uppercased()) \(exchange.host)\(Self.pathOnly(exchange.path))",
+                                        host: exchange.host, path: Self.pathOnly(exchange.path), method: exchange.method)
+        method = exchange.method
+        url = exchange.url
+        requestHeaders = exchange.requestHeaders
+    }
+
+    private static func pathOnly(_ path: String) -> String {
+        path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+    }
+}
+
 // MARK: Matching & applying
 
 /// Pure functions over plain data — no sockets — so the whole rewrite is testable without a proxy.

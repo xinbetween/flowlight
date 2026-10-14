@@ -50,7 +50,7 @@ struct PluginManifest: Codable, Identifiable, Equatable, Sendable {
             }
         }
     }
-    enum Capability: String, Codable, Sendable { case annotate, suggestGuardrail }
+    enum Capability: String, Codable, Sendable { case annotate, suggestGuardrail, suggestAction }
 
     init(id: String, name: String, version: String, kind: Kind, enabled: Bool = true, source: Source = .builtIn,
          publisher: Publisher = .official, guardrailProvider: GuardrailProvider = .flowlight, description: String,
@@ -113,6 +113,7 @@ enum PluginPermission: String, Codable, CaseIterable, Sendable {
     case llmMetadata
     case mcpMetadata
     case suggestGuardrail
+    case suggestAction
 
     static let defaultMetadata: [PluginPermission] = [.trafficMetadata, .headerNames, .appIdentity, .llmMetadata, .mcpMetadata]
 
@@ -123,7 +124,7 @@ enum PluginPermission: String, Codable, CaseIterable, Sendable {
         case .appIdentity: return L("App identity")
         case .llmMetadata: return L("LLM metadata")
         case .mcpMetadata: return L("MCP metadata")
-        case .suggestGuardrail: return L("Suggest guardrails")
+        case .suggestGuardrail, .suggestAction: return L("Suggest reviewed actions")
         }
     }
 }
@@ -276,6 +277,76 @@ struct PluginEvidence: Codable, Equatable, Sendable {
     }
 }
 
+struct PluginSuggestedAction: Codable, Equatable, Sendable, Identifiable {
+    enum Kind: String, Codable, Sendable {
+        case guardrail
+        case networkRule
+        case mockResponse
+        case requestRewrite
+        case responseTransform
+    }
+
+    var id: String { "\(kind.rawValue):\(title)" }
+    var kind: Kind
+    var title: String
+    var reason: String
+    var guardrail: Guardrail?
+    var networkRule: Rule?
+    var mock: MockSuggestion?
+    var rewrite: RewriteSuggestion?
+    var responseTransform: ResponseTransformSuggestion?
+
+    init(kind: Kind, title: String, reason: String, guardrail: Guardrail? = nil, networkRule: Rule? = nil,
+         mock: MockSuggestion? = nil, rewrite: RewriteSuggestion? = nil, responseTransform: ResponseTransformSuggestion? = nil) {
+        self.kind = kind
+        self.title = title
+        self.reason = reason
+        self.guardrail = guardrail
+        self.networkRule = networkRule
+        self.mock = mock
+        self.rewrite = rewrite
+        self.responseTransform = responseTransform
+    }
+
+    static func legacy(guardrail: Guardrail) -> PluginSuggestedAction {
+        PluginSuggestedAction(kind: .guardrail, title: guardrail.name.isEmpty ? L("Review guardrail") : guardrail.name,
+                              reason: L("Plugin suggested a normal Flowlight guardrail."), guardrail: guardrail)
+    }
+
+    static func legacy(rule: Rule) -> PluginSuggestedAction {
+        PluginSuggestedAction(kind: .networkRule, title: rule.name.isEmpty ? L("Review rule") : rule.name,
+                              reason: L("Plugin suggested a normal Flowlight rule."), networkRule: rule)
+    }
+
+    struct MockSuggestion: Codable, Equatable, Sendable {
+        var name: String = ""
+        var host: String = ""
+        var path: String = ""
+        var method: String = ""
+        var status: Int = 500
+        var delay: Double = 0
+        var headers: [HTTPHeader] = []
+        var body: String = ""
+    }
+
+    struct RewriteSuggestion: Codable, Equatable, Sendable {
+        var name: String = ""
+        var host: String = ""
+        var path: String = ""
+        var method: String = ""
+        var headers: [HeaderEdit] = []
+        var body: [BodyEdit] = []
+    }
+
+    struct ResponseTransformSuggestion: Codable, Equatable, Sendable {
+        var name: String = ""
+        var host: String = ""
+        var path: String = ""
+        var method: String = ""
+        var script: String = ""
+    }
+}
+
 struct PluginFinding: Codable, Identifiable, Equatable, Sendable {
     var id: String
     var exchangeID: Int64
@@ -288,9 +359,60 @@ struct PluginFinding: Codable, Identifiable, Equatable, Sendable {
     var evidence: [PluginEvidence]
     var suggestedGuardrail: Guardrail?
     var suggestedRule: Rule?
+    var suggestedActions: [PluginSuggestedAction]
     var createdAt: Date
 
     enum Severity: String, Codable, Sendable, CaseIterable { case info, low, medium, high }
+
+    init(id: String, exchangeID: Int64, pluginID: String, pluginVersion: String, kind: PluginManifest.Kind, severity: Severity,
+         title: String, summary: String, evidence: [PluginEvidence], suggestedGuardrail: Guardrail? = nil,
+         suggestedRule: Rule? = nil, suggestedActions: [PluginSuggestedAction] = [], createdAt: Date) {
+        self.id = id
+        self.exchangeID = exchangeID
+        self.pluginID = pluginID
+        self.pluginVersion = pluginVersion
+        self.kind = kind
+        self.severity = severity
+        self.title = title
+        self.summary = summary
+        self.evidence = evidence
+        self.suggestedGuardrail = suggestedGuardrail
+        self.suggestedRule = suggestedRule
+        self.suggestedActions = Self.normalizedActions(suggestedActions, guardrail: suggestedGuardrail, rule: suggestedRule)
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, exchangeID, pluginID, pluginVersion, kind, severity, title, summary, evidence, suggestedGuardrail, suggestedRule, suggestedActions, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let guardrail = try c.decodeIfPresent(Guardrail.self, forKey: .suggestedGuardrail)
+        let rule = try c.decodeIfPresent(Rule.self, forKey: .suggestedRule)
+        id = try c.decode(String.self, forKey: .id)
+        exchangeID = try c.decode(Int64.self, forKey: .exchangeID)
+        pluginID = try c.decode(String.self, forKey: .pluginID)
+        pluginVersion = try c.decode(String.self, forKey: .pluginVersion)
+        kind = try c.decode(PluginManifest.Kind.self, forKey: .kind)
+        severity = try c.decode(Severity.self, forKey: .severity)
+        title = try c.decode(String.self, forKey: .title)
+        summary = try c.decode(String.self, forKey: .summary)
+        evidence = try c.decode([PluginEvidence].self, forKey: .evidence)
+        suggestedGuardrail = guardrail
+        suggestedRule = rule
+        suggestedActions = Self.normalizedActions(try c.decodeIfPresent([PluginSuggestedAction].self, forKey: .suggestedActions) ?? [],
+                                                  guardrail: guardrail, rule: rule)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+    }
+
+    private static func normalizedActions(_ actions: [PluginSuggestedAction], guardrail: Guardrail?, rule: Rule?) -> [PluginSuggestedAction] {
+        if !actions.isEmpty { return actions }
+        var legacy: [PluginSuggestedAction] = []
+        if let guardrail { legacy.append(.legacy(guardrail: guardrail)) }
+        if let rule { legacy.append(.legacy(rule: rule)) }
+        return legacy
+    }
 }
 
 struct PluginFindingDraft: Equatable, Sendable {
@@ -303,12 +425,14 @@ struct PluginFindingDraft: Equatable, Sendable {
     var evidence: [PluginEvidence]
     var suggestedGuardrail: Guardrail?
     var suggestedRule: Rule?
+    var suggestedActions: [PluginSuggestedAction] = []
 
     func materialize(exchangeID: Int64, createdAt: Date = Date()) -> PluginFinding {
         let stable = [String(exchangeID), pluginID, title].joined(separator: "|")
         return PluginFinding(id: StablePluginID.make(stable), exchangeID: exchangeID, pluginID: pluginID, pluginVersion: pluginVersion,
                              kind: kind, severity: severity, title: title, summary: summary, evidence: evidence,
-                             suggestedGuardrail: suggestedGuardrail, suggestedRule: suggestedRule, createdAt: createdAt)
+                             suggestedGuardrail: suggestedGuardrail, suggestedRule: suggestedRule,
+                             suggestedActions: suggestedActions, createdAt: createdAt)
     }
 }
 
