@@ -13,7 +13,22 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.14.4</h2><time datetime="2026-10-14">October 14, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.14.5</h2><time datetime="2026-10-17">October 17, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Review plugin actions in Flowlight's existing editors.</strong> Plugin findings can now suggest guardrails,
+            network rules, mock responses, request rewrites and response transforms as typed, inert actions. Inspect opens the
+            matching editor with bounded defaults, and nothing changes until the user reviews and saves it.</li>
+          <li><strong>Keep mutation and enforcement outside plugins.</strong> Suggested actions require an explicit
+            <code>suggestAction</code> capability and permission, are sanitized in both the script helper and app, and never give
+            plugins direct access to captured bodies, header values, prompts, completions or full tool inputs.</li>
+          <li><strong>Preserve existing plugin packages and findings.</strong> Flowlight still accepts the legacy
+            <code>suggestGuardrail</code>, <code>suggestedGuardrail</code> and <code>suggestedRule</code> forms, normalizes them into
+            reviewed actions, and stores the new typed action list alongside retained findings.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.14.4</h2><time datetime="2026-10-14">October 14, 2026</time></header>
         <ul>
           <li><strong>Turn plugin findings into reviewable rules.</strong> Plugin findings can now suggest normal Flowlight
             rules as inert actions next to guardrail suggestions, so a user can save an inspected rule through the existing
