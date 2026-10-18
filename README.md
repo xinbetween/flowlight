@@ -128,7 +128,7 @@ An allowlist warns by default. Turn on **Refuse connections outside the list** f
 connections as well, recording each one as an alert with **Allow … from Now On** to add it to the list in a click.
 
 It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
-traffic, DNS, Apple services and Flowlight's own connections are never refused, enforcement lapses a few seconds
+traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, enforcement lapses a few seconds
 after the app stops running, and HTTPS inspection doesn't combine with it.
 
 ### Rules
@@ -147,6 +147,23 @@ Reports, AI Agents or Inspect to write one about what you're looking at; all of 
   inspection refuses one request and answers with a status the agent can read; the sampler refuses nothing. A rule
   the current setup can't carry out says so in the list instead of looking enforced.
 - A **violations feed** beside the list: every connection a rule decided, refusals and exceptions alike.
+
+### Managed ad and tracker packs
+Flowlight includes three official, built-in hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and
+telemetry**. All three are visible in **Rules › Packs** and off by default. Enable a pack for every app or only selected
+apps; enforcement needs the Network Extension, because the sampler can observe connections but cannot refuse them.
+
+Before enabling or broadening a pack, replay it against up to seven days of retained traffic to see which apps,
+destinations, connection counts and bytes would have changed. The activity feed groups repeated blocks instead of
+turning every ad request into a separate alert, while still naming the app, destination, matched list entry and pack.
+From any grouped event, add an exception for that app and destination in that pack. An ordinary allow rule remains the
+universal escape hatch, global **Pause Blocking** pauses packs too, and essential system traffic for accounts, push,
+updates, certificates and iCloud remains allowed.
+
+These are hostname-level network blocks, not page or window cleaners. They cannot remove first-party ads, DOM or layout
+gaps, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and
+shared CDNs can hide or blur the hostname and limit coverage. Cosmetic popup filtering needs a later browser extension
+that can see and change page content; the Network Extension cannot do that job.
 
 ### Agent guardrails
 *Which tools may this agent use* is a different question from *which hosts may it reach*, so it gets its own tab in
@@ -389,7 +406,7 @@ The [threat model](https://flowlight.xinbetween.com/threat-model/) says what is 
   started by Claude Code* or *the github MCP server*, not which individual tool call inside a long-running server opened it.
 - **Allowlists only block when you ask them to.** Every allowlist warns; turning on *Refuse connections outside the
   list*, per agent, makes it refuse as well. That needs the Network Extension engine — the sampler can only watch —
-  and it never refuses local traffic, DNS, Apple services or Flowlight's own.
+  and it never refuses local traffic, DNS, essential Apple system services or Flowlight's own.
 - **Encrypted payloads stay encrypted by default.** Flowlight reads metadata (hostnames, ports, byte counts). Decryption
   happens only with HTTPS inspection turned on, only for apps that use its proxy, and never for apps that pin certificates.
   Inspection speaks HTTP/1.1 to both sides.

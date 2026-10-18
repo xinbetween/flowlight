@@ -19,6 +19,15 @@ import Foundation
     /// means no rules at all. Like `setEnforcement` this is sent whole on every connection and every change, and
     /// like it the extension keeps none of it across a launch: a rule nobody is left to record is not enforced.
     func setRules(payload: Data, withReply reply: @escaping (Int) -> Void)
+
+    /// Negotiates the independently-versioned pack protocol before any bytes move.
+    func rulePackHello(appProtocol: Int, withReply reply: @escaping (Data) -> Void)
+    /// Starts one generation. Chunks are accepted only for this header and never affect the active matcher yet.
+    func beginRulePack(payload: Data, withReply reply: @escaping (Data) -> Void)
+    func appendRulePack(generation: String, index: Int, payload: Data, withReply reply: @escaping (Bool) -> Void)
+    /// Validates, compiles, then atomically swaps one complete generation. A failure leaves the previous one active.
+    func commitRulePack(generation: String, withReply reply: @escaping (Data) -> Void)
+    func clearRulePacks(payload: Data, withReply reply: @escaping (Data) -> Void)
 }
 
 /// Exported by the host app on the same connection.
@@ -35,4 +44,7 @@ import Foundation
     /// Both halves come back: a refusal has to be visible, and so does an exception that let something through,
     /// because "why is this getting through?" is the question a rule list exists to answer.
     func ruleDecisions(payload: Data, reply: @escaping () -> Void)
+
+    /// Bounded minute rollups from managed packs. True is returned only after the batch is durably committed.
+    func rulePackEvents(payload: Data, reply: @escaping (Bool) -> Void)
 }

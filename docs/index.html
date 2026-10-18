@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/#webpage", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight for macOS", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-07"}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app", "name": "Flowlight", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "url": "https://flowlight.xinbetween.com/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.14.5", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/#webpage", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight for macOS", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-17"}, {"@type": "SoftwareApplication", "@id": "https://flowlight.xinbetween.com/#app", "name": "Flowlight", "description": "Flowlight is open-source application-aware network intelligence for macOS, with deeper visibility into AI agents, tools and MCP servers.", "url": "https://flowlight.xinbetween.com/", "applicationCategory": "SecurityApplication", "applicationSubCategory": "Network monitor", "operatingSystem": "macOS 15 or later", "softwareVersion": "0.14.5", "downloadUrl": "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg", "installUrl": "https://flowlight.xinbetween.com/docs/#install", "image": "https://flowlight.xinbetween.com/assets/social-card.png", "screenshot": "https://flowlight.xinbetween.com/assets/screenshots/agents.png", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock"}}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -243,6 +243,18 @@
               already trust, not a barrier against software you don't — see the <a href="threat-model/">threat
               model</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · refused 4 times · weekdays 18:00–09:00</p></div>
+        </div>
+        <div class="rule">
+          <span class="sev critical">⛔ Opt-in</span>
+          <div><h3>Managed ad and tracker packs</h3>
+            <p>Three official packs — Advertising, Cross-site tracking, and Privacy and telemetry — are built in, visible and off by
+              default. With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
+              see grouped, explainable activity, and add pack-specific exceptions for an app. Ordinary allow rules remain the universal
+              escape hatch, global Pause Blocking applies, and essential system traffic stays allowed.</p>
+            <p>They block by hostname, so they cannot remove first-party ads, DOM or layout gaps, browser overlays, scripted popups, or
+              native app windows. ECH, QUIC, encrypted DNS, direct IPs and shared CDNs can limit coverage. Cosmetic popup filtering needs
+              a later browser extension that can change the page.</p>
+            <p class="example">Safari · Advertising matched doubleclick.net · 18 connections grouped</p></div>
         </div>
         <div class="rule">
           <span class="sev critical">⛔ Refuses</span>
@@ -501,7 +513,7 @@ open Flowlight.app --args -FLDemo YES</pre>
         <details><summary>Does Flowlight block traffic?</summary>
           <p>By default it watches and alerts, including when an agent leaves its allowlist. It can also refuse those connections,
             but only for an agent you have turned that on for, and only with the Network Extension engine installed — the sampler can
-            only watch. Local traffic, DNS, Apple services and Flowlight's own connections are never refused.</p></details>
+            only watch. Local traffic, DNS, essential Apple system services and Flowlight's own connections are never refused.</p></details>
         <details><summary>Can it read my HTTPS traffic?</summary>
           <p>Not by default. It reads the hostname a client asks for when it opens a connection (TLS SNI) and the DNS answers
             that map names to addresses, and contents stay encrypted. If you want the full picture, <strong>HTTPS inspection</strong> is a

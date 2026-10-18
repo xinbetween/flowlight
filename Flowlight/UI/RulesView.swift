@@ -28,18 +28,27 @@ struct RulesView: View {
     }
 
     private enum Tab: String, CaseIterable, Identifiable {
-        case rules, activity
+        case rules, packs, activity
         var id: String { rawValue }
-        var title: String { self == .rules ? L("Rules") : L("What they did") }
+        var title: String {
+            switch self {
+            case .rules: return L("Rules")
+            case .packs: return L("Packs")
+            case .activity: return L("What they did")
+            }
+        }
     }
 
     private var store: RuleStore { monitor.rules }
 
     var body: some View {
         Group {
-            if tab == .rules {
+            switch tab {
+            case .rules:
                 if store.rules.isEmpty { empty } else { ruleList }
-            } else {
+            case .packs:
+                RulePacksView()
+            case .activity:
                 activityFeed
             }
         }
@@ -100,29 +109,31 @@ struct RulesView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         // Nothing to switch between until there is something in one of them.
-        if !store.rules.isEmpty || !store.events.isEmpty {
+        if !store.rules.isEmpty || !store.events.isEmpty || !monitor.rulePacks.definitions.isEmpty {
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $tab) {
                     ForEach(Tab.allCases) { Text($0.title).tag($0) }
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 310)
             }
         }
         ToolbarItemGroup {
             pauseControl
-            Button {
-                sheet = .library(nil, RuleTemplate.Subject())
-            } label: {
-                Label(L("Templates"), systemImage: "square.grid.2x2")
+            if tab == .rules {
+                Button {
+                    sheet = .library(nil, RuleTemplate.Subject())
+                } label: {
+                    Label(L("Templates"), systemImage: "square.grid.2x2")
+                }
+                .help(L("Rules worth having, grouped by what they are for, with the hosts already written out"))
+                Button {
+                    sheet = .editor(Rule(), isNew: true)
+                } label: {
+                    Label(L("Add Rule"), systemImage: "plus")
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .help(L("Write a rule: an app, an agent, a destination or a URL, blocked or allowed"))
             }
-            .help(L("Rules worth having, grouped by what they are for, with the hosts already written out"))
-            Button {
-                sheet = .editor(Rule(), isNew: true)
-            } label: {
-                Label(L("Add Rule"), systemImage: "plus")
-            }
-            .keyboardShortcut("n", modifiers: .command)
-            .help(L("Write a rule: an app, an agent, a destination or a URL, blocked or allowed"))
         }
     }
 
@@ -260,11 +271,11 @@ struct RulesView: View {
 
     private var activityFeed: some View {
         Group {
-            if store.events.isEmpty {
+            if store.events.isEmpty && monitor.rulePacks.events.isEmpty {
                 ContentUnavailableView {
                     Label(L("Nothing yet"), systemImage: "list.bullet.rectangle")
                 } description: {
-                    Text(L("Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable."))
+                    Text(L("Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts."))
                 }
             } else {
                 feed
@@ -277,6 +288,18 @@ struct RulesView: View {
     private var feed: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
+                if !monitor.rulePacks.events.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        heading(L("Managed packs"))
+                        VStack(spacing: 0) {
+                            ForEach(Array(monitor.rulePacks.events.enumerated()), id: \.element.id) { index, event in
+                                if index > 0 { Divider().padding(.leading, 34) }
+                                RulePackEventRow(event: event)
+                            }
+                        }
+                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                }
                 ForEach(feedDays) { day in
                     VStack(alignment: .leading, spacing: 6) {
                         heading(day.title)

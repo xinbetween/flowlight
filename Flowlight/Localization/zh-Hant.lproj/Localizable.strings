@@ -1180,7 +1180,42 @@
 "and %lld more" = "還有 %lld 項";
 "Tested against traffic back to %@." = "對照了回溯到 %@ 的流量。";
 
+/* UI/RulePacksView.swift */
+"%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full." = "由於延伸功能的限容量佇列已滿，%lld 個受管理套件決定未記錄到活動中。";
+"Network ad and tracker blocking" = "網路廣告與追蹤器封鎖";
+"Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows." = "官方套件會在各個 App 中拒絕連線已知目標。啟用前它們處於關閉狀態，並且需要網路延伸功能；它們無法移除頁面配置空白、瀏覽器浮層、指令碼彈出視窗或 App 原生視窗。";
+"Every app" = "所有 App";
+"%lld selected apps" = "已選取 %lld 個 App";
+"%lld blocked" = "已封鎖 %lld 個";
+"%lld exceptions" = "%lld 個例外";
+"Review…" = "檢視…";
+"Official · Built into Flowlight · pack v%@ · %@" = "官方 · Flowlight 內建 · 套件 v%@ · %@";
+"Applying…" = "正在套用…";
+"Watching only" = "僅監看";
+"Blocking" = "正在封鎖";
+"Needs extension update" = "需要更新延伸功能";
+"Needs review" = "需要檢視";
+"Test against recent traffic" = "使用最近的流量測試";
+"Apply this pack to every app?" = "將此套件套用到所有 App？";
+"Apply to every app" = "套用到所有 App";
+"This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed." = "這會把封鎖範圍從所選 App 擴大到這台 Mac 上的所有 App。必要的系統流量仍會被允許。";
+"Scope" = "範圍";
+"Only selected apps" = "僅所選 App";
+"App name, bundle identifier, or process" = "App 名稱、Bundle ID 或程序";
+"Recent-traffic impact" = "對最近流量的影響";
+"No retained traffic was available to test." = "沒有可供測試的已保留流量。";
+"Would have changed nothing across %lld retained connections." = "在已保留的 %lld 個連線中不會改變任何內容。";
+"Would have refused %lld of %lld connections from %lld apps (%@)." = "本來會拒絕來自 %3$lld 個 App 的 %2$lld 個連線中的 %1$lld 個（%4$@）。";
+"%@ · %@ pack v%@ matched %@ · %lld connections" = "%1$@ · %2$@ 套件 v%3$@ 符合 %4$@ · %5$lld 個連線";
+"Allow for %@" = "為 %@ 允許";
+"Undo" = "還原";
+"Allow…" = "允許…";
+"Edit as normal rule…" = "編輯為一般規則…";
+
 /* UI/RulesView.swift */
+"Packs" = "套件";
+"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "規則決定和套件的封鎖摘要會顯示在這裡。套件活動會被分組，以免滿是廣告的頁面變成滿是警示的頁面。";
+"Managed packs" = "受管理套件";
 "What they did" = "它們做了什麼";
 "Paused until %@" = "已暫停至 %@";
 "%lld in force" = "%lld 條生效中";
@@ -1207,7 +1242,6 @@
 "Browse Templates…" = "瀏覽範本…";
 "Write One…" = "自己寫一條…";
 "Nothing yet" = "還沒有任何項目";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "每一條由規則決定的連線都會出現在這裡 — 被拒絕的，以及例外放行的。後者的存在，正是為了讓「為什麼這個還通得過？」始終有答案。";
 "Today" = "今天";
 "Yesterday" = "昨天";
 "A rule since deleted" = "一條之後被刪除的規則";
@@ -1328,6 +1362,15 @@
 "%@ — the language is saved, so quitting and opening Flowlight again will finish the change." = "%@ — 語言設定已儲存，所以結束 Flowlight 再開啟一次就會完成變更。";
 
 /* UI/SharedStrings.swift */
+"Advertising" = "廣告";
+"Known advertising delivery and auction hosts across apps." = "各個 App 使用的已知廣告投放與競價主機。";
+"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "封鎖連線無法移除頁面配置空白、第一方廣告，或瀏覽器和 App 顯示的浮層。";
+"Cross-site tracking" = "跨網站追蹤";
+"Common analytics, session replay, and cross-site measurement hosts." = "常見的分析、工作階段重播和跨網站衡量主機。";
+"Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "部分 App 也使用相同供應商來管理功能旗標。主機無法使用時，它們可能會退回內建預設值。";
+"Privacy and telemetry" = "隱私權與遙測";
+"Crash reporting, install attribution, and audited Apple advertising and analytics hosts." = "當機報告、安裝歸因，以及經過審核的 Apple 廣告與分析主機。";
+"Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed." = "當機報告有助於開發者修正故障。Apple 帳號、推播、更新、憑證和 iCloud 所需的重要流量仍會被允許。";
 "Any agent" = "任何代理";
 "%@: no %@" = "%@：禁用 %@";
 "everything from %@" = "%@ 的所有工具";

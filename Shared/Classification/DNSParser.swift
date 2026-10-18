@@ -49,8 +49,8 @@ enum DNSParser {
             }
             i += rdLength
         }
-        guard !addresses.isEmpty else { return nil }
-        return Answer(queriedName: qname.lowercased(), addresses: addresses, ttl: minTTL)
+        guard !addresses.isEmpty, let queriedName = HostCanonicalizer.host(qname) else { return nil }
+        return Answer(queriedName: queriedName, addresses: addresses, ttl: minTTL)
     }
 
     private static func readName(_ b: [UInt8], _ i: inout Int) -> String? {

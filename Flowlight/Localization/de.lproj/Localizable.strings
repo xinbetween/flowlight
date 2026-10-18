@@ -1157,7 +1157,42 @@
 "and %lld more" = "und %lld weitere";
 "Tested against traffic back to %@." = "Getestet gegen Datenverkehr ab %@.";
 
+/* UI/RulePacksView.swift */
+"%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full." = "%lld Entscheidungen verwalteter Pakete wurden nicht in den Aktivitäten erfasst, weil die Warteschlange der Erweiterung ihre Kapazitätsgrenze erreicht hatte.";
+"Network ad and tracker blocking" = "Netzwerkweite Werbe- und Trackerblockierung";
+"Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows." = "Offizielle Pakete verweigern appübergreifend Verbindungen zu bekannten Zielen. Sie sind deaktiviert, bis du sie einschaltest, und benötigen die Netzwerkerweiterung; sie können keine Lücken im Seitenlayout, Browser-Overlays, skriptgesteuerten Pop-ups oder nativen App-Fenster entfernen.";
+"Every app" = "Jede App";
+"%lld selected apps" = "%lld ausgewählte Apps";
+"%lld blocked" = "%lld blockiert";
+"%lld exceptions" = "%lld Ausnahmen";
+"Review…" = "Prüfen…";
+"Official · Built into Flowlight · pack v%@ · %@" = "Offiziell · In Flowlight integriert · Paket v%@ · %@";
+"Applying…" = "Wird angewendet…";
+"Watching only" = "Nur beobachten";
+"Blocking" = "Blockieren";
+"Needs extension update" = "Erweiterung muss aktualisiert werden";
+"Needs review" = "Überprüfung erforderlich";
+"Test against recent traffic" = "Mit kürzlich erfasstem Datenverkehr testen";
+"Apply this pack to every app?" = "Dieses Paket auf jede App anwenden?";
+"Apply to every app" = "Auf jede App anwenden";
+"This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed." = "Dadurch wird die Blockierung von ausgewählten Apps auf jede App auf diesem Mac ausgeweitet. Wesentlicher Systemverkehr bleibt erlaubt.";
+"Scope" = "Umfang";
+"Only selected apps" = "Nur ausgewählte Apps";
+"App name, bundle identifier, or process" = "App-Name, Bundle-ID oder Prozess";
+"Recent-traffic impact" = "Auswirkung auf kürzlich erfassten Datenverkehr";
+"No retained traffic was available to test." = "Kein gespeicherter Datenverkehr zum Testen verfügbar.";
+"Would have changed nothing across %lld retained connections." = "Bei %lld gespeicherten Verbindungen hätte sich nichts geändert.";
+"Would have refused %lld of %lld connections from %lld apps (%@)." = "%lld von %lld Verbindungen aus %lld Apps wären verweigert worden (%@).";
+"%@ · %@ pack v%@ matched %@ · %lld connections" = "%@ · %@-Paket v%@ stimmte mit %@ überein · %lld Verbindungen";
+"Allow for %@" = "Für %@ erlauben";
+"Undo" = "Rückgängig";
+"Allow…" = "Erlauben…";
+"Edit as normal rule…" = "Als normale Regel bearbeiten…";
+
 /* UI/RulesView.swift */
+"Packs" = "Pakete";
+"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "Regelentscheidungen und zusammengefasste Paketblockierungen erscheinen hier. Paketaktivitäten werden gruppiert, damit eine Seite voller Werbung nicht zu einer Seite voller Warnungen wird.";
+"Managed packs" = "Verwaltete Pakete";
 "What they did" = "Wirkung";
 "Paused until %@" = "Pausiert bis %@";
 "%lld in force" = "%lld in Kraft";
@@ -1184,7 +1219,6 @@
 "Browse Templates…" = "Vorlagen durchsuchen…";
 "Write One…" = "Eine schreiben…";
 "Nothing yet" = "Noch nichts";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Jede Verbindung, über die eine Regel entscheidet, landet hier: die Verweigerungen und die Ausnahmen, die etwas durchlassen. Die zweite Hälfte hält die Frage „Warum kommt das hier durch?“ beantwortbar.";
 "Today" = "Heute";
 "Yesterday" = "Gestern";
 "A rule since deleted" = "Eine inzwischen gelöschte Regel";
@@ -1305,6 +1339,15 @@
 "%@ — the language is saved, so quitting and opening Flowlight again will finish the change." = "%@ – die Sprache ist gesichert; Flowlight beenden und erneut öffnen schließt die Änderung ab.";
 
 /* UI/SharedStrings.swift */
+"Advertising" = "Werbung";
+"Known advertising delivery and auction hosts across apps." = "Bekannte Hosts für Werbeauslieferung und -auktionen in verschiedenen Apps.";
+"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "Das Blockieren von Verbindungen kann keine Lücken im Seitenlayout, Erstanbieterwerbung oder von einem Browser oder einer App dargestellte Overlays entfernen.";
+"Cross-site tracking" = "Websiteübergreifendes Tracking";
+"Common analytics, session replay, and cross-site measurement hosts." = "Gängige Hosts für Analysen, Sitzungswiedergaben und websiteübergreifende Messungen.";
+"Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "Einige Apps nutzen dieselben Anbieter für Feature-Flags. Wenn ein Host nicht verfügbar ist, greifen sie möglicherweise auf integrierte Standardwerte zurück.";
+"Privacy and telemetry" = "Datenschutz und Telemetrie";
+"Crash reporting, install attribution, and audited Apple advertising and analytics hosts." = "Hosts für Absturzberichte, Installationszuordnung sowie geprüfte Werbe- und Analysefunktionen von Apple.";
+"Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed." = "Absturzberichte helfen Entwicklern, Fehler zu beheben. Wesentlicher Datenverkehr für Apple-Konten, Push-Mitteilungen, Updates, Zertifikate und iCloud bleibt erlaubt.";
 "Any agent" = "Jeder Agent";
 "%@: no %@" = "%@: kein %@";
 "everything from %@" = "alles von %@";

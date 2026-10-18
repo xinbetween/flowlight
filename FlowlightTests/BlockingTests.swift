@@ -38,6 +38,10 @@ final class BlockingTests: XCTestCase {
         XCTAssertEqual(BlockRules.verdict(for: facts(bundleID: "com.flowlight.app"), policy: policy()), .allow,
                        "Flowlight's own traffic")
         XCTAssertEqual(BlockRules.verdict(for: facts(bundleID: "com.apple.nsurlsessiond"), policy: policy()), .allow)
+        XCTAssertEqual(BlockRules.verdict(for: facts(bundleID: "com.apple.Safari"), policy: policy()), .block,
+                       "user-facing Apple apps are not a blanket safety exemption")
+        XCTAssertEqual(BlockRules.verdict(for: facts(host: "advertising.apple.com"), policy: policy()), .block,
+                       "audited Apple advertising hosts remain blockable")
         XCTAssertEqual(BlockRules.verdict(for: facts(host: "gateway.icloud.com"), policy: policy()), .allow,
                        "Apple services")
         XCTAssertEqual(BlockRules.verdict(for: facts(host: "", ip: "1.1.1.1", port: 53), policy: policy()), .allow,

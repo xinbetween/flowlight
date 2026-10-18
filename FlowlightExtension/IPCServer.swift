@@ -17,7 +17,53 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// Connections a rule decided, on the same footing and for the same reason.
     private var decisions: [RuleEvent] = []
     private var decisionsInFlight = false
+    /// Managed-pack hits are coalesced before IPC. Every immutable explanation field participates so a snapshot
+    /// change cannot make an older decision appear to come from newer pack content or a different agent.
+    private struct PackEventKey: Hashable {
+        var bucket: Int64
+        var packID: String
+        var packVersion: String
+        var entryID: UInt32
+        var category: String
+        var match: String
+        var action: String
+        var bundleID: String
+        var appName: String
+        var agentKey: String
+        var agentName: String
+        var host: String
+        var matchedHost: String
+        var port: UInt16
+
+        init(_ event: RulePackEvent) {
+            bucket = event.bucket
+            packID = event.packID
+            packVersion = event.packVersion
+            entryID = event.entryID
+            category = event.category.rawValue
+            match = event.match.rawValue
+            action = event.action.rawValue
+            bundleID = event.bundleID
+            appName = event.appName
+            agentKey = event.agentKey
+            agentName = event.agentName
+            host = event.host
+            matchedHost = event.matchedHost
+            port = event.port
+        }
+    }
+    private var packEvents: [PackEventKey: RulePackEvent] = [:]
+    /// Removed from the mutable map before sending. New hits for the same key therefore cannot be erased by its ack.
+    private var packEventBatch: RulePackEventBatch?
+    private let packDeliverySession = UUID()
+    private var nextPackSequence: Int64 = 0
+    private var packEventsInFlight = false
+    private var packFlushScheduled = false
+    private var droppedPackHits: Int64 = 0
+    private var droppedPackKeys: Int64 = 0
+    private var packTransfer = RulePackTransferBuffer()
     private let maxPendingBlocks = 500
+    private let maxPackEventKeys = 4_096
     private let queue = DispatchQueue(label: "flowlight.ipc")
     /// Seconds of traffic held while no app is connected — the whole time the app is on the nettop sampler, or
     /// quit. An hour of it is worth keeping now that the newest second is delivered first (see `flushLocked`);
@@ -33,6 +79,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     func startListener() {
         BlockEnforcer.shared.report = { [weak self] event in self?.report(event) }
         BlockEnforcer.shared.reportDecision = { [weak self] event in self?.report(decision: event) }
+        BlockEnforcer.shared.reportPack = { [weak self] event in self?.report(pack: event) }
         let listener = NSXPCListener(machServiceName: machServiceName)
         listener.delegate = self
         listener.resume()
@@ -57,6 +104,8 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.inFlight = false
                 self.blocksInFlight = false
                 self.decisionsInFlight = false
+                self.packEventsInFlight = false
+                self.packTransfer.reset()
                 BlockEnforcer.shared.appConnectionChanged(connected: false)
             }
         }
@@ -77,10 +126,17 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.inFlight = false
             self.blocksInFlight = false
             self.decisionsInFlight = false
-            BlockEnforcer.shared.appConnectionChanged(connected: true)
+            self.packEventsInFlight = false
+            // A reconnect begins fail-open. The app may have disabled or narrowed any of these while disconnected;
+            // stale state must not become active during the policy/rule/pack synchronization that follows register.
+            _ = BlockEnforcer.shared.apply([])
+            _ = BlockEnforcer.shared.apply(RuleSet())
+            _ = BlockEnforcer.shared.clearPacks()
+            BlockEnforcer.shared.appConnectionChanged(connected: false)
             self.flushLocked()
             self.flushBlocksLocked()
             self.flushDecisionsLocked()
+            self.flushPackEventsLocked()
         }
         reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
     }
@@ -99,6 +155,68 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         reply(count)
     }
 
+    func rulePackHello(appProtocol: Int, withReply reply: @escaping (Data) -> Void) {
+        reply(BlockCoding.encode(BlockEnforcer.shared.packHandshake()))
+    }
+
+    func beginRulePack(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        queue.async {
+            guard let header = BlockCoding.decode(RulePackTransferHeader.self, from: payload) else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable pack transfer")))
+                return
+            }
+            let result = self.packTransfer.begin(header, active: BlockEnforcer.shared.packHandshake())
+            reply(BlockCoding.encode(result))
+        }
+    }
+
+    func appendRulePack(generation: String, index: Int, payload: Data, withReply reply: @escaping (Bool) -> Void) {
+        queue.async { reply(self.packTransfer.append(generation: generation, index: index, payload: payload)) }
+    }
+
+    func commitRulePack(generation: String, withReply reply: @escaping (Data) -> Void) {
+        queue.async {
+            switch self.packTransfer.commit(generation: generation, active: BlockEnforcer.shared.packHandshake()) {
+            case .rejected(let result):
+                reply(BlockCoding.encode(result))
+            case .payload(let data, let header):
+                guard let snapshot = BlockCoding.decode(RulePackSnapshot.self, from: data),
+                      snapshot.generation == header.generation, snapshot.digest == header.digest else {
+                    reply(BlockCoding.encode(RulePackApplyResult(status: .invalid,
+                                                                 detail: "Pack generation or digest mismatch")))
+                    return
+                }
+                do {
+                    let result = try BlockEnforcer.shared.apply(snapshot)
+                    BlockEnforcer.shared.appConnectionChanged(connected: true)
+                    reply(BlockCoding.encode(result))
+                } catch {
+                    reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "\(error)")))
+                }
+            }
+        }
+    }
+
+    func clearRulePacks(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        queue.async {
+            guard let request = BlockCoding.decode(RulePackClearRequest.self, from: payload) else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable clear request")))
+                return
+            }
+            let active = BlockEnforcer.shared.packHandshake()
+            guard request.expectedActiveGeneration == active.activeGeneration else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .stale, generation: active.activeGeneration,
+                                                             activeDigest: active.activeDigest,
+                                                             detail: "The active pack generation changed.")))
+                return
+            }
+            self.packTransfer.reset()
+            let result = BlockEnforcer.shared.clearPacks()
+            BlockEnforcer.shared.appConnectionChanged(connected: true)
+            reply(BlockCoding.encode(result))
+        }
+    }
+
     func send(_ batches: [TrafficBatch]) {
         queue.async {
             for batch in batches {
@@ -109,6 +227,29 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.pending.removeFirst(self.pending.count - self.maxPendingBatches)
             }
             self.flushLocked()
+        }
+    }
+
+    func report(pack event: RulePackEvent) {
+        queue.async {
+            let key = PackEventKey(event)
+            if var existing = self.packEvents[key] {
+                existing.count += event.count
+                existing.firstAt = min(existing.firstAt, event.firstAt)
+                existing.lastAt = max(existing.lastAt, event.lastAt)
+                self.packEvents[key] = existing
+            } else if self.packEvents.count < self.maxPackEventKeys {
+                self.packEvents[key] = event
+            } else {
+                self.droppedPackHits = self.saturatingAdd(self.droppedPackHits, Int64(event.count))
+                self.droppedPackKeys = self.saturatingAdd(self.droppedPackKeys, 1)
+            }
+            guard !self.packFlushScheduled else { return }
+            self.packFlushScheduled = true
+            self.queue.asyncAfter(deadline: .now() + 1) {
+                self.packFlushScheduled = false
+                self.flushPackEventsLocked()
+            }
         }
     }
 
@@ -132,6 +273,57 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             }
             self.flushDecisionsLocked()
         }
+    }
+
+    private func flushPackEventsLocked() {
+        guard !packEventsInFlight, let client else { return }
+        if packEventBatch == nil {
+            guard !packEvents.isEmpty || droppedPackHits > 0 else { return }
+            let keys = Array(packEvents.keys.prefix(300))
+            let events = keys.compactMap { packEvents.removeValue(forKey: $0) }
+            nextPackSequence = saturatingAdd(nextPackSequence, 1)
+            packEventBatch = RulePackEventBatch(deliverySession: packDeliverySession, sequence: nextPackSequence,
+                                                events: events, droppedHits: droppedPackHits,
+                                                droppedKeys: droppedPackKeys)
+            droppedPackHits = 0
+            droppedPackKeys = 0
+        }
+        guard let batch = packEventBatch else { return }
+        let capturedClient = client
+        let proxy = capturedClient.remoteObjectProxyWithErrorHandler { [weak self, weak capturedClient] error in
+            extensionLog.error("rulePackEvents() failed: \(error.localizedDescription, privacy: .public)")
+            self?.queue.async {
+                guard let self, self.client === capturedClient, self.packEventBatch?.id == batch.id else { return }
+                self.packEventsInFlight = false
+                self.schedulePackRetryLocked()
+            }
+        } as? FlowlightAppXPC
+        guard let proxy else {
+            schedulePackRetryLocked()
+            return
+        }
+        packEventsInFlight = true
+        proxy.rulePackEvents(payload: BlockCoding.encode(batch)) { [weak self, weak capturedClient] accepted in
+            self?.queue.async {
+                guard let self, self.client === capturedClient, self.packEventBatch?.id == batch.id else { return }
+                self.packEventsInFlight = false
+                if accepted {
+                    self.packEventBatch = nil
+                    self.flushPackEventsLocked()
+                } else {
+                    self.schedulePackRetryLocked()
+                }
+            }
+        }
+    }
+
+    private func schedulePackRetryLocked() {
+        queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.flushPackEventsLocked() }
+    }
+
+    private func saturatingAdd(_ lhs: Int64, _ rhs: Int64) -> Int64 {
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        return overflow ? Int64.max : sum
     }
 
     private func flushDecisionsLocked() {

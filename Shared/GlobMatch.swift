@@ -6,16 +6,15 @@ import Foundation
 /// `*.example.com` or `/v1/*` means: the app writes the rules, and the extension carries them out.
 enum GlobMatch {
     static func host(_ pattern: String, _ host: String) -> Bool {
-        let p = pattern.trimmingCharacters(in: .whitespaces).lowercased()
-        let h = host.trimmingCharacters(in: .whitespaces).lowercased()
+        let rawPattern = pattern.trimmingCharacters(in: .whitespaces).lowercased()
         // A half-written rule matches nothing rather than everything: an empty host is a rule in progress, and
         // answering every request on the Mac from it would be the worst possible surprise.
-        guard !p.isEmpty, !h.isEmpty else { return false }
-        if p.hasPrefix("*.") || p.hasPrefix(".") {
-            let domain = String(p.drop { $0 == "*" || $0 == "." })
-            return !domain.isEmpty && (h == domain || h.hasSuffix("." + domain))
+        guard !rawPattern.isEmpty, let h = HostCanonicalizer.host(host) else { return false }
+        if rawPattern.hasPrefix("*.") || rawPattern.hasPrefix(".") {
+            guard let domain = HostCanonicalizer.host(String(rawPattern.drop { $0 == "*" || $0 == "." })) else { return false }
+            return h == domain || h.hasSuffix("." + domain)
         }
-        return h == p
+        return HostCanonicalizer.host(rawPattern) == h
     }
 
     static func method(_ pattern: String, _ method: String) -> Bool {

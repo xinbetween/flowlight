@@ -1180,7 +1180,42 @@
 "and %lld more" = "그 외 %lld건";
 "Tested against traffic back to %@." = "%@까지의 트래픽과 대조했습니다.";
 
+/* UI/RulePacksView.swift */
+"%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full." = "확장 프로그램의 용량 제한 큐가 가득 차서 관리형 팩 판단 %lld건이 활동에서 누락되었습니다.";
+"Network ad and tracker blocking" = "네트워크 광고 및 추적기 차단";
+"Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows." = "공식 팩은 모든 앱에서 알려진 목적지로 가는 연결을 거부합니다. 직접 켜기 전에는 꺼져 있으며 네트워크 확장 프로그램이 필요합니다. 페이지 레이아웃의 빈 공간, 브라우저 오버레이, 스크립트 팝업, 앱 자체 창은 제거할 수 없습니다.";
+"Every app" = "모든 앱";
+"%lld selected apps" = "선택한 앱 %lld개";
+"%lld blocked" = "%lld개 차단";
+"%lld exceptions" = "예외 %lld개";
+"Review…" = "검토…";
+"Official · Built into Flowlight · pack v%@ · %@" = "공식 · Flowlight 내장 · 팩 v%@ · %@";
+"Applying…" = "적용 중…";
+"Watching only" = "관찰만";
+"Blocking" = "차단 중";
+"Needs extension update" = "확장 프로그램 업데이트 필요";
+"Needs review" = "검토 필요";
+"Test against recent traffic" = "최근 트래픽으로 테스트";
+"Apply this pack to every app?" = "이 팩을 모든 앱에 적용할까요?";
+"Apply to every app" = "모든 앱에 적용";
+"This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed." = "차단 범위를 선택한 앱에서 이 Mac의 모든 앱으로 넓힙니다. 필수 시스템 트래픽은 계속 허용됩니다.";
+"Scope" = "범위";
+"Only selected apps" = "선택한 앱만";
+"App name, bundle identifier, or process" = "앱 이름, 번들 식별자 또는 프로세스";
+"Recent-traffic impact" = "최근 트래픽에 미치는 영향";
+"No retained traffic was available to test." = "테스트할 보관 트래픽이 없습니다.";
+"Would have changed nothing across %lld retained connections." = "보관된 연결 %lld건에는 아무 변화도 주지 않았을 것입니다.";
+"Would have refused %lld of %lld connections from %lld apps (%@)." = "앱 %3$lld개에서 나가는 연결 %2$lld건 가운데 %1$lld건을 거부했을 것입니다(%4$@).";
+"%@ · %@ pack v%@ matched %@ · %lld connections" = "%1$@ · %2$@ 팩 v%3$@이(가) %4$@와 일치 · 연결 %5$lld건";
+"Allow for %@" = "%@에서는 허용";
+"Undo" = "실행 취소";
+"Allow…" = "허용…";
+"Edit as normal rule…" = "일반 규칙으로 편집…";
+
 /* UI/RulesView.swift */
+"Packs" = "팩";
+"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "규칙 판단과 팩 차단 요약이 여기에 표시됩니다. 광고가 많은 페이지 때문에 알림이 가득 차지 않도록 팩 활동은 묶어서 표시됩니다.";
+"Managed packs" = "관리형 팩";
 "What they did" = "동작 내역";
 "Paused until %@" = "%@까지 일시 중지됨";
 "%lld in force" = "%lld개 적용 중";
@@ -1207,7 +1242,6 @@
 "Browse Templates…" = "템플릿 둘러보기…";
 "Write One…" = "직접 작성…";
 "Nothing yet" = "아직 없음";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "규칙이 판단한 모든 연결이 여기에 남습니다. 거부한 연결뿐 아니라 통과시킨 예외도 함께 기록됩니다. 뒤쪽 절반이 있어야 “이건 왜 통과됐지?”라는 질문에 답할 수 있습니다.";
 "Today" = "오늘";
 "Yesterday" = "어제";
 "A rule since deleted" = "이후 삭제된 규칙";
@@ -1328,6 +1362,15 @@
 "%@ — the language is saved, so quitting and opening Flowlight again will finish the change." = "%@ — 언어는 저장되었으므로, Flowlight를 종료한 뒤 다시 열면 변경이 완료됩니다.";
 
 /* UI/SharedStrings.swift */
+"Advertising" = "광고";
+"Known advertising delivery and auction hosts across apps." = "여러 앱에서 사용되는 알려진 광고 전송 및 경매 호스트입니다.";
+"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "연결 차단으로는 페이지 레이아웃의 빈 공간, 자사 광고, 브라우저나 앱이 표시하는 오버레이를 제거할 수 없습니다.";
+"Cross-site tracking" = "사이트 간 추적";
+"Common analytics, session replay, and cross-site measurement hosts." = "일반적인 분석, 세션 재생 및 사이트 간 측정 호스트입니다.";
+"Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "일부 앱은 기능 플래그에도 같은 제공업체를 사용합니다. 호스트를 사용할 수 없으면 내장 기본값으로 대체될 수 있습니다.";
+"Privacy and telemetry" = "개인정보 보호 및 원격 측정";
+"Crash reporting, install attribution, and audited Apple advertising and analytics hosts." = "충돌 보고, 설치 기여도 측정 및 감사된 Apple 광고·분석 호스트입니다.";
+"Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed." = "충돌 보고서는 개발자가 오류를 수정하는 데 도움이 됩니다. Apple 계정, 푸시, 업데이트, 인증서 및 iCloud에 필수적인 트래픽은 계속 허용됩니다.";
 "Any agent" = "모든 에이전트";
 "%@: no %@" = "%@: %@ 차단";
 "everything from %@" = "%@의 모든 도구";

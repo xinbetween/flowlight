@@ -198,6 +198,29 @@ struct RuleEventRecord: Identifiable, Sendable, Hashable {
     var destination: String { host.isEmpty ? ip : host }
 }
 
+/// Aggregated managed-pack activity. One row may represent many matching connections in a minute; pack activity
+/// answers what was blocked without turning every ad request into an alert or an unbounded event row.
+struct RulePackEventRecord: Identifiable, Sendable, Hashable {
+    var id: Int64
+    var bucket: Date
+    var packID: String
+    var packVersion: String
+    var entryID: UInt32
+    var category: RulePackEntry.Category
+    var match: RulePackEntry.Match
+    var action: RulePackEvent.Action
+    var count: Int
+    var firstAt: Date
+    var lastAt: Date
+    var bundleID: String
+    var appName: String
+    var agentKey: String
+    var agentName: String
+    var host: String
+    var matchedHost: String
+    var port: UInt16
+}
+
 /// SQLite store (App Group container) with tiered rollups:
 /// flows_1s → agg_1m (complete minutes) → agg_1h / agg_1d (folded from immutable minute rows).
 final class TrafficDatabase: @unchecked Sendable {
@@ -455,7 +478,58 @@ final class TrafficDatabase: @unchecked Sendable {
             ip TEXT NOT NULL, port INTEGER NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS rule_events_ts ON rule_events(ts);
         CREATE INDEX IF NOT EXISTS rule_events_rule ON rule_events(rule_id, ts);
+        -- Managed packs keep only user state here. The verified entry lists remain in the signed app bundle.
+        CREATE TABLE IF NOT EXISTS rule_packs (
+            pack_id TEXT PRIMARY KEY, configuration TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_pack_overrides (
+            id TEXT PRIMARY KEY, override TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_pack_event_rollups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, bucket INTEGER NOT NULL, pack_id TEXT NOT NULL,
+            pack_version TEXT NOT NULL, entry_id INTEGER NOT NULL, category TEXT NOT NULL,
+            match TEXT NOT NULL DEFAULT 'suffix', action TEXT NOT NULL,
+            count INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL,
+            bundle_id TEXT NOT NULL, app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL,
+            host TEXT NOT NULL, matched_host TEXT NOT NULL, port INTEGER NOT NULL,
+            UNIQUE(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id, app_name,
+                   agent, agent_name, host, matched_host, port));
+        CREATE TABLE IF NOT EXISTS rule_pack_event_watermarks (
+            delivery_session TEXT PRIMARY KEY, sequence INTEGER NOT NULL, received INTEGER NOT NULL,
+            dropped_hits INTEGER NOT NULL, dropped_keys INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS rule_pack_events_time ON rule_pack_event_rollups(bucket DESC);
+        CREATE INDEX IF NOT EXISTS rule_pack_events_pack ON rule_pack_event_rollups(pack_id, bucket DESC);
         """)
+        let packEventKeyVersion = try conn.query(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.rulePackEventKey'",
+            map: { $0.int(0) }
+        ).first ?? 0
+        if packEventKeyVersion < 2 {
+            let oldPackEventColumns = Set(try conn.query("PRAGMA table_info(rule_pack_event_rollups)") { $0.text(1) })
+            let oldMatch = oldPackEventColumns.contains("match") ? "match" : "'suffix'"
+            try conn.transaction {
+                try conn.execute("""
+                CREATE TABLE rule_pack_event_rollups_v2 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, bucket INTEGER NOT NULL, pack_id TEXT NOT NULL,
+                    pack_version TEXT NOT NULL, entry_id INTEGER NOT NULL, category TEXT NOT NULL,
+                    match TEXT NOT NULL DEFAULT 'suffix', action TEXT NOT NULL,
+                    count INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL,
+                    bundle_id TEXT NOT NULL, app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL,
+                    host TEXT NOT NULL, matched_host TEXT NOT NULL, port INTEGER NOT NULL,
+                    UNIQUE(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id, app_name,
+                           agent, agent_name, host, matched_host, port));
+                INSERT INTO rule_pack_event_rollups_v2
+                    (id, bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
+                     bundle_id, app_name, agent, agent_name, host, matched_host, port)
+                    SELECT id, bucket, pack_id, pack_version, entry_id, category, \(oldMatch), action, count, first_at, last_at,
+                           bundle_id, app_name, agent, agent_name, host, matched_host, port
+                    FROM rule_pack_event_rollups;
+                DROP TABLE rule_pack_event_rollups;
+                ALTER TABLE rule_pack_event_rollups_v2 RENAME TO rule_pack_event_rollups;
+                CREATE INDEX rule_pack_events_time ON rule_pack_event_rollups(bucket DESC);
+                CREATE INDEX rule_pack_events_pack ON rule_pack_event_rollups(pack_id, bucket DESC);
+                INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('schema.rulePackEventKey', 2);
+                """)
+            }
+        }
 
         // Runs once. `rollup_state` already exists to remember how far a job has got, so the repair uses it
         // rather than introducing a second way to record the same kind of fact.
@@ -956,6 +1030,140 @@ final class TrafficDatabase: @unchecked Sendable {
     /// Keeps the feed from growing without bound. Called with the same retention sweep as everything else.
     func pruneRuleEvents(before date: Date) throws {
         try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
+    }
+
+    // MARK: Managed rule packs
+
+    func loadRulePackConfigurations() throws -> [RulePackConfiguration] {
+        try conn.query("SELECT configuration FROM rule_packs ORDER BY pack_id") { $0.text(0) }.compactMap {
+            try? JSONDecoder().decode(RulePackConfiguration.self, from: Data($0.utf8))
+        }
+    }
+
+    func saveRulePackConfiguration(_ configuration: RulePackConfiguration) throws {
+        let json = String(decoding: try JSONEncoder().encode(configuration), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO rule_packs (pack_id, configuration, updated) VALUES (?,?,?)
+            ON CONFLICT(pack_id) DO UPDATE SET configuration = excluded.configuration, updated = excluded.updated
+            """, [.text(configuration.packID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    func loadRulePackOverrides() throws -> [RulePackOverride] {
+        try conn.query("SELECT override FROM rule_pack_overrides ORDER BY updated") { $0.text(0) }.compactMap {
+            try? JSONDecoder().decode(RulePackOverride.self, from: Data($0.utf8))
+        }
+    }
+
+    func saveRulePackOverride(_ override: RulePackOverride) throws {
+        let json = String(decoding: try JSONEncoder().encode(override), as: UTF8.self)
+        try conn.run("""
+            INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)
+            ON CONFLICT(id) DO UPDATE SET override = excluded.override, updated = excluded.updated
+            """, [.text(override.id.uuidString), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+    }
+
+    func deleteRulePackOverride(_ id: UUID) throws {
+        try conn.run("DELETE FROM rule_pack_overrides WHERE id = ?", [.text(id.uuidString)])
+    }
+
+    /// Commits a retryable extension delivery exactly once. One monotonic watermark per extension process and the
+    /// additive rollups share one transaction, so acknowledging a batch means both are durable and retries are no-ops.
+    @discardableResult
+    func recordRulePackEventBatch(_ batch: RulePackEventBatch) throws -> Bool {
+        var inserted = false
+        try conn.transaction {
+            let session = batch.deliverySession.uuidString
+            let watermark = try conn.query(
+                "SELECT sequence FROM rule_pack_event_watermarks WHERE delivery_session = ?",
+                [.text(session)], map: { $0.int(0) }
+            ).first ?? 0
+            guard batch.sequence > watermark else { return }
+            try conn.run("""
+                INSERT INTO rule_pack_event_watermarks
+                    (delivery_session, sequence, received, dropped_hits, dropped_keys) VALUES (?,?,?,?,?)
+                ON CONFLICT(delivery_session) DO UPDATE SET
+                    sequence = excluded.sequence, received = excluded.received,
+                    dropped_hits = dropped_hits + excluded.dropped_hits,
+                    dropped_keys = dropped_keys + excluded.dropped_keys
+                """, [.text(session), .int(batch.sequence), .int(Int64(Date().timeIntervalSince1970)),
+                      .int(batch.droppedHits), .int(batch.droppedKeys)])
+            try recordRulePackEvents(batch.events, inTransaction: true)
+            inserted = true
+        }
+        return inserted
+    }
+
+    func recordRulePackEvents(_ events: [RulePackEvent]) throws {
+        try recordRulePackEvents(events, inTransaction: false)
+    }
+
+    private func recordRulePackEvents(_ events: [RulePackEvent], inTransaction: Bool) throws {
+        let sql = """
+        INSERT INTO rule_pack_event_rollups
+            (bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
+             bundle_id, app_name, agent, agent_name, host, matched_host, port)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id, app_name,
+                    agent, agent_name, host, matched_host, port) DO UPDATE SET
+            count = count + excluded.count,
+            first_at = MIN(first_at, excluded.first_at),
+            last_at = MAX(last_at, excluded.last_at)
+        """
+        let write = {
+            for event in events {
+                try self.conn.run(sql, [.int(event.bucket), .text(event.packID), .text(event.packVersion),
+                                        .int(Int64(event.entryID)), .text(event.category.rawValue),
+                                        .text(event.match.rawValue), .text(event.action.rawValue),
+                                        .int(Int64(event.count)), .int(event.firstAt), .int(event.lastAt),
+                                        .text(event.bundleID), .text(event.appName), .text(event.agentKey),
+                                        .text(event.agentName), .text(event.host), .text(event.matchedHost),
+                                        .int(Int64(event.port))])
+            }
+        }
+        if inTransaction { try write() }
+        else { try conn.transaction(write) }
+    }
+
+    func rulePackDeliveryStats() throws -> RulePackDeliveryStats {
+        let row = try conn.query("SELECT COALESCE(SUM(dropped_hits), 0), COALESCE(SUM(dropped_keys), 0) FROM rule_pack_event_watermarks") {
+            RulePackDeliveryStats(droppedHits: $0.int(0), droppedKeys: $0.int(1))
+        }.first
+        return row ?? RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0)
+    }
+
+    func rulePackEvents(packID: String? = nil, limit: Int = 300) throws -> [RulePackEventRecord] {
+        var sql = """
+        SELECT id, bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
+               bundle_id, app_name, agent, agent_name, host, matched_host, port
+        FROM rule_pack_event_rollups
+        """
+        var values: [SQLValue] = []
+        if let packID { sql += " WHERE pack_id = ?"; values = [.text(packID)] }
+        sql += " ORDER BY last_at DESC, id DESC LIMIT \(max(1, limit))"
+        return try conn.query(sql, values) { row in
+            RulePackEventRecord(id: row.int(0), bucket: Date(timeIntervalSince1970: TimeInterval(row.int(1))),
+                                packID: row.text(2), packVersion: row.text(3), entryID: UInt32(clamping: row.int(4)),
+                                category: RulePackEntry.Category(rawValue: row.text(5)) ?? .tracking,
+                                match: RulePackEntry.Match(rawValue: row.text(6)) ?? .suffix,
+                                action: RulePackEvent.Action(rawValue: row.text(7)) ?? .block,
+                                count: Int(row.int(8)),
+                                firstAt: Date(timeIntervalSince1970: TimeInterval(row.int(9))),
+                                lastAt: Date(timeIntervalSince1970: TimeInterval(row.int(10))),
+                                bundleID: row.text(11), appName: row.text(12), agentKey: row.text(13),
+                                agentName: row.text(14), host: row.text(15), matchedHost: row.text(16),
+                                port: UInt16(clamping: row.int(17)))
+        }
+    }
+
+    func pruneRulePackEvents(before date: Date) throws {
+        let cutoff = Int64(date.timeIntervalSince1970)
+        try conn.transaction {
+            try conn.run("DELETE FROM rule_pack_event_rollups WHERE bucket < ?", [.int(cutoff)])
+            // Receipt IDs outlive visible activity: the extension may retry a committed batch after any disconnect.
+            // Keep deduplication durable, but stop old overflow counters contributing to the current warning.
+            try conn.run("UPDATE rule_pack_event_watermarks SET dropped_hits = 0, dropped_keys = 0 WHERE received < ?",
+                         [.int(cutoff)])
+        }
     }
 
     // MARK: Devices on other channels
@@ -1561,9 +1769,11 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "rule_pack_event_rollups"] {
                 try conn.run("DELETE FROM \(t)")
             }
+            // Keep event batch IDs so an acknowledgment lost before "Delete everything" cannot resurrect activity.
+            try conn.run("UPDATE rule_pack_event_watermarks SET dropped_hits = 0, dropped_keys = 0")
         }
     }
 

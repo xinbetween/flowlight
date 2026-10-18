@@ -42,10 +42,9 @@ struct AgentPolicy: Codable, Equatable, Sendable {
     static func matches(_ pattern: String, host: String, ip: String) -> Bool {
         let p = pattern.lowercased()
         if p.contains("/") { return cidrContains(p, ip) }
-        if isIPAddress(p) { return p == ip.lowercased() }
-        let h = host.lowercased()
-        guard !h.isEmpty else { return false }
-        return h == p || h.hasSuffix("." + p)
+        if isIPAddress(p) { return HostCanonicalizer.address(p) == HostCanonicalizer.address(ip) }
+        guard let domain = HostCanonicalizer.host(p), let h = HostCanonicalizer.host(host) else { return false }
+        return h == domain || h.hasSuffix("." + domain)
     }
 
     /// Cleans user input: "https://api.GitHub.com:443/x" → "api.github.com", "*.npmjs.org" → "npmjs.org".
@@ -56,8 +55,11 @@ struct AgentPolicy: Codable, Equatable, Sendable {
         if s.hasPrefix(".") { s = String(s.dropFirst()) }
         if !s.contains("/") || !isCIDR(s) { s = s.split(separator: "/").first.map(String.init) ?? s }
         if !isIPAddress(s), !isCIDR(s), let colon = s.lastIndex(of: ":") { s = String(s[..<colon]) }   // host:port
-        guard !s.isEmpty, s.count <= 253, isIPAddress(s) || isCIDR(s) || s.contains(".") else { return nil }
-        return s
+        guard !s.isEmpty, s.count <= 253 else { return nil }
+        if isCIDR(s) { return s }
+        if let address = HostCanonicalizer.address(s) { return address }
+        guard s.contains(".") else { return nil }
+        return HostCanonicalizer.host(s)
     }
 
     static func isIPAddress(_ s: String) -> Bool {

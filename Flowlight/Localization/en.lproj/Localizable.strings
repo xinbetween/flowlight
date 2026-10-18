@@ -1089,7 +1089,42 @@
 "Allow %1$@ requests from %2$@ to %3$@." = "Allow %1$@ requests from %2$@ to %3$@.";
 "anywhere" = "anywhere";
 
+/* UI/RulePacksView.swift */
+"%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full." = "%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full.";
+"Network ad and tracker blocking" = "Network ad and tracker blocking";
+"Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows." = "Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows.";
+"Every app" = "Every app";
+"%lld selected apps" = "%lld selected apps";
+"%lld blocked" = "%lld blocked";
+"%lld exceptions" = "%lld exceptions";
+"Review…" = "Review…";
+"Official · Built into Flowlight · pack v%@ · %@" = "Official · Built into Flowlight · pack v%@ · %@";
+"Applying…" = "Applying…";
+"Watching only" = "Watching only";
+"Blocking" = "Blocking";
+"Needs extension update" = "Needs extension update";
+"Needs review" = "Needs review";
+"Test against recent traffic" = "Test against recent traffic";
+"Apply this pack to every app?" = "Apply this pack to every app?";
+"Apply to every app" = "Apply to every app";
+"This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed." = "This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed.";
+"Scope" = "Scope";
+"Only selected apps" = "Only selected apps";
+"App name, bundle identifier, or process" = "App name, bundle identifier, or process";
+"Recent-traffic impact" = "Recent-traffic impact";
+"No retained traffic was available to test." = "No retained traffic was available to test.";
+"Would have changed nothing across %lld retained connections." = "Would have changed nothing across %lld retained connections.";
+"Would have refused %lld of %lld connections from %lld apps (%@)." = "Would have refused %lld of %lld connections from %lld apps (%@).";
+"%@ · %@ pack v%@ matched %@ · %lld connections" = "%@ · %@ pack v%@ matched %@ · %lld connections";
+"Allow for %@" = "Allow for %@";
+"Undo" = "Undo";
+"Allow…" = "Allow…";
+"Edit as normal rule…" = "Edit as normal rule…";
+
 /* UI/RulesView.swift */
+"Packs" = "Packs";
+"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts.";
+"Managed packs" = "Managed packs";
 "What they did" = "What they did";
 "Paused until %@" = "Paused until %@";
 "%lld in force" = "%lld in force";
@@ -1116,7 +1151,6 @@
 "Browse Templates…" = "Browse Templates…";
 "Write One…" = "Write One…";
 "Nothing yet" = "Nothing yet";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable.";
 "Today" = "Today";
 "Yesterday" = "Yesterday";
 "A rule since deleted" = "A rule since deleted";
@@ -1237,6 +1271,15 @@
 "%@ — the language is saved, so quitting and opening Flowlight again will finish the change." = "%@ — the language is saved, so quitting and opening Flowlight again will finish the change.";
 
 /* UI/SharedStrings.swift */
+"Advertising" = "Advertising";
+"Known advertising delivery and auction hosts across apps." = "Known advertising delivery and auction hosts across apps.";
+"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app.";
+"Cross-site tracking" = "Cross-site tracking";
+"Common analytics, session replay, and cross-site measurement hosts." = "Common analytics, session replay, and cross-site measurement hosts.";
+"Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable.";
+"Privacy and telemetry" = "Privacy and telemetry";
+"Crash reporting, install attribution, and audited Apple advertising and analytics hosts." = "Crash reporting, install attribution, and audited Apple advertising and analytics hosts.";
+"Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed." = "Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed.";
 "Any agent" = "Any agent";
 "%@: no %@" = "%@: no %@";
 "everything from %@" = "everything from %@";

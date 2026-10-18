@@ -22,6 +22,11 @@ final class BlockEnforcer: @unchecked Sendable {
     /// The rule list, which is asked before any allowlist: a rule is something someone wrote down about this
     /// exact connection, and it should not be second-guessed by a policy written about a whole agent.
     private var ruleSet = RuleSet()
+    /// One immutable, fully validated managed-pack generation. It is built away from the flow callback and swapped
+    /// under the same short lock as rules; a transfer in progress never appears here.
+    private var packMatcher: RulePackMatcher?
+    private var packGeneration: UUID?
+    private var packDigest = ""
     /// How many decisions each rule has made this run, for the rules that stop after a set number ("allow once").
     /// The app is the one that persists them; this is only what is needed to stop applying a spent rule.
     private var ruleHits: [UUID: Int] = [:]
@@ -34,11 +39,13 @@ final class BlockEnforcer: @unchecked Sendable {
 
     /// Called with every connection a rule decided, refusal and relaxation alike.
     var reportDecision: (RuleEvent) -> Void = { _ in }
+    /// Pack hits are aggregated by `IPCServer`; this callback is intentionally not the ordinary block-alert path.
+    var reportPack: (RulePackEvent) -> Void = { _ in }
 
     /// Asked before anything else on the data path: with no enforcing policy the filter does no extra work at all.
     var isEnforcing: Bool {
         lock.lock(); defer { lock.unlock() }
-        return !policies.isEmpty || !ruleSet.rules.isEmpty
+        return !policies.isEmpty || !ruleSet.rules.isEmpty || packMatcher != nil
     }
 
     /// Replaces the enforcing set. The app sends this on connect and on every change, so it is always the whole
@@ -57,6 +64,32 @@ final class BlockEnforcer: @unchecked Sendable {
         ruleSet = set
         ruleHits = Dictionary(set.rules.map { ($0.id, $0.hits) }, uniquingKeysWith: { a, _ in a })
         return set.rules.filter(\.enabled).count
+    }
+
+    func apply(_ snapshot: RulePackSnapshot) throws -> RulePackApplyResult {
+        let matcher = try RulePackMatcher(snapshot: snapshot)
+        lock.lock()
+        packMatcher = matcher
+        packGeneration = snapshot.generation
+        packDigest = snapshot.digest
+        lock.unlock()
+        return RulePackApplyResult(status: .committed, generation: snapshot.generation,
+                                   activeDigest: snapshot.digest, activePacks: snapshot.configurations.filter(\.enabled).count)
+    }
+
+    func clearPacks() -> RulePackApplyResult {
+        lock.lock()
+        packMatcher = nil
+        packGeneration = nil
+        packDigest = ""
+        lock.unlock()
+        return RulePackApplyResult(status: .cleared)
+    }
+
+    func packHandshake() -> RulePackHandshake {
+        lock.lock(); defer { lock.unlock() }
+        return RulePackHandshake(protocolVersion: RulePackSnapshot.protocolVersion,
+                                 activeGeneration: packGeneration, activeDigest: packDigest)
     }
 
     func appConnectionChanged(connected: Bool) {
@@ -97,6 +130,26 @@ final class BlockEnforcer: @unchecked Sendable {
             return false
         case .allow:
             break
+        }
+
+        // A managed pack can only decide from a hostname. The first flow callback often arrives before TLS SNI or
+        // HTTP Host, so keep the flow unjudged until inspection either names it or reaches its bounded end. Without
+        // this, a flow with no matching AgentPolicy would be permanently waved through on its first callback.
+        if packNeedsHostname(facts) { return false }
+
+        if let match = packDecision(facts, process: state.process, agent: agent) {
+            state.judged = true
+            let minute = Int64(Date().timeIntervalSince1970) / 60 * 60
+            let now = Int64(Date().timeIntervalSince1970)
+            reportPack(RulePackEvent(bucket: minute, packID: match.packID, packVersion: match.packVersion,
+                                     entryID: match.entry.id, category: match.entry.category,
+                                     match: match.entry.match, action: .block,
+                                     count: 1, firstAt: now, lastAt: now, bundleID: facts.bundleID,
+                                     appName: state.process.name, agentKey: facts.agentKey,
+                                     agentName: agent?.name ?? state.process.name, host: match.matchedHost,
+                                     matchedHost: match.entry.host, port: facts.port))
+            extensionLog.info("Pack \(match.packID, privacy: .public) refused \(match.entry.host, privacy: .public)")
+            return true
         }
 
         guard let agent, let policy = policy(for: agent.key) else {
@@ -153,6 +206,23 @@ final class BlockEnforcer: @unchecked Sendable {
                               rule: rule.title))
         }
         return decision
+    }
+
+    private func packNeedsHostname(_ facts: FlowFacts) -> Bool {
+        guard !facts.hostSettled, facts.host.isEmpty, inForce(), !BlockRules.isExempt(facts) else { return false }
+        lock.lock(); defer { lock.unlock() }
+        guard ruleSet.pausedUntil.map({ Date() >= $0 }) ?? true else { return false }
+        return packMatcher != nil
+    }
+
+    private func packDecision(_ facts: FlowFacts, process: ProcessInfoRecord, agent: Agent?) -> RulePackMatch? {
+        guard inForce(), !facts.host.isEmpty, !BlockRules.isExempt(facts) else { return nil }
+        lock.lock()
+        let matcher = packMatcher
+        let pausedUntil = ruleSet.pausedUntil
+        lock.unlock()
+        guard pausedUntil.map({ Date() >= $0 }) ?? true else { return nil }
+        return matcher?.matches(host: facts.host, bundleID: process.bundleID).first
     }
 
     private func policy(for key: String) -> AgentPolicy? {

@@ -29,10 +29,19 @@ enum BlockRules {
     /// Never refused whatever an allowlist says. Apple's own services carry the Mac's account, push and software
     /// update traffic, and many of them pin certificates, so a refusal there looks like a broken Mac rather than a
     /// blocked agent.
+    /// Essential service families rather than every Apple-owned host. Advertising and analytics endpoints are kept
+    /// out deliberately, so Safari and Apple apps can use an enabled pack without risking account, push, update,
+    /// certificate, or iCloud traffic.
     static let alwaysAllowedHosts = [
-        "apple.com", "icloud.com", "icloud-content.com", "apple-cloudkit.com", "mzstatic.com", "cdn-apple.com",
-        "apple-dns.net", "aaplimg.com",
+        "icloud.com", "icloud-content.com", "apple-cloudkit.com", "cdn-apple.com", "apple-dns.net",
     ]
+
+    /// Background system processes that carry machine/account infrastructure rather than a user-facing app's web
+    /// traffic. A blanket `com.apple.*` exemption made Safari impossible to protect and contradicted the UI.
+    static let alwaysAllowedBundles = [
+        "com.apple.apsd", "com.apple.cloudd", "com.apple.nsurlsessiond", "com.apple.softwareupdated",
+        "com.apple.trustd", "com.apple.akd", "com.apple.accountsd",
+    ].map { $0.lowercased() }
 
     /// Enforcement only stands while the host app is connected to hear about it, plus a few seconds of grace.
     ///
@@ -81,7 +90,7 @@ enum BlockRules {
         // Flowlight's own traffic, including anything relayed by its HTTPS inspection proxy.
         if facts.bundleID == FlowlightConstants.hostBundleIdentifier
             || facts.bundleID == FlowlightConstants.extensionBundleIdentifier { return true }
-        if facts.bundleID.hasPrefix("com.apple.") { return true }
+        if alwaysAllowedBundles.contains(facts.bundleID.lowercased()) { return true }
         // Refusing DNS wouldn't stop the agent, it would break name resolution for whatever asked next.
         if facts.port == 53 || facts.port == 853 { return true }
         return alwaysAllowedHosts.contains { AgentPolicy.matches($0, host: facts.host, ip: facts.ip) }
