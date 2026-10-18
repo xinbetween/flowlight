@@ -10,15 +10,24 @@ struct RulePacksView: View {
 
 private struct RulePackEditorRequest: Identifiable {
     let pack: RulePackDefinition
-    let saved: RulePackConfiguration
     let intent: RulePackEditorDraft.Intent
     var id: String { pack.id }
+}
+
+struct RulePackSaveTracker {
+    private(set) var packIDs: Set<String> = []
+
+    func contains(_ packID: String) -> Bool { packIDs.contains(packID) }
+    mutating func begin(_ packID: String) { packIDs.insert(packID) }
+    mutating func finish(_ packID: String) { packIDs.remove(packID) }
 }
 
 private struct RulePacksContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @ObservedObject var packs: RulePackStore
     @State private var editor: RulePackEditorRequest?
+    @State private var saves = RulePackSaveTracker()
+    @State private var saveErrors: [String: String] = [:]
 
     var body: some View {
         ScrollView {
@@ -37,8 +46,10 @@ private struct RulePacksContent: View {
             .padding(Measure.gutter)
         }
         .sheet(item: $editor) { request in
-            RulePackEditor(pack: request.pack, saved: request.saved, intent: request.intent, packs: packs)
+            RulePackEditor(pack: request.pack, saved: packs.configuration(for: request.pack.id),
+                           intent: request.intent, packs: packs, rules: monitor.rules)
         }
+        .onChange(of: packs.version) { _, _ in saveErrors.removeAll() }
     }
 
     private var explanation: some View {
@@ -54,6 +65,8 @@ private struct RulePacksContent: View {
         let configuration = packs.configuration(for: pack.id)
         let events = packs.events(for: pack.id)
         let blocks = events.reduce(0) { $0 + $1.count }
+        let exceptions = packs.overrides(for: pack.id)
+        let isSaving = saves.contains(pack.id)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: symbol(pack)).font(.title3).foregroundStyle(configuration.enabled ? FL.critical : .secondary)
@@ -66,26 +79,35 @@ private struct RulePacksContent: View {
                 Spacer(minLength: 8)
                 Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
                     if enabled {
-                        editor = RulePackEditorRequest(pack: pack, saved: configuration, intent: .activate)
+                        editor = RulePackEditorRequest(pack: pack, intent: .activate)
                     } else {
                         var changed = configuration
                         changed.enabled = false
-                        packs.save(changed)
+                        saves.begin(pack.id)
+                        saveErrors[pack.id] = nil
+                        packs.save(changed) { success in
+                            saves.finish(pack.id)
+                            if !success { saveErrors[pack.id] = packs.failureMessage ?? L("Failed: %@", L("Save")) }
+                        }
                     }
-                })).toggleStyle(.switch).controlSize(.small).labelsHidden()
+                })).toggleStyle(.switch).controlSize(.small).labelsHidden().disabled(isSaving)
             }
             HStack(spacing: 8) {
                 pill(status(configuration), tint: statusTint(configuration))
                 pill(configuration.scope == .allApps ? L("Every app") : L("%lld selected apps", configuration.apps.count))
                 pill(L("%lld destinations", pack.entries.count))
                 if blocks > 0 { pill(L("%lld blocked", blocks), tint: FL.critical) }
-                if !packs.overrides(for: pack.id).isEmpty {
-                    pill(L("%lld exceptions", packs.overrides(for: pack.id).count), tint: FL.good)
+                if !exceptions.isEmpty {
+                    pill(L("%lld exceptions", exceptions.count), tint: FL.good)
                 }
                 Spacer()
                 Button(L("Review…")) {
-                    editor = RulePackEditorRequest(pack: pack, saved: configuration, intent: .review)
-                }
+                    editor = RulePackEditorRequest(pack: pack, intent: .review)
+                }.disabled(isSaving)
+            }
+            if let saveError = saveErrors[pack.id] {
+                Label(saveError, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.critical)
             }
             Text(L(pack.manifest.caveatKey)).font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -144,17 +166,23 @@ private struct RulePackEditor: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var packs: RulePackStore
+    @ObservedObject var rules: RuleStore
     @State private var draft: RulePackEditorDraft
     @State private var installed: [InstalledApps.App] = []
+    @State private var appsLoaded = false
+    @State private var appsScanned = false
     @State private var preview: RuleSimulation.Result?
     @State private var previewing = false
+    @State private var previewError: String?
+    @State private var saveError: String?
     @State private var confirmBroadening = false
     @State private var saving = false
 
     init(pack: RulePackDefinition, saved: RulePackConfiguration,
-         intent: RulePackEditorDraft.Intent, packs: RulePackStore) {
+         intent: RulePackEditorDraft.Intent, packs: RulePackStore, rules: RuleStore) {
         self.pack = pack
         self.packs = packs
+        self.rules = rules
         _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent))
     }
 
@@ -174,21 +202,30 @@ private struct RulePackEditor: View {
                     exceptions
                 }.padding(Measure.gutter)
             }
+            .disabled(saving)
+            if let saveError {
+                Label(saveError, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.critical)
+                    .padding(.horizontal, Measure.gutter).padding(.bottom, 8)
+            }
             Divider()
             HStack {
                 Button(L("Test against recent traffic")) { Task { await runPreview() } }
+                    .disabled(previewing || saving)
                 if previewing { ProgressView().controlSize(.small) }
                 Spacer()
-                Button(L("Cancel")) { dismiss() }
+                Button(L("Cancel")) { dismiss() }.disabled(saving)
                 Button(L("Save")) { save() }
                     .disabled(!draft.canSave || saving)
             }.padding(Measure.gutter)
         }
         .frame(width: Measure.prose)
         .frame(minHeight: 620)
-        .onAppear {
-            Task { installed = await Task.detached(priority: .userInitiated) { InstalledApps.all() }.value }
-        }
+        .interactiveDismissDisabled(saving)
+        .onChange(of: draft.configuration) { _, _ in invalidatePreview() }
+        .onChange(of: packs.version) { _, _ in invalidatePreview() }
+        .onChange(of: rules.version) { _, _ in invalidatePreview() }
+        .onAppear { loadApps() }
         .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
             Button(L("Apply to every app"), role: .destructive) { commit(draft.configuration) }
             Button(L("Cancel"), role: .cancel) {}
@@ -207,9 +244,14 @@ private struct RulePackEditor: View {
             if draft.configuration.scope == .selectedApps {
                 HStack {
                     TextField(L("App name, bundle identifier, or process"), text: $draft.typedApp)
-                        .onSubmit { addApp() }
+                        .onSubmit { if appsLoaded { addApp() } }
+                    if !appsScanned {
+                        ProgressView().controlSize(.small)
+                    } else if !appsLoaded {
+                        Button(L("Refresh")) { loadApps() }.controlSize(.small)
+                    }
                     Button(L("Add")) { addApp() }
-                        .disabled(draft.typedApp.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(!appsLoaded || draft.typedApp.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 if !draft.typedApp.isEmpty, !appSuggestions.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
@@ -249,7 +291,11 @@ private struct RulePackEditor: View {
     }
 
     @ViewBuilder private var previewSection: some View {
-        if let preview {
+        if let previewError {
+            Label(previewError, systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(FL.critical)
+                .padding(10).background(FL.critical.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        } else if let preview {
             VStack(alignment: .leading, spacing: 5) {
                 Text(L("Recent-traffic impact")).font(.headline)
                 if preview.connectionsConsidered == 0 {
@@ -302,12 +348,24 @@ private struct RulePackEditor: View {
         }.prefix(5))
     }
 
+    private func loadApps() {
+        appsScanned = false
+        appsLoaded = false
+        Task {
+            let result = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
+            installed = result.apps
+            appsLoaded = result.complete
+            appsScanned = true
+        }
+    }
+
     private func addApp(_ value: String? = nil) {
-        if let value { _ = draft.addApp(value, installed: installed) }
-        else { _ = draft.submitApp(installed: installed) }
+        if let value { _ = draft.addApp(value, installed: installed, appsLoaded: appsLoaded) }
+        else { _ = draft.submitApp(installed: installed, appsLoaded: appsLoaded) }
     }
 
     private func save() {
+        saveError = nil
         switch draft.requestSave() {
         case .commit(let configuration): commit(configuration)
         case .confirmBroadening: confirmBroadening = true
@@ -317,24 +375,50 @@ private struct RulePackEditor: View {
 
     private func commit(_ configuration: RulePackConfiguration? = nil) {
         saving = true
+        saveError = nil
         let value = configuration ?? draft.configuration
         packs.save(value) { success in
             saving = false
-            if success { dismiss() }
+            if success {
+                dismiss()
+            } else {
+                saveError = packs.failureMessage ?? L("Failed: %@", L("Save"))
+            }
         }
     }
 
+    private func invalidatePreview() {
+        preview = nil
+        previewError = nil
+    }
+
     private func runPreview() async {
+        let candidate = draft.configuration
+        let packVersion = packs.version
+        let ruleVersion = rules.version
         previewing = true
+        preview = nil
+        previewError = nil
         defer { previewing = false }
-        let input = try? await monitor.read {
-            (try $0.flowsForSimulation(since: Date().addingTimeInterval(-7 * 86400)), try $0.loadPolicies())
+        do {
+            let input = try await monitor.read {
+                (try $0.flowsForSimulation(since: Date().addingTimeInterval(-7 * 86400)),
+                 try $0.loadPolicies())
+            }
+            guard candidate == draft.configuration,
+                  packVersion == packs.version,
+                  ruleVersion == rules.version else { return }
+            preview = RulePackSimulation.run(candidate: candidate, definitions: packs.definitions,
+                                             configurations: packs.configurations,
+                                             overrides: packs.overrides, rules: rules.rules,
+                                             policies: input.1, paused: rules.isPaused,
+                                             flows: input.0, session: RuleStore.session)
+        } catch {
+            guard candidate == draft.configuration,
+                  packVersion == packs.version,
+                  ruleVersion == rules.version else { return }
+            previewError = L("Failed: %@", L("Test against recent traffic"))
         }
-        preview = RulePackSimulation.run(candidate: draft.configuration, definitions: packs.definitions,
-                                         configurations: packs.configurations,
-                                         overrides: packs.overrides, rules: monitor.rules.rules,
-                                         policies: input?.1 ?? [:], paused: monitor.rules.isPaused,
-                                         flows: input?.0 ?? [], session: RuleStore.session)
     }
 }
 

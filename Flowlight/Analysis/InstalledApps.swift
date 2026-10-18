@@ -17,8 +17,13 @@ enum InstalledApps {
         var bluetoothPurpose: String?
     }
 
+    struct ScanResult: Sendable {
+        var apps: [App]
+        var complete: Bool
+    }
+
     private static let lock = NSLock()
-    private static var cached: [App]?
+    private static var cached: ScanResult?
 
     /// Where applications live. The system folder is included because Safari and Mail are perfectly reasonable
     /// things to focus on, and they aren't in /Applications.
@@ -29,15 +34,22 @@ enum InstalledApps {
 
     /// Scanned once and kept. A Mac doesn't gain applications while a popover is open, and re-reading several
     /// hundred Info.plists on every keystroke would be felt.
-    static func all() -> [App] {
+    static func all() -> [App] { scan().apps }
+
+    static func scan() -> ScanResult {
         lock.lock()
         if let cached { lock.unlock(); return cached }
         lock.unlock()
 
         var found: [String: App] = [:]
+        var complete = true
         let manager = FileManager.default
         for directory in searchPaths {
-            guard let entries = try? manager.contentsOfDirectory(atPath: directory) else { continue }
+            guard manager.fileExists(atPath: directory) else { continue }
+            guard let entries = try? manager.contentsOfDirectory(atPath: directory) else {
+                complete = false
+                continue
+            }
             for entry in entries where entry.hasSuffix(".app") {
                 let path = directory + "/" + entry
                 guard let bundle = Bundle(path: path), let id = bundle.bundleIdentifier, !id.isEmpty else { continue }
@@ -49,9 +61,14 @@ enum InstalledApps {
                 found[id] = App(name: name, bundleID: id, path: path, bluetoothPurpose: purpose)
             }
         }
-        let sorted = found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        lock.lock(); cached = sorted; lock.unlock()
-        return sorted
+        let result = ScanResult(
+            apps: found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+            complete: complete && !found.isEmpty
+        )
+        if result.complete {
+            lock.lock(); cached = result; lock.unlock()
+        }
+        return result
     }
 
     /// The applications built to use Bluetooth, as they say so themselves in their Info.plist.

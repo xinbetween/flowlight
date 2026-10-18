@@ -31,6 +31,10 @@ final class RulePackStore: ObservableObject {
 
     var enabledCount: Int { configurations.filter(\.enabled).count }
     var hasEnabledPacks: Bool { enabledCount > 0 }
+    var failureMessage: String? {
+        if case .failed(let message) = status { return message }
+        return nil
+    }
 
     func configuration(for packID: String) -> RulePackConfiguration {
         configurations.first { $0.packID == packID } ?? RulePackConfiguration(packID: packID)
@@ -185,7 +189,13 @@ final class RulePackStore: ObservableObject {
             return
         }
         db.queue.async { [weak self, weak db] in
-            guard let db else { return }
+            guard let db else {
+                Task { @MainActor in
+                    self?.status = .failed("Rule pack storage is unavailable.")
+                    onFailure?()
+                }
+                return
+            }
             do {
                 try write(db)
                 Task { @MainActor in commit() }

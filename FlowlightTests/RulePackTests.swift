@@ -363,7 +363,7 @@ final class RulePackTests: XCTestCase {
 
         XCTAssertFalse(draft.configuration.enabled)
         XCTAssertEqual(draft.configuration.scope, .allApps)
-        XCTAssertNil(draft.saveAction)
+        XCTAssertEqual(draft.requestSave(), .commit(saved))
     }
 
     func testEditorActivationAndCancelNeverMutateSavedConfiguration() {
@@ -387,12 +387,40 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(draft.submitApp(installed: []), .added("com.apple.curl"))
         XCTAssertEqual(draft.configuration.apps, ["com.apple.curl"])
         XCTAssertEqual(draft.typedApp, "")
-        XCTAssertNil(draft.saveAction, "Return in the app field must not save or dismiss the editor")
 
         draft.typedApp = "com.example.second"
         XCTAssertEqual(draft.submitApp(installed: []), .added("com.example.second"))
         XCTAssertEqual(draft.configuration.apps, ["com.apple.curl", "com.example.second"])
-        XCTAssertNil(draft.saveAction, "Return must remain Add even after Save becomes valid")
+        XCTAssertEqual(draft.requestSave(), .commit(draft.configuration),
+                       "Return only edits the draft; explicit Save decides whether to commit")
+    }
+
+    func testConcurrentCardSavesStayTrackedIndependently() {
+        var saves = RulePackSaveTracker()
+        saves.begin("official.advertising")
+        saves.begin("official.tracking")
+
+        saves.finish("official.advertising")
+
+        XCTAssertFalse(saves.contains("official.advertising"))
+        XCTAssertTrue(saves.contains("official.tracking"))
+    }
+
+    func testEditorWaitsForInstalledAppsBeforeResolvingDisplayName() {
+        let safari = InstalledApps.App(name: "Safari", bundleID: "com.apple.Safari",
+                                       path: "/Applications/Safari.app")
+        var draft = RulePackEditorDraft(saved: RulePackConfiguration(packID: "official.advertising"),
+                                        intent: .activate)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "Safari"
+
+        XCTAssertEqual(draft.submitApp(installed: [], appsLoaded: false), .loading)
+        XCTAssertEqual(draft.typedApp, "Safari")
+        XCTAssertTrue(draft.configuration.apps.isEmpty)
+
+        XCTAssertEqual(draft.submitApp(installed: [safari], appsLoaded: true), .added("com.apple.Safari"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.Safari"])
+        XCTAssertEqual(draft.typedApp, "")
     }
 
     func testEditorExplicitSaveAndBroadeningDecision() {
@@ -405,8 +433,8 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(draft.requestSave(), .confirmBroadening)
 
         selected.apps = []
-        var invalid = RulePackEditorDraft(saved: selected, intent: .review)
-        XCTAssertNil(invalid.saveAction)
+        let invalid = RulePackEditorDraft(saved: selected, intent: .review)
+        XCTAssertNil(invalid.requestSave())
         XCTAssertFalse(invalid.canSave)
     }
 

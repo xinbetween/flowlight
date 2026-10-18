@@ -9,6 +9,7 @@ struct RulePackEditorDraft {
     }
 
     enum AppSubmission: Equatable {
+        case loading
         case ignored
         case added(String)
     }
@@ -21,7 +22,6 @@ struct RulePackEditorDraft {
     let originalConfiguration: RulePackConfiguration
     var configuration: RulePackConfiguration
     var typedApp = ""
-    private(set) var saveAction: SaveAction?
 
     init(saved: RulePackConfiguration, intent: Intent) {
         originalConfiguration = saved
@@ -33,11 +33,12 @@ struct RulePackEditorDraft {
         configuration.scope != .selectedApps || !configuration.apps.isEmpty
     }
 
-    mutating func submitApp(installed: [InstalledApps.App]) -> AppSubmission {
-        addApp(typedApp, installed: installed)
+    mutating func submitApp(installed: [InstalledApps.App], appsLoaded: Bool = true) -> AppSubmission {
+        addApp(typedApp, installed: installed, appsLoaded: appsLoaded)
     }
 
-    mutating func addApp(_ value: String, installed: [InstalledApps.App]) -> AppSubmission {
+    mutating func addApp(_ value: String, installed: [InstalledApps.App], appsLoaded: Bool = true) -> AppSubmission {
+        guard appsLoaded else { return .loading }
         guard let target = InstalledApps.target(forTyped: value, apps: installed) else { return .ignored }
         if !configuration.apps.contains(where: { $0.caseInsensitiveCompare(target.value) == .orderedSame }) {
             configuration.apps.append(target.value)
@@ -47,17 +48,13 @@ struct RulePackEditorDraft {
         return .added(target.value)
     }
 
-    mutating func requestSave() -> SaveAction? {
-        guard canSave else { saveAction = nil; return nil }
+    func requestSave() -> SaveAction? {
+        guard canSave else { return nil }
         if originalConfiguration.enabled,
            originalConfiguration.scope == .selectedApps,
            configuration.scope == .allApps {
-            saveAction = .confirmBroadening
-        } else {
-            saveAction = .commit(configuration)
+            return .confirmBroadening
         }
-        return saveAction
+        return .commit(configuration)
     }
-
-    mutating func clearSaveAction() { saveAction = nil }
 }
