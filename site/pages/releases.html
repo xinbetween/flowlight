@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.0</h2><time datetime="2026-10-17">October 17, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.1</h2><time datetime="2026-10-18">October 18, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Keep managed-pack changes safely in review.</strong> Opening or cancelling an off pack no longer
+            activates it, and configuration changes persist only after an explicit Save succeeds.</li>
+          <li><strong>Add selected apps without closing the editor.</strong> Pressing Return in the app field now adds
+            the typed app or process to the draft instead of triggering the sheet's Save action.</li>
+          <li><strong>Show the configuration that actually committed.</strong> Pack cards now observe managed-pack state
+            directly, so scope, status, exceptions and activity refresh as soon as an asynchronous save completes.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.0</h2><time datetime="2026-10-17">October 17, 2026</time></header>
         <ul>
           <li><strong>Block known ad and tracker destinations across apps.</strong> Three official managed packs cover
             advertising, cross-site tracking, and privacy/telemetry hosts. They ship disabled, require explicit review,

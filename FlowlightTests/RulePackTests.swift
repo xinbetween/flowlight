@@ -225,6 +225,57 @@ final class RulePackTests: XCTestCase {
     }
 
     @MainActor
+    func testStoreDisablesEmptySelectedAppConfiguration() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-empty-scope-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        var candidate = store.configuration(for: "official.advertising")
+        candidate.enabled = true
+        candidate.scope = .selectedApps
+        candidate.apps = ["  ", "\n"]
+        var completed = false
+        store.save(candidate) { success in
+            XCTAssertTrue(success)
+            completed = true
+        }
+
+        try await waitUntil { completed }
+        let committed = store.configuration(for: candidate.packID)
+        XCTAssertFalse(committed.enabled)
+        XCTAssertEqual(committed.scope, .selectedApps)
+        XCTAssertTrue(committed.apps.isEmpty)
+        let persisted = try db.sync { try $0.loadRulePackConfigurations() }
+        XCTAssertEqual(persisted, [committed])
+    }
+
+    @MainActor
+    func testStoreSaveCompletionSeesCommittedConfiguration() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-completion-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        var candidate = store.configuration(for: "official.advertising")
+        candidate.enabled = true
+        candidate.scope = .selectedApps
+        candidate.apps = ["com.apple.curl"]
+        var completed = false
+        store.save(candidate) { success in
+            XCTAssertTrue(success)
+            XCTAssertEqual(store.configuration(for: candidate.packID).scope, .selectedApps)
+            XCTAssertEqual(store.configuration(for: candidate.packID).apps, ["com.apple.curl"])
+            XCTAssertNotNil(store.snapshot)
+            completed = true
+        }
+
+        try await waitUntil { completed }
+    }
+
+    @MainActor
     func testStorePublishesAfterTransientFailureRecovers() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-recovery-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
@@ -304,6 +355,59 @@ final class RulePackTests: XCTestCase {
 
         XCTAssertFalse(store.configuration(for: original.id).enabled)
         XCTAssertNil(store.snapshot)
+    }
+
+    func testEditorReviewPreservesOffConfiguration() {
+        let saved = RulePackConfiguration(packID: "official.advertising")
+        let draft = RulePackEditorDraft(saved: saved, intent: .review)
+
+        XCTAssertFalse(draft.configuration.enabled)
+        XCTAssertEqual(draft.configuration.scope, .allApps)
+        XCTAssertNil(draft.saveAction)
+    }
+
+    func testEditorActivationAndCancelNeverMutateSavedConfiguration() {
+        let saved = RulePackConfiguration(packID: "official.advertising")
+        var draft = RulePackEditorDraft(saved: saved, intent: .activate)
+
+        XCTAssertTrue(draft.configuration.enabled)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "com.apple.curl"
+        XCTAssertEqual(draft.submitApp(installed: []), .added("com.apple.curl"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.curl"])
+        XCTAssertEqual(saved, RulePackConfiguration(packID: "official.advertising"))
+    }
+
+    func testEditorReturnAddsAppWithoutSaving() {
+        let saved = RulePackConfiguration(packID: "official.advertising")
+        var draft = RulePackEditorDraft(saved: saved, intent: .activate)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "com.apple.curl"
+
+        XCTAssertEqual(draft.submitApp(installed: []), .added("com.apple.curl"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.curl"])
+        XCTAssertEqual(draft.typedApp, "")
+        XCTAssertNil(draft.saveAction, "Return in the app field must not save or dismiss the editor")
+
+        draft.typedApp = "com.example.second"
+        XCTAssertEqual(draft.submitApp(installed: []), .added("com.example.second"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.curl", "com.example.second"])
+        XCTAssertNil(draft.saveAction, "Return must remain Add even after Save becomes valid")
+    }
+
+    func testEditorExplicitSaveAndBroadeningDecision() {
+        var selected = RulePackConfiguration(packID: "official.advertising", enabled: true,
+                                             scope: .selectedApps, apps: ["com.apple.curl"])
+        var draft = RulePackEditorDraft(saved: selected, intent: .review)
+        XCTAssertEqual(draft.requestSave(), .commit(selected))
+
+        draft.configuration.scope = .allApps
+        XCTAssertEqual(draft.requestSave(), .confirmBroadening)
+
+        selected.apps = []
+        var invalid = RulePackEditorDraft(saved: selected, intent: .review)
+        XCTAssertNil(invalid.saveAction)
+        XCTAssertFalse(invalid.canSave)
     }
 
     func testActivityKeepsPackProvenanceSeparateAndReceiptAfterPrune() throws {

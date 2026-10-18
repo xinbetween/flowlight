@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.1, macOS 15 or later.
 
  On this page
 
@@ -887,7 +887,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1617,8 +1617,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.1
+October 18, 2026Latest
+
+ Keep managed-pack changes safely in review. Opening or cancelling an off pack no longer
+ activates it, and configuration changes persist only after an explicit Save succeeds.
+
+ Add selected apps without closing the editor. Pressing Return in the app field now adds
+ the typed app or process to the draft instead of triggering the sheet's Save action.
+
+ Show the configuration that actually committed. Pack cards now observe managed-pack state
+ directly, so scope, status, exceptions and activity refresh as soon as an asynchronous save completes.
+
  0.15.0
-October 17, 2026Latest
+October 17, 2026
 
  Block known ad and tracker destinations across apps. Three official managed packs cover
  advertising, cross-site tracking, and privacy/telemetry hosts. They ship disabled, require explicit review,

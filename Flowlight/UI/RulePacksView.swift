@@ -2,25 +2,43 @@ import SwiftUI
 
 struct RulePacksView: View {
     @EnvironmentObject var monitor: TrafficMonitor
-    @State private var editor: RulePackDefinition?
+
+    var body: some View {
+        RulePacksContent(packs: monitor.rulePacks)
+    }
+}
+
+private struct RulePackEditorRequest: Identifiable {
+    let pack: RulePackDefinition
+    let saved: RulePackConfiguration
+    let intent: RulePackEditorDraft.Intent
+    var id: String { pack.id }
+}
+
+private struct RulePacksContent: View {
+    @EnvironmentObject var monitor: TrafficMonitor
+    @ObservedObject var packs: RulePackStore
+    @State private var editor: RulePackEditorRequest?
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 explanation
-                if monitor.rulePacks.deliveryStats.droppedHits > 0 {
+                if packs.deliveryStats.droppedHits > 0 {
                     Label(L("%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full.",
-                            monitor.rulePacks.deliveryStats.droppedHits), systemImage: "exclamationmark.triangle")
+                            packs.deliveryStats.droppedHits), systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(FL.warning)
                         .padding(10).background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
-                ForEach(monitor.rulePacks.definitions) { pack in
+                ForEach(packs.definitions) { pack in
                     card(pack)
                 }
             }
             .padding(Measure.gutter)
         }
-        .sheet(item: $editor) { pack in RulePackEditor(pack: pack) }
+        .sheet(item: $editor) { request in
+            RulePackEditor(pack: request.pack, saved: request.saved, intent: request.intent, packs: packs)
+        }
     }
 
     private var explanation: some View {
@@ -33,8 +51,8 @@ struct RulePacksView: View {
     }
 
     private func card(_ pack: RulePackDefinition) -> some View {
-        let configuration = monitor.rulePacks.configuration(for: pack.id)
-        let events = monitor.rulePacks.events(for: pack.id)
+        let configuration = packs.configuration(for: pack.id)
+        let events = packs.events(for: pack.id)
         let blocks = events.reduce(0) { $0 + $1.count }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
@@ -47,8 +65,13 @@ struct RulePacksView: View {
                 }
                 Spacer(minLength: 8)
                 Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
-                    if enabled { editor = pack }
-                    else { var changed = configuration; changed.enabled = false; monitor.rulePacks.save(changed) }
+                    if enabled {
+                        editor = RulePackEditorRequest(pack: pack, saved: configuration, intent: .activate)
+                    } else {
+                        var changed = configuration
+                        changed.enabled = false
+                        packs.save(changed)
+                    }
                 })).toggleStyle(.switch).controlSize(.small).labelsHidden()
             }
             HStack(spacing: 8) {
@@ -56,11 +79,13 @@ struct RulePacksView: View {
                 pill(configuration.scope == .allApps ? L("Every app") : L("%lld selected apps", configuration.apps.count))
                 pill(L("%lld destinations", pack.entries.count))
                 if blocks > 0 { pill(L("%lld blocked", blocks), tint: FL.critical) }
-                if !monitor.rulePacks.overrides(for: pack.id).isEmpty {
-                    pill(L("%lld exceptions", monitor.rulePacks.overrides(for: pack.id).count), tint: FL.good)
+                if !packs.overrides(for: pack.id).isEmpty {
+                    pill(L("%lld exceptions", packs.overrides(for: pack.id).count), tint: FL.good)
                 }
                 Spacer()
-                Button(L("Review…")) { editor = pack }
+                Button(L("Review…")) {
+                    editor = RulePackEditorRequest(pack: pack, saved: configuration, intent: .review)
+                }
             }
             Text(L(pack.manifest.caveatKey)).font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -73,13 +98,13 @@ struct RulePacksView: View {
 
     private func status(_ configuration: RulePackConfiguration) -> String {
         if !configuration.enabled {
-            switch monitor.rulePacks.status {
+            switch packs.status {
             case .applying: return L("Applying…")
             case .failed: return L("Needs review")
             default: return L("Off")
             }
         }
-        switch monitor.rulePacks.status {
+        switch packs.status {
         case .off, .ready, .applying: return monitor.canBlock ? L("Applying…") : L("Watching only")
         case .enforcing: return monitor.canBlock ? L("Blocking") : L("Watching only")
         case .watchingOnly: return L("Watching only")
@@ -90,12 +115,12 @@ struct RulePacksView: View {
 
     private func statusTint(_ configuration: RulePackConfiguration) -> Color? {
         if !configuration.enabled {
-            switch monitor.rulePacks.status {
+            switch packs.status {
             case .applying, .failed: return FL.warning
             default: return nil
             }
         }
-        return monitor.canBlock && monitor.rulePacks.status == .enforcing ? FL.critical : FL.warning
+        return monitor.canBlock && packs.status == .enforcing ? FL.critical : FL.warning
     }
 
     private func symbol(_ pack: RulePackDefinition) -> String {
@@ -118,19 +143,19 @@ private struct RulePackEditor: View {
     let pack: RulePackDefinition
     @EnvironmentObject var monitor: TrafficMonitor
     @Environment(\.dismiss) private var dismiss
-    @State private var configuration: RulePackConfiguration
-    @State private var originalConfiguration: RulePackConfiguration
-    @State private var app = ""
+    @ObservedObject var packs: RulePackStore
+    @State private var draft: RulePackEditorDraft
     @State private var installed: [InstalledApps.App] = []
     @State private var preview: RuleSimulation.Result?
     @State private var previewing = false
     @State private var confirmBroadening = false
+    @State private var saving = false
 
-    init(pack: RulePackDefinition) {
+    init(pack: RulePackDefinition, saved: RulePackConfiguration,
+         intent: RulePackEditorDraft.Intent, packs: RulePackStore) {
         self.pack = pack
-        let initial = RulePackConfiguration(packID: pack.id)
-        _configuration = State(initialValue: initial)
-        _originalConfiguration = State(initialValue: initial)
+        self.packs = packs
+        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent))
     }
 
     var body: some View {
@@ -156,21 +181,16 @@ private struct RulePackEditor: View {
                 Spacer()
                 Button(L("Cancel")) { dismiss() }
                 Button(L("Save")) { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(configuration.scope == .selectedApps && configuration.apps.isEmpty)
+                    .disabled(!draft.canSave || saving)
             }.padding(Measure.gutter)
         }
         .frame(width: Measure.prose)
         .frame(minHeight: 620)
         .onAppear {
-            let saved = monitor.rulePacks.configuration(for: pack.id)
-            configuration = saved
-            if !saved.enabled { configuration.enabled = true }
-            originalConfiguration = saved
             Task { installed = await Task.detached(priority: .userInitiated) { InstalledApps.all() }.value }
         }
         .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
-            Button(L("Apply to every app"), role: .destructive) { commit() }
+            Button(L("Apply to every app"), role: .destructive) { commit(draft.configuration) }
             Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(L("This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed."))
@@ -180,16 +200,18 @@ private struct RulePackEditor: View {
     private var scope: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L("Scope")).font(.headline)
-            Picker("", selection: $configuration.scope) {
+            Picker("", selection: $draft.configuration.scope) {
                 Text(L("Every app")).tag(RulePackConfiguration.Scope.allApps)
                 Text(L("Only selected apps")).tag(RulePackConfiguration.Scope.selectedApps)
             }.pickerStyle(.segmented).labelsHidden()
-            if configuration.scope == .selectedApps {
+            if draft.configuration.scope == .selectedApps {
                 HStack {
-                    TextField(L("App name, bundle identifier, or process"), text: $app)
-                    Button(L("Add")) { addApp() }.disabled(app.trimmingCharacters(in: .whitespaces).isEmpty)
+                    TextField(L("App name, bundle identifier, or process"), text: $draft.typedApp)
+                        .onSubmit { addApp() }
+                    Button(L("Add")) { addApp() }
+                        .disabled(draft.typedApp.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                if !app.isEmpty, !appSuggestions.isEmpty {
+                if !draft.typedApp.isEmpty, !appSuggestions.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(appSuggestions) { suggestion in
                             Button {
@@ -210,8 +232,8 @@ private struct RulePackEditor: View {
                     }
                 }
                 FlowLayout(spacing: 6) {
-                    ForEach(configuration.apps, id: \.self) { id in
-                        Button { configuration.apps.removeAll { $0 == id } } label: {
+                    ForEach(draft.configuration.apps, id: \.self) { id in
+                        Button { draft.configuration.apps.removeAll { $0 == id } } label: {
                             Label(id, systemImage: "xmark.circle.fill").font(.caption)
                         }.buttonStyle(.borderless)
                     }
@@ -258,7 +280,7 @@ private struct RulePackEditor: View {
     }
 
     @ViewBuilder private var exceptions: some View {
-        let found = monitor.rulePacks.overrides(for: pack.id)
+        let found = packs.overrides(for: pack.id)
         if !found.isEmpty {
             DisclosureGroup(L("%lld exceptions", found.count)) {
                 ForEach(found) { exception in
@@ -267,7 +289,7 @@ private struct RulePackEditor: View {
                         Text("→").foregroundStyle(.tertiary)
                         Text(exception.host).font(.caption.monospaced())
                         Spacer()
-                        Button(L("Delete"), role: .destructive) { monitor.rulePacks.deleteOverride(exception) }
+                        Button(L("Delete"), role: .destructive) { packs.deleteOverride(exception) }
                     }.padding(.vertical, 2)
                 }
             }
@@ -275,32 +297,31 @@ private struct RulePackEditor: View {
     }
 
     private var appSuggestions: [InstalledApps.App] {
-        Array(InstalledApps.search(app, in: installed).filter { candidate in
-            !configuration.apps.contains { $0.caseInsensitiveCompare(candidate.bundleID) == .orderedSame }
+        Array(InstalledApps.search(draft.typedApp, in: installed).filter { candidate in
+            !draft.configuration.apps.contains { $0.caseInsensitiveCompare(candidate.bundleID) == .orderedSame }
         }.prefix(5))
     }
 
     private func addApp(_ value: String? = nil) {
-        guard let target = InstalledApps.target(forTyped: value ?? app, apps: installed) else { return }
-        if !configuration.apps.contains(where: { $0.caseInsensitiveCompare(target.value) == .orderedSame }) {
-            configuration.apps.append(target.value); configuration.apps.sort()
-        }
-        app = ""
+        if let value { _ = draft.addApp(value, installed: installed) }
+        else { _ = draft.submitApp(installed: installed) }
     }
 
     private func save() {
-        if originalConfiguration.enabled,
-           originalConfiguration.scope == .selectedApps,
-           configuration.scope == .allApps {
-            confirmBroadening = true
-        } else {
-            commit()
+        switch draft.requestSave() {
+        case .commit(let configuration): commit(configuration)
+        case .confirmBroadening: confirmBroadening = true
+        case nil: break
         }
     }
 
-    private func commit() {
-        monitor.rulePacks.save(configuration)
-        dismiss()
+    private func commit(_ configuration: RulePackConfiguration? = nil) {
+        saving = true
+        let value = configuration ?? draft.configuration
+        packs.save(value) { success in
+            saving = false
+            if success { dismiss() }
+        }
     }
 
     private func runPreview() async {
@@ -309,9 +330,9 @@ private struct RulePackEditor: View {
         let input = try? await monitor.read {
             (try $0.flowsForSimulation(since: Date().addingTimeInterval(-7 * 86400)), try $0.loadPolicies())
         }
-        preview = RulePackSimulation.run(candidate: configuration, definitions: monitor.rulePacks.definitions,
-                                         configurations: monitor.rulePacks.configurations,
-                                         overrides: monitor.rulePacks.overrides, rules: monitor.rules.rules,
+        preview = RulePackSimulation.run(candidate: draft.configuration, definitions: packs.definitions,
+                                         configurations: packs.configurations,
+                                         overrides: packs.overrides, rules: monitor.rules.rules,
                                          policies: input?.1 ?? [:], paused: monitor.rules.isPaused,
                                          flows: input?.0 ?? [], session: RuleStore.session)
     }

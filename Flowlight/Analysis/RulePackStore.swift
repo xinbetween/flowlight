@@ -72,8 +72,11 @@ final class RulePackStore: ObservableObject {
         }
     }
 
-    func save(_ configuration: RulePackConfiguration) {
-        guard definitions.contains(where: { $0.id == configuration.packID }) else { return }
+    func save(_ configuration: RulePackConfiguration, completion: ((Bool) -> Void)? = nil) {
+        guard definitions.contains(where: { $0.id == configuration.packID }) else {
+            completion?(false)
+            return
+        }
         var cleaned = configuration
         if cleaned.enabled, let definition = definitions.first(where: { $0.id == cleaned.packID }) {
             cleaned.consentedVersion = definition.manifest.version
@@ -83,15 +86,18 @@ final class RulePackStore: ObservableObject {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }.filter { !$0.isEmpty })).sorted()
         if cleaned.scope == .selectedApps && cleaned.apps.isEmpty { cleaned.enabled = false }
-        persist({ try $0.saveRulePackConfiguration(cleaned) }) { [weak self] in
-            guard let self else { return }
+        persist({ try $0.saveRulePackConfiguration(cleaned) }, then: { [weak self] in
+            guard let self else { completion?(false); return }
             if let index = self.configurations.firstIndex(where: { $0.packID == cleaned.packID }) {
                 self.configurations[index] = cleaned
             } else {
                 self.configurations.append(cleaned)
             }
             self.publish()
-        }
+            completion?(true)
+        }, onFailure: {
+            completion?(false)
+        })
     }
 
     func setEnabled(_ packID: String, _ enabled: Bool) {
@@ -171,9 +177,11 @@ final class RulePackStore: ObservableObject {
     }
 
     private func persist(_ write: @escaping (TrafficDatabase) throws -> Void,
-                         then commit: @escaping @MainActor () -> Void) {
+                         then commit: @escaping @MainActor () -> Void,
+                         onFailure: (@MainActor () -> Void)? = nil) {
         guard let db else {
             status = .failed("Rule pack storage is unavailable.")
+            onFailure?()
             return
         }
         db.queue.async { [weak self, weak db] in
@@ -184,6 +192,7 @@ final class RulePackStore: ObservableObject {
             } catch {
                 Task { @MainActor in
                     self?.status = .failed("Could not save the rule pack change: \(error.localizedDescription)")
+                    onFailure?()
                 }
             }
         }
