@@ -38,8 +38,15 @@ struct RulePackEditorDraft {
     }
 
     mutating func addApp(_ value: String, installed: [InstalledApps.App], appsLoaded: Bool = true) -> AppSubmission {
-        guard appsLoaded else { return .loading }
-        guard let target = InstalledApps.target(forTyped: value, apps: installed) else { return .ignored }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let exactApp = installed.contains {
+            $0.bundleID.caseInsensitiveCompare(trimmed) == .orderedSame
+                || $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+        }
+        let explicitIdentity = trimmed.contains(".") && !trimmed.contains(where: \.isWhitespace)
+            || AgentCatalog.knownAgent(bundleID: trimmed, appName: trimmed) != nil
+        guard appsLoaded || exactApp || explicitIdentity else { return .loading }
+        guard let target = InstalledApps.target(forTyped: trimmed, apps: installed) else { return .ignored }
         if !configuration.apps.contains(where: { $0.caseInsensitiveCompare(target.value) == .orderedSame }) {
             configuration.apps.append(target.value)
             configuration.apps.sort()

@@ -1,5 +1,14 @@
 import Foundation
 
+extension RulePackOverride {
+    func hasSameScope(as other: RulePackOverride) -> Bool {
+        packID == other.packID
+            && app.caseInsensitiveCompare(other.app) == .orderedSame
+            && host.caseInsensitiveCompare(other.host) == .orderedSame
+            && match == other.match
+    }
+}
+
 /// The app-owned half of managed rule packs: built-in definitions, user activation/scope, exceptions, and the
 /// complete validated snapshot handed to the Network Extension.
 @MainActor
@@ -110,25 +119,34 @@ final class RulePackStore: ObservableObject {
         save(value)
     }
 
-    func addOverride(_ override: RulePackOverride) {
+    func addOverride(_ override: RulePackOverride, completion: ((Bool) -> Void)? = nil) {
         guard definitions.contains(where: { $0.id == override.packID }),
-              let host = HostCanonicalizer.host(override.host) else { return }
+              let host = HostCanonicalizer.host(override.host) else {
+            completion?(false)
+            return
+        }
         var cleaned = override
         cleaned.host = host
         cleaned.app = override.app.trimmingCharacters(in: .whitespacesAndNewlines)
-        persist({ try $0.saveRulePackOverride(cleaned) }) { [weak self] in
-            guard let self else { return }
-            self.overrides.removeAll { $0.id == cleaned.id }
+        persist({ try $0.saveRulePackOverride(cleaned) }, then: { [weak self] in
+            guard let self else { completion?(false); return }
+            self.overrides.removeAll { $0.id == cleaned.id || $0.hasSameScope(as: cleaned) }
             self.overrides.append(cleaned)
             self.publish()
-        }
+            completion?(true)
+        }, onFailure: {
+            completion?(false)
+        })
     }
 
-    func deleteOverride(_ override: RulePackOverride) {
-        persist({ try $0.deleteRulePackOverride(override.id) }) { [weak self] in
-            self?.overrides.removeAll { $0.id == override.id }
+    func deleteOverride(_ override: RulePackOverride, completion: ((Bool) -> Void)? = nil) {
+        persist({ try $0.deleteRulePackOverride(override) }, then: { [weak self] in
+            self?.overrides.removeAll { $0.hasSameScope(as: override) }
             self?.publish()
-        }
+            completion?(true)
+        }, onFailure: {
+            completion?(false)
+        })
     }
 
     func updateStatus(_ newStatus: ApplyStatus) { status = newStatus }
@@ -201,7 +219,7 @@ final class RulePackStore: ObservableObject {
                 Task { @MainActor in commit() }
             } catch {
                 Task { @MainActor in
-                    self?.status = .failed("Could not save the rule pack change: \(error.localizedDescription)")
+                    self?.status = .failed("Could not save the rule pack change: \(String(describing: error))")
                     onFailure?()
                 }
             }

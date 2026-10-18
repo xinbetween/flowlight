@@ -693,6 +693,7 @@ struct RuleTemplateLibrary: View {
     @State private var app = ""
     @State private var destination = ""
     @State private var added: Set<RuleTemplate.ID> = []
+    @State private var installed: [InstalledApps.App] = []
 
     /// The subject as the cards see it. The readable name is looked up rather than stored, so typing over the app
     /// can't leave a rule named after the one that was there before.
@@ -704,8 +705,7 @@ struct RuleTemplateLibrary: View {
         if bundleID.caseInsensitiveCompare(subject.app) == .orderedSame, !subject.appName.isEmpty {
             return subject.appName
         }
-        return InstalledApps.all().first { $0.bundleID.caseInsensitiveCompare(bundleID) == .orderedSame }?.name
-            ?? bundleID
+        return installed.first { $0.bundleID.caseInsensitiveCompare(bundleID) == .orderedSame }?.name ?? bundleID
     }
 
     var body: some View {
@@ -737,6 +737,9 @@ struct RuleTemplateLibrary: View {
         }
         .frame(width: Measure.prose)
         .frame(minHeight: 560)
+        .task {
+            installed = await Task.detached(priority: .userInitiated) { InstalledApps.all() }.value
+        }
     }
 
     private var header: some View {
@@ -862,10 +865,9 @@ struct RuleTemplateLibrary: View {
     }
 
     private var suggestions: [InstalledApps.App] {
-        let all = InstalledApps.all()
-        guard !app.isEmpty, !all.contains(where: { $0.bundleID.caseInsensitiveCompare(app) == .orderedSame })
-        else { return [] }
-        return Array(InstalledApps.search(app, in: all).prefix(4))
+        guard !app.isEmpty,
+              !installed.contains(where: { $0.bundleID.caseInsensitiveCompare(app) == .orderedSame }) else { return [] }
+        return Array(InstalledApps.search(app, in: installed).prefix(4))
     }
 
     /// Every rule, written out. Long lists are the whole point of a template, so they aren't truncated — an

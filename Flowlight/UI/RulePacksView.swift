@@ -226,6 +226,7 @@ private struct RulePackEditor: View {
         .onChange(of: draft.configuration) { _, _ in invalidatePreview() }
         .onChange(of: packs.version) { _, _ in invalidatePreview() }
         .onChange(of: rules.version) { _, _ in invalidatePreview() }
+        .onChange(of: monitor.dataVersion) { _, _ in invalidatePreview() }
         .onAppear { loadApps() }
         .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
             Button(L("Apply to every app"), role: .destructive) { commit(draft.configuration) }
@@ -245,14 +246,14 @@ private struct RulePackEditor: View {
             if draft.configuration.scope == .selectedApps {
                 HStack {
                     TextField(L("App name, bundle identifier, or process"), text: $draft.typedApp)
-                        .onSubmit { if appsLoaded { addApp() } }
+                        .onSubmit { addApp() }
                     if !appsScanned {
                         ProgressView().controlSize(.small)
                     } else if !appsLoaded {
                         Button(L("Refresh")) { loadApps() }.controlSize(.small)
                     }
                     Button(L("Add")) { addApp() }
-                        .disabled(!appsLoaded || draft.typedApp.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(draft.typedApp.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 if !draft.typedApp.isEmpty, !appSuggestions.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
@@ -336,7 +337,16 @@ private struct RulePackEditor: View {
                         Text("→").foregroundStyle(.tertiary)
                         Text(exception.host).font(.caption.monospaced())
                         Spacer()
-                        Button(L("Delete"), role: .destructive) { packs.deleteOverride(exception) }
+                        Button(L("Delete"), role: .destructive) {
+                            saving = true
+                            saveError = nil
+                            packs.deleteOverride(exception) { success in
+                                saving = false
+                                if !success {
+                                    saveError = packs.failureMessage ?? L("Failed: %@", L("Delete"))
+                                }
+                            }
+                        }
                     }.padding(.vertical, 2)
                 }
             }
@@ -350,10 +360,11 @@ private struct RulePackEditor: View {
     }
 
     private func loadApps() {
+        let refresh = appsScanned
         appsScanned = false
         appsLoaded = false
         Task {
-            let result = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
+            let result = await Task.detached(priority: .userInitiated) { InstalledApps.scan(refresh: refresh) }.value
             installed = result.apps
             appsLoaded = result.complete
             appsScanned = true
@@ -397,6 +408,7 @@ private struct RulePackEditor: View {
         let candidate = draft.configuration
         let packVersion = packs.version
         let ruleVersion = rules.version
+        let dataVersion = monitor.dataVersion
         previewing = true
         preview = nil
         previewError = nil
@@ -408,7 +420,8 @@ private struct RulePackEditor: View {
             }
             guard candidate == draft.configuration,
                   packVersion == packs.version,
-                  ruleVersion == rules.version else { return }
+                  ruleVersion == rules.version,
+                  dataVersion == monitor.dataVersion else { return }
             preview = RulePackSimulation.run(candidate: candidate, definitions: packs.definitions,
                                              configurations: packs.configurations,
                                              overrides: packs.overrides, rules: rules.rules,
@@ -417,8 +430,9 @@ private struct RulePackEditor: View {
         } catch {
             guard candidate == draft.configuration,
                   packVersion == packs.version,
-                  ruleVersion == rules.version else { return }
-            previewError = L("Failed: %@", L("Test against recent traffic"))
+                  ruleVersion == rules.version,
+                  dataVersion == monitor.dataVersion else { return }
+            previewError = L("Failed: %@", String(describing: error))
         }
     }
 }
@@ -428,6 +442,8 @@ struct RulePackEventRow: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @State private var recentOverride: RulePackOverride?
+    @State private var overrideSaving = false
+    @State private var overrideError: String?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -444,9 +460,14 @@ struct RulePackEventRow: View {
                 Text(event.lastAt.formatted(date: .omitted, time: .standard)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 if let recentOverride {
                     Button(L("Undo")) {
-                        monitor.rulePacks.deleteOverride(recentOverride)
-                        self.recentOverride = nil
-                    }.buttonStyle(.link).font(.caption)
+                        overrideSaving = true
+                        overrideError = nil
+                        monitor.rulePacks.deleteOverride(recentOverride) { success in
+                            overrideSaving = false
+                            if success { self.recentOverride = nil }
+                            else { overrideError = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Delete")) }
+                        }
+                    }.buttonStyle(.link).font(.caption).disabled(overrideSaving)
                 } else {
                     Menu {
                         Button(L("Allow for %@", event.appName)) { allowForApp() }
@@ -456,7 +477,11 @@ struct RulePackEventRow: View {
                     } label: {
                         Text(L("Allow…"))
                     }
-                    .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                    .menuStyle(.borderlessButton).fixedSize().font(.caption).disabled(overrideSaving)
+                }
+                if overrideSaving { ProgressView().controlSize(.mini) }
+                if let overrideError {
+                    Text(overrideError).font(.caption2).foregroundStyle(FL.critical)
                 }
             }
         }.padding(.horizontal, 10).padding(.vertical, 8)
@@ -465,8 +490,13 @@ struct RulePackEventRow: View {
     private func allowForApp() {
         let exception = RulePackOverride(packID: event.packID, app: event.bundleID,
                                          host: event.matchedHost, match: event.match)
-        recentOverride = exception
-        monitor.rulePacks.addOverride(exception)
+        overrideSaving = true
+        overrideError = nil
+        monitor.rulePacks.addOverride(exception) { success in
+            overrideSaving = false
+            if success { recentOverride = exception }
+            else { overrideError = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Save")) }
+        }
     }
 
     private var packName: String {

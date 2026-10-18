@@ -184,8 +184,111 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(event?.matchedHost, "ads.example")
         XCTAssertEqual(event?.lastAt, Date(timeIntervalSince1970: 1_700_000_030))
         XCTAssertEqual(events.first { $0.entryID == 8 }?.count, 4)
-        try reopened.deleteRulePackOverride(override.id)
+        try reopened.deleteRulePackOverride(override)
         XCTAssertTrue(try reopened.loadRulePackOverrides().isEmpty)
+    }
+
+    func testStalePackEventMarkerRepairsThePhysicalUniqueKey() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-stale-key-\(UUID().uuidString).sqlite")
+        defer {
+            for suffix in ["", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+            }
+        }
+
+        do {
+            let fixture = try SQLiteConnection(path: url.path)
+            try fixture.execute("""
+            CREATE TABLE rollup_state (tier TEXT PRIMARY KEY, watermark INTEGER NOT NULL);
+            INSERT INTO rollup_state (tier, watermark) VALUES ('schema.rulePackEventKey', 2);
+            CREATE TABLE rule_pack_event_rollups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, bucket INTEGER NOT NULL, pack_id TEXT NOT NULL,
+                pack_version TEXT NOT NULL, entry_id INTEGER NOT NULL, category TEXT NOT NULL,
+                match TEXT NOT NULL DEFAULT 'suffix', action TEXT NOT NULL,
+                count INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL,
+                bundle_id TEXT NOT NULL, app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL,
+                host TEXT NOT NULL, matched_host TEXT NOT NULL, port INTEGER NOT NULL,
+                UNIQUE(bucket, pack_id, pack_version, entry_id, category, action, bundle_id, app_name,
+                       agent, agent_name, host, matched_host, port));
+            CREATE INDEX rule_pack_events_time ON rule_pack_event_rollups(bucket DESC);
+            CREATE INDEX rule_pack_events_pack ON rule_pack_event_rollups(pack_id, bucket DESC);
+            INSERT INTO rule_pack_event_rollups
+                (id, bucket, pack_id, pack_version, entry_id, category, match, action, count,
+                 first_at, last_at, bundle_id, app_name, agent, agent_name, host, matched_host, port)
+            VALUES (41, 1700000000, 'official.ads', '1', 7, 'advertising', 'suffix', 'block', 3,
+                    1700000001, 1700000020, 'com.apple.Safari', 'Safari', 'com.apple.Safari', 'Safari',
+                    'cdn.ads.example', 'ads.example', 443);
+            """)
+            XCTAssertThrowsError(try fixture.run("""
+                INSERT INTO rule_pack_event_rollups
+                    (bucket, pack_id, pack_version, entry_id, category, match, action, count,
+                     first_at, last_at, bundle_id, app_name, agent, agent_name, host, matched_host, port)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id,
+                            app_name, agent, agent_name, host, matched_host, port) DO UPDATE SET
+                    count = count + excluded.count
+                """, [.int(1_700_000_000), .text("official.ads"), .text("1"), .int(7),
+                      .text("advertising"), .text("suffix"), .text("block"), .int(1),
+                      .int(1_700_000_001), .int(1_700_000_020), .text("com.apple.Safari"),
+                      .text("Safari"), .text("com.apple.Safari"), .text("Safari"),
+                      .text("cdn.ads.example"), .text("ads.example"), .int(443)])) { error in
+                XCTAssertTrue(String(describing: error).contains("ON CONFLICT clause does not match"))
+            }
+        }
+
+        var repaired: TrafficDatabase? = try TrafficDatabase(url: url)
+        let suffix = RulePackEvent(
+            bucket: 1_700_000_000, packID: "official.ads", packVersion: "1", entryID: 7,
+            category: .advertising, match: .suffix, action: .block, count: 2,
+            firstAt: 1_699_999_999, lastAt: 1_700_000_030, bundleID: "com.apple.Safari",
+            appName: "Safari", agentKey: "com.apple.Safari", agentName: "Safari",
+            host: "cdn.ads.example", matchedHost: "ads.example", port: 443)
+        var exact = suffix
+        exact.match = .exact
+        exact.count = 4
+        try repaired?.recordRulePackEvents([suffix, exact])
+
+        var events = try XCTUnwrap(repaired).rulePackEvents()
+        XCTAssertEqual(events.count, 2)
+        XCTAssertEqual(events.first { $0.match == .suffix }?.id, 41)
+        XCTAssertEqual(events.first { $0.match == .suffix }?.count, 5)
+        XCTAssertEqual(events.first { $0.match == .suffix }?.firstAt,
+                       Date(timeIntervalSince1970: 1_699_999_999))
+        XCTAssertEqual(events.first { $0.match == .suffix }?.lastAt,
+                       Date(timeIntervalSince1970: 1_700_000_030))
+        XCTAssertEqual(events.first { $0.match == .exact }?.count, 4)
+
+        let indexes = try XCTUnwrap(repaired).raw(
+            "PRAGMA index_list(rule_pack_event_rollups)",
+            map: { (name: $0.text(1), unique: $0.int(2), partial: $0.int(4)) }
+        )
+        let expected = ["bucket", "pack_id", "pack_version", "entry_id", "category", "match", "action",
+                        "bundle_id", "app_name", "agent", "agent_name", "host", "matched_host", "port"]
+        let matching = try indexes.filter { $0.unique == 1 && $0.partial == 0 }.contains { index in
+            let escaped = index.name.replacingOccurrences(of: "'", with: "''")
+            let columns = try XCTUnwrap(repaired).raw("PRAGMA index_info('\(escaped)')") { $0.text(2) }
+            return columns == expected
+        }
+        XCTAssertTrue(matching)
+        XCTAssertEqual(Set(indexes.map(\.name)).intersection(["rule_pack_events_time", "rule_pack_events_pack"]),
+                       Set(["rule_pack_events_time", "rule_pack_events_pack"]))
+        XCTAssertEqual(try XCTUnwrap(repaired).raw(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.rulePackEventKey'", map: { $0.int(0) }
+        ), [2])
+
+        repaired = nil
+        let reopened = try TrafficDatabase(url: url)
+        try reopened.recordRulePackEvents([suffix])
+        let batch = RulePackEventBatch(events: [exact], droppedHits: 2, droppedKeys: 1)
+        XCTAssertTrue(try reopened.recordRulePackEventBatch(batch))
+        XCTAssertFalse(try reopened.recordRulePackEventBatch(batch))
+        XCTAssertEqual(try reopened.rulePackDeliveryStats(), RulePackDeliveryStats(droppedHits: 2, droppedKeys: 1))
+        events = try reopened.rulePackEvents()
+        XCTAssertEqual(events.count, 2)
+        XCTAssertEqual(events.first { $0.match == .suffix }?.count, 7)
+        XCTAssertEqual(events.first { $0.match == .suffix }?.id, 41)
+        XCTAssertEqual(events.first { $0.match == .exact }?.count, 8)
     }
 
     @MainActor
@@ -273,6 +376,91 @@ final class RulePackTests: XCTestCase {
         }
 
         try await waitUntil { completed }
+    }
+
+    @MainActor
+    func testOverrideAppearsOnlyAfterDatabaseCommit() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-override-failure-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+        _ = try db.raw("DROP TABLE rule_pack_overrides") { _ in 0 }
+
+        let exception = RulePackOverride(packID: "official.advertising", app: "com.apple.Safari",
+                                         host: "ads.example")
+        var result: Bool?
+        store.addOverride(exception) { result = $0 }
+
+        try await waitUntil { result != nil }
+        XCTAssertEqual(result, false)
+        XCTAssertTrue(store.overrides.isEmpty)
+        XCTAssertTrue(store.failureMessage?.contains("no such table") == true)
+    }
+
+    @MainActor
+    func testRepeatedOverrideReplacesAndDeleteRemovesItsWholeScope() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-override-dedupe-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        let first = RulePackOverride(packID: "official.advertising", app: "com.apple.Safari",
+                                     host: "ADS.EXAMPLE")
+        let second = RulePackOverride(packID: first.packID, app: "COM.APPLE.SAFARI",
+                                      host: "ads.example")
+        var added = 0
+        store.addOverride(first) { if $0 { added += 1 } }
+        try await waitUntil { added == 1 }
+        store.addOverride(second) { if $0 { added += 1 } }
+        try await waitUntil { added == 2 }
+
+        XCTAssertEqual(store.overrides, [second])
+        XCTAssertEqual(try db.sync { try $0.loadRulePackOverrides() }, [second])
+
+        let legacyJSON = String(decoding: try JSONEncoder().encode(first), as: UTF8.self)
+        _ = try db.raw(
+            "INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)",
+            [.text(first.id.uuidString), .text(legacyJSON), .int(1)]
+        ) { _ in 0 }
+        XCTAssertEqual(try db.sync { try $0.loadRulePackOverrides() }.count, 2)
+
+        var deleted: Bool?
+        store.deleteOverride(second) { deleted = $0 }
+        try await waitUntil { deleted != nil }
+        XCTAssertEqual(deleted, true)
+        XCTAssertTrue(store.overrides.isEmpty)
+        XCTAssertTrue(try db.sync { try $0.loadRulePackOverrides() }.isEmpty)
+    }
+
+    @MainActor
+    func testOverrideRemainsAfterDatabaseDeleteFails() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-override-delete-failure-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        let exception = RulePackOverride(packID: "official.advertising", app: "com.apple.Safari",
+                                         host: "ads.example")
+        var added: Bool?
+        store.addOverride(exception) { added = $0 }
+        try await waitUntil { added != nil }
+        XCTAssertEqual(added, true)
+        XCTAssertEqual(store.overrides, [exception])
+
+        _ = try db.raw("DROP TABLE rule_pack_overrides") { _ in 0 }
+        var deleted: Bool?
+        store.deleteOverride(exception) { deleted = $0 }
+
+        try await waitUntil { deleted != nil }
+        XCTAssertEqual(deleted, false)
+        XCTAssertEqual(store.overrides, [exception])
+        XCTAssertTrue(store.failureMessage?.contains("no such table") == true)
     }
 
     @MainActor
@@ -421,6 +609,49 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(draft.submitApp(installed: [safari], appsLoaded: true), .added("com.apple.Safari"))
         XCTAssertEqual(draft.configuration.apps, ["com.apple.Safari"])
         XCTAssertEqual(draft.typedApp, "")
+    }
+
+    func testEditorAcceptsExplicitBundleIdentityDuringIncompleteScan() {
+        var draft = RulePackEditorDraft(saved: RulePackConfiguration(packID: "official.advertising"),
+                                        intent: .activate)
+        draft.configuration.scope = .selectedApps
+
+        draft.typedApp = "com.apple.Safari"
+        XCTAssertEqual(draft.submitApp(installed: [], appsLoaded: false), .added("com.apple.Safari"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.Safari"])
+    }
+
+    func testEditorIncompleteScanAcceptsKnownCommandLineAgent() {
+        var draft = RulePackEditorDraft(saved: RulePackConfiguration(packID: "official.advertising"),
+                                        intent: .activate)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "claude"
+
+        XCTAssertEqual(draft.submitApp(installed: [], appsLoaded: false), .added("claude"))
+        XCTAssertEqual(draft.configuration.apps, ["claude"])
+    }
+
+    func testEditorIncompleteScanDoesNotGuessLowercaseDisplayNameIsAProcess() {
+        var draft = RulePackEditorDraft(saved: RulePackConfiguration(packID: "official.advertising"),
+                                        intent: .activate)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "zoom"
+
+        XCTAssertEqual(draft.submitApp(installed: [], appsLoaded: false), .loading)
+        XCTAssertEqual(draft.typedApp, "zoom")
+        XCTAssertTrue(draft.configuration.apps.isEmpty)
+    }
+
+    func testEditorIncompleteScanStillResolvesKnownDisplayName() {
+        let safari = InstalledApps.App(name: "Safari", bundleID: "com.apple.Safari",
+                                       path: "/System/Applications/Safari.app")
+        var draft = RulePackEditorDraft(saved: RulePackConfiguration(packID: "official.advertising"),
+                                        intent: .activate)
+        draft.configuration.scope = .selectedApps
+        draft.typedApp = "Safari"
+
+        XCTAssertEqual(draft.submitApp(installed: [safari], appsLoaded: false), .added("com.apple.Safari"))
+        XCTAssertEqual(draft.configuration.apps, ["com.apple.Safari"])
     }
 
     func testEditorExplicitSaveAndBroadeningDecision() {

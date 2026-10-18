@@ -12,8 +12,7 @@ struct RuleEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var appQuery = ""
     @State private var showAdvanced = false
-
-    private var apps: [InstalledApps.App] { InstalledApps.all() }
+    @State private var apps: [InstalledApps.App] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -135,6 +134,9 @@ struct RuleEditor: View {
         .padding(16)
         .frame(width: 540)
         .frame(minHeight: 520)
+        .task {
+            apps = await Task.detached(priority: .userInitiated) { InstalledApps.all() }.value
+        }
     }
 
     /// The rule, read back, above the fields that make it. An unfinished rule says so here rather than only at the

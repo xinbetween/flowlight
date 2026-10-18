@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.2, macOS 15 or later.
 
  On this page
 
@@ -887,7 +887,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1617,8 +1617,22 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.15.1
+ 0.15.2
 October 18, 2026Latest
+
+ Repair managed-pack activity on upgraded databases. Flowlight now verifies the physical
+ activity key during startup and atomically repairs stale schemas, preserving existing rows before any
+ blocked connection is recorded.
+
+ Keep pack decisions distinct and exactly once. Exact and suffix matches retain separate
+ provenance, repeated decisions aggregate correctly, and retried extension deliveries do not double count.
+
+ Keep editor feedback truthful under partial failures. Incomplete app scans still accept
+ explicit bundle identifiers, previews expire when traffic or policies change, and exceptions appear only after their
+ database write succeeds with a concrete error when it does not.
+
+ 0.15.1
+October 18, 2026
 
  Keep managed-pack changes safely in review. Opening or cancelling an off pack no longer
  activates it, and configuration changes persist only after an explicit Save succeeds.
