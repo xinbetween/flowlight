@@ -49,7 +49,6 @@ private struct RulePacksContent: View {
             RulePackEditor(pack: request.pack, saved: packs.configuration(for: request.pack.id),
                            intent: request.intent, packs: packs, rules: monitor.rules)
         }
-        .onChange(of: packs.version) { _, _ in saveErrors.removeAll() }
     }
 
     private var explanation: some View {
@@ -79,6 +78,7 @@ private struct RulePacksContent: View {
                 Spacer(minLength: 8)
                 Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
                     if enabled {
+                        saveErrors[pack.id] = nil
                         editor = RulePackEditorRequest(pack: pack, intent: .activate)
                     } else {
                         var changed = configuration
@@ -102,6 +102,7 @@ private struct RulePacksContent: View {
                 }
                 Spacer()
                 Button(L("Review…")) {
+                    saveErrors[pack.id] = nil
                     editor = RulePackEditorRequest(pack: pack, intent: .review)
                 }.disabled(isSaving)
             }
