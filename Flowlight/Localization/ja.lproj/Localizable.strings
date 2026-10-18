@@ -1157,7 +1157,42 @@
 "and %lld more" = "ほか %lld 件";
 "Tested against traffic back to %@." = "%@ 以降のトラフィックでテストしました。";
 
+/* UI/RulePacksView.swift */
+"%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full." = "拡張機能の容量制限付きキューが満杯だったため、管理対象パックの判定 %lld 件がアクティビティから除外されました。";
+"Network ad and tracker blocking" = "ネットワークで広告とトラッカーをブロック";
+"Official packs refuse connections to known destinations across apps. They are off until you enable them and need the Network Extension; they cannot remove page layout gaps, browser overlays, scripted popups, or native app windows." = "公式パックは、アプリをまたいで既知の接続先への接続を拒否します。有効にするまではオフで、ネットワーク拡張が必要です。ページレイアウトの空白、ブラウザのオーバーレイ、スクリプトによるポップアップ、アプリ固有のウインドウは削除できません。";
+"Every app" = "すべてのアプリ";
+"%lld selected apps" = "選択したアプリ %lld 個";
+"%lld blocked" = "%lld 件をブロック";
+"%lld exceptions" = "例外 %lld 件";
+"Review…" = "確認…";
+"Official · Built into Flowlight · pack v%@ · %@" = "公式 · Flowlight 内蔵 · パック v%@ · %@";
+"Applying…" = "適用中…";
+"Watching only" = "監視のみ";
+"Blocking" = "ブロック中";
+"Needs extension update" = "拡張機能の更新が必要";
+"Needs review" = "確認が必要";
+"Test against recent traffic" = "最近のトラフィックでテスト";
+"Apply this pack to every app?" = "このパックをすべてのアプリに適用しますか？";
+"Apply to every app" = "すべてのアプリに適用";
+"This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed." = "ブロック対象を選択したアプリから、この Mac 上のすべてのアプリへ広げます。システムに不可欠な通信は引き続き許可されます。";
+"Scope" = "範囲";
+"Only selected apps" = "選択したアプリのみ";
+"App name, bundle identifier, or process" = "アプリ名、バンドル識別子、またはプロセス";
+"Recent-traffic impact" = "最近のトラフィックへの影響";
+"No retained traffic was available to test." = "テストに使える保持済みトラフィックがありませんでした。";
+"Would have changed nothing across %lld retained connections." = "保持済みの %lld 接続には何も変更を加えなかったはずです。";
+"Would have refused %lld of %lld connections from %lld apps (%@)." = "%3$lld 個のアプリによる %2$lld 接続のうち %1$lld 件を拒否したはずです（%4$@）。";
+"%@ · %@ pack v%@ matched %@ · %lld connections" = "%1$@ · %2$@パック v%3$@ が %4$@ に一致 · %5$lld 接続";
+"Allow for %@" = "%@ では許可";
+"Undo" = "取り消す";
+"Allow…" = "許可…";
+"Edit as normal rule…" = "通常のルールとして編集…";
+
 /* UI/RulesView.swift */
+"Packs" = "パック";
+"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "ルールの判断とパックによるブロックの要約がここに表示されます。広告だらけのページがアラートだらけにならないよう、パックのアクティビティはまとめられます。";
+"Managed packs" = "管理対象パック";
 "What they did" = "判断の記録";
 "Paused until %@" = "%@ まで一時停止中";
 "%lld in force" = "%lld 件が有効";
@@ -1184,7 +1219,6 @@
 "Browse Templates…" = "テンプレートを見る…";
 "Write One…" = "作成する…";
 "Nothing yet" = "まだ何もありません";
-"Every connection a rule decides lands here — the refusals, and the exceptions that let something through. The second half is how \"why is this getting through?\" stays answerable." = "ルールが判断した接続はすべてここに記録されます。拒否したものと、通過を許した例外の両方です。後者があることで、「なぜこれが通っているのか」に答えられる状態が保たれます。";
 "Today" = "今日";
 "Yesterday" = "昨日";
 "A rule since deleted" = "すでに削除されたルール";
@@ -1305,6 +1339,15 @@
 "%@ — the language is saved, so quitting and opening Flowlight again will finish the change." = "%@ — 言語は保存されているため、Flowlight を終了して開き直せば変更が完了します。";
 
 /* UI/SharedStrings.swift */
+"Advertising" = "広告";
+"Known advertising delivery and auction hosts across apps." = "アプリをまたいで使われる既知の広告配信・広告オークションホスト。";
+"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "接続をブロックしても、ページレイアウトの空白、ファーストパーティ広告、ブラウザやアプリが表示するオーバーレイは削除できません。";
+"Cross-site tracking" = "サイト横断トラッキング";
+"Common analytics, session replay, and cross-site measurement hosts." = "一般的なアクセス解析、セッションリプレイ、サイト横断測定のホスト。";
+"Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "一部のアプリは同じプロバイダを機能フラグにも使っています。ホストが利用できない場合、内蔵の既定値に切り替わることがあります。";
+"Privacy and telemetry" = "プライバシーとテレメトリ";
+"Crash reporting, install attribution, and audited Apple advertising and analytics hosts." = "クラッシュ報告、インストール計測、監査済みの Apple 広告・解析ホスト。";
+"Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed." = "クラッシュ報告は開発者による不具合修正に役立ちます。Apple アカウント、プッシュ通知、アップデート、証明書、iCloud に不可欠な通信は引き続き許可されます。";
 "Any agent" = "すべてのエージェント";
 "%@: no %@" = "%@: %@ なし";
 "everything from %@" = "%@ のすべて";

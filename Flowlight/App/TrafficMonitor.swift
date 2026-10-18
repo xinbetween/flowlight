@@ -54,6 +54,8 @@ final class TrafficMonitor: ObservableObject {
     let exporter = ExportController()
     /// Everything Flowlight has been told to block or allow, and what those rules have done.
     let rules = RuleStore()
+    /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
+    let rulePacks = RulePackStore()
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
     let guardrails = GuardrailStore()
     /// Advisory inspection plugins: official built-ins first, installed third-party packs later.
@@ -153,6 +155,13 @@ final class TrafficMonitor: ObservableObject {
         Task { await localRisk.recover() }
         rules.onChange = { [weak self] set in self?.source?.setRules(set) }
         rules.attach(db: db)
+        rulePacks.onChange = { [weak self] snapshot in
+            guard let self else { return }
+            if self.source is ExtensionTrafficSource { self.rulePacks.markApplying() }
+            else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
+            self.source?.setRulePacks(snapshot)
+        }
+        rulePacks.attach(db: db)
         // A rule that names a path is carried out by the proxy, which reads its list fresh on every connection.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
         inspection.onRuleRefusal = { [weak self] event in
@@ -365,6 +374,12 @@ final class TrafficMonitor: ObservableObject {
             extensionSource.onRuleDecisions = { [weak self] events in
                 Task { @MainActor in self?.rules.record(events) }
             }
+            extensionSource.onRulePackEvents = { [weak self] batch, completion in
+                self?.recordRulePackEvents(batch, completion: completion) ?? completion(false)
+            }
+            extensionSource.onRulePackStatus = { [weak self] result in
+                Task { @MainActor in self?.updateRulePackStatus(result) }
+            }
             extensionSource.onRepairRequested = { [weak self] in
                 Task { @MainActor in self?.repairExtensionVersion() }
             }
@@ -382,6 +397,35 @@ final class TrafficMonitor: ObservableObject {
         })
         pushEnforcement()
         newSource.setRules(rules.ruleSet)
+        newSource.setRulePacks(rulePacks.snapshot)
+        if rulePacks.hasEnabledPacks, !(newSource is ExtensionTrafficSource) {
+            rulePacks.updateStatus(.watchingOnly)
+        }
+    }
+
+    private func updateRulePackStatus(_ result: RulePackApplyResult) {
+        switch result.status {
+        case .accepted:
+            rulePacks.updateStatus(.applying)
+        case .committed:
+            rulePacks.updateStatus(.enforcing)
+        case .cleared:
+            rulePacks.updateStatus(.off)
+        case .incompatible:
+            rulePacks.updateStatus(.incompatible(result.detail))
+        case .invalid, .stale:
+            rulePacks.updateStatus(.failed(result.detail))
+        }
+    }
+
+    nonisolated private func recordRulePackEvents(_ batch: RulePackEventBatch,
+                                                   completion: @escaping (Bool) -> Void) {
+        Task { @MainActor in
+            self.rulePacks.record(batch) { [weak self] committed in
+                if committed { self?.dataVersion += 1 }
+                completion(committed)
+            }
+        }
     }
 
     /// The extension source has been refused often enough that plain redialling isn't the answer. Ask macOS which
@@ -610,6 +654,9 @@ final class TrafficMonitor: ObservableObject {
             for hour in completed.completedHours { try engine.hourCompleted(hour) }
             for day in completed.completedDays { try engine.dayCompleted(day) }
             try engine.evaluateIdleTraffic()
+            let eventCutoff = Date().addingTimeInterval(-max(1, retentionHours) * 3600)
+            try db.pruneRuleEvents(before: eventCutoff)
+            try db.pruneRulePackEvents(before: eventCutoff)
             let coverage = try db.coverage(since: Date().addingTimeInterval(-3600))
             Task { @MainActor in
                 self?.coverage = coverage
@@ -663,6 +710,7 @@ final class TrafficMonitor: ObservableObject {
                 self?.perSecond.removeAll()
                 self?.sessionIn = 0
                 self?.sessionOut = 0
+                self?.rulePacks.clearActivity()
                 self?.dataVersion += 1
                 self?.refreshAlertCount()
             }

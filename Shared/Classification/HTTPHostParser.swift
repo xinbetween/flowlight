@@ -14,7 +14,7 @@ enum HTTPHostParser {
                 } else if let portColon = host.lastIndex(of: ":") {
                     host = String(host[..<portColon])
                 }
-                return host.isEmpty ? nil : host
+                return HostCanonicalizer.host(host)
             }
         }
         return nil

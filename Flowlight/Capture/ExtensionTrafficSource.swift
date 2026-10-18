@@ -27,6 +27,12 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private var ruleSet = RuleSet()
     /// Connections a rule decided, refusals and relaxations alike.
     var onRuleDecisions: (([RuleEvent]) -> Void)?
+    /// Aggregated managed-pack decisions. These never enter the ordinary block-alert path.
+    var onRulePackEvents: ((RulePackEventBatch, @escaping (Bool) -> Void) -> Void)?
+    var onRulePackStatus: ((RulePackApplyResult) -> Void)?
+    private var rulePackSnapshot: RulePackSnapshot?
+    /// Invalidates every callback from a superseded desired snapshot or XPC connection.
+    private var rulePackPushEpoch: UInt64 = 0
     /// The escalation ladder for a connection that keeps failing. Only touched on the main thread, like
     /// `connection`, because a decision made from two queues at once is no decision at all.
     private var recovery = ExtensionRecovery()
@@ -72,6 +78,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         let superseded = connection
         connection = nil
         superseded?.invalidate()
+        rulePackPushEpoch &+= 1
 
         let connection = NSXPCConnection(machServiceName: FlowlightConstants.machServiceName, options: [])
         connection.remoteObjectInterface = NSXPCInterface(with: FlowlightProviderXPC.self)
@@ -102,8 +109,14 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
                                              : L("Connected to filter extension %@ — no traffic from it yet", version))
                 self.startHeartbeat()
-                self.pushEnforcement()
-                self.pushRules()
+                self.reportPackStatus(.init(status: .accepted, detail: "Synchronizing managed packs"))
+                // Initial synchronization is ordered: explicit user allows must exist before either managed packs or
+                // AgentPolicy can block. The extension stays fail-open until the final pack commit/clear acknowledges.
+                self.pushRules {
+                    self.pushEnforcement {
+                        self.pushRulePacks()
+                    }
+                }
                 self.checkFilterState(on: connection, version: version)
             }
         }
@@ -200,11 +213,16 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
 
     /// Always on the main thread, like `connect()`, and always the whole list: the extension holds no state of its
     /// own about this, so one message either describes the current rules completely or turns blocking off.
-    private func pushEnforcement() {
+    private func pushEnforcement(completion: (() -> Void)? = nil) {
         guard let connection else { return }
         let payload = enforcement.isEmpty ? Data() : BlockCoding.encode(enforcement)
         let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
-        proxy?.setEnforcement(payload: payload) { _ in }
+        proxy?.setEnforcement(payload: payload) { _ in
+            DispatchQueue.main.async { [weak self, weak connection] in
+                guard let self, let connection, self.connection === connection else { return }
+                completion?()
+            }
+        }
     }
 
     func setRules(_ rules: RuleSet) {
@@ -215,11 +233,149 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         }
     }
 
-    private func pushRules() {
+    private func pushRules(completion: (() -> Void)? = nil) {
         guard let connection else { return }
         let payload = ruleSet.rules.isEmpty && ruleSet.pausedUntil == nil ? Data() : BlockCoding.encode(ruleSet)
         let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
-        proxy?.setRules(payload: payload) { _ in }
+        proxy?.setRules(payload: payload) { _ in
+            DispatchQueue.main.async { [weak self, weak connection] in
+                guard let self, let connection, self.connection === connection else { return }
+                completion?()
+            }
+        }
+    }
+
+    func setRulePacks(_ snapshot: RulePackSnapshot?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.rulePackSnapshot = snapshot
+            self.rulePackPushEpoch &+= 1
+            self.pushRulePacks()
+        }
+    }
+
+    private func pushRulePacks() {
+        guard let connection else { return }
+        let epoch = rulePackPushEpoch
+        let desiredGeneration = rulePackSnapshot?.generation
+        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self, weak connection] error in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection,
+                      self.rulePackPushEpoch == epoch else { return }
+                self.reportPackStatus(.init(status: .invalid, detail: error.localizedDescription))
+            }
+        } as? FlowlightProviderXPC
+        proxy?.rulePackHello(appProtocol: Int(RulePackSnapshot.protocolVersion)) { [weak self, weak connection] data in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection,
+                      self.rulePackPushEpoch == epoch,
+                      self.rulePackSnapshot?.generation == desiredGeneration,
+                      let handshake = BlockCoding.decode(RulePackHandshake.self, from: data) else { return }
+                guard handshake.protocolVersion == RulePackSnapshot.protocolVersion else {
+                    self.reportPackStatus(.init(status: .incompatible, activeDigest: handshake.activeDigest,
+                                                detail: "The installed extension does not support this pack format."))
+                    return
+                }
+                guard let snapshot = self.rulePackSnapshot else {
+                    let request = RulePackClearRequest(expectedActiveGeneration: handshake.activeGeneration)
+                    proxy?.clearRulePacks(payload: BlockCoding.encode(request)) { [weak self, weak connection] data in
+                        DispatchQueue.main.async {
+                            guard let self, let connection, self.connection === connection,
+                                  self.rulePackPushEpoch == epoch, self.rulePackSnapshot == nil else { return }
+                            self.decodePackStatus(data)
+                        }
+                    }
+                    return
+                }
+                guard handshake.activeDigest != snapshot.digest else {
+                    self.reportPackStatus(.init(status: .committed, generation: handshake.activeGeneration,
+                                                activeDigest: handshake.activeDigest,
+                                                activePacks: snapshot.configurations.filter(\.enabled).count))
+                    return
+                }
+                let payload = BlockCoding.encode(snapshot)
+                let chunkSize = 64 * 1_024
+                let chunks = stride(from: 0, to: payload.count, by: chunkSize).map {
+                    payload.subdata(in: $0..<min(payload.count, $0 + chunkSize))
+                }
+                let header = RulePackTransferHeader(protocolVersion: RulePackSnapshot.protocolVersion,
+                                                    generation: snapshot.generation, digest: snapshot.digest,
+                                                    totalBytes: payload.count, chunks: chunks.count,
+                                                    expectedActiveGeneration: handshake.activeGeneration)
+                proxy?.beginRulePack(payload: BlockCoding.encode(header)) { [weak self, weak connection] reply in
+                    DispatchQueue.main.async {
+                        guard let self, let connection, self.connection === connection,
+                              self.rulePackPushEpoch == epoch,
+                              self.rulePackSnapshot?.generation == snapshot.generation else { return }
+                        guard BlockCoding.decode(RulePackApplyResult.self, from: reply)?.status == .accepted else {
+                            self.decodePackStatus(reply)
+                            return
+                        }
+                        self.appendPackChunks(chunks, index: 0, snapshot: snapshot, epoch: epoch,
+                                              connection: connection, proxy: proxy)
+                    }
+                }
+            }
+        }
+    }
+
+    private func appendPackChunks(_ chunks: [Data], index: Int, snapshot: RulePackSnapshot, epoch: UInt64,
+                                  connection: NSXPCConnection, proxy: FlowlightProviderXPC?) {
+        guard self.connection === connection, rulePackPushEpoch == epoch,
+              rulePackSnapshot?.generation == snapshot.generation else { return }
+        guard index < chunks.count else {
+            proxy?.commitRulePack(generation: snapshot.generation.uuidString) { [weak self, weak connection] data in
+                DispatchQueue.main.async {
+                    guard let self, let connection, self.connection === connection,
+                          self.rulePackPushEpoch == epoch,
+                          self.rulePackSnapshot?.generation == snapshot.generation else { return }
+                    self.decodePackStatus(data)
+                }
+            }
+            return
+        }
+        proxy?.appendRulePack(generation: snapshot.generation.uuidString, index: index, payload: chunks[index]) {
+            [weak self, weak connection] accepted in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection,
+                      self.rulePackPushEpoch == epoch,
+                      self.rulePackSnapshot?.generation == snapshot.generation else { return }
+                guard accepted else {
+                    self.reportPackStatus(.init(status: .invalid, generation: snapshot.generation,
+                                                detail: "The extension rejected pack chunk \(index + 1)."))
+                    return
+                }
+                self.appendPackChunks(chunks, index: index + 1, snapshot: snapshot, epoch: epoch,
+                                      connection: connection, proxy: proxy)
+            }
+        }
+    }
+
+    private func decodePackStatus(_ data: Data) {
+        guard let status = BlockCoding.decode(RulePackApplyResult.self, from: data) else {
+            reportPackStatus(.init(status: .invalid, detail: "The extension returned an unreadable pack status."))
+            return
+        }
+        if status.status == .stale {
+            reportPackStatus(.init(status: .accepted, generation: status.generation,
+                                   activeDigest: status.activeDigest, detail: status.detail))
+            DispatchQueue.main.async { [weak self] in self?.pushRulePacks() }
+        } else {
+            reportPackStatus(status)
+        }
+    }
+
+    private func reportPackStatus(_ status: RulePackApplyResult) {
+        DispatchQueue.main.async { [weak self] in self?.onRulePackStatus?(status) }
+    }
+
+    func rulePackEvents(payload: Data, reply: @escaping (Bool) -> Void) {
+        guard let batch = BlockCoding.decode(RulePackEventBatch.self, from: payload),
+              let onRulePackEvents else {
+            reply(false)
+            return
+        }
+        onRulePackEvents(batch, reply)
     }
 
     func ruleDecisions(payload: Data, reply: @escaping () -> Void) {

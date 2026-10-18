@@ -20,17 +20,17 @@
 	     content filter at a time and holds superseded copies until a restart, so changing the extension's version
 	     on every app release forced a reboot each time. Kept fixed, an app-only update ships the version macOS
 	     already runs and replaces nothing. Bump these two ONLY when the FlowlightExtension binary itself changes
-	     (and expect one replacement when you do). Kept at the 0.10.1 values so upgrades from 0.10.1 need no reboot. -->
+	     (and expect one replacement when you do). 0.15.0 adds managed rule-pack enforcement and IPC. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.10.1</string>
+	<string>0.15.0</string>
 	<key>CFBundleVersion</key>
-	<string>22</string>
+	<string>23</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>FLAppGroupIdentifier</key>
 	<string>$(TeamIdentifierPrefix)com.flowlight.shared</string>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Flowlight uses a network filter extension to attribute every connection to the app that made it. It records only metadata, never blocks traffic, and nothing leaves your Mac.</string>
+	<string>Flowlight uses a network filter extension to attribute connections to apps and can refuse only the rules and managed packs you enable. It records metadata locally, and nothing leaves your Mac.</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEMachServiceName</key>

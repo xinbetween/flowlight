@@ -25,7 +25,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Flowlight installs a network filter extension so it can attribute every connection to the app that made it. It records only metadata, never blocks traffic, and nothing leaves your Mac.</string>
+	<string>Flowlight installs a network filter extension to attribute connections to apps and can refuse only the rules and managed packs you enable. It records metadata locally, and nothing leaves your Mac.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Flowlight looks for AI agent configuration (skills, MCP servers, hooks) in the project folder you pick, so it can show what each agent is set up to do. It reads only those config files, and nothing leaves your Mac.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

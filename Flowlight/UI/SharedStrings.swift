@@ -11,6 +11,20 @@ import Foundation
 /// but `scripts/i18n_extract.py` reads keys out of the source, so a key that is only ever a variable never
 /// reaches the catalog and never gets translated. Spelling them out is what puts them in front of a translator.
 
+private var builtInRulePackLocalizationAnchors: [String] {
+    [
+        L("Advertising"),
+        L("Known advertising delivery and auction hosts across apps."),
+        L("Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app."),
+        L("Cross-site tracking"),
+        L("Common analytics, session replay, and cross-site measurement hosts."),
+        L("Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable."),
+        L("Privacy and telemetry"),
+        L("Crash reporting, install attribution, and audited Apple advertising and analytics hosts."),
+        L("Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed."),
+    ]
+}
+
 extension Guardrail {
     /// `title`, in the reader's language. The parts that name things the user typed — an agent, a server, a
     /// tool, a resource — stay exactly as they were typed.

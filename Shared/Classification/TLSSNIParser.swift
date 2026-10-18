@@ -23,7 +23,7 @@ enum TLSSNIParser {
                     let nameBytes = b[(i + 9)..<(i + 9 + nameLen)]
                     if nameBytes.allSatisfy({ isHostnameByte($0) }), nameBytes.contains(UInt8(ascii: ".")),
                        let name = String(bytes: nameBytes, encoding: .ascii) {
-                        return name.lowercased()
+                        return HostCanonicalizer.host(name)
                     }
                 }
             }
@@ -65,7 +65,7 @@ enum TLSSNIParser {
                     guard let nameType = u8(), let nameLen = u16() else { return nil }
                     guard i + nameLen <= b.count else { return nil }
                     if nameType == 0 {
-                        return String(bytes: b[i..<(i + nameLen)], encoding: .ascii)?.lowercased()
+                        return String(bytes: b[i..<(i + nameLen)], encoding: .ascii).flatMap(HostCanonicalizer.host)
                     }
                     i += nameLen
                 }

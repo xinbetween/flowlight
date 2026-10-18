@@ -390,6 +390,34 @@ open build/Build/Products/Release/Flowlight.app</pre>
         of them says the rule is safe. The screen also names the oldest traffic it could see: a rule tested against two hours of
         history has been tested against two hours of history.</p>
 
+      <h3>Managed ad and tracker packs</h3>
+      <p><strong>Rules › Packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
+        advertising delivery and auction hosts; <strong>Cross-site tracking</strong> covers common analytics, session replay and
+        cross-site measurement hosts; and <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and
+        audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.
+        Nothing changes on an update until you choose a pack and enable it.</p>
+      <p><strong>Each pack has its own scope.</strong> Apply it globally to every app, or only to selected applications. Blocking needs
+        the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. Essential
+        system traffic remains allowed — including the services that carry Apple accounts, push notifications, software updates,
+        certificate checks and iCloud — even when a pack applies globally.</p>
+      <p><strong>Preview before enforcing.</strong> <em>Test against recent traffic</em> replays the proposed pack and scope against up
+        to seven days of retained traffic. It reports only decisions that would actually change after ordinary rules, the global pause,
+        existing packs and agent policies are taken into account: the affected apps and destinations, connection counts, and bytes.
+        "Would have changed nothing" is kept distinct from having no retained traffic to test.</p>
+      <p><strong>Activity stays aggregated and explainable.</strong> Repeated blocks are grouped so a page full of ads does not become
+        a page full of alerts. Each row still names the app and destination, the list entry that matched, the pack and its version, and
+        the number of connections. <strong>Allow for this app</strong> creates a pack-specific app-and-destination exception; it does not
+        silently disable that destination for other apps or remove it from another pack.</p>
+      <p><strong>The ordinary controls still win.</strong> An ordinary allow rule is the universal escape hatch and can allow traffic a
+        pack would otherwise refuse. The global <strong>Pause Blocking</strong> control pauses managed packs along with the rest of
+        connection blocking. Pack exceptions are narrower conveniences; ordinary rules remain the place for a deliberate policy that
+        should apply beyond one pack.</p>
+      <p><strong>This is hostname-level network blocking, not content filtering.</strong> A Network Extension can refuse a connection,
+        but it cannot edit what a browser or app draws. Packs therefore cannot remove first-party ads, DOM or layout gaps left behind by
+        blocked content, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and
+        shared CDNs can hide a hostname or make one hostname serve unrelated content, limiting what a destination list can cover safely.
+        Cosmetic popup filtering needs a later browser extension that can inspect and change the page itself.</p>
+
       <h2 id="allowlists">Allowlists</h2>
       <p>Select an agent in <strong>AI Agents</strong> and use <strong>Allowlist</strong> in its detail to say where it may connect. Enter domains
         (subdomains included), IP addresses or CIDR ranges, or pick a preset: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules or
@@ -404,7 +432,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         to the list in one click. The agent's next attempt goes through.</p>
       <p><strong>It needs the Network Extension.</strong> Refusing a connection means sitting in its path, which the nettop sampler
         cannot do — Capture will say so rather than offer a switch that does nothing.</p>
-      <p>Some things are never refused, whatever a list says: your local network, DNS, Apple's own services, and Flowlight's own
+      <p>Some things are never refused, whatever a list says: your local network, DNS, essential Apple system services, and Flowlight's own
         traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
         Enforcement also lapses a few seconds after Flowlight stops running — a refusal nobody can see is worse than none, and the way
         to undo one lives in the app.</p>
