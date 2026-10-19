@@ -225,6 +225,11 @@ struct RulePackEventRecord: Identifiable, Sendable, Hashable {
 /// flows_1s → agg_1m (complete minutes) → agg_1h / agg_1d (folded from immutable minute rows).
 final class TrafficDatabase: @unchecked Sendable {
     static let tables = ["flows_1s", "agg_1m", "agg_1h", "agg_1d"]
+    private static let rulePackEventKey = [
+        "bucket", "pack_id", "pack_version", "entry_id", "category", "match", "action",
+        "bundle_id", "app_name", "agent", "agent_name", "host", "matched_host", "port",
+    ]
+    private static let rulePackEventKeySQL = rulePackEventKey.joined(separator: ", ")
     let queue = DispatchQueue(label: "flowlight.db", qos: .userInitiated)
     private let conn: SQLiteConnection
     let url: URL
@@ -490,8 +495,7 @@ final class TrafficDatabase: @unchecked Sendable {
             count INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL,
             bundle_id TEXT NOT NULL, app_name TEXT NOT NULL, agent TEXT NOT NULL, agent_name TEXT NOT NULL,
             host TEXT NOT NULL, matched_host TEXT NOT NULL, port INTEGER NOT NULL,
-            UNIQUE(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id, app_name,
-                   agent, agent_name, host, matched_host, port));
+            UNIQUE(\(Self.rulePackEventKeySQL)));
         CREATE TABLE IF NOT EXISTS rule_pack_event_watermarks (
             delivery_session TEXT PRIMARY KEY, sequence INTEGER NOT NULL, received INTEGER NOT NULL,
             dropped_hits INTEGER NOT NULL, dropped_keys INTEGER NOT NULL);
@@ -502,7 +506,16 @@ final class TrafficDatabase: @unchecked Sendable {
             "SELECT watermark FROM rollup_state WHERE tier = 'schema.rulePackEventKey'",
             map: { $0.int(0) }
         ).first ?? 0
-        if packEventKeyVersion < 2 {
+        let packEventIndexes = try conn.query("PRAGMA index_list(rule_pack_event_rollups)") {
+            (name: $0.text(1), unique: $0.int(2) == 1, partial: $0.int(4) == 1)
+        }
+        let hasCurrentPackEventKey = try packEventIndexes
+            .filter { $0.unique && !$0.partial }
+            .contains { index in
+                let quoted = index.name.replacingOccurrences(of: "'", with: "''")
+                return try conn.query("PRAGMA index_info('\(quoted)')") { $0.text(2) } == Self.rulePackEventKey
+            }
+        if packEventKeyVersion < 2 || !hasCurrentPackEventKey {
             let oldPackEventColumns = Set(try conn.query("PRAGMA table_info(rule_pack_event_rollups)") { $0.text(1) })
             let oldMatch = oldPackEventColumns.contains("match") ? "match" : "'suffix'"
             try conn.transaction {
@@ -1056,14 +1069,23 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func saveRulePackOverride(_ override: RulePackOverride) throws {
         let json = String(decoding: try JSONEncoder().encode(override), as: UTF8.self)
-        try conn.run("""
-            INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)
-            ON CONFLICT(id) DO UPDATE SET override = excluded.override, updated = excluded.updated
-            """, [.text(override.id.uuidString), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        try conn.transaction {
+            for existing in try loadRulePackOverrides().filter({ $0.id != override.id && $0.hasSameScope(as: override) }) {
+                try conn.run("DELETE FROM rule_pack_overrides WHERE id = ?", [.text(existing.id.uuidString)])
+            }
+            try conn.run("""
+                INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)
+                ON CONFLICT(id) DO UPDATE SET override = excluded.override, updated = excluded.updated
+                """, [.text(override.id.uuidString), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        }
     }
 
-    func deleteRulePackOverride(_ id: UUID) throws {
-        try conn.run("DELETE FROM rule_pack_overrides WHERE id = ?", [.text(id.uuidString)])
+    func deleteRulePackOverride(_ override: RulePackOverride) throws {
+        try conn.transaction {
+            for existing in try loadRulePackOverrides().filter({ $0.hasSameScope(as: override) }) {
+                try conn.run("DELETE FROM rule_pack_overrides WHERE id = ?", [.text(existing.id.uuidString)])
+            }
+        }
     }
 
     /// Commits a retryable extension delivery exactly once. One monotonic watermark per extension process and the
@@ -1103,8 +1125,7 @@ final class TrafficDatabase: @unchecked Sendable {
             (bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
              bundle_id, app_name, agent, agent_name, host, matched_host, port)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(bucket, pack_id, pack_version, entry_id, category, match, action, bundle_id, app_name,
-                    agent, agent_name, host, matched_host, port) DO UPDATE SET
+        ON CONFLICT(\(Self.rulePackEventKeySQL)) DO UPDATE SET
             count = count + excluded.count,
             first_at = MIN(first_at, excluded.first_at),
             last_at = MAX(last_at, excluded.last_at)

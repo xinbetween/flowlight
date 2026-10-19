@@ -17,41 +17,87 @@ enum InstalledApps {
         var bluetoothPurpose: String?
     }
 
-    private static let lock = NSLock()
-    private static var cached: [App]?
+    struct ScanResult: Sendable {
+        var apps: [App]
+        var complete: Bool
+    }
+
+    private static let condition = NSCondition()
+    private static var cached: ScanResult?
+    private static var scanning = false
 
     /// Where applications live. The system folder is included because Safari and Mail are perfectly reasonable
     /// things to focus on, and they aren't in /Applications.
     private static var searchPaths: [String] {
-        ["/Applications", "/Applications/Utilities", "/System/Applications", "/System/Applications/Utilities",
-         NSHomeDirectory() + "/Applications"]
+        ["/Applications", "/System/Applications", NSHomeDirectory() + "/Applications"]
     }
 
-    /// Scanned once and kept. A Mac doesn't gain applications while a popover is open, and re-reading several
-    /// hundred Info.plists on every keystroke would be felt.
-    static func all() -> [App] {
-        lock.lock()
-        if let cached { lock.unlock(); return cached }
-        lock.unlock()
+    /// A complete catalog is retained for synchronous lookups. Callers that can be first to ask load off the main
+    /// actor; a partial scan is returned to that caller but never poisons every later lookup.
+    static func all() -> [App] { scan().apps }
 
+    static func scan(refresh: Bool = false) -> ScanResult {
+        cachedScan(refresh: refresh) { scan(in: searchPaths) }
+    }
+
+    static func cachedScan(refresh: Bool = false, _ load: () -> ScanResult) -> ScanResult {
+        condition.lock()
+        if !refresh, let cached { condition.unlock(); return cached }
+        if scanning {
+            repeat { condition.wait() } while scanning
+            if let cached { condition.unlock(); return cached }
+        }
+        scanning = true
+        condition.unlock()
+
+        let result = load()
+        condition.lock()
+        if result.complete { cached = result }
+        scanning = false
+        condition.broadcast()
+        condition.unlock()
+        return result
+    }
+
+    static func resetCacheForTesting() {
+        condition.lock()
+        cached = nil
+        condition.unlock()
+    }
+
+    static func scan(in searchPaths: [String], manager: FileManager = .default) -> ScanResult {
         var found: [String: App] = [:]
-        let manager = FileManager.default
+        var complete = true
         for directory in searchPaths {
-            guard let entries = try? manager.contentsOfDirectory(atPath: directory) else { continue }
-            for entry in entries where entry.hasSuffix(".app") {
-                let path = directory + "/" + entry
-                guard let bundle = Bundle(path: path), let id = bundle.bundleIdentifier, !id.isEmpty else { continue }
+            guard manager.fileExists(atPath: directory) else { continue }
+            guard let enumerator = manager.enumerator(
+                at: URL(fileURLWithPath: directory),
+                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+                options: [.skipsHiddenFiles],
+                errorHandler: { _, _ in complete = false; return true }
+            ) else {
+                complete = false
+                continue
+            }
+            for case let url as URL in enumerator {
+                guard url.pathExtension.caseInsensitiveCompare("app") == .orderedSame else { continue }
+                enumerator.skipDescendants()
+                guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !id.isEmpty else {
+                    continue
+                }
                 let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
-                    ?? String(entry.dropLast(4))
+                    ?? url.deletingPathExtension().lastPathComponent
                 let purpose = (bundle.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "NSBluetoothPeripheralUsageDescription") as? String)
-                found[id] = App(name: name, bundleID: id, path: path, bluetoothPurpose: purpose)
+                found[id] = App(name: name, bundleID: id, path: url.path, bluetoothPurpose: purpose)
             }
         }
-        let sorted = found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        lock.lock(); cached = sorted; lock.unlock()
-        return sorted
+        let result = ScanResult(
+            apps: found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+            complete: complete && !found.isEmpty
+        )
+        return result
     }
 
     /// The applications built to use Bluetooth, as they say so themselves in their Info.plist.

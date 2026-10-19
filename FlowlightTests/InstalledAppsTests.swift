@@ -33,6 +33,56 @@ final class InstalledAppsTests: XCTestCase {
     func testBlankInputIsRefused() {
         XCTAssertNil(InstalledApps.target(forTyped: "   ", apps: apps))
     }
+
+    func testPartialScanDoesNotPoisonTheCompleteCache() {
+        InstalledApps.resetCacheForTesting()
+        defer { InstalledApps.resetCacheForTesting() }
+        let partial = InstalledApps.ScanResult(apps: [apps[0]], complete: false)
+        let complete = InstalledApps.ScanResult(apps: apps, complete: true)
+        var loads = 0
+
+        XCTAssertEqual(InstalledApps.cachedScan { loads += 1; return partial }.apps, [apps[0]])
+        XCTAssertEqual(InstalledApps.cachedScan { loads += 1; return complete }.apps, apps)
+        XCTAssertEqual(InstalledApps.cachedScan { loads += 1; return partial }.apps, apps)
+        XCTAssertEqual(loads, 2)
+    }
+
+    func testMalformedNestedAppDoesNotMakeTheCatalogIncomplete() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("installed-apps-broken-\(UUID().uuidString)")
+        let valid = root.appendingPathComponent("Setapp/Sample.app/Contents")
+        let broken = root.appendingPathComponent("Setapp/Broken.app")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: valid, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: broken, withIntermediateDirectories: true)
+        let plist: [String: Any] = ["CFBundleIdentifier": "com.example.Sample", "CFBundleName": "Sample"]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: valid.appendingPathComponent("Info.plist"))
+
+        let result = InstalledApps.scan(in: [root.path])
+
+        XCTAssertTrue(result.complete)
+        XCTAssertEqual(result.apps.map(\.bundleID), ["com.example.Sample"])
+    }
+
+    func testScanFindsAppsBelowCollectionDirectories() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("installed-apps-\(UUID().uuidString)")
+        let nested = root.appendingPathComponent("Setapp/Sample.app")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": "com.example.Sample",
+            "CFBundleName": "Sample",
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        let contents = nested.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+
+        let result = InstalledApps.scan(in: [root.path])
+
+        XCTAssertTrue(result.complete)
+        XCTAssertEqual(result.apps.map(\.bundleID), ["com.example.Sample"])
+    }
 }
 
 /// Focus is symmetric: either half alone is a complete focus.

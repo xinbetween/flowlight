@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.14.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.2, macOS 15 or later.
 
  On this page
 
@@ -887,7 +887,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.14.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1617,8 +1617,53 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.2
+October 18, 2026Latest
+
+ Repair managed-pack activity on upgraded databases. Flowlight now verifies the physical
+ activity key during startup and atomically repairs stale schemas, preserving existing rows before any
+ blocked connection is recorded.
+
+ Keep pack decisions distinct and exactly once. Exact and suffix matches retain separate
+ provenance, repeated decisions aggregate correctly, and retried extension deliveries do not double count.
+
+ Keep editor feedback truthful under partial failures. Incomplete app scans still accept
+ explicit bundle identifiers, previews expire when traffic or policies change, and exceptions appear only after their
+ database write succeeds with a concrete error when it does not.
+
+ 0.15.1
+October 18, 2026
+
+ Keep managed-pack changes safely in review. Opening or cancelling an off pack no longer
+ activates it, and configuration changes persist only after an explicit Save succeeds.
+
+ Add selected apps without closing the editor. Pressing Return in the app field now adds
+ the typed app or process to the draft instead of triggering the sheet's Save action.
+
+ Show the configuration that actually committed. Pack cards now observe managed-pack state
+ directly, so scope, status, exceptions and activity refresh as soon as an asynchronous save completes.
+
+ 0.15.0
+October 17, 2026
+
+ Block known ad and tracker destinations across apps. Three official managed packs cover
+ advertising, cross-site tracking, and privacy/telemetry hosts. They ship disabled, require explicit review,
+ and can apply to every app or only selected apps.
+
+ Keep blocking explainable and reversible. Preview seven days of retained traffic before
+ enabling a pack, review its built-in destinations and provenance, inspect aggregated activity, add scoped
+ per-app exceptions, or use an ordinary allow rule as the universal escape hatch.
+
+ Fail open with atomic, version-bound enforcement. Flowlight validates and transfers one
+ complete pack generation to the Network Extension, binds consent to the exact reviewed content, preserves
+ ordinary-rule and essential-system precedence, and never treats a partial or stale update as active.
+
+ Set honest network-only expectations. Hostname blocking cannot remove first-party ads,
+ page gaps, browser overlays, scripted popups or native app windows; those need the later browser extension.
+ ECH, QUIC, encrypted DNS, direct IPs, shared CDNs and unavailable hostnames can also limit coverage.
+
  0.14.5
-October 17, 2026Latest
+October 17, 2026
 
  Review plugin actions in Flowlight's existing editors. Plugin findings can now suggest guardrails,
  network rules, mock responses, request rewrites and response transforms as typed, inert actions. Inspect opens the
