@@ -381,14 +381,12 @@ def serialized(catalog):
 def atomic_write(path, data):
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "wb") as output:
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
-        os.chmod(temporary, mode)
         os.replace(temporary, path)
         directory = os.open(path.parent, os.O_RDONLY)
         try:
