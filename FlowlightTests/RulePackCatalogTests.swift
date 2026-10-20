@@ -278,6 +278,12 @@ final class RulePackCatalogTests: XCTestCase {
         assertError(.invalidEnvelope) {
             try RulePackCatalogVerifier.validateStrictJSONSyntax(rejectedNestedJSON)
         }
+
+        let rejectedEmptyNestedJSON = Data((String(repeating: "[", count: rejectedNesting) +
+                                            String(repeating: "]", count: rejectedNesting)).utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(rejectedEmptyNestedJSON)
+        }
     }
 
     func testBoundsAndOrderingAreRejectedBeforeVerification() throws {

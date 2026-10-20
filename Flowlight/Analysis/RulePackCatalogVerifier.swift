@@ -494,6 +494,9 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func parseObject(depth: Int) throws {
+            guard depth <= RulePackCatalogVerifier.maximumJSONNestingDepth else {
+                throw RulePackCatalogVerificationError.invalidEnvelope
+            }
             index += 1
             skipWhitespace()
             if consume(0x7D) { return }
@@ -513,6 +516,9 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func parseArray(depth: Int) throws {
+            guard depth <= RulePackCatalogVerifier.maximumJSONNestingDepth else {
+                throw RulePackCatalogVerificationError.invalidEnvelope
+            }
             index += 1
             skipWhitespace()
             if consume(0x5D) { return }
