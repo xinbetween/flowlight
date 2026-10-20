@@ -34,12 +34,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 2
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       # CI checks this on every pull request, but this workflow is the one that actually puts the site in front
       # of people, and a deploy is not something you can take back from a cache. Seconds of Python for the
       # guarantee that nothing broken is ever served.
+      - name: Verify the official rule-pack catalog
+        run: |
+          python3 -I scripts/rule_pack_catalog.py compare \
+            rule-packs/official-source.json site/packs/v1/official.json
+          if git cat-file -e "HEAD^:site/packs/v1/official.json" 2>/dev/null; then
+            python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
+              --previous-ref HEAD^
+          fi
+          python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
+            --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
+            --expected-key-id flowlight-rule-packs-2026-01 --current-app-version 0.15.3 \
+            --extension-protocol 1 --now "$(date +%s)"
+
       - name: Check the site before serving it
         run: python3 scripts/check_site.py --ci
 

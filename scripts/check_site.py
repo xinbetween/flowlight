@@ -8,7 +8,7 @@ roadmap still advertising what you can already download. None of that stops the 
 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
-import re, sys, pathlib, collections, json
+import re, sys, pathlib, collections, json, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -16,6 +16,12 @@ PAGES = sorted(OUT.rglob("index.html")) + [OUT / "404.html"]
 # The nine translations, named by their string catalogues rather than guessed from directory names — "about"
 # and "privacy" are pages, not languages.
 LANGS = sorted(p.stem for p in (ROOT / "site/i18n").glob("*.json") if p.stem != "en")
+OFFICIAL_PACK_REVIEWED_SOURCE = ROOT / "rule-packs/official-source.json"
+OFFICIAL_PACK_SOURCE = ROOT / "site/packs/v1/official.json"
+OFFICIAL_PACK_BUNDLED = ROOT / "Flowlight/Resources/RulePacks/official.json"
+OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
+OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem"
+OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
 
 # Fetched by the browser to render the page. A <link> is only that for some values of rel — `alternate` and
 # `canonical` are addresses for a crawler, and every translated page carries ten of them.
@@ -45,6 +51,41 @@ def version_key(text):
 
 def problems():
     found = []
+
+    # The public catalog is a signed app update channel, not an ordinary generated asset. The source served by
+    # Pages and the committed docs copy must be byte-for-byte identical, and verification uses the public key
+    # embedded in the app. The private key never belongs in this repository or in CI.
+    if not OFFICIAL_PACK_SOURCE.is_file():
+        found.append("site/packs/v1/official.json: signed catalog is missing — sign rule-packs/official-source.json offline")
+    if not OFFICIAL_PACK_BUNDLED.is_file():
+        found.append("Flowlight/Resources/RulePacks/official.json: bundled signed catalog is missing")
+    if not OFFICIAL_PACK_OUTPUT.is_file():
+        found.append("docs/packs/v1/official.json: generated signed catalog is missing — run scripts/build_site.py after signing")
+    if OFFICIAL_PACK_SOURCE.is_file() and OFFICIAL_PACK_OUTPUT.is_file():
+        source_bytes = OFFICIAL_PACK_SOURCE.read_bytes()
+        if source_bytes != OFFICIAL_PACK_OUTPUT.read_bytes():
+            found.append("docs/packs/v1/official.json: differs from site/packs/v1/official.json")
+        if OFFICIAL_PACK_BUNDLED.is_file() and source_bytes != OFFICIAL_PACK_BUNDLED.read_bytes():
+            found.append("Flowlight/Resources/RulePacks/official.json: differs from site/packs/v1/official.json")
+        if not OFFICIAL_PACK_PUBLIC_KEY.is_file():
+            found.append("Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem: public verification key is missing")
+        else:
+            catalog_tool = str(ROOT / "scripts/rule_pack_catalog.py")
+            compared = subprocess.run(
+                [sys.executable, "-I", catalog_tool, "compare",
+                 str(OFFICIAL_PACK_REVIEWED_SOURCE), str(OFFICIAL_PACK_SOURCE)],
+                cwd=ROOT, capture_output=True, text=True, timeout=30)
+            if compared.returncode:
+                detail = (compared.stderr or compared.stdout).strip().replace("\n", " ")
+                found.append(f"site/packs/v1/official.json: reviewed source comparison failed: {detail}")
+            verified = subprocess.run(
+                [sys.executable, "-I", catalog_tool, "verify", str(OFFICIAL_PACK_SOURCE),
+                 "--public-key", str(OFFICIAL_PACK_PUBLIC_KEY), "--expected-key-id", OFFICIAL_PACK_KEY_ID,
+                 "--current-app-version", "0.15.3", "--extension-protocol", "1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=30)
+            if verified.returncode:
+                detail = (verified.stderr or verified.stdout).strip().replace("\n", " ")
+                found.append(f"site/packs/v1/official.json: signature verification failed: {detail}")
 
     # 1. A placeholder that didn't render. `{{t:nav.threat-model}}` printed itself on all 51 pages because the
     #    pattern for {{t:}} didn't allow hyphens, and nothing noticed — it is valid HTML.

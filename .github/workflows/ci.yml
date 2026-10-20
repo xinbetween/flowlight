@@ -78,13 +78,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate and verify the official rule-pack catalog
+        env:
+          PREVIOUS_CATALOG_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 -I scripts/rule_pack_catalog.py validate rule-packs/official-source.json
+          python3 -I scripts/rule_pack_catalog.py compare \
+            rule-packs/official-source.json site/packs/v1/official.json
+          if [ -n "$PREVIOUS_CATALOG_REF" ] && \
+             git cat-file -e "$PREVIOUS_CATALOG_REF:site/packs/v1/official.json" 2>/dev/null; then
+            python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
+              --previous-ref "$PREVIOUS_CATALOG_REF"
+          fi
+          python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
+            --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
+            --expected-key-id flowlight-rule-packs-2026-01 --current-app-version 0.15.3 \
+            --extension-protocol 1 --now "$(date +%s)"
+
       - name: Check the site builds and is committed
         run: |
           python3 scripts/build_site.py
-          git diff --exit-code -- docs/ || {
+          if [ -n "$(git status --porcelain -- docs/)" ]; then
+            git status --short -- docs/
             echo "::error::docs/ is out of date — run scripts/build_site.py and commit the result."
             exit 1
-          }
+          fi
 
       # The build is a template renderer: it cannot fail on a placeholder that did not render, a link to a
       # section that exists in English only, a font that came back from Google, or a roadmap still promising

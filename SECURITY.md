@@ -47,3 +47,15 @@ what Flowlight does defend against.
 Releases are signed with a Developer ID and notarized by Apple, and every release publishes `SHA256SUMS.txt`.
 The in-app updater refuses a download whose checksum it cannot verify, and refuses to install an app that is
 not signed by the same team as the copy asking for the update.
+
+## Official rule-pack feed
+
+The official rule-pack catalog is signed separately with an offline P-256 key. The repository and deployment
+workflows contain only its public key: CI verifies the exact catalog Pages will serve and has no ability to produce a
+trusted replacement. Each catalog has an increasing sequence number, and clients do not accept a lower sequence, so
+an older feed cannot be replayed as a rollback even if it is otherwise correctly signed.
+
+Key rotation has an overlap period: an app release first trusts both keys, the feed is then signed by both, and only a
+later app release removes the old public key. Revocation likewise requires an app release removing the affected key;
+a signed feed cannot revoke the key that authenticates it. After rollback, expiry, or key compromise, corrected
+content is published with a new higher sequence rather than changing history or reusing a sequence.

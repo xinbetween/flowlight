@@ -11,8 +11,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.15.2"
-    CURRENT_PROJECT_VERSION: "38"
+    MARKETING_VERSION: "0.15.3"
+    CURRENT_PROJECT_VERSION: "39"
 targets:
   Flowlight:
     type: application
@@ -82,6 +82,8 @@ targets:
     platform: macOS
     sources:
       - FlowlightTests
+      - path: docs/docs/index.html
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowlight.app.tests

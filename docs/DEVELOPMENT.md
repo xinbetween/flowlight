@@ -287,6 +287,51 @@ build now stamps them from the PNG, which is better than checking a number a per
 
 Add a rule when something slips past this list; that is cheaper than finding it twice.
 
+### Publishing official rule packs
+
+`rule-packs/official-source.json` is the reviewed, unsigned source for the official catalog. The signed catalog is
+`site/packs/v1/official.json`; `build_site.py` copies it byte-for-byte to `docs/packs/v1/official.json`, which Pages
+serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. CI and Pages validate the catalog and verify its
+P-256 signature against `Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem`. They never sign it and have
+no private key.
+
+Validate edits before asking the offline signer to sign them:
+
+```sh
+python3 -I scripts/rule_pack_catalog.py validate rule-packs/official-source.json
+python3 -I scripts/rule_pack_catalog.py digest rule-packs/official-source.json
+```
+
+Every publication has a strictly increasing positive `sequence`. Never reuse or lower one, even to restore older
+content: make the desired content a new catalog with a higher sequence. Set fixed Unix-second `issuedAt` and
+`expiresAt` values as part of the reviewed source. Keep the signing key offline, pass its path explicitly, and write
+the result directly to the site source without printing or copying key material:
+
+```sh
+python3 -I scripts/rule_pack_catalog.py sign rule-packs/official-source.json site/packs/v1/official.json \
+  --private-key /offline/path/official-rule-packs-private.pem \
+  --key-id flowlight-rule-packs-2026-01
+python3 -I scripts/rule_pack_catalog.py compare \
+  rule-packs/official-source.json site/packs/v1/official.json
+python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
+  --previous-ref origin/main
+python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
+  --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
+  --expected-key-id flowlight-rule-packs-2026-01
+python3 scripts/build_site.py
+python3 scripts/check_site.py
+```
+
+For key rotation, first release an app that trusts both the old and new public keys. During that overlap, sign the
+same canonical payload once with each key; `sign` replaces only the named key's signature and preserves the other.
+Add both `--expected-key-id`/`--public-key` pairs to the CI and Pages verification commands for the entire overlap so
+neither signature can disappear unnoticed. Publish the dual-signed feed, wait for the trusting app release to
+propagate, then a later app release may remove the old key. A compromised or retired key is revoked by an app release
+that removes it from the trust set; the feed
+cannot revoke its own signing authority. If compromise is suspected, stop publishing, ship the trust change, and
+resume with a higher sequence signed by a trusted key. Clients reject rollback by sequence, so restoring an older
+catalog always means republishing its contents under a new, higher sequence.
+
 ## Releasing
 
 ```sh
