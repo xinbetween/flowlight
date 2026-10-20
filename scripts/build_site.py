@@ -22,6 +22,8 @@ import os, re, sys, html, json, datetime, pathlib, hashlib, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE, OUT = ROOT / "site", ROOT / "docs"
+OFFICIAL_PACK_SOURCE = SITE / "packs/v1/official.json"
+OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
 DOMAIN = "https://flowlight.xinbetween.com"
 REPO = os.environ.get("GITHUB_REPO", "xinbetween/flowlight")
 DMG = f"https://github.com/{REPO}/releases/latest/download/Flowlight.dmg"
@@ -323,6 +325,12 @@ def picker(langs, table, current, targets):
 
 
 def build():
+    if not OFFICIAL_PACK_SOURCE.is_file():
+        sys.exit("site/packs/v1/official.json is missing — sign rule-packs/official-source.json before building the site.")
+    official_pack = OFFICIAL_PACK_SOURCE.read_bytes()
+    OFFICIAL_PACK_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OFFICIAL_PACK_OUTPUT.write_bytes(official_pack)
+
     css = (SITE / "site.css").read_text()
     # The stylesheet is one URL that never changes name, so a browser and the Pages CDN both keep serving the
     # copy they have: a restyle can ship and still look exactly as it did. The screenshots already carry a
@@ -432,6 +440,7 @@ def build():
     (OUT / "llms-full.txt").write_text("\n\n---\n\n".join(f"# {m['title']}\nURL: {DOMAIN}{m['path']}\n\n{text_of(b)}" for m, b in english_pages) + "\n")
     print(f"  + 404.html, sitemap.xml, robots.txt, llms.txt, llms-full.txt · version {VERSION} · "
           f"{len(pages)} pages in {len(order)} language(s)")
+    print(f"  /packs/v1/official.json → {OFFICIAL_PACK_OUTPUT.relative_to(ROOT)} ({len(official_pack)} bytes)")
 
 
 class Strings(dict):

@@ -28,9 +28,10 @@ final class HelpTests: XCTestCase {
         XCTAssertEqual(Help.forScreen(.inspect).absoluteString, "https://flowlight.xinbetween.com/docs/#inspection")
     }
 
-    /// The built page, which is what a help link actually opens.
+    /// The built page, copied into the test bundle so the app-hosted suite does not need repository file access.
     private func publishedDocs() throws -> String {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        return try String(contentsOf: root.appendingPathComponent("docs/docs/index.html"), encoding: .utf8)
+        let bundle = Bundle(for: HelpTests.self)
+        let page = try XCTUnwrap(bundle.url(forResource: "index", withExtension: "html"))
+        return try String(contentsOf: page, encoding: .utf8)
     }
 }

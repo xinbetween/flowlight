@@ -15,6 +15,8 @@ certs/
 *.pfx
 *.p8
 *.pem
+# The app's purpose-scoped verification key is public data, not signing authority.
+!Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem
 *.key
 *.cer
 *.provisionprofile

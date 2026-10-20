@@ -149,9 +149,11 @@ Reports, AI Agents or Inspect to write one about what you're looking at; all of 
 - A **violations feed** beside the list: every connection a rule decided, refusals and exceptions alike.
 
 ### Managed ad and tracker packs
-Flowlight includes three official, built-in hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and
-telemetry**. All three are visible in **Rules › Packs** and off by default. Enable a pack for every app or only selected
-apps; enforcement needs the Network Extension, because the sampler can observe connections but cannot refuse them.
+Flowlight includes three official hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and telemetry**.
+Their baseline is built into the signed app for offline use and published separately as a purpose-signed official catalog;
+0.15.3 establishes that publisher boundary without downloading updates in the app yet. All three are visible in
+**Rules › Packs** and off by default. Enable a pack for every app or only selected apps; enforcement needs the Network
+Extension, because the sampler can observe connections but cannot refuse them.
 
 Before enabling or broadening a pack, replay it against up to seven days of retained traffic to see which apps,
 destinations, connection counts and bytes would have changed. The activity feed groups repeated blocks instead of

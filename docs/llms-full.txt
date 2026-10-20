@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.3, macOS 15 or later.
 
  On this page
 
@@ -887,7 +887,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1617,8 +1617,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.3
+October 19, 2026Latest
+
+ Publish official rule packs as signed data. Flowlight now defines a purpose-scoped P-256
+ signature contract for its official managed-pack catalog, with the public verification key included in the
+ signed app and the exact signed baseline published on the Flowlight site.
+
+ Make pack publishing reproducible and fail closed. Repository tooling canonicalizes every
+ manifest and destination, validates size and compatibility limits, rejects tampering, requires a trusted
+ signature, and prevents changed catalog content from reusing an existing monotonic sequence.
+
+ Keep offline behavior independent of the network. The exact signed catalog is bundled for
+ verification and remains semantically identical to the three compiled built-in packs that Flowlight uses
+ offline. This release establishes the publisher boundary; automatic remote refresh arrives separately.
+
  0.15.2
-October 18, 2026Latest
+October 18, 2026
 
  Repair managed-pack activity on upgraded databases. Flowlight now verifies the physical
  activity key during startup and atomically repairs stale schemas, preserving existing rows before any
