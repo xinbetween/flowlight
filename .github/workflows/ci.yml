@@ -90,9 +90,11 @@ jobs:
             python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
               --previous-ref "$PREVIOUS_CATALOG_REF"
           fi
+          APP_VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          test -n "$APP_VERSION"
           python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
             --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
-            --expected-key-id flowlight-rule-packs-2026-01 --current-app-version 0.15.3 \
+            --expected-key-id flowlight-rule-packs-2026-01 --current-app-version "$APP_VERSION" \
             --extension-protocol 1 --now "$(date +%s)"
 
       - name: Check the site builds and is committed

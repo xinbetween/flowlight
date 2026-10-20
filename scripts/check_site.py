@@ -8,7 +8,7 @@ roadmap still advertising what you can already download. None of that stops the 
 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
-import re, sys, pathlib, collections, json, subprocess
+import re, sys, pathlib, collections, json, subprocess, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -22,6 +22,8 @@ OFFICIAL_PACK_BUNDLED = ROOT / "Flowlight/Resources/RulePacks/official.json"
 OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
 OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem"
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
+PROJECT = (ROOT / "project.yml").read_text()
+APP_VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', PROJECT).group(1)
 
 # Fetched by the browser to render the page. A <link> is only that for some values of rel — `alternate` and
 # `canonical` are addresses for a crawler, and every translated page carries ten of them.
@@ -81,7 +83,8 @@ def problems():
             verified = subprocess.run(
                 [sys.executable, "-I", catalog_tool, "verify", str(OFFICIAL_PACK_SOURCE),
                  "--public-key", str(OFFICIAL_PACK_PUBLIC_KEY), "--expected-key-id", OFFICIAL_PACK_KEY_ID,
-                 "--current-app-version", "0.15.3", "--extension-protocol", "1"],
+                 "--current-app-version", APP_VERSION, "--extension-protocol", "1",
+                 "--now", str(int(time.time()))],
                 cwd=ROOT, capture_output=True, text=True, timeout=30)
             if verified.returncode:
                 detail = (verified.stderr or verified.stdout).strip().replace("\n", " ")
