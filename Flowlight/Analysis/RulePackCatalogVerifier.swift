@@ -138,6 +138,7 @@ enum RulePackCatalogVerifier {
     static let maximumPacks = 16
     static let maximumTotalEntries = 250_000
     static let maximumStringBytes = 16 * 1024
+    static let maximumJSONNestingDepth = 64
     static let maximumFutureIssueSkew: Int64 = 5 * 60
 
     // Public material only. Embedding it keeps trust independent from resource-bundle selection in test hosts.
@@ -468,16 +469,17 @@ enum RulePackCatalogVerifier {
 
         mutating func validate() throws {
             skipWhitespace()
-            try parseValue()
+            try parseValue(depth: 0)
             skipWhitespace()
             guard index == bytes.count else { throw RulePackCatalogVerificationError.invalidEnvelope }
         }
 
-        private mutating func parseValue() throws {
-            guard index < bytes.count else { throw RulePackCatalogVerificationError.invalidEnvelope }
+        private mutating func parseValue(depth: Int) throws {
+            guard depth <= RulePackCatalogVerifier.maximumJSONNestingDepth,
+                  index < bytes.count else { throw RulePackCatalogVerificationError.invalidEnvelope }
             switch bytes[index] {
-            case 0x7B: try parseObject()
-            case 0x5B: try parseArray()
+            case 0x7B: try parseObject(depth: depth + 1)
+            case 0x5B: try parseArray(depth: depth + 1)
             case 0x22: _ = try parseString()
             case 0x74: try consumeLiteral("true")
             case 0x66: try consumeLiteral("false")
@@ -487,7 +489,7 @@ enum RulePackCatalogVerifier {
             }
         }
 
-        private mutating func parseObject() throws {
+        private mutating func parseObject(depth: Int) throws {
             index += 1
             skipWhitespace()
             if consume(0x7D) { return }
@@ -498,7 +500,7 @@ enum RulePackCatalogVerifier {
                 skipWhitespace()
                 guard consume(0x3A) else { throw RulePackCatalogVerificationError.invalidEnvelope }
                 skipWhitespace()
-                try parseValue()
+                try parseValue(depth: depth)
                 skipWhitespace()
                 if consume(0x7D) { return }
                 guard consume(0x2C) else { throw RulePackCatalogVerificationError.invalidEnvelope }
@@ -506,12 +508,12 @@ enum RulePackCatalogVerifier {
             }
         }
 
-        private mutating func parseArray() throws {
+        private mutating func parseArray(depth: Int) throws {
             index += 1
             skipWhitespace()
             if consume(0x5D) { return }
             while true {
-                try parseValue()
+                try parseValue(depth: depth)
                 skipWhitespace()
                 if consume(0x5D) { return }
                 guard consume(0x2C) else { throw RulePackCatalogVerificationError.invalidEnvelope }

@@ -266,6 +266,14 @@ final class RulePackCatalogTests: XCTestCase {
             try RulePackCatalogVerifier.verify(data: duplicate, trustedSigners: [signer(key: key)],
                                                now: now, currentAppVersion: "0.15.3")
         }
+
+        let nesting = RulePackCatalogVerifier.maximumJSONNestingDepth + 1
+        let deeplyNested = Data((String(repeating: "[", count: nesting) + "0" +
+                                 String(repeating: "]", count: nesting)).utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.verify(data: deeplyNested, trustedSigners: [signer(key: key)],
+                                               now: now, currentAppVersion: "0.15.3")
+        }
     }
 
     func testBoundsAndOrderingAreRejectedBeforeVerification() throws {
