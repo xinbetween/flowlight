@@ -10,7 +10,6 @@ on:
   push:
     branches: [main]
     paths: ["docs/**", ".github/workflows/pages.yml"]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,7 +45,7 @@ jobs:
       # guarantee that nothing broken is ever served.
       - name: Verify the official rule-pack catalog
         env:
-          PREVIOUS_CATALOG_REF: ${{ github.event.before || 'HEAD^' }}
+          PREVIOUS_CATALOG_REF: ${{ github.event.before }}
         run: |
           python3 -I scripts/rule_pack_catalog.py compare \
             rule-packs/official-source.json site/packs/v1/official.json
