@@ -10,6 +10,7 @@ struct RulePacksView: View {
 
 private struct RulePackEditorRequest: Identifiable {
     let pack: RulePackDefinition
+    let receipt: RulePackReviewReceipt?
     let intent: RulePackEditorDraft.Intent
     var id: String { pack.id }
 }
@@ -46,7 +47,8 @@ private struct RulePacksContent: View {
             .padding(Measure.gutter)
         }
         .sheet(item: $editor) { request in
-            RulePackEditor(pack: request.pack, saved: packs.configuration(for: request.pack.id),
+            RulePackEditor(pack: request.pack, receipt: request.receipt,
+                           saved: packs.configuration(for: request.pack.id),
                            intent: request.intent, packs: packs, rules: monitor.rules)
         }
     }
@@ -79,7 +81,8 @@ private struct RulePacksContent: View {
                 Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
                     if enabled {
                         saveErrors[pack.id] = nil
-                        editor = RulePackEditorRequest(pack: pack, intent: .activate)
+                        editor = RulePackEditorRequest(pack: pack, receipt: packs.reviewReceipt(for: pack),
+                                                       intent: .activate)
                     } else {
                         var changed = configuration
                         changed.enabled = false
@@ -103,7 +106,8 @@ private struct RulePacksContent: View {
                 Spacer()
                 Button(L("Review…")) {
                     saveErrors[pack.id] = nil
-                    editor = RulePackEditorRequest(pack: pack, intent: .review)
+                    editor = RulePackEditorRequest(pack: pack, receipt: packs.reviewReceipt(for: pack),
+                                                   intent: .review)
                 }.disabled(isSaving)
             }
             if let saveError = saveErrors[pack.id] {
@@ -164,6 +168,7 @@ private struct RulePacksContent: View {
 
 private struct RulePackEditor: View {
     let pack: RulePackDefinition
+    let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var packs: RulePackStore
@@ -179,12 +184,14 @@ private struct RulePackEditor: View {
     @State private var confirmBroadening = false
     @State private var saving = false
 
-    init(pack: RulePackDefinition, saved: RulePackConfiguration,
+    init(pack: RulePackDefinition, receipt: RulePackReviewReceipt?, saved: RulePackConfiguration,
          intent: RulePackEditorDraft.Intent, packs: RulePackStore, rules: RuleStore) {
         self.pack = pack
+        self.receipt = receipt
         self.packs = packs
         self.rules = rules
-        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent))
+        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent,
+                                                        reviewedDefinition: pack, reviewReceipt: receipt))
     }
 
     var body: some View {
@@ -229,7 +236,9 @@ private struct RulePackEditor: View {
         .onChange(of: monitor.dataVersion) { _, _ in invalidatePreview() }
         .onAppear { loadApps() }
         .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
-            Button(L("Apply to every app"), role: .destructive) { commit(draft.configuration) }
+            Button(L("Apply to every app"), role: .destructive) {
+                commit(draft.configuration, receipt: draft.reviewReceipt)
+            }
             Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(L("This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed."))
@@ -379,22 +388,26 @@ private struct RulePackEditor: View {
     private func save() {
         saveError = nil
         switch draft.requestSave() {
-        case .commit(let configuration): commit(configuration)
+        case .commit(let configuration, let receipt): commit(configuration, receipt: receipt)
         case .confirmBroadening: confirmBroadening = true
         case nil: break
         }
     }
 
-    private func commit(_ configuration: RulePackConfiguration? = nil) {
+    private func commit(_ configuration: RulePackConfiguration? = nil,
+                        receipt: RulePackReviewReceipt? = nil) {
         saving = true
         saveError = nil
         let value = configuration ?? draft.configuration
-        packs.save(value) { success in
+        packs.save(value, reviewedDefinition: pack, receipt: receipt) { result in
             saving = false
-            if success {
+            switch result {
+            case .saved:
                 dismiss()
-            } else {
-                saveError = packs.failureMessage ?? L("Failed: %@", L("Save"))
+            case .staleReview:
+                saveError = L("This pack changed while it was open. Reopen it to review the new content before saving.")
+            case .failed(let message):
+                saveError = message
             }
         }
     }
@@ -422,7 +435,7 @@ private struct RulePackEditor: View {
                   packVersion == packs.version,
                   ruleVersion == rules.version,
                   dataVersion == monitor.dataVersion else { return }
-            preview = RulePackSimulation.run(candidate: candidate, definitions: packs.definitions,
+            preview = RulePackSimulation.run(candidate: candidate, definitions: [pack],
                                              configurations: packs.configurations,
                                              overrides: packs.overrides, rules: rules.rules,
                                              policies: input.1, paused: rules.isPaused,

@@ -15,16 +15,22 @@ struct RulePackEditorDraft {
     }
 
     enum SaveAction: Equatable {
-        case commit(RulePackConfiguration)
+        case commit(RulePackConfiguration, RulePackReviewReceipt?)
         case confirmBroadening
     }
 
     let originalConfiguration: RulePackConfiguration
+    let reviewedDefinition: RulePackDefinition?
+    let reviewReceipt: RulePackReviewReceipt?
     var configuration: RulePackConfiguration
     var typedApp = ""
 
-    init(saved: RulePackConfiguration, intent: Intent) {
+    init(saved: RulePackConfiguration, intent: Intent,
+         reviewedDefinition: RulePackDefinition? = nil,
+         reviewReceipt: RulePackReviewReceipt? = nil) {
         originalConfiguration = saved
+        self.reviewedDefinition = reviewedDefinition
+        self.reviewReceipt = reviewReceipt
         configuration = saved
         if intent == .activate { configuration.enabled = true }
     }
@@ -62,6 +68,6 @@ struct RulePackEditorDraft {
            configuration.scope == .allApps {
             return .confirmBroadening
         }
-        return .commit(configuration)
+        return .commit(configuration, reviewReceipt)
     }
 }

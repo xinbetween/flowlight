@@ -551,7 +551,97 @@ final class RulePackTests: XCTestCase {
 
         XCTAssertFalse(draft.configuration.enabled)
         XCTAssertEqual(draft.configuration.scope, .allApps)
-        XCTAssertEqual(draft.requestSave(), .commit(saved))
+        XCTAssertEqual(draft.requestSave(), .commit(saved, nil))
+    }
+
+    func testEditorSaveCarriesImmutableReviewedContentReceipt() {
+        let definition = BuiltInRulePacks.advertising
+        let receipt = RulePackReviewReceipt(
+            packID: definition.id, version: definition.manifest.version,
+            contentSHA256: definition.manifest.contentSHA256,
+            catalogSequence: 7, catalogDigest: String(repeating: "7", count: 64)
+        )
+        let draft = RulePackEditorDraft(
+            saved: RulePackConfiguration(packID: definition.id), intent: .activate,
+            reviewedDefinition: definition, reviewReceipt: receipt
+        )
+
+        XCTAssertEqual(draft.reviewedDefinition, definition)
+        XCTAssertEqual(draft.requestSave(), .commit(draft.configuration, receipt))
+    }
+
+    @MainActor
+    func testSnapshotGenerationIsStableUntilCommittedStateChanges() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-generation-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+        var configuration = store.configuration(for: BuiltInRulePacks.advertising.id)
+        configuration.enabled = true
+        store.save(configuration)
+        try await waitUntil { store.snapshot != nil }
+
+        let first = try XCTUnwrap(store.snapshot)
+        let second = try XCTUnwrap(store.snapshot)
+        XCTAssertEqual(first.generation, second.generation)
+        XCTAssertEqual(first, second)
+
+        configuration = store.configuration(for: configuration.packID)
+        configuration.scope = .selectedApps
+        configuration.apps = ["com.apple.Safari"]
+        store.save(configuration)
+        try await waitUntil { store.snapshot?.digest != first.digest }
+        XCTAssertNotEqual(store.snapshot?.generation, first.generation)
+    }
+
+    @MainActor
+    func testRefreshBeforeEditorSaveRejectsStaleReviewedContent() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-stale-review-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let original = BuiltInRulePacks.advertising
+        let originalCatalog = VerifiedRulePackCatalog(
+            definitions: [original], sequence: 1, digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("one".utf8)
+        )
+        let firstAcceptance = try db.acceptVerifiedRulePackCatalog(
+            originalCatalog, checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        let store = RulePackStore(definitions: [original])
+        store.attach(db: db)
+        try await waitUntil { store.reviewReceipt(for: original) != nil }
+        let staleReceipt = try XCTUnwrap(store.reviewReceipt(for: original))
+
+        var replacement = original
+        replacement.entries.append(RulePackEntry(
+            id: UInt32(replacement.entries.count + 1), host: "zz-stale-review.example",
+            category: .advertising
+        ))
+        replacement.entries.sort { "\($0.host)|\($0.match.rawValue)" < "\($1.host)|\($1.match.rawValue)" }
+        replacement.manifest.version = "2"
+        replacement.manifest.entryCount = replacement.entries.count
+        replacement.manifest.contentSHA256 = RulePackValidator.digest(replacement.entries)
+        let replacementCatalog = VerifiedRulePackCatalog(
+            definitions: [replacement], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("two".utf8)
+        )
+        let secondAcceptance = try db.acceptVerifiedRulePackCatalog(
+            replacementCatalog, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
+        store.installCommittedCatalog(replacementCatalog, acceptance: secondAcceptance)
+        XCTAssertEqual(firstAcceptance.state.receipt?.sequence, 1)
+
+        var candidate = RulePackConfiguration(packID: original.id, enabled: true)
+        var result: RulePackStore.SaveResult?
+        store.save(candidate, reviewedDefinition: original, receipt: staleReceipt) { result = $0 }
+        XCTAssertEqual(result, .staleReview)
+        XCTAssertFalse(store.configuration(for: original.id).enabled)
+        XCTAssertNil(store.snapshot)
+        candidate.enabled = false
     }
 
     func testEditorActivationAndCancelNeverMutateSavedConfiguration() {
@@ -579,7 +669,7 @@ final class RulePackTests: XCTestCase {
         draft.typedApp = "com.example.second"
         XCTAssertEqual(draft.submitApp(installed: []), .added("com.example.second"))
         XCTAssertEqual(draft.configuration.apps, ["com.apple.curl", "com.example.second"])
-        XCTAssertEqual(draft.requestSave(), .commit(draft.configuration),
+        XCTAssertEqual(draft.requestSave(), .commit(draft.configuration, nil),
                        "Return only edits the draft; explicit Save decides whether to commit")
     }
 
@@ -658,7 +748,7 @@ final class RulePackTests: XCTestCase {
         var selected = RulePackConfiguration(packID: "official.advertising", enabled: true,
                                              scope: .selectedApps, apps: ["com.apple.curl"])
         var draft = RulePackEditorDraft(saved: selected, intent: .review)
-        XCTAssertEqual(draft.requestSave(), .commit(selected))
+        XCTAssertEqual(draft.requestSave(), .commit(selected, nil))
 
         draft.configuration.scope = .allApps
         XCTAssertEqual(draft.requestSave(), .confirmBroadening)
