@@ -486,6 +486,18 @@ final class TrafficDatabase: @unchecked Sendable {
         -- Managed packs keep only user state here. The verified entry lists remain in the signed app bundle.
         CREATE TABLE IF NOT EXISTS rule_packs (
             pack_id TEXT PRIMARY KEY, configuration TEXT NOT NULL, updated INTEGER NOT NULL);
+        -- The anti-rollback receipt is deliberately independent from the cached bytes. A corrupt or missing cache
+        -- must never make a previously accepted sequence disappear and permit the bundled sequence again.
+        CREATE TABLE IF NOT EXISTS rule_pack_catalog_receipts (
+            catalog_id TEXT PRIMARY KEY, highest_sequence INTEGER NOT NULL,
+            canonical_digest TEXT NOT NULL, signer_key_id TEXT NOT NULL, accepted_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_pack_catalog_cache (
+            catalog_id TEXT PRIMARY KEY, raw_envelope BLOB NOT NULL, etag TEXT,
+            last_modified TEXT, verified_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_pack_catalog_updates (
+            catalog_id TEXT PRIMARY KEY, automatic_refresh INTEGER NOT NULL DEFAULT 1,
+            last_attempt INTEGER, last_success INTEGER, next_eligible_attempt INTEGER,
+            failure_count INTEGER NOT NULL DEFAULT 0, last_status TEXT, last_error TEXT);
         CREATE TABLE IF NOT EXISTS rule_pack_overrides (
             id TEXT PRIMARY KEY, override TEXT NOT NULL, updated INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS rule_pack_event_rollups (
@@ -1053,12 +1065,228 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    /// Catalog reconciliation is a security boundary. A malformed saved row must roll the transaction back rather
+    /// than disappearing through the tolerant loader used by older UI reloads.
+    private func loadRulePackConfigurationsStrictly() throws -> [RulePackConfiguration] {
+        let rows = try conn.query("SELECT configuration FROM rule_packs ORDER BY pack_id") { $0.text(0) }
+        return try rows.map { try JSONDecoder().decode(RulePackConfiguration.self, from: Data($0.utf8)) }
+    }
+
     func saveRulePackConfiguration(_ configuration: RulePackConfiguration) throws {
+        try writeRulePackConfiguration(configuration, updatedAt: Date())
+    }
+
+    /// Compare-and-save for an editor that may have remained open across a catalog refresh. Disabling never needs
+    /// a receipt; enabling requires both the reviewed pack identity and the durable catalog watermark to still match.
+    func saveRulePackConfiguration(_ configuration: RulePackConfiguration,
+                                   reviewed receipt: RulePackReviewReceipt?) throws {
+        try conn.transaction {
+            if configuration.enabled {
+                guard let receipt,
+                      receipt.packID == configuration.packID,
+                      receipt.version == configuration.consentedVersion,
+                      receipt.contentSHA256 == configuration.consentedContentSHA256,
+                      let durable = try loadRulePackCatalogReceipt(catalogID: RulePackCatalogVerifier.catalogID),
+                      durable.sequence == receipt.catalogSequence,
+                      durable.digest == receipt.catalogDigest else {
+                    throw RulePackCatalogPersistenceError.staleReview
+                }
+            }
+            try writeRulePackConfiguration(configuration, updatedAt: Date())
+        }
+    }
+
+    private func writeRulePackConfiguration(_ configuration: RulePackConfiguration, updatedAt: Date) throws {
         let json = String(decoding: try JSONEncoder().encode(configuration), as: UTF8.self)
         try conn.run("""
             INSERT INTO rule_packs (pack_id, configuration, updated) VALUES (?,?,?)
             ON CONFLICT(pack_id) DO UPDATE SET configuration = excluded.configuration, updated = excluded.updated
-            """, [.text(configuration.packID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+            """, [.text(configuration.packID), .text(json), .int(Int64(updatedAt.timeIntervalSince1970))])
+    }
+
+    func loadRulePackCatalogState(catalogID: String) throws -> RulePackCatalogState {
+        guard !catalogID.isEmpty else { throw RulePackCatalogPersistenceError.invalidCatalogID }
+        let receipt = try loadRulePackCatalogReceipt(catalogID: catalogID)
+        let cache = try conn.query("""
+            SELECT raw_envelope, etag, last_modified, verified_at
+            FROM rule_pack_catalog_cache WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                RulePackCatalogCache(
+                    catalogID: catalogID,
+                    rawEnvelope: row.blob(0),
+                    etag: row.isNull(1) ? nil : row.text(1),
+                    lastModified: row.isNull(2) ? nil : row.text(2),
+                    verifiedAt: Date(timeIntervalSince1970: TimeInterval(row.int(3)))
+                )
+            }.first
+        let update = try conn.query("""
+            SELECT automatic_refresh, last_attempt, last_success, next_eligible_attempt,
+                   failure_count, last_status, last_error
+            FROM rule_pack_catalog_updates WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                RulePackCatalogUpdateState(
+                    catalogID: catalogID,
+                    automaticRefresh: row.int(0) != 0,
+                    lastAttempt: row.isNull(1) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(1))),
+                    lastSuccess: row.isNull(2) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(2))),
+                    nextEligibleAttempt: row.isNull(3) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(3))),
+                    failureCount: Int(row.int(4)),
+                    lastStatus: row.isNull(5) ? nil : row.text(5),
+                    lastError: row.isNull(6) ? nil : row.text(6)
+                )
+            }.first ?? RulePackCatalogUpdateState(catalogID: catalogID)
+        return RulePackCatalogState(receipt: receipt, cache: cache, update: update)
+    }
+
+    /// Atomically rechecks anti-rollback state, saves the exact signed bytes and validators, invalidates stale
+    /// consent, and resets refresh backoff. Callers may publish the returned definitions/configurations only after
+    /// this method returns successfully.
+    func acceptVerifiedRulePackCatalog(_ catalog: VerifiedRulePackCatalog,
+                                       catalogID: String = RulePackCatalogVerifier.catalogID,
+                                       etag: String? = nil,
+                                       lastModified: String? = nil,
+                                       checkedAt: Date,
+                                       nextEligibleAt: Date) throws -> RulePackCatalogAcceptance {
+        guard catalogID == RulePackCatalogVerifier.catalogID else {
+            throw RulePackCatalogPersistenceError.invalidCatalogID
+        }
+        guard catalog.sequence > 0, !catalog.digest.isEmpty, !catalog.signerKeyID.isEmpty,
+              !catalog.rawEnvelope.isEmpty else {
+            throw RulePackCatalogPersistenceError.invalidReceipt
+        }
+        var packIDs = Set<String>()
+        guard catalog.definitions.allSatisfy({ packIDs.insert($0.id).inserted }) else {
+            throw RulePackValidationError.duplicatePack(catalog.definitions.first?.id ?? "")
+        }
+
+        var reconciled: [RulePackConfiguration] = []
+        try conn.transaction {
+            if let prior = try loadRulePackCatalogReceipt(catalogID: catalogID) {
+                if catalog.sequence < prior.sequence { throw RulePackCatalogPersistenceError.rollback }
+                if catalog.sequence == prior.sequence, catalog.digest != prior.digest {
+                    throw RulePackCatalogPersistenceError.equivocation
+                }
+            }
+
+            let acceptedAt = Int64(checkedAt.timeIntervalSince1970)
+            try conn.run("""
+                INSERT INTO rule_pack_catalog_receipts
+                    (catalog_id, highest_sequence, canonical_digest, signer_key_id, accepted_at)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(catalog_id) DO UPDATE SET
+                    highest_sequence = excluded.highest_sequence,
+                    canonical_digest = excluded.canonical_digest,
+                    signer_key_id = excluded.signer_key_id,
+                    accepted_at = excluded.accepted_at
+                """, [.text(catalogID), .int(catalog.sequence), .text(catalog.digest),
+                      .text(catalog.signerKeyID), .int(acceptedAt)])
+            try conn.run("""
+                INSERT INTO rule_pack_catalog_cache
+                    (catalog_id, raw_envelope, etag, last_modified, verified_at)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(catalog_id) DO UPDATE SET
+                    raw_envelope = excluded.raw_envelope, etag = excluded.etag,
+                    last_modified = excluded.last_modified, verified_at = excluded.verified_at
+                """, [.text(catalogID), .blob(catalog.rawEnvelope), etag.map(SQLValue.text) ?? .null,
+                      lastModified.map(SQLValue.text) ?? .null, .int(acceptedAt)])
+            try conn.run("""
+                INSERT INTO rule_pack_catalog_updates
+                    (catalog_id, automatic_refresh, last_attempt, last_success, next_eligible_attempt,
+                     failure_count, last_status, last_error)
+                VALUES (?,1,?,?,?,0,?,NULL)
+                ON CONFLICT(catalog_id) DO UPDATE SET
+                    last_attempt = excluded.last_attempt, last_success = excluded.last_success,
+                    next_eligible_attempt = excluded.next_eligible_attempt,
+                    failure_count = 0, last_status = excluded.last_status, last_error = NULL
+                """, [.text(catalogID), .int(acceptedAt), .int(acceptedAt),
+                      .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("accepted")])
+
+            let definitionsByID = Dictionary(uniqueKeysWithValues: catalog.definitions.map { ($0.id, $0) })
+            let saved = try loadRulePackConfigurationsStrictly()
+            for var configuration in saved {
+                if let definition = definitionsByID[configuration.packID], configuration.enabled,
+                   !configuration.isConsented(to: definition) {
+                    configuration.enabled = false
+                    try writeRulePackConfiguration(configuration, updatedAt: checkedAt)
+                }
+                reconciled.append(configuration)
+            }
+        }
+
+        let state = try loadRulePackCatalogState(catalogID: catalogID)
+        return RulePackCatalogAcceptance(
+            state: state,
+            configurations: reconciled.sorted { $0.packID < $1.packID }
+        )
+    }
+
+    /// A 304 is meaningful only after the caller has reverified the cached bytes. The expected receipt makes that
+    /// re-verification a compare-and-set instead of allowing stale in-memory state to mark a newer row successful.
+    func recordRulePackCatalogNotModified(catalogID: String,
+                                          expectedSequence: Int64,
+                                          expectedDigest: String,
+                                          checkedAt: Date,
+                                          nextEligibleAt: Date) throws {
+        try conn.transaction {
+            guard let receipt = try loadRulePackCatalogReceipt(catalogID: catalogID),
+                  receipt.sequence == expectedSequence,
+                  receipt.digest == expectedDigest,
+                  try conn.query("SELECT 1 FROM rule_pack_catalog_cache WHERE catalog_id = ?",
+                                 [.text(catalogID)], map: { $0.int(0) }).first == 1 else {
+                throw RulePackCatalogPersistenceError.invalidReceipt
+            }
+            let checked = Int64(checkedAt.timeIntervalSince1970)
+            try conn.run("""
+                INSERT INTO rule_pack_catalog_updates
+                    (catalog_id, automatic_refresh, last_attempt, last_success, next_eligible_attempt,
+                     failure_count, last_status, last_error)
+                VALUES (?,1,?,?,?,0,?,NULL)
+                ON CONFLICT(catalog_id) DO UPDATE SET
+                    last_attempt = excluded.last_attempt, last_success = excluded.last_success,
+                    next_eligible_attempt = excluded.next_eligible_attempt,
+                    failure_count = 0, last_status = excluded.last_status, last_error = NULL
+                """, [.text(catalogID), .int(checked), .int(checked),
+                      .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("not-modified")])
+        }
+    }
+
+    func recordRulePackCatalogFailure(catalogID: String,
+                                      attemptedAt: Date,
+                                      failureCount: Int,
+                                      nextEligibleAt: Date,
+                                      status: String,
+                                      error: String) throws {
+        guard !catalogID.isEmpty, failureCount > 0 else {
+            throw RulePackCatalogPersistenceError.invalidReceipt
+        }
+        try conn.run("""
+            INSERT INTO rule_pack_catalog_updates
+                (catalog_id, automatic_refresh, last_attempt, last_success, next_eligible_attempt,
+                 failure_count, last_status, last_error)
+            VALUES (?,1,?,NULL,?,?,?,?)
+            ON CONFLICT(catalog_id) DO UPDATE SET
+                last_attempt = excluded.last_attempt,
+                next_eligible_attempt = excluded.next_eligible_attempt,
+                failure_count = excluded.failure_count,
+                last_status = excluded.last_status, last_error = excluded.last_error
+            """, [.text(catalogID), .int(Int64(attemptedAt.timeIntervalSince1970)),
+                  .int(Int64(nextEligibleAt.timeIntervalSince1970)), .int(Int64(failureCount)),
+                  .text(status), .text(error)])
+    }
+
+    private func loadRulePackCatalogReceipt(catalogID: String) throws -> RulePackCatalogReceipt? {
+        try conn.query("""
+            SELECT highest_sequence, canonical_digest, signer_key_id, accepted_at
+            FROM rule_pack_catalog_receipts WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                RulePackCatalogReceipt(
+                    catalogID: catalogID,
+                    sequence: row.int(0),
+                    digest: row.text(1),
+                    signerKeyID: row.text(2),
+                    acceptedAt: Date(timeIntervalSince1970: TimeInterval(row.int(3)))
+                )
+            }.first
     }
 
     func loadRulePackOverrides() throws -> [RulePackOverride] {
@@ -1805,6 +2033,14 @@ final class TrafficDatabase: @unchecked Sendable {
     func async(_ body: @escaping (TrafficDatabase) throws -> Void) {
         queue.async {
             do { try body(self) } catch { appLog.error("db error: \(String(describing: error), privacy: .public)") }
+        }
+    }
+
+    /// Serialized work whose success or failure controls a caller decision. Unlike `async`, this never turns a
+    /// persistence failure into a log-only event, and callers must not invoke `sync` from inside its body.
+    func asyncResult<T: Sendable>(_ body: @escaping @Sendable (TrafficDatabase) throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { continuation.resume(with: Result { try body(self) }) }
         }
     }
 }
