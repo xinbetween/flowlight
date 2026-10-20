@@ -399,10 +399,14 @@ enum RulePackCatalogVerifier {
         throw RulePackCatalogVerificationError.invalidSignature
     }
 
+    static func validateStrictJSONSyntax(_ data: Data) throws {
+        var scanner = StrictJSONScanner(data: data)
+        try scanner.validate()
+    }
+
     private static func strictDecode(_ data: Data) throws -> RulePackCatalogEnvelope {
         do {
-            var scanner = StrictJSONScanner(data: data)
-            try scanner.validate()
+            try validateStrictJSONSyntax(data)
             let object = try JSONSerialization.jsonObject(with: data)
             try StrictSchema.validateEnvelope(object)
             return try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: data)

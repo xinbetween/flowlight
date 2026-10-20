@@ -267,12 +267,16 @@ final class RulePackCatalogTests: XCTestCase {
                                                now: now, currentAppVersion: "0.15.3")
         }
 
-        let nesting = RulePackCatalogVerifier.maximumJSONNestingDepth + 1
-        let deeplyNested = Data((String(repeating: "[", count: nesting) + "0" +
-                                 String(repeating: "]", count: nesting)).utf8)
+        let acceptedNesting = RulePackCatalogVerifier.maximumJSONNestingDepth
+        let acceptedNestedJSON = Data((String(repeating: "[", count: acceptedNesting) + "0" +
+                                       String(repeating: "]", count: acceptedNesting)).utf8)
+        XCTAssertNoThrow(try RulePackCatalogVerifier.validateStrictJSONSyntax(acceptedNestedJSON))
+
+        let rejectedNesting = acceptedNesting + 1
+        let rejectedNestedJSON = Data((String(repeating: "[", count: rejectedNesting) + "0" +
+                                       String(repeating: "]", count: rejectedNesting)).utf8)
         assertError(.invalidEnvelope) {
-            try RulePackCatalogVerifier.verify(data: deeplyNested, trustedSigners: [signer(key: key)],
-                                               now: now, currentAppVersion: "0.15.3")
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(rejectedNestedJSON)
         }
     }
 
