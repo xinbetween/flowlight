@@ -169,6 +169,96 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
     }
 
     @MainActor
+    func testManualCheckBypassesScheduleAndFailureBackoffProgresses() async throws {
+        let fixture = try productionFixture()
+        let db = try database("manual-backoff")
+        let store = RulePackStore()
+        final class Clock: @unchecked Sendable { var date: Date; init(_ date: Date) { self.date = date } }
+        final class Counter: @unchecked Sendable { var calls = 0 }
+        let clock = Clock(now)
+        let counter = Counter()
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { fixture },
+            transport: { _ in counter.calls += 1; throw URLError(.notConnectedToInternet) },
+            now: { clock.date }
+        )
+        await updater.bootstrap()
+        updater.startScheduling(networkingEnabled: true)
+
+        for (index, delay) in RulePackCatalogUpdater.failureBackoff.enumerated() {
+            await updater.checkNow()
+            XCTAssertEqual(counter.calls, index + 1, "manual checks must bypass the future due time")
+            XCTAssertEqual(updater.catalogState.update.failureCount, index + 1)
+            XCTAssertEqual(updater.catalogState.update.nextEligibleAttempt,
+                           clock.date.addingTimeInterval(delay))
+            clock.date = clock.date.addingTimeInterval(10)
+        }
+        await updater.checkNow()
+        XCTAssertEqual(counter.calls, 4)
+        XCTAssertEqual(updater.catalogState.update.failureCount, 4)
+        XCTAssertEqual(updater.catalogState.update.nextEligibleAttempt,
+                       clock.date.addingTimeInterval(RulePackCatalogUpdater.failureBackoff[2]))
+    }
+
+    @MainActor
+    func testConcurrentManualChecksShareOneInFlightRequest() async throws {
+        let fixture = try productionFixture()
+        let db = try database("one-in-flight")
+        let store = RulePackStore()
+        final class Gate: @unchecked Sendable {
+            var calls = 0
+            var continuation: CheckedContinuation<(Data, URLResponse), Error>?
+        }
+        let gate = Gate()
+        let started = expectation(description: "first catalog request started")
+        let response = HTTPURLResponse(
+            url: try XCTUnwrap(URL(string: RulePackCatalogVerifier.sourceURL)),
+            statusCode: 304, httpVersion: nil, headerFields: nil
+        )!
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { fixture }, transport: { _ in
+                gate.calls += 1
+                started.fulfill()
+                return try await withCheckedThrowingContinuation { gate.continuation = $0 }
+            }, now: { self.now }
+        )
+        await updater.bootstrap()
+        updater.startScheduling(networkingEnabled: true)
+
+        async let first: Void = updater.checkNow()
+        await fulfillment(of: [started], timeout: 1)
+        await updater.checkNow()
+        XCTAssertEqual(gate.calls, 1)
+        gate.continuation?.resume(returning: (Data(), response))
+        await first
+        XCTAssertEqual(updater.status, .current)
+    }
+
+    @MainActor
+    func testAutomaticRefreshPreferencePersistsAcrossUpdaterInstances() async throws {
+        let fixture = try productionFixture()
+        let db = try database("refresh-preference")
+        let store = RulePackStore()
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { fixture }, now: { self.now }
+        )
+        await updater.bootstrap()
+
+        await updater.setAutomaticRefresh(false)
+
+        XCTAssertFalse(updater.automaticRefresh)
+        let reloaded = RulePackCatalogUpdater(
+            db: db, store: RulePackStore(), currentAppVersion: "0.15.4",
+            bundledCatalog: { fixture }, now: { self.now }
+        )
+        await reloaded.bootstrap()
+        XCTAssertFalse(reloaded.automaticRefresh)
+    }
+
+    @MainActor
     func testNetworkingDisabledNeverInvokesTransport() async throws {
         let fixture = try productionFixture()
         let db = try database("disabled-network")
@@ -188,6 +278,118 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
 
         XCTAssertEqual(counter.calls, 0)
         XCTAssertEqual(updater.status, .current)
+    }
+
+    @MainActor
+    func testAcceptedExpiredCatalogLoadsAsStaleLastKnownGood() async throws {
+        let key = P256.Signing.PrivateKey()
+        let acceptedAt = now.addingTimeInterval(-7_200)
+        let data = try signedCatalog(
+            key: key, sequence: 2, definitions: [newDefinition()],
+            issuedAt: Int64(acceptedAt.timeIntervalSince1970) - 100,
+            expiresAt: Int64(acceptedAt.timeIntervalSince1970) + 3_600
+        )
+        let verified = try RulePackCatalogVerifier.verify(
+            data: data, trustedSigners: [signer(key)],
+            now: Int64(acceptedAt.timeIntervalSince1970), currentAppVersion: "0.15.4"
+        )
+        let db = try database("expired-lkg")
+        _ = try db.acceptVerifiedRulePackCatalog(
+            try RulePackCatalogComposition.compose(verified), checkedAt: acceptedAt,
+            nextEligibleAt: acceptedAt.addingTimeInterval(60)
+        )
+        let store = RulePackStore()
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { data }, trustedSigners: [signer(key)], now: { self.now }
+        )
+
+        await updater.bootstrap()
+
+        XCTAssertEqual(updater.status, .stale)
+        XCTAssertFalse(store.definitions.isEmpty)
+    }
+
+    @MainActor
+    func testNeverAcceptedExpiredCatalogEntersRecovery() async throws {
+        let key = P256.Signing.PrivateKey()
+        let data = try signedCatalog(
+            key: key, sequence: 2, definitions: [newDefinition()],
+            issuedAt: Int64(now.timeIntervalSince1970) - 7_200,
+            expiresAt: Int64(now.timeIntervalSince1970) - 3_600
+        )
+        let store = RulePackStore()
+        let updater = RulePackCatalogUpdater(
+            db: try database("expired-cold"), store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { data }, trustedSigners: [signer(key)], now: { self.now }
+        )
+
+        await updater.bootstrap()
+
+        guard case .recovery = updater.status else { return XCTFail("expired unaccepted content must fail closed") }
+        XCTAssertTrue(store.definitions.isEmpty)
+        XCTAssertNil(store.snapshot)
+    }
+
+    @MainActor
+    func testRevokedSignerForAcceptedCacheEntersRecovery() async throws {
+        let key = P256.Signing.PrivateKey()
+        let data = try signedCatalog(key: key, sequence: 2, definitions: [newDefinition()])
+        let db = try database("revoked-cache")
+        let verified = try RulePackCatalogVerifier.verify(
+            data: data, trustedSigners: [signer(key)], now: Int64(now.timeIntervalSince1970),
+            currentAppVersion: "0.15.4"
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            try RulePackCatalogComposition.compose(verified), checkedAt: now,
+            nextEligibleAt: now.addingTimeInterval(60)
+        )
+        var revoked = signer(key)
+        revoked.revoked = true
+        let store = RulePackStore()
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { data }, trustedSigners: [revoked], now: { self.now }
+        )
+
+        await updater.bootstrap()
+
+        guard case .recovery = updater.status else { return XCTFail("revoked cached signer must fail closed") }
+        XCTAssertTrue(store.definitions.isEmpty)
+        XCTAssertNil(store.snapshot)
+    }
+
+    @MainActor
+    func testPersistenceFailureDoesNotPublishCandidateDefinitions() async throws {
+        let key = P256.Signing.PrivateKey()
+        let baseline = try signedCatalog(key: key, sequence: 1, definitions: [newDefinition()])
+        var changed = newDefinition()
+        changed.manifest.version = "2"
+        let candidate = try signedCatalog(key: key, sequence: 2, definitions: [changed])
+        let db = try database("failed-publication")
+        let store = RulePackStore()
+        let response = HTTPURLResponse(
+            url: try XCTUnwrap(URL(string: RulePackCatalogVerifier.sourceURL)),
+            statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+        )!
+        let updater = RulePackCatalogUpdater(
+            db: db, store: store, currentAppVersion: "0.15.4",
+            bundledCatalog: { baseline }, transport: { _ in (candidate, response) },
+            trustedSigners: [signer(key)], now: { self.now }
+        )
+        await updater.bootstrap()
+        let before = store.definitions
+        _ = try db.raw("DROP TABLE rule_pack_catalog_cache") { _ in 0 }
+        updater.startScheduling(networkingEnabled: true)
+
+        await updater.checkNow()
+
+        XCTAssertEqual(store.definitions, before)
+        XCTAssertEqual(updater.receipt?.sequence, 1)
+        guard case .failed(_, let usingLastKnownGood) = updater.status else {
+            return XCTFail("persistence failure should be visible")
+        }
+        XCTAssertTrue(usingLastKnownGood)
     }
 
     private func productionFixture() throws -> Data {
@@ -225,7 +427,8 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
     }
 
     private func signedCatalog(key: P256.Signing.PrivateKey, sequence: Int64,
-                               definitions: [RulePackDefinition]) throws -> Data {
+                               definitions: [RulePackDefinition],
+                               issuedAt: Int64? = nil, expiresAt: Int64? = nil) throws -> Data {
         let packs = definitions.sorted { $0.id < $1.id }.map { definition in
             RulePackCatalogWirePack(
                 manifest: RulePackCatalogWireManifest(
@@ -249,8 +452,8 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
                 channel: RulePackCatalogVerifier.channel,
                 sourceURL: RulePackCatalogVerifier.sourceURL,
                 sequence: sequence,
-                issuedAt: Int64(now.timeIntervalSince1970) - 100,
-                expiresAt: Int64(now.timeIntervalSince1970) + 3_600,
+                issuedAt: issuedAt ?? Int64(now.timeIntervalSince1970) - 100,
+                expiresAt: expiresAt ?? Int64(now.timeIntervalSince1970) + 3_600,
                 publisher: RulePackCatalogVerifier.publisher,
                 packs: packs
             ),

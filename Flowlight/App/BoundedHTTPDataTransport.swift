@@ -13,6 +13,34 @@ final class BoundedHTTPDataTransport: NSObject, URLSessionDataDelegate, @uncheck
         var continuation: CheckedContinuation<(Data, URLResponse), Error>
     }
 
+    private final class TaskHandle: @unchecked Sendable {
+        private let lock = NSLock()
+        private var task: URLSessionTask?
+        private var cancelled = false
+
+        func install(_ task: URLSessionTask, cancel: (Int) -> Void) {
+            lock.lock()
+            if cancelled {
+                lock.unlock()
+                cancel(task.taskIdentifier)
+                task.cancel()
+                return
+            }
+            self.task = task
+            lock.unlock()
+        }
+
+        func cancel(_ finish: (Int) -> Void) {
+            lock.lock()
+            cancelled = true
+            let task = task
+            lock.unlock()
+            guard let task else { return }
+            finish(task.taskIdentifier)
+            task.cancel()
+        }
+    }
+
     private let maximumBytes: Int
     private let allowedOrigin: URL
     private let lock = NSLock()
@@ -20,11 +48,12 @@ final class BoundedHTTPDataTransport: NSObject, URLSessionDataDelegate, @uncheck
     private var session: URLSession!
 
     init(allowedOrigin: URL, maximumBytes: Int, requestTimeout: TimeInterval = 20,
-         resourceTimeout: TimeInterval = 30) {
+         resourceTimeout: TimeInterval = 30, protocolClasses: [AnyClass]? = nil) {
         self.allowedOrigin = allowedOrigin
         self.maximumBytes = maximumBytes
         super.init()
         let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = protocolClasses ?? configuration.protocolClasses
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
         configuration.timeoutIntervalForRequest = requestTimeout
@@ -35,20 +64,21 @@ final class BoundedHTTPDataTransport: NSObject, URLSessionDataDelegate, @uncheck
     deinit { session.invalidateAndCancel() }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await withTaskCancellationHandler {
+        let handle = TaskHandle()
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 let task = session.dataTask(with: request)
                 lock.lock()
                 pending[task.taskIdentifier] = Pending(continuation: continuation)
                 lock.unlock()
+                handle.install(task) { [weak self] taskID in
+                    self?.finish(taskID: taskID, result: .failure(CancellationError()))
+                }
                 task.resume()
             }
         } onCancel: {
-            self.lock.lock()
-            let taskIDs = Set(self.pending.keys)
-            self.lock.unlock()
-            self.session.getAllTasks { tasks in
-                for task in tasks where taskIDs.contains(task.taskIdentifier) { task.cancel() }
+            handle.cancel { [weak self] taskID in
+                self?.finish(taskID: taskID, result: .failure(CancellationError()))
             }
         }
     }
