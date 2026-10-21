@@ -4,9 +4,10 @@ enum RulePackCatalogComposition {
     /// The signed feed may replace a built-in with the same stable ID or add an official pack. Omission is not a
     /// tombstone: every built-in remains available as the signed-app emergency baseline.
     static func compose(_ catalog: VerifiedRulePackCatalog,
+                        currentAppVersion: String,
                         builtIns: [RulePackDefinition] = BuiltInRulePacks.all) throws -> VerifiedRulePackCatalog {
-        try RulePackValidator.validate(builtIns)
-        try RulePackValidator.validate(catalog.definitions)
+        try RulePackValidator.validate(builtIns, currentAppVersion: currentAppVersion)
+        try RulePackValidator.validate(catalog.definitions, currentAppVersion: currentAppVersion)
 
         var merged: [String: RulePackDefinition] = [:]
         for definition in builtIns {
@@ -23,7 +24,7 @@ enum RulePackCatalogComposition {
 
         var composed = catalog
         composed.definitions = merged.values.sorted { $0.id < $1.id }
-        try RulePackValidator.validate(composed.definitions)
+        try RulePackValidator.validate(composed.definitions, currentAppVersion: currentAppVersion)
         return composed
     }
 }

@@ -18,6 +18,7 @@ final class RulePackCatalogUpdater: ObservableObject {
         case wrongMIME(String)
         case responseTooLarge
         case missingCache
+        case rejectedCatalogInstall
 
         var description: String {
             switch self {
@@ -27,6 +28,7 @@ final class RulePackCatalogUpdater: ObservableObject {
             case .wrongMIME(let value): return "The official catalog returned an unsupported content type: \(value)."
             case .responseTooLarge: return "The official catalog exceeded the 8 MiB size limit."
             case .missingCache: return "The server reported no change, but no verified cached catalog is available."
+            case .rejectedCatalogInstall: return "The committed official catalog could not be installed."
             }
         }
     }
@@ -107,7 +109,7 @@ final class RulePackCatalogUpdater: ObservableObject {
                         receipt: receipt,
                         allowExpiredLastKnownGood: true
                     )
-                    let composed = try RulePackCatalogComposition.compose(verified)
+                    let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
                     store.installCommittedCatalog(composed, acceptance: bootstrap)
                     recoveryNeeded = false
                     status = verified.stale ? .stale : .current
@@ -118,7 +120,7 @@ final class RulePackCatalogUpdater: ObservableObject {
             }
 
             let verified = try verify(try bundledCatalog(), receipt: nil, allowExpiredLastKnownGood: false)
-            let composed = try RulePackCatalogComposition.compose(verified)
+            let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
             let checkedAt = now()
             let acceptance = try await db.asyncResult {
                 try $0.acceptVerifiedRulePackCatalog(
@@ -198,8 +200,9 @@ final class RulePackCatalogUpdater: ObservableObject {
                 try validateJSONResponse(http, data: data)
                 let prior = catalogState.receipt
                 let verified = try verify(data, receipt: prior, allowExpiredLastKnownGood: false)
-                let composed = try RulePackCatalogComposition.compose(verified)
-                let acceptance = try await db.asyncResult {
+                let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
+                let storeRevision = store.catalogInstallRevision
+                var acceptance = try await db.asyncResult {
                     try $0.acceptVerifiedRulePackCatalog(
                         composed,
                         etag: http.value(forHTTPHeaderField: "ETag"),
@@ -208,9 +211,15 @@ final class RulePackCatalogUpdater: ObservableObject {
                         nextEligibleAt: attempt.addingTimeInterval(Self.healthyInterval)
                     )
                 }
-                guard generation == requestGeneration else { return }
+                guard generation == requestGeneration,
+                      let installed = try await installCommittedCatalog(
+                          composed,
+                          acceptance: acceptance,
+                          expectedRevision: storeRevision,
+                          generation: generation
+                      ) else { return }
+                acceptance = installed
                 catalogState = acceptance.state
-                store.installCommittedCatalog(composed, acceptance: acceptance)
                 recoveryNeeded = false
                 status = .current
 
@@ -223,7 +232,8 @@ final class RulePackCatalogUpdater: ObservableObject {
                     receipt: receipt,
                     allowExpiredLastKnownGood: true
                 )
-                let composed = try RulePackCatalogComposition.compose(verified)
+                let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
+                let storeRevision = store.catalogInstallRevision
                 try await db.asyncResult {
                     try $0.recordRulePackCatalogNotModified(
                         catalogID: RulePackCatalogVerifier.catalogID,
@@ -237,8 +247,14 @@ final class RulePackCatalogUpdater: ObservableObject {
                 let acceptance = try await db.asyncResult {
                     try $0.loadRulePackCatalogBootstrap(catalogID: RulePackCatalogVerifier.catalogID)
                 }
-                catalogState = acceptance.state
-                store.installCommittedCatalog(composed, acceptance: acceptance)
+                guard generation == requestGeneration,
+                      let installed = try await installCommittedCatalog(
+                          composed,
+                          acceptance: acceptance,
+                          expectedRevision: storeRevision,
+                          generation: generation
+                      ) else { return }
+                catalogState = installed.state
                 status = verified.stale ? .stale : .current
 
             default:
@@ -250,6 +266,34 @@ final class RulePackCatalogUpdater: ObservableObject {
             guard generation == requestGeneration else { return }
             await recordFailure(error, attemptedAt: attempt)
         }
+    }
+
+    private func installCommittedCatalog(
+        _ catalog: VerifiedRulePackCatalog,
+        acceptance initialAcceptance: RulePackCatalogAcceptance,
+        expectedRevision initialRevision: Int,
+        generation: Int
+    ) async throws -> RulePackCatalogAcceptance? {
+        var acceptance = initialAcceptance
+        var expectedRevision = initialRevision
+        while generation == requestGeneration {
+            switch store.installCommittedCatalog(
+                catalog,
+                acceptance: acceptance,
+                expectedRevision: expectedRevision
+            ) {
+            case .installed:
+                return acceptance
+            case .rejected:
+                throw UpdateError.rejectedCatalogInstall
+            case .staleRevision:
+                expectedRevision = store.catalogInstallRevision
+                acceptance = try await db.asyncResult {
+                    try $0.loadRulePackCatalogBootstrap(catalogID: RulePackCatalogVerifier.catalogID)
+                }
+            }
+        }
+        return nil
     }
 
     private func makeRequest(useValidators: Bool) -> URLRequest {

@@ -1107,7 +1107,10 @@ final class TrafficDatabase: @unchecked Sendable {
     func loadRulePackCatalogBootstrap(catalogID: String) throws -> RulePackCatalogAcceptance {
         RulePackCatalogAcceptance(
             state: try loadRulePackCatalogState(catalogID: catalogID),
-            configurations: try loadRulePackConfigurationsStrictly()
+            configurations: try loadRulePackConfigurationsStrictly(),
+            overrides: try loadRulePackOverrides(),
+            events: try rulePackEvents(limit: 300),
+            deliveryStats: try rulePackDeliveryStats()
         )
     }
 
@@ -1223,7 +1226,10 @@ final class TrafficDatabase: @unchecked Sendable {
         let state = try loadRulePackCatalogState(catalogID: catalogID)
         return RulePackCatalogAcceptance(
             state: state,
-            configurations: reconciled.sorted { $0.packID < $1.packID }
+            configurations: reconciled.sorted { $0.packID < $1.packID },
+            overrides: try loadRulePackOverrides(),
+            events: try rulePackEvents(limit: 300),
+            deliveryStats: try rulePackDeliveryStats()
         )
     }
 

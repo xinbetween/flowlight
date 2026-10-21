@@ -9,7 +9,7 @@ final class TrafficMonitorRulePackStartupTests: XCTestCase {
         let definition = BuiltInRulePacks.advertising
         let verified = try productionCatalog()
         _ = try db.acceptVerifiedRulePackCatalog(
-            try RulePackCatalogComposition.compose(verified), checkedAt: Date(),
+            try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4"), checkedAt: Date(),
             nextEligibleAt: Date().addingTimeInterval(86_400)
         )
         var configuration = RulePackConfiguration(packID: definition.id, enabled: true)

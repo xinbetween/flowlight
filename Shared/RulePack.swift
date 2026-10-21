@@ -205,18 +205,21 @@ enum RulePackValidationError: Error, Equatable {
 }
 
 enum RulePackValidator {
-    static let appVersion = "0.15.0"
-
+    /// App-owned callers pass the running app version. The extension omits it because snapshots have already crossed
+    /// that trust boundary; its compatibility contract is the independently versioned extension protocol.
     static func validate(_ definitions: [RulePackDefinition], extensionProtocol: UInt16 = RulePackSnapshot.protocolVersion,
-                         currentAppVersion: String = appVersion) throws {
+                         currentAppVersion: String? = nil) throws {
         var packIDs = Set<String>()
         for definition in definitions {
             let manifest = definition.manifest
             guard manifest.format == RulePackManifest.formatVersion else {
                 throw RulePackValidationError.unsupportedFormat(manifest.id)
             }
-            guard manifest.minimumExtensionProtocol <= extensionProtocol,
-                  compareVersions(manifest.minimumAppVersion, currentAppVersion) != .orderedDescending else {
+            guard manifest.minimumExtensionProtocol <= extensionProtocol else {
+                throw RulePackValidationError.incompatibleProtocol(manifest.id)
+            }
+            if let currentAppVersion,
+               compareVersions(manifest.minimumAppVersion, currentAppVersion) == .orderedDescending {
                 throw RulePackValidationError.incompatibleProtocol(manifest.id)
             }
             guard !manifest.id.isEmpty,

@@ -55,7 +55,7 @@ final class TrafficMonitor: ObservableObject {
     /// Everything Flowlight has been told to block or allow, and what those rules have done.
     let rules = RuleStore()
     /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
-    let rulePacks = RulePackStore()
+    let rulePacks: RulePackStore
     /// Signed official catalog bootstrap, cache re-verification, and bounded refresh state.
     private(set) var rulePackCatalog: RulePackCatalogUpdater!
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
@@ -109,6 +109,7 @@ final class TrafficMonitor: ObservableObject {
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
         self.trafficSourceFactory = trafficSourceFactory
         catalogTransportInjected = catalogTransport != nil
+        rulePacks = RulePackStore(currentAppVersion: ExtensionManager.appVersion)
         do {
             if let databaseURL {
                 db = try TrafficDatabase(url: databaseURL)

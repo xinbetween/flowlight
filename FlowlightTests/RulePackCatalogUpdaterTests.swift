@@ -67,9 +67,11 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
     @MainActor
     func testVerified200PersistsValidatorsAndInstallsNewPackDefaultOff() async throws {
         let key = P256.Signing.PrivateKey()
-        let data = try signedCatalog(key: key, sequence: 2, definitions: [newDefinition()])
+        var compatible = newDefinition()
+        compatible.manifest.minimumAppVersion = "0.15.4"
+        let data = try signedCatalog(key: key, sequence: 2, definitions: [compatible])
         let db = try database("accepted-200")
-        let store = RulePackStore()
+        let store = RulePackStore(currentAppVersion: "0.15.4")
         let response = HTTPURLResponse(
             url: try XCTUnwrap(URL(string: RulePackCatalogVerifier.sourceURL)),
             statusCode: 200, httpVersion: nil,
@@ -133,7 +135,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
             data: sequenceTwo, trustedSigners: [signer(key)], now: Int64(now.timeIntervalSince1970),
             currentAppVersion: "0.15.4"
         )
-        let composed = try RulePackCatalogComposition.compose(verified)
+        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4")
         let db = try database("missing-cache")
         _ = try db.acceptVerifiedRulePackCatalog(
             composed, etag: "stale-validator", checkedAt: now,
@@ -295,7 +297,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         )
         let db = try database("expired-lkg")
         _ = try db.acceptVerifiedRulePackCatalog(
-            try RulePackCatalogComposition.compose(verified), checkedAt: acceptedAt,
+            try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4"), checkedAt: acceptedAt,
             nextEligibleAt: acceptedAt.addingTimeInterval(60)
         )
         let store = RulePackStore()
@@ -341,7 +343,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
             currentAppVersion: "0.15.4"
         )
         _ = try db.acceptVerifiedRulePackCatalog(
-            try RulePackCatalogComposition.compose(verified), checkedAt: now,
+            try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4"), checkedAt: now,
             nextEligibleAt: now.addingTimeInterval(60)
         )
         var revoked = signer(key)

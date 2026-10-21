@@ -25,6 +25,12 @@ final class RulePackStore: ObservableObject {
         var succeeded: Bool { self == .saved }
     }
 
+    enum CatalogInstallResult: Equatable, Sendable {
+        case installed
+        case staleRevision
+        case rejected
+    }
+
     @Published private(set) var configurations: [RulePackConfiguration] = []
     @Published private(set) var overrides: [RulePackOverride] = []
     @Published private(set) var events: [RulePackEventRecord] = []
@@ -39,10 +45,13 @@ final class RulePackStore: ObservableObject {
     private var catalogReceipt: RulePackCatalogReceipt?
     private var committedSnapshot: RulePackSnapshot?
     private var revision = 0
+    private let currentAppVersion: String
 
-    init(definitions: [RulePackDefinition] = BuiltInRulePacks.all) {
+    init(definitions: [RulePackDefinition] = BuiltInRulePacks.all,
+         currentAppVersion: String = ExtensionManager.appVersion) {
         self.definitions = definitions.sorted { $0.id < $1.id }
-        do { try RulePackValidator.validate(self.definitions) }
+        self.currentAppVersion = currentAppVersion
+        do { try RulePackValidator.validate(self.definitions, currentAppVersion: currentAppVersion) }
         catch {
             definitionsValid = false
             status = .failed("Built-in pack validation failed: \(error)")
@@ -58,6 +67,7 @@ final class RulePackStore: ObservableObject {
     }
 
     var snapshot: RulePackSnapshot? { committedSnapshot }
+    var catalogInstallRevision: Int { revision }
 
     func configuration(for packID: String) -> RulePackConfiguration {
         configurations.first { $0.packID == packID } ?? RulePackConfiguration(packID: packID)
@@ -126,19 +136,22 @@ final class RulePackStore: ObservableObject {
         publish()
     }
 
-    /// Installs definitions only after `acceptVerifiedRulePackCatalog` committed them. A newer local mutation bumps
-    /// the revision first, so an older asynchronous install result cannot overwrite it.
+    /// Installs definitions only after `acceptVerifiedRulePackCatalog` committed them. The optional revision is a
+    /// compare-and-swap guard: a local save that publishes while catalog I/O is suspended makes captured state stale.
+    @discardableResult
     func installCommittedCatalog(_ catalog: VerifiedRulePackCatalog,
-                                 acceptance: RulePackCatalogAcceptance) {
-        do { try RulePackValidator.validate(catalog.definitions) }
+                                 acceptance: RulePackCatalogAcceptance,
+                                 expectedRevision: Int? = nil) -> CatalogInstallResult {
+        guard expectedRevision == nil || expectedRevision == revision else { return .staleRevision }
+        do { try RulePackValidator.validate(catalog.definitions, currentAppVersion: currentAppVersion) }
         catch {
             status = .failed("Verified pack validation failed: \(error)")
-            return
+            return .rejected
         }
         guard acceptance.state.receipt?.sequence == catalog.sequence,
               acceptance.state.receipt?.digest == catalog.digest else {
             status = .failed("Verified catalog receipt does not match committed storage.")
-            return
+            return .rejected
         }
         revision += 1
         definitions = catalog.definitions.sorted { $0.id < $1.id }
@@ -146,9 +159,11 @@ final class RulePackStore: ObservableObject {
         catalogReceipt = acceptance.state.receipt
         configurations = effectiveConfigurations(from: acceptance.configurations)
         let known = Set(definitions.map(\.id))
-        overrides = overrides.filter { known.contains($0.packID) }
-        events = events.filter { known.contains($0.packID) }
+        overrides = acceptance.overrides.filter { known.contains($0.packID) }
+        events = acceptance.events.filter { known.contains($0.packID) }
+        deliveryStats = acceptance.deliveryStats
         publish()
+        return .installed
     }
 
     /// Receipt-free writes can only narrow enforcement. Every enabling path must use the immutable-review overload.
@@ -283,6 +298,7 @@ final class RulePackStore: ObservableObject {
                 let events = try db.rulePackEvents(limit: 300)
                 let deliveryStats = try db.rulePackDeliveryStats()
                 Task { @MainActor in
+                    self?.revision += 1
                     self?.events = events
                     self?.deliveryStats = deliveryStats
                     self?.version += 1
@@ -298,6 +314,7 @@ final class RulePackStore: ObservableObject {
     func events(for packID: String) -> [RulePackEventRecord] { events.filter { $0.packID == packID } }
 
     func clearActivity() {
+        revision += 1
         events = []
         deliveryStats = RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0)
         version += 1

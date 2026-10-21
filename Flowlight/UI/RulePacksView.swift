@@ -413,7 +413,7 @@ private struct RulePackEditor: View {
 
     private var destinations: some View {
         DisclosureGroup(L("%lld destinations", pack.entries.count)) {
-            VStack(alignment: .leading, spacing: 3) {
+            LazyVStack(alignment: .leading, spacing: 3) {
                 ForEach(pack.entries) { entry in
                     Text(entry.host).font(.caption.monospaced()).textSelection(.enabled)
                 }
@@ -520,7 +520,7 @@ private struct RulePackEditor: View {
                   packVersion == packs.version,
                   ruleVersion == rules.version,
                   dataVersion == monitor.dataVersion else { return }
-            preview = RulePackSimulation.run(candidate: candidate, definitions: [pack],
+            preview = RulePackSimulation.run(candidate: candidate, definitions: packs.definitions,
                                              configurations: packs.configurations,
                                              overrides: packs.overrides, rules: rules.rules,
                                              policies: input.1, paused: rules.isPaused,

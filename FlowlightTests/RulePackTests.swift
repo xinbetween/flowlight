@@ -90,6 +90,8 @@ final class RulePackTests: XCTestCase {
         XCTAssertThrowsError(try RulePackValidator.validate([newerApp], currentAppVersion: "0.15.0")) {
             XCTAssertEqual($0 as? RulePackValidationError, .incompatibleProtocol(valid.id))
         }
+        XCTAssertNoThrow(try RulePackValidator.validate([newerApp]),
+                         "the extension validates protocol compatibility after the app has admitted the snapshot")
     }
 
     func testSimulationReportsOnlyNewlyBlockedTraffic() throws {
@@ -106,6 +108,27 @@ final class RulePackTests: XCTestCase {
         let unchanged = RulePackSimulation.run(candidate: candidate, definitions: [definition], configurations: [],
                                                overrides: [], rules: [alreadyBlocked], flows: [flow])
         XCTAssertTrue(unchanged.isEmpty)
+    }
+
+    func testSimulationIncludesOtherEnabledPacksInBaseline() {
+        let entry = RulePackEntry(id: 1, host: "ads.example", category: .advertising)
+        let candidateDefinition = pack(id: "official.candidate", entries: [entry])
+        let activeDefinition = pack(id: "official.active", entries: [entry])
+        let candidate = RulePackConfiguration(packID: candidateDefinition.id)
+        let active = RulePackConfiguration(packID: activeDefinition.id, enabled: true)
+        let flow = RuleSimulation.Flow(
+            when: Date(), agentKey: "com.apple.Safari", bundleID: "com.apple.Safari",
+            appName: "Safari", host: "cdn.ads.example", ip: "203.0.113.7", port: 443,
+            bytes: 50, connections: 2
+        )
+
+        let result = RulePackSimulation.run(
+            candidate: candidate,
+            definitions: [activeDefinition, candidateDefinition],
+            configurations: [active], overrides: [], rules: [], flows: [flow]
+        )
+
+        XCTAssertTrue(result.isEmpty, "an already-enforced destination is not a newly refused connection")
     }
 
     func testSimulationUsesSafetyPauseRulesAndAgentPolicyPrecedence() {
@@ -520,6 +543,63 @@ final class RulePackTests: XCTestCase {
     }
 
     @MainActor
+    func testClearingActivityRejectsCatalogInstallWithCapturedEvents() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-clear-race-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let definition = BuiltInRulePacks.advertising
+        let catalog = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 1, digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("one".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog, checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        let batch = RulePackEventBatch(events: [
+            RulePackEvent(
+                bucket: 1_700_000_000, packID: definition.id, packVersion: definition.manifest.version,
+                entryID: 1, category: .advertising, action: .block, count: 1,
+                firstAt: 1_700_000_001, lastAt: 1_700_000_001,
+                bundleID: "com.apple.Safari", appName: "Safari",
+                agentKey: "com.apple.Safari", agentName: "Safari", host: "ads.example",
+                matchedHost: "ads.example", port: 443
+            ),
+        ], droppedHits: 2, droppedKeys: 1)
+        XCTAssertTrue(try db.recordRulePackEventBatch(batch))
+
+        let store = RulePackStore(definitions: [definition], currentAppVersion: "0.15.4")
+        XCTAssertEqual(
+            store.installCommittedCatalog(
+                catalog,
+                acceptance: try db.loadRulePackCatalogBootstrap(
+                    catalogID: RulePackCatalogVerifier.catalogID
+                )
+            ),
+            .installed
+        )
+        XCTAssertFalse(store.events.isEmpty)
+        let expectedRevision = store.catalogInstallRevision
+        let captured = try db.loadRulePackCatalogBootstrap(
+            catalogID: RulePackCatalogVerifier.catalogID
+        )
+
+        try db.clearAll()
+        store.clearActivity()
+
+        XCTAssertEqual(
+            store.installCommittedCatalog(
+                catalog,
+                acceptance: captured,
+                expectedRevision: expectedRevision
+            ),
+            .staleRevision
+        )
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertEqual(store.deliveryStats, RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0))
+    }
+
+    @MainActor
     func testChangedPackRequiresFreshConsent() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-consent-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
@@ -642,6 +722,143 @@ final class RulePackTests: XCTestCase {
         XCTAssertFalse(store.configuration(for: original.id).enabled)
         XCTAssertNil(store.snapshot)
         candidate.enabled = false
+    }
+
+    @MainActor
+    func testOmittedAndReintroducedPackRestoresDurableException() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-reintroduced-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        var definition = BuiltInRulePacks.advertising
+        definition.manifest.id = "official.reintroduced"
+        let first = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 1, digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("one".utf8)
+        )
+        let firstAcceptance = try db.acceptVerifiedRulePackCatalog(
+            first, checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        var configuration = RulePackConfiguration(packID: definition.id, enabled: true)
+        configuration.consentedVersion = definition.manifest.version
+        configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+        let exception = RulePackOverride(
+            packID: definition.id, app: "com.apple.Safari", host: definition.entries[0].host
+        )
+        try db.saveRulePackOverride(exception)
+
+        let store = RulePackStore(definitions: [definition], currentAppVersion: "0.15.4")
+        store.installCommittedCatalog(first, acceptance: try db.loadRulePackCatalogBootstrap(
+            catalogID: RulePackCatalogVerifier.catalogID
+        ))
+        XCTAssertEqual(firstAcceptance.state.receipt?.sequence, 1)
+        XCTAssertEqual(store.overrides, [exception])
+        XCTAssertNotNil(store.snapshot)
+
+        let omitted = VerifiedRulePackCatalog(
+            definitions: [], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("two".utf8)
+        )
+        let omissionAcceptance = try db.acceptVerifiedRulePackCatalog(
+            omitted, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
+        store.installCommittedCatalog(omitted, acceptance: omissionAcceptance)
+        XCTAssertTrue(store.overrides.isEmpty)
+        XCTAssertNil(store.snapshot)
+
+        let reintroduced = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 3, digest: String(repeating: "3", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("three".utf8)
+        )
+        let reintroductionAcceptance = try db.acceptVerifiedRulePackCatalog(
+            reintroduced, checkedAt: Date(timeIntervalSince1970: 500),
+            nextEligibleAt: Date(timeIntervalSince1970: 600)
+        )
+        store.installCommittedCatalog(reintroduced, acceptance: reintroductionAcceptance)
+
+        XCTAssertEqual(store.overrides, [exception])
+        XCTAssertEqual(store.snapshot?.overrides, [exception])
+        XCTAssertTrue(store.configuration(for: definition.id).enabled)
+    }
+
+    @MainActor
+    func testCatalogInstallDoesNotOverwriteNewerLocalDisable() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-catalog-race-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let definition = BuiltInRulePacks.advertising
+        let first = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 1, digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("one".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            first, checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        var enabled = RulePackConfiguration(packID: definition.id, enabled: true)
+        enabled.consentedVersion = definition.manifest.version
+        enabled.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(enabled)
+
+        let store = RulePackStore(definitions: [definition], currentAppVersion: "0.15.4")
+        store.attach(db: db)
+        try await waitUntil { store.reviewReceipt(for: definition) != nil }
+        XCTAssertEqual(
+            store.installCommittedCatalog(
+                first,
+                acceptance: try db.loadRulePackCatalogBootstrap(
+                    catalogID: RulePackCatalogVerifier.catalogID
+                )
+            ),
+            .installed
+        )
+        XCTAssertNotNil(store.snapshot)
+
+        let expectedRevision = store.catalogInstallRevision
+        let refreshed = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("two".utf8)
+        )
+        let staleAcceptance = try db.acceptVerifiedRulePackCatalog(
+            refreshed, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
+
+        var disabled = enabled
+        disabled.enabled = false
+        await withCheckedContinuation { continuation in
+            store.save(disabled) { saved in
+                XCTAssertTrue(saved)
+                continuation.resume()
+            }
+        }
+        XCTAssertNil(store.snapshot)
+        XCTAssertEqual(
+            store.installCommittedCatalog(
+                refreshed,
+                acceptance: staleAcceptance,
+                expectedRevision: expectedRevision
+            ),
+            .staleRevision
+        )
+        XCTAssertFalse(store.configuration(for: definition.id).enabled)
+        XCTAssertNil(store.snapshot)
+
+        let currentRevision = store.catalogInstallRevision
+        XCTAssertEqual(
+            store.installCommittedCatalog(
+                refreshed,
+                acceptance: try db.loadRulePackCatalogBootstrap(
+                    catalogID: RulePackCatalogVerifier.catalogID
+                ),
+                expectedRevision: currentRevision
+            ),
+            .installed
+        )
+        XCTAssertFalse(store.configuration(for: definition.id).enabled)
+        XCTAssertNil(store.snapshot)
     }
 
     func testEditorActivationAndCancelNeverMutateSavedConfiguration() {
@@ -861,7 +1078,7 @@ final class RulePackTests: XCTestCase {
         let verified = try RulePackCatalogVerifier.verify(
             data: data, now: 1_800_000_000, currentAppVersion: "0.15.4"
         )
-        let composed = try RulePackCatalogComposition.compose(verified)
+        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4")
         _ = try db.acceptVerifiedRulePackCatalog(
             composed,
             checkedAt: Date(timeIntervalSince1970: 1_800_000_000),

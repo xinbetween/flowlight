@@ -16,7 +16,7 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
             definitions: [added, replacement]
         )
 
-        let composed = try RulePackCatalogComposition.compose(catalog)
+        let composed = try RulePackCatalogComposition.compose(catalog, currentAppVersion: "0.15.4")
 
         XCTAssertEqual(composed.definitions.map(\.id),
                        ["official.added", "official.advertising", "official.telemetry", "official.tracking"])
@@ -25,6 +25,21 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
                        BuiltInRulePacks.telemetry)
         XCTAssertEqual(composed.rawEnvelope, catalog.rawEnvelope)
         XCTAssertEqual(composed.digest, catalog.digest)
+    }
+
+    func testCompositionUsesRunningAppVersionForCompatibleCatalog() throws {
+        var definition = BuiltInRulePacks.advertising
+        definition.manifest.minimumAppVersion = "0.15.4"
+        let catalog = verifiedCatalog(
+            sequence: 2,
+            digest: String(repeating: "a", count: 64),
+            definitions: [definition]
+        )
+
+        XCTAssertNoThrow(try RulePackCatalogComposition.compose(catalog, currentAppVersion: "0.15.4"))
+        XCTAssertThrowsError(try RulePackCatalogComposition.compose(catalog, currentAppVersion: "0.15.3")) {
+            XCTAssertEqual($0 as? RulePackValidationError, .incompatibleProtocol(definition.id))
+        }
     }
 
     func testCatalogAcceptancePersistsExactBytesAndSurvivesReopen() throws {

@@ -31,6 +31,13 @@ SIGN=()
 productbuild --package "$WORK/Flowlight-component.pkg" --identifier com.flowlight.app.installer --version "$VERSION" \
   "${SIGN[@]}" "build/Flowlight-$VERSION.pkg"
 
+PAYLOAD_FILES="$WORK/payload-files.txt"
+pkgutil --payload-files "build/Flowlight-$VERSION.pkg" > "$PAYLOAD_FILES"
+if grep -Eq '/\._|/\.__|^\./\._' "$PAYLOAD_FILES"; then
+  echo "Package contains AppleDouble metadata files." >&2
+  exit 1
+fi
+
 # A signed installer still needs notarizing, or macOS refuses to open it.
 if [[ ${#SIGN[@]} -gt 0 ]]; then scripts/notarize.sh "build/Flowlight-$VERSION.pkg"; fi
 echo "Built build/Flowlight-$VERSION.pkg"
