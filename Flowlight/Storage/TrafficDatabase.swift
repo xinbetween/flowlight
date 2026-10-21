@@ -1104,6 +1104,13 @@ final class TrafficDatabase: @unchecked Sendable {
             """, [.text(configuration.packID), .text(json), .int(Int64(updatedAt.timeIntervalSince1970))])
     }
 
+    func loadRulePackCatalogBootstrap(catalogID: String) throws -> RulePackCatalogAcceptance {
+        RulePackCatalogAcceptance(
+            state: try loadRulePackCatalogState(catalogID: catalogID),
+            configurations: try loadRulePackConfigurationsStrictly()
+        )
+    }
+
     func loadRulePackCatalogState(catalogID: String) throws -> RulePackCatalogState {
         guard !catalogID.isEmpty else { throw RulePackCatalogPersistenceError.invalidCatalogID }
         let receipt = try loadRulePackCatalogReceipt(catalogID: catalogID)
@@ -1248,6 +1255,15 @@ final class TrafficDatabase: @unchecked Sendable {
                 """, [.text(catalogID), .int(checked), .int(checked),
                       .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("not-modified")])
         }
+    }
+
+    func setRulePackCatalogAutomaticRefresh(catalogID: String, enabled: Bool) throws {
+        guard !catalogID.isEmpty else { throw RulePackCatalogPersistenceError.invalidCatalogID }
+        try conn.run("""
+            INSERT INTO rule_pack_catalog_updates (catalog_id, automatic_refresh, failure_count)
+            VALUES (?,?,0)
+            ON CONFLICT(catalog_id) DO UPDATE SET automatic_refresh = excluded.automatic_refresh
+            """, [.text(catalogID), .int(enabled ? 1 : 0)])
     }
 
     func recordRulePackCatalogFailure(catalogID: String,

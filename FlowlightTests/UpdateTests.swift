@@ -139,6 +139,30 @@ final class UpdateTests: XCTestCase {
         XCTAssertFalse(checker.showWindow)
     }
 
+    @MainActor
+    func testReleaseLookupUsesExplicitRequestHeaders() async {
+        final class Capture: @unchecked Sendable { var request: URLRequest? }
+        let capture = Capture()
+        let data = Data(#"{"tag_name":"v1.0.0","name":"Flowlight","body":"","html_url":"https://example.invalid","draft":false,"prerelease":false,"assets":[]}"#.utf8)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com/repos/xinbetween/flowlight/releases/latest")!,
+            statusCode: 200, httpVersion: nil, headerFields: nil
+        )!
+        let checker = UpdateChecker { request in
+            capture.request = request
+            return (data, response)
+        }
+
+        await checker.check(userInitiated: false)
+
+        XCTAssertEqual(capture.request?.url, response.url)
+        XCTAssertEqual(capture.request?.httpMethod, "GET")
+        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "User-Agent"),
+                       "Flowlight/\(checker.currentVersion)")
+        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "Accept"),
+                       "application/vnd.github+json")
+    }
+
     func testReleaseNotesAreReadable() {
         let notes = "**Early preview.** Hi\n\n### What's new\n- One\n- Two\n\n### Checksums (SHA-256)\n```\nabc  Flowlight.dmg\n```"
         let text = ReleaseNotes.readable(notes)

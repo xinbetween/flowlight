@@ -6,6 +6,27 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
     private let acceptedAt = Date(timeIntervalSince1970: 1_800_000_000)
     private let nextCheck = Date(timeIntervalSince1970: 1_800_086_400)
 
+    func testCompositionOverlaysAddsAndRetainsOmittedBuiltIns() throws {
+        var replacement = BuiltInRulePacks.advertising
+        replacement.manifest.version = "2"
+        var added = BuiltInRulePacks.tracking
+        added.manifest.id = "official.added"
+        let catalog = verifiedCatalog(
+            sequence: 2, digest: String(repeating: "a", count: 64),
+            definitions: [added, replacement]
+        )
+
+        let composed = try RulePackCatalogComposition.compose(catalog)
+
+        XCTAssertEqual(composed.definitions.map(\.id),
+                       ["official.added", "official.advertising", "official.telemetry", "official.tracking"])
+        XCTAssertEqual(composed.definitions.first { $0.id == replacement.id }?.manifest.version, "2")
+        XCTAssertEqual(composed.definitions.first { $0.id == BuiltInRulePacks.telemetry.id },
+                       BuiltInRulePacks.telemetry)
+        XCTAssertEqual(composed.rawEnvelope, catalog.rawEnvelope)
+        XCTAssertEqual(composed.digest, catalog.digest)
+    }
+
     func testCatalogAcceptancePersistsExactBytesAndSurvivesReopen() throws {
         let url = temporaryDatabaseURL("catalog-reopen")
         var db: TrafficDatabase? = try TrafficDatabase(url: url)

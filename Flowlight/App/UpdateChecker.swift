@@ -121,7 +121,7 @@ final class UpdateChecker: ObservableObject {
     private var timer: Timer?
     private var downloadTask: Task<Void, Never>?
     /// Fixture seam for release metadata only; downloads always use the private ephemeral session below.
-    private let releaseTransport: (@Sendable (URL) async throws -> (Data, URLResponse))?
+    private let releaseTransport: HTTPDataTransport?
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -132,7 +132,7 @@ final class UpdateChecker: ObservableObject {
     }()
 
     init(bundle: Bundle = .main,
-         releaseTransport: (@Sendable (URL) async throws -> (Data, URLResponse))? = nil) {
+         releaseTransport: HTTPDataTransport? = nil) {
         currentVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         repository = bundle.object(forInfoDictionaryKey: "FLUpdateRepository") as? String ?? "xinbetween/flowlight"
         self.releaseTransport = releaseTransport
@@ -189,11 +189,15 @@ final class UpdateChecker: ObservableObject {
         state = .checking
         do {
             let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Flowlight/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
             let (data, response): (Data, URLResponse)
             if let releaseTransport {
-                (data, response) = try await releaseTransport(url)
+                (data, response) = try await releaseTransport(request)
             } else {
-                (data, response) = try await session.data(from: url)
+                (data, response) = try await session.data(for: request)
             }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard code == 200 else { throw code == 404 ? UpdateError.noRelease : UpdateError.badResponse(code) }

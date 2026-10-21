@@ -78,12 +78,12 @@ final class RulePackStore: ObservableObject {
         )
     }
 
-    func attach(db: TrafficDatabase) {
+    func attach(db: TrafficDatabase, completion: (() -> Void)? = nil) {
         self.db = db
-        reload()
+        reload(completion: completion)
     }
 
-    func reload() {
+    func reload(completion: (() -> Void)? = nil) {
         guard let db else { return }
         revision += 1
         let expectedRevision = revision
@@ -99,11 +99,26 @@ final class RulePackStore: ObservableObject {
                 self.catalogReceipt = loaded.4
                 self.applyLoaded(configurations: loaded.0, overrides: loaded.1,
                                  events: loaded.2, deliveryStats: loaded.3)
+                completion?()
             } catch {
                 guard let self, self.revision == expectedRevision else { return }
                 self.status = .failed("Could not load rule packs: \(String(describing: error))")
+                completion?()
             }
         }
+    }
+
+    /// Prevents a higher durable watermark with missing/corrupt bytes from falling back to bundled enforcement while
+    /// a recovery copy is fetched. Saved scope and consent remain in SQLite; no definition can enter a snapshot.
+    func enterCatalogRecovery() {
+        revision += 1
+        definitions = []
+        definitionsValid = true
+        catalogReceipt = nil
+        configurations = []
+        overrides = []
+        committedSnapshot = nil
+        publish()
     }
 
     /// Installs definitions only after `acceptVerifiedRulePackCatalog` committed them. A newer local mutation bumps
@@ -131,29 +146,25 @@ final class RulePackStore: ObservableObject {
         publish()
     }
 
-    /// Compatibility path for non-editor callers. The editor uses the receipt-bearing overload below; this method
-    /// remains for existing programmatic toggles and is removed once every caller has an immutable review context.
+    /// Receipt-free writes can only narrow enforcement. Every enabling path must use the immutable-review overload.
     func save(_ configuration: RulePackConfiguration, completion: ((Bool) -> Void)? = nil) {
-        guard let definition = definitions.first(where: { $0.id == configuration.packID }) else {
+        guard definitions.contains(where: { $0.id == configuration.packID }), !configuration.enabled else {
             completion?(false)
             return
         }
         var cleaned = configuration
-        if cleaned.enabled {
-            cleaned.consentedVersion = definition.manifest.version
-            cleaned.consentedContentSHA256 = definition.manifest.contentSHA256
-        }
         cleaned.apps = Array(Set(configuration.apps.map {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }.filter { !$0.isEmpty })).sorted()
         if cleaned.scope == .selectedApps && cleaned.apps.isEmpty { cleaned.enabled = false }
-        persist({ try $0.saveRulePackConfiguration(cleaned) }, then: { [weak self] in
+        let committed = cleaned
+        persist({ try $0.saveRulePackConfiguration(committed) }, then: { [weak self] in
             guard let self else { completion?(false); return }
             self.revision += 1
-            if let index = self.configurations.firstIndex(where: { $0.packID == cleaned.packID }) {
-                self.configurations[index] = cleaned
+            if let index = self.configurations.firstIndex(where: { $0.packID == committed.packID }) {
+                self.configurations[index] = committed
             } else {
-                self.configurations.append(cleaned)
+                self.configurations.append(committed)
                 self.configurations.sort { $0.packID < $1.packID }
             }
             self.publish()
@@ -191,16 +202,18 @@ final class RulePackStore: ObservableObject {
             durableReceipt = receipt
         }
 
-        persist({ try $0.saveRulePackConfiguration(cleaned, reviewed: durableReceipt) }, then: { [weak self] in
+        let committed = cleaned
+        let committedReceipt = durableReceipt
+        persist({ try $0.saveRulePackConfiguration(committed, reviewed: committedReceipt) }, then: { [weak self] in
             guard let self else {
                 completion?(.failed("Rule pack storage is unavailable."))
                 return
             }
             self.revision += 1
-            if let index = self.configurations.firstIndex(where: { $0.packID == cleaned.packID }) {
-                self.configurations[index] = cleaned
+            if let index = self.configurations.firstIndex(where: { $0.packID == committed.packID }) {
+                self.configurations[index] = committed
             } else {
-                self.configurations.append(cleaned)
+                self.configurations.append(committed)
                 self.configurations.sort { $0.packID < $1.packID }
             }
             self.publish()
@@ -229,11 +242,12 @@ final class RulePackStore: ObservableObject {
         var cleaned = override
         cleaned.host = host
         cleaned.app = override.app.trimmingCharacters(in: .whitespacesAndNewlines)
-        persist({ try $0.saveRulePackOverride(cleaned) }, then: { [weak self] in
+        let committed = cleaned
+        persist({ try $0.saveRulePackOverride(committed) }, then: { [weak self] in
             guard let self else { completion?(false); return }
             self.revision += 1
-            self.overrides.removeAll { $0.id == cleaned.id || $0.hasSameScope(as: cleaned) }
-            self.overrides.append(cleaned)
+            self.overrides.removeAll { $0.id == committed.id || $0.hasSameScope(as: committed) }
+            self.overrides.append(committed)
             self.publish()
             completion?(true)
         }, onFailure: { _ in completion?(false) })

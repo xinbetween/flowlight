@@ -307,15 +307,15 @@ final class RulePackTests: XCTestCase {
     func testStorePublishesOnlyAfterConfigurationCommit() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-store-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
+        let store = try await attachedStore(db: db)
 
         var publications = [RulePackSnapshot?]()
         store.onChange = { publications.append($0) }
-        var enabled = store.configuration(for: "official.advertising")
+        let definition = BuiltInRulePacks.advertising
+        var enabled = store.configuration(for: definition.id)
         enabled.enabled = true
-        store.save(enabled)
+        store.save(enabled, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition)))
 
         XCTAssertTrue(publications.isEmpty)
         try await waitUntil { publications.count == 1 }
@@ -331,17 +331,15 @@ final class RulePackTests: XCTestCase {
     func testStoreDisablesEmptySelectedAppConfiguration() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-empty-scope-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
+        let store = try await attachedStore(db: db)
 
         var candidate = store.configuration(for: "official.advertising")
         candidate.enabled = true
         candidate.scope = .selectedApps
         candidate.apps = ["  ", "\n"]
         var completed = false
-        store.save(candidate) { success in
-            XCTAssertTrue(success)
+        store.save(candidate, reviewedDefinition: BuiltInRulePacks.advertising, receipt: nil) { result in
+            XCTAssertEqual(result, .saved)
             completed = true
         }
 
@@ -358,17 +356,17 @@ final class RulePackTests: XCTestCase {
     func testStoreSaveCompletionSeesCommittedConfiguration() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-completion-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
+        let store = try await attachedStore(db: db)
 
         var candidate = store.configuration(for: "official.advertising")
         candidate.enabled = true
         candidate.scope = .selectedApps
         candidate.apps = ["com.apple.curl"]
         var completed = false
-        store.save(candidate) { success in
-            XCTAssertTrue(success)
+        let definition = BuiltInRulePacks.advertising
+        store.save(candidate, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition))) { result in
+            XCTAssertEqual(result, .saved)
             XCTAssertEqual(store.configuration(for: candidate.packID).scope, .selectedApps)
             XCTAssertEqual(store.configuration(for: candidate.packID).apps, ["com.apple.curl"])
             XCTAssertNotNil(store.snapshot)
@@ -467,16 +465,16 @@ final class RulePackTests: XCTestCase {
     func testStorePublishesAfterTransientFailureRecovers() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-recovery-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
+        let store = try await attachedStore(db: db)
 
         var publications = [RulePackSnapshot?]()
         store.onChange = { publications.append($0) }
         store.updateStatus(.failed("transient storage failure"))
-        var enabled = store.configuration(for: "official.advertising")
+        let definition = BuiltInRulePacks.advertising
+        var enabled = store.configuration(for: definition.id)
         enabled.enabled = true
-        store.save(enabled)
+        store.save(enabled, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition)))
 
         try await waitUntil { publications.count == 1 }
         let saved = try db.sync { try $0.loadRulePackConfigurations() }
@@ -490,13 +488,13 @@ final class RulePackTests: XCTestCase {
     func testClearingStoreActivityKeepsConfigurationAndExceptions() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-pack-clear-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
+        let store = try await attachedStore(db: db)
 
-        var configuration = store.configuration(for: "official.advertising")
+        let definition = BuiltInRulePacks.advertising
+        var configuration = store.configuration(for: definition.id)
         configuration.enabled = true
-        store.save(configuration)
+        store.save(configuration, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition)))
         let exception = RulePackOverride(packID: configuration.packID, app: "com.apple.Safari", host: "ads.example")
         store.addOverride(exception)
         let batch = RulePackEventBatch(events: [
@@ -575,12 +573,12 @@ final class RulePackTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("flowlight-pack-generation-\(UUID().uuidString).sqlite")
         let db = try TrafficDatabase(url: url)
-        let store = RulePackStore()
-        store.attach(db: db)
-        try await waitUntil { store.configurations.count == store.definitions.count }
-        var configuration = store.configuration(for: BuiltInRulePacks.advertising.id)
+        let store = try await attachedStore(db: db)
+        let definition = BuiltInRulePacks.advertising
+        var configuration = store.configuration(for: definition.id)
         configuration.enabled = true
-        store.save(configuration)
+        store.save(configuration, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition)))
         try await waitUntil { store.snapshot != nil }
 
         let first = try XCTUnwrap(store.snapshot)
@@ -591,7 +589,8 @@ final class RulePackTests: XCTestCase {
         configuration = store.configuration(for: configuration.packID)
         configuration.scope = .selectedApps
         configuration.apps = ["com.apple.Safari"]
-        store.save(configuration)
+        store.save(configuration, reviewedDefinition: definition,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: definition)))
         try await waitUntil { store.snapshot?.digest != first.digest }
         XCTAssertNotEqual(store.snapshot?.generation, first.generation)
     }
@@ -852,6 +851,26 @@ final class RulePackTests: XCTestCase {
                       lastAt: 1_700_000_002, bundleID: "com.apple.Safari", appName: "Safari",
                       agentKey: agentKey, agentName: agentKey, host: "ads.example",
                       matchedHost: matchedHost, port: 443)
+    }
+
+    @MainActor
+    private func attachedStore(db: TrafficDatabase) async throws -> RulePackStore {
+        let fixture = try XCTUnwrap(Bundle.main.url(forResource: "official", withExtension: "json"))
+        let data = try Data(contentsOf: fixture)
+        let verified = try RulePackCatalogVerifier.verify(
+            data: data, now: 1_800_000_000, currentAppVersion: "0.15.4"
+        )
+        let composed = try RulePackCatalogComposition.compose(verified)
+        _ = try db.acceptVerifiedRulePackCatalog(
+            composed,
+            checkedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            nextEligibleAt: Date(timeIntervalSince1970: 1_800_086_400)
+        )
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count
+            && store.reviewReceipt(for: BuiltInRulePacks.advertising) != nil }
+        return store
     }
 
     @MainActor

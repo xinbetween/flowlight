@@ -56,6 +56,8 @@ final class TrafficMonitor: ObservableObject {
     let rules = RuleStore()
     /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
     let rulePacks = RulePackStore()
+    /// Signed official catalog bootstrap, cache re-verification, and bounded refresh state.
+    private(set) var rulePackCatalog: RulePackCatalogUpdater!
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
     let guardrails = GuardrailStore()
     /// Advisory inspection plugins: official built-ins first, installed third-party packs later.
@@ -116,6 +118,17 @@ final class TrafficMonitor: ObservableObject {
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
+        rulePackCatalog = RulePackCatalogUpdater(
+            db: db,
+            store: rulePacks,
+            currentAppVersion: ExtensionManager.appVersion,
+            bundledCatalog: {
+                guard let url = Bundle.main.url(forResource: "official", withExtension: "json") else {
+                    throw RulePackCatalogPersistenceError.invalidReceipt
+                }
+                return try Data(contentsOf: url)
+            }
+        )
         IPOwnerLookup.shared.onResolved = { [db] ip, owner in
             db.async { try $0.saveOwner(ip: ip, owner) }
         }
@@ -132,6 +145,7 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private var started = false
+    private var rulePackCatalogReady = false
 
     func start() {
         guard !started else { return }
@@ -161,7 +175,6 @@ final class TrafficMonitor: ObservableObject {
             else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
             self.source?.setRulePacks(snapshot)
         }
-        rulePacks.attach(db: db)
         // A rule that names a path is carried out by the proxy, which reads its list fresh on every connection.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
         inspection.onRuleRefusal = { [weak self] event in
@@ -195,7 +208,19 @@ final class TrafficMonitor: ObservableObject {
         if defaults.bool(forKey: AnomalySettings.Keys.notifications) || defaults.bool(forKey: UpdateChecker.Keys.automatic) {
             Notifier.requestAuthorization()
         }
-        startSource()
+        // Establish the signed catalog before loading saved consent and exceptions. Starting capture waits for both,
+        // so a corrupt higher cache can never briefly enforce bundled content, and enabled packs never omit exceptions.
+        Task { [weak self] in
+            guard let self else { return }
+            await self.rulePackCatalog.bootstrap()
+            self.rulePacks.attach(db: self.db) { [weak self] in
+                guard let self else { return }
+                self.rulePackCatalogReady = true
+                self.startSource()
+                let mayUseNetwork = !DemoData.isEnabled && !FlowlightApp.runningTests
+                self.rulePackCatalog.startScheduling(networkingEnabled: mayUseNetwork)
+            }
+        }
         db.async { [engine] db in
             IPOwnerLookup.shared.preload(try db.loadOwners())
             for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) { IPOwnerLookup.shared.owner(for: ip) }
@@ -342,6 +367,7 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private func startSource() {
+        guard rulePackCatalogReady else { return }
         source?.stop()
         let newSource: TrafficSource
         // A build without the entitlement can never reach the extension; capture with the sampler rather than
