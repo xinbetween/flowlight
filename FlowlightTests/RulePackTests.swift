@@ -540,6 +540,7 @@ final class RulePackTests: XCTestCase {
         try await waitUntil { store.configurations.count == 1 }
 
         XCTAssertFalse(store.configuration(for: original.id).enabled)
+        XCTAssertTrue(store.needsReview(original))
         XCTAssertNil(store.snapshot)
     }
 

@@ -4,7 +4,7 @@ struct RulePacksView: View {
     @EnvironmentObject var monitor: TrafficMonitor
 
     var body: some View {
-        RulePacksContent(packs: monitor.rulePacks)
+        RulePacksContent(packs: monitor.rulePacks, catalog: monitor.rulePackCatalog)
     }
 }
 
@@ -26,6 +26,7 @@ struct RulePackSaveTracker {
 private struct RulePacksContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @ObservedObject var packs: RulePackStore
+    @ObservedObject var catalog: RulePackCatalogUpdater
     @State private var editor: RulePackEditorRequest?
     @State private var saves = RulePackSaveTracker()
     @State private var saveErrors: [String: String] = [:]
@@ -34,6 +35,12 @@ private struct RulePacksContent: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 explanation
+                officialUpdates
+                if let failure = packs.failureMessage {
+                    Label(failure, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(FL.warning)
+                        .padding(10).background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                }
                 if packs.deliveryStats.droppedHits > 0 {
                     Label(L("%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full.",
                             packs.deliveryStats.droppedHits), systemImage: "exclamationmark.triangle")
@@ -60,6 +67,85 @@ private struct RulePacksContent: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 4)
+    }
+
+    private var officialUpdates: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Official pack updates")).font(.body.weight(.semibold))
+                    Text(L("Flowlight checks its fixed HTTPS feed for publisher-signed destination lists. No traffic, pack settings, or device identifier is sent."))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                Toggle(L("Automatic updates"), isOn: Binding(
+                    get: { catalog.automaticRefresh },
+                    set: { enabled in Task { await catalog.setAutomaticRefresh(enabled) } }
+                ))
+                .toggleStyle(.switch).controlSize(.small)
+            }
+            HStack(spacing: 8) {
+                pill(catalogStatusText, tint: catalogStatusTint)
+                if let sequence = catalog.receipt?.sequence { pill(L("Sequence %lld", sequence)) }
+                Spacer()
+                Button(L("Check Now")) { Task { await catalog.checkNow() } }
+                    .disabled(catalog.status == .checking)
+            }
+            if let detail = catalogStatusDetail {
+                Label(detail, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                if let success = catalog.catalogState.update.lastSuccess {
+                    Text(L("Last verified %@", success.formatted(.relative(presentation: .named))))
+                }
+                if catalog.automaticRefresh,
+                   let next = catalog.catalogState.update.nextEligibleAttempt {
+                    Text(L("Next check %@", next.formatted(.relative(presentation: .named))))
+                }
+            }
+            .font(.caption2).foregroundStyle(.tertiary)
+            Text(L("Official source: %@", RulePackCatalogVerifier.sourceURL))
+                .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                .textSelection(.enabled)
+            if let receipt = catalog.receipt {
+                Text(L("Publisher: Flowlight · signer %@ · catalog digest %@",
+                       receipt.signerKeyID, String(receipt.digest.prefix(12))))
+                    .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(14)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private var catalogStatusText: String {
+        switch catalog.status {
+        case .idle: return L("Not checked yet")
+        case .checking: return L("Checking…")
+        case .current: return L("Verified and current")
+        case .stale: return L("Verified last-known-good is stale")
+        case .recovery: return L("Recovery required")
+        case .failed(_, let usingLastKnownGood):
+            return usingLastKnownGood ? L("Check failed · using last-known-good") : L("Check failed")
+        }
+    }
+
+    private var catalogStatusTint: Color? {
+        switch catalog.status {
+        case .current: return FL.good
+        case .checking, .idle: return nil
+        case .stale, .recovery, .failed: return FL.warning
+        }
+    }
+
+    private var catalogStatusDetail: String? {
+        switch catalog.status {
+        case .recovery(let message), .failed(let message, _): return message
+        case .idle, .checking, .current, .stale: return nil
+        }
     }
 
     private func card(_ pack: RulePackDefinition) -> some View {
@@ -96,7 +182,7 @@ private struct RulePacksContent: View {
                 })).toggleStyle(.switch).controlSize(.small).labelsHidden().disabled(isSaving)
             }
             HStack(spacing: 8) {
-                pill(status(configuration), tint: statusTint(configuration))
+                pill(status(configuration, definition: pack), tint: statusTint(configuration, definition: pack))
                 pill(configuration.scope == .allApps ? L("Every app") : L("%lld selected apps", configuration.apps.count))
                 pill(L("%lld destinations", pack.entries.count))
                 if blocks > 0 { pill(L("%lld blocked", blocks), tint: FL.critical) }
@@ -116,36 +202,35 @@ private struct RulePacksContent: View {
             }
             Text(L(pack.manifest.caveatKey)).font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(L("Official · Built into Flowlight · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
+            Text(catalog.isDownloadedUpdate(pack)
+                 ? L("Official · Verified official update · pack v%@ · %@", pack.manifest.version, pack.manifest.license)
+                 : L("Official · Bundled baseline · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
                 .font(.caption2).foregroundStyle(.tertiary)
         }
         .padding(14)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
     }
 
-    private func status(_ configuration: RulePackConfiguration) -> String {
+    private func status(_ configuration: RulePackConfiguration,
+                        definition: RulePackDefinition) -> String {
+        if packs.needsReview(definition) { return L("Needs review") }
         if !configuration.enabled {
-            switch packs.status {
-            case .applying: return L("Applying…")
-            case .failed: return L("Needs review")
-            default: return L("Off")
-            }
+            return packs.status == .applying ? L("Applying…") : L("Off")
         }
         switch packs.status {
         case .off, .ready, .applying: return monitor.canBlock ? L("Applying…") : L("Watching only")
         case .enforcing: return monitor.canBlock ? L("Blocking") : L("Watching only")
         case .watchingOnly: return L("Watching only")
         case .incompatible: return L("Needs extension update")
-        case .failed: return L("Needs review")
+        case .failed: return L("Apply failed")
         }
     }
 
-    private func statusTint(_ configuration: RulePackConfiguration) -> Color? {
+    private func statusTint(_ configuration: RulePackConfiguration,
+                            definition: RulePackDefinition) -> Color? {
+        if packs.needsReview(definition) { return FL.warning }
         if !configuration.enabled {
-            switch packs.status {
-            case .applying, .failed: return FL.warning
-            default: return nil
-            }
+            return packs.status == .applying ? FL.warning : nil
         }
         return monitor.canBlock && packs.status == .enforcing ? FL.critical : FL.warning
     }

@@ -41,6 +41,11 @@ final class RulePackCatalogUpdater: ObservableObject {
     var automaticRefresh: Bool { catalogState.update.automaticRefresh }
     var receipt: RulePackCatalogReceipt? { catalogState.receipt }
 
+    func isDownloadedUpdate(_ definition: RulePackDefinition) -> Bool {
+        guard let builtIn = BuiltInRulePacks.all.first(where: { $0.id == definition.id }) else { return true }
+        return builtIn != definition
+    }
+
     private let db: TrafficDatabase
     private let store: RulePackStore
     private let currentAppVersion: String

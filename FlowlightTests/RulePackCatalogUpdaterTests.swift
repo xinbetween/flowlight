@@ -25,6 +25,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         XCTAssertEqual(updater.receipt?.sequence, 1)
         XCTAssertEqual(updater.status, .current)
         XCTAssertEqual(store.definitions, BuiltInRulePacks.all.sorted { $0.id < $1.id })
+        XCTAssertFalse(updater.isDownloadedUpdate(BuiltInRulePacks.advertising))
         XCTAssertNotNil(store.reviewReceipt(for: BuiltInRulePacks.advertising))
     }
 
@@ -88,7 +89,8 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         XCTAssertEqual(updater.receipt?.sequence, 2)
         XCTAssertEqual(updater.catalogState.cache?.etag, #""catalog-2""#)
         XCTAssertEqual(updater.catalogState.cache?.lastModified, "Tue, 20 Oct 2026 00:00:00 GMT")
-        XCTAssertNotNil(store.definitions.first { $0.id == "official.new" })
+        let downloaded = try XCTUnwrap(store.definitions.first { $0.id == "official.new" })
+        XCTAssertTrue(updater.isDownloadedUpdate(downloaded))
         XCTAssertFalse(store.configuration(for: "official.new").enabled)
         XCTAssertNil(store.snapshot)
     }

@@ -67,6 +67,11 @@ final class RulePackStore: ObservableObject {
         overrides.filter { $0.packID == packID }
     }
 
+    func needsReview(_ definition: RulePackDefinition) -> Bool {
+        guard let configuration = configurations.first(where: { $0.packID == definition.id }) else { return false }
+        return configuration.consentedVersion != nil && !configuration.isConsented(to: definition)
+    }
+
     func reviewReceipt(for definition: RulePackDefinition) -> RulePackReviewReceipt? {
         guard let catalogReceipt else { return nil }
         return RulePackReviewReceipt(
