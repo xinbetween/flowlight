@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
@@ -162,16 +162,12 @@
       <p>流量元数据，存在本地的 SQLite 数据库里，保留期限是公布的。打开 HTTPS 检查后，它还会保存请求和响应的正文三天——
         这是它所保存的东西里最敏感的。凭据标头会按名称、也按其中的词来遮蔽，那是一种启发式判断，不是保证；
         一个把密钥放在没人认得的名字底下的标头，是可能被记录下来的。</p>
-      <p>流量数据库从不上传。不过确实有三样比较小的东西，会在你没有要求的情况下离开这台 Mac，它们都在<a href="../../zh-Hans/privacy/">隐私页面</a>上
-        逐项列出：更新检查，它在启动时和每天一次向 GitHub 询问最新的发布；网络所有者查询，它就没有主机名的公网地址向 Team Cymru
-        询问；以及，当 Flowlight 在读计数器而不是在跑它的扩展时，对那些它没看到名字的地址做的一次反向 DNS 查询。前两样都有关闭
-        开关。第三样没有，因为在采样器上，一条连接能有名字，大半就靠它——这次查询会走这台 Mac 本来就在用的解析器，而一旦扩展
-        接手、从流量本身给连接命名，它就停了。用托管模型提问，送出去的东西比它们任何一个都多得多，而它也是唯一在你配置之前
-        一直关着的。</p>
+      <p>流量数据库从不上传。<a href="../../zh-Hans/privacy/">隐私页面</a>列出了每项外部请求：版本和签名规则包检查、可选的网络所有者查询，以及采样器的反向 DNS。前三项都有关闭开关；反向 DNS 没有，因为没有它，采样器无法为大多数连接命名。托管模型会发送更多内容，并且在配置前保持关闭。</p>
 
       <h2 id="updates">更新</h2>
       <p>版本以 Developer ID 签名并经过公证。更新程序要求有公布的校验和，没有就拒绝下载；随后会在安装之前核对下载到的应用
         是否由与运行中副本相同的团队签名。由别人签名的更新会被拒绝，即使它在其他方面都有效。</p>
+      <p>官方规则包使用一套用途受限的独立签名和一个固定的 HTTPS 源。应用会独立保存最高序列号水位，在启动时重新验证缓存的确切字节，拒绝回滚和相互矛盾的发布，并且绝不会把发布者签名当作强制执行变更内容的许可。新增或变更的包必须经过对确切内容的明确审查并保存；已接受但过期的内容会标示为最后已知正常版本；如果信任已撤销或字节损坏，则一律按拒绝处理。</p>
 
       <h2 id="reporting">报告漏洞</h2>
       <p>请使用 GitHub 的<a href="https://github.com/xinbetween/flowlight/security/advisories/new">私密漏洞报告</a>，或者如果你不愿意用
@@ -212,7 +208,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
-      <span>版本 0.15.3 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+      <span>版本 0.15.4 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
     </div>
   </div>
 </footer>

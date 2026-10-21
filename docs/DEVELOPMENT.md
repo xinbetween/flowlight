@@ -332,6 +332,26 @@ cannot revoke its own signing authority. If compromise is suspected, stop publis
 resume with a higher sequence signed by a trusted key. Clients reject rollback by sequence, so restoring an older
 catalog always means republishing its contents under a new, higher sequence.
 
+### Consuming the official rule-pack feed
+
+`RulePackCatalogUpdater` is app-owned and has one compiled HTTPS source. It uses an ephemeral cookieless session,
+requires same-origin redirects and JSON, caps both declared and streamed response bytes, sends persisted ETag and
+Last-Modified validators, and permits only one request at a time. Healthy automatic checks run daily; failures back off
+from one hour to six hours and then 24 hours. Manual checks bypass only that schedule. Demo and XCTest startup establish
+the local trusted catalog but do not use the network unless a test explicitly injects a transport.
+
+The receipt watermark and exact envelope cache are separate SQLite rows. Startup reverifies the exact accepted bytes
+before saved configuration or exceptions can produce a snapshot, and capture does not start until that reload completes.
+If a higher watermark has missing, corrupt, expired-before-acceptance, or newly untrusted bytes, definitions and the
+snapshot stay empty while recovery fetches without validators; the bundled lower sequence is never silently restored.
+An already accepted envelope may reverify after expiry as stale last-known-good.
+
+Acceptance runs in `BEGIN IMMEDIATE`: rollback/equivocation checks, exact bytes, validators, scheduling state, and consent
+invalidation commit together. Only then may `RulePackStore` publish definitions or a snapshot. New packs default off;
+changed content preserves saved scope, app selection, exceptions, and historical activity but is effectively disabled.
+Every enabling Save carries the immutable pack and catalog receipt displayed when the editor opened, and SQLite checks
+the durable catalog again inside the save transaction.
+
 ## Releasing
 
 ```sh

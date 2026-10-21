@@ -56,7 +56,7 @@ final class RulePackCatalogUpdater: ObservableObject {
     private let sourceURL = URL(string: RulePackCatalogVerifier.sourceURL)!
     private let productionTransport: BoundedHTTPDataTransport
     private var timer: Timer?
-    private var networkingEnabled = false
+    private(set) var networkingEnabled = false
     private var inFlight = false
     private var requestGeneration = 0
     private var recoveryNeeded = false

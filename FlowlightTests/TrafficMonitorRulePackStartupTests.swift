@@ -37,21 +37,15 @@ final class TrafficMonitorRulePackStartupTests: XCTestCase {
     @MainActor
     func testTestModeBootstrapDoesNotInvokeCatalogTransport() async throws {
         let source = RecordingTrafficSource()
-        let counter = CallCounter()
         let monitor = TrafficMonitor(
             databaseURL: temporaryDatabaseURL("no-network"),
-            catalogTransport: { _ in
-                counter.calls += 1
-                throw URLError(.notConnectedToInternet)
-            },
             trafficSourceFactory: { source }
         )
 
         monitor.start()
         try await waitUntil { source.started }
-        try await Task.sleep(for: .milliseconds(50))
 
-        XCTAssertEqual(counter.calls, 0)
+        XCTAssertFalse(monitor.rulePackCatalog.networkingEnabled)
         XCTAssertFalse(monitor.rulePacks.definitions.isEmpty)
         XCTAssertNotNil(monitor.rulePackCatalog.receipt)
     }

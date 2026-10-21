@@ -22,6 +22,7 @@ OFFICIAL_PACK_BUNDLED = ROOT / "Flowlight/Resources/RulePacks/official.json"
 OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
 OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem"
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
+OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
 PROJECT = (ROOT / "project.yml").read_text()
 APP_VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', PROJECT).group(1)
 
@@ -90,6 +91,40 @@ def problems():
                 detail = (verified.stderr or verified.stdout).strip().replace("\n", " ")
                 found.append(f"site/packs/v1/official.json: signature verification failed: {detail}")
 
+    # The app now consumes this endpoint. Keep the fixed source, privacy disclosure, documentation and release notes
+    # tied together so a future refactor cannot silently create an undocumented outbound request or arbitrary source.
+    verifier_source = (ROOT / "Flowlight/Analysis/RulePackCatalogVerifier.swift").read_text()
+    if OFFICIAL_PACK_URL not in verifier_source:
+        found.append("Flowlight/Analysis/RulePackCatalogVerifier.swift: fixed official feed URL is missing")
+    source_pages = [ROOT / "README.md", ROOT / "SECURITY.md", ROOT / "site/pages/docs.html",
+                    ROOT / "site/pages/privacy.html", ROOT / "site/pages/threat-model.html"]
+    for path in source_pages:
+        text = path.read_text().lower()
+        if "official" not in text or not any(word in text for word in ("signed", "signature", "publisher")):
+            found.append(f"{path.relative_to(ROOT)}: authenticated official rule-pack consumer is not documented")
+    privacy_sources = [ROOT / "site/pages/privacy.html"] + [
+        ROOT / f"site/pages/{lang}/privacy.html" for lang in LANGS
+    ]
+    for path in privacy_sources:
+        if "flowlight.xinbetween.com" not in path.read_text():
+            found.append(f"{path.relative_to(ROOT)}: official rule-pack request is missing from privacy table")
+    docs_sources = [ROOT / "site/pages/docs.html"] + [
+        ROOT / f"site/pages/{lang}/docs.html" for lang in LANGS
+    ]
+    for path in docs_sources:
+        if 'id="managed-packs"' not in path.read_text():
+            found.append(f"{path.relative_to(ROOT)}: #managed-packs subscription section is missing")
+    stale_request_counts = ("Three requests", "Three smaller things", "Drei Anfragen", "Drei kleinere Dinge",
+                            "Tres peticiones", "Tres cosas más pequeñas", "Trois requêtes", "Trois choses plus petites",
+                            "Tre richieste", "Tre cose più piccole", "Três pedidos", "três coisas mais pequenas",
+                            "リクエストは 3 つ", "요청은 세 가지", "떠나는 것이 세 가지",
+                            "三个请求", "三個請求")
+    for path in [ROOT / "site/pages/docs.html", ROOT / "site/pages/threat-model.html"] + [
+            ROOT / f"site/pages/{lang}/docs.html" for lang in LANGS
+    ] + [ROOT / f"site/pages/{lang}/threat-model.html" for lang in LANGS]:
+        if any(phrase.casefold() in path.read_text().casefold() for phrase in stale_request_counts):
+            found.append(f"{path.relative_to(ROOT)}: fixed outbound-request count is stale-prone")
+
     # 1. A placeholder that didn't render. `{{t:nav.threat-model}}` printed itself on all 51 pages because the
     #    pattern for {{t:}} didn't allow hyphens, and nothing noticed — it is valid HTML.
     for page in PAGES:
@@ -140,8 +175,16 @@ def problems():
     #    newest version on the releases page. It reads as a promise until someone notices it is a memory.
     releases = (ROOT / "site/pages/releases.html").read_text()
     shipped = re.findall(r"<h2>(\d+\.\d+(?:\.\d+)?)</h2>", releases)
+    release_headers = re.findall(r"<header>(.*?)</header>", releases, re.S)
+    latest = [match.group(1) for header in release_headers
+              if 'class="tag">Latest</span>' in header
+              if (match := re.search(r"<h2>(\d+\.\d+(?:\.\d+)?)</h2>", header))]
     if shipped:
         newest = max(shipped, key=version_key)
+        if newest != APP_VERSION:
+            found.append(f"site/pages/releases.html: newest release {newest} does not match app {APP_VERSION}")
+        if latest != [APP_VERSION]:
+            found.append(f"site/pages/releases.html: expected one Latest tag on {APP_VERSION}, found {latest}")
         for page in PAGES:
             text = page.read_text()
             start = text.find('id="roadmap"')

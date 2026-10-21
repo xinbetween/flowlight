@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-fr", "url": "https://flowlight.xinbetween.com/fr/", "name": "Flowlight", "inLanguage": "fr", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/fr/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/fr/threat-model/", "name": "Modèle de menaces de Flowlight", "description": "Ce contre quoi Flowlight protège, ce contre quoi il ne peut pas, et pourquoi — observer plutôt qu’empêcher.", "inLanguage": "fr", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-fr"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/fr/"}, {"@type": "ListItem", "position": 2, "name": "Modèle de menaces de Flowlight", "item": "https://flowlight.xinbetween.com/fr/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-fr", "url": "https://flowlight.xinbetween.com/fr/", "name": "Flowlight", "inLanguage": "fr", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/fr/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/fr/threat-model/", "name": "Modèle de menaces de Flowlight", "description": "Ce contre quoi Flowlight protège, ce contre quoi il ne peut pas, et pourquoi — observer plutôt qu’empêcher.", "inLanguage": "fr", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-fr"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/fr/"}, {"@type": "ListItem", "position": 2, "name": "Modèle de menaces de Flowlight", "item": "https://flowlight.xinbetween.com/fr/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Aller au contenu</a>
@@ -172,19 +172,13 @@
         conserve aussi les corps des requêtes et des réponses pendant trois jours — la chose la plus sensible qu’il garde jamais. Les en-têtes
         d’identification sont masqués par nom et par mot, ce qui est une heuristique et non une garantie&nbsp;; un en-tête qui porte un secret sous un
         nom que rien ne reconnaît peut être enregistré.</p>
-      <p>La base de données de trafic n’est jamais téléversée. Trois choses plus petites quittent bien le Mac sans qu’on les demande, toutes trois
-        nommées sur la <a href="../../fr/privacy/">page Confidentialité</a>&nbsp;: la recherche de mise à jour, qui demande à GitHub la dernière version
-        au lancement et une fois par jour&nbsp;; la consultation du propriétaire du réseau, qui interroge Team Cymru sur les adresses publiques sans
-        nom d’hôte&nbsp;; et, tant que Flowlight lit des compteurs au lieu de faire tourner son extension, une recherche DNS inverse des adresses dont
-        il n’a vu aucun nom. Les deux premières ont un interrupteur d’arrêt. La troisième non, parce que sur l’échantillonneur c’est l’essentiel de la
-        façon dont une connexion obtient un nom&nbsp;: elle va au résolveur que le Mac utilise déjà, et elle s’arrête dès que l’extension prend le
-        relais et nomme les connexions à partir du trafic lui-même. Demander avec un modèle hébergé envoie bien plus que n’importe laquelle d’entre
-        elles, et c’est la seule chose qui reste désactivée jusqu’à ce que vous la configuriez.</p>
+      <p>La base de données de trafic n’est jamais téléversée. La <a href="../../fr/privacy/">page Confidentialité</a> répertorie chaque requête sortante&nbsp;: vérifications de version et de packs de règles signés, consultation facultative du propriétaire du réseau et DNS inverse avec l’échantillonneur. Les trois premières ont des interrupteurs&nbsp;; le DNS inverse non, car sans lui l’échantillonneur ne pourrait pas nommer la plupart des connexions. Un modèle hébergé envoie bien plus et reste désactivé jusqu’à configuration.</p>
 
       <h2 id="updates">Mises à jour</h2>
       <p>Les versions sont signées avec un Developer ID et notarisées. Le programme de mise à jour exige une somme de contrôle publiée et refuse un
         téléchargement qui n’en a pas, puis vérifie que l’app téléchargée est signée par la même équipe que la copie en cours d’exécution avant de
         l’installer. Une mise à jour signée par quelqu’un d’autre est refusée, même si elle est valide par ailleurs.</p>
+      <p>Les packs de règles officiels utilisent une signature distincte limitée à cet usage et une source HTTPS fixe unique. L’application conserve séparément un repère de la séquence la plus élevée, revérifie au démarrage les octets exacts mis en cache, rejette les retours en arrière et les publications contradictoires, et ne considère jamais la signature d’un éditeur comme une autorisation d’appliquer un contenu modifié. Les packs nouveaux ou modifiés exigent l’examen explicite du contenu exact et Enregistrer ; le contenu obsolète déjà accepté est étiqueté comme dernière version valide connue, tandis qu’une révocation de confiance ou des octets corrompus entraînent un refus sécurisé.</p>
 
       <h2 id="reporting">Signaler une vulnérabilité</h2>
       <p>Utilisez le <a href="https://github.com/xinbetween/flowlight/security/advisories/new">signalement privé de vulnérabilités</a> de GitHub, ou écrivez à
@@ -226,7 +220,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.15.3 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.15.4 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

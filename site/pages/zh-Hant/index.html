@@ -166,6 +166,7 @@ nav: home
               它是對你本來就信任的軟體的管控，不是一道擋住你不信任的軟體的屏障 — 見<a href="{{link:threat-model}}">威脅模型</a>。</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · 已拒絕 4 次 · 平日 18:00–09:00</p></div>
         </div>
+        <div class="rule"><span class="sev critical">⛔ 需自行開啟</span><div><h3>受管理的廣告與追蹤器套件</h3><p>三個官方套件均已內建，從一開始便可見，但預設全部關閉。Flowlight 會從一個固定的 HTTPS 來源檢查已簽署的更新；新增或變更的內容在你檢閱確切版本並按下儲存之前，不會進入強制執行。服務中斷期間，經過驗證且已接受的內容可能會以已知正常的最後版本保留，並明確標示為已過時。</p><p>這些套件依主機名稱封鎖，因此無法移除第一方廣告、DOM 或版面配置空白、瀏覽器覆疊層、由指令碼產生的彈出式視窗或原生 App 視窗。</p></div></div>
         <div class="rule">
           <span class="sev critical">⛔ 拒絕</span>
           <div><h3>為代理的工具設下防護機制</h3>
@@ -364,7 +365,7 @@ nav: home
         <div><strong>只留在你的 Mac 上</strong><p>一個本機 SQLite 檔案。不用帳號、沒有雲端同步、沒有遙測。</p></div>
         <div><strong>預設只看後設資料</strong><p>主機名稱、連接埠和位元組計數。解密 HTTPS 是另一個必須由你開啟的模式，而且一切都留在你的 Mac 上。</p></div>
         <div><strong>在核心層就先過濾</strong><p>擷取只放行 DNS 回應和 TLS ClientHello。其他所有內容在 Flowlight 看到之前就被丟掉了。</p></div>
-        <div><strong>查詢由你作主</strong><p>要辨識某個位址屬於誰，只會把沒有主機名稱的公開 IP 傳給 Team Cymru，而且一鍵就能關閉。每天的更新檢查只是向 GitHub 查詢最新版本，同樣也可以關掉。</p></div>
+        <div><strong>查詢由你作主</strong><p>要辨識某個位址屬於誰，只會把沒有主機名稱的公開 IP 傳給 Team Cymru。版本與已簽署規則套件檢查會傳送不含流量或套件設定的標準 HTTPS 請求。兩者都有各自的關閉開關。</p></div>
       </div>
     </div>
   </section>

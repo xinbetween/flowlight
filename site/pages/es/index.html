@@ -167,6 +167,7 @@ nav: home
               software en el que no — mira el <a href="{{link:threat-model}}">modelo de amenazas</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · rechazada 4 veces · de lunes a viernes 18:00–09:00</p></div>
         </div>
+        <div class="rule"><span class="sev critical">⛔ Previa activación</span><div><h3>Paquetes gestionados de publicidad y rastreadores</h3><p>Hay tres paquetes oficiales integrados, visibles y desactivados de forma predeterminada. Flowlight consulta un único feed HTTPS fijo para buscar actualizaciones firmadas; el contenido nuevo o modificado no se aplica hasta que revises esa versión exacta y pulses Guardar. Durante una interrupción, el contenido verificado y aceptado puede conservarse como la última versión válida conocida, marcada visiblemente como obsoleta.</p><p>Bloquean por nombre de host, por lo que no pueden eliminar anuncios propios del sitio, huecos del DOM o del diseño, superposiciones del navegador, ventanas emergentes generadas por scripts ni ventanas de aplicaciones nativas.</p></div></div>
         <div class="rule">
           <span class="sev critical">⛔ Rechaza</span>
           <div><h3>Salvaguardas sobre las herramientas de un agente</h3>
@@ -366,7 +367,7 @@ nav: home
         <div><strong>Se queda en tu Mac</strong><p>Un único archivo SQLite local. Sin cuenta, sin sincronización en la nube, sin telemetría.</p></div>
         <div><strong>Metadatos por defecto</strong><p>Nombres de host, puertos y bytes. Descifrar HTTPS es un modo aparte que tienes que activar, y también se queda en tu Mac.</p></div>
         <div><strong>Filtrado en el núcleo</strong><p>La captura solo deja pasar las respuestas DNS y los ClientHello de TLS. Todo lo demás se descarta antes de que Flowlight lo vea.</p></div>
-        <div><strong>Consultas que tú controlas</strong><p>Para saber de quién es una dirección solo se envían a Team Cymru las IP públicas sin nombre de host, y se desactiva con un clic. La comprobación diaria de actualizaciones solo pregunta a GitHub por la última versión, y también puede desactivarse.</p></div>
+        <div><strong>Consultas que tú controlas</strong><p>Para saber de quién es una dirección solo se envían a Team Cymru las IP públicas sin nombre de host. Las comprobaciones de versiones y de paquetes de reglas firmados envían solicitudes HTTPS estándar sin tráfico ni configuración de paquetes. Cada una tiene su propio interruptor.</p></div>
       </div>
     </div>
   </section>

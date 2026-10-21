@@ -167,6 +167,7 @@ nav: home
               Software, der du nicht vertraust – siehe das <a href="{{link:threat-model}}">Bedrohungsmodell</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · 4-mal verweigert · wochentags 18:00–09:00</p></div>
         </div>
+        <div class="rule"><span class="sev critical">⛔ Opt-in</span><div><h3>Verwaltete Werbe- und Tracker-Pakete</h3><p>Drei offizielle Pakete sind integriert, sichtbar und standardmäßig deaktiviert. Flowlight prüft einen einzigen festgelegten HTTPS-Feed auf signierte Updates; neue oder geänderte Inhalte werden erst durchgesetzt, nachdem du genau diese Version geprüft und Sichern gedrückt hast. Verifizierte, akzeptierte Inhalte können bei einem Ausfall als sichtbar veralteter letzter bekannter funktionsfähiger Stand erhalten bleiben.</p><p>Sie blockieren nach Hostname und können daher keine Erstanbieterwerbung, Lücken im DOM oder Layout, Browser-Overlays, skriptgesteuerten Pop-ups oder Fenster nativer Apps entfernen.</p></div></div>
         <div class="rule">
           <span class="sev critical">⛔ Verweigert</span>
           <div><h3>Schutzregeln für die Tools eines Agenten</h3>
@@ -366,7 +367,7 @@ nav: home
         <div><strong>Bleibt auf deinem Mac</strong><p>Eine lokale SQLite-Datei. Kein Konto, keine Cloud-Synchronisierung, keine Telemetrie.</p></div>
         <div><strong>Standardmäßig nur Metadaten</strong><p>Hostnamen, Ports und Byte-Zahlen. HTTPS zu entschlüsseln ist ein eigener Modus, den du einschalten musst – und er bleibt auf deinem Mac.</p></div>
         <div><strong>Im Kernel gefiltert</strong><p>Die Erfassung lässt nur DNS-Antworten und TLS-ClientHellos durch. Alles andere wird verworfen, bevor Flowlight es sieht.</p></div>
-        <div><strong>Abfragen, die du steuerst</strong><p>Um zu benennen, wem eine Adresse gehört, gehen nur öffentliche IPs ohne Hostnamen an Team Cymru – abschaltbar mit einem Klick. Die tägliche Update-Prüfung fragt GitHub nur nach der neuesten Version und lässt sich ebenfalls abschalten.</p></div>
+        <div><strong>Abfragen, die du steuerst</strong><p>Um zu benennen, wem eine Adresse gehört, gehen nur öffentliche IPs ohne Hostnamen an Team Cymru. Release- und signierte Regelpaket-Prüfungen senden Standard-HTTPS-Anfragen ohne Verkehrs- oder Paketeinstellungen. Jede Prüfung hat einen eigenen Abschalter.</p></div>
       </div>
     </div>
   </section>

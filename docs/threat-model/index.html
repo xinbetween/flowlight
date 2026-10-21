@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/threat-model/", "name": "Flowlight threat model", "description": "What Flowlight defends against, what it cannot, and why — monitoring rather than prevention.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight threat model", "item": "https://flowlight.xinbetween.com/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/threat-model/", "name": "Flowlight threat model", "description": "What Flowlight defends against, what it cannot, and why — monitoring rather than prevention.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight threat model", "item": "https://flowlight.xinbetween.com/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -170,18 +170,21 @@
       <p>Traffic metadata in a local SQLite database, with published retention. With HTTPS inspection on it also holds request and
         response bodies for three days — the most sensitive thing it ever keeps. Credential headers are redacted by name and by word,
         which is a heuristic and not a guarantee; a header carrying a secret under a name nothing recognises can be recorded.</p>
-      <p>The traffic database is never uploaded. Three smaller things do leave the Mac without being asked for, all of them named on
-        the <a href="../privacy/">privacy page</a>: the update check, which asks GitHub for the latest release on launch and
-        daily; the network-owner lookup, which asks Team Cymru about public addresses that have no hostname; and, while Flowlight is
-        reading counters instead of running its extension, a reverse-DNS lookup of addresses it saw no name for. The first two have
-        off switches. The third does not, because on the sampler it is most of how a connection gets a name at all — it goes to the
-        resolver the Mac already uses, and it stops once the extension takes over and names connections from the traffic itself.
-        Ask with a hosted model sends far more than any of them, and is the one thing that stays off until you configure it.</p>
+      <p>The traffic database is never uploaded. Four smaller things do leave the Mac without being asked for, all of them named on
+        the <a href="../privacy/">privacy page</a>: the release update check; the fixed official rule-pack feed, which receives
+        no traffic or pack settings; the network-owner lookup, which asks Team Cymru about public addresses with no hostname; and,
+        while Flowlight is reading counters instead of running its extension, reverse DNS through the Mac's configured resolver.
+        The first three have off switches. Reverse DNS does not, because on the sampler it is most of how a connection gets a name;
+        it stops once the extension takes over. Ask with a hosted model sends far more than any of them, and stays off until configured.</p>
 
       <h2 id="updates">Updates</h2>
       <p>Releases are signed with a Developer ID and notarized. The updater requires a published checksum and refuses a download
         without one, then verifies that the downloaded app is signed by the same team as the running copy before installing it. An
         update signed by somebody else is refused even if it is otherwise valid.</p>
+      <p>Official rule packs use a separate purpose-scoped P-256 signature and one compiled HTTPS source. The app keeps an independent
+        highest-sequence watermark, reverifies exact cached bytes at launch, rejects rollback and equivocation, and never treats a
+        publisher signature as permission to enforce changed content. New or changed packs require explicit exact-content review and
+        Save; stale accepted content is labeled last-known-good, while revoked trust or corrupt bytes fail closed.</p>
 
       <h2 id="reporting">Reporting a vulnerability</h2>
       <p>Use GitHub's <a href="https://github.com/xinbetween/flowlight/security/advisories/new">private vulnerability reporting</a>, or email
@@ -224,7 +227,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.15.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.15.4 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

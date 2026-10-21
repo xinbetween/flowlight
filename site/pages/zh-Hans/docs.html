@@ -346,6 +346,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         可供对照”——同一张空列表，意思正好相反，而其中只有一个说这条规则是安全的。界面还会说出它能看到
         的最早的流量：一条只对照了两小时历史的规则，就是只对照了两小时历史。</p>
 
+      <h3 id="managed-packs">托管广告和跟踪器包</h3>
+      <p><strong>规则 › 包</strong>包含三个官方主机名列表：<strong>广告</strong>、<strong>跨站跟踪</strong>和<strong>隐私与遥测</strong>。它们从一开始就可见，并且默认均为关闭状态。阻止功能需要网络扩展；nettop 采样器只能观察。</p>
+      <p><strong>仅限官方签名更新。</strong> Flowlight 会检查一个固定的 HTTPS 源，以查找由发布者签名的新版目录。自动检查默认开启，可在此处关闭。签名可验证内容，但不会启用内容：新包会保持关闭；如果目标发生变化，已启用的包将停止执行，直到你审查确切的新版本并按下保存。服务中断期间，已接受的内容可能会继续作为最后已知正常版本保留，并明确显示为已过期。这些是主机名级别的网络阻止，无法移除 DOM 或布局中的空白、浏览器叠加层、脚本生成的弹出窗口或原生应用窗口。</p>
+
       <h2 id="allowlists">允许列表</h2>
       <p>在<strong>AI 代理</strong>里选中一个代理，用它详情里的<strong>允许列表</strong>指定它可以连接哪里。输入域名
         （含子域名）、IP 地址或 CIDR 地址段，或者选一个预设：GitHub、npm、PyPI、Homebrew、Docker Hub、Rust crates、Go modules 或
@@ -573,9 +577,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
           它会显示安装了哪些扩展、macOS 是否真的启动了 Flowlight 的过滤器，以及最近一次记录是什么时候。
           把它粘贴到<a href="https://github.com/{{repo}}/issues">一个 issue</a> 里。</dd>
         <dt><strong>Flowlight 会把关于我的任何信息发到什么地方吗？</strong></dt>
-        <dd>没有账号，没有遥测，也没有分析，而且你的流量数据库从不上传。确实有三个请求会离开这台 Mac，它们都列在<a href="{{link:privacy}}">隐私页面</a>上：
-          每日更新检查和可选的网络所有者查询，这两个都有开关可以关掉；以及 Flowlight 在采样器上运行时的反向 DNS，它没有开关——
-          没有它，采样器就没法给大多数连接命名。</dd>
+        <dd>没有账号，没有遥测，也没有分析，而且你的流量数据库从不上传。<a href="{{link:privacy}}">隐私页面</a>列出了每项请求：版本和签名规则包检查以及可选的网络所有者查询都有关闭开关；反向 DNS 只在采样器模式运行且没有开关，因为没有它，大多数连接将无法命名。</dd>
         <dt><strong>它会让我的 Mac 变慢，或者更耗电吗？</strong></dt>
         <dd>窗口关闭时 Flowlight 几乎什么都不做：它保留菜单栏速率，每秒写入一行。网络扩展
           比作为后备的采样器更省，后者每秒都要启动一个短命的 <code>nettop</code> 进程。</dd>

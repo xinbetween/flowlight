@@ -96,6 +96,7 @@ jobs:
             --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
             --expected-key-id flowlight-rule-packs-2026-01 --current-app-version "$APP_VERSION" \
             --extension-protocol 1 --now "$(date +%s)"
+          python3 scripts/release_notes.py "$APP_VERSION" >/dev/null
 
       - name: Check the site builds and is committed
         run: |

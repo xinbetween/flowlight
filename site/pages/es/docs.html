@@ -379,6 +379,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         segura. La pantalla nombra también el tráfico más antiguo que pudo ver: una regla probada con dos horas de historial se ha
         probado con dos horas de historial.</p>
 
+      <h3 id="managed-packs">Paquetes gestionados de publicidad y rastreadores</h3>
+      <p><strong>Reglas › Paquetes</strong> contiene tres listas oficiales de nombres de host: <strong>Publicidad</strong>, <strong>Seguimiento entre sitios</strong> y <strong>Privacidad y telemetría</strong>. Son visibles desde el principio y todas están desactivadas de forma predeterminada. El bloqueo requiere la Extensión de red; el muestreador nettop solo puede observar.</p>
+      <p><strong>Solo actualizaciones oficiales y firmadas.</strong> Flowlight consulta una única fuente HTTPS fija para buscar catálogos más recientes firmados por el editor. Las comprobaciones automáticas están activadas de forma predeterminada y pueden desactivarse aquí. Una firma autentica el contenido, pero no lo activa: un paquete nuevo permanece desactivado y, si cambian los destinos, un paquete activado deja de aplicarse hasta que revises la nueva versión exacta y pulses Guardar. Durante una interrupción, el contenido aceptado puede conservarse como la última versión válida conocida, marcada visiblemente como obsoleta. Estos son bloqueos de red a nivel de nombre de host: no pueden eliminar huecos del DOM o del diseño, superposiciones del navegador, ventanas emergentes generadas por scripts ni ventanas de aplicaciones nativas.</p>
+
       <h2 id="allowlists">Listas de permitidos</h2>
       <p>Selecciona un agente en <strong>Agentes de IA</strong> y usa <strong>Lista de permitidos</strong> en su detalle para indicar adónde puede conectar. Introduce dominios
         (subdominios incluidos), direcciones IP o rangos CIDR, o elige un preajuste: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, Go modules o
@@ -616,9 +620,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Muestra qué extensiones están instaladas, si macOS arrancó de verdad el filtro de Flowlight y cuándo se registró algo por última vez.
           Pégalo en <a href="https://github.com/{{repo}}/issues">una incidencia</a>.</dd>
         <dt><strong>¿Flowlight envía algo sobre mí a alguna parte?</strong></dt>
-        <dd>Sin cuenta, sin telemetría, sin analítica, y tu base de datos de tráfico nunca se sube. Tres peticiones sí salen del Mac, todas listadas en la
-          <a href="{{link:privacy}}">página de privacidad</a>: la comprobación diaria de actualizaciones y la consulta opcional del propietario de la red, las dos con
-          interruptor para desactivarlas, y el DNS inverso mientras Flowlight está en el muestreador, que no lo tiene — sin él el muestreador no podría nombrar la mayoría de las conexiones.</dd>
+        <dd>Sin cuenta, sin telemetría, sin analítica, y tu base de datos de tráfico nunca se sube. La <a href="{{link:privacy}}">página de privacidad</a> enumera cada petición: las comprobaciones de versión y de paquetes de reglas firmados, además de la consulta opcional del propietario de red, tienen interruptores; el DNS inverso solo funciona con el muestreador y no tiene uno porque sin él no podría nombrar la mayoría de las conexiones.</dd>
         <dt><strong>¿Ralentizará mi Mac o gastará la batería?</strong></dt>
         <dd>Con la ventana cerrada, Flowlight casi no hace nada: mantiene las tasas de la barra de menús y escribe una fila por segundo. La extensión de red
           cuesta menos que el muestreador de reserva, que arranca un proceso <code>nettop</code> efímero cada segundo.</dd>

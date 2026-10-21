@@ -101,19 +101,13 @@ nav: threat-model
         cuerpos de las peticiones y las respuestas durante tres días: lo más delicado que llega a conservar. Las cabeceras con credenciales se
         censuran por nombre y por palabra, lo cual es una heurística y no una garantía; una cabecera que lleve un secreto con un nombre que nada
         reconoce puede quedar registrada.</p>
-      <p>La base de datos de tráfico nunca se sube. Tres cosas más pequeñas sí salen del Mac sin que nadie las pida, las tres nombradas en la
-        <a href="{{link:privacy}}">página de privacidad</a>: la comprobación de actualizaciones, que pide a GitHub la última versión al arrancar y a
-        diario; la consulta del propietario de la red, que pregunta a Team Cymru por direcciones públicas que no tienen nombre de host; y, mientras
-        Flowlight lee contadores en vez de ejecutar su extensión, una consulta de DNS inverso de las direcciones para las que no vio ningún nombre.
-        Las dos primeras se pueden desactivar. La tercera no, porque en el muestreador es casi la única manera en la que una conexión llega a tener
-        nombre: va al servidor DNS que el Mac ya usa, y se detiene en cuanto la extensión toma el relevo y nombra las conexiones a partir del propio
-        tráfico. Preguntar con un modelo alojado envía mucho más que cualquiera de ellas, y es lo único que está desactivado hasta que lo
-        configuras.</p>
+      <p>La base de datos de tráfico nunca se sube. La <a href="{{link:privacy}}">página de privacidad</a> enumera cada petición saliente: comprobaciones de versión y de paquetes de reglas firmados, la consulta opcional del propietario de red y DNS inverso en el muestreador. Las tres primeras tienen interruptores; el DNS inverso no, porque sin él el muestreador no podría nombrar la mayoría de las conexiones. Preguntar con un modelo alojado envía mucho más y permanece desactivado hasta que lo configuras.</p>
 
       <h2 id="updates">Actualizaciones</h2>
       <p>Las versiones se firman con un Developer ID y se notarizan. El actualizador exige una suma de comprobación publicada y rechaza una descarga
         que no la tenga; después comprueba que la app descargada esté firmada por el mismo equipo que la copia en ejecución antes de instalarla. Una
         actualización firmada por otra persona se rechaza aunque por lo demás sea válida.</p>
+      <p>Los paquetes de reglas oficiales usan una firma independiente limitada a este fin y una única fuente HTTPS fija. La aplicación mantiene por separado una marca de la secuencia más alta, vuelve a verificar al iniciarse los bytes exactos almacenados en caché, rechaza las regresiones y las publicaciones contradictorias, y nunca considera la firma del editor como permiso para aplicar contenido modificado. Los paquetes nuevos o modificados requieren la revisión explícita del contenido exacto y Guardar; el contenido obsoleto ya aceptado se etiqueta como la última versión válida conocida, mientras que la revocación de la confianza o los bytes dañados provocan un rechazo seguro.</p>
 
       <h2 id="reporting">Informar de una vulnerabilidad</h2>
       <p>Usa el <a href="https://github.com/{{repo}}/security/advisories/new">informe privado de vulnerabilidades</a> de GitHub, o escribe a
