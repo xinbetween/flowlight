@@ -77,6 +77,8 @@ final class TrafficMonitor: ObservableObject {
     }
     let activity = ActivityMonitor()
     private let engine: AnomalyEngine
+    private let trafficSourceFactory: (() -> TrafficSource)?
+    private let catalogTransportInjected: Bool
     private var source: TrafficSource?
     private var timers: [Timer] = []
 
@@ -98,13 +100,19 @@ final class TrafficMonitor: ObservableObject {
     private var perSecond: [Int64: [String: (name: String, path: String, counters: FlowCounters, topDest: String, topBytes: Int64)]] = [:]
     private var sessionPerApp: [String: FlowCounters] = [:]
 
-    init() {
+    init(databaseURL: URL? = nil,
+         catalogTransport: HTTPDataTransport? = nil,
+         trafficSourceFactory: (() -> TrafficSource)? = nil) {
         AnomalySettings.registerDefaults()
         LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
+        self.trafficSourceFactory = trafficSourceFactory
+        catalogTransportInjected = catalogTransport != nil
         do {
-            if DemoData.isEnabled {
+            if let databaseURL {
+                db = try TrafficDatabase(url: databaseURL)
+            } else if DemoData.isEnabled {
                 DemoData.resetDatabase()
                 db = try TrafficDatabase(url: DemoData.databaseURL)
             } else {
@@ -127,7 +135,8 @@ final class TrafficMonitor: ObservableObject {
                     throw RulePackCatalogPersistenceError.invalidReceipt
                 }
                 return try Data(contentsOf: url)
-            }
+            },
+            transport: catalogTransport
         )
         IPOwnerLookup.shared.onResolved = { [db] ip, owner in
             db.async { try $0.saveOwner(ip: ip, owner) }
@@ -217,7 +226,8 @@ final class TrafficMonitor: ObservableObject {
                 guard let self else { return }
                 self.rulePackCatalogReady = true
                 self.startSource()
-                let mayUseNetwork = !DemoData.isEnabled && !FlowlightApp.runningTests
+                let mayUseNetwork = self.catalogTransportInjected
+                    || !DemoData.isEnabled && !FlowlightApp.runningTests
                 self.rulePackCatalog.startScheduling(networkingEnabled: mayUseNetwork)
             }
         }
@@ -374,7 +384,9 @@ final class TrafficMonitor: ObservableObject {
         // sitting there recording nothing.
         let canUseExtension = ExtensionManager.isEntitled
         var fallbackNote: String?
-        if DemoData.isEnabled {
+        if let trafficSourceFactory {
+            newSource = trafficSourceFactory()
+        } else if DemoData.isEnabled {
             newSource = DemoTrafficSource()
         } else if mode == .networkExtension, canUseExtension, !extensionFellBack {
             newSource = ExtensionTrafficSource()
