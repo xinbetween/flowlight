@@ -181,16 +181,45 @@ struct RulePackEvent: Codable, Equatable, Sendable {
 
 /// One immutable delivery. Its ID makes an uncertain acknowledgement safe to retry without double-counting.
 struct RulePackEventBatch: Codable, Equatable, Sendable {
-    var id = UUID()
+    var id: UUID
     /// Stable for one extension process. Sequence is strictly increasing because only one batch is ever in flight.
-    var deliverySession = UUID()
-    var sequence: Int64 = 1
+    var deliverySession: UUID
+    var sequence: Int64
     /// Extension deliveries survive uncertain cross-process acknowledgements. App-local proxy deliveries do not need
     /// a permanent watermark: their database callback and authorization state live in the same process.
-    var requiresDurableWatermark = true
+    var requiresDurableWatermark: Bool
     var events: [RulePackEvent]
-    var droppedHits: Int64 = 0
-    var droppedKeys: Int64 = 0
+    var droppedHits: Int64
+    var droppedKeys: Int64
+
+    init(id: UUID = UUID(), deliverySession: UUID = UUID(), sequence: Int64 = 1,
+         requiresDurableWatermark: Bool = true, events: [RulePackEvent],
+         droppedHits: Int64 = 0, droppedKeys: Int64 = 0) {
+        self.id = id
+        self.deliverySession = deliverySession
+        self.sequence = sequence
+        self.requiresDurableWatermark = requiresDurableWatermark
+        self.events = events
+        self.droppedHits = droppedHits
+        self.droppedKeys = droppedKeys
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, deliverySession, sequence, requiresDurableWatermark, events, droppedHits, droppedKeys
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        deliverySession = try values.decode(UUID.self, forKey: .deliverySession)
+        sequence = try values.decode(Int64.self, forKey: .sequence)
+        // The app can upgrade while the prior extension is still running. Its batches predate this field and need
+        // the original extension behavior: durable cross-process deduplication.
+        requiresDurableWatermark = try values.decodeIfPresent(Bool.self, forKey: .requiresDurableWatermark) ?? true
+        events = try values.decode([RulePackEvent].self, forKey: .events)
+        droppedHits = try values.decode(Int64.self, forKey: .droppedHits)
+        droppedKeys = try values.decode(Int64.self, forKey: .droppedKeys)
+    }
 }
 
 enum RulePackValidationError: Error, Equatable {

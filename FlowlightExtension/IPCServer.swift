@@ -127,6 +127,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.blocksInFlight = false
             self.decisionsInFlight = false
             self.packEventsInFlight = false
+            self.packTransfer.reset()
             // A reconnect begins fail-open. The app may have disabled or narrowed any of these while disconnected;
             // stale state must not become active during the policy/rule/pack synchronization that follows register.
             _ = BlockEnforcer.shared.apply([])
@@ -168,20 +169,36 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func claimRule(payload: Data, withReply reply: @escaping (Int) -> Void) {
-        guard let claim = BlockCoding.decode(RuleClaim.self, from: payload),
-              let claimed = BlockEnforcer.shared.claimRule(claim) else {
-            reply(-1)
-            return
+        guard let connection = NSXPCConnection.current() else { reply(-1); return }
+        queue.async {
+            guard self.client === connection,
+                  let claim = BlockCoding.decode(RuleClaim.self, from: payload),
+                  let claimed = BlockEnforcer.shared.claimRule(claim) else {
+                reply(-1)
+                return
+            }
+            reply(claimed ? 1 : 0)
         }
-        reply(claimed ? 1 : 0)
     }
 
     func rulePackHello(appProtocol: Int, withReply reply: @escaping (Data) -> Void) {
-        reply(BlockCoding.encode(BlockEnforcer.shared.packHandshake()))
+        guard let connection = NSXPCConnection.current() else { reply(Data()); return }
+        queue.async {
+            guard self.client === connection else { reply(Data()); return }
+            reply(BlockCoding.encode(BlockEnforcer.shared.packHandshake()))
+        }
     }
 
     func beginRulePack(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             guard let header = BlockCoding.decode(RulePackTransferHeader.self, from: payload) else {
                 reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable pack transfer")))
                 return
@@ -192,11 +209,23 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func appendRulePack(generation: String, index: Int, payload: Data, withReply reply: @escaping (Bool) -> Void) {
-        queue.async { reply(self.packTransfer.append(generation: generation, index: index, payload: payload)) }
+        guard let connection = NSXPCConnection.current() else { reply(false); return }
+        queue.async {
+            guard self.client === connection else { reply(false); return }
+            reply(self.packTransfer.append(generation: generation, index: index, payload: payload))
+        }
     }
 
     func commitRulePack(generation: String, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             switch self.packTransfer.commit(generation: generation, active: BlockEnforcer.shared.packHandshake()) {
             case .rejected(let result):
                 reply(BlockCoding.encode(result))
@@ -219,7 +248,15 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func clearRulePacks(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             guard let request = BlockCoding.decode(RulePackClearRequest.self, from: payload) else {
                 reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable clear request")))
                 return

@@ -142,14 +142,20 @@ final class RulePackStore: ObservableObject {
                      try db.rulePackEvents(limit: 300), try db.rulePackDeliveryStats(),
                      try db.loadRulePackCatalogState(catalogID: RulePackCatalogVerifier.catalogID).receipt)
                 }
-                guard let self, self.revision == expectedRevision else { return }
-                self.catalogReceipt = loaded.4
-                self.applyLoaded(configurations: loaded.0, overrides: loaded.1,
-                                 events: loaded.2, deliveryStats: loaded.3)
+                guard let self else { return }
+                if self.revision == expectedRevision {
+                    self.catalogReceipt = loaded.4
+                    self.applyLoaded(configurations: loaded.0, overrides: loaded.1,
+                                     events: loaded.2, deliveryStats: loaded.3)
+                }
+                // A concurrent clear or save supersedes these loaded values, not startup readiness. The caller still
+                // needs its one completion so capture can start from the newer in-memory publication.
                 completion?()
             } catch {
-                guard let self, self.revision == expectedRevision else { return }
-                self.status = .failed("Could not load rule packs: \(String(describing: error))")
+                guard let self else { return }
+                if self.revision == expectedRevision {
+                    self.status = .failed("Could not load rule packs: \(String(describing: error))")
+                }
                 completion?()
             }
         }

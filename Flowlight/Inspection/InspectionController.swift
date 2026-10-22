@@ -125,7 +125,12 @@ final class InspectionController: ObservableObject {
         RuleClaim,
         @escaping @Sendable (Bool?) -> Void
     ) -> Void = { _, completion in completion(nil) }
-    nonisolated(unsafe) var flowRuleClaimed: @Sendable (RuleClaim) -> Void = { _ in }
+    /// Persists an accepted bounded claim and its event before the proxy applies the answer.
+    nonisolated(unsafe) var flowRuleClaimed: @Sendable (
+        RuleClaim,
+        RuleEvent,
+        @escaping @Sendable (Bool) -> Void
+    ) -> Void = { _, _, completion in completion(false) }
     nonisolated(unsafe) var flowRuleSpent: @Sendable (
         RuleClaim,
         @escaping @Sendable (Bool) -> Void
@@ -893,13 +898,14 @@ final class InspectionController: ObservableObject {
         owner: InspectionRecorder.Owner,
         answer: @escaping @Sendable (Bool) -> Void
     ) {
+        let event = RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id,
+                              ruleSession: externalClaim?.session,
+                              ruleGeneration: externalClaim?.generation,
+                              action: rule.action, engine: .flow, agentKey: facts.agentKey,
+                              agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                              bundleID: owner.bundleID, host: facts.host, ip: facts.ip, port: facts.port)
         let finish: @Sendable (Rule) -> Void = { [onRuleRefusal] rule in
-            onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id,
-                                    ruleSession: externalClaim?.session,
-                                    ruleGeneration: externalClaim?.generation,
-                                    action: rule.action, engine: .flow, agentKey: facts.agentKey,
-                                    agentName: owner.agentName ?? owner.appName, appName: owner.appName,
-                                    bundleID: owner.bundleID, host: facts.host, ip: facts.ip, port: facts.port))
+            onRuleRefusal(event)
             answer(rule.action != .block)
         }
         guard let externalClaim else {
@@ -932,8 +938,9 @@ final class InspectionController: ObservableObject {
                 }
                 return
             }
-            self.flowRuleClaimed(externalClaim)
-            finish(rule)
+            self.flowRuleClaimed(externalClaim, event) { persisted in
+                answer(persisted ? rule.action != .block : true)
+            }
         }
     }
 

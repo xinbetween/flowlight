@@ -166,6 +166,51 @@ final class RuleStore: ObservableObject {
         version += 1
     }
 
+    /// Persists an accepted bounded proxy claim and its visible explanation before the proxy acts on the decision.
+    /// The extension already spent the claim; a failed write therefore fails this connection open and leaves the local
+    /// mirror spent so neither side can quietly reuse it during this process.
+    func recordBoundedClaim(
+        _ claim: RuleClaim,
+        event: RuleEvent,
+        completion: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard event.ruleID == claim.ruleID,
+              event.ruleSession == claim.session,
+              event.ruleGeneration == claim.generation,
+              acceptsDecision(ruleID: claim.ruleID, session: claim.session, generation: claim.generation),
+              let index = rules.firstIndex(where: { $0.id == claim.ruleID }),
+              rules[index].maxHits > 0 else {
+            completion(false)
+            return
+        }
+        rules[index].hits = min(rules[index].maxHits, rules[index].hits + 1)
+        rules[index].lastHit = Date(timeIntervalSince1970: TimeInterval(event.at))
+        let rule = rules[index]
+        live.markBoundedRuleClaimed(claim, at: rules[index].lastHit ?? Date())
+        publish(advancingGeneration: false)
+        guard let db else {
+            completion(false)
+            return
+        }
+        db.queue.async { [weak self, weak db] in
+            guard let db else {
+                completion(false)
+                return
+            }
+            do {
+                try db.recordBoundedRuleDecision(rule: rule, event: event)
+                let events = (try? db.ruleEvents(limit: 300)) ?? []
+                completion(true)
+                Task { @MainActor in
+                    self?.events = events
+                    self?.version += 1
+                }
+            } catch {
+                completion(false)
+            }
+        }
+    }
+
     /// Conservatively retires a bounded claim whose XPC reply was lost. The extension may already have accepted it;
     /// saving the spent count before authorization completes prevents reconnect or relaunch from reusing it.
     func retireBoundedClaim(

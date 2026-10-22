@@ -232,6 +232,26 @@ final class RulePackTests: XCTestCase {
         XCTAssertTrue(try reopened.loadRulePackOverrides().isEmpty)
     }
 
+    func testPreWatermarkFlagBatchDefaultsToDurableDelivery() throws {
+        let batch = activityBatch()
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(batch)) as? [String: Any]
+        )
+        object.removeValue(forKey: "requiresDurableWatermark")
+
+        let decoded = try JSONDecoder().decode(
+            RulePackEventBatch.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+
+        XCTAssertTrue(decoded.requiresDurableWatermark,
+                      "a still-running older extension needs the original durable delivery behavior")
+        XCTAssertEqual(decoded.id, batch.id)
+        XCTAssertEqual(decoded.deliverySession, batch.deliverySession)
+        XCTAssertEqual(decoded.sequence, batch.sequence)
+        XCTAssertEqual(decoded.events, batch.events)
+    }
+
     func testAppLocalPackBatchesDoNotCreatePermanentWatermarks() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("flowlight-pack-local-watermark-\(UUID().uuidString).sqlite")
@@ -573,6 +593,30 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(store.deliveryStats, RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0))
         XCTAssertEqual(store.configuration(for: configuration.packID), configuration)
         XCTAssertEqual(store.overrides, [exception])
+    }
+
+    @MainActor
+    func testSupersededInitialReloadStillCompletesStartupBarrier() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-startup-revision-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RulePackStore()
+        let blockerStarted = expectation(description: "database queue blocked")
+        let completed = expectation(description: "startup barrier completed")
+        let release = DispatchSemaphore(value: 0)
+        db.queue.async {
+            blockerStarted.fulfill()
+            release.wait()
+        }
+        await fulfillment(of: [blockerStarted], timeout: 1)
+
+        store.attach(db: db) { completed.fulfill() }
+        store.beginActivityClear()
+        release.signal()
+
+        await fulfillment(of: [completed], timeout: 2)
+        XCTAssertTrue(store.events.isEmpty)
+        store.finishActivityClear(succeeded: true)
     }
 
     @MainActor

@@ -223,7 +223,11 @@ final class TrafficMonitor: ObservableObject {
         inspection.claimFlowRule = { [liveRuleClaims] claim, completion in
             liveRuleClaims.claim(claim, completion: completion)
         }
-        inspection.flowRuleClaimed = { [live = rules.live] claim in live.markBoundedRuleClaimed(claim) }
+        inspection.flowRuleClaimed = { [weak rules] claim, event, completion in
+            Task { @MainActor in
+                rules?.recordBoundedClaim(claim, event: event, completion: completion) ?? completion(false)
+            }
+        }
         inspection.flowRuleSpent = { [weak rules] claim, completion in
             Task { @MainActor in
                 rules?.retireBoundedClaim(claim, completion: completion) ?? completion(false)

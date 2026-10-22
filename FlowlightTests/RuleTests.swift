@@ -467,6 +467,81 @@ final class RuleTests: XCTestCase {
         XCTAssertTrue(try db.sync { try $0.ruleEvents(limit: 10).isEmpty })
     }
 
+    func testAcceptedBoundedClaimPersistsCountAndEventBeforeCompletion() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-accepted-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        store.save(allow)
+        let claim = RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: store.ruleSet.generation)
+        let event = RuleEvent(
+            at: 1_700_000_000,
+            ruleID: allow.id,
+            ruleSession: claim.session,
+            ruleGeneration: claim.generation,
+            action: .allow,
+            engine: .flow,
+            agentKey: "com.example.app",
+            agentName: "Example",
+            appName: "Example",
+            bundleID: "com.example.app",
+            host: "api.example.com",
+            ip: "",
+            port: 443
+        )
+        let completed = expectation(description: "accepted claim committed")
+
+        store.recordBoundedClaim(claim, event: event) { persisted in
+            XCTAssertTrue(persisted)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        let loaded = try db.sync { try $0.loadRules() }
+        XCTAssertEqual(loaded.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertEqual(try db.sync { try $0.ruleEvents(ruleID: allow.id).count }, 1)
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
+    }
+
+    func testAcceptedBoundedClaimFailsOpenWhenDurableStorageIsUnavailable() async {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let store = RuleStore()
+        store.save(allow)
+        let claim = RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: store.ruleSet.generation)
+        let event = RuleEvent(
+            at: 1_700_000_000,
+            ruleID: allow.id,
+            ruleSession: claim.session,
+            ruleGeneration: claim.generation,
+            action: .allow,
+            engine: .flow,
+            agentKey: "com.example.app",
+            agentName: "Example",
+            appName: "Example",
+            bundleID: "com.example.app",
+            host: "api.example.com",
+            ip: "",
+            port: 443
+        )
+        let completed = expectation(description: "accepted claim failed open")
+
+        store.recordBoundedClaim(claim, event: event) { persisted in
+            XCTAssertFalse(persisted)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
+    }
+
     func testUncertainClaimFailsOpenWhenDurableStorageIsUnavailable() async {
         var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
         allow.maxHits = 1

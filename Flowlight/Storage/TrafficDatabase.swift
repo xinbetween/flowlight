@@ -1017,6 +1017,19 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     func recordRuleEvents(_ events: [RuleEvent]) throws {
+        try writeRuleEvents(events)
+    }
+
+    /// A bounded proxy decision is not carried out until both its spent count and visible explanation commit. Keeping
+    /// them in one transaction prevents a crash between those writes from reopening a one-shot rule without history.
+    func recordBoundedRuleDecision(rule: Rule, event: RuleEvent) throws {
+        try conn.transaction {
+            try saveRule(rule)
+            try writeRuleEvents([event])
+        }
+    }
+
+    private func writeRuleEvents(_ events: [RuleEvent]) throws {
         let sql = """
         INSERT INTO rule_events (ts, rule_id, action, engine, bundle_id, app_name, agent, agent_name, host, ip, port, path, method)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
