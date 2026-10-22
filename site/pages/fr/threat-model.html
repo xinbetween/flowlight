@@ -87,36 +87,34 @@ nav: threat-model
         des deux s’applique, app par app.</p>
 
       <h2 id="blocking">Ce que le blocage est, et n’est pas</h2>
-      <p>Une règle qui refuse des connexions est exécutée par l’extension réseau, sur le chemin, avant que la connexion ne soit faite. Une règle qui
-        nomme une URL est exécutée par le proxy d’inspection, qui répond à la requête avec un statut que l’app peut lire. Ce sont les deux seules
-        parties de Flowlight qui agissent au lieu de rapporter — l’échantillonneur nettop, lui, ne peut rien refuser du tout&nbsp;: sur un Mac qui
-        capture avec l’échantillonneur, aucune règle n’est appliquée, et Flowlight le dit plutôt que de proposer un interrupteur qui ne fait rien.</p>
+      <p>Une règle qui refuse des connexions est normalement exécutée par l’extension réseau, sur le chemin, avant que la connexion ne soit faite. Pour
+        le trafic acheminé par l’inspection HTTPS, le proxy local applique les règles de destination et les packs gérés activés au client d’origine
+        avant d’ouvrir la connexion au serveur d’origine&nbsp;; une règle qui nomme une URL y est également exécutée après le déchiffrement, avec un
+        statut que l’app peut lire. Ce sont les deux seules parties de Flowlight qui agissent au lieu de rapporter — l’échantillonneur nettop, lui, ne
+        peut rien refuser du tout&nbsp;: sur un Mac qui capture avec l’échantillonneur, aucune règle n’est appliquée, et Flowlight le dit plutôt que de
+        proposer un interrupteur qui ne fait rien.</p>
       <p>Ce n’est pourtant toujours pas empêcher. Un agent qui peut lancer un shell peut faire à la main ce que l’outil refusé aurait fait. Un refus que
         vous pouvez annuler d’un clic est un refus que la tentative suivante d’un agent peut franchir. Le trafic local, le DNS, les services d’Apple et
         les connexions de Flowlight lui-même ne sont jamais refusés, parce qu’un Mac bloqué est un pire résultat qu’un agent bloqué. Et l’application
         des refus cesse quelques secondes après l’arrêt de Flowlight&nbsp;: un refus que personne ne peut voir est pire que pas de refus.</p>
-      <p><strong>Inspection et refus ne se combinent pas.</strong> Le trafic passé par le proxy de Flowlight lui-même quitte le Mac comme du trafic de
-        Flowlight, et Flowlight ne se refuse jamais lui-même — une app dont vous lisez les requêtes est donc une app dont les règles n’arrêtent plus
-        les connexions. Activer l’inspection pour en voir plus vous coûte l’application des refus, et rien à l’écran ne le disait jusqu’ici.</p>
+      <p><strong>L’inspection préserve le refus par nom d’hôte, avec une limite.</strong> Le trafic acheminé par le proxy de Flowlight quitte le Mac comme
+        du trafic Flowlight exempté&nbsp;; le proxy décide donc d’abord des règles de destination ordinaires et des packs gérés activés en utilisant
+        l’identité d’origine de l’app. Il peut le faire même pour les tunnels épinglés ou jamais déchiffrés, car CONNECT nomme l’hôte. Les listes
+        d’autorisation des agents restent une décision de l’Extension réseau et ne s’appliquent pas à ce trajet vers le serveur d’origine par le proxy&nbsp;;
+        le trafic sans propriétaire fiable ou sans nom d’hôte est autorisé plutôt que refusé sans que personne ne le voie.</p>
 
       <h2 id="itself">Ce que Flowlight lui-même conserve</h2>
       <p>Des métadonnées de trafic dans une base de données SQLite locale, avec une durée de conservation publiée. Avec l’inspection HTTPS activée, il
         conserve aussi les corps des requêtes et des réponses pendant trois jours — la chose la plus sensible qu’il garde jamais. Les en-têtes
         d’identification sont masqués par nom et par mot, ce qui est une heuristique et non une garantie&nbsp;; un en-tête qui porte un secret sous un
         nom que rien ne reconnaît peut être enregistré.</p>
-      <p>La base de données de trafic n’est jamais téléversée. Trois choses plus petites quittent bien le Mac sans qu’on les demande, toutes trois
-        nommées sur la <a href="{{link:privacy}}">page Confidentialité</a>&nbsp;: la recherche de mise à jour, qui demande à GitHub la dernière version
-        au lancement et une fois par jour&nbsp;; la consultation du propriétaire du réseau, qui interroge Team Cymru sur les adresses publiques sans
-        nom d’hôte&nbsp;; et, tant que Flowlight lit des compteurs au lieu de faire tourner son extension, une recherche DNS inverse des adresses dont
-        il n’a vu aucun nom. Les deux premières ont un interrupteur d’arrêt. La troisième non, parce que sur l’échantillonneur c’est l’essentiel de la
-        façon dont une connexion obtient un nom&nbsp;: elle va au résolveur que le Mac utilise déjà, et elle s’arrête dès que l’extension prend le
-        relais et nomme les connexions à partir du trafic lui-même. Demander avec un modèle hébergé envoie bien plus que n’importe laquelle d’entre
-        elles, et c’est la seule chose qui reste désactivée jusqu’à ce que vous la configuriez.</p>
+      <p>La base de données de trafic n’est jamais téléversée. La <a href="{{link:privacy}}">page Confidentialité</a> répertorie chaque requête sortante&nbsp;: vérifications de version et de packs de règles signés, consultation facultative du propriétaire du réseau et DNS inverse avec l’échantillonneur. Les trois premières ont des interrupteurs&nbsp;; le DNS inverse non, car sans lui l’échantillonneur ne pourrait pas nommer la plupart des connexions. Un modèle hébergé envoie bien plus et reste désactivé jusqu’à configuration.</p>
 
       <h2 id="updates">Mises à jour</h2>
       <p>Les versions sont signées avec un Developer ID et notarisées. Le programme de mise à jour exige une somme de contrôle publiée et refuse un
         téléchargement qui n’en a pas, puis vérifie que l’app téléchargée est signée par la même équipe que la copie en cours d’exécution avant de
         l’installer. Une mise à jour signée par quelqu’un d’autre est refusée, même si elle est valide par ailleurs.</p>
+      <p>Les packs de règles officiels utilisent une signature distincte limitée à cet usage et une source HTTPS fixe unique. L’application conserve séparément un repère de la séquence la plus élevée, revérifie au démarrage les octets exacts mis en cache, rejette les retours en arrière et les publications contradictoires, et ne considère jamais la signature d’un éditeur comme une autorisation d’appliquer un contenu modifié. Les packs nouveaux ou modifiés exigent l’examen explicite du contenu exact et Enregistrer ; le contenu obsolète déjà accepté est étiqueté comme dernière version valide connue, tandis qu’une révocation de confiance ou des octets corrompus entraînent un refus sécurisé.</p>
 
       <h2 id="reporting">Signaler une vulnérabilité</h2>
       <p>Utilisez le <a href="https://github.com/{{repo}}/security/advisories/new">signalement privé de vulnérabilités</a> de GitHub, ou écrivez à

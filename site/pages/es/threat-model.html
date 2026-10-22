@@ -84,36 +84,34 @@ nav: threat-model
         cosas se aplica, app por app.</p>
 
       <h2 id="blocking">Qué es bloquear, y qué no</h2>
-      <p>De una regla que rechaza conexiones se encarga la extensión de red, en el camino, antes de que la conexión se haga. De una regla que nombra
-        una URL se encarga en cambio el proxy de inspección, que responde a la petición con un estado que la app puede leer. Esas son las dos únicas
-        partes de Flowlight que actúan en lugar de informar — el muestreador nettop no puede rechazar nada en absoluto, así que en un Mac que captura
-        con el muestreador no se aplica ninguna regla, y Flowlight lo dice en lugar de ofrecer un interruptor que no hace nada.</p>
+      <p>De una regla que rechaza conexiones se encarga normalmente la extensión de red, en el camino, antes de que la conexión se haga. Para el tráfico
+        encaminado por la inspección HTTPS, el proxy local aplica las reglas de destino y los paquetes gestionados activados al cliente original antes
+        de abrir la conexión con el servidor de origen; una regla que nombra una URL también se aplica allí, después del descifrado, y responde con un
+        estado que la app puede leer. Esas son las dos únicas partes de Flowlight que actúan en lugar de informar — el muestreador nettop no puede
+        rechazar nada en absoluto, así que en un Mac que captura con el muestreador no se aplica ninguna regla, y Flowlight lo dice en lugar de ofrecer
+        un interruptor que no hace nada.</p>
       <p>Aun así no es impedir. Un agente que puede ejecutar un shell puede hacer a mano lo que habría hecho la herramienta rechazada. Un rechazo que
         puedes deshacer con un clic es un rechazo por el que el siguiente intento del agente puede pasar. El tráfico local, el DNS, los servicios de
         Apple y las propias conexiones de Flowlight no se rechazan nunca, porque un Mac bloqueado es peor resultado que un agente bloqueado. Y la
         aplicación de las reglas caduca unos segundos después de que Flowlight deje de ejecutarse: un rechazo que nadie puede ver es peor que ninguno.</p>
-      <p><strong>La inspección y el rechazo no se combinan.</strong> El tráfico encaminado por el propio proxy de Flowlight sale del Mac como tráfico
-        de Flowlight, y Flowlight no se rechaza nunca a sí mismo — así que una app cuyas peticiones estás leyendo es una app cuyas conexiones las
-        reglas ya no detienen. Activar la inspección para ver más te cuesta la aplicación de las reglas, y hasta ahora nada en la pantalla lo decía.</p>
+      <p><strong>La inspección conserva el rechazo por nombre de host, con un límite.</strong> El tráfico encaminado por el proxy de Flowlight sale del
+        Mac como tráfico exento de Flowlight, así que el proxy decide primero las reglas de destino normales y los paquetes gestionados activados usando
+        la identidad original de la app. Puede hacerlo incluso con túneles que fijan certificados o que nunca se descifran, porque CONNECT nombra el host.
+        Las listas de permitidos de agentes siguen siendo una decisión de la Extensión de red y no se aplican a ese tramo hacia el servidor de origen a
+        través del proxy; el tráfico sin un propietario fiable o sin nombre de host se permite en vez de rechazarse sin que nadie lo vea.</p>
 
       <h2 id="itself">Lo que guarda Flowlight mismo</h2>
       <p>Metadatos de tráfico en una base de datos SQLite local, con una retención publicada. Con la inspección HTTPS activada guarda además los
         cuerpos de las peticiones y las respuestas durante tres días: lo más delicado que llega a conservar. Las cabeceras con credenciales se
         censuran por nombre y por palabra, lo cual es una heurística y no una garantía; una cabecera que lleve un secreto con un nombre que nada
         reconoce puede quedar registrada.</p>
-      <p>La base de datos de tráfico nunca se sube. Tres cosas más pequeñas sí salen del Mac sin que nadie las pida, las tres nombradas en la
-        <a href="{{link:privacy}}">página de privacidad</a>: la comprobación de actualizaciones, que pide a GitHub la última versión al arrancar y a
-        diario; la consulta del propietario de la red, que pregunta a Team Cymru por direcciones públicas que no tienen nombre de host; y, mientras
-        Flowlight lee contadores en vez de ejecutar su extensión, una consulta de DNS inverso de las direcciones para las que no vio ningún nombre.
-        Las dos primeras se pueden desactivar. La tercera no, porque en el muestreador es casi la única manera en la que una conexión llega a tener
-        nombre: va al servidor DNS que el Mac ya usa, y se detiene en cuanto la extensión toma el relevo y nombra las conexiones a partir del propio
-        tráfico. Preguntar con un modelo alojado envía mucho más que cualquiera de ellas, y es lo único que está desactivado hasta que lo
-        configuras.</p>
+      <p>La base de datos de tráfico nunca se sube. La <a href="{{link:privacy}}">página de privacidad</a> enumera cada petición saliente: comprobaciones de versión y de paquetes de reglas firmados, la consulta opcional del propietario de red y DNS inverso en el muestreador. Las tres primeras tienen interruptores; el DNS inverso no, porque sin él el muestreador no podría nombrar la mayoría de las conexiones. Preguntar con un modelo alojado envía mucho más y permanece desactivado hasta que lo configuras.</p>
 
       <h2 id="updates">Actualizaciones</h2>
       <p>Las versiones se firman con un Developer ID y se notarizan. El actualizador exige una suma de comprobación publicada y rechaza una descarga
         que no la tenga; después comprueba que la app descargada esté firmada por el mismo equipo que la copia en ejecución antes de instalarla. Una
         actualización firmada por otra persona se rechaza aunque por lo demás sea válida.</p>
+      <p>Los paquetes de reglas oficiales usan una firma independiente limitada a este fin y una única fuente HTTPS fija. La aplicación mantiene por separado una marca de la secuencia más alta, vuelve a verificar al iniciarse los bytes exactos almacenados en caché, rechaza las regresiones y las publicaciones contradictorias, y nunca considera la firma del editor como permiso para aplicar contenido modificado. Los paquetes nuevos o modificados requieren la revisión explícita del contenido exacto y Guardar; el contenido obsoleto ya aceptado se etiqueta como la última versión válida conocida, mientras que la revocación de la confianza o los bytes dañados provocan un rechazo seguro.</p>
 
       <h2 id="reporting">Informar de una vulnerabilidad</h2>
       <p>Usa el <a href="https://github.com/{{repo}}/security/advisories/new">informe privado de vulnerabilidades</a> de GitHub, o escribe a

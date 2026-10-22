@@ -323,11 +323,13 @@ final class MockRuleStorageTests: XCTestCase {
 /// the decision, this covers the wiring that acts on it.
 final class MockProxyTests: XCTestCase {
     /// A stand-in server that answers "real" to anything that reaches it, and says whether anything did.
-    private func startUpstream(reached: @escaping () -> Void) throws -> (NWListener, UInt16) {
+    private func startUpstream(accepted: @escaping () -> Void = {},
+                               reached: @escaping () -> Void) throws -> (NWListener, UInt16) {
         // Not the main queue: the test blocks its own thread waiting for curl, which would deadlock the stub.
         let queue = DispatchQueue(label: "test.upstream")
         let upstream = try NWListener(using: .tcp)
         upstream.newConnectionHandler = { conn in
+            accepted()
             conn.start(queue: queue)
             // "Reached" means request bytes arrived: the proxy opens the upstream socket either way.
             conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, _ in
@@ -350,6 +352,16 @@ final class MockProxyTests: XCTestCase {
         let ready = expectation(description: "proxy ready")
         proxy.onStateChange = { _ in if proxy.port != nil { ready.fulfill() } }
         proxy.start(port: 0)   // any free port: a fixed one would collide with a real Flowlight on this Mac
+        wait(for: [ready], timeout: 10)
+        return (proxy, try XCTUnwrap(proxy.port))
+    }
+
+    private func startDeniedProxy() throws -> (InspectionProxy, UInt16) {
+        let proxy = InspectionProxy()
+        proxy.authorizeConnection = { _, _, _, answer in answer(false) }
+        let ready = expectation(description: "proxy ready")
+        proxy.onStateChange = { _ in if proxy.port != nil { ready.fulfill() } }
+        proxy.start(port: 0)
         wait(for: [ready], timeout: 10)
         return (proxy, try XCTUnwrap(proxy.port))
     }
@@ -414,5 +426,48 @@ final class MockProxyTests: XCTestCase {
         XCTAssertEqual(result.body, "real")
         XCTAssertTrue(reached)
         XCTAssertNil(recorded.first?.mockRule)
+    }
+
+    func testDeniedPlainHTTPConnectionNeverOpensUpstream() throws {
+        let accepted = expectation(description: "upstream accepted")
+        accepted.isInverted = true
+        let (upstream, upstreamPort) = try startUpstream(accepted: { accepted.fulfill() }) {}
+        defer { upstream.cancel() }
+        let (proxy, proxyPort) = try startDeniedProxy()
+        defer { proxy.stop() }
+
+        let result = curl("http://127.0.0.1:\(upstreamPort)/blocked", through: proxyPort)
+
+        XCTAssertEqual(result.status, "403")
+        wait(for: [accepted], timeout: 0.5)
+    }
+
+    func testDeniedConnectIsRejectedBeforeTunnelOpens() throws {
+        let accepted = expectation(description: "CONNECT upstream accepted")
+        accepted.isInverted = true
+        let (upstream, upstreamPort) = try startUpstream(accepted: { accepted.fulfill() }) {}
+        defer { upstream.cancel() }
+        let (proxy, proxyPort) = try startDeniedProxy()
+        defer { proxy.stop() }
+
+        // Use another process: the proxy deliberately rejects its own process before policy authorization to avoid loops.
+        let client = Process()
+        client.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        client.arguments = ["127.0.0.1", String(proxyPort)]
+        let input = Pipe()
+        let output = Pipe()
+        client.standardInput = input
+        client.standardOutput = output
+        client.standardError = FileHandle.nullDevice
+        try client.run()
+        input.fileHandleForWriting.write(Data(
+            "CONNECT 127.0.0.1:\(upstreamPort) HTTP/1.1\r\nHost: 127.0.0.1:\(upstreamPort)\r\n\r\n".utf8
+        ))
+        try input.fileHandleForWriting.close()
+        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+        client.waitUntilExit()
+
+        XCTAssertTrue(String(decoding: bytes, as: UTF8.self).hasPrefix("HTTP/1.1 403 Forbidden"))
+        wait(for: [accepted], timeout: 0.5)
     }
 }

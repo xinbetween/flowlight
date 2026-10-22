@@ -180,7 +180,9 @@ nav: home
           <span class="sev critical">⛔ Opt-in</span>
           <div><h3>Managed ad and tracker packs</h3>
             <p>Three official packs — Advertising, Cross-site tracking, and Privacy and telemetry — are built in, visible and off by
-              default. With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
+              default. Flowlight checks one fixed HTTPS feed for signed updates; new or changed content remains out of enforcement until
+              you review that exact version and press Save. During an outage, verified accepted content is visibly stale last-known-good.</p>
+            <p>With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
               see grouped, explainable activity, and add pack-specific exceptions for an app. Ordinary allow rules remain the universal
               escape hatch, global Pause Blocking applies, and essential system traffic stays allowed.</p>
             <p>They block by hostname, so they cannot remove first-party ads, DOM or layout gaps, browser overlays, scripted popups, or
@@ -387,7 +389,7 @@ nav: home
         <div><strong>Stays on your Mac</strong><p>One local SQLite file. No account, no cloud sync, no telemetry.</p></div>
         <div><strong>Metadata by default</strong><p>Hostnames, ports and byte counts. Decrypting HTTPS is a separate mode you have to turn on, and it stays on your Mac.</p></div>
         <div><strong>Filtered in the kernel</strong><p>Capture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.</p></div>
-        <div><strong>Lookups you control</strong><p>Naming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.</p></div>
+        <div><strong>Lookups you control</strong><p>Naming who owns an address sends only public IPs with no hostname to Team Cymru. Release and signed rule-pack checks send standard HTTPS requests with no traffic or pack settings. Each has an off switch.</p></div>
       </div>
     </div>
   </section>

@@ -1,6 +1,56 @@
 import AppKit
 import Foundation
 
+/// Socket ownership can lag connection acceptance briefly while libproc publishes the new descriptor. Keep the
+/// authorization wait bounded, but give app-scoped rules and managed packs more than one scheduling instant to find it.
+enum ProxyOwnerLookup {
+    typealias Scheduler = @Sendable (
+        TimeInterval,
+        @escaping @Sendable () -> Void
+    ) -> Void
+
+    static let retryDelays: [TimeInterval] = [0.01, 0.025, 0.05]
+
+    static func resolve(
+        lookup: @escaping @Sendable () -> InspectionRecorder.Owner,
+        completion: @escaping @Sendable (InspectionRecorder.Owner) -> Void
+    ) {
+        resolve(
+            delays: retryDelays[...],
+            lookup: lookup,
+            schedule: { delay, work in
+                DispatchQueue.global(qos: .userInitiated).asyncAfter(
+                    deadline: .now() + delay,
+                    execute: work
+                )
+            },
+            completion: completion
+        )
+    }
+
+    static func resolve(
+        delays: ArraySlice<TimeInterval>,
+        lookup: @escaping @Sendable () -> InspectionRecorder.Owner,
+        schedule: @escaping Scheduler,
+        completion: @escaping @Sendable (InspectionRecorder.Owner) -> Void
+    ) {
+        let owner = lookup()
+        guard owner.bundleID.isEmpty,
+              let delay = delays.first else {
+            completion(owner)
+            return
+        }
+        schedule(delay) {
+            resolve(
+                delays: delays.dropFirst(),
+                lookup: lookup,
+                schedule: schedule,
+                completion: completion
+            )
+        }
+    }
+}
+
 /// HTTPS inspection: an opt-in mode, off by default, that decrypts the traffic of apps routed through Flowlight's
 /// local proxy using a certificate authority created on this Mac. Everything it records stays in the local database.
 @MainActor
@@ -64,8 +114,33 @@ final class InspectionController: ObservableObject {
     /// which only the proxy can see. Read fresh on every connection, so a rule written now applies to the next
     /// request rather than the next launch.
     nonisolated(unsafe) var requestRules: @Sendable () -> [Rule] = { [] }
-    /// Called with every request a rule refused, ready to be recorded in the violations feed.
+    /// Called with every request or proxied connection a rule refused, ready for the violations feed.
     nonisolated(unsafe) var onRuleRefusal: @Sendable (RuleEvent) -> Void = { _ in }
+    /// One atomic flow-level rule answer, including whether the global escape hatch is active.
+    nonisolated(unsafe) var flowRuleDecision: @Sendable (FlowFacts) -> LiveFlowRuleDecision = {
+        _ in LiveFlowRuleDecision(paused: false, decision: RuleDecision(verdict: .allow, rule: nil), externalClaim: nil)
+    }
+    /// Bounded rules are previewed locally, then atomically claimed by the active enforcement source.
+    nonisolated(unsafe) var claimFlowRule: @Sendable (
+        RuleClaim,
+        @escaping @Sendable (Bool?) -> Void
+    ) -> Void = { _, completion in completion(nil) }
+    /// Persists an accepted bounded claim and its event before the proxy applies the answer.
+    nonisolated(unsafe) var flowRuleClaimed: @Sendable (
+        RuleClaim,
+        RuleEvent,
+        @escaping @Sendable (Bool) -> Void
+    ) -> Void = { _, _, completion in completion(false) }
+    nonisolated(unsafe) var flowRuleSpent: @Sendable (
+        RuleClaim,
+        @escaping @Sendable (Bool) -> Void
+    ) -> Void = { _, completion in completion(false) }
+    /// The exact extension-committed managed-pack generation, queried with the original proxied app identity.
+    nonisolated(unsafe) var rulePackMatch: @Sendable (String, String) -> RulePackMatch? = { _, _ in nil }
+    /// Persists a proxy pack refusal before the proxy acts. False means fail open: no invisible refusal.
+    nonisolated(unsafe) var onRulePackRefusal: @Sendable (RulePackEvent, @escaping @Sendable (Bool) -> Void) -> Void = {
+        _, completion in completion(false)
+    }
     /// The guardrails in force, read fresh per connection like the rules.
     nonisolated(unsafe) var guardrails: @Sendable () -> [Guardrail] = { [] }
     /// Called with every tool a guardrail took away, and every call it refused.
@@ -104,8 +179,10 @@ final class InspectionController: ObservableObject {
         // A rule refusing a request is answered by the same machinery that gives a mock its canned response, and
         // it goes first: a block someone wrote has to outrank a mock they left switched on.
         let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
+            let destination = Self.proxyDestination(host)
             var refusals = (self?.requestRules() ?? []).filter {
-                $0.action == .block && ($0.destination.isEmpty || AgentPolicy.matches($0.destination, host: host, ip: ""))
+                $0.action == .block && ($0.destination.isEmpty
+                    || AgentPolicy.matches($0.destination, host: destination.host, ip: destination.ip))
             }
             if refusals.contains(where: { !$0.app.isEmpty }) {
                 // Only then is it worth asking who opened this connection: naming an app is the uncommon case,
@@ -119,6 +196,14 @@ final class InspectionController: ObservableObject {
             return refusals.map { $0.asRefusal(host: host) } + MockRules.mocks(mockRules(), host: host)
         }
         proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
+        proxy.authorizeConnection = { [weak self, recorder, proxy] host, port, clientPort, answer in
+            guard let self else { answer(true); return }
+            ProxyOwnerLookup.resolve(
+                lookup: { recorder.owner(clientPort: clientPort, proxyPort: proxy.port) }
+            ) { owner in
+                self.authorizeProxyConnection(host: host, port: port, owner: owner, answer: answer)
+            }
+        }
         // Guardrails read and change whole requests, which is a different job from matching a URL, so they get
         // their own hook rather than being squeezed into the answer machinery.
         proxy.interventions = { [weak self, recorder, proxy] host, clientPort in
@@ -456,24 +541,27 @@ final class InspectionController: ObservableObject {
             proxy.stop()
             return
         }
-        Task.detached(priority: .userInitiated) {
-            var failure: String?
-            var trustChanged = false
-            // Trust first: it has its own dialog, and there's no point changing the proxy if it's refused.
-            if needsTrustChange {
-                do { try certificate.setTrusted(on); trustChanged = true } catch { failure = error.localizedDescription }
-            }
-            if failure == nil, needsProxyChange {
-                var error: NSDictionary?
-                NSAppleScript(source: script)?.executeAndReturnError(&error)
-                failure = error.flatMap { e -> String? in
-                    (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
-                        : (e[NSAppleScript.errorMessage] as? String ?? L("authorization failed"))
+        Task {
+            let failure = await Task.detached(priority: .userInitiated) {
+                var failure: String?
+                var trustChanged = false
+                // Trust first: it has its own dialog, and there's no point changing the proxy if it's refused.
+                if needsTrustChange {
+                    do { try certificate.setTrusted(on); trustChanged = true } catch { failure = error.localizedDescription }
                 }
-                // Don't leave the certificate trusted for a proxy that was never set up.
-                if failure != nil, trustChanged { try? certificate.setTrusted(!on) }
-            }
-            await MainActor.run { self.finishSetup(on: on, failure: failure) }
+                if failure == nil, needsProxyChange {
+                    var error: NSDictionary?
+                    NSAppleScript(source: script)?.executeAndReturnError(&error)
+                    failure = error.flatMap { e -> String? in
+                        (e[NSAppleScript.errorNumber] as? Int) == -128 ? "cancelled"
+                            : (e[NSAppleScript.errorMessage] as? String ?? L("authorization failed"))
+                    }
+                    // Don't leave the certificate trusted for a proxy that was never set up.
+                    if failure != nil, trustChanged { try? certificate.setTrusted(!on) }
+                }
+                return failure
+            }.value
+            finishSetup(on: on, failure: failure)
         }
     }
 
@@ -769,6 +857,113 @@ final class InspectionController: ObservableObject {
     }
 
     // MARK: Matching
+
+    nonisolated private func authorizeProxyConnection(
+        host: String,
+        port: Int,
+        owner: InspectionRecorder.Owner,
+        answer: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard !owner.bundleID.isEmpty else { answer(true); return }
+        let facts = Self.proxyFlowFacts(host: host, port: port, owner: owner)
+        guard !BlockRules.isExempt(facts) else { answer(true); return }
+        let ruled = flowRuleDecision(facts)
+        guard !ruled.paused else { answer(true); return }
+        if let rule = ruled.decision.rule {
+            authorizeProxyRule(
+                rule,
+                externalClaim: ruled.externalClaim,
+                facts: facts,
+                owner: owner,
+                answer: answer
+            )
+            return
+        }
+        guard let match = rulePackMatch(host, owner.bundleID) else { answer(true); return }
+        let now = Int64(Date().timeIntervalSince1970)
+        let event = RulePackEvent(bucket: now / 60 * 60, packID: match.packID,
+                                  packVersion: match.packVersion, entryID: match.entry.id,
+                                  category: match.entry.category, match: match.entry.match, action: .block,
+                                  count: 1, firstAt: now, lastAt: now, bundleID: owner.bundleID,
+                                  appName: owner.appName, agentKey: facts.agentKey,
+                                  agentName: owner.agentName ?? owner.appName, host: match.matchedHost,
+                                  matchedHost: match.entry.host, port: facts.port)
+        onRulePackRefusal(event) { committed in answer(!committed) }
+    }
+
+    nonisolated private func authorizeProxyRule(
+        _ rule: Rule,
+        externalClaim: RuleClaim?,
+        facts: FlowFacts,
+        owner: InspectionRecorder.Owner,
+        answer: @escaping @Sendable (Bool) -> Void
+    ) {
+        let event = RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id,
+                              ruleSession: externalClaim?.session,
+                              ruleGeneration: externalClaim?.generation,
+                              action: rule.action, engine: .flow, agentKey: facts.agentKey,
+                              agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                              bundleID: owner.bundleID, host: facts.host, ip: facts.ip, port: facts.port)
+        let finish: @Sendable (Rule) -> Void = { [onRuleRefusal] rule in
+            onRuleRefusal(event)
+            answer(rule.action != .block)
+        }
+        guard let externalClaim else {
+            finish(rule)
+            return
+        }
+        claimFlowRule(externalClaim) { [weak self] claimed in
+            guard let self else { answer(true); return }
+            guard claimed == true else {
+                // Another flow spent this rule first. An uncertain reply may also mean this exact claim committed
+                // before XPC failed; retire it conservatively so reconnect cannot reuse a bounded allowance. Both
+                // paths fail this connection open unless a definitive "already spent" result supports re-decision.
+                self.flowRuleSpent(externalClaim) { persisted in
+                    guard persisted, claimed == false else {
+                        answer(true)
+                        return
+                    }
+                    let next = self.flowRuleDecision(facts)
+                    guard !next.paused, let nextRule = next.decision.rule else {
+                        answer(true)
+                        return
+                    }
+                    self.authorizeProxyRule(
+                        nextRule,
+                        externalClaim: next.externalClaim,
+                        facts: facts,
+                        owner: owner,
+                        answer: answer
+                    )
+                }
+                return
+            }
+            self.flowRuleClaimed(externalClaim, event) { persisted in
+                answer(persisted ? rule.action != .block : true)
+            }
+        }
+    }
+
+    nonisolated static func proxyDestination(_ host: String) -> (host: String, ip: String) {
+        guard let address = HostCanonicalizer.address(host) else { return (host, "") }
+        return ("", address)
+    }
+
+    nonisolated static func proxyFlowFacts(
+        host: String,
+        port: Int,
+        owner: InspectionRecorder.Owner
+    ) -> FlowFacts {
+        let destination = proxyDestination(host)
+        return FlowFacts(
+            agentKey: owner.agent ?? owner.bundleID,
+            bundleID: owner.bundleID,
+            host: destination.host,
+            ip: destination.ip,
+            port: UInt16(clamping: port),
+            hostSettled: true
+        )
+    }
 
     nonisolated static func matches(host: String, patterns: [String]) -> Bool {
         let host = host.lowercased()

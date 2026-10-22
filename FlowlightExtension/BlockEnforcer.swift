@@ -62,8 +62,27 @@ final class BlockEnforcer: @unchecked Sendable {
     func apply(_ set: RuleSet) -> Int {
         lock.lock(); defer { lock.unlock() }
         ruleSet = set
-        ruleHits = Dictionary(set.rules.map { ($0.id, $0.hits) }, uniquingKeysWith: { a, _ in a })
+        ruleHits = Dictionary(set.rules.map { rule in
+            let published = rule.hits
+            let runtime = ruleHits[rule.id] ?? published
+            return (rule.id, set.resetHitCounts.contains(rule.id) ? published : max(published, runtime))
+        }, uniquingKeysWith: { a, _ in a })
         return set.rules.filter(\.enabled).count
+    }
+
+    /// Atomically spends one bounded rule for a connection the local proxy is about to decide. Unbounded rules need
+    /// no claim. Nil means the app and extension no longer share this rule generation and the proxy must fail open.
+    func claimRule(_ claim: RuleClaim) -> Bool? {
+        lock.lock(); defer { lock.unlock() }
+        guard ruleSet.accepts(claim),
+              let rule = ruleSet.rules.first(where: { $0.id == claim.ruleID }),
+              rule.maxHits > 0 else {
+            return nil
+        }
+        let hits = ruleHits[claim.ruleID] ?? rule.hits
+        guard hits < rule.maxHits else { return false }
+        ruleHits[claim.ruleID] = hits + 1
+        return true
     }
 
     func apply(_ snapshot: RulePackSnapshot) throws -> RulePackApplyResult {
@@ -176,25 +195,35 @@ final class BlockEnforcer: @unchecked Sendable {
     /// is away, for the same reason an allowlist isn't: a refusal nobody can see, and nobody can undo, is worse
     /// than the connection it stopped.
     private func ruleDecision(_ facts: FlowFacts, process: ProcessInfoRecord, agent: Agent?) -> RuleDecision {
-        lock.lock()
-        let set = ruleSet
-        let hits = ruleHits
-        lock.unlock()
         // The pause stands everything down, allowlists included: it is the one global escape hatch, and an escape
         // hatch that only half works is worse than none. `.undecided` rather than `.allow`, so the flow is judged
         // again when the pause ends rather than being waved through for its whole life.
-        if let until = set.pausedUntil, Date() < until { return RuleDecision(verdict: .undecided, rule: nil) }
-        guard !set.rules.isEmpty, inForce() else { return RuleDecision(verdict: .allow, rule: nil) }
+        guard inForce() else { return RuleDecision(verdict: .allow, rule: nil) }
         if BlockRules.isExempt(facts) { return RuleDecision(verdict: .allow, rule: nil) }
+        lock.lock()
+        let set = ruleSet
+        if let until = set.pausedUntil, Date() < until {
+            lock.unlock()
+            return RuleDecision(verdict: .undecided, rule: nil)
+        }
+        guard !set.rules.isEmpty else {
+            lock.unlock()
+            return RuleDecision(verdict: .allow, rule: nil)
+        }
         let rules = set.rules.map { rule -> Rule in
             var copy = rule
-            copy.hits = hits[rule.id] ?? rule.hits
+            copy.hits = ruleHits[rule.id] ?? rule.hits
             return copy
         }
         let decision = RuleBook.decide(facts, rules: rules, session: set.session, pausedUntil: set.pausedUntil)
-        guard let rule = decision.rule else { return decision }
-        lock.lock(); ruleHits[rule.id] = (ruleHits[rule.id] ?? 0) + 1; lock.unlock()
-        let event = RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id, action: rule.action,
+        guard let rule = decision.rule else {
+            lock.unlock()
+            return decision
+        }
+        ruleHits[rule.id] = (ruleHits[rule.id] ?? 0) + 1
+        lock.unlock()
+        let event = RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: rule.id,
+                              ruleSession: set.session, ruleGeneration: set.generation, action: rule.action,
                               engine: .flow, agentKey: facts.agentKey, agentName: agent?.name ?? process.name,
                               appName: process.name, bundleID: process.bundleID, host: facts.host, ip: facts.ip,
                               port: facts.port)

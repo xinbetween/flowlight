@@ -4,12 +4,13 @@ struct RulePacksView: View {
     @EnvironmentObject var monitor: TrafficMonitor
 
     var body: some View {
-        RulePacksContent(packs: monitor.rulePacks)
+        RulePacksContent(packs: monitor.rulePacks, catalog: monitor.rulePackCatalog)
     }
 }
 
 private struct RulePackEditorRequest: Identifiable {
     let pack: RulePackDefinition
+    let receipt: RulePackReviewReceipt?
     let intent: RulePackEditorDraft.Intent
     var id: String { pack.id }
 }
@@ -25,6 +26,7 @@ struct RulePackSaveTracker {
 private struct RulePacksContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @ObservedObject var packs: RulePackStore
+    @ObservedObject var catalog: RulePackCatalogUpdater
     @State private var editor: RulePackEditorRequest?
     @State private var saves = RulePackSaveTracker()
     @State private var saveErrors: [String: String] = [:]
@@ -33,6 +35,12 @@ private struct RulePacksContent: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 explanation
+                officialUpdates
+                if let failure = packs.failureMessage {
+                    Label(failure, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(FL.warning)
+                        .padding(10).background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                }
                 if packs.deliveryStats.droppedHits > 0 {
                     Label(L("%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full.",
                             packs.deliveryStats.droppedHits), systemImage: "exclamationmark.triangle")
@@ -46,7 +54,8 @@ private struct RulePacksContent: View {
             .padding(Measure.gutter)
         }
         .sheet(item: $editor) { request in
-            RulePackEditor(pack: request.pack, saved: packs.configuration(for: request.pack.id),
+            RulePackEditor(pack: request.pack, receipt: request.receipt,
+                           saved: packs.configuration(for: request.pack.id),
                            intent: request.intent, packs: packs, rules: monitor.rules)
         }
     }
@@ -58,6 +67,85 @@ private struct RulePacksContent: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 4)
+    }
+
+    private var officialUpdates: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Official pack updates")).font(.body.weight(.semibold))
+                    Text(L("Flowlight checks its fixed HTTPS feed for publisher-signed destination lists. No traffic, pack settings, or device identifier is sent."))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                Toggle(L("Automatic updates"), isOn: Binding(
+                    get: { catalog.automaticRefresh },
+                    set: { enabled in Task { await catalog.setAutomaticRefresh(enabled) } }
+                ))
+                .toggleStyle(.switch).controlSize(.small)
+            }
+            HStack(spacing: 8) {
+                pill(catalogStatusText, tint: catalogStatusTint)
+                if let sequence = catalog.receipt?.sequence { pill(L("Sequence %lld", sequence)) }
+                Spacer()
+                Button(L("Check Now")) { Task { await catalog.checkNow() } }
+                    .disabled(catalog.status == .checking)
+            }
+            if let detail = catalogStatusDetail {
+                Label(detail, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                if let success = catalog.catalogState.update.lastSuccess {
+                    Text(L("Last verified %@", success.formatted(.relative(presentation: .named))))
+                }
+                if catalog.automaticRefresh,
+                   let next = catalog.catalogState.update.nextEligibleAttempt {
+                    Text(L("Next check %@", next.formatted(.relative(presentation: .named))))
+                }
+            }
+            .font(.caption2).foregroundStyle(.tertiary)
+            Text(L("Official source: %@", RulePackCatalogVerifier.sourceURL))
+                .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                .textSelection(.enabled)
+            if let receipt = catalog.receipt {
+                Text(L("Publisher: Flowlight · signer %@ · catalog digest %@",
+                       receipt.signerKeyID, String(receipt.digest.prefix(12))))
+                    .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(14)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private var catalogStatusText: String {
+        switch catalog.status {
+        case .idle: return L("Not checked yet")
+        case .checking: return L("Checking…")
+        case .current: return L("Verified and current")
+        case .stale: return L("Verified last-known-good is stale")
+        case .recovery: return L("Recovery required")
+        case .failed(_, let usingLastKnownGood):
+            return usingLastKnownGood ? L("Check failed · using last-known-good") : L("Check failed")
+        }
+    }
+
+    private var catalogStatusTint: Color? {
+        switch catalog.status {
+        case .current: return FL.good
+        case .checking, .idle: return nil
+        case .stale, .recovery, .failed: return FL.warning
+        }
+    }
+
+    private var catalogStatusDetail: String? {
+        switch catalog.status {
+        case .recovery(let message), .failed(let message, _): return message
+        case .idle, .checking, .current, .stale: return nil
+        }
     }
 
     private func card(_ pack: RulePackDefinition) -> some View {
@@ -79,7 +167,8 @@ private struct RulePacksContent: View {
                 Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
                     if enabled {
                         saveErrors[pack.id] = nil
-                        editor = RulePackEditorRequest(pack: pack, intent: .activate)
+                        editor = RulePackEditorRequest(pack: pack, receipt: packs.reviewReceipt(for: pack),
+                                                       intent: .activate)
                     } else {
                         var changed = configuration
                         changed.enabled = false
@@ -93,7 +182,7 @@ private struct RulePacksContent: View {
                 })).toggleStyle(.switch).controlSize(.small).labelsHidden().disabled(isSaving)
             }
             HStack(spacing: 8) {
-                pill(status(configuration), tint: statusTint(configuration))
+                pill(status(configuration, definition: pack), tint: statusTint(configuration, definition: pack))
                 pill(configuration.scope == .allApps ? L("Every app") : L("%lld selected apps", configuration.apps.count))
                 pill(L("%lld destinations", pack.entries.count))
                 if blocks > 0 { pill(L("%lld blocked", blocks), tint: FL.critical) }
@@ -103,7 +192,8 @@ private struct RulePacksContent: View {
                 Spacer()
                 Button(L("Review…")) {
                     saveErrors[pack.id] = nil
-                    editor = RulePackEditorRequest(pack: pack, intent: .review)
+                    editor = RulePackEditorRequest(pack: pack, receipt: packs.reviewReceipt(for: pack),
+                                                   intent: .review)
                 }.disabled(isSaving)
             }
             if let saveError = saveErrors[pack.id] {
@@ -112,36 +202,35 @@ private struct RulePacksContent: View {
             }
             Text(L(pack.manifest.caveatKey)).font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(L("Official · Built into Flowlight · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
+            Text(catalog.isDownloadedUpdate(pack)
+                 ? L("Official · Verified official update · pack v%@ · %@", pack.manifest.version, pack.manifest.license)
+                 : L("Official · Bundled baseline · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
                 .font(.caption2).foregroundStyle(.tertiary)
         }
         .padding(14)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
     }
 
-    private func status(_ configuration: RulePackConfiguration) -> String {
+    private func status(_ configuration: RulePackConfiguration,
+                        definition: RulePackDefinition) -> String {
+        if packs.needsReview(definition) { return L("Needs review") }
         if !configuration.enabled {
-            switch packs.status {
-            case .applying: return L("Applying…")
-            case .failed: return L("Needs review")
-            default: return L("Off")
-            }
+            return packs.status == .applying ? L("Applying…") : L("Off")
         }
         switch packs.status {
         case .off, .ready, .applying: return monitor.canBlock ? L("Applying…") : L("Watching only")
         case .enforcing: return monitor.canBlock ? L("Blocking") : L("Watching only")
         case .watchingOnly: return L("Watching only")
         case .incompatible: return L("Needs extension update")
-        case .failed: return L("Needs review")
+        case .failed: return L("Apply failed")
         }
     }
 
-    private func statusTint(_ configuration: RulePackConfiguration) -> Color? {
+    private func statusTint(_ configuration: RulePackConfiguration,
+                            definition: RulePackDefinition) -> Color? {
+        if packs.needsReview(definition) { return FL.warning }
         if !configuration.enabled {
-            switch packs.status {
-            case .applying, .failed: return FL.warning
-            default: return nil
-            }
+            return packs.status == .applying ? FL.warning : nil
         }
         return monitor.canBlock && packs.status == .enforcing ? FL.critical : FL.warning
     }
@@ -164,6 +253,7 @@ private struct RulePacksContent: View {
 
 private struct RulePackEditor: View {
     let pack: RulePackDefinition
+    let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var packs: RulePackStore
@@ -179,12 +269,14 @@ private struct RulePackEditor: View {
     @State private var confirmBroadening = false
     @State private var saving = false
 
-    init(pack: RulePackDefinition, saved: RulePackConfiguration,
+    init(pack: RulePackDefinition, receipt: RulePackReviewReceipt?, saved: RulePackConfiguration,
          intent: RulePackEditorDraft.Intent, packs: RulePackStore, rules: RuleStore) {
         self.pack = pack
+        self.receipt = receipt
         self.packs = packs
         self.rules = rules
-        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent))
+        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent,
+                                                        reviewedDefinition: pack, reviewReceipt: receipt))
     }
 
     var body: some View {
@@ -229,7 +321,9 @@ private struct RulePackEditor: View {
         .onChange(of: monitor.dataVersion) { _, _ in invalidatePreview() }
         .onAppear { loadApps() }
         .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
-            Button(L("Apply to every app"), role: .destructive) { commit(draft.configuration) }
+            Button(L("Apply to every app"), role: .destructive) {
+                commit(draft.configuration, receipt: draft.reviewReceipt)
+            }
             Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(L("This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed."))
@@ -319,7 +413,7 @@ private struct RulePackEditor: View {
 
     private var destinations: some View {
         DisclosureGroup(L("%lld destinations", pack.entries.count)) {
-            VStack(alignment: .leading, spacing: 3) {
+            LazyVStack(alignment: .leading, spacing: 3) {
                 ForEach(pack.entries) { entry in
                     Text(entry.host).font(.caption.monospaced()).textSelection(.enabled)
                 }
@@ -379,22 +473,26 @@ private struct RulePackEditor: View {
     private func save() {
         saveError = nil
         switch draft.requestSave() {
-        case .commit(let configuration): commit(configuration)
+        case .commit(let configuration, let receipt): commit(configuration, receipt: receipt)
         case .confirmBroadening: confirmBroadening = true
         case nil: break
         }
     }
 
-    private func commit(_ configuration: RulePackConfiguration? = nil) {
+    private func commit(_ configuration: RulePackConfiguration? = nil,
+                        receipt: RulePackReviewReceipt? = nil) {
         saving = true
         saveError = nil
         let value = configuration ?? draft.configuration
-        packs.save(value) { success in
+        packs.save(value, reviewedDefinition: pack, receipt: receipt) { result in
             saving = false
-            if success {
+            switch result {
+            case .saved:
                 dismiss()
-            } else {
-                saveError = packs.failureMessage ?? L("Failed: %@", L("Save"))
+            case .staleReview:
+                saveError = L("This pack changed while it was open. Reopen it to review the new content before saving.")
+            case .failed(let message):
+                saveError = message
             }
         }
     }

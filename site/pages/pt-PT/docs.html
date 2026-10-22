@@ -383,6 +383,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         é segura. O ecrã indica também o tráfego mais antigo que conseguiu ver: uma regra testada contra duas horas de histórico foi
         testada contra duas horas de histórico.</p>
 
+      <h3 id="managed-packs">Pacotes geridos de publicidade e rastreadores</h3>
+      <p><strong>Regras › Pacotes</strong> contém três listas oficiais de nomes de anfitrião: <strong>Publicidade</strong>, <strong>Rastreio entre sites</strong> e <strong>Privacidade e telemetria</strong>. Estão visíveis desde o início e todas desativadas por predefinição. O bloqueio requer a Extensão de rede; o amostrador nettop apenas pode observar.</p>
+      <p><strong>Apenas atualizações oficiais e assinadas.</strong> O Flowlight consulta uma única fonte HTTPS fixa para procurar catálogos mais recentes assinados pelo editor. As verificações automáticas estão ativas por predefinição e podem ser desativadas aqui. Uma assinatura autentica o conteúdo, mas não o ativa: um novo pacote permanece desativado e, se os destinos forem alterados, um pacote ativo deixa de ser aplicado até que reveja a nova versão exata e prima Guardar. Durante uma interrupção, o conteúdo aceite pode permanecer disponível como a última versão válida conhecida, visivelmente assinalada como desatualizada. Estes são bloqueios de rede ao nível do nome de anfitrião: não podem remover espaços vazios no DOM ou no esquema, sobreposições do navegador, janelas pop-up geradas por scripts ou janelas de aplicações nativas.</p>
+      <p>Quando a inspeção HTTPS encaminha uma app pelo proxy do Flowlight, este decide as regras de destino comuns e os pacotes geridos ativos com base na identidade original da app antes de abrir qualquer ligação ao servidor de origem. Nos túneis CONNECT com certificado fixado ou que nunca são decifrados, isto funciona pelo nome de anfitrião; as listas de permissões dos agentes continuam limitadas ao caminho direto pela Extensão de rede. Se o proprietário ou o nome de anfitrião for desconhecido, a ligação é permitida.</p>
+
       <h2 id="allowlists">Listas de permissões</h2>
       <p>Selecione um agente em <strong>Agentes de IA</strong> e use a <strong>Lista de permissões</strong> no seu detalhe para dizer onde pode ligar-se. Introduza domínios
         (subdomínios incluídos), endereços IP ou intervalos CIDR, ou escolha uma predefinição: GitHub, npm, PyPI, Homebrew, Docker Hub, Rust crates, módulos de Go ou
@@ -401,8 +406,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Flowlight. Um Mac bloqueado é um resultado pior do que um agente bloqueado, por isso, na dúvida, a ligação é permitida e registada.
         A aplicação efetiva também caduca uns segundos depois de o Flowlight deixar de correr — uma recusa que ninguém consegue ver é pior do que nenhuma, e a maneira
         de a desfazer está na app.</p>
-      <p>A inspeção HTTPS e o bloqueio não se combinam: o tráfego encaminhado pelo proxy do Flowlight sai como sendo do próprio Flowlight, que
-        nunca é recusado.</p>
+      <p>Para uma app encaminhada pela inspeção HTTPS, o proxy do Flowlight decide as regras de destino comuns e os pacotes geridos ativos com base na identidade original da app antes de abrir qualquer ligação ao servidor de origem. Nos túneis CONNECT com certificado fixado ou que nunca são decifrados, fá-lo pelo nome de anfitrião. As listas de permissões dos agentes continuam limitadas ao caminho direto pela Extensão de rede; se o proprietário ou o nome de anfitrião for desconhecido, a ligação é permitida.</p>
 
       <h2 id="guardrails">Proteções dos agentes: bloquear uma ferramenta, um servidor ou um recurso</h2>
       <p><em>Que ferramentas pode este agente usar</em> é uma pergunta diferente de <em>que anfitriões pode alcançar</em>, por isso tem a sua própria
@@ -616,10 +620,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Mostra que extensões estão instaladas, se o macOS realmente iniciou o filtro do Flowlight e há quanto tempo foi registado algo.
           Cole isso <a href="https://github.com/{{repo}}/issues">num problema</a>.</dd>
         <dt><strong>O Flowlight envia algo sobre mim para algum lado?</strong></dt>
-        <dd>Não há conta, nem telemetria, nem analítica, e a sua base de dados de tráfego nunca é enviada. Três pedidos saem do Mac, todos listados na
-          <a href="{{link:privacy}}">página de privacidade</a>: a procura diária de atualizações e a consulta opcional do proprietário da rede, ambas com
-          interruptores para desativar, e o DNS inverso enquanto o Flowlight está no amostrador, que não tem nenhum — sem ele, o amostrador não conseguiria
-          dar nome à maioria das ligações.</dd>
+        <dd>Não há conta, nem telemetria, nem analítica, e a sua base de dados de tráfego nunca é enviada. A <a href="{{link:privacy}}">página de privacidade</a> lista cada pedido: as verificações de versão e de pacotes de regras assinados, além da consulta opcional do proprietário da rede, têm interruptores; o DNS inverso só funciona com o amostrador e não tem um, porque sem ele a maioria das ligações ficaria sem nome.</dd>
         <dt><strong>Vai tornar o meu Mac mais lento ou gastar a bateria?</strong></dt>
         <dd>Com a janela fechada, o Flowlight quase não faz nada: mantém as taxas na barra de menus e escreve uma linha por segundo. A extensão de rede
           custa menos do que o amostrador de reserva, que inicia um processo <code>nettop</code> de vida curta a cada segundo.</dd>

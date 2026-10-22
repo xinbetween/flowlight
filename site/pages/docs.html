@@ -390,16 +390,22 @@ open build/Build/Products/Release/Flowlight.app</pre>
         of them says the rule is safe. The screen also names the oldest traffic it could see: a rule tested against two hours of
         history has been tested against two hours of history.</p>
 
-      <h3>Managed ad and tracker packs</h3>
+      <h3 id="managed-packs">Managed ad and tracker packs</h3>
       <p><strong>Rules › Packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
         advertising delivery and auction hosts; <strong>Cross-site tracking</strong> covers common analytics, session replay and
         cross-site measurement hosts; and <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and
-        audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.
-        Nothing changes on an update until you choose a pack and enable it.</p>
+        audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.</p>
+      <p><strong>Official-only, signed updates.</strong> Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs.
+        Automatic checks are on by default and can be switched off here. A signature authenticates content but does not enable it:
+        a new pack stays off, and changed destinations remove an enabled pack from enforcement until you review the exact new version
+        and press Save. If content changes while its editor is open, the stale Save is refused. An accepted catalog may remain available
+        as visibly stale last-known-good during an outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.</p>
       <p><strong>Each pack has its own scope.</strong> Apply it globally to every app, or only to selected applications. Blocking needs
-        the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. Essential
-        system traffic remains allowed — including the services that carry Apple accounts, push notifications, software updates,
-        certificate checks and iCloud — even when a pack applies globally.</p>
+        the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. When HTTPS
+        inspection routes an app through Flowlight's proxy, enabled packs and ordinary destination rules are decided against that original
+        app before any origin connection opens. This also covers pinned and never-decrypted tunnels by hostname; agent allowlists remain
+        limited to the direct Network Extension path. Essential system traffic remains allowed — including the services that carry Apple
+        accounts, push notifications, software updates, certificate checks and iCloud — even when a pack applies globally.</p>
       <p><strong>Preview before enforcing.</strong> <em>Test against recent traffic</em> replays the proposed pack and scope against up
         to seven days of retained traffic. It reports only decisions that would actually change after ordinary rules, the global pause,
         existing packs and agent policies are taken into account: the affected apps and destinations, connection counts, and bytes.
@@ -656,9 +662,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
           It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded.
           Paste it into <a href="https://github.com/{{repo}}/issues">an issue</a>.</dd>
         <dt><strong>Does Flowlight send anything about me anywhere?</strong></dt>
-        <dd>No account, no telemetry, no analytics, and your traffic database is never uploaded. Three requests do leave the Mac, all listed on the
-          <a href="{{link:privacy}}">privacy page</a>: the daily update check and the optional network-owner lookup, both with off switches, and
-          reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections.</dd>
+        <dd>No account, no telemetry, no analytics, and your traffic database is never uploaded. Four requests can leave the Mac, all listed on the
+          <a href="{{link:privacy}}">privacy page</a>: release and signed rule-pack checks plus the optional network-owner lookup, all with off
+          switches, and reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections.</dd>
         <dt><strong>Will it slow my Mac down or drain the battery?</strong></dt>
         <dd>With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
           costs less than the fallback sampler, which starts a short-lived <code>nettop</code> process every second.</dd>

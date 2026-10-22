@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ko", "url": "https://flowlight.xinbetween.com/ko/", "name": "Flowlight", "inLanguage": "ko", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ko/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ko/threat-model/", "name": "Flowlight 위협 모델", "description": "Flowlight가 무엇으로부터 지켜 주고 무엇은 지켜 주지 못하는지, 그리고 그 이유. 예방이 아니라 관찰입니다.", "inLanguage": "ko", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ko"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ko/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 위협 모델", "item": "https://flowlight.xinbetween.com/ko/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ko", "url": "https://flowlight.xinbetween.com/ko/", "name": "Flowlight", "inLanguage": "ko", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ko/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ko/threat-model/", "name": "Flowlight 위협 모델", "description": "Flowlight가 무엇으로부터 지켜 주고 무엇은 지켜 주지 못하는지, 그리고 그 이유. 예방이 아니라 관찰입니다.", "inLanguage": "ko", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ko"}, "dateModified": "2026-10-22"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ko/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 위협 모델", "item": "https://flowlight.xinbetween.com/ko/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">본문으로 이동</a>
@@ -154,34 +154,32 @@
         어느 쪽인지는 포착 범위가 앱마다 알려줍니다.</p>
 
       <h2 id="blocking">차단이 무엇이고 무엇이 아닌지</h2>
-      <p>연결을 거부하는 규칙을 실행하는 것은 네트워크 확장이며, 그 경로 안에서, 연결이 만들어지기 전에 실행합니다. URL을 지정하는
-        규칙은 검사 프록시가 대신 실행해, 앱이 읽을 수 있는 상태 코드로 요청에 답합니다. 보고하는 대신 실제로 손을 쓰는 Flowlight의
-        부분은 이 둘뿐입니다. nettop 샘플러는 아무것도 거부할 수 없으므로, 샘플러로 돌아가는 Mac에서는 어떤 규칙도 적용되지 않습니다.
-        Flowlight는 아무 일도 하지 않는 스위치를 내놓는 대신 그렇다고 말합니다.</p>
+      <p>연결을 거부하는 규칙은 보통 네트워크 확장이 그 경로 안에서, 연결이 만들어지기 전에 실행합니다. HTTPS 검사를 거치는 트래픽은
+        로컬 프록시가 원본 서버 연결을 열기 전에 원래 클라이언트에 대상 규칙과 활성화된 관리형 팩을 적용합니다. URL을 지정하는 규칙도
+        복호화 후 그곳에서 실행되어, 앱이 읽을 수 있는 상태 코드로 응답합니다. 보고하는 대신 실제로 손을 쓰는 Flowlight의 부분은 이
+        둘뿐입니다. nettop 샘플러는 아무것도 거부할 수 없으므로, 샘플러로 돌아가는 Mac에서는 어떤 규칙도 적용되지 않습니다. Flowlight는
+        아무 일도 하지 않는 스위치를 내놓는 대신 그렇다고 말합니다.</p>
       <p>그래도 예방은 아닙니다. 셸을 쓸 수 있는 에이전트는 거부된 도구가 했을 일을 직접 할 수 있습니다. 클릭 한 번으로 되돌릴 수 있는
         거부는, 에이전트의 다음 시도가 걸어 나갈 수 있는 거부입니다. 로컬 트래픽과 DNS, Apple 기본 서비스, Flowlight 자신의 연결은 절대
         거부되지 않습니다. 막힌 Mac은 막힌 에이전트보다 나쁜 결과이기 때문입니다. 그리고 Flowlight가 멈추면 몇 초 뒤에 적용이 풀립니다.
         아무도 볼 수 없는 거부는 거부가 없는 것보다 나쁘기 때문입니다.</p>
-      <p><strong>검사와 거부는 함께 가지 않습니다.</strong> Flowlight 자신의 프록시를 거친 트래픽은 Flowlight의 트래픽으로 Mac을
-        떠나고, Flowlight는 자기 자신을 거부하지 않습니다. 그러니 요청을 읽고 있는 앱은, 규칙으로는 더 이상 연결을 막을 수 없는
-        앱입니다. 더 보려고 검사를 켜는 일은 적용을 내주는 일이기도 한데, 화면에는 지금까지 그런 말이 없었습니다.</p>
+      <p><strong>검사에서도 호스트 이름에 따른 거부는 유지되지만 경계가 있습니다.</strong> Flowlight의 프록시를 거친 트래픽은 예외 처리된
+        Flowlight 트래픽으로 Mac을 떠나므로, 프록시가 먼저 원래 앱의 신원을 사용해 일반 대상 규칙과 활성화된 관리형 팩을 결정합니다.
+        CONNECT가 호스트 이름을 지정하므로 인증서가 고정되었거나 복호화되지 않는 터널에서도 이 판정을 할 수 있습니다. 에이전트 허용 목록은
+        네트워크 확장의 결정으로 남으며 프록시에서 원본 서버로 가는 구간에는 적용되지 않습니다. 신뢰할 수 있는 소유자나 호스트 이름이 없는
+        트래픽은 보이지 않게 거부하지 않고 연결을 허용합니다.</p>
 
       <h2 id="itself">Flowlight 자신이 갖고 있는 것</h2>
       <p>트래픽 메타데이터를 로컬 SQLite 데이터베이스에, 공개된 보관 기간만큼 갖고 있습니다. HTTPS 검사를 켜 두면 요청과 응답의 본문도
         3일 동안 갖고 있는데, 이것이 Flowlight가 보관하는 것 중 가장 민감한 것입니다. 인증 정보 헤더는 이름과 낱말로 가려지지만, 그것은
         추정 규칙이고 보장이 아닙니다. 아무것도 알아보지 못하는 이름 아래 비밀을 실어 보내는 헤더는 기록될 수 있습니다.</p>
-      <p>트래픽 데이터베이스는 업로드되지 않습니다. 그래도 묻지 않아도 Mac을 떠나는 것이 세 가지 있고, 셋 다
-        <a href="../../ko/privacy/">개인정보 페이지</a>에 이름이 적혀 있습니다. 실행할 때와 하루에 한 번 GitHub에 최신 릴리스를 묻는
-        업데이트 확인, 호스트 이름이 없는 공개 주소를 Team Cymru에 묻는 네트워크 소유자 조회, 그리고 Flowlight가 확장 대신 카운터를
-        읽고 있는 동안 이름을 보지 못한 주소에 대한 역방향 DNS 조회입니다. 앞의 둘은 끄는 스위치가 있습니다. 셋째는 없습니다.
-        샘플러에서는 연결에 이름이 붙는 길이 대부분 그것이기 때문입니다. 그 조회는 Mac이 이미 쓰는 리졸버로 가고, 확장이 이어받아
-        트래픽 자체에서 이름을 붙이기 시작하면 멈춥니다. 호스팅 모델로 하는 질문은 그 셋 가운데 어느 것보다도 훨씬 많은 것을
-        보내지만, 직접 설정할 때까지 꺼져 있는 유일한 것입니다.</p>
+      <p>트래픽 데이터베이스는 업로드되지 않습니다. <a href="../../ko/privacy/">개인정보 페이지</a>에는 릴리스와 서명된 규칙 팩 확인, 선택 사항인 네트워크 소유자 조회, 샘플러의 역방향 DNS 등 모든 외부 요청이 나열됩니다. 앞의 세 항목에는 끄기 스위치가 있습니다. 역방향 DNS는 대부분의 연결에 이름을 붙이는 데 필요해 스위치가 없습니다. 호스팅 모델은 훨씬 더 많은 정보를 보내며 설정하기 전에는 꺼져 있습니다.</p>
 
       <h2 id="updates">업데이트</h2>
       <p>릴리스는 Developer ID로 서명되고 공증됩니다. 업데이터는 공개된 체크섬을 요구하고 그것이 없는 내려받기를 거부하며, 그다음 설치
         전에 내려받은 앱이 실행 중인 사본과 같은 팀의 서명인지 확인합니다. 다른 사람이 서명한 업데이트는 나머지가 다 유효해도
         거부됩니다.</p>
+      <p>공식 규칙 팩은 용도를 한정한 별도의 서명과 하나의 고정 HTTPS 소스를 사용합니다. 앱은 독립적인 최고 시퀀스 워터마크를 유지하고, 시작할 때 캐시된 정확한 바이트를 다시 검증하며, 롤백과 서로 상충하는 콘텐츠의 제시를 거부합니다. 또한 게시자 서명을 변경된 콘텐츠의 차단 적용을 허용하는 권한으로 취급하지 않습니다. 새 팩이나 변경된 팩에는 정확한 콘텐츠를 명시적으로 검토하고 저장하는 절차가 필요합니다. 오래된 승인 콘텐츠에는 마지막 정상 버전이라는 표시가 붙으며, 신뢰가 취소되었거나 바이트가 손상된 경우에는 안전을 위해 거부됩니다.</p>
 
       <h2 id="reporting">취약점 신고하기</h2>
       <p>GitHub의 <a href="https://github.com/xinbetween/flowlight/security/advisories/new">비공개 취약점 신고</a>를 이용하시고, GitHub를 쓰고
@@ -223,7 +221,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.15.3 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.15.4 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>

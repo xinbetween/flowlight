@@ -128,8 +128,9 @@ An allowlist warns by default. Turn on **Refuse connections outside the list** f
 connections as well, recording each one as an alert with **Allow … from Now On** to add it to the list in a click.
 
 It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
-traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, enforcement lapses a few seconds
-after the app stops running, and HTTPS inspection doesn't combine with it.
+traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, and enforcement lapses a few seconds
+after the app stops running. When HTTPS inspection proxies an app, destination rules and enabled managed packs are decided against the
+original app before Flowlight opens the origin connection; agent allowlists still apply only on the direct Network Extension path.
 
 ### Rules
 An allowlist is one agent's idea of where it may go. A **rule** is the general version: it names a subject — an app,
@@ -150,10 +151,15 @@ Reports, AI Agents or Inspect to write one about what you're looking at; all of 
 
 ### Managed ad and tracker packs
 Flowlight includes three official hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and telemetry**.
-Their baseline is built into the signed app for offline use and published separately as a purpose-signed official catalog;
-0.15.3 establishes that publisher boundary without downloading updates in the app yet. All three are visible in
-**Rules › Packs** and off by default. Enable a pack for every app or only selected apps; enforcement needs the Network
-Extension, because the sampler can observe connections but cannot refuse them.
+Their baseline is built into the signed app for offline use and the app checks one fixed HTTPS source for newer
+publisher-signed catalogs. Automatic checks are on by default and can be switched off in **Rules › Packs**; no traffic,
+pack settings, or device identifier is sent. The server sees the Mac's IP address and `Flowlight/<version>` user agent.
+
+All three packs are visible in **Rules › Packs** and off by default. A valid signature authenticates content but never
+grants enforcement consent: new packs remain off, and changed destinations disable that pack until you review the exact
+new version and press Save. A verified accepted catalog remains available as visible stale last-known-good during an
+outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed. Enable a pack for every app or only
+selected apps; enforcement needs the Network Extension, because the sampler can observe connections but cannot refuse them.
 
 Before enabling or broadening a pack, replay it against up to seven days of retained traffic to see which apps,
 destinations, connection counts and bytes would have changed. The activity feed groups repeated blocks instead of
@@ -296,8 +302,9 @@ appears in Live and Reports like any other app's traffic, including a collector 
 No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
 Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
-Team Cymru's DNS service, and you can turn it off in Capture. The daily update check asks GitHub for the latest release, and you can switch it off in
-Settings. To attribute tools and MCP servers, Flowlight reads process command lines and your agents' MCP config files
+Team Cymru's DNS service, and you can turn it off in Capture. Release and official rule-pack checks make standard HTTPS
+requests with no traffic or pack settings; each has its own off switch in Settings or Rules › Packs. To attribute tools
+and MCP servers, Flowlight reads process command lines and your agents' MCP config files
 on your Mac; none of it leaves your Mac. HTTPS inspection is off unless you turn it on, and what it records stays in the
 same local database.
 

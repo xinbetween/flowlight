@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-pt-PT", "url": "https://flowlight.xinbetween.com/pt-PT/", "name": "Flowlight", "inLanguage": "pt-PT", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/pt-PT/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/pt-PT/threat-model/", "name": "Modelo de ameaças do Flowlight", "description": "Contra o que o Flowlight defende, contra o que não consegue defender e porquê — observar em vez de impedir.", "inLanguage": "pt-PT", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-pt-PT"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/"}, {"@type": "ListItem", "position": 2, "name": "Modelo de ameaças do Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-pt-PT", "url": "https://flowlight.xinbetween.com/pt-PT/", "name": "Flowlight", "inLanguage": "pt-PT", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/pt-PT/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/pt-PT/threat-model/", "name": "Modelo de ameaças do Flowlight", "description": "Contra o que o Flowlight defende, contra o que não consegue defender e porquê — observar em vez de impedir.", "inLanguage": "pt-PT", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-pt-PT"}, "dateModified": "2026-10-22"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/"}, {"@type": "ListItem", "position": 2, "name": "Modelo de ameaças do Flowlight", "item": "https://flowlight.xinbetween.com/pt-PT/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Ir para o conteúdo</a>
@@ -154,36 +154,33 @@
         coisas se aplica, app por app.</p>
 
       <h2 id="blocking">O que o bloqueio é, e não é</h2>
-      <p>Uma regra que recusa ligações é levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Uma regra que nomeia um URL é
-        levada a cabo pelo proxy de inspeção, que responde ao pedido com um estado que a app consegue ler. São as duas únicas partes do Flowlight que
-        agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com o amostrador nenhuma regra é aplicada, e
-        o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
+      <p>Uma regra que recusa ligações é normalmente levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Para o tráfego
+        encaminhado pela inspeção HTTPS, o proxy local aplica as regras de destino e os pacotes geridos ativos ao cliente original antes de abrir a
+        ligação ao servidor de origem; uma regra que nomeia um URL também é aplicada ali, depois da desencriptação, com um estado que a app consegue ler.
+        São as duas únicas partes do Flowlight que agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com
+        o amostrador nenhuma regra é aplicada, e o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
       <p>Continua a não ser impedir. Um agente que consiga executar uma shell pode fazer à mão o que a ferramenta recusada teria feito. Uma recusa
         que pode desfazer num clique é uma recusa por onde a tentativa seguinte de um agente pode passar. O tráfego local, o DNS, os serviços da
         Apple e as ligações do próprio Flowlight nunca são recusados, porque um Mac bloqueado é um resultado pior do que um agente bloqueado. E a
         aplicação efetiva caduca uns segundos depois de o Flowlight deixar de correr: uma recusa que ninguém consegue ver é pior do que nenhuma.</p>
-      <p><strong>A inspeção e a recusa não se combinam.</strong> O tráfego encaminhado pelo próprio proxy do Flowlight sai do Mac como tráfego do
-        Flowlight, e o Flowlight nunca se recusa a si mesmo — por isso uma app cujos pedidos está a ler é uma app cujas ligações as regras já não
-        travam. Ligar a inspeção para ver mais custa-lhe a aplicação das regras, e até agora nada no ecrã o dizia.</p>
+      <p><strong>A inspeção preserva a recusa por nome de anfitrião, com um limite.</strong> O tráfego encaminhado pelo proxy do Flowlight sai do Mac como
+        tráfego isento do Flowlight, por isso o proxy decide primeiro as regras de destino comuns e os pacotes geridos ativos com base na identidade
+        original da app. Consegue fazê-lo mesmo em túneis com certificado fixado ou nunca decifrados, porque CONNECT indica o anfitrião. As listas de
+        permissões dos agentes continuam a ser uma decisão da Extensão de rede e não se aplicam a esse trajeto pelo proxy até ao servidor de origem; o
+        tráfego sem um proprietário fiável ou sem nome de anfitrião é permitido em vez de ser recusado sem que ninguém o veja.</p>
 
       <h2 id="itself">O que o próprio Flowlight guarda</h2>
       <p>Metadados de tráfego numa base de dados SQLite local, com uma retenção publicada. Com a inspeção HTTPS ligada, guarda também os corpos dos
         pedidos e das respostas durante três dias — a coisa mais sensível que chega a manter. Os cabeçalhos de credenciais são ocultados por nome e
         por palavra, o que é uma heurística e não uma garantia; um cabeçalho que leve um segredo sob um nome que nada reconhece pode ficar
         registado.</p>
-      <p>A base de dados de tráfego nunca é enviada. Há, ainda assim, três coisas mais pequenas que saem do Mac sem lhe serem pedidas,
-        todas nomeadas na <a href="../../pt-PT/privacy/">página de privacidade</a>: a procura de atualizações, que pede ao GitHub a versão mais
-        recente no arranque e uma vez por dia; a consulta do proprietário da rede, que pergunta ao Team Cymru por endereços públicos sem
-        nome de anfitrião; e, enquanto o Flowlight lê contadores em vez de correr a sua extensão, uma consulta de DNS inverso dos endereços
-        para os quais não viu nome. As duas primeiras têm interruptores para desligar. A terceira não tem, porque no amostrador é quase
-        tudo aquilo que dá um nome a uma ligação — vai para o resolvedor de DNS que o Mac já usa e para quando a extensão assume e passa a
-        nomear as ligações a partir do próprio tráfego. Perguntar com um modelo alojado envia muito mais do que qualquer uma delas, e é a
-        única coisa que fica desligada até a configurar.</p>
+      <p>A base de dados de tráfego nunca é enviada. A <a href="../../pt-PT/privacy/">página de privacidade</a> lista cada pedido externo: verificações de versão e de pacotes de regras assinados, consulta opcional do proprietário da rede e DNS inverso com o amostrador. Os três primeiros têm interruptores; o DNS inverso não, porque sem ele o amostrador não conseguiria nomear a maioria das ligações. Um modelo alojado envia muito mais e fica desligado até o configurar.</p>
 
       <h2 id="updates">Atualizações</h2>
       <p>As versões são assinadas com um Developer ID e notarizadas. O atualizador exige uma soma de verificação publicada e recusa uma
         transferência sem ela; depois verifica que a app transferida está assinada pela mesma equipa que a cópia em execução antes de a instalar. Uma
         atualização assinada por outra pessoa é recusada mesmo que no resto seja válida.</p>
+      <p>Os pacotes de regras oficiais usam uma assinatura distinta e limitada a esta finalidade e uma única fonte HTTPS fixa. A aplicação mantém separadamente um marcador da sequência mais alta, volta a verificar no arranque os bytes exatos guardados em cache, rejeita regressões e publicações contraditórias e nunca trata a assinatura do editor como autorização para aplicar conteúdos alterados. Os pacotes novos ou alterados exigem a revisão explícita do conteúdo exato e Guardar; os conteúdos desatualizados já aceites são assinalados como a última versão válida conhecida, enquanto a revogação da confiança ou bytes corrompidos fazem com que o conteúdo seja recusado por segurança.</p>
 
       <h2 id="reporting">Comunicar uma vulnerabilidade</h2>
       <p>Use a <a href="https://github.com/xinbetween/flowlight/security/advisories/new">comunicação privada de vulnerabilidades</a> do GitHub, ou envie um email
@@ -225,7 +222,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Quem contribui para o Flowlight. O Flowlight é software livre, publicado sob a <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versão 0.15.3 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
+      <span>Versão 0.15.4 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
     </div>
   </div>
 </footer>

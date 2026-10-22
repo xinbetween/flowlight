@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/privacy/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hant/privacy/", "name": "Flowlight 隱私", "description": "Flowlight 記錄什麼、資料存放在哪裡，以及這個 App 會連線哪些外部服務。", "inLanguage": "zh-Hant", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hant"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 隱私", "item": "https://flowlight.xinbetween.com/zh-Hant/privacy/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/privacy/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hant/privacy/", "name": "Flowlight 隱私", "description": "Flowlight 記錄什麼、資料存放在哪裡，以及這個 App 會連線哪些外部服務。", "inLanguage": "zh-Hant", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hant"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 隱私", "item": "https://flowlight.xinbetween.com/zh-Hant/privacy/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳至內容</a>
@@ -124,6 +124,7 @@
         <tr><th>請求</th><th>送到哪裡</th><th>內容是什麼</th><th>什麼時候</th></tr>
         <tr><td>更新檢查</td><td><code>api.github.com</code></td><td>一個查詢最新版本的標準 HTTPS 請求；GitHub 會看到你的 IP 位址和 <code>Flowlight/&lt;version&gt;</code> 這個 user agent</td><td>啟動時以及每天一次，自 0.1.2 起。關閉開關在「設定」› 「一般」</td></tr>
         <tr><td>更新下載</td><td><code>github.com</code></td><td>磁碟映像檔及其總和檢查碼檔案</td><td>只有在你點「下載並開啟」時</td></tr>
+        <tr><td>官方規則套件更新</td><td><code>flowlight.xinbetween.com</code></td><td>向固定官方來源傳送的標準 HTTPS 要求。伺服器會看到你的 IP 位址、<code>Flowlight/&lt;version&gt;</code>使用者代理程式和條件式快取驗證器；不會收到任何流量、套件設定或裝置識別碼</td><td>啟動後在檢查到期時執行，此後在運作正常的情況下每天最多執行一次。預設開啟；可在規則 › 套件中關閉或手動選擇立即檢查</td></tr>
         <tr><td>反向 DNS</td><td>你設定的 DNS 解析器</td><td>在沒有看到主機名稱時，查詢某個 IP 位址登記的名稱</td><td>需要時進行，在取樣器擷取模式下，也就是網路延伸功能開始運作之前的預設模式。沒有關閉開關：少了它，取樣器就沒辦法為大多數連線命名。網路延伸功能會從流量本身為它們命名，因此不做這件事</td></tr>
         <tr><td>網路擁有者查詢</td><td>Team Cymru，透過 DNS</td><td>沒有已知主機名稱的公開 IP 位址。私有和保留位址絕不會離開你的 Mac</td><td>預設開啟。關閉開關在「擷取」› 「辨識網路擁有者」</td></tr>
         <tr><td>用託管模型提問</td><td>你選擇的供應商：Anthropic、OpenAI、Google Gemini 或相容的端點</td><td>你的問題，以及模型所選用的 Flowlight 唯讀查詢回傳的結果。流量資料庫本身不會被上傳</td><td>只有在你選擇託管供應商並送出問題時。「提問」畫面會顯示送出的請求</td></tr>
@@ -186,7 +187,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.15.3 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.15.4 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

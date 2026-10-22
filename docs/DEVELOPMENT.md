@@ -157,8 +157,10 @@ sits in the path of a connection, and a switch that did nothing would be worse t
 - Every refusal travels back as a `BlockEvent` and becomes a **Connection blocked** alert naming the agent, the
   process, the destination and the fact that it didn't get there. That alert's context menu offers *Allow … from
   Now On*, which adds the destination to the agent's list and pushes the change straight back to the filter.
-- A flow through the HTTPS inspection proxy leaves the Mac as Flowlight's own traffic, which is never refused, so
-  blocking and inspection don't compose for the same agent.
+- A flow through the HTTPS inspection proxy leaves the Mac as exempt Flowlight traffic. Before opening that upstream
+  connection, the proxy attributes the original client and applies destination rules plus the exact managed-pack snapshot
+  acknowledged by the extension. Pack refusal waits for its durable activity record and fails open if that record cannot
+  commit. Agent allowlists remain extension-only and do not compose with the proxied leg.
 - `BlockRules` is plain functions over plain data (like `AgentPolicy.matches`), so `BlockingTests` covers the whole
   decision without a filter installed.
 
@@ -331,6 +333,26 @@ that removes it from the trust set; the feed
 cannot revoke its own signing authority. If compromise is suspected, stop publishing, ship the trust change, and
 resume with a higher sequence signed by a trusted key. Clients reject rollback by sequence, so restoring an older
 catalog always means republishing its contents under a new, higher sequence.
+
+### Consuming the official rule-pack feed
+
+`RulePackCatalogUpdater` is app-owned and has one compiled HTTPS source. It uses an ephemeral cookieless session,
+requires same-origin redirects and JSON, caps both declared and streamed response bytes, sends persisted ETag and
+Last-Modified validators, and permits only one request at a time. Healthy automatic checks run daily; failures back off
+from one hour to six hours and then 24 hours. Manual checks bypass only that schedule. Demo and XCTest startup establish
+the local trusted catalog but do not use the network unless a test explicitly injects a transport.
+
+The receipt watermark and exact envelope cache are separate SQLite rows. Startup reverifies the exact accepted bytes
+before saved configuration or exceptions can produce a snapshot, and capture does not start until that reload completes.
+If a higher watermark has missing, corrupt, expired-before-acceptance, or newly untrusted bytes, definitions and the
+snapshot stay empty while recovery fetches without validators; the bundled lower sequence is never silently restored.
+An already accepted envelope may reverify after expiry as stale last-known-good.
+
+Acceptance runs in `BEGIN IMMEDIATE`: rollback/equivocation checks, exact bytes, validators, scheduling state, and consent
+invalidation commit together. Only then may `RulePackStore` publish definitions or a snapshot. New packs default off;
+changed content preserves saved scope, app selection, exceptions, and historical activity but is effectively disabled.
+Every enabling Save carries the immutable pack and catalog receipt displayed when the editor opened, and SQLite checks
+the durable catalog again inside the save transaction.
 
 ## Releasing
 

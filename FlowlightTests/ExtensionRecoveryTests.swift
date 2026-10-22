@@ -159,10 +159,17 @@ final class ExtensionVersionTests: XCTestCase {
         XCTAssertEqual(ExtensionVersion.compare("0.9.0", "0.10.0"), .orderedAscending)
     }
 
-    /// `systemextensionsctl list` prints the short version and the build together. Whatever reads it should get
-    /// the same answer as the properties request, which only carries the short version.
-    func testTheBuildSuffixIsIgnored() {
+    /// A legacy caller that knows only the short version remains compatible with the full identity.
+    func testAnUnknownBuildSuffixDoesNotCreateAFalseMismatch() {
         XCTAssertEqual(ExtensionVersion.compare("0.5.0/8", "0.5.0"), .orderedSame)
+    }
+
+    /// The failure this release exposed: extension code changed without changing the short version. The bundle build
+    /// is the only fact that distinguishes the active old binary from the embedded new one.
+    func testDifferentBundleBuildsAreStale() {
+        XCTAssertEqual(ExtensionVersion.compare("0.15.4/24", "0.15.4/25"), .orderedAscending)
+        XCTAssertTrue(ExtensionVersion.isStale(installed: ["0.15.4/24"], appVersion: "0.15.4/25"))
+        XCTAssertFalse(ExtensionVersion.isStale(installed: ["0.15.4/25"], appVersion: "0.15.4/25"))
     }
 }
 

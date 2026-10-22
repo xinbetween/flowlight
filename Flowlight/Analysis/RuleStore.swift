@@ -22,6 +22,12 @@ final class RuleStore: ObservableObject {
     var onChange: (RuleSet) -> Void = { _ in }
 
     private weak var db: TrafficDatabase?
+    private var pendingHitResets: Set<UUID> = []
+    private var pendingRuleInvalidations: Set<UUID> = []
+    /// The first whole-list generation that describes each rule's current definition. Delayed decisions from an
+    /// older definition are ignored, while an unrelated rule edit does not erase a valid spend.
+    private var ruleInvalidatedAt: [UUID: UInt64] = [:]
+    private var publicationGeneration: UInt64 = 0
     private var pauseTimer: Timer?
     /// The same rules, readable from the proxy's queue. The store itself is main-actor — it is a published model —
     /// but the proxy asks which rules apply while framing a request, so it needs an answer without a hop.
@@ -69,12 +75,14 @@ final class RuleStore: ObservableObject {
         } else {
             rules.append(rule)
         }
+        pendingRuleInvalidations.insert(rule.id)
         db?.async { try $0.saveRule(rule) }
         publish()
     }
 
     func delete(_ rule: Rule) {
         rules.removeAll { $0.id == rule.id }
+        pendingRuleInvalidations.insert(rule.id)
         db?.async { try $0.deleteRule(rule.id) }
         publish()
     }
@@ -90,6 +98,7 @@ final class RuleStore: ObservableObject {
         guard var found = rules.first(where: { $0.id == rule.id }) else { return }
         found.hits = 0
         found.lastHit = nil
+        pendingHitResets.insert(found.id)
         save(found)
     }
 
@@ -119,22 +128,126 @@ final class RuleStore: ObservableObject {
     /// Decisions from the filter: recorded, counted, and shown. Both refusals and relaxations arrive here.
     func record(_ incoming: [RuleEvent]) {
         guard !incoming.isEmpty else { return }
+        var accepted: [RuleEvent] = []
         for event in incoming {
+            if let eventSession = event.ruleSession,
+               let eventGeneration = event.ruleGeneration,
+               !acceptsDecision(
+                   ruleID: event.ruleID,
+                   session: eventSession,
+                   generation: eventGeneration
+               ) {
+                continue
+            }
+            accepted.append(event)
             guard let index = rules.firstIndex(where: { $0.id == event.ruleID }) else { continue }
-            rules[index].hits += 1
+            rules[index].hits = rules[index].maxHits > 0
+                ? min(rules[index].maxHits, rules[index].hits + 1)
+                : rules[index].hits + 1
             rules[index].lastHit = Date(timeIntervalSince1970: TimeInterval(event.at))
             let rule = rules[index]
             db?.async { try $0.saveRule(rule) }
         }
+        guard !accepted.isEmpty else { return }
         db?.async { [weak self] db in
-            try db.recordRuleEvents(incoming)
+            try db.recordRuleEvents(accepted)
             let events = (try? db.ruleEvents(limit: 300)) ?? []
             Task { @MainActor in
                 self?.events = events
                 self?.version += 1
             }
         }
-        publish()
+        publish(advancingGeneration: false)
+    }
+
+    /// Clears the published feed after its durable rows were deleted by the caller.
+    func clearPublishedEventsAfterDurableDeletion() {
+        events = []
+        version += 1
+    }
+
+    /// Persists an accepted bounded proxy claim and its visible explanation before the proxy acts on the decision.
+    /// The extension already spent the claim; a failed write therefore fails this connection open and leaves the local
+    /// mirror spent so neither side can quietly reuse it during this process.
+    func recordBoundedClaim(
+        _ claim: RuleClaim,
+        event: RuleEvent,
+        completion: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard event.ruleID == claim.ruleID,
+              event.ruleSession == claim.session,
+              event.ruleGeneration == claim.generation,
+              acceptsDecision(ruleID: claim.ruleID, session: claim.session, generation: claim.generation),
+              let index = rules.firstIndex(where: { $0.id == claim.ruleID }),
+              rules[index].maxHits > 0 else {
+            completion(false)
+            return
+        }
+        rules[index].hits = min(rules[index].maxHits, rules[index].hits + 1)
+        rules[index].lastHit = Date(timeIntervalSince1970: TimeInterval(event.at))
+        let rule = rules[index]
+        live.markBoundedRuleClaimed(claim, at: rules[index].lastHit ?? Date())
+        publish(advancingGeneration: false)
+        guard let db else {
+            completion(false)
+            return
+        }
+        db.queue.async { [weak self, weak db] in
+            guard let db else {
+                completion(false)
+                return
+            }
+            do {
+                try db.recordBoundedRuleDecision(rule: rule, event: event)
+                let events = (try? db.ruleEvents(limit: 300)) ?? []
+                completion(true)
+                Task { @MainActor in
+                    self?.events = events
+                    self?.version += 1
+                }
+            } catch {
+                completion(false)
+            }
+        }
+    }
+
+    /// Conservatively retires a bounded claim whose XPC reply was lost. The extension may already have accepted it;
+    /// saving the spent count before authorization completes prevents reconnect or relaunch from reusing it.
+    func retireBoundedClaim(
+        _ claim: RuleClaim,
+        completion: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard acceptsDecision(
+                  ruleID: claim.ruleID,
+                  session: claim.session,
+                  generation: claim.generation
+              ),
+              let index = rules.firstIndex(where: { $0.id == claim.ruleID }),
+              rules[index].maxHits > 0 else {
+            completion(false)
+            return
+        }
+        rules[index].hits = max(rules[index].hits, rules[index].maxHits)
+        rules[index].lastHit = Date()
+        let rule = rules[index]
+        live.markBoundedRuleSpent(claim)
+        publish(advancingGeneration: false)
+        guard let db else {
+            completion(false)
+            return
+        }
+        db.queue.async { [weak db] in
+            guard let db else {
+                completion(false)
+                return
+            }
+            do {
+                try db.saveRule(rule)
+                completion(true)
+            } catch {
+                completion(false)
+            }
+        }
     }
 
     /// The feed for one rule, for its own page.
@@ -167,15 +280,40 @@ final class RuleStore: ObservableObject {
 
     // MARK: Telling everyone else
 
-    private func publish() {
+    private func acceptsDecision(
+        ruleID: UUID,
+        session: String,
+        generation: UInt64
+    ) -> Bool {
+        session == Self.session &&
+            generation <= publicationGeneration &&
+            generation >= (ruleInvalidatedAt[ruleID] ?? 0)
+    }
+
+    private func publish(advancingGeneration: Bool = true) {
         version += 1
-        live.replace(rules, pausedUntil: pausedUntil)
+        if advancingGeneration {
+            publicationGeneration &+= 1
+            for ruleID in pendingRuleInvalidations {
+                ruleInvalidatedAt[ruleID] = publicationGeneration
+            }
+        }
+        live.replace(
+            rules,
+            pausedUntil: pausedUntil,
+            generation: publicationGeneration,
+            resetHitCounts: pendingHitResets,
+            ruleInvalidatedAt: ruleInvalidatedAt
+        )
         onChange(ruleSet)
+        pendingHitResets.removeAll()
+        pendingRuleInvalidations.removeAll()
     }
 
     var ruleSet: RuleSet {
         RuleSet(rules: rules.filter { $0.enabled && $0.isComplete && $0.engine == .flow },
-                pausedUntil: pausedUntil, session: Self.session)
+                generation: publicationGeneration, pausedUntil: pausedUntil, session: Self.session,
+                resetHitCounts: pendingHitResets, ruleInvalidatedAt: ruleInvalidatedAt)
     }
 
     /// The rules the inspection proxy carries out: the ones that name a path or a method, which no filter can see.
@@ -185,15 +323,132 @@ final class RuleStore: ObservableObject {
 /// The rule list as anything off the main actor sees it. Held behind a lock rather than an actor because the
 /// proxy asks while it is framing a request, and a request that has to wait for an actor hop is a request that
 /// arrives late.
+struct LiveFlowRuleDecision: Sendable {
+    var paused: Bool
+    var decision: RuleDecision
+    var externalClaim: RuleClaim?
+}
+
+final class LiveRuleClaimAuthority: @unchecked Sendable {
+    private let lock = NSLock()
+    private weak var source: ExtensionTrafficSource?
+
+    func replace(_ source: ExtensionTrafficSource?) {
+        lock.lock(); defer { lock.unlock() }
+        self.source = source
+    }
+
+    func claim(_ claim: RuleClaim, completion: @escaping @Sendable (Bool?) -> Void) {
+        lock.lock()
+        let source = source
+        lock.unlock()
+        source?.claimRule(claim, completion: completion) ?? completion(nil)
+    }
+}
+
 final class LiveRules: @unchecked Sendable {
     private let lock = NSLock()
     private var rules: [Rule] = []
     private var pausedUntil: Date?
+    private var generation: UInt64 = 0
+    private var ruleInvalidatedAt: [UUID: UInt64] = [:]
+    private var usesExternalClaimAuthority = false
 
-    func replace(_ rules: [Rule], pausedUntil: Date?) {
+    /// Atomically hands finite-rule counting to the extension and returns the exact whole-list publication it should
+    /// install. Any local claim completed before this lock is reflected in the transferred hit count; every decision
+    /// after it carries a generation-bound external claim instead of spending independently.
+    func beginExternalClaimAuthority(with set: RuleSet) -> RuleSet {
         lock.lock(); defer { lock.unlock() }
-        self.rules = rules
+        usesExternalClaimAuthority = true
+        var synchronized = set
+        synchronized.rules = set.rules.map { published in
+            guard let runtime = rules.first(where: { $0.id == published.id }),
+                  runtime.hits > published.hits else { return published }
+            var merged = published
+            merged.hits = runtime.hits
+            merged.lastHit = runtime.lastHit
+            return merged
+        }
+        return synchronized
+    }
+
+    func replace(
+        _ rules: [Rule],
+        pausedUntil: Date?,
+        generation: UInt64 = 0,
+        resetHitCounts: Set<UUID> = [],
+        ruleInvalidatedAt: [UUID: UInt64] = [:]
+    ) {
+        lock.lock(); defer { lock.unlock() }
+        self.rules = rules.map { published in
+            guard !resetHitCounts.contains(published.id),
+                  let runtime = self.rules.first(where: { $0.id == published.id }),
+                  runtime.hits > published.hits else {
+                return published
+            }
+            var merged = published
+            merged.hits = runtime.hits
+            merged.lastHit = runtime.lastHit
+            return merged
+        }
         self.pausedUntil = pausedUntil
+        self.generation = generation
+        self.ruleInvalidatedAt.merge(ruleInvalidatedAt, uniquingKeysWith: max)
+        for ruleID in resetHitCounts {
+            self.ruleInvalidatedAt[ruleID] = generation
+        }
+    }
+
+    /// The flow-level answer for an already named proxied connection. Pause and rules are read under one lock so a
+    /// connection cannot combine the pause from one publication with the rule list from another. Bounded rules can
+    /// be previewed without spending them while the extension atomically claims the decision for both data paths.
+    func flowDecision(
+        _ facts: FlowFacts,
+        now: Date = Date()
+    ) -> LiveFlowRuleDecision {
+        lock.lock(); defer { lock.unlock() }
+        let consumeBounded = !usesExternalClaimAuthority
+        let paused = pausedUntil.map { now < $0 } ?? false
+        let decision = RuleBook.decide(facts, rules: rules, now: now, session: RuleStore.session,
+                                       pausedUntil: pausedUntil)
+        if let rule = decision.rule,
+           (rule.maxHits == 0 || consumeBounded),
+           let index = rules.firstIndex(where: { $0.id == rule.id }) {
+            rules[index].hits += 1
+            rules[index].lastHit = now
+        }
+        return LiveFlowRuleDecision(
+            paused: paused,
+            decision: decision,
+            externalClaim: decision.rule.flatMap { rule in
+                rule.maxHits > 0 && !consumeBounded
+                    ? RuleClaim(ruleID: rule.id, session: RuleStore.session, generation: generation)
+                    : nil
+            }
+        )
+    }
+
+    private func acceptsDecision(_ claim: RuleClaim) -> Bool {
+        claim.session == RuleStore.session &&
+            claim.generation <= generation &&
+            claim.generation >= (ruleInvalidatedAt[claim.ruleID] ?? 0)
+    }
+
+    func markBoundedRuleClaimed(_ claim: RuleClaim, at now: Date = Date()) {
+        lock.lock(); defer { lock.unlock() }
+        guard acceptsDecision(claim),
+              let index = rules.firstIndex(where: { $0.id == claim.ruleID }),
+              rules[index].maxHits > 0 else { return }
+        rules[index].hits = min(rules[index].maxHits, rules[index].hits + 1)
+        rules[index].lastHit = now
+    }
+
+    func markBoundedRuleSpent(_ claim: RuleClaim) {
+        lock.lock(); defer { lock.unlock() }
+        guard acceptsDecision(claim),
+              let index = rules.firstIndex(where: { $0.id == claim.ruleID }),
+              rules[index].maxHits > 0 else { return }
+        rules[index].hits = max(rules[index].hits, rules[index].maxHits)
     }
 
     /// The rules that would answer a request right now. Timing is judged here, at the moment the request arrives,

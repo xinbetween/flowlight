@@ -56,6 +56,8 @@ final class ExtensionRebootTests: XCTestCase {
     /// on a loop, so the read has to actually find it in the bundle that hosts these tests.
     func testTheExpectedVersionIsReadFromTheEmbeddedExtension() {
         XCTAssertFalse(ExtensionManager.expectedExtensionVersion.isEmpty)
+        XCTAssertTrue(ExtensionManager.expectedExtensionVersion.contains("/"),
+                      "the repair identity must include CFBundleVersion when extension code changes")
     }
 
     /// The held-slot state, read from what `systemextensionsctl list` actually prints — the reliable signal, since

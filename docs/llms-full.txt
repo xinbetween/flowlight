@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.4, macOS 15 or later.
 
  On this page
 
@@ -518,12 +518,19 @@ open build/Build/Products/Release/Flowlight.app
  advertising delivery and auction hosts; Cross-site tracking covers common analytics, session replay and
  cross-site measurement hosts; and Privacy and telemetry covers crash reporting, install attribution, and
  audited Apple advertising and analytics hosts. The packs are visible from the start and all are off by default.
- Nothing changes on an update until you choose a pack and enable it.
+
+ Official-only, signed updates. Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs.
+ Automatic checks are on by default and can be switched off here. A signature authenticates content but does not enable it:
+ a new pack stays off, and changed destinations remove an enabled pack from enforcement until you review the exact new version
+ and press Save. If content changes while its editor is open, the stale Save is refused. An accepted catalog may remain available
+ as visibly stale last-known-good during an outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.
 
  Each pack has its own scope. Apply it globally to every app, or only to selected applications. Blocking needs
- the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. Essential
- system traffic remains allowed — including the services that carry Apple accounts, push notifications, software updates,
- certificate checks and iCloud — even when a pack applies globally.
+ the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. When HTTPS
+ inspection routes an app through Flowlight's proxy, enabled packs and ordinary destination rules are decided against that original
+ app before any origin connection opens. This also covers pinned and never-decrypted tunnels by hostname; agent allowlists remain
+ limited to the direct Network Extension path. Essential system traffic remains allowed — including the services that carry Apple
+ accounts, push notifications, software updates, certificate checks and iCloud — even when a pack applies globally.
 
  Preview before enforcing. Test against recent traffic replays the proposed pack and scope against up
  to seven days of retained traffic. It reports only decisions that would actually change after ordinary rules, the global pause,
@@ -838,9 +845,9 @@ open build/Build/Products/Release/Flowlight.app
  It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded.
  Paste it into an issue.
  Does Flowlight send anything about me anywhere?
- No account, no telemetry, no analytics, and your traffic database is never uploaded. Three requests do leave the Mac, all listed on the
- privacy page: the daily update check and the optional network-owner lookup, both with off switches, and
- reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections.
+ No account, no telemetry, no analytics, and your traffic database is never uploaded. Four requests can leave the Mac, all listed on the
+ privacy page: release and signed rule-pack checks plus the optional network-owner lookup, all with off
+ switches, and reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections.
  Will it slow my Mac down or drain the battery?
  With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
  costs less than the fallback sampler, which starts a short-lived nettop process every second.
@@ -887,7 +894,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1038,7 +1045,10 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  Managed ad and tracker packs
 
  Three official packs — Advertising, Cross-site tracking, and Privacy and telemetry — are built in, visible and off by
- default. With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
+ default. Flowlight checks one fixed HTTPS feed for signed updates; new or changed content remains out of enforcement until
+ you review that exact version and press Save. During an outage, verified accepted content is visibly stale last-known-good.
+
+ With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
  see grouped, explainable activity, and add pack-specific exceptions for an app. Ordinary allow rules remain the universal
  escape hatch, global Pause Blocking applies, and essential system traffic stays allowed.
 
@@ -1256,7 +1266,7 @@ e.g. Wireshark
 
  Filtered in the kernelCapture passes only DNS answers and TLS ClientHellos. Everything else is dropped before Flowlight sees it.
 
- Lookups you controlNaming who owns an address sends only public IPs with no hostname to Team Cymru, and turns off in one click. The daily update check only asks GitHub for the latest version, and can be turned off too.
+ Lookups you controlNaming who owns an address sends only public IPs with no hostname to Team Cymru. Release and signed rule-pack checks send standard HTTPS requests with no traffic or pack settings. Each has an off switch.
 
  One agent, every tool call. Traffic from the git, curl and MCP servers Claude Code started counts as Claude Code's.
  With HTTPS inspection on, the Tool calls tab shows what the model asked for, what came back, and the requests each tool made:
@@ -1569,6 +1579,8 @@ Privacy
 
  Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
 
+ Official rule-pack updateflowlight.xinbetween.comA standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the Flowlight/<version> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifierAfter startup when due and then at most daily while healthy. On by default; off switch and manual Check Now in Rules › Packs
+
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this
 
  Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Capture › Identify network owners
@@ -1617,8 +1629,31 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.4
+October 20, 2026Latest
+
+ Consume verified official rule-pack updates. Flowlight checks its one fixed HTTPS feed with conditional
+ requests, verifies publisher signatures and compatibility before persistence, and keeps exact last-known-good bytes plus
+ an independent anti-rollback watermark.
+
+ Keep every policy change consentful. New packs stay off. Changed versions or destinations immediately leave
+ enforcement while preserving scope, selected apps, exceptions and history; explicit review and Save of the exact new content
+ restores consent, and a refresh racing an open editor makes its old Save stale.
+
+ Expose trust and failure state without overclaiming. Rules › Packs now shows automatic-refresh controls,
+ verification status, sequence, source, signer, timestamps, bundled-versus-downloaded provenance, stale last-known-good, and
+ independent fetch/apply failures. Refresh sends no traffic, pack settings or device identifier.
+
+ Fail closed at startup and on the wire. Capture waits for catalog verification plus saved exceptions;
+ redirects, MIME, size, timeout, rollback, equivocation, revoked trust, corrupt cache and failed database commits cannot publish
+ unseen definitions or replace the active snapshot.
+
+ Keep managed packs enforcing during HTTPS inspection. Before the local proxy opens a CONNECT tunnel or
+ plaintext origin connection, it applies the extension-acknowledged pack snapshot to the original app identity. A refusal is
+ returned only after its activity record commits; failed persistence allows the connection instead of blocking invisibly.
+
  0.15.3
-October 19, 2026Latest
+October 19, 2026
 
  Publish official rule packs as signed data. Flowlight now defines a purpose-scoped P-256
  signature contract for its official managed-pack catalog, with the public verification key included in the
@@ -2976,19 +3011,23 @@ Threat model
 
  What blocking is, and isn't
 
- A rule that refuses a connection is carried out by the Network Extension, in the path, before the connection is made. A rule
- that names a URL is carried out by the inspection proxy instead, which answers the request with a status the app can read.
- Those are the only two parts of Flowlight that act rather than report — the nettop sampler can refuse nothing at all, so on a
- Mac running the sampler no rule is enforced, and Flowlight says so rather than offering a switch that does nothing.
+ A rule that refuses a connection is normally carried out by the Network Extension, in the path, before the connection is made.
+ For traffic routed through HTTPS inspection, the local proxy applies destination rules and enabled managed packs against the
+ original client before it opens the upstream connection; a rule that names a URL is also carried out there, after decryption,
+ with a status the app can read. Those are the only two parts of Flowlight that act rather than report — the nettop sampler can
+ refuse nothing at all, so on a Mac running the sampler no rule is enforced, and Flowlight says so rather than offering a switch
+ that does nothing.
 
  It is still not prevention. An agent that can run a shell can do by hand what a refused tool would have done. A refusal you
  can undo in one click is a refusal an agent's next attempt may walk through. Local traffic, DNS, Apple's own services and
  Flowlight's own connections are never refused, because a blocked Mac is a worse outcome than a blocked agent. And enforcement
  lapses a few seconds after Flowlight stops running: a refusal nobody can see is worse than none.
 
- Inspection and refusal do not combine. Traffic routed through Flowlight's own proxy leaves the Mac as
- Flowlight's traffic, and Flowlight never refuses itself — so an app whose requests you are reading is an app whose connections
- rules no longer stop. Turning inspection on to see more costs you enforcement, and nothing on screen previously said so.
+ Inspection preserves hostname refusal, with a boundary. Traffic routed through Flowlight's proxy leaves the
+ Mac as exempt Flowlight traffic, so the proxy decides ordinary destination rules and enabled managed packs first, using the
+ original app identity. It can do this even for pinned or never-decrypted tunnels because CONNECT names the host. Agent allowlists
+ remain a Network Extension decision and do not apply to that proxied upstream leg; traffic with no trustworthy owner or no
+ hostname fails open rather than being refused invisibly.
 
  What Flowlight itself holds
 
@@ -2996,19 +3035,23 @@ Threat model
  response bodies for three days — the most sensitive thing it ever keeps. Credential headers are redacted by name and by word,
  which is a heuristic and not a guarantee; a header carrying a secret under a name nothing recognises can be recorded.
 
- The traffic database is never uploaded. Three smaller things do leave the Mac without being asked for, all of them named on
- the privacy page: the update check, which asks GitHub for the latest release on launch and
- daily; the network-owner lookup, which asks Team Cymru about public addresses that have no hostname; and, while Flowlight is
- reading counters instead of running its extension, a reverse-DNS lookup of addresses it saw no name for. The first two have
- off switches. The third does not, because on the sampler it is most of how a connection gets a name at all — it goes to the
- resolver the Mac already uses, and it stops once the extension takes over and names connections from the traffic itself.
- Ask with a hosted model sends far more than any of them, and is the one thing that stays off until you configure it.
+ The traffic database is never uploaded. Four smaller things do leave the Mac without being asked for, all of them named on
+ the privacy page: the release update check; the fixed official rule-pack feed, which receives
+ no traffic or pack settings; the network-owner lookup, which asks Team Cymru about public addresses with no hostname; and,
+ while Flowlight is reading counters instead of running its extension, reverse DNS through the Mac's configured resolver.
+ The first three have off switches. Reverse DNS does not, because on the sampler it is most of how a connection gets a name;
+ it stops once the extension takes over. Ask with a hosted model sends far more than any of them, and stays off until configured.
 
  Updates
 
  Releases are signed with a Developer ID and notarized. The updater requires a published checksum and refuses a download
  without one, then verifies that the downloaded app is signed by the same team as the running copy before installing it. An
  update signed by somebody else is refused even if it is otherwise valid.
+
+ Official rule packs use a separate purpose-scoped P-256 signature and one compiled HTTPS source. The app keeps an independent
+ highest-sequence watermark, reverifies exact cached bytes at launch, rejects rollback and equivocation, and never treats a
+ publisher signature as permission to enforce changed content. New or changed packs require explicit exact-content review and
+ Save; stale accepted content is labeled last-known-good, while revoked trust or corrupt bytes fail closed.
 
  Reporting a vulnerability
 

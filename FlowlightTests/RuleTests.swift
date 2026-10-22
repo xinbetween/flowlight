@@ -3,6 +3,7 @@ import XCTest
 
 /// The rule engine, which decides whether a connection happens. Everything here is plain data in and a verdict
 /// out, so the whole of it can be checked without a filter, a proxy or a database.
+@MainActor
 final class RuleTests: XCTestCase {
     private let session = "this-run"
 
@@ -198,6 +199,522 @@ final class RuleTests: XCTestCase {
         allow.hits = 1
         XCTAssertFalse(allow.isUsable)
         XCTAssertEqual(RuleBook.decide(facts(), rules: [block, allow], session: session).verdict, .block)
+    }
+
+    func testLiveProxyConsumesFiniteHitRulesExactlyOnce() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let block = Rule(action: .block, destination: "example.com")
+        let live = LiveRules()
+        live.replace([block, allow], pausedUntil: nil)
+
+        let first = live.flowDecision(facts())
+        XCTAssertEqual(first.decision.rule?.id, allow.id)
+        XCTAssertEqual(first.decision.verdict, .allow)
+        XCTAssertNil(first.externalClaim)
+
+        let second = live.flowDecision(facts())
+        XCTAssertEqual(second.decision.rule?.id, block.id)
+        XCTAssertEqual(second.decision.verdict, .block)
+    }
+
+    func testLiveProxyCanPreviewAndReconcileAnExtensionClaim() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let block = Rule(action: .block, destination: "example.com")
+        let live = LiveRules()
+        live.replace([block, allow], pausedUntil: nil, generation: 7)
+        _ = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [block, allow], generation: 7, session: RuleStore.session)
+        )
+
+        let preview = live.flowDecision(facts())
+        XCTAssertEqual(preview.decision.rule?.id, allow.id)
+        XCTAssertEqual(preview.externalClaim, RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 7))
+        live.markBoundedRuleClaimed(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 7))
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, block.id)
+
+        live.replace([block, allow], pausedUntil: nil, generation: 8)
+        live.markBoundedRuleSpent(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 8))
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, block.id)
+    }
+
+    func testOrdinaryPublicationCannotReopenAConsumedFiniteRule() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 2
+        let block = Rule(action: .block, destination: "example.com")
+        let live = LiveRules()
+        live.replace([block, allow], pausedUntil: nil, generation: 1)
+
+        live.markBoundedRuleClaimed(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 1))
+        live.markBoundedRuleClaimed(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 1))
+        live.replace([block, allow], pausedUntil: nil, generation: 2)
+
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, block.id)
+    }
+
+    func testExplicitResetMayLowerALiveFiniteRuleCount() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let block = Rule(action: .block, destination: "example.com")
+        let live = LiveRules()
+        live.replace([block, allow], pausedUntil: nil, generation: 1)
+        live.markBoundedRuleClaimed(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 1))
+
+        live.replace([block, allow], pausedUntil: nil, generation: 2, resetHitCounts: [allow.id])
+
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, allow.id)
+    }
+
+    func testStaleClaimRepliesDoNotUndoAnExplicitReset() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let live = LiveRules()
+        live.replace([allow], pausedUntil: nil, generation: 4)
+        _ = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [allow], generation: 4, session: RuleStore.session)
+        )
+        let stale = try! XCTUnwrap(live.flowDecision(facts()).externalClaim)
+
+        live.replace([allow], pausedUntil: nil, generation: 5, resetHitCounts: [allow.id])
+        live.markBoundedRuleClaimed(stale)
+        live.markBoundedRuleSpent(stale)
+
+        XCTAssertEqual(live.flowDecision(facts()).externalClaim,
+                       RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 5))
+    }
+
+    func testExtensionClaimSurvivesAnUnrelatedRuleEdit() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let unrelated = Rule(action: .block, destination: "other.example.com")
+        let set = RuleSet(rules: [allow, unrelated], generation: 5, session: RuleStore.session,
+                          ruleInvalidatedAt: [allow.id: 1, unrelated.id: 5])
+
+        XCTAssertTrue(
+            set.accepts(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 1))
+        )
+    }
+
+    func testExtensionClaimDoesNotSurviveSameRuleInvalidation() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let set = RuleSet(rules: [allow], generation: 5, session: RuleStore.session,
+                          ruleInvalidatedAt: [allow.id: 5])
+
+        XCTAssertFalse(
+            set.accepts(RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 4))
+        )
+    }
+
+    func testClaimReplySurvivesAnUnrelatedRuleEdit() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let unrelated = Rule(action: .block, destination: "other.example.com")
+        let live = LiveRules()
+        live.replace([allow, unrelated], pausedUntil: nil, generation: 4)
+        _ = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [allow, unrelated], generation: 4, session: RuleStore.session)
+        )
+        let claim = try! XCTUnwrap(live.flowDecision(facts()).externalClaim)
+
+        var edited = unrelated
+        edited.name = "Edited"
+        live.replace(
+            [allow, edited],
+            pausedUntil: nil,
+            generation: 5,
+            ruleInvalidatedAt: [unrelated.id: 5]
+        )
+        live.markBoundedRuleClaimed(claim)
+
+        XCTAssertNil(live.flowDecision(facts()).externalClaim)
+    }
+
+    @MainActor
+    func testStaleRuleEventDoesNotUndoAnExplicitReset() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let live = LiveRules()
+        let store = RuleStore()
+        store.save(allow)
+        let staleGeneration = store.ruleSet.generation
+        store.resetHits(allow)
+
+        store.record([
+            RuleEvent(
+                at: 1_700_000_000,
+                ruleID: allow.id,
+                ruleSession: RuleStore.session,
+                ruleGeneration: staleGeneration,
+                action: .allow,
+                engine: .flow,
+                agentKey: "com.example.app",
+                agentName: "Example",
+                appName: "Example",
+                bundleID: "com.example.app",
+                host: "api.example.com",
+                ip: "",
+                port: 443
+            ),
+        ])
+        live.replace(store.rules, pausedUntil: nil, generation: store.ruleSet.generation)
+
+        XCTAssertEqual(store.rules.first?.hits, 0)
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, allow.id)
+    }
+
+    func testStaleRuleEventIsNotPersistedAfterReset() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-stale-event-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        store.save(allow)
+        let staleGeneration = store.ruleSet.generation
+        store.resetHits(allow)
+
+        store.record([
+            RuleEvent(
+                at: 1_700_000_000,
+                ruleID: allow.id,
+                ruleSession: RuleStore.session,
+                ruleGeneration: staleGeneration,
+                action: .allow,
+                engine: .flow,
+                agentKey: "com.example.app",
+                agentName: "Example",
+                appName: "Example",
+                bundleID: "com.example.app",
+                host: "api.example.com",
+                ip: "",
+                port: 443
+            ),
+        ])
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertTrue(try db.sync { try $0.ruleEvents(limit: 10).isEmpty })
+        XCTAssertTrue(store.events.isEmpty)
+    }
+
+    @MainActor
+    func testRuleEventSurvivesAnUnrelatedRuleEdit() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        var unrelated = Rule(action: .block, destination: "other.example.com")
+        let store = RuleStore()
+        store.save(allow)
+        let claimGeneration = store.ruleSet.generation
+        store.save(unrelated)
+        unrelated.name = "Edited"
+        store.save(unrelated)
+
+        store.record([
+            RuleEvent(
+                at: 1_700_000_000,
+                ruleID: allow.id,
+                ruleSession: RuleStore.session,
+                ruleGeneration: claimGeneration,
+                action: .allow,
+                engine: .flow,
+                agentKey: "com.example.app",
+                agentName: "Example",
+                appName: "Example",
+                bundleID: "com.example.app",
+                host: "api.example.com",
+                ip: "",
+                port: 443
+            ),
+        ])
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+    }
+
+    func testPublishedRuleEventsClearAfterDurableDeletion() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-events-published-clear-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+        let rule = Rule(action: .block, destination: "example.com")
+        store.save(rule)
+        store.record([
+            RuleEvent(
+                at: 1_700_000_000,
+                ruleID: rule.id,
+                action: .block,
+                engine: .flow,
+                agentKey: "com.example.app",
+                agentName: "Example",
+                appName: "Example",
+                bundleID: "com.example.app",
+                host: "example.com",
+                ip: "",
+                port: 443
+            ),
+        ])
+        try await waitUntil { !store.events.isEmpty }
+        XCTAssertEqual(store.events.count, 1)
+
+        try await db.asyncResult { try $0.clearAll() }
+        store.clearPublishedEventsAfterDurableDeletion()
+
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertTrue(try db.sync { try $0.ruleEvents(limit: 10).isEmpty })
+    }
+
+    func testAcceptedBoundedClaimPersistsCountAndEventBeforeCompletion() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-accepted-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        store.save(allow)
+        let claim = RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: store.ruleSet.generation)
+        let event = RuleEvent(
+            at: 1_700_000_000,
+            ruleID: allow.id,
+            ruleSession: claim.session,
+            ruleGeneration: claim.generation,
+            action: .allow,
+            engine: .flow,
+            agentKey: "com.example.app",
+            agentName: "Example",
+            appName: "Example",
+            bundleID: "com.example.app",
+            host: "api.example.com",
+            ip: "",
+            port: 443
+        )
+        let completed = expectation(description: "accepted claim committed")
+
+        store.recordBoundedClaim(claim, event: event) { persisted in
+            XCTAssertTrue(persisted)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        let loaded = try db.sync { try $0.loadRules() }
+        XCTAssertEqual(loaded.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertEqual(try db.sync { try $0.ruleEvents(ruleID: allow.id).count }, 1)
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
+    }
+
+    func testAcceptedBoundedClaimFailsOpenWhenDurableStorageIsUnavailable() async {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let store = RuleStore()
+        store.save(allow)
+        let claim = RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: store.ruleSet.generation)
+        let event = RuleEvent(
+            at: 1_700_000_000,
+            ruleID: allow.id,
+            ruleSession: claim.session,
+            ruleGeneration: claim.generation,
+            action: .allow,
+            engine: .flow,
+            agentKey: "com.example.app",
+            agentName: "Example",
+            appName: "Example",
+            bundleID: "com.example.app",
+            host: "api.example.com",
+            ip: "",
+            port: 443
+        )
+        let completed = expectation(description: "accepted claim failed open")
+
+        store.recordBoundedClaim(claim, event: event) { persisted in
+            XCTAssertFalse(persisted)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
+    }
+
+    func testUncertainClaimFailsOpenWhenDurableStorageIsUnavailable() async {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let store = RuleStore()
+        store.save(allow)
+        let claim = RuleClaim(
+            ruleID: allow.id,
+            session: RuleStore.session,
+            generation: store.ruleSet.generation
+        )
+        let completed = expectation(description: "retirement completed")
+        var saved: Bool?
+
+        store.retireBoundedClaim(claim) { result in
+            saved = result
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        XCTAssertEqual(saved, false)
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
+    }
+
+    func testUncertainClaimIsPersistedSpentBeforeCompletion() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-uncertain-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        store.save(allow)
+        let claim = RuleClaim(
+            ruleID: allow.id,
+            session: RuleStore.session,
+            generation: store.ruleSet.generation
+        )
+        let persisted = expectation(description: "uncertain claim persisted")
+
+        store.retireBoundedClaim(claim) { saved in
+            XCTAssertTrue(saved)
+            persisted.fulfill()
+        }
+        await fulfillment(of: [persisted], timeout: 2)
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        let loaded = try db.sync { try $0.loadRules() }
+        XCTAssertEqual(loaded.first(where: { $0.id == allow.id })?.hits, 1)
+    }
+
+    func testUncertainClaimSurvivesAnUnrelatedEditAndPersistsSpent() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-unrelated-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        var unrelated = Rule(action: .block, destination: "other.example.com")
+        store.save(allow)
+        let claim = RuleClaim(
+            ruleID: allow.id,
+            session: RuleStore.session,
+            generation: store.ruleSet.generation
+        )
+        store.save(unrelated)
+        unrelated.name = "Edited"
+        store.save(unrelated)
+        let persisted = expectation(description: "claim persisted across unrelated edit")
+
+        store.retireBoundedClaim(claim) { saved in
+            XCTAssertTrue(saved)
+            persisted.fulfill()
+        }
+        await fulfillment(of: [persisted], timeout: 2)
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
+        let loaded = try db.sync { try $0.loadRules() }
+        XCTAssertEqual(loaded.first(where: { $0.id == allow.id })?.hits, 1)
+    }
+
+    func testExternalAuthorityReceivesLocallyConsumedHitsAtHandoff() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 2
+        let live = LiveRules()
+        live.replace([allow], pausedUntil: nil, generation: 12)
+        XCTAssertEqual(live.flowDecision(facts()).decision.rule?.id, allow.id)
+
+        let transferred = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [allow], generation: 12, session: RuleStore.session)
+        )
+
+        XCTAssertEqual(transferred.rules.first?.hits, 1)
+        XCTAssertEqual(live.flowDecision(facts()).externalClaim,
+                       RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 12))
+    }
+
+    func testExternalAuthorityRemainsStickyAcrossSourceFallback() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let live = LiveRules()
+        live.replace([allow], pausedUntil: nil, generation: 12)
+        _ = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [allow], generation: 12, session: RuleStore.session)
+        )
+
+        let afterFallback = live.flowDecision(facts())
+
+        XCTAssertEqual(afterFallback.externalClaim,
+                       RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 12))
+        XCTAssertEqual(live.flowDecision(facts()).externalClaim,
+                       afterFallback.externalClaim,
+                       "fallback must fail open through unavailable claims, not resume a second counter")
+    }
+
+    func testRuleClaimRoundTripKeepsSessionIdentity() throws {
+        let claim = RuleClaim(
+            ruleID: UUID(),
+            session: "new-app-process",
+            generation: 1
+        )
+
+        let decoded = try JSONDecoder().decode(
+            RuleClaim.self,
+            from: JSONEncoder().encode(claim)
+        )
+
+        XCTAssertEqual(decoded, claim)
+        XCTAssertNotEqual(
+            decoded,
+            RuleClaim(
+                ruleID: claim.ruleID,
+                session: "old-app-process",
+                generation: claim.generation
+            )
+        )
+    }
+
+    func testExternalAuthorityOwnsFiniteRuleDuringSynchronization() {
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        let live = LiveRules()
+        live.replace([allow], pausedUntil: nil, generation: 12)
+        _ = live.beginExternalClaimAuthority(
+            with: RuleSet(rules: [allow], generation: 12, session: RuleStore.session)
+        )
+
+        let first = live.flowDecision(facts())
+        let second = live.flowDecision(facts())
+
+        XCTAssertEqual(first.externalClaim, RuleClaim(ruleID: allow.id, session: RuleStore.session, generation: 12))
+        XCTAssertEqual(second.externalClaim, first.externalClaim)
+        XCTAssertEqual(second.decision.rule?.id, allow.id,
+                       "the proxy must not spend independently while the extension owns the counter")
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval = 2,
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            if Date() >= deadline {
+                XCTFail("condition did not become true")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     // MARK: Which engine can carry a rule out

@@ -23,13 +23,48 @@ cp -R "$APP" "$WORK/root/"
 pkgbuild --analyze --root "$WORK/root" "$WORK/components.plist" >/dev/null
 plutil -replace 0.BundleIsRelocatable -bool NO "$WORK/components.plist"
 
+# pkgbuild serializes every extended attribute as a ._ AppleDouble payload
+# record. Newer macOS releases pin com.apple.provenance on signed files, so the
+# attribute survives COPYFILE_DISABLE and even xattr -d. Let pkgbuild create the
+# component metadata, then replace only its payload archive and BOM. cpio keeps
+# the signed bundle bytes and POSIX modes while COPYFILE_DISABLE omits xattrs.
+# Match pkgbuild's recommended system-domain ownership in both archives: an
+# installer must not leave /Applications/Flowlight.app owned by the build user.
 pkgbuild --root "$WORK/root" --component-plist "$WORK/components.plist" --install-location /Applications \
-  --identifier com.flowlight.app.pkg --version "$VERSION" "$WORK/Flowlight-component.pkg"
+  --identifier com.flowlight.app.pkg --version "$VERSION" "$WORK/Flowlight-component-with-metadata.pkg"
+pkgutil --expand "$WORK/Flowlight-component-with-metadata.pkg" "$WORK/component-expanded"
+WORK_ABS="$PWD/$WORK"
+(
+  cd "$WORK/root"
+  find . -print | cpio -o -R root:wheel --format odc 2> "$WORK_ABS/cpio.log" \
+    | gzip -9 > "$WORK_ABS/component-expanded/Payload"
+)
+# pkgbuild's BOM already has the right root:wheel ownership and checksums. Drop
+# only the AppleDouble basenames it synthesized from pinned extended attributes.
+lsbom "$WORK/component-expanded/Bom" \
+  | perl -F'\t' -lane '$name = (split m{/}, $F[0])[-1]; print unless $name =~ /^\._/' \
+  > "$WORK/bom-files.txt"
+mkbom -i "$WORK/bom-files.txt" "$WORK/clean.bom"
+mv "$WORK/clean.bom" "$WORK/component-expanded/Bom"
+PAYLOAD_COUNT=$(lsbom -s "$WORK/component-expanded/Bom" | wc -l | tr -d ' ')
+PAYLOAD_COUNT="$PAYLOAD_COUNT" perl -0pi -e \
+  's{(<payload numberOfFiles=")\d+}{$1 . $ENV{PAYLOAD_COUNT}}e' "$WORK/component-expanded/PackageInfo"
+[[ $(xmllint --xpath 'string(/pkg-info/payload/@numberOfFiles)' "$WORK/component-expanded/PackageInfo") == "$PAYLOAD_COUNT" ]]
+! lsbom -pfMUG "$WORK/component-expanded/Bom" | grep -Ev $'\troot\twheel$'
+pkgutil --flatten "$WORK/component-expanded" "$WORK/Flowlight-component.pkg"
 
 SIGN=()
 [[ -n "${INSTALLER_IDENTITY:-}" ]] && SIGN=(--sign "$INSTALLER_IDENTITY")
 productbuild --package "$WORK/Flowlight-component.pkg" --identifier com.flowlight.app.installer --version "$VERSION" \
   "${SIGN[@]}" "build/Flowlight-$VERSION.pkg"
+
+PAYLOAD_FILES="$WORK/payload-files.txt"
+pkgutil --payload-files "build/Flowlight-$VERSION.pkg" > "$PAYLOAD_FILES"
+if grep -Eq '/\._|/\.__|^\./\._' "$PAYLOAD_FILES"; then
+  echo "Package contains AppleDouble metadata files." >&2
+  exit 1
+fi
+[[ $(wc -l < "$PAYLOAD_FILES" | tr -d ' ') == "$PAYLOAD_COUNT" ]]
 
 # A signed installer still needs notarizing, or macOS refuses to open it.
 if [[ ${#SIGN[@]} -gt 0 ]]; then scripts/notarize.sh "build/Flowlight-$VERSION.pkg"; fi

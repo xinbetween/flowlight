@@ -59,3 +59,13 @@ Key rotation has an overlap period: an app release first trusts both keys, the f
 later app release removes the old public key. Revocation likewise requires an app release removing the affected key;
 a signed feed cannot revoke the key that authenticates it. After rollback, expiry, or key compromise, corrected
 content is published with a new higher sequence rather than changing history or reusing a sequence.
+
+The app consumes only `https://flowlight.xinbetween.com/packs/v1/official.json`; there is no user-supplied source or
+unsigned fallback. It bounds response size and redirects, verifies exact cached bytes again at launch, and keeps its
+highest accepted sequence independently from those bytes so cache loss cannot authorize rollback. An already accepted
+catalog may remain active after expiry as visibly stale last-known-good, but a revoked signer or unverifiable cache
+fails closed until the same or a higher trusted catalog is recovered.
+
+A valid publisher signature is not user consent. New packs default off, and any changed version or destination digest
+removes that pack from enforcement while retaining its saved scope and exceptions. Re-enabling requires an explicit Save
+bound to the exact catalog and pack content the editor displayed; a concurrent refresh makes the old Save stale.

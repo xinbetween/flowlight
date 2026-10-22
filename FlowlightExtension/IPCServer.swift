@@ -127,6 +127,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.blocksInFlight = false
             self.decisionsInFlight = false
             self.packEventsInFlight = false
+            self.packTransfer.reset()
             // A reconnect begins fail-open. The app may have disabled or narrowed any of these while disconnected;
             // stale state must not become active during the policy/rule/pack synchronization that follows register.
             _ = BlockEnforcer.shared.apply([])
@@ -137,30 +138,67 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.flushBlocksLocked()
             self.flushDecisionsLocked()
             self.flushPackEventsLocked()
+            // Registration is the synchronization barrier: the app may publish rules only after this reset is done.
+            reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
         }
-        reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
     }
 
     func setEnforcement(payload: Data, withReply reply: @escaping (Int) -> Void) {
-        let policies = payload.isEmpty ? [] : (BlockCoding.decode([AgentPolicy].self, from: payload) ?? [])
-        let count = BlockEnforcer.shared.apply(policies)
-        extensionLog.info("Enforcing \(count, privacy: .public) allowlists")
-        reply(count)
+        guard let connection = NSXPCConnection.current() else { reply(-1); return }
+        queue.async {
+            guard self.client === connection else { reply(-1); return }
+            let policies = payload.isEmpty ? [] : (BlockCoding.decode([AgentPolicy].self, from: payload) ?? [])
+            let count = BlockEnforcer.shared.apply(policies)
+            // Rules are synchronized first. Once both ordinary policy sources are installed, enforcement can safely
+            // run; managed packs remain independently cleared until their own commit or clear succeeds.
+            BlockEnforcer.shared.appConnectionChanged(connected: true)
+            extensionLog.info("Enforcing \(count, privacy: .public) allowlists")
+            reply(count)
+        }
     }
 
     func setRules(payload: Data, withReply reply: @escaping (Int) -> Void) {
-        let set = payload.isEmpty ? RuleSet() : (BlockCoding.decode(RuleSet.self, from: payload) ?? RuleSet())
-        let count = BlockEnforcer.shared.apply(set)
-        extensionLog.info("Carrying out \(count, privacy: .public) rules")
-        reply(count)
+        guard let connection = NSXPCConnection.current() else { reply(-1); return }
+        queue.async {
+            guard self.client === connection else { reply(-1); return }
+            let set = payload.isEmpty ? RuleSet() : (BlockCoding.decode(RuleSet.self, from: payload) ?? RuleSet())
+            let count = BlockEnforcer.shared.apply(set)
+            extensionLog.info("Carrying out \(count, privacy: .public) rules")
+            reply(count)
+        }
+    }
+
+    func claimRule(payload: Data, withReply reply: @escaping (Int) -> Void) {
+        guard let connection = NSXPCConnection.current() else { reply(-1); return }
+        queue.async {
+            guard self.client === connection,
+                  let claim = BlockCoding.decode(RuleClaim.self, from: payload),
+                  let claimed = BlockEnforcer.shared.claimRule(claim) else {
+                reply(-1)
+                return
+            }
+            reply(claimed ? 1 : 0)
+        }
     }
 
     func rulePackHello(appProtocol: Int, withReply reply: @escaping (Data) -> Void) {
-        reply(BlockCoding.encode(BlockEnforcer.shared.packHandshake()))
+        guard let connection = NSXPCConnection.current() else { reply(Data()); return }
+        queue.async {
+            guard self.client === connection else { reply(Data()); return }
+            reply(BlockCoding.encode(BlockEnforcer.shared.packHandshake()))
+        }
     }
 
     func beginRulePack(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             guard let header = BlockCoding.decode(RulePackTransferHeader.self, from: payload) else {
                 reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable pack transfer")))
                 return
@@ -171,11 +209,23 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func appendRulePack(generation: String, index: Int, payload: Data, withReply reply: @escaping (Bool) -> Void) {
-        queue.async { reply(self.packTransfer.append(generation: generation, index: index, payload: payload)) }
+        guard let connection = NSXPCConnection.current() else { reply(false); return }
+        queue.async {
+            guard self.client === connection else { reply(false); return }
+            reply(self.packTransfer.append(generation: generation, index: index, payload: payload))
+        }
     }
 
     func commitRulePack(generation: String, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             switch self.packTransfer.commit(generation: generation, active: BlockEnforcer.shared.packHandshake()) {
             case .rejected(let result):
                 reply(BlockCoding.encode(result))
@@ -198,7 +248,15 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func clearRulePacks(payload: Data, withReply reply: @escaping (Data) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "No registered app connection")))
+            return
+        }
         queue.async {
+            guard self.client === connection else {
+                reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Superseded app connection")))
+                return
+            }
             guard let request = BlockCoding.decode(RulePackClearRequest.self, from: payload) else {
                 reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "Unreadable clear request")))
                 return
@@ -290,6 +348,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         }
         guard let batch = packEventBatch else { return }
         let capturedClient = client
+        let capturedClientID = ObjectIdentifier(capturedClient)
         let proxy = capturedClient.remoteObjectProxyWithErrorHandler { [weak self, weak capturedClient] error in
             extensionLog.error("rulePackEvents() failed: \(error.localizedDescription, privacy: .public)")
             self?.queue.async {
@@ -303,9 +362,10 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             return
         }
         packEventsInFlight = true
-        proxy.rulePackEvents(payload: BlockCoding.encode(batch)) { [weak self, weak capturedClient] accepted in
+        proxy.rulePackEvents(payload: BlockCoding.encode(batch)) { [weak self] accepted in
             self?.queue.async {
-                guard let self, self.client === capturedClient, self.packEventBatch?.id == batch.id else { return }
+                guard let self, self.client.map(ObjectIdentifier.init) == capturedClientID,
+                      self.packEventBatch?.id == batch.id else { return }
                 self.packEventsInFlight = false
                 if accepted {
                     self.packEventBatch = nil

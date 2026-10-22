@@ -167,6 +167,7 @@ nav: home
               software di cui non ti fidi — vedi il <a href="{{link:threat-model}}">modello di minaccia</a>.</p>
             <p class="example">Cursor ⇥ raw.githubusercontent.com · rifiutata 4 volte · nei giorni feriali 18:00–09:00</p></div>
         </div>
+        <div class="rule"><span class="sev critical">⛔ Da attivare</span><div><h3>Pacchetti gestiti per pubblicità e tracker</h3><p>Tre pacchetti ufficiali sono integrati, visibili e disattivati per impostazione predefinita. Flowlight controlla un unico feed HTTPS fisso per gli aggiornamenti firmati; i contenuti nuovi o modificati restano esclusi dall’applicazione finché non esamini quella versione esatta e premi Salva. Durante un’interruzione, i contenuti verificati e accettati possono restare disponibili come ultima versione valida nota, visibilmente indicata come obsoleta.</p><p>Bloccano in base al nome host, quindi non possono rimuovere pubblicità proprietarie, spazi vuoti nel DOM o nel layout, sovrapposizioni del browser, popup generati da script o finestre native delle app.</p></div></div>
         <div class="rule">
           <span class="sev critical">⛔ Rifiuta</span>
           <div><h3>Protezioni sugli strumenti di un agente</h3>
@@ -366,7 +367,7 @@ nav: home
         <div><strong>Resta sul tuo Mac</strong><p>Un solo file SQLite locale. Nessun account, nessuna sincronizzazione nel cloud, nessuna telemetria.</p></div>
         <div><strong>Metadati, per impostazione predefinita</strong><p>Nomi host, porte e byte conteggiati. Decifrare HTTPS è una modalità separata che devi attivare tu, e resta sul tuo Mac.</p></div>
         <div><strong>Filtrato nel kernel</strong><p>L'acquisizione lascia passare solo le risposte DNS e i ClientHello TLS. Tutto il resto viene scartato prima che Flowlight lo veda.</p></div>
-        <div><strong>Ricerche che controlli tu</strong><p>Per dare un nome al proprietario di un indirizzo vengono inviati a Team Cymru solo gli IP pubblici senza nome host, e si disattiva con un clic. Il controllo giornaliero degli aggiornamenti chiede a GitHub solo l'ultima versione, e anche quello si può disattivare.</p></div>
+        <div><strong>Ricerche che controlli tu</strong><p>Per dare un nome al proprietario di un indirizzo vengono inviati a Team Cymru solo gli IP pubblici senza nome host. I controlli della versione e dei pacchetti di regole firmati inviano richieste HTTPS standard senza traffico né impostazioni dei pacchetti. Ciascuno ha il proprio interruttore.</p></div>
       </div>
     </div>
   </section>

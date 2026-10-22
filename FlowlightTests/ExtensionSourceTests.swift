@@ -39,4 +39,44 @@ final class ExtensionSourceTests: XCTestCase {
         lock.lock(); defer { lock.unlock() }
         XCTAssertEqual(count, 1)
     }
+
+    func testRulePackPushGateAbsorbsDuplicateStartupPush() {
+        var gate = RulePackPushGate()
+
+        XCTAssertTrue(gate.begin(epoch: 2))
+        XCTAssertFalse(gate.begin(epoch: 2))
+        XCTAssertEqual(gate.finish(epoch: 2), false)
+        XCTAssertTrue(gate.begin(epoch: 2))
+    }
+
+    func testRulePackPushGateCoalescesANewerSnapshot() {
+        var gate = RulePackPushGate()
+
+        XCTAssertTrue(gate.begin(epoch: 2))
+        XCTAssertFalse(gate.begin(epoch: 3))
+        XCTAssertFalse(gate.begin(epoch: 4))
+        XCTAssertEqual(gate.finish(epoch: 2), true)
+        XCTAssertTrue(gate.begin(epoch: 4))
+        XCTAssertNil(gate.finish(epoch: 3))
+        XCTAssertEqual(gate.finish(epoch: 4), false)
+    }
+
+    func testEveryPackMutationRequiresTheRegisteredXPCClient() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("FlowlightExtension/IPCServer.swift"),
+            encoding: .utf8
+        )
+        for method in ["claimRule", "rulePackHello", "beginRulePack", "appendRulePack", "commitRulePack", "clearRulePacks"] {
+            let start = try XCTUnwrap(source.range(of: "func \(method)("))
+            let body = source[start.lowerBound...].prefix(1_500)
+            XCTAssertTrue(body.contains("NSXPCConnection.current()"), method)
+            XCTAssertTrue(body.contains("self.client === connection"), method)
+        }
+        let registerStart = try XCTUnwrap(source.range(of: "func register("))
+        let registerBody = source[registerStart.lowerBound...].prefix(1_500)
+        XCTAssertTrue(registerBody.contains("self.packTransfer.reset()"))
+    }
 }

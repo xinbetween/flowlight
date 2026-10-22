@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hant/threat-model/", "name": "Flowlight 威脅模型", "description": "Flowlight 防得住什麼、防不住什麼，以及為什麼 — 它只做監控，不做防護。", "inLanguage": "zh-Hant", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hant"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威脅模型", "item": "https://flowlight.xinbetween.com/zh-Hant/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hant", "url": "https://flowlight.xinbetween.com/zh-Hant/", "name": "Flowlight", "inLanguage": "zh-Hant", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hant/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hant/threat-model/", "name": "Flowlight 威脅模型", "description": "Flowlight 防得住什麼、防不住什麼，以及為什麼 — 它只做監控，不做防護。", "inLanguage": "zh-Hant", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hant"}, "dateModified": "2026-10-22"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hant/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威脅模型", "item": "https://flowlight.xinbetween.com/zh-Hant/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳至內容</a>
@@ -148,31 +148,29 @@
         逐個說明。</p>
 
       <h2 id="blocking">封鎖是什麼，不是什麼</h2>
-      <p>一條拒絕連線的規則是由網路延伸功能執行的，就在連線的路徑上，在連線建立之前。一條指名 URL 的規則則由檢查用的代理伺服器
-        執行，它用 App 讀得到的狀態來回答那個請求。這兩處是 Flowlight 裡唯一動手、而不只是回報的部分 — nettop 取樣器什麼都拒絕不了，
-        所以在用取樣器的 Mac 上，沒有任何規則會被強制執行，而 Flowlight 會把這一點說出來，而不是擺一個什麼都不做的開關。</p>
+      <p>一條拒絕連線的規則通常由網路延伸功能執行，就在連線的路徑上，在連線建立之前。對於轉送經過 HTTPS 檢查的流量，本機代理伺服器
+        會在開啟來源伺服器連線之前，針對原始用戶端套用目的地規則和已啟用的受管理套件；一條指名 URL 的規則也會在解密後由它執行，
+        並用 App 讀得到的狀態作出回應。這兩處是 Flowlight 裡唯一動手、而不只是回報的部分 — nettop 取樣器什麼都拒絕不了，所以在用
+        取樣器的 Mac 上，沒有任何規則會被強制執行，而 Flowlight 會把這一點說出來，而不是擺一個什麼都不做的開關。</p>
       <p>但它依然不是防護。一個還能執行 shell 的代理，可以自己動手做那個被拒絕的工具原本要做的事。一次你能一鍵解除的拒絕，
         也是代理下一次嘗試就可能走過去的拒絕。本機流量、DNS、Apple 自己的服務，以及 Flowlight 自己的連線永遠不會被拒絕，
         因為一台被封死的 Mac 比一個被封住的代理更糟。而且 Flowlight 停止執行後幾秒，強制執行就會失效：
         沒人看得到的拒絕比不拒絕更糟。</p>
-      <p><strong>檢查與拒絕無法並存。</strong>經由 Flowlight 自己的代理伺服器轉送的流量，是以 Flowlight 的流量的身分離開這台 Mac 的，
-        而 Flowlight 從不拒絕自己 — 所以一個你正在讀它請求的 App，也就是一個規則再也攔不住它連線的 App。為了看得更多而開啟檢查，
-        代價就是強制執行，而畫面上先前並沒有說這件事。</p>
+      <p><strong>檢查仍能按主機名稱拒絕連線，但有一條界線。</strong>轉送經過 Flowlight 代理伺服器的流量，會以豁免的 Flowlight
+        流量身分離開 Mac，因此代理伺服器會先使用原 App 的身分，對一般目的地規則和已啟用的受管理套件作出判定。即使通道使用憑證綁定
+        或始終不解密，也能這樣判定，因為 CONNECT 會指明主機。代理的允許清單仍由網路延伸功能判定，不適用於從代理伺服器到來源伺服器
+        的這一段路徑；沒有可信擁有者或主機名稱的流量會被允許，而不會在無人察覺的情況下遭到拒絕。</p>
 
       <h2 id="itself">Flowlight 自己留著什麼</h2>
       <p>流量的後設資料，放在本機的 SQLite 資料庫裡，保留期限有公布。開啟 HTTPS 檢查後，它還會把請求與回應的內文留 3 天 —
         那是它留下來的東西裡最敏感的。憑證類標頭會依名稱、也依其中的字詞遮蔽，那是一種推測規則，不是保證；
         一個把祕密放在沒人認得的名稱底下的標頭，是可能被記錄下來的。</p>
-      <p>流量資料庫從不上傳。不過確實有三樣比較小的東西，會在你沒有要求的情況下離開這台 Mac，它們都在<a href="../../zh-Hant/privacy/">隱私頁面</a>上
-        逐項列出：更新檢查，它在啟動時和每天一次向 GitHub 詢問最新的發布；網路擁有者查詢，它就沒有主機名稱的公開位址向 Team Cymru
-        詢問；以及，當 Flowlight 在讀計數器而不是執行它的延伸功能時，對那些它沒看到名稱的位址所做的一次反向 DNS 查詢。前兩樣都有
-        關閉開關。第三樣沒有，因為在取樣器上，一條連線能有名稱，大半就靠它 — 這個查詢會走這台 Mac 本來就在用的解析器，而一旦
-        延伸功能接手、從流量本身為連線命名，它就停了。用託管模型「提問」送出去的東西，比它們任何一個都多得多，而它也是唯一在你
-        設定之前一直關著的。</p>
+      <p>流量資料庫從不上傳。<a href="../../zh-Hant/privacy/">隱私頁面</a>列出每項外部要求：版本與簽署規則套件檢查、選用的網路擁有者查詢，以及取樣器的反向 DNS。前三項都有關閉開關；反向 DNS 沒有，因為少了它，取樣器無法為大多數連線命名。託管模型會傳送更多內容，並在設定前保持關閉。</p>
 
       <h2 id="updates">更新</h2>
       <p>版本以 Developer ID 簽章並經過公證。更新程式要求有公布的總和檢查碼，沒有就拒絕下載；接著會在安裝之前確認下載到的 App
         是否由與執行中副本相同的團隊簽章。由別人簽章的更新會被拒絕，即使它在其他方面都有效。</p>
+      <p>官方規則套件使用一套用途受限的獨立簽章和一個固定的 HTTPS 來源。App 會獨立保存最高序號水位，在啟動時重新驗證快取的確切位元組，拒絕回復舊版和相互矛盾的發佈，並且絕不會把發佈者簽章視為強制執行變更內容的許可。新增或變更的套件必須經過對確切內容的明確檢閱並儲存；已接受但過時的內容會標示為已知正常的最後版本；如果信任已撤銷或位元組損壞，則一律以拒絕處理。</p>
 
       <h2 id="reporting">回報漏洞</h2>
       <p>請使用 GitHub 的<a href="https://github.com/xinbetween/flowlight/security/advisories/new">私密漏洞回報</a>，或者如果你不想用
@@ -213,7 +211,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.15.3 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.15.4 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

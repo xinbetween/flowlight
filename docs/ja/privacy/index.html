@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/privacy/#webpage", "url": "https://flowlight.xinbetween.com/ja/privacy/", "name": "Flowlight のプライバシー", "description": "Flowlight が何を記録し、どこに保存し、どの外部サービスに接続するのか。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-09-27"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight のプライバシー", "item": "https://flowlight.xinbetween.com/ja/privacy/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/privacy/#webpage", "url": "https://flowlight.xinbetween.com/ja/privacy/", "name": "Flowlight のプライバシー", "description": "Flowlight が何を記録し、どこに保存し、どの外部サービスに接続するのか。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight のプライバシー", "item": "https://flowlight.xinbetween.com/ja/privacy/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">本文へスキップ</a>
@@ -123,6 +123,7 @@
         <tr><th>リクエスト</th><th>送信先</th><th>含まれるもの</th><th>タイミング</th></tr>
         <tr><td>アップデートの確認</td><td><code>api.github.com</code></td><td>最新リリースを尋ねる通常の HTTPS リクエスト。GitHub が見るのは、IP アドレスと <code>Flowlight/&lt;version&gt;</code> というユーザーエージェントです</td><td>起動時と 1 日 1 回（0.1.2 以降）。オフのスイッチは設定 › 一般</td></tr>
         <tr><td>アップデートのダウンロード</td><td><code>github.com</code></td><td>ディスクイメージと、そのチェックサムファイル</td><td>「ダウンロードして開く」をクリックしたときだけ</td></tr>
+        <tr><td>公式ルールパックのアップデート</td><td><code>flowlight.xinbetween.com</code></td><td>固定された公式フィードへの標準 HTTPS リクエストです。サーバには、IP アドレス、<code>Flowlight/&lt;version&gt;</code>ユーザーエージェント、条件付きキャッシュバリデータが表示されます。トラフィック、パック設定、デバイス識別子は送信されません</td><td>起動後、確認期限に達している場合に実行し、その後は正常稼働中に1日最大1回実行します。デフォルトでオンです。ルール › パックでオフにするか、今すぐ確認を手動で実行できます</td></tr>
         <tr><td>逆引き DNS</td><td>あなたが設定した DNS リゾルバ</td><td>ホスト名が見つからなかった場合の、IP アドレスの登録名の照会</td><td>必要に応じて、サンプラーのキャプチャモードで。ネットワーク機能拡張が動き出すまではこれがデフォルトです。オフのスイッチはありません。これがないとサンプラーはほとんどの接続に名前を付けられないからです。ネットワーク機能拡張はトラフィック自身から名前を付けるので、これを行いません</td></tr>
         <tr><td>ネットワーク所有者の照会</td><td>Team Cymru（DNS 経由）</td><td>ホスト名がわからないパブリック IP アドレス。プライベートアドレスと予約アドレスは、この Mac から決して出ません</td><td>デフォルトでオン。オフのスイッチはキャプチャ › ネットワーク所有者を特定</td></tr>
         <tr><td>ホスト型モデルでの質問</td><td>あなたが選んだプロバイダ：Anthropic、OpenAI、Google Gemini、または互換のエンドポイント</td><td>あなたの質問と、モデルが選んだ読み取り専用の Flowlight の問い合わせが返した結果。トラフィックのデータベース自体はアップロードされません</td><td>ホスト型のプロバイダを選び、質問を送信したときだけ。質問の画面には、送信されたリクエストが表示されます</td></tr>
@@ -186,7 +187,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight コントリビューター。Flowlight は <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> のもとで公開されている自由ソフトウェアです。</span>
-      <span>バージョン 0.15.3 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
+      <span>バージョン 0.15.4 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
     </div>
   </div>
 </footer>

@@ -13,7 +13,28 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.3</h2><time datetime="2026-10-19">October 19, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.4</h2><time datetime="2026-10-20">October 20, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Consume verified official rule-pack updates.</strong> Flowlight checks its one fixed HTTPS feed with conditional
+            requests, verifies publisher signatures and compatibility before persistence, and keeps exact last-known-good bytes plus
+            an independent anti-rollback watermark.</li>
+          <li><strong>Keep every policy change consentful.</strong> New packs stay off. Changed versions or destinations immediately leave
+            enforcement while preserving scope, selected apps, exceptions and history; explicit review and Save of the exact new content
+            restores consent, and a refresh racing an open editor makes its old Save stale.</li>
+          <li><strong>Expose trust and failure state without overclaiming.</strong> Rules › Packs now shows automatic-refresh controls,
+            verification status, sequence, source, signer, timestamps, bundled-versus-downloaded provenance, stale last-known-good, and
+            independent fetch/apply failures. Refresh sends no traffic, pack settings or device identifier.</li>
+          <li><strong>Fail closed at startup and on the wire.</strong> Capture waits for catalog verification plus saved exceptions;
+            redirects, MIME, size, timeout, rollback, equivocation, revoked trust, corrupt cache and failed database commits cannot publish
+            unseen definitions or replace the active snapshot.</li>
+          <li><strong>Keep managed packs enforcing during HTTPS inspection.</strong> Before the local proxy opens a CONNECT tunnel or
+            plaintext origin connection, it applies the extension-acknowledged pack snapshot to the original app identity. A refusal is
+            returned only after its activity record commits; failed persistence allows the connection instead of blocking invisibly.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.3</h2><time datetime="2026-10-19">October 19, 2026</time></header>
         <ul>
           <li><strong>Publish official rule packs as signed data.</strong> Flowlight now defines a purpose-scoped P-256
             signature contract for its official managed-pack catalog, with the public verification key included in the
