@@ -185,6 +185,9 @@ struct RulePackEventBatch: Codable, Equatable, Sendable {
     /// Stable for one extension process. Sequence is strictly increasing because only one batch is ever in flight.
     var deliverySession = UUID()
     var sequence: Int64 = 1
+    /// Extension deliveries survive uncertain cross-process acknowledgements. App-local proxy deliveries do not need
+    /// a permanent watermark: their database callback and authorization state live in the same process.
+    var requiresDurableWatermark = true
     var events: [RulePackEvent]
     var droppedHits: Int64 = 0
     var droppedKeys: Int64 = 0

@@ -305,6 +305,9 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         if let hit = owners[clientPort], Date().timeIntervalSince(hit.at) < 30 { ownersLock.unlock(); return hit.owner }
         ownersLock.unlock()
         let owner = lookupOwner(clientPort: clientPort, proxyPort: proxyPort)
+        // The socket can reach the listener just before libproc publishes it. Do not turn that timing miss into a
+        // 30-second cached identity-less owner; authorization gets a bounded chance to ask again.
+        guard !owner.bundleID.isEmpty else { return owner }
         ownersLock.lock()
         if owners.count > 2000 { owners.removeAll() }
         owners[clientPort] = (owner, Date())

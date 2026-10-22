@@ -401,9 +401,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         and press Save. If content changes while its editor is open, the stale Save is refused. An accepted catalog may remain available
         as visibly stale last-known-good during an outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.</p>
       <p><strong>Each pack has its own scope.</strong> Apply it globally to every app, or only to selected applications. Blocking needs
-        the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. Essential
-        system traffic remains allowed — including the services that carry Apple accounts, push notifications, software updates,
-        certificate checks and iCloud — even when a pack applies globally.</p>
+        the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. When HTTPS
+        inspection routes an app through Flowlight's proxy, enabled packs and ordinary destination rules are decided against that original
+        app before any origin connection opens. This also covers pinned and never-decrypted tunnels by hostname; agent allowlists remain
+        limited to the direct Network Extension path. Essential system traffic remains allowed — including the services that carry Apple
+        accounts, push notifications, software updates, certificate checks and iCloud — even when a pack applies globally.</p>
       <p><strong>Preview before enforcing.</strong> <em>Test against recent traffic</em> replays the proposed pack and scope against up
         to seven days of retained traffic. It reports only decisions that would actually change after ordinary rules, the global pause,
         existing packs and agent policies are taken into account: the affected apps and destinations, connection counts, and bytes.

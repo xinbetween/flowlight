@@ -27,6 +27,9 @@ nav: releases
           <li><strong>Fail closed at startup and on the wire.</strong> Capture waits for catalog verification plus saved exceptions;
             redirects, MIME, size, timeout, rollback, equivocation, revoked trust, corrupt cache and failed database commits cannot publish
             unseen definitions or replace the active snapshot.</li>
+          <li><strong>Keep managed packs enforcing during HTTPS inspection.</strong> Before the local proxy opens a CONNECT tunnel or
+            plaintext origin connection, it applies the extension-acknowledged pack snapshot to the original app identity. A refusal is
+            returned only after its activity record commits; failed persistence allows the connection instead of blocking invisibly.</li>
         </ul>
       </section>
 

@@ -94,7 +94,8 @@ final class ExtensionManager: NSObject, ObservableObject {
         guard let bundle = Bundle(url: url),
               let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
               !version.isEmpty else { return appVersion }
-        return version
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return build.isEmpty ? version : "\(version)/\(build)"
     }
 
     /// Whether this build carries the content-filter entitlement (false for ad-hoc/local builds).
@@ -245,6 +246,12 @@ final class ExtensionManager: NSObject, ObservableObject {
 }
 
 extension ExtensionManager: OSSystemExtensionRequestDelegate {
+    nonisolated private static func versionIdentity(_ properties: OSSystemExtensionProperties) -> String {
+        let version = properties.bundleShortVersion
+        let build = properties.bundleVersion
+        return build.isEmpty ? version : "\(version)/\(build)"
+    }
+
     nonisolated func request(_ request: OSSystemExtensionRequest, actionForReplacingExtension existing: OSSystemExtensionProperties,
                              withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
         .replace
@@ -254,10 +261,10 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
     nonisolated func request(_ request: OSSystemExtensionRequest, foundProperties properties: [OSSystemExtensionProperties]) {
         // Only the enabled copies count. A disabled one holds nothing and replacing it would quietly switch the
         // filter back on for someone who turned it off on purpose.
-        let installed = properties.filter { $0.isEnabled && !$0.isUninstalling }.map(\.bundleShortVersion)
+        let installed = properties.filter { $0.isEnabled && !$0.isUninstalling }.map(Self.versionIdentity)
         // Copies macOS has terminated and is holding until a restart. They still occupy the one content-filter
         // slot, so the enabled build is installed without being the one running.
-        let awaitingReboot = properties.filter(\.isUninstalling).map(\.bundleShortVersion)
+        let awaitingReboot = properties.filter(\.isUninstalling).map(Self.versionIdentity)
         Task { @MainActor in
             let expected = Self.expectedExtensionVersion
             self.versionCheckResult = VersionCheck(installed: installed, expectedVersion: expected,

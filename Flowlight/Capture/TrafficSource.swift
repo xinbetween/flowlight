@@ -12,6 +12,8 @@ protocol TrafficSource: AnyObject {
     /// The rule list this source should carry out. Same story as `setEnforcement`: only the Network Extension is
     /// in the data path, and the Rules screen says so per rule rather than pretending.
     func setRules(_ rules: RuleSet)
+    /// Atomically spends one bounded flow rule. Nil means this source cannot authoritatively claim it.
+    func claimRule(_ claim: RuleClaim, completion: @escaping @Sendable (Bool?) -> Void)
     /// One complete managed-pack generation. Nil clears packs. Other capture sources ignore it and the UI reports
     /// watching-only instead of claiming that the setting is enforced.
     func setRulePacks(_ snapshot: RulePackSnapshot?)
@@ -20,6 +22,7 @@ protocol TrafficSource: AnyObject {
 extension TrafficSource {
     func setEnforcement(_ policies: [AgentPolicy]) {}
     func setRules(_ rules: RuleSet) {}
+    func claimRule(_ claim: RuleClaim, completion: @escaping @Sendable (Bool?) -> Void) { completion(nil) }
     func setRulePacks(_ snapshot: RulePackSnapshot?) {}
 }
 

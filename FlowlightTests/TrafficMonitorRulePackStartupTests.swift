@@ -50,6 +50,30 @@ final class TrafficMonitorRulePackStartupTests: XCTestCase {
         XCTAssertNotNil(monitor.rulePackCatalog.receipt)
     }
 
+    @MainActor
+    func testSupersededExtensionCannotPublishALatePackCommit() async throws {
+        let oldExtension = ExtensionTrafficSource()
+        let replacement = RecordingTrafficSource()
+        var sourceCount = 0
+        let monitor = TrafficMonitor(
+            databaseURL: temporaryDatabaseURL("stale-extension-status"),
+            trafficSourceFactory: {
+                sourceCount += 1
+                return sourceCount == 1 ? oldExtension : replacement
+            }
+        )
+
+        monitor.start()
+        try await waitUntil { sourceCount == 1 && oldExtension.onRulePackStatus != nil }
+        monitor.reconnectSource()
+        try await waitUntil { replacement.started }
+
+        oldExtension.onRulePackStatus?(.init(status: .committed, activeDigest: "stale"))
+        try await Task.sleep(for: .milliseconds(20))
+
+        XCTAssertEqual(monitor.rulePacks.status, .off)
+    }
+
     private func productionCatalog() throws -> VerifiedRulePackCatalog {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "official", withExtension: "json"))
         return try RulePackCatalogVerifier.verify(

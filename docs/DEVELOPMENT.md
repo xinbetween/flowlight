@@ -157,8 +157,10 @@ sits in the path of a connection, and a switch that did nothing would be worse t
 - Every refusal travels back as a `BlockEvent` and becomes a **Connection blocked** alert naming the agent, the
   process, the destination and the fact that it didn't get there. That alert's context menu offers *Allow … from
   Now On*, which adds the destination to the agent's list and pushes the change straight back to the filter.
-- A flow through the HTTPS inspection proxy leaves the Mac as Flowlight's own traffic, which is never refused, so
-  blocking and inspection don't compose for the same agent.
+- A flow through the HTTPS inspection proxy leaves the Mac as exempt Flowlight traffic. Before opening that upstream
+  connection, the proxy attributes the original client and applies destination rules plus the exact managed-pack snapshot
+  acknowledged by the extension. Pack refusal waits for its durable activity record and fails open if that record cannot
+  commit. Agent allowlists remain extension-only and do not compose with the proxied leg.
 - `BlockRules` is plain functions over plain data (like `AgentPolicy.matches`), so `BlockingTests` covers the whole
   decision without a filter installed.
 

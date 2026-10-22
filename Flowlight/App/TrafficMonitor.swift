@@ -56,6 +56,12 @@ final class TrafficMonitor: ObservableObject {
     let rules = RuleStore()
     /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
     let rulePacks: RulePackStore
+    /// The exact extension-committed generation, readable from the inspection proxy's queue.
+    private let liveRulePacks = LiveRulePacks()
+    /// The active extension is the one atomic authority for bounded rules across direct and proxied flows.
+    private let liveRuleClaims = LiveRuleClaimAuthority()
+    /// App-local pack refusals use their own ordered, retryable delivery session.
+    private var proxyRulePackEvents: RulePackEventDelivery!
     /// Signed official catalog bootstrap, cache re-verification, and bounded refresh state.
     private(set) var rulePackCatalog: RulePackCatalogUpdater!
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
@@ -127,6 +133,16 @@ final class TrafficMonitor: ObservableObject {
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
+        proxyRulePackEvents = RulePackEventDelivery { [weak rulePacks] batch, claim, completion in
+            Task { @MainActor in
+                rulePacks?.record(
+                    batch,
+                    claim: claim,
+                    acknowledgeDuringClear: false,
+                    completion: completion
+                ) ?? completion(false)
+            }
+        }
         rulePackCatalog = RulePackCatalogUpdater(
             db: db,
             store: rulePacks,
@@ -160,6 +176,12 @@ final class TrafficMonitor: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        // A signed build may have an older extension process still enforcing its disconnect grace or holding a
+        // buffered finite-rule decision. Reserve the extension as the only counter from process startup, even when
+        // this run begins in sampler mode; unavailable claims fail open rather than reusing a bounded allowance.
+        if ExtensionManager.isEntitled {
+            _ = rules.live.beginExternalClaimAuthority(with: rules.ruleSet)
+        }
         if DemoData.isEnabled {
             IPOwnerLookup.shared.isEnabled = { false }
             IPOwnerLookup.shared.preload(DemoData.owners())
@@ -177,16 +199,42 @@ final class TrafficMonitor: ObservableObject {
         }
         inspection.attach(db: db)
         Task { await localRisk.recover() }
-        rules.onChange = { [weak self] set in self?.source?.setRules(set) }
+        rules.onChange = { [weak self] set in
+            guard let self else { return }
+            if self.source is ExtensionTrafficSource {
+                self.source?.setRules(self.rules.live.beginExternalClaimAuthority(with: set))
+            } else {
+                self.source?.setRules(set)
+            }
+        }
         rules.attach(db: db)
         rulePacks.onChange = { [weak self] snapshot in
             guard let self else { return }
+            self.liveRulePacks.replace(snapshot: nil)
             if self.source is ExtensionTrafficSource { self.rulePacks.markApplying() }
             else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
             self.source?.setRulePacks(snapshot)
         }
-        // A rule that names a path is carried out by the proxy, which reads its list fresh on every connection.
+        // The proxy reads one lock-backed publication for rules and one for the extension-committed pack generation.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
+        inspection.flowRuleDecision = { [live = rules.live] facts in
+            live.flowDecision(facts)
+        }
+        inspection.claimFlowRule = { [liveRuleClaims] claim, completion in
+            liveRuleClaims.claim(claim, completion: completion)
+        }
+        inspection.flowRuleClaimed = { [live = rules.live] claim in live.markBoundedRuleClaimed(claim) }
+        inspection.flowRuleSpent = { [weak rules] claim, completion in
+            Task { @MainActor in
+                rules?.retireBoundedClaim(claim, completion: completion) ?? completion(false)
+            }
+        }
+        inspection.rulePackMatch = { [liveRulePacks] host, bundleID in
+            liveRulePacks.match(host: host, bundleID: bundleID)
+        }
+        inspection.onRulePackRefusal = { [weak proxyRulePackEvents] event, completion in
+            proxyRulePackEvents?.enqueue(event, completion: completion) ?? completion(false)
+        }
         inspection.onRuleRefusal = { [weak self] event in
             Task { @MainActor in self?.rules.record([event]) }
         }
@@ -379,6 +427,7 @@ final class TrafficMonitor: ObservableObject {
 
     private func startSource() {
         guard rulePackCatalogReady else { return }
+        liveRulePacks.replace(snapshot: nil)
         source?.stop()
         let newSource: TrafficSource
         // A build without the entitlement can never reach the extension; capture with the sampler rather than
@@ -416,8 +465,11 @@ final class TrafficMonitor: ObservableObject {
             extensionSource.onRulePackEvents = { [weak self] batch, completion in
                 self?.recordRulePackEvents(batch, completion: completion) ?? completion(false)
             }
-            extensionSource.onRulePackStatus = { [weak self] result in
-                Task { @MainActor in self?.updateRulePackStatus(result) }
+            extensionSource.onRulePackStatus = { [weak self, weak extensionSource] result in
+                Task { @MainActor in
+                    guard let self, let extensionSource, self.source === extensionSource else { return }
+                    self.updateRulePackStatus(result)
+                }
             }
             extensionSource.onRepairRequested = { [weak self] in
                 Task { @MainActor in self?.repairExtensionVersion() }
@@ -427,6 +479,16 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         source = newSource
+        let extensionSource = newSource as? ExtensionTrafficSource
+        liveRuleClaims.replace(extensionSource)
+        let sourceRuleSet: RuleSet
+        if extensionSource != nil {
+            sourceRuleSet = rules.live.beginExternalClaimAuthority(with: rules.ruleSet)
+        } else {
+            // External finite-rule ownership is session-sticky. The extension deliberately enforces for a short
+            // disconnect grace and may still hold an undelivered spend; resuming a local counter would permit reuse.
+            sourceRuleSet = rules.ruleSet
+        }
         status = fallbackNote ?? L("Starting %@…", newSource.displayName)
         if started { updatePacketCapture() }
         newSource.start(sink: { [weak self] batches in
@@ -435,7 +497,7 @@ final class TrafficMonitor: ObservableObject {
             Task { @MainActor in self?.status = fallbackNote ?? message }
         })
         pushEnforcement()
-        newSource.setRules(rules.ruleSet)
+        newSource.setRules(sourceRuleSet)
         newSource.setRulePacks(rulePacks.snapshot)
         if rulePacks.hasEnabledPacks, !(newSource is ExtensionTrafficSource) {
             rulePacks.updateStatus(.watchingOnly)
@@ -445,24 +507,41 @@ final class TrafficMonitor: ObservableObject {
     private func updateRulePackStatus(_ result: RulePackApplyResult) {
         switch result.status {
         case .accepted:
+            liveRulePacks.replace(snapshot: nil)
             rulePacks.updateStatus(.applying)
         case .committed:
-            rulePacks.updateStatus(.enforcing)
+            let desired = rulePacks.snapshot
+            liveRulePacks.commit(snapshot: desired, activeDigest: result.activeDigest)
+            if desired?.digest == result.activeDigest {
+                rulePacks.updateStatus(.enforcing)
+            } else {
+                rulePacks.updateStatus(.failed("The filter acknowledged a different rule pack snapshot."))
+            }
         case .cleared:
+            liveRulePacks.replace(snapshot: nil)
             rulePacks.updateStatus(.off)
         case .incompatible:
+            liveRulePacks.replace(snapshot: nil)
             rulePacks.updateStatus(.incompatible(result.detail))
         case .invalid, .stale:
+            liveRulePacks.replace(snapshot: nil)
             rulePacks.updateStatus(.failed(result.detail))
         }
     }
 
-    nonisolated private func recordRulePackEvents(_ batch: RulePackEventBatch,
-                                                   completion: @escaping (Bool) -> Void) {
-        Task { @MainActor in
+    nonisolated private func recordRulePackEvents(
+        _ batch: RulePackEventBatch,
+        completion: @escaping @Sendable (Bool) -> Void
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else {
+                completion(false)
+                return
+            }
             self.rulePacks.record(batch) { [weak self] committed in
-                if committed { self?.dataVersion += 1 }
                 completion(committed)
+                guard committed else { return }
+                Task { @MainActor [weak self] in self?.dataVersion += 1 }
             }
         }
     }
@@ -742,16 +821,24 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func clearAllData() {
-        db.async { [weak self] db in
-            try db.clearAll()
-            Task { @MainActor in
-                self?.sessionPerApp.removeAll()
-                self?.perSecond.removeAll()
-                self?.sessionIn = 0
-                self?.sessionOut = 0
-                self?.rulePacks.clearActivity()
-                self?.dataVersion += 1
-                self?.refreshAlertCount()
+        rulePacks.beginActivityClear()
+        proxyRulePackEvents.invalidate { [weak self, db] in
+            Task { @MainActor [weak self, db] in
+                guard let self else { return }
+                do {
+                    try await db.asyncResult { try $0.clearAll() }
+                    self.sessionPerApp.removeAll()
+                    self.perSecond.removeAll()
+                    self.sessionIn = 0
+                    self.sessionOut = 0
+                    self.rulePacks.finishActivityClear(succeeded: true)
+                    self.rules.clearPublishedEventsAfterDurableDeletion()
+                    self.dataVersion += 1
+                    self.refreshAlertCount()
+                } catch {
+                    self.rulePacks.finishActivityClear(succeeded: false)
+                    self.lastError = L("Couldn't delete the captured data: %@", error.localizedDescription)
+                }
             }
         }
     }

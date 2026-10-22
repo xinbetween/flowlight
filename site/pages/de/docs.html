@@ -387,6 +387,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h3 id="managed-packs">Verwaltete Werbe- und Tracker-Pakete</h3>
       <p><strong>Regeln › Pakete</strong> enthält drei offizielle Hostnamenlisten: <strong>Werbung</strong>, <strong>Websiteübergreifendes Tracking</strong> und <strong>Datenschutz und Telemetrie</strong>. Sie sind von Anfang an sichtbar und standardmäßig alle deaktiviert. Zum Blockieren ist die Netzwerkerweiterung erforderlich; der nettop-Sampler kann nur beobachten.</p>
       <p><strong>Ausschließlich offizielle, signierte Updates.</strong> Flowlight prüft eine einzige festgelegte HTTPS-Quelle auf neuere, vom Herausgeber signierte Kataloge. Automatische Prüfungen sind standardmäßig aktiviert und können hier deaktiviert werden. Eine Signatur authentifiziert den Inhalt, aktiviert ihn aber nicht: Ein neues Paket bleibt deaktiviert, und bei geänderten Zielen wird ein aktiviertes Paket nicht mehr durchgesetzt, bis du die genaue neue Version geprüft und auf Sichern geklickt hast. Akzeptierte Inhalte können während eines Ausfalls als sichtbar veralteter letzter bekannter funktionsfähiger Stand erhalten bleiben. Dies sind Netzwerksperren auf Hostnamenebene: Sie können keine Lücken im DOM oder Layout, Browser-Overlays, skriptgesteuerten Pop-ups oder Fenster nativer Apps entfernen.</p>
+      <p>Wenn die HTTPS-Inspektion eine App durch Flowlights Proxy leitet, entscheidet er anhand der ursprünglichen App-Identität über gewöhnliche Zielregeln und aktivierte verwaltete Pakete, bevor eine Verbindung zum Ursprungsserver geöffnet wird. Bei angepinnten oder nie entschlüsselten CONNECT-Tunneln funktioniert das anhand des Hostnamens; Agenten-Erlaubnislisten bleiben auf den direkten Weg über die Netzwerkerweiterung beschränkt. Ist der Eigentümer oder Hostname unbekannt, wird die Verbindung im Zweifel zugelassen.</p>
 
       <h2 id="allowlists">Erlaubnislisten</h2>
       <p>Wähle einen Agenten in <strong>KI-Agenten</strong> und sage über <strong>Erlaubnisliste</strong> in seinem Detail, wohin er sich verbinden darf. Trage Domains
@@ -406,8 +407,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Datenverkehr. Ein blockierter Mac ist schlimmer als ein blockierter Agent, im Zweifel wird die Verbindung also erlaubt und aufgezeichnet.
         Die Durchsetzung endet außerdem wenige Sekunden nachdem Flowlight nicht mehr läuft – eine Verweigerung, die niemand sehen kann, ist schlimmer als keine, und der Weg,
         sie aufzuheben, liegt in der App.</p>
-      <p>HTTPS-Inspektion und Blockieren lassen sich nicht kombinieren: Datenverkehr, der über Flowlights Proxy läuft, geht als Flowlights eigener hinaus und wird
-        nie verweigert.</p>
+      <p>Für eine App, die durch die HTTPS-Inspektion geleitet wird, entscheidet Flowlights Proxy gewöhnliche Zielregeln und aktivierte verwaltete Pakete anhand der ursprünglichen App-Identität, bevor er eine Verbindung zum Ursprungsserver öffnet. Bei angepinnten oder nie entschlüsselten CONNECT-Tunneln geschieht das anhand des Hostnamens. Agenten-Erlaubnislisten bleiben auf den direkten Weg über die Netzwerkerweiterung beschränkt; ist der Eigentümer oder Hostname unbekannt, wird die Verbindung im Zweifel zugelassen.</p>
 
       <h2 id="guardrails">Schutzregeln für Agenten: ein Tool, einen Server oder eine Ressource blockieren</h2>
       <p><em>Welche Tools darf dieser Agent nutzen</em> ist eine andere Frage als <em>welche Hosts darf er erreichen</em>, und hat darum ihren eigenen

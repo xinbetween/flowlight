@@ -39,4 +39,25 @@ final class ExtensionSourceTests: XCTestCase {
         lock.lock(); defer { lock.unlock() }
         XCTAssertEqual(count, 1)
     }
+
+    func testRulePackPushGateAbsorbsDuplicateStartupPush() {
+        var gate = RulePackPushGate()
+
+        XCTAssertTrue(gate.begin(epoch: 2))
+        XCTAssertFalse(gate.begin(epoch: 2))
+        XCTAssertEqual(gate.finish(epoch: 2), false)
+        XCTAssertTrue(gate.begin(epoch: 2))
+    }
+
+    func testRulePackPushGateCoalescesANewerSnapshot() {
+        var gate = RulePackPushGate()
+
+        XCTAssertTrue(gate.begin(epoch: 2))
+        XCTAssertFalse(gate.begin(epoch: 3))
+        XCTAssertFalse(gate.begin(epoch: 4))
+        XCTAssertEqual(gate.finish(epoch: 2), true)
+        XCTAssertTrue(gate.begin(epoch: 4))
+        XCTAssertNil(gate.finish(epoch: 3))
+        XCTAssertEqual(gate.finish(epoch: 4), false)
+    }
 }

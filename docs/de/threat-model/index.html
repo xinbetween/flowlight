@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/de/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/de/threat-model/", "name": "Bedrohungsmodell von Flowlight", "description": "Wogegen Flowlight schützt, wogegen es nicht schützen kann und warum – beobachten statt verhindern.", "inLanguage": "de", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-de"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/de/"}, {"@type": "ListItem", "position": 2, "name": "Bedrohungsmodell von Flowlight", "item": "https://flowlight.xinbetween.com/de/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-de", "url": "https://flowlight.xinbetween.com/de/", "name": "Flowlight", "inLanguage": "de", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/de/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/de/threat-model/", "name": "Bedrohungsmodell von Flowlight", "description": "Wogegen Flowlight schützt, wogegen es nicht schützen kann und warum – beobachten statt verhindern.", "inLanguage": "de", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-de"}, "dateModified": "2026-10-21"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/de/"}, {"@type": "ListItem", "position": 2, "name": "Bedrohungsmodell von Flowlight", "item": "https://flowlight.xinbetween.com/de/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Zum Inhalt springen</a>
@@ -155,19 +155,22 @@
         welches von beidem gilt.</p>
 
       <h2 id="blocking">Was Blockieren ist und was nicht</h2>
-      <p>Eine Regel, die Verbindungen verweigert, wird von der Netzwerkerweiterung ausgeführt, im Weg der Verbindung, bevor sie zustande kommt. Eine
-        Regel, die eine URL nennt, führt stattdessen der Inspektions-Proxy aus, der die Anfrage mit einem Status beantwortet, den die App lesen kann.
-        Das sind die einzigen zwei Teile von Flowlight, die handeln statt zu berichten – der nettop-Sampler kann überhaupt nichts verweigern, auf einem
-        Mac, der mit dem Sampler erfasst, wird also keine Regel durchgesetzt, und Flowlight sagt das, statt einen Schalter anzubieten, der nichts tut.</p>
+      <p>Eine Regel, die Verbindungen verweigert, wird normalerweise von der Netzwerkerweiterung ausgeführt, im Weg der Verbindung, bevor sie zustande kommt.
+        Bei Datenverkehr, der durch die HTTPS-Inspektion geleitet wird, wendet der lokale Proxy Zielregeln und aktivierte verwaltete Pakete auf den
+        ursprünglichen Client an, bevor er die Verbindung zum Ursprungsserver öffnet; eine Regel, die eine URL nennt, führt er nach der Entschlüsselung
+        ebenfalls dort aus und antwortet mit einem Status, den die App lesen kann. Das sind die einzigen zwei Teile von Flowlight, die handeln statt zu
+        berichten – der nettop-Sampler kann überhaupt nichts verweigern, auf einem Mac, der mit dem Sampler erfasst, wird also keine Regel durchgesetzt,
+        und Flowlight sagt das, statt einen Schalter anzubieten, der nichts tut.</p>
       <p>Verhindern ist es trotzdem nicht. Ein Agent, der eine Shell ausführen kann, kann von Hand tun, was ein verweigertes Tool getan hätte. Eine
         Verweigerung, die du mit einem Klick aufheben kannst, ist eine Verweigerung, durch die der nächste Versuch eines Agenten hindurchgehen kann.
         Lokaler Datenverkehr, DNS, Apples eigene Dienste und Flowlights eigene Verbindungen werden nie verweigert, denn ein blockierter Mac ist ein
         schlechteres Ergebnis als ein blockierter Agent. Und die Durchsetzung endet wenige Sekunden nachdem Flowlight nicht mehr läuft: Eine
         Verweigerung, die niemand sehen kann, ist schlimmer als keine.</p>
-      <p><strong>Inspektion und Verweigerung lassen sich nicht verbinden.</strong> Datenverkehr, der über Flowlights eigenen Proxy geleitet wird,
-        verlässt den Mac als Flowlights Datenverkehr, und Flowlight verweigert sich selbst nie – eine App, deren Anfragen du liest, ist also eine App,
-        deren Verbindungen Regeln nicht mehr stoppen. Die Inspektion einzuschalten, um mehr zu sehen, kostet dich die Durchsetzung, und auf dem
-        Bildschirm stand das vorher nirgends.</p>
+      <p><strong>Die Inspektion erhält die Verweigerung nach Hostnamen, mit einer Grenze.</strong> Datenverkehr, der durch Flowlights Proxy geleitet wird,
+        verlässt den Mac als ausgenommener Flowlight-Datenverkehr. Deshalb entscheidet der Proxy zuerst anhand der ursprünglichen App-Identität über
+        gewöhnliche Zielregeln und aktivierte verwaltete Pakete. Das funktioniert auch bei angepinnten oder nie entschlüsselten Tunneln, weil CONNECT den
+        Host nennt. Agenten-Erlaubnislisten bleiben eine Entscheidung der Netzwerkerweiterung und gelten nicht für diesen über den Proxy geleiteten Weg
+        zum Ursprungsserver; Datenverkehr ohne vertrauenswürdigen Eigentümer oder Hostnamen wird im Zweifel zugelassen, statt unsichtbar verweigert zu werden.</p>
 
       <h2 id="itself">Was Flowlight selbst aufbewahrt</h2>
       <p>Metadaten zum Datenverkehr in einer lokalen SQLite-Datenbank, mit veröffentlichten Aufbewahrungsfristen. Bei eingeschalteter

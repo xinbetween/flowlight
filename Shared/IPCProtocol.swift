@@ -20,6 +20,12 @@ import Foundation
     /// like it the extension keeps none of it across a launch: a rule nobody is left to record is not enforced.
     func setRules(payload: Data, withReply reply: @escaping (Int) -> Void)
 
+    /// Atomically spends one bounded flow rule on behalf of the inspection proxy. The extension is the single claim
+    /// authority while it is active, so a direct flow and a proxied flow cannot both consume "allow once". `payload`
+    /// is `BlockCoding.encode(RuleClaim)` and binds the claim to the exact app session and whole-list generation the
+    /// proxy previewed. The reply is 1 when claimed, 0 when already spent, and -1 when that publication no longer matches.
+    func claimRule(payload: Data, withReply reply: @escaping (Int) -> Void)
+
     /// Negotiates the independently-versioned pack protocol before any bytes move.
     func rulePackHello(appProtocol: Int, withReply reply: @escaping (Data) -> Void)
     /// Starts one generation. Chunks are accepted only for this header and never affect the active matcher yet.
@@ -46,5 +52,5 @@ import Foundation
     func ruleDecisions(payload: Data, reply: @escaping () -> Void)
 
     /// Bounded minute rollups from managed packs. True is returned only after the batch is durably committed.
-    func rulePackEvents(payload: Data, reply: @escaping (Bool) -> Void)
+    func rulePackEvents(payload: Data, reply: @escaping @Sendable (Bool) -> Void)
 }

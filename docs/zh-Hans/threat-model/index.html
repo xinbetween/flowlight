@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-10-21"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
@@ -147,16 +147,18 @@
       <p>所以，检查界面是空的，意思是“没有东西被转发到这里”，而不是“什么都没发生”。到底是哪一种，覆盖范围会按应用逐个说明。</p>
 
       <h2 id="blocking">阻止是什么，不是什么</h2>
-      <p>一条拒绝连接的规则由网络扩展执行，就在连接的路径上，在连接建立之前。一条指名 URL 的规则则由检查用的代理服务器执行，
-        它用应用能读到的状态来回答那个请求。这两处是 Flowlight 里唯一动手而不只是报告的部分——nettop 采样器什么都拒绝不了，
-        所以在用采样器的 Mac 上，没有任何规则会被强制执行，而 Flowlight 会把这一点说出来，而不是摆一个什么都不做的开关。</p>
+      <p>一条拒绝连接的规则通常由网络扩展执行，就在连接的路径上，在连接建立之前。对于经由 HTTPS 检查转发的流量，本地代理会在
+        打开源站连接之前，针对原客户端应用目标规则和已启用的托管包；一条指名 URL 的规则也会在解密后由它执行，并用应用能读到的
+        状态作出响应。这两处是 Flowlight 里唯一动手而不只是报告的部分——nettop 采样器什么都拒绝不了，所以在用采样器的 Mac 上，
+        没有任何规则会被强制执行，而 Flowlight 会把这一点说出来，而不是摆一个什么都不做的开关。</p>
       <p>它仍然不是防护。一个能运行 shell 的代理，可以手动做到那个被拒绝的工具本来要做的事。一次你能一键撤销的拒绝，
         也是代理下一次尝试就可能走过去的拒绝。本地流量、DNS、Apple 自家的服务以及 Flowlight 自己的连接永远不会被拒绝，
         因为一台被封住的 Mac 比一个被封住的代理更糟。而且 Flowlight 停止运行几秒之后，强制执行就会失效：
         没人能看见的拒绝比没有拒绝更糟。</p>
-      <p><strong>检查与拒绝无法并存。</strong>经由 Flowlight 自己的代理服务器转发的流量，是以 Flowlight 的流量的身份离开这台 Mac 的，
-        而 Flowlight 从不拒绝自己——所以一个你正在读它请求的应用，也就是一个规则不再拦得住它连接的应用。为了看得更多而打开检查，
-        代价就是强制执行，而画面上此前并没有说这一点。</p>
+      <p><strong>检查仍能按主机名拒绝连接，但有一条边界。</strong>经由 Flowlight 代理转发的流量，会作为豁免的 Flowlight 流量离开
+        Mac，因此代理会先使用原应用的身份，对普通目标规则和已启用的托管包作出判定。即使隧道固定了证书或始终不解密，也能这样判定，
+        因为 CONNECT 会指明主机。代理允许列表仍由网络扩展判定，不适用于从代理到源站的这一段路径；没有可信所有者或主机名的流量会
+        被允许，而不会在无人察觉的情况下遭到拒绝。</p>
 
       <h2 id="itself">Flowlight 自己保存了什么</h2>
       <p>流量元数据，存在本地的 SQLite 数据库里，保留期限是公布的。打开 HTTPS 检查后，它还会保存请求和响应的正文三天——

@@ -128,8 +128,9 @@ An allowlist warns by default. Turn on **Refuse connections outside the list** f
 connections as well, recording each one as an alert with **Allow … from Now On** to add it to the list in a click.
 
 It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
-traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, enforcement lapses a few seconds
-after the app stops running, and HTTPS inspection doesn't combine with it.
+traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, and enforcement lapses a few seconds
+after the app stops running. When HTTPS inspection proxies an app, destination rules and enabled managed packs are decided against the
+original app before Flowlight opens the origin connection; agent allowlists still apply only on the direct Network Extension path.
 
 ### Rules
 An allowlist is one agent's idea of where it may go. A **rule** is the general version: it names a subject — an app,

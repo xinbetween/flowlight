@@ -308,6 +308,9 @@ extension Rule {
 struct RuleEvent: Codable, Sendable, Equatable {
     var at: Int64
     var ruleID: UUID
+    /// Present for generation-bound flow decisions. Buffered older/request events remain decodable without it.
+    var ruleSession: String? = nil
+    var ruleGeneration: UInt64? = nil
     var action: Rule.Action
     var engine: Rule.Engine
     var agentKey: String
@@ -326,10 +329,31 @@ struct RuleEvent: Codable, Sendable, Equatable {
 
 /// The enforcing half of the rule list, as the extension is told it: the rules themselves plus the one global
 /// escape hatch. Sent whole on every change, like `AgentPolicy`, so the extension never has to reconcile a delta.
+struct RuleClaim: Codable, Sendable, Equatable {
+    var ruleID: UUID
+    /// Identifies the app process that published this generation; generations restart from zero on every launch.
+    var session: String
+    var generation: UInt64
+}
+
 struct RuleSet: Codable, Sendable, Equatable {
     var rules: [Rule] = []
+    /// Changes on every whole-list publication. Per-rule boundaries below distinguish relevant from unrelated changes.
+    var generation: UInt64 = 0
     /// Nothing is refused before this moment. The escape hatch is what makes strict rules usable.
     var pausedUntil: Date?
     /// The token `.session` schedules are measured against.
     var session = ""
+    /// The only hit counters allowed to move backwards in the extension. Ordinary event-driven publications can
+    /// arrive out of order with proxy claims and must preserve the newer runtime count.
+    var resetHitCounts: Set<UUID> = []
+    /// The first generation describing each rule's current definition. A claim from an older whole-list generation
+    /// remains valid across unrelated edits, but never across an edit, reset, or delete of the claimed rule itself.
+    var ruleInvalidatedAt: [UUID: UInt64] = [:]
+
+    func accepts(_ claim: RuleClaim) -> Bool {
+        session == claim.session &&
+            claim.generation <= generation &&
+            claim.generation >= (ruleInvalidatedAt[claim.ruleID] ?? 0)
+    }
 }

@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=807a8a77">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ja/threat-model/", "name": "Flowlight の脅威モデル", "description": "Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-10-20"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight の脅威モデル", "item": "https://flowlight.xinbetween.com/ja/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ja/threat-model/", "name": "Flowlight の脅威モデル", "description": "Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-10-21"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight の脅威モデル", "item": "https://flowlight.xinbetween.com/ja/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">本文へスキップ</a>
@@ -154,18 +154,20 @@
         ありません。どちらなのかは、カバー範囲がアプリごとに答えます。</p>
 
       <h2 id="blocking">ブロックとは何で、何でないか</h2>
-      <p>接続を拒否するルールを実行するのはネットワーク機能拡張で、その経路の中で、接続が行われる前に実行します。URL を指定する
-        ルールを実行するのはインスペクション用のプロキシで、アプリが読める状態コードでリクエストに応えます。報告するのではなく実際に
-        手を出す Flowlight の部分は、この 2 つだけです。nettop サンプラーは何ひとつ拒否できないので、サンプラーで動いている Mac では
-        どのルールも強制されません。Flowlight は何もしないスイッチを見せるのではなく、そのことをはっきり言います。</p>
+      <p>接続を拒否するルールは通常、ネットワーク機能拡張がその経路の中で、接続が行われる前に実行します。HTTPS インスペクションを
+        経由するトラフィックについては、ローカルプロキシが接続先の通常ルールと有効な管理対象パックを元のクライアントに対して適用してから、
+        接続先サーバへの接続を開きます。URL を指定するルールも復号後にそこで実行され、アプリが読める状態コードで応答します。報告する
+        のではなく実際に手を出す Flowlight の部分は、この 2 つだけです。nettop サンプラーは何ひとつ拒否できないので、サンプラーで
+        動いている Mac ではどのルールも強制されません。Flowlight は何もしないスイッチを見せるのではなく、そのことをはっきり言います。</p>
       <p>それでも防止ではありません。シェルを使えるエージェントは、拒否されたツールがしたはずのことを手作業で行えます。ワンクリックで
         取り消せる拒否は、エージェントの次の試みが通り抜けうる拒否でもあります。ローカルのトラフィック、DNS、Apple 純正のサービス、
         Flowlight 自身の接続は決して拒否されません。ブロックされたエージェントより、ブロックされた Mac のほうが悪い結果だからです。
         そして強制は、Flowlight が動作を止めた数秒後に失効します。誰にも見えない拒否は、拒否がないより悪いからです。</p>
-      <p><strong>インスペクションと拒否は両立しません。</strong>Flowlight 自身のプロキシを通ったトラフィックは、Flowlight の
-        トラフィックとして Mac を出ていき、Flowlight が自分自身を拒否することはありません。つまり、リクエストを読んでいるアプリは、
-        ルールではもう接続を止められないアプリです。もっと見るためにインスペクションをオンにすることは、強制を手放すことでもあり、
-        画面にはこれまでそう書かれていませんでした。</p>
+      <p><strong>インスペクションでもホスト名による拒否は保たれますが、境界があります。</strong>Flowlight のプロキシを通ったトラフィックは、
+        除外対象の Flowlight トラフィックとして Mac を出ていくため、プロキシがまず元のアプリの識別情報を使って、接続先の通常ルールと
+        有効な管理対象パックを判定します。CONNECT がホスト名を示すので、証明書がピン留めされている、または復号されないトンネルでも
+        判定できます。エージェントの許可リストはネットワーク機能拡張による判定のままで、プロキシから接続先サーバへ向かう区間には
+        適用されません。信頼できる所有者またはホスト名がないトラフィックは、見えないところで拒否せず、接続を許可します。</p>
 
       <h2 id="itself">Flowlight 自身が保持するもの</h2>
       <p>トラフィックのメタデータを、ローカルの SQLite データベースに、公開された保持期間のあいだ保持します。HTTPS インスペクションを

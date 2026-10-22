@@ -1733,3 +1733,4 @@
 "Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves." = "Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves.";
 "Suggests reviewed actions" = "Suggests reviewed actions";
 "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";
+"Couldn't delete the captured data: %@" = "Die erfassten Daten konnten nicht gelöscht werden: %@";

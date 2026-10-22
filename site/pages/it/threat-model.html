@@ -86,17 +86,21 @@ nav: threat-model
         cose valga, app per app.</p>
 
       <h2 id="blocking">Cosa è, e cosa non è, il blocco</h2>
-      <p>Una regola che rifiuta le connessioni viene eseguita dall'estensione di rete, sul percorso, prima che la connessione venga stabilita. Una
-        regola che nomina un URL viene eseguita invece dal proxy di ispezione, che risponde alla richiesta con uno stato che l'app può leggere. Sono le
-        sole due parti di Flowlight che agiscono invece di riferire — il campionatore nettop non può rifiutare proprio nulla, quindi su un Mac che
-        acquisisce con il campionatore nessuna regola viene applicata, e Flowlight lo dice invece di offrire un interruttore che non fa niente.</p>
+      <p>Una regola che rifiuta le connessioni viene normalmente eseguita dall'estensione di rete, sul percorso, prima che la connessione venga stabilita.
+        Per il traffico instradato attraverso l'ispezione HTTPS, il proxy locale applica le regole di destinazione e i pacchetti gestiti attivi al client
+        originale prima di aprire la connessione al server di origine; una regola che nomina un URL viene eseguita anche lì, dopo la decifratura, con uno
+        stato che l'app può leggere. Sono le sole due parti di Flowlight che agiscono invece di riferire — il campionatore nettop non può rifiutare
+        proprio nulla, quindi su un Mac che acquisisce con il campionatore nessuna regola viene applicata, e Flowlight lo dice invece di offrire un
+        interruttore che non fa niente.</p>
       <p>Non è comunque impedire. Un agente che può eseguire una shell può fare a mano ciò che avrebbe fatto lo strumento rifiutato. Un rifiuto che
         puoi annullare con un clic è un rifiuto attraverso cui il tentativo successivo di un agente può passare. Il traffico locale, il DNS, i servizi
         di Apple e le connessioni di Flowlight stesso non vengono mai rifiutati, perché un Mac bloccato è un esito peggiore di un agente bloccato. E
         l'applicazione decade pochi secondi dopo che Flowlight smette di funzionare: un rifiuto che nessuno può vedere è peggio di nessun rifiuto.</p>
-      <p><strong>Ispezione e rifiuto non si combinano.</strong> Il traffico instradato attraverso il proxy di Flowlight stesso lascia il Mac come
-        traffico di Flowlight, e Flowlight non rifiuta mai se stesso — quindi un'app di cui stai leggendo le richieste è un'app le cui connessioni le
-        regole non fermano più. Attivare l'ispezione per vedere di più ti costa l'applicazione delle regole, e finora nulla sullo schermo lo diceva.</p>
+      <p><strong>L'ispezione mantiene il rifiuto per nome host, con un limite.</strong> Il traffico instradato attraverso il proxy di Flowlight lascia il
+        Mac come traffico Flowlight esente, quindi il proxy decide prima le normali regole di destinazione e i pacchetti gestiti attivi usando l'identità
+        originale dell'app. Può farlo anche per tunnel con pinning o mai decifrati, perché CONNECT specifica l'host. Gli elenchi consentiti degli agenti
+        restano una decisione dell'Estensione di rete e non si applicano a quel tratto verso il server di origine attraverso il proxy; il traffico senza
+        un proprietario attendibile o senza nome host viene consentito invece di essere rifiutato senza che nessuno lo veda.</p>
 
       <h2 id="itself">Cosa conserva Flowlight stesso</h2>
       <p>Metadati del traffico in un database SQLite locale, con una conservazione pubblicata. Con l'ispezione HTTPS attiva conserva anche i corpi delle

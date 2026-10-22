@@ -234,6 +234,42 @@ final class LLMToolCallReaderTests: XCTestCase {
 }
 
 final class InspectionStorageTests: XCTestCase {
+    func testProxyOwnerLookupRetriesUntilIdentityAppears() {
+        let state = ProxyOwnerLookupTestState(ownerAppearsAt: 3)
+
+        ProxyOwnerLookup.resolve(
+            delays: ProxyOwnerLookup.retryDelays[...],
+            lookup: { state.lookup() },
+            schedule: { delay, work in
+                state.schedule(delay)
+                work()
+            },
+            completion: { state.resolve($0) }
+        )
+
+        XCTAssertEqual(state.lookupCount, 3)
+        XCTAssertEqual(state.scheduledDelays, [0.01, 0.025])
+        XCTAssertEqual(state.resolvedOwner.bundleID, "com.example.app")
+    }
+
+    func testProxyOwnerLookupFailsOpenAfterBoundedRetries() {
+        let state = ProxyOwnerLookupTestState(ownerAppearsAt: nil)
+
+        ProxyOwnerLookup.resolve(
+            delays: ProxyOwnerLookup.retryDelays[...],
+            lookup: { state.lookup() },
+            schedule: { delay, work in
+                state.schedule(delay)
+                work()
+            },
+            completion: { state.resolve($0) }
+        )
+
+        XCTAssertEqual(state.lookupCount, 4)
+        XCTAssertEqual(state.scheduledDelays, ProxyOwnerLookup.retryDelays)
+        XCTAssertTrue(state.resolvedOwner.bundleID.isEmpty)
+    }
+
     func testNeverInspectMatchingAndPAC() {
         XCTAssertTrue(InspectionController.matches(host: "gateway.icloud.com", patterns: ["icloud.com"]))
         XCTAssertTrue(InspectionController.matches(host: "apple.com", patterns: ["*.apple.com"]))
@@ -242,6 +278,34 @@ final class InspectionStorageTests: XCTestCase {
         XCTAssertTrue(pac.contains("\"apple.com\""))
         XCTAssertTrue(pac.contains("PROXY 127.0.0.1:8877; DIRECT"))
         XCTAssertFalse(pac.contains("alert(1)\""))
+    }
+
+    func testProxyFactsPutNumericDestinationsInTheAddressField() {
+        let owner = InspectionRecorder.Owner(bundleID: "com.example.app")
+        let v4 = InspectionController.proxyFlowFacts(host: "203.0.113.9", port: 443, owner: owner)
+        let v6 = InspectionController.proxyFlowFacts(host: "2001:0db8::1", port: 8443, owner: owner)
+
+        XCTAssertEqual(v4.host, "")
+        XCTAssertEqual(v4.ip, "203.0.113.9")
+        XCTAssertTrue(Rule(action: .block, destination: "203.0.113.9").matches(v4))
+        XCTAssertTrue(Rule(action: .block, destination: "203.0.113.0/24").matches(v4))
+        XCTAssertTrue(AgentPolicy.matches("203.0.113.0/24", host: v4.host, ip: v4.ip),
+                      "request-level proxy rules use the same destination split")
+        XCTAssertEqual(v6.host, "")
+        XCTAssertEqual(v6.ip, "2001:db8::1")
+        XCTAssertTrue(Rule(action: .block, destination: "2001:db8::/32").matches(v6))
+    }
+
+    func testProxyFactsKeepNamesAndExemptLocalAddresses() {
+        let owner = InspectionRecorder.Owner(bundleID: "com.example.app")
+        let named = InspectionController.proxyFlowFacts(host: "API.Example.com", port: 443, owner: owner)
+        let loopback = InspectionController.proxyFlowFacts(host: "127.0.0.1", port: 8080, owner: owner)
+        let privateAddress = InspectionController.proxyFlowFacts(host: "192.168.1.4", port: 8080, owner: owner)
+
+        XCTAssertEqual(named.host, "API.Example.com")
+        XCTAssertEqual(named.ip, "")
+        XCTAssertTrue(BlockRules.isExempt(loopback))
+        XCTAssertTrue(BlockRules.isExempt(privateAddress))
     }
 
     func testExchangeRoundTrip() throws {
@@ -267,6 +331,51 @@ final class InspectionStorageTests: XCTestCase {
         XCTAssertEqual(try db.exchanges(since: .distantPast, search: "nothing-matches").count, 0)
         try db.pruneExchanges(olderThan: Date().addingTimeInterval(60))
         XCTAssertTrue(try db.exchanges(since: .distantPast).isEmpty)
+    }
+}
+
+private final class ProxyOwnerLookupTestState: @unchecked Sendable {
+    private let lock = NSLock()
+    private let ownerAppearsAt: Int?
+    private var lookups = 0
+    private var delays: [TimeInterval] = []
+    private var owner = InspectionRecorder.Owner(bundleID: "sentinel")
+
+    init(ownerAppearsAt: Int?) {
+        self.ownerAppearsAt = ownerAppearsAt
+    }
+
+    func lookup() -> InspectionRecorder.Owner {
+        lock.lock(); defer { lock.unlock() }
+        lookups += 1
+        return lookups == ownerAppearsAt
+            ? InspectionRecorder.Owner(bundleID: "com.example.app")
+            : InspectionRecorder.Owner()
+    }
+
+    func schedule(_ delay: TimeInterval) {
+        lock.lock(); defer { lock.unlock() }
+        delays.append(delay)
+    }
+
+    func resolve(_ owner: InspectionRecorder.Owner) {
+        lock.lock(); defer { lock.unlock() }
+        self.owner = owner
+    }
+
+    var lookupCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return lookups
+    }
+
+    var scheduledDelays: [TimeInterval] {
+        lock.lock(); defer { lock.unlock() }
+        return delays
+    }
+
+    var resolvedOwner: InspectionRecorder.Owner {
+        lock.lock(); defer { lock.unlock() }
+        return owner
     }
 }
 

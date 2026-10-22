@@ -3,7 +3,39 @@ import SwiftUI
 /// Handles the one thing SwiftUI's scene lifecycle doesn't give cleanly: a hook that runs as the app quits, used to
 /// strip the proxy routing Flowlight persisted into agents' settings files so a clean quit never leaves one pointing
 /// at a proxy that is about to stop. A crash skips this; `ProxyJanitor` covers that.
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static var didFinishLaunching = false
+    private static var didStart = false
+    private static var startup: (() -> Void)?
+
+    static func installStartup(_ action: @escaping () -> Void) {
+        guard !didStart else { return }
+        startup = action
+        runStartupIfReady()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.didFinishLaunching = true
+        Self.runStartupIfReady()
+    }
+
+    private static func runStartupIfReady() {
+        guard didFinishLaunching, !didStart, let startup else { return }
+        didStart = true
+        self.startup = nil
+        startup()
+    }
+
+    #if DEBUG
+    static func resetStartupForTests(didFinishLaunching: Bool = false) {
+        guard FlowlightApp.runningTests else { return }
+        self.didFinishLaunching = didFinishLaunching
+        didStart = false
+        startup = nil
+    }
+    #endif
+
     func applicationWillTerminate(_ notification: Notification) {
         // Not in tests (they share this process), and not in a demo or screenshot run: that is a throwaway instance
         // with its own database, and it must never strip the enforcement the real running app owns.
@@ -41,11 +73,38 @@ struct FlowlightApp: App {
         }
     }
 
-    @StateObject private var monitor = TrafficMonitor()
-    @StateObject private var extensionManager = ExtensionManager()
-    @StateObject private var nav = AppNavigation()
-    @StateObject private var updater = UpdateChecker()
-    @StateObject private var focus = FocusStore()
+    @StateObject private var monitor: TrafficMonitor
+    @StateObject private var extensionManager: ExtensionManager
+    @StateObject private var nav: AppNavigation
+    @StateObject private var updater: UpdateChecker
+    @StateObject private var focus: FocusStore
+
+    init() {
+        let monitor = TrafficMonitor()
+        let extensionManager = ExtensionManager()
+        let nav = AppNavigation()
+        let updater = UpdateChecker()
+        let focus = FocusStore()
+        _monitor = StateObject(wrappedValue: monitor)
+        _extensionManager = StateObject(wrappedValue: extensionManager)
+        _nav = StateObject(wrappedValue: nav)
+        _updater = StateObject(wrappedValue: updater)
+        _focus = StateObject(wrappedValue: focus)
+
+        // SwiftUI may restore a background-only launch with no window and without rendering the menu-bar label yet.
+        // Core services belong to the application lifecycle, not to either presentation path.
+        guard !Self.runningTests else { return }
+        AppDelegate.installStartup {
+            monitor.start()
+            monitor.applyFocus(focus.scope)
+            extensionManager.refresh()
+            extensionManager.matchExtensionToApp { check in
+                guard check.repairing else { return }
+                Task { @MainActor in monitor.extensionVersionRepairing(check) }
+            }
+            updater.start()
+        }
+    }
 
     var body: some Scene {
         WindowGroup("Flowlight", id: "main") {
@@ -56,21 +115,6 @@ struct FlowlightApp: App {
                 .environmentObject(updater)
                 .environmentObject(focus)
                 .frame(minWidth: 1000, minHeight: 660)
-                .task {
-                    // The unit tests are hosted in this app, so every test run launches it for real: capture
-                    // starts, nettop is spawned every second, XPC connects, the update check fires. None of that
-                    // belongs in a test run, and it is where CI intermittently hangs.
-                    guard !FlowlightApp.runningTests else { return }
-                    monitor.start()
-                    monitor.applyFocus(focus.scope)
-                    extensionManager.refresh()
-                    extensionManager.matchExtensionToApp { check in
-                        guard check.repairing else { return }
-                        Task { @MainActor in monitor.extensionVersionRepairing(check) }
-                    }
-                    updater.start()
-                }
-                .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
                 .onChange(of: backgroundOnly, initial: true) { _, on in Self.applyActivationPolicy(backgroundOnly: on) }
                 .onAppear { Self.windowsChanged() }
                 .onDisappear { Self.windowsChanged() }
@@ -134,7 +178,11 @@ struct FlowlightApp: App {
                 .environmentObject(updater)
                 .environmentObject(focus)
         } label: {
-            MenuBarLabel().environmentObject(monitor).environmentObject(updater)
+            MenuBarLabel()
+                .environmentObject(monitor)
+                .environmentObject(extensionManager)
+                .environmentObject(updater)
+                .environmentObject(focus)
         }
 
         Settings {
@@ -146,11 +194,15 @@ struct FlowlightApp: App {
 struct MenuBarLabel: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var updater: UpdateChecker
+    @EnvironmentObject var focus: FocusStore
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @AppStorage(AnomalySettings.Keys.menuBarRates) private var showRates = true
 
     var body: some View {
         label
+            .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
+            .onChange(of: backgroundOnly, initial: true) { _, _ in FlowlightApp.windowsChanged() }
             // The menu bar item always exists, so a found update opens its window even with the main window closed.
             .onChange(of: updater.showWindow) { _, show in
                 if show { openWindow(id: "update"); updater.showWindow = false }

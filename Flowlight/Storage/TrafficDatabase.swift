@@ -1344,21 +1344,23 @@ final class TrafficDatabase: @unchecked Sendable {
     func recordRulePackEventBatch(_ batch: RulePackEventBatch) throws -> Bool {
         var inserted = false
         try conn.transaction {
-            let session = batch.deliverySession.uuidString
-            let watermark = try conn.query(
-                "SELECT sequence FROM rule_pack_event_watermarks WHERE delivery_session = ?",
-                [.text(session)], map: { $0.int(0) }
-            ).first ?? 0
-            guard batch.sequence > watermark else { return }
-            try conn.run("""
-                INSERT INTO rule_pack_event_watermarks
-                    (delivery_session, sequence, received, dropped_hits, dropped_keys) VALUES (?,?,?,?,?)
-                ON CONFLICT(delivery_session) DO UPDATE SET
-                    sequence = excluded.sequence, received = excluded.received,
-                    dropped_hits = dropped_hits + excluded.dropped_hits,
-                    dropped_keys = dropped_keys + excluded.dropped_keys
-                """, [.text(session), .int(batch.sequence), .int(Int64(Date().timeIntervalSince1970)),
-                      .int(batch.droppedHits), .int(batch.droppedKeys)])
+            if batch.requiresDurableWatermark {
+                let session = batch.deliverySession.uuidString
+                let watermark = try conn.query(
+                    "SELECT sequence FROM rule_pack_event_watermarks WHERE delivery_session = ?",
+                    [.text(session)], map: { $0.int(0) }
+                ).first ?? 0
+                guard batch.sequence > watermark else { return }
+                try conn.run("""
+                    INSERT INTO rule_pack_event_watermarks
+                        (delivery_session, sequence, received, dropped_hits, dropped_keys) VALUES (?,?,?,?,?)
+                    ON CONFLICT(delivery_session) DO UPDATE SET
+                        sequence = excluded.sequence, received = excluded.received,
+                        dropped_hits = dropped_hits + excluded.dropped_hits,
+                        dropped_keys = dropped_keys + excluded.dropped_keys
+                    """, [.text(session), .int(batch.sequence), .int(Int64(Date().timeIntervalSince1970)),
+                          .int(batch.droppedHits), .int(batch.droppedKeys)])
+            }
             try recordRulePackEvents(batch.events, inTransaction: true)
             inserted = true
         }
@@ -2040,7 +2042,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "rule_pack_event_rollups"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "rule_events", "rule_pack_event_rollups"] {
                 try conn.run("DELETE FROM \(t)")
             }
             // Keep event batch IDs so an acknowledgment lost before "Delete everything" cannot resurrect activity.

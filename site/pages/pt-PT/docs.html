@@ -386,6 +386,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h3 id="managed-packs">Pacotes geridos de publicidade e rastreadores</h3>
       <p><strong>Regras › Pacotes</strong> contém três listas oficiais de nomes de anfitrião: <strong>Publicidade</strong>, <strong>Rastreio entre sites</strong> e <strong>Privacidade e telemetria</strong>. Estão visíveis desde o início e todas desativadas por predefinição. O bloqueio requer a Extensão de rede; o amostrador nettop apenas pode observar.</p>
       <p><strong>Apenas atualizações oficiais e assinadas.</strong> O Flowlight consulta uma única fonte HTTPS fixa para procurar catálogos mais recentes assinados pelo editor. As verificações automáticas estão ativas por predefinição e podem ser desativadas aqui. Uma assinatura autentica o conteúdo, mas não o ativa: um novo pacote permanece desativado e, se os destinos forem alterados, um pacote ativo deixa de ser aplicado até que reveja a nova versão exata e prima Guardar. Durante uma interrupção, o conteúdo aceite pode permanecer disponível como a última versão válida conhecida, visivelmente assinalada como desatualizada. Estes são bloqueios de rede ao nível do nome de anfitrião: não podem remover espaços vazios no DOM ou no esquema, sobreposições do navegador, janelas pop-up geradas por scripts ou janelas de aplicações nativas.</p>
+      <p>Quando a inspeção HTTPS encaminha uma app pelo proxy do Flowlight, este decide as regras de destino comuns e os pacotes geridos ativos com base na identidade original da app antes de abrir qualquer ligação ao servidor de origem. Nos túneis CONNECT com certificado fixado ou que nunca são decifrados, isto funciona pelo nome de anfitrião; as listas de permissões dos agentes continuam limitadas ao caminho direto pela Extensão de rede. Se o proprietário ou o nome de anfitrião for desconhecido, a ligação é permitida.</p>
 
       <h2 id="allowlists">Listas de permissões</h2>
       <p>Selecione um agente em <strong>Agentes de IA</strong> e use a <strong>Lista de permissões</strong> no seu detalhe para dizer onde pode ligar-se. Introduza domínios
@@ -405,8 +406,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Flowlight. Um Mac bloqueado é um resultado pior do que um agente bloqueado, por isso, na dúvida, a ligação é permitida e registada.
         A aplicação efetiva também caduca uns segundos depois de o Flowlight deixar de correr — uma recusa que ninguém consegue ver é pior do que nenhuma, e a maneira
         de a desfazer está na app.</p>
-      <p>A inspeção HTTPS e o bloqueio não se combinam: o tráfego encaminhado pelo proxy do Flowlight sai como sendo do próprio Flowlight, que
-        nunca é recusado.</p>
+      <p>Para uma app encaminhada pela inspeção HTTPS, o proxy do Flowlight decide as regras de destino comuns e os pacotes geridos ativos com base na identidade original da app antes de abrir qualquer ligação ao servidor de origem. Nos túneis CONNECT com certificado fixado ou que nunca são decifrados, fá-lo pelo nome de anfitrião. As listas de permissões dos agentes continuam limitadas ao caminho direto pela Extensão de rede; se o proprietário ou o nome de anfitrião for desconhecido, a ligação é permitida.</p>
 
       <h2 id="guardrails">Proteções dos agentes: bloquear uma ferramenta, um servidor ou um recurso</h2>
       <p><em>Que ferramentas pode este agente usar</em> é uma pergunta diferente de <em>que anfitriões pode alcançar</em>, por isso tem a sua própria

@@ -86,17 +86,21 @@ nav: threat-model
         per app.</p>
 
       <h2 id="blocking">What blocking is, and isn't</h2>
-      <p>A rule that refuses a connection is carried out by the Network Extension, in the path, before the connection is made. A rule
-        that names a URL is carried out by the inspection proxy instead, which answers the request with a status the app can read.
-        Those are the only two parts of Flowlight that act rather than report — the nettop sampler can refuse nothing at all, so on a
-        Mac running the sampler no rule is enforced, and Flowlight says so rather than offering a switch that does nothing.</p>
+      <p>A rule that refuses a connection is normally carried out by the Network Extension, in the path, before the connection is made.
+        For traffic routed through HTTPS inspection, the local proxy applies destination rules and enabled managed packs against the
+        original client before it opens the upstream connection; a rule that names a URL is also carried out there, after decryption,
+        with a status the app can read. Those are the only two parts of Flowlight that act rather than report — the nettop sampler can
+        refuse nothing at all, so on a Mac running the sampler no rule is enforced, and Flowlight says so rather than offering a switch
+        that does nothing.</p>
       <p>It is still not prevention. An agent that can run a shell can do by hand what a refused tool would have done. A refusal you
         can undo in one click is a refusal an agent's next attempt may walk through. Local traffic, DNS, Apple's own services and
         Flowlight's own connections are never refused, because a blocked Mac is a worse outcome than a blocked agent. And enforcement
         lapses a few seconds after Flowlight stops running: a refusal nobody can see is worse than none.</p>
-      <p><strong>Inspection and refusal do not combine.</strong> Traffic routed through Flowlight's own proxy leaves the Mac as
-        Flowlight's traffic, and Flowlight never refuses itself — so an app whose requests you are reading is an app whose connections
-        rules no longer stop. Turning inspection on to see more costs you enforcement, and nothing on screen previously said so.</p>
+      <p><strong>Inspection preserves hostname refusal, with a boundary.</strong> Traffic routed through Flowlight's proxy leaves the
+        Mac as exempt Flowlight traffic, so the proxy decides ordinary destination rules and enabled managed packs first, using the
+        original app identity. It can do this even for pinned or never-decrypted tunnels because CONNECT names the host. Agent allowlists
+        remain a Network Extension decision and do not apply to that proxied upstream leg; traffic with no trustworthy owner or no
+        hostname fails open rather than being refused invisibly.</p>
 
       <h2 id="itself">What Flowlight itself holds</h2>
       <p>Traffic metadata in a local SQLite database, with published retention. With HTTPS inspection on it also holds request and

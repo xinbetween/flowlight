@@ -119,19 +119,25 @@ enum ExtensionVersion {
     }
 
     /// Dotted numeric comparison, so "0.5" and "0.5.0" are one version and "0.10.0" comes after "0.9.0" — which
-    /// plain string comparison gets backwards. A component that isn't a number counts as zero, and anything
-    /// trailing it is ignored, which is what makes the "0.5.0/8" form `systemextensionsctl` prints work here too.
+    /// plain string comparison gets backwards. `systemextensionsctl` appends the bundle build after `/`; compare it
+    /// when both sides provide one, while retaining compatibility with older callers that know only the short version.
     static func compare(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        let left = components(lhs), right = components(rhs)
-        for index in 0..<max(left.count, right.count) {
-            let a = index < left.count ? left[index] : 0
-            let b = index < right.count ? right[index] : 0
+        let left = identity(lhs), right = identity(rhs)
+        for index in 0..<max(left.version.count, right.version.count) {
+            let a = index < left.version.count ? left.version[index] : 0
+            let b = index < right.version.count ? right.version[index] : 0
             if a != b { return a < b ? .orderedAscending : .orderedDescending }
         }
-        return .orderedSame
+        guard let leftBuild = left.build, let rightBuild = right.build, leftBuild != rightBuild else {
+            return .orderedSame
+        }
+        return leftBuild < rightBuild ? .orderedAscending : .orderedDescending
     }
 
-    private static func components(_ version: String) -> [Int] {
-        version.split(separator: ".").map { Int($0.prefix(while: \.isNumber)) ?? 0 }
+    private static func identity(_ value: String) -> (version: [Int], build: Int?) {
+        let parts = value.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+        let version = parts[0].split(separator: ".").map { Int($0.prefix(while: \.isNumber)) ?? 0 }
+        let build = parts.count == 2 ? Int(parts[1].prefix(while: \.isNumber)) : nil
+        return (version, build)
     }
 }

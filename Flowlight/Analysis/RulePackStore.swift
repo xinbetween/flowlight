@@ -9,6 +9,36 @@ extension RulePackOverride {
     }
 }
 
+/// The immutable pack generation the inspection proxy may carry out. A committed extension acknowledgement swaps the
+/// whole matcher in; applying, fallback, and failure clear it so the UI cannot say Blocking while the proxy uses stale policy.
+final class LiveRulePacks: @unchecked Sendable {
+    private let lock = NSLock()
+    private var digest = ""
+    private var matcher: RulePackMatcher?
+
+    func replace(snapshot: RulePackSnapshot?) {
+        let next = snapshot.flatMap { try? RulePackMatcher(snapshot: $0) }
+        lock.lock(); defer { lock.unlock() }
+        digest = next == nil ? "" : (snapshot?.digest ?? "")
+        matcher = next
+    }
+
+    func commit(snapshot: RulePackSnapshot?, activeDigest: String) {
+        guard let snapshot, snapshot.digest == activeDigest else { replace(snapshot: nil); return }
+        replace(snapshot: snapshot)
+    }
+
+    func match(host: String, bundleID: String) -> RulePackMatch? {
+        lock.lock(); defer { lock.unlock() }
+        return matcher?.matches(host: host, bundleID: bundleID).first
+    }
+
+    var activeDigest: String {
+        lock.lock(); defer { lock.unlock() }
+        return digest
+    }
+}
+
 /// The app-owned half of managed rule packs: verified definitions, user activation/scope, exceptions, and the
 /// complete validated snapshot handed to the Network Extension.
 @MainActor
@@ -45,6 +75,8 @@ final class RulePackStore: ObservableObject {
     private var catalogReceipt: RulePackCatalogReceipt?
     private var committedSnapshot: RulePackSnapshot?
     private var revision = 0
+    private var activityRevision = 0
+    private var clearingActivity = false
     private let currentAppVersion: String
 
     init(definitions: [RulePackDefinition] = BuiltInRulePacks.all,
@@ -289,35 +321,63 @@ final class RulePackStore: ObservableObject {
         status = .applying
     }
 
-    func record(_ batch: RulePackEventBatch, completion: @escaping (Bool) -> Void) {
+    func record(_ batch: RulePackEventBatch,
+                claim: @escaping @Sendable () -> Bool = { true },
+                acknowledgeDuringClear: Bool = true,
+                completion: @escaping @Sendable (Bool) -> Void) {
+        guard !clearingActivity else { completion(acknowledgeDuringClear); return }
         guard let db else { completion(false); return }
+        let expectedActivityRevision = activityRevision
         db.queue.async { [weak self, weak db] in
             guard let db else { completion(false); return }
+            guard claim() else { completion(false); return }
             do {
                 _ = try db.recordRulePackEventBatch(batch)
+            } catch {
+                appLog.error("rule pack batch failed: \(String(describing: error), privacy: .public)")
+                completion(false)
+                return
+            }
+            // Authorization waits only for the durable transaction. Feed loading and MainActor publication are
+            // not part of the refusal critical path and cannot hold a connection after SQLite has committed it.
+            completion(true)
+            do {
                 let events = try db.rulePackEvents(limit: 300)
                 let deliveryStats = try db.rulePackDeliveryStats()
                 Task { @MainActor in
-                    self?.revision += 1
-                    self?.events = events
-                    self?.deliveryStats = deliveryStats
-                    self?.version += 1
-                    completion(true)
+                    guard let self,
+                          self.activityRevision == expectedActivityRevision else { return }
+                    self.revision += 1
+                    self.events = events
+                    self.deliveryStats = deliveryStats
+                    self.version += 1
                 }
             } catch {
-                appLog.error("rule pack batch failed: \(String(describing: error), privacy: .public)")
-                Task { @MainActor in completion(false) }
+                appLog.error("rule pack activity refresh failed: \(String(describing: error), privacy: .public)")
             }
         }
     }
 
     func events(for packID: String) -> [RulePackEventRecord] { events.filter { $0.packID == packID } }
 
-    func clearActivity() {
+    func beginActivityClear() {
+        clearingActivity = true
         revision += 1
+        activityRevision += 1
         events = []
         deliveryStats = RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0)
         version += 1
+    }
+
+    func finishActivityClear(succeeded: Bool) {
+        clearingActivity = false
+        if !succeeded { reload() }
+    }
+
+    /// Clears only the published model after the database rows have already been deleted by the caller.
+    func clearPublishedActivityAfterDurableDeletion() {
+        beginActivityClear()
+        finishActivityClear(succeeded: true)
     }
 
     private func applyLoaded(configurations saved: [RulePackConfiguration],

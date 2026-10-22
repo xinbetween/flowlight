@@ -57,6 +57,12 @@ final class InspectionProxy: @unchecked Sendable {
     private var pinned: [String: Date] = [:]
 
     weak var observer: ProxyObserver?
+    /// Decides whether a client connection may reach its origin. The answer can wait for a durable refusal record;
+    /// routing resumes on the proxy queue and no upstream socket exists before an allow answer.
+    var authorizeConnection: @Sendable (_ host: String, _ port: Int, _ clientPort: UInt16,
+                                        _ answer: @escaping @Sendable (Bool) -> Void) -> Void = {
+        _, _, _, answer in answer(true)
+    }
     /// Decides whether to decrypt a CONNECT to `host` from the client at `clientPort`. May answer asynchronously
     /// (it can look up the owning process); the proxy continues on its own queue.
     var shouldInspect: (_ host: String, _ clientPort: UInt16, _ answer: @escaping (Bool) -> Void) -> Void = { _, _, answer in answer(true) }
@@ -150,20 +156,26 @@ final class InspectionProxy: @unchecked Sendable {
         }
         if head.method == "CONNECT" {
             guard let (host, port) = head.authority else { respond(client, status: "400 Bad Request"); return }
-            let notPinned = pinned[host].map { $0 < Date() } ?? true
-            let proceed: (Bool) -> Void = { [weak self] inspect in
+            authorizeConnection(host, port, clientPort) { [weak self] allowed in
                 self?.queue.async {
-                    client.send(content: Data("HTTP/1.1 200 Connection Established\r\n\r\n".utf8), completion: .contentProcessed { error in
-                        guard let self, error == nil else { client.cancel(); return }
-                        if inspect && notPinned {
-                            self.bridge(client, host: host, port: port, clientPort: clientPort, early: rest)
-                        } else {
-                            self.tunnel(client, host: host, port: port, clientPort: clientPort, early: rest)
+                    guard let self else { client.cancel(); return }
+                    guard allowed else { self.respond(client, status: "403 Forbidden"); return }
+                    let notPinned = self.pinned[host].map { $0 < Date() } ?? true
+                    let proceed: (Bool) -> Void = { [weak self] inspect in
+                        self?.queue.async {
+                            client.send(content: Data("HTTP/1.1 200 Connection Established\r\n\r\n".utf8), completion: .contentProcessed { error in
+                                guard let self, error == nil else { client.cancel(); return }
+                                if inspect && notPinned {
+                                    self.bridge(client, host: host, port: port, clientPort: clientPort, early: rest)
+                                } else {
+                                    self.tunnel(client, host: host, port: port, clientPort: clientPort, early: rest)
+                                }
+                            })
                         }
-                    })
+                    }
+                    if notPinned { self.shouldInspect(host, clientPort, proceed) } else { proceed(false) }
                 }
             }
-            if notPinned { shouldInspect(host, clientPort, proceed) } else { proceed(false) }
         } else if head.target.hasPrefix("/") {
             if head.target.hasPrefix("/proxy.pac") {
                 let body = Data(pacScript().utf8)
@@ -172,13 +184,20 @@ final class InspectionProxy: @unchecked Sendable {
                 respond(client, status: "404 Not Found")
             }
         } else if let url = URL(string: head.target), url.scheme == "http", let host = url.host {
-            // Plain HTTP through the proxy: forward it and watch it like an inspected flow.
+            // Plain HTTP through the proxy: decide before an origin socket exists, then forward and observe it.
             let port = url.port ?? 80
-            let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "http")
-            var request = head.originForm()
-            request.append(rest)
-            let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: Self.direct(.tcp))
-            relay(client: client, upstream: upstream, flow: flow, firstClientBytes: request)
+            authorizeConnection(host, port, clientPort) { [weak self] allowed in
+                self?.queue.async {
+                    guard let self else { client.cancel(); return }
+                    guard allowed else { self.respond(client, status: "403 Forbidden"); return }
+                    let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "http")
+                    var request = head.originForm()
+                    request.append(rest)
+                    let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)),
+                                                using: Self.direct(.tcp))
+                    self.relay(client: client, upstream: upstream, flow: flow, firstClientBytes: request)
+                }
+            }
         } else {
             respond(client, status: "400 Bad Request")
         }

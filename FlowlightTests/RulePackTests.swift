@@ -63,6 +63,27 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(matches.map(\.packID), [second.id])
     }
 
+    func testProxyMatcherOnlyPublishesTheExtensionCommittedDigest() {
+        let definition = pack(entries: [
+            RulePackEntry(id: 1, host: "ads.example", category: .advertising),
+        ])
+        let value = snapshot(definition)
+        let live = LiveRulePacks()
+
+        XCTAssertNil(live.match(host: "ads.example", bundleID: "com.example.app"))
+        live.commit(snapshot: value, activeDigest: "different")
+        XCTAssertNil(live.match(host: "ads.example", bundleID: "com.example.app"))
+        XCTAssertEqual(live.activeDigest, "")
+
+        live.commit(snapshot: value, activeDigest: value.digest)
+        XCTAssertEqual(live.match(host: "cdn.ads.example", bundleID: "com.example.app")?.packID, definition.id)
+        XCTAssertEqual(live.activeDigest, value.digest)
+
+        live.replace(snapshot: nil)
+        XCTAssertNil(live.match(host: "ads.example", bundleID: "com.example.app"))
+        XCTAssertEqual(live.activeDigest, "")
+    }
+
     func testValidatorRejectsTamperDuplicateAndProtocolMismatch() throws {
         let valid = pack(entries: [RulePackEntry(id: 1, host: "ads.example", category: .advertising)])
         XCTAssertNoThrow(try RulePackValidator.validate([valid]))
@@ -209,6 +230,18 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(events.first { $0.entryID == 8 }?.count, 4)
         try reopened.deleteRulePackOverride(override)
         XCTAssertTrue(try reopened.loadRulePackOverrides().isEmpty)
+    }
+
+    func testAppLocalPackBatchesDoNotCreatePermanentWatermarks() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-local-watermark-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        var batch = activityBatch()
+        batch.requiresDurableWatermark = false
+
+        XCTAssertTrue(try db.recordRulePackEventBatch(batch))
+        XCTAssertTrue(try db.raw("SELECT delivery_session FROM rule_pack_event_watermarks") { $0.text(0) }.isEmpty)
+        XCTAssertEqual(try db.rulePackEvents(limit: 10).first?.count, 1)
     }
 
     func testStalePackEventMarkerRepairsThePhysicalUniqueKey() throws {
@@ -534,12 +567,131 @@ final class RulePackTests: XCTestCase {
 
         try await waitUntil { store.configuration(for: configuration.packID).enabled }
         configuration = store.configuration(for: configuration.packID)
-        store.clearActivity()
+        store.clearPublishedActivityAfterDurableDeletion()
 
         XCTAssertTrue(store.events.isEmpty)
         XCTAssertEqual(store.deliveryStats, RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0))
         XCTAssertEqual(store.configuration(for: configuration.packID), configuration)
         XCTAssertEqual(store.overrides, [exception])
+    }
+
+    @MainActor
+    func testDurableAcknowledgementDoesNotWaitForMainActorPublication() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-durable-ack-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = try await attachedStore(db: db)
+        let completed = DispatchSemaphore(value: 0)
+        let result = LockedBool()
+
+        store.record(activityBatch()) { committed in
+            result.set(committed)
+            completed.signal()
+        }
+
+        // This blocks MainActor publication. The durable acknowledgement must still come from the database queue.
+        XCTAssertEqual(completed.wait(timeout: .now() + 1), .success)
+        XCTAssertTrue(result.value)
+        XCTAssertEqual(try db.sync { try $0.rulePackEvents(limit: 10).count }, 1)
+    }
+
+    @MainActor
+    func testActivityClearRemovesAPreClearBatchQueuedAheadOfDeletion() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-clear-inflight-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = try await attachedStore(db: db)
+        let blockerStarted = expectation(description: "database queue blocked")
+        let batchRetired = expectation(description: "pre-clear batch retired")
+        let release = DispatchSemaphore(value: 0)
+        db.queue.async {
+            blockerStarted.fulfill()
+            release.wait()
+        }
+        await fulfillment(of: [blockerStarted], timeout: 1)
+
+        store.record(activityBatch()) { accepted in
+            XCTAssertTrue(accepted)
+            batchRetired.fulfill()
+        }
+        store.beginActivityClear()
+        let clear = Task {
+            try await db.asyncResult { try $0.clearAll() }
+            store.finishActivityClear(succeeded: true)
+        }
+        release.signal()
+
+        await fulfillment(of: [batchRetired], timeout: 2)
+        try await clear.value
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertTrue(try db.rulePackEvents(limit: 10).isEmpty)
+    }
+
+    func testDeleteEverythingRemovesOrdinaryRuleEvents() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-events-clear-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let rule = Rule(action: .block, destination: "example.com")
+        try db.recordRuleEvents([
+            RuleEvent(
+                at: 1_700_000_000,
+                ruleID: rule.id,
+                action: .block,
+                engine: .flow,
+                agentKey: "com.example.app",
+                agentName: "Example",
+                appName: "Example",
+                bundleID: "com.example.app",
+                host: "example.com",
+                ip: "",
+                port: 443
+            ),
+        ])
+        XCTAssertEqual(try db.ruleEvents(limit: 10).count, 1)
+
+        try db.clearAll()
+
+        XCTAssertTrue(try db.ruleEvents(limit: 10).isEmpty)
+    }
+
+    @MainActor
+    func testActivityArrivingDuringClearIsAcknowledgedWithoutWriting() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-clear-drop-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = try await attachedStore(db: db)
+        let dropped = expectation(description: "batch acknowledged during clear")
+
+        store.beginActivityClear()
+        store.record(activityBatch()) { accepted in
+            XCTAssertTrue(accepted)
+            dropped.fulfill()
+        }
+        await fulfillment(of: [dropped], timeout: 1)
+        store.finishActivityClear(succeeded: true)
+
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertTrue(try db.rulePackEvents(limit: 10).isEmpty)
+    }
+
+    @MainActor
+    func testProxyActivityDuringClearFailsOpenWithoutWriting() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-clear-proxy-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = try await attachedStore(db: db)
+        let allowed = expectation(description: "proxy refusal failed open during clear")
+
+        store.beginActivityClear()
+        store.record(activityBatch(), acknowledgeDuringClear: false) { committed in
+            XCTAssertFalse(committed)
+            allowed.fulfill()
+        }
+        await fulfillment(of: [allowed], timeout: 1)
+        store.finishActivityClear(succeeded: true)
+
+        XCTAssertTrue(store.events.isEmpty)
+        XCTAssertTrue(try db.rulePackEvents(limit: 10).isEmpty)
     }
 
     @MainActor
@@ -585,7 +737,7 @@ final class RulePackTests: XCTestCase {
         )
 
         try db.clearAll()
-        store.clearActivity()
+        store.clearPublishedActivityAfterDurableDeletion()
 
         XCTAssertEqual(
             store.installCommittedCatalog(
@@ -1062,6 +1214,29 @@ final class RulePackTests: XCTestCase {
         }
     }
 
+    private func activityBatch() -> RulePackEventBatch {
+        RulePackEventBatch(events: [
+            RulePackEvent(
+                bucket: 1_700_000_000,
+                packID: "official.advertising",
+                packVersion: "1",
+                entryID: 1,
+                category: .advertising,
+                action: .block,
+                count: 1,
+                firstAt: 1_700_000_001,
+                lastAt: 1_700_000_001,
+                bundleID: "com.google.Chrome",
+                appName: "Google Chrome",
+                agentKey: "com.google.Chrome",
+                agentName: "Google Chrome",
+                host: "ads.example",
+                matchedHost: "ads.example",
+                port: 443
+            ),
+        ])
+    }
+
     private func event(version: String, category: RulePackEntry.Category, matchedHost: String,
                        agentKey: String) -> RulePackEvent {
         RulePackEvent(bucket: 1_700_000_000, packID: "official.ads", packVersion: version, entryID: 1,
@@ -1115,5 +1290,22 @@ final class RulePackTests: XCTestCase {
         RulePackSnapshot.make(definitions: definitions,
                               configurations: definitions.map { RulePackConfiguration(packID: $0.id, enabled: true) },
                               overrides: [])
+    }
+}
+
+private final class LockedBool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = false
+
+    var value: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func set(_ value: Bool) {
+        lock.lock()
+        stored = value
+        lock.unlock()
     }
 }

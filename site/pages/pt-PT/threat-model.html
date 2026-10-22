@@ -86,17 +86,20 @@ nav: threat-model
         coisas se aplica, app por app.</p>
 
       <h2 id="blocking">O que o bloqueio é, e não é</h2>
-      <p>Uma regra que recusa ligações é levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Uma regra que nomeia um URL é
-        levada a cabo pelo proxy de inspeção, que responde ao pedido com um estado que a app consegue ler. São as duas únicas partes do Flowlight que
-        agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com o amostrador nenhuma regra é aplicada, e
-        o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
+      <p>Uma regra que recusa ligações é normalmente levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Para o tráfego
+        encaminhado pela inspeção HTTPS, o proxy local aplica as regras de destino e os pacotes geridos ativos ao cliente original antes de abrir a
+        ligação ao servidor de origem; uma regra que nomeia um URL também é aplicada ali, depois da desencriptação, com um estado que a app consegue ler.
+        São as duas únicas partes do Flowlight que agem em vez de relatar — o amostrador nettop não consegue recusar nada, por isso num Mac que capta com
+        o amostrador nenhuma regra é aplicada, e o Flowlight di-lo em vez de oferecer um interruptor que não faz nada.</p>
       <p>Continua a não ser impedir. Um agente que consiga executar uma shell pode fazer à mão o que a ferramenta recusada teria feito. Uma recusa
         que pode desfazer num clique é uma recusa por onde a tentativa seguinte de um agente pode passar. O tráfego local, o DNS, os serviços da
         Apple e as ligações do próprio Flowlight nunca são recusados, porque um Mac bloqueado é um resultado pior do que um agente bloqueado. E a
         aplicação efetiva caduca uns segundos depois de o Flowlight deixar de correr: uma recusa que ninguém consegue ver é pior do que nenhuma.</p>
-      <p><strong>A inspeção e a recusa não se combinam.</strong> O tráfego encaminhado pelo próprio proxy do Flowlight sai do Mac como tráfego do
-        Flowlight, e o Flowlight nunca se recusa a si mesmo — por isso uma app cujos pedidos está a ler é uma app cujas ligações as regras já não
-        travam. Ligar a inspeção para ver mais custa-lhe a aplicação das regras, e até agora nada no ecrã o dizia.</p>
+      <p><strong>A inspeção preserva a recusa por nome de anfitrião, com um limite.</strong> O tráfego encaminhado pelo proxy do Flowlight sai do Mac como
+        tráfego isento do Flowlight, por isso o proxy decide primeiro as regras de destino comuns e os pacotes geridos ativos com base na identidade
+        original da app. Consegue fazê-lo mesmo em túneis com certificado fixado ou nunca decifrados, porque CONNECT indica o anfitrião. As listas de
+        permissões dos agentes continuam a ser uma decisão da Extensão de rede e não se aplicam a esse trajeto pelo proxy até ao servidor de origem; o
+        tráfego sem um proprietário fiável ou sem nome de anfitrião é permitido em vez de ser recusado sem que ninguém o veja.</p>
 
       <h2 id="itself">O que o próprio Flowlight guarda</h2>
       <p>Metadados de tráfego numa base de dados SQLite local, com uma retenção publicada. Com a inspeção HTTPS ligada, guarda também os corpos dos
