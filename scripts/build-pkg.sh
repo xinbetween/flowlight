@@ -23,8 +23,21 @@ cp -R "$APP" "$WORK/root/"
 pkgbuild --analyze --root "$WORK/root" "$WORK/components.plist" >/dev/null
 plutil -replace 0.BundleIsRelocatable -bool NO "$WORK/components.plist"
 
+# pkgbuild serializes every extended attribute as a ._ AppleDouble payload
+# record. Newer macOS releases pin com.apple.provenance on signed files, so the
+# attribute survives COPYFILE_DISABLE and even xattr -d. Let pkgbuild create the
+# component metadata, then replace only its payload archive and BOM. cpio keeps
+# the signed bundle bytes and POSIX modes while COPYFILE_DISABLE omits xattrs.
 pkgbuild --root "$WORK/root" --component-plist "$WORK/components.plist" --install-location /Applications \
-  --identifier com.flowlight.app.pkg --version "$VERSION" "$WORK/Flowlight-component.pkg"
+  --identifier com.flowlight.app.pkg --version "$VERSION" "$WORK/Flowlight-component-with-metadata.pkg"
+pkgutil --expand "$WORK/Flowlight-component-with-metadata.pkg" "$WORK/component-expanded"
+WORK_ABS="$PWD/$WORK"
+(
+  cd "$WORK/root"
+  find . -print | cpio -o --format odc 2> "$WORK_ABS/cpio.log" | gzip -9 > "$WORK_ABS/component-expanded/Payload"
+)
+mkbom "$WORK/root" "$WORK/component-expanded/Bom"
+pkgutil --flatten "$WORK/component-expanded" "$WORK/Flowlight-component.pkg"
 
 SIGN=()
 [[ -n "${INSTALLER_IDENTITY:-}" ]] && SIGN=(--sign "$INSTALLER_IDENTITY")
