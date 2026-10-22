@@ -50,7 +50,7 @@ PAYLOAD_COUNT=$(lsbom -s "$WORK/component-expanded/Bom" | wc -l | tr -d ' ')
 PAYLOAD_COUNT="$PAYLOAD_COUNT" perl -0pi -e \
   's{(<payload numberOfFiles=")\d+}{$1 . $ENV{PAYLOAD_COUNT}}e' "$WORK/component-expanded/PackageInfo"
 [[ $(xmllint --xpath 'string(/pkg-info/payload/@numberOfFiles)' "$WORK/component-expanded/PackageInfo") == "$PAYLOAD_COUNT" ]]
-! lsbom -pfMUG "$WORK/component-expanded/Bom" | grep -Ev $'\\troot\\twheel$'
+! lsbom -pfMUG "$WORK/component-expanded/Bom" | grep -Ev $'\troot\twheel$'
 pkgutil --flatten "$WORK/component-expanded" "$WORK/Flowlight-component.pkg"
 
 SIGN=()
