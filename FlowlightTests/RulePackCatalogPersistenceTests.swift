@@ -103,6 +103,8 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
 
         let state = try db.loadRulePackCatalogState(catalogID: catalogID)
         XCTAssertEqual(state.receipt?.sequence, 2)
+        XCTAssertEqual(state.receipt?.acceptedAt, acceptedAt,
+                       "reaccepting identical content must preserve migration evidence")
         XCTAssertEqual(state.cache?.rawEnvelope, recovered.rawEnvelope)
         XCTAssertEqual(state.cache?.etag, "new")
     }
@@ -171,6 +173,11 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
             "UPDATE rule_packs SET updated = ? WHERE pack_id = ?",
             [.int(Int64(acceptedAt.timeIntervalSince1970)), .text(original.id)]
         ) { _ in 0 }
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: acceptedAt.addingTimeInterval(10),
+            nextEligibleAt: nextCheck.addingTimeInterval(10)
+        )
 
         let bootstrap = try db.loadRulePackCatalogBootstrap(catalogID: catalogID)
         let repaired = try db.reconcileRulePackCatalogBootstrap(

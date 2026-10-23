@@ -1290,7 +1290,12 @@ final class TrafficDatabase: @unchecked Sendable {
                     highest_sequence = excluded.highest_sequence,
                     canonical_digest = excluded.canonical_digest,
                     signer_key_id = excluded.signer_key_id,
-                    accepted_at = excluded.accepted_at
+                    accepted_at = CASE
+                        WHEN rule_pack_catalog_receipts.highest_sequence = excluded.highest_sequence
+                         AND rule_pack_catalog_receipts.canonical_digest = excluded.canonical_digest
+                        THEN rule_pack_catalog_receipts.accepted_at
+                        ELSE excluded.accepted_at
+                    END
                 """, [.text(catalogID), .int(catalog.sequence), .text(catalog.digest),
                       .text(catalog.signerKeyID), .int(acceptedAt)])
             try conn.run("""
