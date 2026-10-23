@@ -35,6 +35,42 @@ final class TrafficMonitorRulePackStartupTests: XCTestCase {
     }
 
     @MainActor
+    func testAllEnabledPacksSurviveFreshMonitorStartup() async throws {
+        let url = temporaryDatabaseURL("enabled-restart")
+        let firstSource = RecordingTrafficSource()
+        let first = TrafficMonitor(databaseURL: url, trafficSourceFactory: { firstSource })
+        first.start()
+        try await waitUntil { firstSource.started && first.rulePacks.definitions.count == 3 }
+
+        for definition in first.rulePacks.definitions {
+            var configuration = first.rulePacks.configuration(for: definition.id)
+            configuration.enabled = true
+            var saveResult: RulePackStore.SaveResult?
+            first.rulePacks.save(
+                configuration,
+                reviewedDefinition: definition,
+                receipt: try XCTUnwrap(first.rulePacks.reviewReceipt(for: definition))
+            ) { saveResult = $0 }
+            try await waitUntil { saveResult != nil }
+            XCTAssertEqual(saveResult, .saved)
+        }
+
+        let saved = try TrafficDatabase(url: url).loadRulePackConfigurations()
+        XCTAssertEqual(saved.count, 3)
+        XCTAssertTrue(saved.allSatisfy(\.enabled))
+
+        let restartedSource = RecordingTrafficSource()
+        let restarted = TrafficMonitor(databaseURL: url, trafficSourceFactory: { restartedSource })
+        restarted.start()
+        try await waitUntil { restartedSource.started }
+
+        let expectedIDs = first.rulePacks.definitions.map(\.id)
+        XCTAssertEqual(restarted.rulePacks.configurations.filter(\.enabled).map(\.packID), expectedIDs)
+        XCTAssertEqual(restarted.rulePacks.snapshot?.configurations.map(\.packID), expectedIDs)
+        XCTAssertEqual(restartedSource.rulePackSnapshots.last??.configurations.map(\.packID), expectedIDs)
+    }
+
+    @MainActor
     func testTestModeBootstrapDoesNotInvokeCatalogTransport() async throws {
         let source = RecordingTrafficSource()
         let monitor = TrafficMonitor(

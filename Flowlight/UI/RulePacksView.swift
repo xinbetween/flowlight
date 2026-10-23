@@ -47,8 +47,17 @@ private struct RulePacksContent: View {
                         .font(.caption).foregroundStyle(FL.warning)
                         .padding(10).background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
-                ForEach(packs.definitions) { pack in
-                    card(pack)
+                if catalog.status == .idle {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(L("Loading…")).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                } else {
+                    ForEach(packs.definitions) { pack in
+                        card(pack)
+                    }
                 }
             }
             .padding(Measure.gutter)

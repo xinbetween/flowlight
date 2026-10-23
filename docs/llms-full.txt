@@ -1636,6 +1636,10 @@ October 22, 2026Latest
  raises a persistent app-wide notice and Rules badge. Review opens Rules › Packs directly, while ordinary Rules navigation still
  returns to the rule list; a fresh receipt-bound activation clears the notice.
 
+ Show restored pack state truthfully after reopening. Rules › Packs now waits for the signed catalog and saved
+ consent to finish loading instead of briefly drawing every switch as off. Enabled packs, scope and enforcement remain intact
+ across a normal quit and relaunch.
+
  Recover the public site without weakening catalog history. Manual Pages redeployment is restored only for
  main, authenticates the signed catalog already being served, and rejects rollback or same-sequence equivocation
  before replacing it. Push deployments retain their exact pre-push Git baseline.
