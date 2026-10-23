@@ -194,11 +194,14 @@
 "Not installed" = "Not installed";
 "Waiting for approval in System Settings › General › Login Items & Extensions" = "Waiting for approval in System Settings › General › Login Items & Extensions";
 "Installing…" = "Installing…";
+"Enabling…" = "Enabling…";
 "Filter enabled" = "Filter enabled";
+"Filter disabled" = "Filter disabled";
 "Installed, filter disabled" = "Installed, filter disabled";
 "Restart this Mac to finish replacing the filter" = "Restart this Mac to finish replacing the filter";
 "Failed: %@" = "Failed: %@";
 "unknown" = "unknown";
+"This build isn't signed with the Network Extension entitlement." = "This build isn't signed with the Network Extension entitlement.";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension.";
 "Move Flowlight to /Applications. macOS only activates system extensions from there." = "Move Flowlight to /Applications. macOS only activates system extensions from there.";
 
@@ -595,6 +598,15 @@
 "Delete all recorded traffic, baselines and alerts?" = "Delete all recorded traffic, baselines and alerts?";
 "Delete everything" = "Delete everything";
 "nettop sampler · the extension didn't answer" = "nettop sampler · the extension didn't answer";
+"Network Extension · unavailable" = "Network Extension · unavailable";
+"Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh.";
+"%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — enable Flowlight under Content filter, then press Refresh.";
+"%@ — the content filter is unavailable" = "%@ — the content filter is unavailable";
+"The content filter is unavailable" = "The content filter is unavailable";
+"Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh." = "Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh.";
+"Reconnect to the content filter" = "Reconnect to the content filter";
+"If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled.";
+"The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh.";
 "%@ · receiving" = "%@ · receiving";
 "%@ · nothing arriving yet" = "%@ · nothing arriving yet";
 "Source" = "Source";
@@ -606,6 +618,7 @@
 "Nothing is arriving" = "Nothing is arriving";
 "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension." = "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension.";
 "Install & Enable Filter" = "Install & Enable Filter";
+"Enable Filter" = "Enable Filter";
 "Disable Filter" = "Disable Filter";
 "Uninstall" = "Uninstall";
 "Refresh" = "Refresh";
@@ -621,6 +634,8 @@
 "macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports." = "macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports.";
 "It keeps filtering after you quit Flowlight" = "It keeps filtering after you quit Flowlight";
 "The system extension runs independently and remains active until you select Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "The system extension runs independently and remains active until you select Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit.";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else.";
+"The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit.";
 "macOS runs one content filter at a time" = "macOS runs one content filter at a time";
 "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs." = "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs.";
 "Flowlight reads /usr/bin/nettop once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics." = "Flowlight reads /usr/bin/nettop once per second. You get per-process, per-connection byte counts with no entitlements, and protocols from port heuristics.";

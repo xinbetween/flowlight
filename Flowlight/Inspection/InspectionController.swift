@@ -151,6 +151,13 @@ final class InspectionController: ObservableObject {
             Keys.enabled: false, Keys.port: 8877, Keys.scope: Scope.all.rawValue,
             Keys.neverInspect: Self.defaultNeverInspect, Keys.systemProxy: false,
         ])
+        #if APP_STORE
+        // The Store sandbox cannot install a root certificate, mutate system proxy settings, or rewrite agent
+        // configuration. Clear any preference copied from a direct build before lifecycle setup can act on it.
+        UserDefaults.standard.set(false, forKey: Keys.enabled)
+        UserDefaults.standard.set(false, forKey: Keys.systemProxy)
+        UserDefaults.standard.removeObject(forKey: Keys.monitoredAgents)
+        #endif
         proxy.observer = recorder
         recorder.proxyPort = { [proxy] in proxy.port }
         recorder.budget = { InspectionBudget.load() }
@@ -350,10 +357,17 @@ final class InspectionController: ObservableObject {
         return out
     }
 
+    #if APP_STORE
+    var enabled: Bool {
+        get { false }
+        set { }
+    }
+    #else
     var enabled: Bool {
         get { UserDefaults.standard.bool(forKey: Keys.enabled) }
         set { UserDefaults.standard.set(newValue, forKey: Keys.enabled); objectWillChange.send(); apply() }
     }
+    #endif
 
     var scope: Scope {
         get { Scope(rawValue: UserDefaults.standard.string(forKey: Keys.scope) ?? "") ?? .agents }
@@ -511,6 +525,9 @@ final class InspectionController: ObservableObject {
     /// Everything the simple switch does: create the certificate, trust it, start the proxy and route apps through it.
     /// Trusting and changing the proxy both need an administrator, so they go in one prompt rather than two.
     func setEnabled(_ on: Bool) {
+        #if APP_STORE
+        return
+        #else
         lastError = nil
         if on {
             do { try ca.ensure() } catch { lastError = error.localizedDescription; return }
@@ -563,6 +580,7 @@ final class InspectionController: ObservableObject {
             }.value
             finishSetup(on: on, failure: failure)
         }
+        #endif
     }
 
     private func finishSetup(on: Bool, failure: String?) {
@@ -587,6 +605,15 @@ final class InspectionController: ObservableObject {
 
     /// Starts or stops the proxy to match the setting.
     func apply() {
+        #if APP_STORE
+        running = false
+        port = nil
+        trusted = false
+        caExists = false
+        systemProxyOn = false
+        proxy.stop()
+        return
+        #else
         refreshStatus()
         if enabled && !DemoData.isEnabled {
             do { try ca.ensure() } catch { lastError = error.localizedDescription; return }
@@ -596,6 +623,7 @@ final class InspectionController: ObservableObject {
             if systemProxyOn { setSystemProxy(false) }
             proxy.stop()
         }
+        #endif
     }
 
     func refreshStatus() {
@@ -633,6 +661,9 @@ final class InspectionController: ObservableObject {
     /// monitored agent's file is pointed at it; otherwise none is, because a file pointing at a proxy that isn't
     /// listening would stop the agent reaching its API. Idempotent, so it is safe to call on every state change.
     func reconcileEnforcement() {
+        #if APP_STORE
+        return
+        #else
         guard !DemoData.isEnabled else { return }
         let enforcer = SettingsEnforcer.shared
         let monitored = monitoredAgents
@@ -652,16 +683,19 @@ final class InspectionController: ObservableObject {
             enforcer.relaxAll()
             if janitorInstalled { ProxyJanitor.uninstall(); janitorInstalled = false }
         }
+        #endif
     }
 
     /// On launch, clear anything a previous run left enforced before the proxy is running again: a crash skips the
     /// normal strip, so the file could still point at last run's dead proxy. Normal routing re-applies once the
     /// proxy is up, through `reconcileEnforcement`.
     func reconcileEnforcementAtLaunch() {
+        #if !APP_STORE
         guard !DemoData.isEnabled else { return }
         SettingsEnforcer.shared.relaxAll()
         ProxyJanitor.uninstall()
         janitorInstalled = false
+        #endif
     }
 
     private func prune() {
@@ -672,6 +706,9 @@ final class InspectionController: ObservableObject {
     // MARK: Certificate
 
     func trustCertificate() {
+        #if APP_STORE
+        return
+        #else
         lastError = nil
         Task.detached { [ca] in
             do { try ca.trust() } catch {
@@ -679,6 +716,7 @@ final class InspectionController: ObservableObject {
             }
             await MainActor.run { self.refreshStatus() }
         }
+        #endif
     }
 
     /// Turns inspection off, removes the system proxy, deletes the CA, its trust setting and every recorded exchange.
@@ -745,6 +783,9 @@ final class InspectionController: ObservableObject {
 
     /// Opens a Terminal window with the setup applied; agents started there are inspected.
     func openInspectedTerminal() {
+        #if APP_STORE
+        return
+        #else
         let script = FileManager.default.temporaryDirectory.appendingPathComponent("Flowlight Inspected Shell.command")
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         // The greeting is translated, so it is escaped before it goes into the script: a quote or a $ in a
@@ -766,6 +807,7 @@ final class InspectionController: ObservableObject {
         } catch {
             lastError = L("Couldn't open a Terminal window: %@", error.localizedDescription)
         }
+        #endif
     }
 
     /// The proxy auto-config served to apps that follow system proxy settings. It falls back to a direct connection
@@ -833,6 +875,9 @@ final class InspectionController: ObservableObject {
     /// Points every enabled network service's automatic proxy configuration at Flowlight's PAC file, or restores it.
     /// macOS asks for an administrator password.
     func setSystemProxy(_ on: Bool) {
+        #if APP_STORE
+        return
+        #else
         let services = SystemProxy.services()
         guard !services.isEmpty else { lastError = L("No network services found."); return }
         let pac = "http://127.0.0.1:\(port ?? configuredPort)/proxy.pac"
@@ -854,6 +899,7 @@ final class InspectionController: ObservableObject {
         }
         UserDefaults.standard.set(on, forKey: Keys.systemProxy)
         refreshStatus()
+        #endif
     }
 
     // MARK: Matching

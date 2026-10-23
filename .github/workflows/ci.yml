@@ -178,6 +178,17 @@ jobs:
       - name: Generate the project
         run: xcodegen generate
 
+      # This compiles a different product graph and activation path from the Developer ID build. Ad-hoc signing
+      # deliberately strips protected entitlements; archive signing validates those with the distribution profiles.
+      - name: Build the Mac App Store product
+        run: |
+          xcodebuild build -project Flowlight.xcodeproj -scheme "Flowlight App Store" \
+            -configuration AppStore -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/store-build" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=
+
+      - name: Check the Mac App Store product structure
+        run: scripts/check_app_store_product.sh "$RUNNER_TEMP/store-build/Build/Products/AppStore/Flowlight.app"
+
       # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
       - name: Test
         timeout-minutes: 40

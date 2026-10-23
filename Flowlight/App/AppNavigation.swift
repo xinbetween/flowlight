@@ -3,6 +3,15 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case live, agents, reports, alerts, rules, ask, inspect, devices, coverage, capture
     var id: String { rawValue }
+
+    static var availableCases: [SidebarItem] {
+        #if APP_STORE
+        allCases.filter { $0 != .inspect }
+        #else
+        allCases
+        #endif
+    }
+
     /// The part of the documentation that explains this screen.
     ///
     /// The docs are laid out in the sidebar's own groups — Traffic, Investigate, Control, Sources — so help
@@ -72,7 +81,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     /// digit, and the arithmetic that assumed there was turned `10` into a `Character` and trapped the moment
     /// a tenth screen was added.
     var shortcut: KeyEquivalent? {
-        guard let index = Self.allCases.firstIndex(of: self), index < 10 else { return nil }
+        guard let index = Self.availableCases.firstIndex(of: self), index < 10 else { return nil }
         return KeyEquivalent(Character("\(index == 9 ? 0 : index + 1)"))
     }
 
@@ -105,7 +114,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var items: [SidebarItem] { SidebarItem.allCases.filter { $0.section == self } }
+    var items: [SidebarItem] { SidebarItem.availableCases.filter { $0.section == self } }
 }
 
 /// The three views inside Rules. This lives with the shared navigation state so an app-wide notice can take someone
@@ -142,7 +151,10 @@ struct ReportRequest: Equatable {
 /// Shared navigation state so screens can link to each other (Live/Alerts → Reports).
 @MainActor
 final class AppNavigation: ObservableObject {
-    @Published private(set) var selection: SidebarItem = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
+    @Published private(set) var selection: SidebarItem = {
+        let restored = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
+        return SidebarItem.availableCases.contains(restored) ? restored : .live
+    }()
     @Published var rulesTab: RulesTab = .rules
     @Published var reportRequest: ReportRequest?
     @Published var inspectRequest: InspectRequest?
@@ -151,6 +163,7 @@ final class AppNavigation: ObservableObject {
     /// Opens the Rules screen with this rule in the editor, unsaved. Writing a rule from a table row should land
     /// somewhere it can be read back and changed, not quietly take effect out of sight.
     func show(_ item: SidebarItem) {
+        guard SidebarItem.availableCases.contains(item) else { return }
         if item == .rules { rulesTab = .rules }
         selection = item
     }
@@ -180,8 +193,9 @@ final class AppNavigation: ObservableObject {
     /// traffic" is that field pre-filled rather than a second filtering mechanism. It also means the search
     /// stays visible and editable: someone who arrives here can widen or narrow it without going back.
     func showInspect(search: String, potentialHarmOnly: Bool = false) {
+        guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: search, potentialHarmOnly: potentialHarmOnly)
-        selection = .inspect
+        show(.inspect)
     }
 
     /// Scope Inspect to one app or one destination, rather than searching for its name.
@@ -190,9 +204,10 @@ final class AppNavigation: ObservableObject {
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
     func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil, potentialHarmOnly: Bool = false) {
+        guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
                                        potentialHarmOnly: potentialHarmOnly)
-        selection = .inspect
+        show(.inspect)
     }
 }
 

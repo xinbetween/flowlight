@@ -192,11 +192,14 @@
 "Not installed" = "설치되지 않음";
 "Waiting for approval in System Settings › General › Login Items & Extensions" = "시스템 설정 › 일반 › 로그인 항목 및 확장 프로그램에서 승인 대기 중";
 "Installing…" = "설치 중…";
+"Enabling…" = "활성화 중…";
 "Filter enabled" = "필터 활성화됨";
+"Filter disabled" = "필터 비활성화됨";
 "Installed, filter disabled" = "설치됨, 필터 비활성화";
 "Restart this Mac to finish replacing the filter" = "필터 교체를 완료하려면 이 Mac을 다시 시작하세요";
 "Failed: %@" = "실패: %@";
 "unknown" = "알 수 없음";
+"This build isn't signed with the Network Extension entitlement." = "이 빌드에는 네트워크 확장 프로그램 권한(entitlement)이 서명되어 있지 않습니다.";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "이 빌드에는 네트워크 확장 프로그램 권한(entitlement)이 서명되어 있지 않습니다. Apple이 content-filter-provider-systemextension 권한을 부여한 팀으로 scripts/build-signed.sh를 사용해 빌드하세요.";
 "Move Flowlight to /Applications. macOS only activates system extensions from there." = "Flowlight를 /Applications로 옮기세요. macOS는 그 위치에 있는 앱의 시스템 확장 프로그램만 활성화합니다.";
 
@@ -646,6 +649,15 @@
 "Delete all recorded traffic, baselines and alerts?" = "기록된 트래픽, 기준선, 알림을 모두 삭제할까요?";
 "Delete everything" = "모두 삭제";
 "nettop sampler · the extension didn't answer" = "nettop 샘플러 · 확장 프로그램이 응답하지 않았습니다";
+"Network Extension · unavailable" = "네트워크 확장 · 사용할 수 없음";
+"Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "필터 확장에 연결할 수 없습니다. 콘텐츠 필터에서 활성화한 다음 새로 고침을 누르세요.";
+"%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — 콘텐츠 필터에서 Flowlight를 활성화한 다음 새로 고침을 누르세요.";
+"%@ — the content filter is unavailable" = "%@ — 콘텐츠 필터를 사용할 수 없습니다";
+"The content filter is unavailable" = "콘텐츠 필터를 사용할 수 없습니다";
+"Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh." = "Flowlight가 내장 콘텐츠 필터에 연결할 수 없습니다. 시스템 설정에서 활성화한 다음 새로 고침을 누르세요.";
+"Reconnect to the content filter" = "콘텐츠 필터에 다시 연결";
+"If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "VPN 또는 보안 에이전트가 이미 해당 슬롯을 사용 중이라면(Palo Alto Networks GlobalProtect, CrowdStrike Falcon 등), 그 필터를 비활성화할 때까지 Flowlight 필터는 트래픽을 받을 수 없습니다.";
+"The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "필터가 응답하지 않아 Flowlight가 트래픽을 받지 못하고 있습니다. 콘텐츠 필터에서 활성화한 다음 새로 고침을 누르세요.";
 "%@ · receiving" = "%@ · 수신 중";
 "%@ · nothing arriving yet" = "%@ · 아직 들어오는 데이터 없음";
 "Source" = "소스";
@@ -657,6 +669,9 @@
 "Nothing is arriving" = "들어오는 데이터가 없습니다";
 "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension." = "Flowlight가 필터 확장 프로그램에 연결할 수 없어, 데이터가 끊기지 않도록 nettop으로 샘플링하고 있습니다. 선택한 소스는 여전히 확장 프로그램입니다.";
 "Install & Enable Filter" = "필터 설치 및 활성화";
+"Enable Filter" = "필터 활성화";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "콘텐츠 필터(NEFilterDataProvider)는 감사 토큰으로 대상 TCP·UDP 흐름을 해당 앱에 귀속시키고, TLS SNI, HTTP Host, DNS 응답을 추출해 1초 단위 요약을 XPC로 이 앱에 보냅니다. App Store 앱에 내장되며 네트워크 확장 프로그램 권한(content-filter-provider)을 사용합니다. 규칙이 차단을 지시한 경우에만 연결을 거부하며, 적용되는 규칙이 없으면 기록만 합니다.";
+"The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "내장 필터는 비활성화를 선택할 때까지 활성 상태를 유지합니다. Flowlight 앱이 닫혀 있는 동안 요약은 보존 한도 내에서 확장 프로그램에 버퍼링되었다가 나중에 전달됩니다.";
 "Disable Filter" = "필터 비활성화";
 "Uninstall" = "제거";
 "Refresh" = "새로 고침";

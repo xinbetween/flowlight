@@ -15,6 +15,9 @@ struct InspectMenuItems: View {
     var host: String?
 
     var body: some View {
+        #if APP_STORE
+        EmptyView()
+        #else
         // These scope the list rather than search it. The first version put the name in the search field, which
         // also searches response bodies — so "Inspect Claude Code's Traffic" returned every GitHub page whose
         // HTML contains those two words, and the app whose traffic you asked for was nowhere in it.
@@ -28,6 +31,7 @@ struct InspectMenuItems: View {
             Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app) }
                 .help(helpText)
         }
+        #endif
     }
 
     /// Says what will happen rather than promising what will be there. Inspect can only show what was

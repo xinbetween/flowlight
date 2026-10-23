@@ -32,7 +32,9 @@ struct CaptureView: View {
                 if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
                 sourceSection
                 filterSection
+                #if !APP_STORE
                 if monitor.mode == .nettop { HostnameSection() }
+                #endif
                 storageSection
             }
             // A settings panel is read, not scanned, and a line of prose stretched across a maximised window is
@@ -44,15 +46,23 @@ struct CaptureView: View {
         // The one thing worth a trip to this screen to find out — what is feeding the app right now — said in the
         // title bar, so it can be read from any other screen's neighbour.
         .navigationSubtitle(subtitle)
+        #if !APP_STORE
         // Which other content filters exist decides whether ours can work at all, so it's read when the screen opens.
         .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
+        #endif
         .confirmationDialog(L("Delete all recorded traffic, baselines and alerts?"), isPresented: $confirmClear) {
             Button(L("Delete everything"), role: .destructive) { monitor.clearAllData() }
         }
     }
 
     private var subtitle: String {
-        if monitor.extensionFellBack { return L("nettop sampler · the extension didn't answer") }
+        if monitor.extensionFellBack {
+            #if APP_STORE
+            return L("Network Extension · unavailable")
+            #else
+            return L("nettop sampler · the extension didn't answer")
+            #endif
+        }
         let source = monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler")
         return monitor.isReceiving ? L("%@ · receiving", source) : L("%@ · nothing arriving yet", source)
     }
@@ -64,9 +74,11 @@ struct CaptureView: View {
             CaptureHeading(L("Source"))
             VStack(spacing: 0) {
                 sourceRow(.networkExtension)
+                #if !APP_STORE
                 Divider().padding(.leading, 50)
                 sourceRow(.nettop)
                 samplerNotes
+                #endif
             }
             .background(.quaternary.opacity(0.35))
             .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -149,7 +161,13 @@ struct CaptureView: View {
     }
 
     private var statusHeadline: String {
-        if monitor.extensionFellBack { return L("Arriving from nettop, not the extension") }
+        if monitor.extensionFellBack {
+            #if APP_STORE
+            return L("The content filter is unavailable")
+            #else
+            return L("Arriving from nettop, not the extension")
+            #endif
+        }
         return monitor.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
     }
 
@@ -169,17 +187,25 @@ struct CaptureView: View {
                         .font(.caption.monospaced()).foregroundStyle(.tertiary)
                 }
             }
+            #if !APP_STORE
             if extensionManager.state == .needsReboot { rebootTip }
+            #endif
             if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
             if monitor.extensionFellBack {
+                #if APP_STORE
+                CaptureNote(text: L("Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh."),
+                            icon: "exclamationmark.triangle.fill")
+                #else
                 CaptureNote(text: L("Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension."),
                             icon: "arrow.uturn.down.circle.fill")
+                #endif
             }
             extensionButtons
         }
         .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 14)
     }
 
+    #if !APP_STORE
     /// Shown when the update landed but macOS is still running the previous filter because the superseded copies
     /// hold the single content-filter slot until they are cleared. It names the two things that clear them —
     /// reinstalling the filter (no restart), or restarting the Mac — rather than leaving someone watching the
@@ -199,15 +225,23 @@ struct CaptureView: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(FL.warning.opacity(0.12)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(FL.warning.opacity(0.35)))
     }
+    #endif
 
     private var extensionButtons: some View {
         HStack(spacing: 8) {
+            #if APP_STORE
+            Button(L("Enable Filter")) { extensionManager.activate() }
+                .disabled(extensionManager.blocker != nil || extensionManager.state == .enabled)
+            #else
             Button(L("Install & Enable Filter")) { extensionManager.activate() }
-                .disabled(extensionManager.blocker != nil)
+                .disabled(extensionManager.blocker != nil || extensionManager.state == .enabled)
+            #endif
             Button(L("Disable Filter")) { extensionManager.setFilterEnabled(false) }
                 .disabled(extensionManager.state != .enabled)
+            #if !APP_STORE
             Button(L("Uninstall")) { extensionManager.deactivate() }
                 .disabled(!extensionManager.hasEntitlement)
+            #endif
             Button(L("Refresh")) {
                 extensionManager.refresh()
                 // Also redial the extension: reloading its settings tells you nothing about whether the app can
@@ -217,7 +251,11 @@ struct CaptureView: View {
             .help(L("Re-check the filter and reconnect to it"))
             if monitor.extensionFellBack {
                 Button(L("Try the Extension Again")) { monitor.reconnectSource() }
+                    #if APP_STORE
+                    .help(L("Reconnect to the content filter"))
+                    #else
                     .help(L("Stop sampling with nettop and reconnect to the filter extension"))
+                    #endif
             }
             Spacer(minLength: 0)
         }
@@ -249,27 +287,52 @@ struct CaptureView: View {
     /// fail because of them.
     private var extensionFacts: String {
         let entitlement = ExtensionManager.isEntitled ? L("entitled") : L("not entitled")
+        #if APP_STORE
+        return entitlement
+        #else
         let location = extensionManager.isInApplications ? L("in /Applications") : L("not in /Applications")
         return "\(entitlement) · \(location)"
+        #endif
     }
 
     /// What the filter is and what it costs, folded away. Every word of it matters the first time and none of it
     /// matters the twentieth, which is exactly what a disclosure is for.
+    private var filterDescription: String {
+        #if APP_STORE
+        L("The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else.")
+        #else
+        L("The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else.")
+        #endif
+    }
+
     private var filterNotes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It requires the Network Extension entitlement (content-filter-provider-systemextension) on a paid developer team, and the app must be in the Applications folder. It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else."))
-            .font(.caption).foregroundStyle(.secondary)
+            Text(filterDescription)
+                .font(.caption).foregroundStyle(.secondary)
             .prose()
             .frame(maxWidth: .infinity, alignment: .leading)
             CaptureFact(icon: "checkmark.seal", tint: FL.good, title: L("Captures short-lived eligible flows"),
                         detail: L("macOS calls the filter when an eligible connection opens, providing better coverage of short requests than periodic sampling. Traffic from before activation is not available, some system traffic is exempt from content filters, and byte counts come from the filter's statistics reports."))
+            #if APP_STORE
+            CaptureFact(icon: "info.circle", tint: .secondary, title: L("It keeps filtering after you quit Flowlight"),
+                        detail: L("The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit."))
+            #else
             CaptureFact(icon: "info.circle", tint: .secondary, title: L("It keeps filtering after you quit Flowlight"),
                         detail: L("The system extension runs independently and remains active until you select Disable or Uninstall. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit."))
+            #endif
             CaptureFact(icon: "exclamationmark.triangle", tint: FL.warning,
                         title: L("macOS runs one content filter at a time"),
-                        detail: L("If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs."))
+                        detail: contentFilterConflictDetail)
         }
         .padding(.horizontal, 12).padding(.bottom, 14)
+    }
+
+    private var contentFilterConflictDetail: String {
+        #if APP_STORE
+        return L("If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled.")
+        #else
+        return L("If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter installs and connects but is never asked to filter anything, so nothing appears. Use the sampler on those Macs.")
+        #endif
     }
 
     /// What the sampler costs, under the sampler.

@@ -192,11 +192,14 @@
 "Not installed" = "No instalada";
 "Waiting for approval in System Settings › General › Login Items & Extensions" = "Esperando la autorización en Ajustes del Sistema › General › Ítems de inicio y extensiones";
 "Installing…" = "Instalando…";
+"Enabling…" = "Activando…";
 "Filter enabled" = "Filtro activado";
+"Filter disabled" = "Filtro desactivado";
 "Installed, filter disabled" = "Instalada, filtro desactivado";
 "Restart this Mac to finish replacing the filter" = "Reinicia este Mac para terminar de sustituir el filtro";
 "Failed: %@" = "Error: %@";
 "unknown" = "desconocido";
+"This build isn't signed with the Network Extension entitlement." = "Esta versión no está firmada con el permiso de la extensión de red.";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "Esta versión no está firmada con el permiso de la extensión de red. Compila con scripts/build-signed.sh usando un equipo al que Apple haya concedido content-filter-provider-systemextension.";
 "Move Flowlight to /Applications. macOS only activates system extensions from there." = "Mueve Flowlight a /Applications. macOS solo activa las extensiones del sistema desde ahí.";
 
@@ -623,6 +626,15 @@
 "Delete all recorded traffic, baselines and alerts?" = "¿Eliminar todo el tráfico registrado, las líneas base y las alertas?";
 "Delete everything" = "Eliminar todo";
 "nettop sampler · the extension didn't answer" = "Muestreador nettop · la extensión no ha respondido";
+"Network Extension · unavailable" = "Extensión de red · no disponible";
+"Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "No se pudo acceder a la extensión de filtro. Actívala en Filtro de contenido y pulsa Actualizar.";
+"%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — activa Flowlight en Filtro de contenido y pulsa Actualizar.";
+"%@ — the content filter is unavailable" = "%@ — el filtro de contenido no está disponible";
+"The content filter is unavailable" = "El filtro de contenido no está disponible";
+"Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh." = "Flowlight no pudo acceder al filtro de contenido integrado. Actívalo en Ajustes del Sistema y pulsa Actualizar.";
+"Reconnect to the content filter" = "Volver a conectar con el filtro de contenido";
+"If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "Si una VPN o un agente de seguridad ya ocupa ese espacio —Palo Alto Networks GlobalProtect, CrowdStrike Falcon y otros similares lo utilizan—, el filtro de Flowlight no podrá recibir tráfico hasta que se desactive dicho filtro.";
+"The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "El filtro no responde, por lo que Flowlight no recibe tráfico. Actívalo en Filtro de contenido y pulsa Actualizar.";
 "%@ · receiving" = "%@ · recibiendo";
 "%@ · nothing arriving yet" = "%@ · todavía no llega nada";
 "Source" = "Fuente";
@@ -634,6 +646,9 @@
 "Nothing is arriving" = "No llega nada";
 "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension." = "Flowlight no ha podido contactar con la extensión de filtro y está muestreando con nettop para que sigas teniendo datos. Tu fuente elegida sigue siendo la extensión.";
 "Install & Enable Filter" = "Instalar y activar el filtro";
+"Enable Filter" = "Activar el filtro";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "El filtro de contenido (NEFilterDataProvider) atribuye los flujos TCP y UDP admitidos a sus apps de origen mediante tokens de auditoría, extrae el SNI de TLS, la cabecera Host de HTTP y las respuestas DNS, y envía resúmenes de un segundo a esta app por XPC. Está integrado en la app de App Store y usa el permiso de extensión de red (content-filter-provider). Solo rechaza una conexión cuando una regla lo indica; sin ninguna regla que se aplique, se limita a informar.";
+"The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "El filtro integrado permanece activo hasta que seleccionas Desactivar. Mientras la app Flowlight está cerrada, la extensión almacena resúmenes para entregarlos más tarde, hasta su límite de retención.";
 "Disable Filter" = "Desactivar el filtro";
 "Uninstall" = "Desinstalar";
 "Refresh" = "Actualizar";

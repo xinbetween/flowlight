@@ -62,21 +62,21 @@ final class ExtensionSourceTests: XCTestCase {
     }
 
     func testEveryPackMutationRequiresTheRegisteredXPCClient() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let source = try String(
-            contentsOf: root.appendingPathComponent("FlowlightExtension/IPCServer.swift"),
-            encoding: .utf8
-        )
-        for method in ["claimRule", "rulePackHello", "beginRulePack", "appendRulePack", "commitRulePack", "clearRulePacks"] {
+        let sourceURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "IPCServer", withExtension: "txt"))
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        XCTAssertTrue(source.contains("func claimRule(payload: Data"), "the bundled fixture must be the live IPC source")
+        let methods = ["claimRule", "rulePackHello", "beginRulePack", "appendRulePack", "commitRulePack", "clearRulePacks"]
+        for method in methods {
             let start = try XCTUnwrap(source.range(of: "func \(method)("))
-            let body = source[start.lowerBound...].prefix(1_500)
+            let remaining = source[start.lowerBound...]
+            let next = remaining.dropFirst().range(of: "\n    func ")?.lowerBound ?? remaining.endIndex
+            let body = remaining[..<next]
             XCTAssertTrue(body.contains("NSXPCConnection.current()"), method)
             XCTAssertTrue(body.contains("self.client === connection"), method)
         }
         let registerStart = try XCTUnwrap(source.range(of: "func register("))
-        let registerBody = source[registerStart.lowerBound...].prefix(1_500)
-        XCTAssertTrue(registerBody.contains("self.packTransfer.reset()"))
+        let registerRemaining = source[registerStart.lowerBound...]
+        let registerEnd = registerRemaining.dropFirst().range(of: "\n    func ")?.lowerBound ?? registerRemaining.endIndex
+        XCTAssertTrue(registerRemaining[..<registerEnd].contains("self.packTransfer.reset()"))
     }
 }

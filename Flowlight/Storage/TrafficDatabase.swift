@@ -240,8 +240,14 @@ final class TrafficDatabase: @unchecked Sendable {
     static func defaultURL() -> URL {
         let fm = FileManager.default
         // Touching an un-entitled group container can trigger a "would like to access data from other apps" prompt.
+        #if APP_STORE
+        // A Store build's Application Support is inside its sandbox. Do not silently move a direct build's live
+        // database—or an old App Group WAL—across channels; a future import must be explicit and transactional.
+        let groupURL: URL? = nil
+        #else
         let groupURL = hasAppGroupEntitlement
             ? fm.containerURL(forSecurityApplicationGroupIdentifier: FlowlightConstants.appGroupIdentifier) : nil
+        #endif
         return resolveURL(appSupport: fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0], group: groupURL, fm: fm)
     }
 

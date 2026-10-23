@@ -40,7 +40,8 @@ struct FeatureGuide: Equatable, Sendable, Identifiable {
 extension FeatureGuide {
     /// Everything Flowlight can do. A feature missing from here is a feature the Ask panel cannot explain, so it
     /// is worth adding to when one is added to the app.
-    static let all: [FeatureGuide] = [
+    static var all: [FeatureGuide] {
+        let guides: [FeatureGuide] = [
         FeatureGuide(
             id: "capture", title: "Capture source",
             summary: "Where traffic comes from. The Network Extension is a content filter that sits in the data path and attributes every flow to its app; the nettop sampler needs no entitlement but samples once a second and misses flows shorter than that.",
@@ -196,7 +197,22 @@ extension FeatureGuide {
             steps: ["Choose Flowlight › Check for Updates.", "Or install with Homebrew: brew install --cask xinbetween/tap/flowlight."],
             screen: nil,
             keywords: ["update", "upgrade", "version", "homebrew", "brew", "new release"]),
-    ]
+        ]
+        #if APP_STORE
+        return guides.filter { !["hostnames", "guardrails", "inspection", "mocks", "updates"].contains($0.id) }
+            .map { guide in
+                guard guide.id == "capture" else { return guide }
+                var storeGuide = guide
+                storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
+                storeGuide.steps = ["Open Capture.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
+                storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
+                return storeGuide
+            }
+        #else
+        return guides
+        #endif
+    }
 
     /// The entries that match what was asked, best first. A plain keyword score rather than anything clever: the
     /// corpus is twenty short entries, and a model that gets two near-misses alongside the right one can read.

@@ -192,11 +192,14 @@
 "Not installed" = "未安装";
 "Waiting for approval in System Settings › General › Login Items & Extensions" = "正在等待在“系统设置”›“通用”›“登录项与扩展”中批准";
 "Installing…" = "正在安装…";
+"Enabling…" = "正在启用…";
 "Filter enabled" = "过滤器已启用";
+"Filter disabled" = "过滤器已停用";
 "Installed, filter disabled" = "已安装，过滤器已停用";
 "Restart this Mac to finish replacing the filter" = "重新启动这台 Mac 以完成过滤器替换";
 "Failed: %@" = "失败：%@";
 "unknown" = "未知";
+"This build isn't signed with the Network Extension entitlement." = "此构建未使用网络扩展授权签名。";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "此构建未使用网络扩展授权签名。请使用 Apple 已授予 content-filter-provider-systemextension 的团队，通过 scripts/build-signed.sh 构建。";
 "Move Flowlight to /Applications. macOS only activates system extensions from there." = "请将 Flowlight 移动到 /Applications。macOS 只会从那里激活系统扩展。";
 
@@ -646,6 +649,15 @@
 "Delete all recorded traffic, baselines and alerts?" = "删除所有已记录的流量、基线和警报？";
 "Delete everything" = "全部删除";
 "nettop sampler · the extension didn't answer" = "nettop 采样器 · 扩展没有响应";
+"Network Extension · unavailable" = "网络扩展 · 不可用";
+"Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "无法连接过滤器扩展。请在“内容过滤器”中启用它，然后点按“刷新”。";
+"%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — 请在“内容过滤器”中启用 Flowlight，然后点按“刷新”。";
+"%@ — the content filter is unavailable" = "%@ — 内容过滤器不可用";
+"The content filter is unavailable" = "内容过滤器不可用";
+"Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh." = "Flowlight 无法连接内置内容过滤器。请在“系统设置”中启用它，然后点按“刷新”。";
+"Reconnect to the content filter" = "重新连接内容过滤器";
+"If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "如果 VPN 或安全代理已占用该位置（Palo Alto Networks GlobalProtect、CrowdStrike Falcon 等都会使用它），则在停用该过滤器之前，Flowlight 的过滤器无法接收流量。";
+"The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "过滤器没有响应，因此 Flowlight 未收到流量。请在“内容过滤器”中启用它，然后点按“刷新”。";
 "%@ · receiving" = "%@ · 正在接收";
 "%@ · nothing arriving yet" = "%@ · 尚无数据到达";
 "Source" = "来源";
@@ -657,6 +669,9 @@
 "Nothing is arriving" = "没有数据到达";
 "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension." = "Flowlight 无法连接过滤器扩展，正在用 nettop 采样，好让你仍能获得数据。你选择的来源仍然是扩展。";
 "Install & Enable Filter" = "安装并启用过滤器";
+"Enable Filter" = "启用过滤器";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "内容过滤器（NEFilterDataProvider）通过审计令牌把符合条件的 TCP 和 UDP 流归属到其来源应用，提取 TLS SNI、HTTP Host 和 DNS 应答，并通过 XPC 把每秒的摘要发送给本应用。它内嵌在 App Store 版应用中，并使用网络扩展授权（content-filter-provider）。只有在规则要求时才会拒绝连接；没有要执行的规则时只做记录。";
+"The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "内嵌过滤器会保持启用，直到你选择“停用”。Flowlight 应用关闭期间，扩展会在保留上限内暂存摘要，供稍后传送。";
 "Disable Filter" = "停用过滤器";
 "Uninstall" = "卸载";
 "Refresh" = "刷新";

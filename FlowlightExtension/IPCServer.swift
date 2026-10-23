@@ -77,6 +77,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     }
 
     func startListener() {
+        #if APP_STORE
+        guard listener == nil else { return }
+        #endif
         BlockEnforcer.shared.report = { [weak self] event in self?.report(event) }
         BlockEnforcer.shared.reportDecision = { [weak self] event in self?.report(decision: event) }
         BlockEnforcer.shared.reportPack = { [weak self] event in self?.report(pack: event) }

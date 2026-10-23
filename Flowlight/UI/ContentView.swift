@@ -26,6 +26,7 @@ struct ContentView: View {
             .tint(FL.accent)
             .safeAreaInset(edge: .bottom) {
               VStack(spacing: 0) {
+                #if !APP_STORE
                 if let update = updater.pendingUpdate {
                     Button { openWindow(id: "update") } label: {
                         Label(L("Flowlight %@ is available", update.version), systemImage: "arrow.down.circle.fill")
@@ -39,6 +40,7 @@ struct ContentView: View {
                     .padding(.horizontal, 10)
                     .help(L("See what's new and download the update"))
                 }
+                #endif
                 FocusBar()
                 Button { nav.show(.capture) } label: {
                     HStack(alignment: .top, spacing: 8) {
@@ -68,7 +70,12 @@ struct ContentView: View {
                 case .reports: ReportsView()
                 case .alerts: AlertsView()
                 case .rules: RulesView()
-                case .inspect: InspectView()
+                case .inspect:
+                    #if APP_STORE
+                    LiveView()
+                    #else
+                    InspectView()
+                    #endif
                 case .ask: AskView()
                 case .devices: DevicesView()
                 case .coverage: CoverageView()
@@ -92,11 +99,14 @@ struct ContentView: View {
             }
         }
         .id(localization.revision)
+        #if !APP_STORE
         .onReceive(NotificationCenter.default.publisher(for: .flowlightOpenUpdate)) { _ in openWindow(id: "update") }
+        #endif
         .background(WindowSizer())
         .background(WindowVisibilityReporter { window, visible in
             monitor.windowVisibility(window, isVisible: visible)
         })
+        #if !APP_STORE
         .onChange(of: updater.showWindow) { _, show in
             if show { openWindow(id: "update"); updater.showWindow = false }
         }
@@ -104,6 +114,7 @@ struct ContentView: View {
             // A single Window scene, so several restored main windows don't compete to present it.
             if show { openWindow(id: "capture-onboarding") } else if was { dismissWindow(id: "capture-onboarding") }
         }
+        #endif
         .alert(L("Error"), isPresented: Binding(get: { monitor.lastError != nil }, set: { if !$0 { monitor.lastError = nil } })) {
             Button(L("OK")) { monitor.lastError = nil }
         } message: {

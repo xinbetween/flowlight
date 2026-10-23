@@ -19,6 +19,9 @@ final class FilterDataProvider: NEFilterDataProvider {
     static let filterStarted = OSAllocatedUnfairLock(initialState: (running: false, detail: ""))
 
     override func startFilter(completionHandler: @escaping (Error?) -> Void) {
+        #if APP_STORE
+        IPCServer.shared.startListener()
+        #endif
         let anyNetwork = NENetworkRule(remoteNetworkEndpoint: nil, remotePrefix: 0, localNetworkEndpoint: nil, localPrefix: 0,
                                        protocol: .any, direction: .any)
         let settings = NEFilterSettings(rules: [NEFilterRule(networkRule: anyNetwork, action: .filterData)],
@@ -40,6 +43,9 @@ final class FilterDataProvider: NEFilterDataProvider {
         extensionLog.info("Filter stopped: \(reason.rawValue)")
         flushTimer?.cancel()
         flushTimer = nil
+        let batches = tracker.aggregator.drain(before: .max)
+        if !batches.isEmpty { IPCServer.shared.send(batches) }
+        Self.filterStarted.withLock { $0 = (false, "") }
         completionHandler()
     }
 
