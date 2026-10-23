@@ -133,7 +133,10 @@ final class TrafficMonitor: ObservableObject {
         }
         // Unlike the bulk demo history, this opt-in UI fixture has to exist before catalog bootstrap and the pack
         // store load race each other. The database is disposable and was reset just above.
-        if DemoData.isEnabled && DemoData.showsPackReview { try? DemoData.seedPackReview(db) }
+        if DemoData.isEnabled && DemoData.showsPackReview {
+            do { try DemoData.seedPackReview(db) }
+            catch { lastError = L("Could not prepare managed-pack review demo: %@", error.localizedDescription) }
+        }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
         proxyRulePackEvents = RulePackEventDelivery { [weak rulePacks] batch, claim, completion in

@@ -373,15 +373,25 @@ def problems():
     deploy = pages_workflow.split("\n  deploy:\n", 1)[1] if "\n  deploy:\n" in pages_workflow else ""
     catalog_step = deploy.split("      - name: Verify the official rule-pack catalog\n", 1)[1] \
         if "      - name: Verify the official rule-pack catalog\n" in deploy else ""
+    catalog_step = catalog_step.split("\n      - ", 1)[0]
     if not re.search(r"(?m)^  workflow_dispatch:\s*$", trigger):
         found.append(".github/workflows/pages.yml: manual Pages redeployment is unavailable")
     main_only = r"(?m)^    if: \$\{\{ github\.event_name == 'push' \|\| github\.ref == 'refs/heads/main' \}\}\s*$"
     if not re.search(main_only, deploy):
         found.append(".github/workflows/pages.yml: manual deployment is not restricted to main")
     live_url = r"(?m)^          LIVE_CATALOG_URL: https://flowlight\.xinbetween\.com/packs/v1/official\.json\s*$"
-    live_compare = r"(?s)curl .*?\"\$LIVE_CATALOG_URL\".*?compare-previous site/packs/v1/official\.json \\\n\s+--previous \"\$LIVE_CATALOG\""
-    if not re.search(live_url, catalog_step) or not re.search(live_compare, catalog_step):
-        found.append(".github/workflows/pages.yml: manual deployment does not compare with the live signed catalog")
+    deployment_lookup = r"(?s)gh api .*?/deployments\?environment=github-pages&per_page=20'.*?DEPLOYMENT_STATE=.*?/statuses.*?if \[ \"\$DEPLOYMENT_STATE\" = \"success\" \]"
+    deployed_bytes = r"(?s)application/vnd\.github\.raw\+json.*?/contents/site/packs/v1/official\.json\?ref=\$DEPLOYED_REF.*?> \"\$PREVIOUS_CATALOG\""
+    live_fallback = r"(?s)curl .*?--output \"\$PREVIOUS_CATALOG\" \"\$LIVE_CATALOG_URL\""
+    baseline_verify = r"(?s)rule_pack_catalog\.py verify \"\$PREVIOUS_CATALOG\" .*?--expected-key-id flowlight-rule-packs-2026-01"
+    baseline_compare = r"(?s)compare-previous site/packs/v1/official\.json \\\n\s+--previous \"\$PREVIOUS_CATALOG\""
+    if (not re.search(live_url, catalog_step)
+            or not re.search(deployment_lookup, catalog_step)
+            or not re.search(deployed_bytes, catalog_step)
+            or not re.search(live_fallback, catalog_step)
+            or not re.search(baseline_verify, catalog_step)
+            or not re.search(baseline_compare, catalog_step)):
+        found.append(".github/workflows/pages.yml: manual deployment does not verify the recorded or live catalog baseline")
 
     return found
 

@@ -1735,3 +1735,5 @@
 "Suggests reviewed actions" = "Suggests reviewed actions";
 "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";
 "Couldn't delete the captured data: %@" = "캡처한 데이터를 삭제할 수 없습니다: %@";
+"This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "이전에 활성화한 공식 팩이 더 이상 카탈로그에 없습니다. 차단은 자동으로 중지되었습니다.";
+"Could not prepare managed-pack review demo: %@" = "관리형 팩 검토 데모를 준비할 수 없습니다: %@";

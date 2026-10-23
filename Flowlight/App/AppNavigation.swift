@@ -161,8 +161,7 @@ final class AppNavigation: ObservableObject {
     }
 
     func showRules() {
-        rulesTab = .rules
-        selection = .rules
+        show(.rules)
     }
 
     func showPackReviews() {

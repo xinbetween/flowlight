@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
   pages: write
   id-token: write
 
@@ -61,14 +62,33 @@ jobs:
                 --previous-ref "$PREVIOUS_CATALOG_REF"
             fi
           else
-            LIVE_CATALOG=$(mktemp)
-            curl --fail --silent --show-error --max-filesize 8388608 \
-              --output "$LIVE_CATALOG" "$LIVE_CATALOG_URL"
-            python3 -I scripts/rule_pack_catalog.py verify "$LIVE_CATALOG" \
+            DEPLOYED_REF=""
+            DEPLOYMENT_IDS=$(gh api \
+              'repos/${{ github.repository }}/deployments?environment=github-pages&per_page=20' \
+              --jq '.[].id')
+            for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
+              DEPLOYMENT_STATE=$(gh api \
+                "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
+                --jq '.[0].state // empty')
+              if [ "$DEPLOYMENT_STATE" = "success" ]; then
+                DEPLOYED_REF=$(gh api "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID" --jq '.sha')
+                break
+              fi
+            done
+            PREVIOUS_CATALOG=$(mktemp)
+            if [ -n "$DEPLOYED_REF" ]; then
+              gh api -H 'Accept: application/vnd.github.raw+json' \
+                "repos/${{ github.repository }}/contents/site/packs/v1/official.json?ref=$DEPLOYED_REF" \
+                > "$PREVIOUS_CATALOG"
+            else
+              curl --fail --silent --show-error --connect-timeout 10 --max-time 30 --max-filesize 8388608 \
+                --output "$PREVIOUS_CATALOG" "$LIVE_CATALOG_URL"
+            fi
+            python3 -I scripts/rule_pack_catalog.py verify "$PREVIOUS_CATALOG" \
               --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
               --expected-key-id flowlight-rule-packs-2026-01
             python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
-              --previous "$LIVE_CATALOG"
+              --previous "$PREVIOUS_CATALOG"
           fi
           APP_VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           test -n "$APP_VERSION"

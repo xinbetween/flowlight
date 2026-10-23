@@ -1735,3 +1735,5 @@
 "Suggests reviewed actions" = "待翻译：Suggests reviewed actions";
 "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "待翻译：Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";
 "Couldn't delete the captured data: %@" = "无法删除捕获的数据：%@";
+"This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "此先前启用的官方包已不在目录中。阻止功能已自动停止。";
+"Could not prepare managed-pack review demo: %@" = "无法准备托管包审查演示：%@";

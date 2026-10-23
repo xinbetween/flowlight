@@ -228,6 +228,7 @@ enum DemoData {
         configuration.consentedVersion = "previous-demo-version"
         configuration.consentedContentSHA256 = String(repeating: "0", count: 64)
         try db.saveRulePackConfiguration(configuration)
+        try db.setRulePackReviewRequired(true, packID: configuration.packID)
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {

@@ -216,6 +216,7 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         }
         configuration.enabled = false
         XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: nil))
+        XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: current))
     }
 
     func testAsyncResultReturnsValuesAndPropagatesErrors() async throws {

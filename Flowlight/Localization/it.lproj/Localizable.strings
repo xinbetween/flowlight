@@ -1736,3 +1736,5 @@
 "Suggests reviewed actions" = "Suggests reviewed actions";
 "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";
 "Couldn't delete the captured data: %@" = "Impossibile eliminare i dati acquisiti: %@";
+"This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "Questo pacchetto ufficiale precedentemente attivato non è più nel catalogo. Il blocco è stato interrotto automaticamente.";
+"Could not prepare managed-pack review demo: %@" = "Impossibile preparare la demo di revisione dei pacchetti gestiti: %@";

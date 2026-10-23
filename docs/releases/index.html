@@ -63,15 +63,15 @@
       <section class="release">
         <header><h2>0.15.5</h2><time datetime="2026-10-22">October 22, 2026</time><span class="tag">Latest</span></header>
         <ul>
-          <li><strong>Keep changed packs visible until fresh consent.</strong> A catalog update that disables a previously accepted pack now
-            raises a persistent app-wide notice and Rules badge. Review opens Rules › Packs directly, while ordinary Rules navigation still
-            returns to the rule list; a fresh receipt-bound activation clears the notice.</li>
+          <li><strong>Keep changed packs visible until fresh consent.</strong> A catalog update that disables an active pack now raises a
+            persistent app-wide notice and Rules badge. Changed and removed packs stay off and visible until acknowledged or freshly
+            activated with receipt-bound consent; packs already off do not raise a false warning.</li>
           <li><strong>Show restored pack state truthfully after reopening.</strong> Rules › Packs now waits for the signed catalog and saved
             consent to finish loading instead of briefly drawing every switch as off. Enabled packs, scope and enforcement remain intact
             across a normal quit and relaunch.</li>
           <li><strong>Recover the public site without weakening catalog history.</strong> Manual Pages redeployment is restored only for
-            <code>main</code>, authenticates the signed catalog already being served, and rejects rollback or same-sequence equivocation
-            before replacing it. Push deployments retain their exact pre-push Git baseline.</li>
+            <code>main</code>, authenticates the catalog from GitHub’s latest successful Pages deployment (with the live signed feed as a
+            bounded fallback), and rejects rollback or same-sequence equivocation. Pushes retain their exact pre-push Git baseline.</li>
         </ul>
       </section>
 

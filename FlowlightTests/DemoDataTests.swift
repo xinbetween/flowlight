@@ -28,5 +28,6 @@ final class DemoDataTests: XCTestCase {
         XCTAssertEqual(saved.packID, BuiltInRulePacks.advertising.id)
         XCTAssertFalse(saved.enabled)
         XCTAssertFalse(saved.isConsented(to: BuiltInRulePacks.advertising))
+        XCTAssertEqual(try db.loadRulePackReviewPackIDs(), [saved.packID])
     }
 }
