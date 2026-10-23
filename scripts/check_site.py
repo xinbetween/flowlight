@@ -23,6 +23,7 @@ OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
 OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem"
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
 OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
+PAGES_WORKFLOW = ROOT / ".github/workflows/pages.yml"
 PROJECT = (ROOT / "project.yml").read_text()
 APP_VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', PROJECT).group(1)
 
@@ -362,6 +363,25 @@ def problems():
         source_text = source.read_text()
         if re.search(r"\b(setInterval|setTimeout|requestAnimationFrame)\s*\(", source_text):
             found.append(f"{source.relative_to(ROOT)}: home page has recurring JavaScript animation")
+
+    # 16. Pages occasionally needs redeploying without changing public bytes. A manual dispatch has no `before`
+    # SHA, so it must compare with the signed catalog already being served rather than a guessed commit. Keep these
+    # contracts scoped to the trigger, deploy job, and catalog-verification step so duplicate text elsewhere cannot
+    # make a broken workflow look safe.
+    pages_workflow = PAGES_WORKFLOW.read_text()
+    trigger = pages_workflow.split("\npermissions:", 1)[0]
+    deploy = pages_workflow.split("\n  deploy:\n", 1)[1] if "\n  deploy:\n" in pages_workflow else ""
+    catalog_step = deploy.split("      - name: Verify the official rule-pack catalog\n", 1)[1] \
+        if "      - name: Verify the official rule-pack catalog\n" in deploy else ""
+    if not re.search(r"(?m)^  workflow_dispatch:\s*$", trigger):
+        found.append(".github/workflows/pages.yml: manual Pages redeployment is unavailable")
+    main_only = r"(?m)^    if: \$\{\{ github\.event_name == 'push' \|\| github\.ref == 'refs/heads/main' \}\}\s*$"
+    if not re.search(main_only, deploy):
+        found.append(".github/workflows/pages.yml: manual deployment is not restricted to main")
+    live_url = r"(?m)^          LIVE_CATALOG_URL: https://flowlight\.xinbetween\.com/packs/v1/official\.json\s*$"
+    live_compare = r"(?s)curl .*?\"\$LIVE_CATALOG_URL\".*?compare-previous site/packs/v1/official\.json \\\n\s+--previous \"\$LIVE_CATALOG\""
+    if not re.search(live_url, catalog_step) or not re.search(live_compare, catalog_step):
+        found.append(".github/workflows/pages.yml: manual deployment does not compare with the live signed catalog")
 
     return found
 

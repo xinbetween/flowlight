@@ -10,6 +10,7 @@ on:
   push:
     branches: [main]
     paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,6 +25,8 @@ concurrency:
 
 jobs:
   deploy:
+    # A manual run is recovery for the deployed site, never a way to publish an arbitrary branch.
+    if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
     # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
     # been carrying an annotation saying so. A named image means the move happens when we make it, with a
     # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
@@ -45,13 +48,27 @@ jobs:
       # guarantee that nothing broken is ever served.
       - name: Verify the official rule-pack catalog
         env:
+          # Pushes compare with the exact ref main held before the whole push. A manual recovery run instead compares
+          # with the signed catalog currently served by Pages, so rewritten history cannot roll the public feed back.
           PREVIOUS_CATALOG_REF: ${{ github.event.before }}
+          LIVE_CATALOG_URL: https://flowlight.xinbetween.com/packs/v1/official.json
         run: |
           python3 -I scripts/rule_pack_catalog.py compare \
             rule-packs/official-source.json site/packs/v1/official.json
-          if git cat-file -e "$PREVIOUS_CATALOG_REF:site/packs/v1/official.json" 2>/dev/null; then
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if git cat-file -e "$PREVIOUS_CATALOG_REF:site/packs/v1/official.json" 2>/dev/null; then
+              python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
+                --previous-ref "$PREVIOUS_CATALOG_REF"
+            fi
+          else
+            LIVE_CATALOG=$(mktemp)
+            curl --fail --silent --show-error --max-filesize 8388608 \
+              --output "$LIVE_CATALOG" "$LIVE_CATALOG_URL"
+            python3 -I scripts/rule_pack_catalog.py verify "$LIVE_CATALOG" \
+              --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
+              --expected-key-id flowlight-rule-packs-2026-01
             python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
-              --previous-ref "$PREVIOUS_CATALOG_REF"
+              --previous "$LIVE_CATALOG"
           fi
           APP_VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           test -n "$APP_VERSION"
