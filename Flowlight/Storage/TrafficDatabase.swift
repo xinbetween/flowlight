@@ -1152,14 +1152,15 @@ final class TrafficDatabase: @unchecked Sendable {
     /// exact accepted catalog has been reverified, repair those rows transactionally before publishing startup state.
     func reconcileRulePackCatalogBootstrap(
         _ bootstrap: RulePackCatalogAcceptance,
-        definitions: [RulePackDefinition]
+        definitions: [RulePackDefinition],
+        catalogIssuedAt: Date
     ) throws -> RulePackCatalogAcceptance {
-        guard let reviewedAt = bootstrap.state.receipt?.acceptedAt else { return bootstrap }
+        guard let catalogAcceptedAt = bootstrap.state.receipt?.acceptedAt else { return bootstrap }
         var configurations: [RulePackConfiguration] = []
         try conn.transaction {
             configurations = try reconcileRulePackConfigurations(
                 definitions: definitions,
-                legacyReviewAt: reviewedAt,
+                legacyCatalogWindow: catalogIssuedAt...catalogAcceptedAt,
                 updatedAt: Date(),
                 backfillLegacyDisabled: true
             )
@@ -1210,7 +1211,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     private func reconcileRulePackConfigurations(
         definitions: [RulePackDefinition],
-        legacyReviewAt: Date?,
+        legacyCatalogWindow: ClosedRange<Date>?,
         updatedAt: Date,
         backfillLegacyDisabled: Bool = false
     ) throws -> [RulePackConfiguration] {
@@ -1235,7 +1236,9 @@ final class TrafficDatabase: @unchecked Sendable {
                 && !consentIsCurrent
                 && configuration.consentedVersion?.isEmpty == false
                 && !reviewAlreadyRequired
-                && legacyReviewAt.map { rowUpdated == Int64($0.timeIntervalSince1970) } == true
+                && legacyCatalogWindow.map {
+                    $0.contains(Date(timeIntervalSince1970: TimeInterval(rowUpdated)))
+                } == true
             if wasActive && !consentIsCurrent {
                 configuration.enabled = false
                 try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
@@ -1321,7 +1324,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
             reconciled = try reconcileRulePackConfigurations(
                 definitions: catalog.definitions,
-                legacyReviewAt: nil,
+                legacyCatalogWindow: nil,
                 updatedAt: checkedAt
             )
         }

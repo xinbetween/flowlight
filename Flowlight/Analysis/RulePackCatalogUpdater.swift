@@ -113,7 +113,8 @@ final class RulePackCatalogUpdater: ObservableObject {
                     let reconciled = try await db.asyncResult {
                         try $0.reconcileRulePackCatalogBootstrap(
                             bootstrap,
-                            definitions: composed.definitions
+                            definitions: composed.definitions,
+                            catalogIssuedAt: Date(timeIntervalSince1970: TimeInterval(composed.issuedAt))
                         )
                     }
                     store.installCommittedCatalog(composed, acceptance: reconciled)

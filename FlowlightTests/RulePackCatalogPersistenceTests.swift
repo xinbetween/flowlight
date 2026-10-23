@@ -173,16 +173,18 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
             "UPDATE rule_packs SET updated = ? WHERE pack_id = ?",
             [.int(Int64(acceptedAt.timeIntervalSince1970)), .text(original.id)]
         ) { _ in 0 }
-        _ = try db.acceptVerifiedRulePackCatalog(
-            catalog,
-            checkedAt: acceptedAt.addingTimeInterval(10),
-            nextEligibleAt: nextCheck.addingTimeInterval(10)
-        )
+        // Reproduce a database already written by 0.15.4: a later identical 200 moved the receipt timestamp to T2,
+        // while the row disabled at T1 retained its original update time and there was no durable review table entry.
+        _ = try db.raw(
+            "UPDATE rule_pack_catalog_receipts SET accepted_at = ? WHERE catalog_id = ?",
+            [.int(Int64(acceptedAt.addingTimeInterval(10).timeIntervalSince1970)), .text(catalogID)]
+        ) { _ in 0 }
 
         let bootstrap = try db.loadRulePackCatalogBootstrap(catalogID: catalogID)
         let repaired = try db.reconcileRulePackCatalogBootstrap(
             bootstrap,
-            definitions: catalog.definitions
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
         )
 
         XCTAssertEqual(repaired.pendingReviewPackIDs, [original.id])
@@ -216,7 +218,45 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         let bootstrap = try db.loadRulePackCatalogBootstrap(catalogID: catalogID)
         let repaired = try db.reconcileRulePackCatalogBootstrap(
             bootstrap,
-            definitions: catalog.definitions
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
+        )
+
+        XCTAssertTrue(repaired.pendingReviewPackIDs.isEmpty)
+    }
+
+    func testBootstrapDoesNotMarkPackUserDisabledBeforeChangedCatalogWasIssued() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-disabled-before-issue"))
+        let original = BuiltInRulePacks.advertising
+        var changed = original
+        changed.manifest.version = "2"
+        changed.entries.append(RulePackEntry(id: 999, host: "changed.example", category: .advertising))
+        changed.entries.sort { "\($0.host)|\($0.match.rawValue)" < "\($1.host)|\($1.match.rawValue)" }
+        changed.manifest.entryCount = changed.entries.count
+        changed.manifest.contentSHA256 = RulePackValidator.digest(changed.entries)
+        let catalog = verifiedCatalog(
+            sequence: 2,
+            digest: String(repeating: "b", count: 64),
+            definitions: [changed]
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: acceptedAt,
+            nextEligibleAt: nextCheck
+        )
+        var userDisabled = RulePackConfiguration(packID: original.id)
+        userDisabled.consentedVersion = original.manifest.version
+        userDisabled.consentedContentSHA256 = original.manifest.contentSHA256
+        try db.saveRulePackConfiguration(userDisabled)
+        _ = try db.raw(
+            "UPDATE rule_packs SET updated = ? WHERE pack_id = ?",
+            [.int(Int64(acceptedAt.addingTimeInterval(-200).timeIntervalSince1970)), .text(original.id)]
+        ) { _ in 0 }
+
+        let repaired = try db.reconcileRulePackCatalogBootstrap(
+            db.loadRulePackCatalogBootstrap(catalogID: catalogID),
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
         )
 
         XCTAssertTrue(repaired.pendingReviewPackIDs.isEmpty)
@@ -251,14 +291,16 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         ) { _ in 0 }
         let first = try db.reconcileRulePackCatalogBootstrap(
             db.loadRulePackCatalogBootstrap(catalogID: catalogID),
-            definitions: catalog.definitions
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
         )
         XCTAssertEqual(first.pendingReviewPackIDs, [original.id])
 
         try db.setRulePackReviewRequired(false, packID: original.id)
         let second = try db.reconcileRulePackCatalogBootstrap(
             db.loadRulePackCatalogBootstrap(catalogID: catalogID),
-            definitions: catalog.definitions
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
         )
 
         XCTAssertTrue(second.pendingReviewPackIDs.isEmpty)
@@ -284,7 +326,8 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         let bootstrap = try db.loadRulePackCatalogBootstrap(catalogID: catalogID)
         let repaired = try db.reconcileRulePackCatalogBootstrap(
             bootstrap,
-            definitions: catalog.definitions
+            definitions: catalog.definitions,
+            catalogIssuedAt: acceptedAt.addingTimeInterval(-100)
         )
 
         XCTAssertEqual(repaired.pendingReviewPackIDs, [legacyActive.packID])
