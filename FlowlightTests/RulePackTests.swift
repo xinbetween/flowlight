@@ -811,13 +811,51 @@ final class RulePackTests: XCTestCase {
         original.manifest.version = "2"
         original.manifest.entryCount = original.entries.count
         original.manifest.contentSHA256 = RulePackValidator.digest(original.entries)
+        let catalog = VerifiedRulePackCatalog(
+            definitions: [original], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("replacement".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
         let store = RulePackStore(definitions: [original])
         store.attach(db: db)
-        try await waitUntil { store.configurations.count == 1 }
+        try await waitUntil { store.configurations.count == 1 && store.reviewReceipt(for: original) != nil }
 
         XCTAssertFalse(store.configuration(for: original.id).enabled)
         XCTAssertTrue(store.needsReview(original))
+        XCTAssertEqual(store.pendingReviewCount, 1)
         XCTAssertNil(store.snapshot)
+
+        var renewed = store.configuration(for: original.id)
+        renewed.enabled = true
+        var result: RulePackStore.SaveResult?
+        store.save(renewed, reviewedDefinition: original,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: original))) { result = $0 }
+        try await waitUntil { result != nil }
+
+        XCTAssertEqual(result, .saved)
+        XCTAssertEqual(store.pendingReviewCount, 0)
+        XCTAssertNotNil(store.snapshot)
+    }
+
+    @MainActor
+    func testPendingReviewCountIgnoresNeverConsentedAndCurrentConsent() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-current-consent-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let definition = BuiltInRulePacks.advertising
+        var configuration = RulePackConfiguration(packID: definition.id)
+        configuration.consentedVersion = definition.manifest.version
+        configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        XCTAssertEqual(store.pendingReviewCount, 0)
     }
 
     func testEditorReviewPreservesOffConfiguration() {

@@ -1215,7 +1215,7 @@ struct InspectionHint: View {
             Text(message)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if !inspecting {
-                Button(L("Set up HTTPS inspection")) { nav.selection = .inspect }
+                Button(L("Set up HTTPS inspection")) { nav.show(.inspect) }
                     .controlSize(.small)
             } else if !seen {
                 HStack(spacing: 8) {
@@ -1229,7 +1229,7 @@ struct InspectionHint: View {
                         Button(L("Relaunch Through the Proxy")) { confirmingRelaunch = true }
                             .controlSize(.small)
                     }
-                    Button(L("Open Inspected Terminal")) { nav.selection = .inspect }
+                    Button(L("Open Inspected Terminal")) { nav.show(.inspect) }
                         .controlSize(.small)
                 }
                 if let relaunchError {

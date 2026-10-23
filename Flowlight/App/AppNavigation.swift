@@ -108,6 +108,22 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     var items: [SidebarItem] { SidebarItem.allCases.filter { $0.section == self } }
 }
 
+/// The three views inside Rules. This lives with the shared navigation state so an app-wide notice can take someone
+/// straight to a changed pack, while ordinary rule links always land back on the rule list.
+enum RulesTab: String, CaseIterable, Identifiable {
+    case rules, packs, activity
+
+    var id: String { rawValue }
+
+    @MainActor var title: String {
+        switch self {
+        case .rules: return L("Rules")
+        case .packs: return L("Packs")
+        case .activity: return L("What they did")
+        }
+    }
+}
+
 /// A rule the user started writing somewhere else — a table row, an alert — waiting for the Rules screen to open
 /// its editor. The rule travels rather than its ingredients, so every "Block this" writes the same object.
 struct RuleRequest: Equatable {
@@ -126,15 +142,31 @@ struct ReportRequest: Equatable {
 /// Shared navigation state so screens can link to each other (Live/Alerts → Reports).
 @MainActor
 final class AppNavigation: ObservableObject {
-    @Published var selection: SidebarItem = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
+    @Published private(set) var selection: SidebarItem = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
+    @Published var rulesTab: RulesTab = .rules
     @Published var reportRequest: ReportRequest?
     @Published var inspectRequest: InspectRequest?
     @Published var ruleRequest: RuleRequest?
 
     /// Opens the Rules screen with this rule in the editor, unsaved. Writing a rule from a table row should land
     /// somewhere it can be read back and changed, not quietly take effect out of sight.
+    func show(_ item: SidebarItem) {
+        if item == .rules { rulesTab = .rules }
+        selection = item
+    }
+
     func writeRule(_ rule: Rule) {
         ruleRequest = RuleRequest(rule: rule)
+        showRules()
+    }
+
+    func showRules() {
+        rulesTab = .rules
+        selection = .rules
+    }
+
+    func showPackReviews() {
+        rulesTab = .packs
         selection = .rules
     }
 

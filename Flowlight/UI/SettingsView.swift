@@ -169,7 +169,7 @@ struct MenuBarContent: View {
         }
         if monitor.unacknowledgedAlerts > 0 {
             Button(L("Review Alerts…")) {
-                nav.selection = .alerts
+                nav.show(.alerts)
                 openWindow(id: "main")
                 NSApp.activate()
             }

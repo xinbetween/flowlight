@@ -131,6 +131,9 @@ final class TrafficMonitor: ObservableObject {
             db = try! TrafficDatabase(url: tmp)
             lastError = L("Could not open database: %@", "\(error)")
         }
+        // Unlike the bulk demo history, this opt-in UI fixture has to exist before catalog bootstrap and the pack
+        // store load race each other. The database is disposable and was reset just above.
+        if DemoData.isEnabled && DemoData.showsPackReview { try? DemoData.seedPackReview(db) }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
         proxyRulePackEvents = RulePackEventDelivery { [weak rulePacks] batch, claim, completion in

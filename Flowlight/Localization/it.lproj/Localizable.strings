@@ -1188,6 +1188,8 @@
 "Blocking" = "Blocco";
 "Needs extension update" = "Richiede l’aggiornamento dell’estensione";
 "Needs review" = "Richiede una verifica";
+"One pack needs review" = "Un pacchetto richiede una verifica";
+"%lld packs need review" = "%lld pacchetti richiedono una verifica";
 "Test against recent traffic" = "Prova sul traffico recente";
 "Apply this pack to every app?" = "Applicare questo pacchetto a tutte le app?";
 "Apply to every app" = "Applica a tutte le app";

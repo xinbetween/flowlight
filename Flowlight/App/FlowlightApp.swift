@@ -108,7 +108,7 @@ struct FlowlightApp: App {
 
     var body: some Scene {
         WindowGroup("Flowlight", id: "main") {
-            ContentView()
+            ContentView(rulePacks: monitor.rulePacks)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(nav)
@@ -143,7 +143,7 @@ struct FlowlightApp: App {
             }
             CommandGroup(before: .sidebar) {
                 ForEach(SidebarItem.allCases) { item in
-                    Button(item.title) { nav.selection = item }
+                    Button(item.title) { nav.show(item) }
                         .keyboardShortcut(item.shortcut ?? .init(" "), modifiers: item.shortcut == nil ? [] : .command)
                 }
                 Divider()

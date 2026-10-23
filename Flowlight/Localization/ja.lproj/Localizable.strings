@@ -1188,6 +1188,8 @@
 "Blocking" = "ブロック中";
 "Needs extension update" = "拡張機能の更新が必要";
 "Needs review" = "確認が必要";
+"One pack needs review" = "1個のパックを確認する必要があります";
+"%lld packs need review" = "%lld個のパックを確認する必要があります";
 "Test against recent traffic" = "最近のトラフィックでテスト";
 "Apply this pack to every app?" = "このパックをすべてのアプリに適用しますか？";
 "Apply to every app" = "すべてのアプリに適用";

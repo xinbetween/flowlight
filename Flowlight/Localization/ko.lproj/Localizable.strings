@@ -1211,6 +1211,8 @@
 "Blocking" = "차단 중";
 "Needs extension update" = "확장 프로그램 업데이트 필요";
 "Needs review" = "검토 필요";
+"One pack needs review" = "팩 1개를 검토해야 합니다";
+"%lld packs need review" = "팩 %lld개를 검토해야 합니다";
 "Test against recent traffic" = "최근 트래픽으로 테스트";
 "Apply this pack to every app?" = "이 팩을 모든 앱에 적용할까요?";
 "Apply to every app" = "모든 앱에 적용";

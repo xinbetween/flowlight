@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject private var localization = Localization.shared
+    @ObservedObject var rulePacks: RulePackStore
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
@@ -10,12 +11,12 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: Binding(get: { nav.selection }, set: { if let v = $0 { nav.selection = v } })) {
+            List(selection: Binding(get: { nav.selection }, set: { if let value = $0 { nav.show(value) } })) {
                 ForEach(SidebarSection.allCases) { section in
                     Section(section.title) {
                         ForEach(section.items) { item in
                             Label(item.title, systemImage: item.icon)
-                                .badge(item == .alerts ? monitor.unacknowledgedAlerts : 0)
+                                .badge(badge(for: item))
                                 .tag(item)
                         }
                     }
@@ -39,7 +40,7 @@ struct ContentView: View {
                     .help(L("See what's new and download the update"))
                 }
                 FocusBar()
-                Button { nav.selection = .capture } label: {
+                Button { nav.show(.capture) } label: {
                     HStack(alignment: .top, spacing: 8) {
                         LiveDot(color: monitor.isReceiving ? FL.good : FL.warning, active: monitor.isReceiving)
                             .padding(.top, 4)
@@ -74,6 +75,10 @@ struct ContentView: View {
                 case .capture: CaptureView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if rulePacks.pendingReviewCount > 0 { packReviewBanner }
+            }
             // One help button for all nine screens, because the documentation is grouped the way this sidebar
             // is: whatever is on screen, the button opens the section about it rather than the top of the page.
             .toolbar {
@@ -104,5 +109,39 @@ struct ContentView: View {
         } message: {
             Text(monitor.lastError ?? "")
         }
+    }
+
+    private func badge(for item: SidebarItem) -> Int {
+        switch item {
+        case .alerts: return monitor.unacknowledgedAlerts
+        case .rules: return rulePacks.pendingReviewCount
+        default: return 0
+        }
+    }
+
+    private var packReviewBanner: some View {
+        Button { nav.showPackReviews() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(FL.warning)
+                Text(rulePacks.pendingReviewCount == 1
+                     ? L("One pack needs review")
+                     : L("%lld packs need review", rulePacks.pendingReviewCount))
+                Spacer(minLength: 8)
+                Text(L("Review…"))
+                    .foregroundStyle(FL.accent)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
+        }
+        .buttonStyle(.plain)
+        .help(L("Review…"))
     }
 }

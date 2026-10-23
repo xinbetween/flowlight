@@ -5,7 +5,7 @@ import XCTest
 final class InspectNavigationTests: XCTestCase {
     func testAskingForInspectSwitchesScreenAndCarriesTheSubject() {
         let nav = AppNavigation()
-        nav.selection = .live
+        nav.show(.live)
         nav.showInspect(search: "api.anthropic.com")
         XCTAssertEqual(nav.selection, .inspect)
         XCTAssertEqual(nav.inspectRequest?.search, "api.anthropic.com")
@@ -28,5 +28,36 @@ final class InspectNavigationTests: XCTestCase {
     func testInspectIsAReachableScreen() {
         XCTAssertTrue(SidebarItem.allCases.contains(.inspect))
         XCTAssertEqual(SidebarItem.inspect.section, .investigate)
+    }
+
+    func testPackReviewNavigationOpensThePacksTab() {
+        let nav = AppNavigation()
+        nav.show(.live)
+
+        nav.showPackReviews()
+
+        XCTAssertEqual(nav.selection, .rules)
+        XCTAssertEqual(nav.rulesTab, .packs)
+    }
+
+    func testOrdinaryRulesNavigationReturnsToTheRulesTab() {
+        let nav = AppNavigation()
+        nav.showPackReviews()
+
+        nav.show(.rules)
+
+        XCTAssertEqual(nav.selection, .rules)
+        XCTAssertEqual(nav.rulesTab, .rules)
+    }
+
+    func testWritingRuleReturnsToTheRulesTab() {
+        let nav = AppNavigation()
+        nav.showPackReviews()
+
+        nav.writeRule(Rule())
+
+        XCTAssertEqual(nav.selection, .rules)
+        XCTAssertEqual(nav.rulesTab, .rules)
+        XCTAssertNotNil(nav.ruleRequest)
     }
 }

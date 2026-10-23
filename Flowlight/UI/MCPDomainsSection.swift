@@ -82,6 +82,6 @@ struct MCPDomainsSection: View {
                                            name: name))
         // Straight to the rule, because the next question is always "what would that have stopped?" — which
         // 0.9.4's simulation answers in the editor.
-        nav.selection = .rules
+        nav.showRules()
     }
 }

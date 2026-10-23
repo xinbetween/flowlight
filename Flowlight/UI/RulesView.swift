@@ -10,7 +10,6 @@ struct RulesView: View {
     @EnvironmentObject var nav: AppNavigation
     @ObservedObject private var templates = RuleTemplateRequests.shared
     @State private var sheet: Sheet?
-    @State private var tab = Tab.rules
     @State private var now = Date()
 
     /// One sheet at a time, named rather than implied by two booleans — the editor and the library are alternatives
@@ -27,23 +26,11 @@ struct RulesView: View {
         }
     }
 
-    private enum Tab: String, CaseIterable, Identifiable {
-        case rules, packs, activity
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .rules: return L("Rules")
-            case .packs: return L("Packs")
-            case .activity: return L("What they did")
-            }
-        }
-    }
-
     private var store: RuleStore { monitor.rules }
 
     var body: some View {
         Group {
-            switch tab {
+            switch nav.rulesTab {
             case .rules:
                 if store.rules.isEmpty { empty } else { ruleList }
             case .packs:
@@ -111,15 +98,15 @@ struct RulesView: View {
         // Nothing to switch between until there is something in one of them.
         if !store.rules.isEmpty || !store.events.isEmpty || !monitor.rulePacks.definitions.isEmpty {
             ToolbarItem(placement: .principal) {
-                Picker("", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.title).tag($0) }
+                Picker("", selection: $nav.rulesTab) {
+                    ForEach(RulesTab.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 310)
             }
         }
         ToolbarItemGroup {
             pauseControl
-            if tab == .rules {
+            if nav.rulesTab == .rules {
                 Button {
                     sheet = .library(nil, RuleTemplate.Subject())
                 } label: {
@@ -670,7 +657,7 @@ struct RuleMenuItems: View {
             if let rule = template.rules(for: subject).first { nav.writeRule(rule) }
         case .list:
             RuleTemplateRequests.shared.open(template, for: subject)
-            nav.selection = .rules
+            nav.showRules()
         }
     }
 

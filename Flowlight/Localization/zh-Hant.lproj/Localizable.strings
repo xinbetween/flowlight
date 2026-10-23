@@ -1211,6 +1211,8 @@
 "Blocking" = "正在封鎖";
 "Needs extension update" = "需要更新延伸功能";
 "Needs review" = "需要檢視";
+"One pack needs review" = "有 1 個套件需要檢視";
+"%lld packs need review" = "有 %lld 個套件需要檢視";
 "Test against recent traffic" = "使用最近的流量測試";
 "Apply this pack to every app?" = "將此套件套用到所有 App？";
 "Apply to every app" = "套用到所有 App";

@@ -1120,6 +1120,8 @@
 "Blocking" = "Blocking";
 "Needs extension update" = "Needs extension update";
 "Needs review" = "Needs review";
+"One pack needs review" = "One pack needs review";
+"%lld packs need review" = "%lld packs need review";
 "Test against recent traffic" = "Test against recent traffic";
 "Apply this pack to every app?" = "Apply this pack to every app?";
 "Apply to every app" = "Apply to every app";

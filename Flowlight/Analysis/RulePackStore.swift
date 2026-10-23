@@ -93,6 +93,7 @@ final class RulePackStore: ObservableObject {
 
     var enabledCount: Int { committedSnapshot?.configurations.count ?? 0 }
     var hasEnabledPacks: Bool { committedSnapshot != nil }
+    var pendingReviewCount: Int { definitions.lazy.filter(needsReview).count }
     var failureMessage: String? {
         if case .failed(let message) = status { return message }
         return nil
