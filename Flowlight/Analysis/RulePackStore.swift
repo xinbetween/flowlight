@@ -68,6 +68,7 @@ final class RulePackStore: ObservableObject {
     @Published private(set) var status: ApplyStatus = .off
     @Published private(set) var version = 0
     @Published private(set) var definitions: [RulePackDefinition]
+    @Published private(set) var isRecoveringCatalog = false
 
     var onChange: (RulePackSnapshot?) -> Void = { _ in }
     private weak var db: TrafficDatabase?
@@ -94,8 +95,10 @@ final class RulePackStore: ObservableObject {
 
     var enabledCount: Int { committedSnapshot?.configurations.count ?? 0 }
     var hasEnabledPacks: Bool { committedSnapshot != nil }
-    var pendingReviewCount: Int { pendingReviewPackIDs.count }
+    var hasPackNavigation: Bool { !definitions.isEmpty || isRecoveringCatalog }
+    var pendingReviewCount: Int { isRecoveringCatalog ? 0 : pendingReviewPackIDs.count }
     var unavailableReviewConfigurations: [RulePackConfiguration] {
+        guard !isRecoveringCatalog else { return [] }
         let available = Set(definitions.map(\.id))
         return configurations.filter { pendingReviewPackIDs.contains($0.packID) && !available.contains($0.packID) }
     }
@@ -174,6 +177,7 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = []
         definitionsValid = true
+        isRecoveringCatalog = true
         catalogReceipt = nil
         pendingReviewPackIDs = []
         configurations = []
@@ -202,6 +206,7 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = catalog.definitions.sorted { $0.id < $1.id }
         definitionsValid = true
+        isRecoveringCatalog = false
         catalogReceipt = acceptance.state.receipt
         pendingReviewPackIDs = acceptance.pendingReviewPackIDs
         configurations = effectiveConfigurations(from: acceptance.configurations)
@@ -425,16 +430,7 @@ final class RulePackStore: ObservableObject {
     }
 
     private func effectiveConfigurations(from saved: [RulePackConfiguration]) -> [RulePackConfiguration] {
-        let definitionsByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
-        var values = saved.map { savedConfiguration in
-            var configuration = savedConfiguration
-            if configuration.enabled,
-               definitionsByID[configuration.packID].map(configuration.isConsented(to:)) != true {
-                configuration.enabled = false
-                pendingReviewPackIDs.insert(configuration.packID)
-            }
-            return configuration
-        }
+        var values = saved
         for definition in definitions where !values.contains(where: { $0.packID == definition.id }) {
             values.append(RulePackConfiguration(packID: definition.id))
         }

@@ -96,7 +96,7 @@ struct RulesView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         // Nothing to switch between until there is something in one of them.
-        if !store.rules.isEmpty || !store.events.isEmpty || !monitor.rulePacks.definitions.isEmpty {
+        if !store.rules.isEmpty || !store.events.isEmpty || monitor.rulePacks.hasPackNavigation {
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $nav.rulesTab) {
                     ForEach(RulesTab.allCases) { Text($0.title).tag($0) }

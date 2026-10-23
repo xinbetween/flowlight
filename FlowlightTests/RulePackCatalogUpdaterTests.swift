@@ -158,6 +158,10 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
 
         await updater.bootstrap()
         XCTAssertTrue(store.definitions.isEmpty)
+        XCTAssertTrue(store.isRecoveringCatalog)
+        XCTAssertTrue(store.hasPackNavigation)
+        XCTAssertEqual(store.pendingReviewCount, 0)
+        XCTAssertTrue(store.unavailableReviewConfigurations.isEmpty)
         XCTAssertNil(store.snapshot)
         guard case .recovery = updater.status else { return XCTFail("missing cache must require recovery") }
         updater.startScheduling(networkingEnabled: true)
@@ -168,6 +172,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         XCTAssertEqual(updater.receipt?.sequence, 2)
         XCTAssertEqual(updater.status, .current)
         XCTAssertFalse(store.definitions.isEmpty)
+        XCTAssertFalse(store.isRecoveringCatalog)
     }
 
     @MainActor

@@ -381,9 +381,9 @@ def problems():
         found.append(".github/workflows/pages.yml: manual deployment is not restricted to main")
     gh_token = r"(?m)^          GH_TOKEN: \$\{\{ github\.token \}\}\s*$"
     live_url = r"(?m)^          LIVE_CATALOG_URL: https://flowlight\.xinbetween\.com/packs/v1/official\.json\s*$"
-    deployment_lookup = r"(?s)gh api .*?/deployments\?environment=github-pages&per_page=20'.*?DEPLOYMENT_STATE=.*?/statuses.*?if \[ \"\$DEPLOYMENT_STATE\" = \"success\" \]"
-    deployed_bytes = r"(?s)application/vnd\.github\.raw\+json.*?/contents/site/packs/v1/official\.json\?ref=\$DEPLOYED_REF.*?> \"\$PREVIOUS_CATALOG\""
-    live_fallback = r"(?s)curl .*?--output \"\$PREVIOUS_CATALOG\" \"\$LIVE_CATALOG_URL\""
+    deployment_lookup = r"(?s)if DEPLOYMENT_IDS=\$\(gh api .*?/deployments\?environment=github-pages&per_page=20'.*?DEPLOYMENT_STATE=\$\(gh api .*?/statuses.*?continue"
+    deployed_bytes = r"(?s)DEPLOYED_REF=\$\(gh api .*?application/vnd\.github\.raw\+json.*?/contents/site/packs/v1/official\.json\?ref=\$DEPLOYED_REF.*?> \"\$PREVIOUS_CATALOG\".*?DEPLOYED_CATALOG_FOUND=true"
+    live_fallback = r"(?s)if \[ \"\$DEPLOYED_CATALOG_FOUND\" != \"true\" \].*?curl .*?--output \"\$PREVIOUS_CATALOG\" \"\$LIVE_CATALOG_URL\""
     baseline_verify = r"(?s)rule_pack_catalog\.py verify \"\$PREVIOUS_CATALOG\" .*?--expected-key-id flowlight-rule-packs-2026-01"
     baseline_compare = r"(?s)compare-previous site/packs/v1/official\.json \\\n\s+--previous \"\$PREVIOUS_CATALOG\""
     if (not re.search(gh_token, catalog_step)

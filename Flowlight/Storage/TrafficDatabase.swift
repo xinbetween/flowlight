@@ -1148,6 +1148,32 @@ final class TrafficDatabase: @unchecked Sendable {
         )
     }
 
+    /// 0.15.4 disabled changed packs before durable review markers existed and left omitted packs enabled. Once the
+    /// exact accepted catalog has been reverified, repair those rows transactionally before publishing startup state.
+    func reconcileRulePackCatalogBootstrap(
+        _ bootstrap: RulePackCatalogAcceptance,
+        definitions: [RulePackDefinition]
+    ) throws -> RulePackCatalogAcceptance {
+        guard let reviewedAt = bootstrap.state.receipt?.acceptedAt else { return bootstrap }
+        var configurations: [RulePackConfiguration] = []
+        try conn.transaction {
+            configurations = try reconcileRulePackConfigurations(
+                definitions: definitions,
+                legacyReviewAt: reviewedAt,
+                updatedAt: Date(),
+                backfillLegacyDisabled: true
+            )
+        }
+        return RulePackCatalogAcceptance(
+            state: bootstrap.state,
+            configurations: configurations,
+            pendingReviewPackIDs: try loadRulePackReviewPackIDs(),
+            overrides: try loadRulePackOverrides(),
+            events: try rulePackEvents(limit: 300),
+            deliveryStats: try rulePackDeliveryStats()
+        )
+    }
+
     func loadRulePackCatalogState(catalogID: String) throws -> RulePackCatalogState {
         guard !catalogID.isEmpty else { throw RulePackCatalogPersistenceError.invalidCatalogID }
         let receipt = try loadRulePackCatalogReceipt(catalogID: catalogID)
@@ -1180,6 +1206,49 @@ final class TrafficDatabase: @unchecked Sendable {
                 )
             }.first ?? RulePackCatalogUpdateState(catalogID: catalogID)
         return RulePackCatalogState(receipt: receipt, cache: cache, update: update)
+    }
+
+    private func reconcileRulePackConfigurations(
+        definitions: [RulePackDefinition],
+        legacyReviewAt: Date?,
+        updatedAt: Date,
+        backfillLegacyDisabled: Bool = false
+    ) throws -> [RulePackConfiguration] {
+        let definitionsByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
+        let saved = try conn.query(
+            """
+            SELECT configuration, updated,
+                   EXISTS(SELECT 1 FROM rule_pack_reviews WHERE rule_pack_reviews.pack_id = rule_packs.pack_id)
+            FROM rule_packs ORDER BY pack_id
+            """
+        ) { ($0.text(0), $0.int(1), $0.int(2) != 0) }
+        var reconciled: [RulePackConfiguration] = []
+        for (json, rowUpdated, reviewAlreadyRequired) in saved {
+            var configuration = try JSONDecoder().decode(
+                RulePackConfiguration.self,
+                from: Data(json.utf8)
+            )
+            let consentIsCurrent = definitionsByID[configuration.packID].map(configuration.isConsented(to:)) == true
+            let wasActive = configuration.enabled
+            let wasStoppedByLegacyAcceptance = backfillLegacyDisabled
+                && !configuration.enabled
+                && !consentIsCurrent
+                && configuration.consentedVersion?.isEmpty == false
+                && !reviewAlreadyRequired
+                && legacyReviewAt.map { rowUpdated == Int64($0.timeIntervalSince1970) } == true
+            if wasActive && !consentIsCurrent {
+                configuration.enabled = false
+                try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
+            } else if wasStoppedByLegacyAcceptance {
+                // Move the row past the legacy acceptance timestamp so an acknowledgment cannot be inferred again.
+                try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
+            }
+            if wasActive && !consentIsCurrent || wasStoppedByLegacyAcceptance {
+                try setRulePackReviewRequired(true, packID: configuration.packID)
+            }
+            reconciled.append(configuration)
+        }
+        return reconciled
     }
 
     /// Atomically rechecks anti-rollback state, saves the exact signed bytes and validators, invalidates stale
@@ -1245,18 +1314,11 @@ final class TrafficDatabase: @unchecked Sendable {
                 """, [.text(catalogID), .int(acceptedAt), .int(acceptedAt),
                       .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("accepted")])
 
-            let definitionsByID = Dictionary(uniqueKeysWithValues: catalog.definitions.map { ($0.id, $0) })
-            let saved = try loadRulePackConfigurationsStrictly()
-            for var configuration in saved {
-                let definition = definitionsByID[configuration.packID]
-                if configuration.enabled,
-                   definition.map(configuration.isConsented(to:)) != true {
-                    configuration.enabled = false
-                    try writeRulePackConfiguration(configuration, updatedAt: checkedAt)
-                    try setRulePackReviewRequired(true, packID: configuration.packID)
-                }
-                reconciled.append(configuration)
-            }
+            reconciled = try reconcileRulePackConfigurations(
+                definitions: catalog.definitions,
+                legacyReviewAt: nil,
+                updatedAt: checkedAt
+            )
         }
 
         let state = try loadRulePackCatalogState(catalogID: catalogID)

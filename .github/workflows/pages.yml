@@ -64,25 +64,29 @@ jobs:
                 --previous-ref "$PREVIOUS_CATALOG_REF"
             fi
           else
-            DEPLOYED_REF=""
-            DEPLOYMENT_IDS=$(gh api \
-              'repos/${{ github.repository }}/deployments?environment=github-pages&per_page=20' \
-              --jq '.[].id')
-            for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
-              DEPLOYMENT_STATE=$(gh api \
-                "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
-                --jq '.[0].state // empty')
-              if [ "$DEPLOYMENT_STATE" = "success" ]; then
-                DEPLOYED_REF=$(gh api "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID" --jq '.sha')
-                break
-              fi
-            done
             PREVIOUS_CATALOG=$(mktemp)
-            if [ -n "$DEPLOYED_REF" ]; then
-              gh api -H 'Accept: application/vnd.github.raw+json' \
-                "repos/${{ github.repository }}/contents/site/packs/v1/official.json?ref=$DEPLOYED_REF" \
-                > "$PREVIOUS_CATALOG"
-            else
+            DEPLOYED_CATALOG_FOUND=false
+            if DEPLOYMENT_IDS=$(gh api \
+              'repos/${{ github.repository }}/deployments?environment=github-pages&per_page=20' \
+              --jq '.[].id'); then
+              for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
+                if ! DEPLOYMENT_STATE=$(gh api \
+                  "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
+                  --jq '.[0].state // empty'); then
+                  continue
+                fi
+                if [ "$DEPLOYMENT_STATE" = "success" ] && \
+                   DEPLOYED_REF=$(gh api \
+                     "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID" --jq '.sha') && \
+                   gh api -H 'Accept: application/vnd.github.raw+json' \
+                     "repos/${{ github.repository }}/contents/site/packs/v1/official.json?ref=$DEPLOYED_REF" \
+                     > "$PREVIOUS_CATALOG"; then
+                  DEPLOYED_CATALOG_FOUND=true
+                  break
+                fi
+              done
+            fi
+            if [ "$DEPLOYED_CATALOG_FOUND" != "true" ]; then
               curl --fail --silent --show-error --connect-timeout 10 --max-time 30 --max-filesize 8388608 \
                 --output "$PREVIOUS_CATALOG" "$LIVE_CATALOG_URL"
             fi
