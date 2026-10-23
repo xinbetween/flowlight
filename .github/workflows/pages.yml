@@ -49,6 +49,8 @@ jobs:
       # guarantee that nothing broken is ever served.
       - name: Verify the official rule-pack catalog
         env:
+          # gh does not implicitly read github.token; authenticate deployment-history lookups explicitly.
+          GH_TOKEN: ${{ github.token }}
           # Pushes compare with the exact ref main held before the whole push. A manual recovery run instead compares
           # with the signed catalog currently served by Pages, so rewritten history cannot roll the public feed back.
           PREVIOUS_CATALOG_REF: ${{ github.event.before }}
