@@ -82,7 +82,6 @@ struct RulePackCatalogEnvelope: Codable, Equatable, Sendable {
 struct VerifiedRulePackCatalog: Equatable, Sendable {
     var definitions: [RulePackDefinition]
     var sequence: Int64
-    var issuedAt: Int64 = 0
     var digest: String
     var signerKeyID: String
     var stale: Bool
@@ -214,7 +213,6 @@ enum RulePackCatalogVerifier {
         return VerifiedRulePackCatalog(
             definitions: definitions,
             sequence: envelope.payload.sequence,
-            issuedAt: envelope.payload.issuedAt,
             digest: digest,
             signerKeyID: signerKeyID,
             stale: stale,

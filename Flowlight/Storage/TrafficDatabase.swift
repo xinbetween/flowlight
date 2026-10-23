@@ -1148,21 +1148,19 @@ final class TrafficDatabase: @unchecked Sendable {
         )
     }
 
-    /// 0.15.4 disabled changed packs before durable review markers existed and left omitted packs enabled. Once the
-    /// exact accepted catalog has been reverified, repair those rows transactionally before publishing startup state.
+    /// 0.15.4 could leave an omitted downloaded pack enabled because missing definitions were not reconciled. Once
+    /// the exact accepted catalog has been reverified, durably stop that unambiguous legacy state before publication.
+    /// Disabled stale rows are deliberately left alone: older storage has no provenance that distinguishes a catalog
+    /// invalidation from a user turning the pack off before that catalog reached this Mac.
     func reconcileRulePackCatalogBootstrap(
         _ bootstrap: RulePackCatalogAcceptance,
-        definitions: [RulePackDefinition],
-        catalogIssuedAt: Date
+        definitions: [RulePackDefinition]
     ) throws -> RulePackCatalogAcceptance {
-        guard let catalogAcceptedAt = bootstrap.state.receipt?.acceptedAt else { return bootstrap }
         var configurations: [RulePackConfiguration] = []
         try conn.transaction {
             configurations = try reconcileRulePackConfigurations(
                 definitions: definitions,
-                legacyCatalogWindow: catalogIssuedAt...catalogAcceptedAt,
-                updatedAt: Date(),
-                backfillLegacyDisabled: true
+                updatedAt: Date()
             )
         }
         return RulePackCatalogAcceptance(
@@ -1211,42 +1209,22 @@ final class TrafficDatabase: @unchecked Sendable {
 
     private func reconcileRulePackConfigurations(
         definitions: [RulePackDefinition],
-        legacyCatalogWindow: ClosedRange<Date>?,
-        updatedAt: Date,
-        backfillLegacyDisabled: Bool = false
+        updatedAt: Date
     ) throws -> [RulePackConfiguration] {
         let definitionsByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
         let saved = try conn.query(
-            """
-            SELECT configuration, updated,
-                   EXISTS(SELECT 1 FROM rule_pack_reviews WHERE rule_pack_reviews.pack_id = rule_packs.pack_id)
-            FROM rule_packs ORDER BY pack_id
-            """
-        ) { ($0.text(0), $0.int(1), $0.int(2) != 0) }
+            "SELECT configuration FROM rule_packs ORDER BY pack_id"
+        ) { $0.text(0) }
         var reconciled: [RulePackConfiguration] = []
-        for (json, rowUpdated, reviewAlreadyRequired) in saved {
+        for json in saved {
             var configuration = try JSONDecoder().decode(
                 RulePackConfiguration.self,
                 from: Data(json.utf8)
             )
             let consentIsCurrent = definitionsByID[configuration.packID].map(configuration.isConsented(to:)) == true
-            let wasActive = configuration.enabled
-            let wasStoppedByLegacyAcceptance = backfillLegacyDisabled
-                && !configuration.enabled
-                && !consentIsCurrent
-                && configuration.consentedVersion?.isEmpty == false
-                && !reviewAlreadyRequired
-                && legacyCatalogWindow.map {
-                    $0.contains(Date(timeIntervalSince1970: TimeInterval(rowUpdated)))
-                } == true
-            if wasActive && !consentIsCurrent {
+            if configuration.enabled && !consentIsCurrent {
                 configuration.enabled = false
                 try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
-            } else if wasStoppedByLegacyAcceptance {
-                // Move the row past the legacy acceptance timestamp so an acknowledgment cannot be inferred again.
-                try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
-            }
-            if wasActive && !consentIsCurrent || wasStoppedByLegacyAcceptance {
                 try setRulePackReviewRequired(true, packID: configuration.packID)
             }
             reconciled.append(configuration)
@@ -1324,7 +1302,6 @@ final class TrafficDatabase: @unchecked Sendable {
 
             reconciled = try reconcileRulePackConfigurations(
                 definitions: catalog.definitions,
-                legacyCatalogWindow: nil,
                 updatedAt: checkedAt
             )
         }
