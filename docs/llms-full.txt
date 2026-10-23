@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.5, macOS 15 or later.
 
  On this page
 
@@ -894,7 +894,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1629,8 +1629,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.5
+October 22, 2026Latest
+
+ Keep changed packs visible until fresh consent. A catalog update that disables a previously accepted pack now
+ raises a persistent app-wide notice and Rules badge. Review opens Rules › Packs directly, while ordinary Rules navigation still
+ returns to the rule list; a fresh receipt-bound activation clears the notice.
+
+ Recover the public site without weakening catalog history. Manual Pages redeployment is restored only for
+ main, authenticates the signed catalog already being served, and rejects rollback or same-sequence equivocation
+ before replacing it. Push deployments retain their exact pre-push Git baseline.
+
  0.15.4
-October 20, 2026Latest
+October 20, 2026
 
  Consume verified official rule-pack updates. Flowlight checks its one fixed HTTPS feed with conditional
  requests, verifies publisher signatures and compatibility before persistence, and keeps exact last-known-good bytes plus
