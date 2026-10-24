@@ -43,6 +43,20 @@ def main() -> int:
         )
         return 1
 
+    phase_ids = [match.group("id") for match in matches]
+    direct_target = re.search(
+        r"/\* Flowlight \*/ = \{\n\t\t\tisa = PBXNativeTarget;.*?"
+        r"\t\t\tbuildPhases = \(\n(?P<phases>.*?)\t\t\t\);",
+        source,
+        re.DOTALL,
+    )
+    if direct_target is None or any(
+        f"{phase_id} /* Embed Dependencies */" not in direct_target.group("phases")
+        for phase_id in phase_ids
+    ):
+        print("both Embed Dependencies phases must belong to the Flowlight target", file=sys.stderr)
+        return 1
+
     ordered_bodies = sorted(bodies, key=lambda body: re.search(
         r"^\t\t\tdstPath = (.*);$", body, re.MULTILINE
     ).group(1))
