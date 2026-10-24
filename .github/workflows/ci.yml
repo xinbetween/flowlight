@@ -175,8 +175,8 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate the project
-        run: xcodegen generate
+      - name: Generate the project and reject drift
+        run: scripts/check_xcode_project.sh
 
       # This compiles a different product graph and activation path from the Developer ID build. Ad-hoc signing
       # deliberately strips protected entitlements; archive signing validates those with the distribution profiles.

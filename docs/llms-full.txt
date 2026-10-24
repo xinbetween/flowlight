@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.6, macOS 15 or later.
 
  On this page
 
@@ -894,7 +894,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1629,8 +1629,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.6
+October 23, 2026Latest
+
+ Give Xcode Cloud a stable App Store project. The shared XcodeGen project and Store archive scheme are now
+ committed so Apple can discover the selected container before any cloud build script runs.
+
+ Keep the generated project honest. A repeatable drift gate regenerates the project from
+ project.yml, canonicalizes XcodeGen’s one equivalent copy-phase ordering, and fails CI if shared project files are
+ stale while continuing to ignore user-specific and Xcode-managed state.
+
+ Preserve both distribution channels. The committed project builds the sandboxed App Store content-filter
+ extension and the Developer ID system extension as separate product graphs, with Store packaging checks unchanged.
+
  0.15.5
-October 22, 2026Latest
+October 22, 2026
 
  Keep changed packs visible until fresh consent. A catalog update that disables an active pack now raises a
  persistent app-wide notice and Rules badge. Changed and removed packs stay off and visible until acknowledged or freshly
