@@ -5,6 +5,7 @@ import Foundation
 /// real service is depicted as malicious.
 enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
+    static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
 
     static var databaseURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Flowlight")
@@ -217,6 +218,17 @@ enum DemoData {
                                       patterns: ["github.com", "npmjs.org", "githubusercontent.com"]))
         try seedAlerts(db, now: now)
         try seedInspection(db, now: now)
+    }
+
+    /// A previously accepted pack whose definition has since changed. Screenshot and acceptance runs use this
+    /// disposable state to exercise the same review affordance a catalog update produces, without touching real data.
+    static func seedPackReview(_ db: TrafficDatabase) throws {
+        let definition = BuiltInRulePacks.advertising
+        var configuration = RulePackConfiguration(packID: definition.id)
+        configuration.consentedVersion = "previous-demo-version"
+        configuration.consentedContentSHA256 = String(repeating: "0", count: 64)
+        try db.saveRulePackConfiguration(configuration)
+        try db.setRulePackReviewRequired(true, packID: configuration.packID)
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {

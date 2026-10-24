@@ -811,13 +811,85 @@ final class RulePackTests: XCTestCase {
         original.manifest.version = "2"
         original.manifest.entryCount = original.entries.count
         original.manifest.contentSHA256 = RulePackValidator.digest(original.entries)
+        let catalog = VerifiedRulePackCatalog(
+            definitions: [original], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("replacement".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
         let store = RulePackStore(definitions: [original])
         store.attach(db: db)
-        try await waitUntil { store.configurations.count == 1 }
+        try await waitUntil { store.configurations.count == 1 && store.reviewReceipt(for: original) != nil }
 
         XCTAssertFalse(store.configuration(for: original.id).enabled)
+        XCTAssertEqual(try db.loadRulePackReviewPackIDs(), [original.id])
         XCTAssertTrue(store.needsReview(original))
+        XCTAssertEqual(store.pendingReviewCount, 1)
         XCTAssertNil(store.snapshot)
+
+        var renewed = store.configuration(for: original.id)
+        renewed.enabled = true
+        var result: RulePackStore.SaveResult?
+        store.save(renewed, reviewedDefinition: original,
+                   receipt: try XCTUnwrap(store.reviewReceipt(for: original))) { result = $0 }
+        try await waitUntil { result != nil }
+
+        XCTAssertEqual(result, .saved)
+        XCTAssertEqual(store.pendingReviewCount, 0)
+        XCTAssertNotNil(store.snapshot)
+    }
+
+    @MainActor
+    func testPendingReviewCountIgnoresNeverConsentedAndCurrentConsent() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-current-consent-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let definition = BuiltInRulePacks.advertising
+        var configuration = RulePackConfiguration(packID: definition.id)
+        configuration.consentedVersion = definition.manifest.version
+        configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+
+        let store = RulePackStore()
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        XCTAssertEqual(store.pendingReviewCount, 0)
+    }
+
+    @MainActor
+    func testChangedPackThatWasAlreadyOffDoesNotRequireReview() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-off-before-change-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let original = BuiltInRulePacks.advertising
+        var configuration = RulePackConfiguration(packID: original.id)
+        configuration.consentedVersion = original.manifest.version
+        configuration.consentedContentSHA256 = original.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+
+        var changed = original
+        changed.manifest.version = "2"
+        changed.entries.append(RulePackEntry(id: 999, host: "changed-off.example", category: .advertising))
+        changed.entries.sort { "\($0.host)|\($0.match.rawValue)" < "\($1.host)|\($1.match.rawValue)" }
+        changed.manifest.entryCount = changed.entries.count
+        changed.manifest.contentSHA256 = RulePackValidator.digest(changed.entries)
+        let catalog = VerifiedRulePackCatalog(
+            definitions: [changed], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("changed-off".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
+        let store = RulePackStore(definitions: [changed])
+        store.attach(db: db)
+        try await waitUntil { store.reviewReceipt(for: changed) != nil }
+
+        XCTAssertFalse(store.needsReview(changed))
+        XCTAssertEqual(store.pendingReviewCount, 0)
     }
 
     func testEditorReviewPreservesOffConfiguration() {
@@ -963,6 +1035,8 @@ final class RulePackTests: XCTestCase {
         store.installCommittedCatalog(omitted, acceptance: omissionAcceptance)
         XCTAssertTrue(store.overrides.isEmpty)
         XCTAssertNil(store.snapshot)
+        XCTAssertEqual(store.pendingReviewCount, 1)
+        XCTAssertEqual(store.unavailableReviewConfigurations.map(\.packID), [definition.id])
 
         let reintroduced = VerifiedRulePackCatalog(
             definitions: [definition], sequence: 3, digest: String(repeating: "3", count: 64),
@@ -975,8 +1049,52 @@ final class RulePackTests: XCTestCase {
         store.installCommittedCatalog(reintroduced, acceptance: reintroductionAcceptance)
 
         XCTAssertEqual(store.overrides, [exception])
-        XCTAssertEqual(store.snapshot?.overrides, [exception])
-        XCTAssertTrue(store.configuration(for: definition.id).enabled)
+        XCTAssertNil(store.snapshot)
+        XCTAssertFalse(store.configuration(for: definition.id).enabled)
+        XCTAssertTrue(store.needsReview(definition))
+    }
+
+    @MainActor
+    func testUnavailablePackReviewCanBeAcknowledgedWithoutReactivation() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-unavailable-ack-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        var definition = BuiltInRulePacks.advertising
+        definition.manifest.id = "official.removed"
+        let first = VerifiedRulePackCatalog(
+            definitions: [definition], sequence: 1, digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("one".utf8)
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            first, checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        var configuration = RulePackConfiguration(packID: definition.id, enabled: true)
+        configuration.consentedVersion = definition.manifest.version
+        configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+        let omitted = VerifiedRulePackCatalog(
+            definitions: [], sequence: 2, digest: String(repeating: "2", count: 64),
+            signerKeyID: "test-key", stale: false, rawEnvelope: Data("two".utf8)
+        )
+        let acceptance = try db.acceptVerifiedRulePackCatalog(
+            omitted, checkedAt: Date(timeIntervalSince1970: 300),
+            nextEligibleAt: Date(timeIntervalSince1970: 400)
+        )
+        let store = RulePackStore(definitions: [], currentAppVersion: "0.15.4")
+        store.attach(db: db)
+        try await waitUntil { store.pendingReviewCount == 1 }
+        XCTAssertEqual(store.installCommittedCatalog(omitted, acceptance: acceptance), .installed)
+
+        var acknowledged: Bool?
+        store.acknowledgeUnavailableReview(definition.id) { acknowledged = $0 }
+        try await waitUntil { acknowledged != nil }
+
+        XCTAssertEqual(acknowledged, true)
+        XCTAssertEqual(store.pendingReviewCount, 0)
+        XCTAssertFalse(store.configuration(for: definition.id).enabled)
+        XCTAssertNil(store.snapshot)
+        XCTAssertTrue(try db.loadRulePackReviewPackIDs().isEmpty)
     }
 
     @MainActor

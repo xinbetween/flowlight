@@ -63,6 +63,8 @@ struct RulePackCatalogAcceptance: Equatable, Sendable {
     var state: RulePackCatalogState
     /// All saved rows, including dormant IDs omitted by the currently active catalog.
     var configurations: [RulePackConfiguration]
+    /// IDs whose enforcement was stopped by a changed or omitted catalog while they were enabled.
+    var pendingReviewPackIDs: Set<String>
     /// Durable user state is returned with every accepted catalog so an omitted and later reintroduced pack cannot
     /// resume enforcement without the exceptions and history that still belong to its stable ID.
     var overrides: [RulePackOverride]

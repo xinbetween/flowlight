@@ -240,8 +240,14 @@ final class TrafficDatabase: @unchecked Sendable {
     static func defaultURL() -> URL {
         let fm = FileManager.default
         // Touching an un-entitled group container can trigger a "would like to access data from other apps" prompt.
+        #if APP_STORE
+        // A Store build's Application Support is inside its sandbox. Do not silently move a direct build's live
+        // database—or an old App Group WAL—across channels; a future import must be explicit and transactional.
+        let groupURL: URL? = nil
+        #else
         let groupURL = hasAppGroupEntitlement
             ? fm.containerURL(forSecurityApplicationGroupIdentifier: FlowlightConstants.appGroupIdentifier) : nil
+        #endif
         return resolveURL(appSupport: fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0], group: groupURL, fm: fm)
     }
 
@@ -486,6 +492,8 @@ final class TrafficDatabase: @unchecked Sendable {
         -- Managed packs keep only user state here. The verified entry lists remain in the signed app bundle.
         CREATE TABLE IF NOT EXISTS rule_packs (
             pack_id TEXT PRIMARY KEY, configuration TEXT NOT NULL, updated INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_pack_reviews (
+            pack_id TEXT PRIMARY KEY, required INTEGER NOT NULL, updated INTEGER NOT NULL);
         -- The anti-rollback receipt is deliberately independent from the cached bytes. A corrupt or missing cache
         -- must never make a previously accepted sequence disappear and permit the bundled sequence again.
         CREATE TABLE IF NOT EXISTS rule_pack_catalog_receipts (
@@ -1089,14 +1097,29 @@ final class TrafficDatabase: @unchecked Sendable {
         try writeRulePackConfiguration(configuration, updatedAt: Date())
     }
 
-    /// Compare-and-save for an editor that may have remained open across a catalog refresh. Disabling never needs
-    /// a receipt; enabling requires both the reviewed pack identity and the durable catalog watermark to still match.
+    func setRulePackReviewRequired(_ required: Bool, packID: String) throws {
+        guard !packID.isEmpty else { throw RulePackCatalogPersistenceError.invalidReceipt }
+        if required {
+            try conn.run("""
+                INSERT INTO rule_pack_reviews (pack_id, required, updated) VALUES (?,1,?)
+                ON CONFLICT(pack_id) DO UPDATE SET required = 1, updated = excluded.updated
+                """, [.text(packID), .int(Int64(Date().timeIntervalSince1970))])
+        } else {
+            try conn.run("DELETE FROM rule_pack_reviews WHERE pack_id = ?", [.text(packID)])
+        }
+    }
+
+    func loadRulePackReviewPackIDs() throws -> Set<String> {
+        Set(try conn.query("SELECT pack_id FROM rule_pack_reviews WHERE required = 1 ORDER BY pack_id") { $0.text(0) })
+    }
+
+    /// Compare-and-save for an editor that may have remained open across a catalog refresh. A receipt is optional only
+    /// for narrowing enforcement. Enabling or acknowledging reviewed content rechecks the durable catalog watermark.
     func saveRulePackConfiguration(_ configuration: RulePackConfiguration,
                                    reviewed receipt: RulePackReviewReceipt?) throws {
         try conn.transaction {
-            if configuration.enabled {
-                guard let receipt,
-                      receipt.packID == configuration.packID,
+            if let receipt {
+                guard receipt.packID == configuration.packID,
                       receipt.version == configuration.consentedVersion,
                       receipt.contentSHA256 == configuration.consentedContentSHA256,
                       let durable = try loadRulePackCatalogReceipt(catalogID: RulePackCatalogVerifier.catalogID),
@@ -1104,8 +1127,11 @@ final class TrafficDatabase: @unchecked Sendable {
                       durable.digest == receipt.catalogDigest else {
                     throw RulePackCatalogPersistenceError.staleReview
                 }
+            } else if configuration.enabled {
+                throw RulePackCatalogPersistenceError.staleReview
             }
             try writeRulePackConfiguration(configuration, updatedAt: Date())
+            if receipt != nil { try setRulePackReviewRequired(false, packID: configuration.packID) }
         }
     }
 
@@ -1121,6 +1147,32 @@ final class TrafficDatabase: @unchecked Sendable {
         RulePackCatalogAcceptance(
             state: try loadRulePackCatalogState(catalogID: catalogID),
             configurations: try loadRulePackConfigurationsStrictly(),
+            pendingReviewPackIDs: try loadRulePackReviewPackIDs(),
+            overrides: try loadRulePackOverrides(),
+            events: try rulePackEvents(limit: 300),
+            deliveryStats: try rulePackDeliveryStats()
+        )
+    }
+
+    /// 0.15.4 could leave an omitted downloaded pack enabled because missing definitions were not reconciled. Once
+    /// the exact accepted catalog has been reverified, durably stop that unambiguous legacy state before publication.
+    /// Disabled stale rows are deliberately left alone: older storage has no provenance that distinguishes a catalog
+    /// invalidation from a user turning the pack off before that catalog reached this Mac.
+    func reconcileRulePackCatalogBootstrap(
+        _ bootstrap: RulePackCatalogAcceptance,
+        definitions: [RulePackDefinition]
+    ) throws -> RulePackCatalogAcceptance {
+        var configurations: [RulePackConfiguration] = []
+        try conn.transaction {
+            configurations = try reconcileRulePackConfigurations(
+                definitions: definitions,
+                updatedAt: Date()
+            )
+        }
+        return RulePackCatalogAcceptance(
+            state: bootstrap.state,
+            configurations: configurations,
+            pendingReviewPackIDs: try loadRulePackReviewPackIDs(),
             overrides: try loadRulePackOverrides(),
             events: try rulePackEvents(limit: 300),
             deliveryStats: try rulePackDeliveryStats()
@@ -1159,6 +1211,31 @@ final class TrafficDatabase: @unchecked Sendable {
                 )
             }.first ?? RulePackCatalogUpdateState(catalogID: catalogID)
         return RulePackCatalogState(receipt: receipt, cache: cache, update: update)
+    }
+
+    private func reconcileRulePackConfigurations(
+        definitions: [RulePackDefinition],
+        updatedAt: Date
+    ) throws -> [RulePackConfiguration] {
+        let definitionsByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
+        let saved = try conn.query(
+            "SELECT configuration FROM rule_packs ORDER BY pack_id"
+        ) { $0.text(0) }
+        var reconciled: [RulePackConfiguration] = []
+        for json in saved {
+            var configuration = try JSONDecoder().decode(
+                RulePackConfiguration.self,
+                from: Data(json.utf8)
+            )
+            let consentIsCurrent = definitionsByID[configuration.packID].map(configuration.isConsented(to:)) == true
+            if configuration.enabled && !consentIsCurrent {
+                configuration.enabled = false
+                try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
+                try setRulePackReviewRequired(true, packID: configuration.packID)
+            }
+            reconciled.append(configuration)
+        }
+        return reconciled
     }
 
     /// Atomically rechecks anti-rollback state, saves the exact signed bytes and validators, invalidates stale
@@ -1200,7 +1277,12 @@ final class TrafficDatabase: @unchecked Sendable {
                     highest_sequence = excluded.highest_sequence,
                     canonical_digest = excluded.canonical_digest,
                     signer_key_id = excluded.signer_key_id,
-                    accepted_at = excluded.accepted_at
+                    accepted_at = CASE
+                        WHEN rule_pack_catalog_receipts.highest_sequence = excluded.highest_sequence
+                         AND rule_pack_catalog_receipts.canonical_digest = excluded.canonical_digest
+                        THEN rule_pack_catalog_receipts.accepted_at
+                        ELSE excluded.accepted_at
+                    END
                 """, [.text(catalogID), .int(catalog.sequence), .text(catalog.digest),
                       .text(catalog.signerKeyID), .int(acceptedAt)])
             try conn.run("""
@@ -1224,22 +1306,17 @@ final class TrafficDatabase: @unchecked Sendable {
                 """, [.text(catalogID), .int(acceptedAt), .int(acceptedAt),
                       .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("accepted")])
 
-            let definitionsByID = Dictionary(uniqueKeysWithValues: catalog.definitions.map { ($0.id, $0) })
-            let saved = try loadRulePackConfigurationsStrictly()
-            for var configuration in saved {
-                if let definition = definitionsByID[configuration.packID], configuration.enabled,
-                   !configuration.isConsented(to: definition) {
-                    configuration.enabled = false
-                    try writeRulePackConfiguration(configuration, updatedAt: checkedAt)
-                }
-                reconciled.append(configuration)
-            }
+            reconciled = try reconcileRulePackConfigurations(
+                definitions: catalog.definitions,
+                updatedAt: checkedAt
+            )
         }
 
         let state = try loadRulePackCatalogState(catalogID: catalogID)
         return RulePackCatalogAcceptance(
             state: state,
             configurations: reconciled.sorted { $0.packID < $1.packID },
+            pendingReviewPackIDs: try loadRulePackReviewPackIDs(),
             overrides: try loadRulePackOverrides(),
             events: try rulePackEvents(limit: 300),
             deliveryStats: try rulePackDeliveryStats()

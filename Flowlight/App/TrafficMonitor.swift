@@ -112,7 +112,11 @@ final class TrafficMonitor: ObservableObject {
         AnomalySettings.registerDefaults()
         LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
+        #if APP_STORE
+        mode = .networkExtension
+        #else
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
+        #endif
         self.trafficSourceFactory = trafficSourceFactory
         catalogTransportInjected = catalogTransport != nil
         rulePacks = RulePackStore(currentAppVersion: ExtensionManager.appVersion)
@@ -130,6 +134,12 @@ final class TrafficMonitor: ObservableObject {
             let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("flowlight-\(UUID().uuidString).sqlite")
             db = try! TrafficDatabase(url: tmp)
             lastError = L("Could not open database: %@", "\(error)")
+        }
+        // Unlike the bulk demo history, this opt-in UI fixture has to exist before catalog bootstrap and the pack
+        // store load race each other. The database is disposable and was reset just above.
+        if DemoData.isEnabled && DemoData.showsPackReview {
+            do { try DemoData.seedPackReview(db) }
+            catch { lastError = L("Could not prepare managed-pack review demo: %@", error.localizedDescription) }
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
@@ -267,9 +277,13 @@ final class TrafficMonitor: ObservableObject {
         Notifier.configure()
         // Either kind of notification needs permission: anomaly alerts, or "a new version is available".
         let defaults = UserDefaults.standard
-        if defaults.bool(forKey: AnomalySettings.Keys.notifications) || defaults.bool(forKey: UpdateChecker.Keys.automatic) {
-            Notifier.requestAuthorization()
-        }
+        #if APP_STORE
+        let wantsNotifications = defaults.bool(forKey: AnomalySettings.Keys.notifications)
+        #else
+        let wantsNotifications = defaults.bool(forKey: AnomalySettings.Keys.notifications)
+            || defaults.bool(forKey: UpdateChecker.Keys.automatic)
+        #endif
+        if wantsNotifications { Notifier.requestAuthorization() }
         // Establish the signed catalog before loading saved consent and exceptions. Starting capture waits for both,
         // so a corrupt higher cache can never briefly enforce bundled content, and enabled packs never omit exceptions.
         Task { [weak self] in
@@ -292,6 +306,7 @@ final class TrafficMonitor: ObservableObject {
                 .map(\.bundleID)
             engine.seedDiscoveredAgents(Set(agents))
         }
+        #if !APP_STORE
         updatePacketCapture()
         // Not yet: the first thing someone sees should be their own traffic, not a request for a password.
         // Hostnames are a refinement, and the offer explains itself better once there are rows on screen to
@@ -299,6 +314,7 @@ final class TrafficMonitor: ObservableObject {
         timers.append(Timer.scheduledTimer(withTimeInterval: Self.onboardingDelay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.offerCaptureSetupIfNeeded() }
         })
+        #endif
         refreshAlertCount()
         timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tickLive() }
@@ -309,8 +325,10 @@ final class TrafficMonitor: ObservableObject {
         timers.append(Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                #if !APP_STORE
                 self.sniffer.refreshInterface()
                 if self.captureState == .noPermission { self.updatePacketCapture() }
+                #endif
             }
         })
         runMaintenance()
@@ -357,6 +375,9 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func setMode(_ newMode: CaptureMode) {
+        #if APP_STORE
+        guard newMode == .networkExtension else { return }
+        #endif
         guard newMode != mode else { return }
         mode = newMode
         extensionRetry?.cancel()
@@ -377,6 +398,11 @@ final class TrafficMonitor: ObservableObject {
 
     /// Passive hostname capture is only needed for the nettop source; the extension sees payloads itself.
     func updatePacketCapture() {
+        #if APP_STORE
+        sniffer.stop()
+        captureState = .stopped
+        return
+        #else
         let onSampler = mode == .nettop || extensionFellBack
         let wanted = !DemoData.isEnabled && onSampler && UserDefaults.standard.bool(forKey: AnomalySettings.Keys.packetCapture)
         if wanted {
@@ -386,6 +412,7 @@ final class TrafficMonitor: ObservableObject {
             sniffer.stop()
         }
         captureState = sniffer.state
+        #endif
     }
 
     /// How long the first run is left alone before hostname setup is offered.
@@ -445,6 +472,10 @@ final class TrafficMonitor: ObservableObject {
         } else if mode == .networkExtension, canUseExtension, !extensionFellBack {
             newSource = ExtensionTrafficSource()
         } else {
+            #if APP_STORE
+            fallbackNote = L("Couldn't reach the filter extension. Enable it under Content filter, then press Refresh.")
+            newSource = UnavailableTrafficSource(message: fallbackNote!)
+            #else
             if mode == .networkExtension {
                 fallbackNote = extensionFellBack
                     // Names the button that is on screen. It used to say "under Network Extension", which was
@@ -453,6 +484,7 @@ final class TrafficMonitor: ObservableObject {
                     : L("This build isn't signed for the Network Extension — sampling with nettop instead.")
             }
             newSource = NettopTrafficSource()
+            #endif
         }
         // Same idea as FLForceCaptureOnboarding: a way to see this state on a Mac where the filter works.
         captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
@@ -475,11 +507,19 @@ final class TrafficMonitor: ObservableObject {
                     self.updateRulePackStatus(result)
                 }
             }
+            #if !APP_STORE
             extensionSource.onRepairRequested = { [weak self] in
                 Task { @MainActor in self?.repairExtensionVersion() }
             }
-            extensionSource.onGaveUp = { [weak self] _ in
-                Task { @MainActor in self?.fallBackToSampler() }
+            #endif
+            extensionSource.onGaveUp = { [weak self] message in
+                Task { @MainActor in
+                    #if APP_STORE
+                    self?.filterBecameUnavailable(message)
+                    #else
+                    self?.fallBackToSampler()
+                    #endif
+                }
             }
         }
         source = newSource
@@ -550,6 +590,7 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    #if !APP_STORE
     /// The extension source has been refused often enough that plain redialling isn't the answer. Ask macOS which
     /// build of the extension it is running: if it isn't this app's, re-activating replaces it, and that is the
     /// one fault behind "the filter is enabled but the app can't reach it" that the app can repair by itself.
@@ -597,7 +638,25 @@ final class TrafficMonitor: ObservableObject {
             }
         }
     }
+    #endif
 
+    #if APP_STORE
+    /// The Store product has no privileged sampler fallback. Leave enforcement visibly unavailable and let Refresh
+    /// create a new bounded reconnect ladder after the person enables the content filter in System Settings.
+    private func filterBecameUnavailable(_ message: String) {
+        guard mode == .networkExtension else { return }
+        extensionFellBack = true
+        let note = L("%@ — enable Flowlight under Content filter, then press Refresh.", message)
+        source?.stop()
+        let unavailable = UnavailableTrafficSource(message: note)
+        source = unavailable
+        liveRuleClaims.replace(nil)
+        liveRulePacks.replace(snapshot: nil)
+        if rulePacks.hasEnabledPacks { rulePacks.updateStatus(.watchingOnly) }
+        status = note
+        unavailable.start(sink: { _ in }, status: { _ in })
+    }
+    #else
     /// The extension has stopped answering for good. Rather than leave someone with an orange dot and no data,
     /// capture with the sampler and say plainly that this is what happened — their chosen source is still the
     /// extension, and the status line says how to go back to it.
@@ -607,6 +666,7 @@ final class TrafficMonitor: ObservableObject {
         startSource()
         scheduleExtensionRetry()
     }
+    #endif
 
     /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has
     /// switched to blocking travel: everything else stays a matter for alerts, and a source that can't block
@@ -861,15 +921,28 @@ final class TrafficMonitor: ObservableObject {
     /// Read on the main actor and handed to the query that needs it, so nothing reaches across threads for it.
     /// Settings only: no keys, no export headers, no endpoint. Those live in the Keychain and have no business
     /// travelling to a model to answer "is export on?".
+    private var askCaptureSource: String {
+        #if APP_STORE
+        return extensionFellBack ? "Network Extension unavailable" : "Network Extension"
+        #else
+        return mode == .networkExtension && !extensionFellBack ? "Network Extension" : "nettop sampler"
+        #endif
+    }
+
     func askEnvironment() -> AskEnvironment {
         AskEnvironment(
             appVersion: ExtensionManager.appVersion,
-            captureSource: DemoData.isEnabled ? "demo data"
-                : (mode == .networkExtension && !extensionFellBack ? "Network Extension" : "nettop sampler"),
+            captureSource: DemoData.isEnabled ? "demo data" : askCaptureSource,
             captureStatus: status,
             receiving: isReceiving,
             extensionState: ExtensionManager.current?.state.label ?? "unknown",
-            fellBackToSampler: extensionFellBack,
+            fellBackToSampler: {
+                #if APP_STORE
+                false
+                #else
+                extensionFellBack
+                #endif
+            }(),
             canBlock: canBlock,
             inspecting: inspection.enabled && inspection.running,
             inspectionScope: inspection.scope.title,

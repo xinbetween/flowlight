@@ -40,8 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Not in tests (they share this process), and not in a demo or screenshot run: that is a throwaway instance
         // with its own database, and it must never strip the enforcement the real running app owns.
         guard !FlowlightApp.runningTests, !DemoData.isEnabled else { return }
+        #if !APP_STORE
         SettingsEnforcer.shared.relaxAll()
         UpdateLaunchPolicy.markCleanExit()
+        #endif
     }
 }
 
@@ -98,17 +100,21 @@ struct FlowlightApp: App {
             monitor.start()
             monitor.applyFocus(focus.scope)
             extensionManager.refresh()
+            #if !APP_STORE
             extensionManager.matchExtensionToApp { check in
                 guard check.repairing else { return }
                 Task { @MainActor in monitor.extensionVersionRepairing(check) }
             }
+            #endif
+            #if !APP_STORE
             updater.start()
+            #endif
         }
     }
 
     var body: some Scene {
         WindowGroup("Flowlight", id: "main") {
-            ContentView()
+            ContentView(rulePacks: monitor.rulePacks)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(nav)
@@ -125,9 +131,11 @@ struct FlowlightApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button(L("About Flowlight")) { AboutPanel.show() }
             }
+            #if !APP_STORE
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesButton().environmentObject(updater)
             }
+            #endif
             CommandGroup(replacing: .help) {
                 // Help for wherever you are, first: someone who presses ⌘? on the Rules screen wants the part
                 // about rules, not the top of a page they then have to search.
@@ -142,8 +150,8 @@ struct FlowlightApp: App {
                 Button(L("Report an Issue")) { NSWorkspace.shared.open(Help.issues) }
             }
             CommandGroup(before: .sidebar) {
-                ForEach(SidebarItem.allCases) { item in
-                    Button(item.title) { nav.selection = item }
+                ForEach(SidebarItem.availableCases) { item in
+                    Button(item.title) { nav.show(item) }
                         .keyboardShortcut(item.shortcut ?? .init(" "), modifiers: item.shortcut == nil ? [] : .command)
                 }
                 Divider()
@@ -154,6 +162,7 @@ struct FlowlightApp: App {
             }
         }
 
+        #if !APP_STORE
         Window(L("Software Update"), id: "update") {
             UpdateView().environmentObject(updater)
         }
@@ -170,6 +179,7 @@ struct FlowlightApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultPosition(.center)
         .restorationBehavior(.disabled)
+        #endif
 
         MenuBarExtra {
             MenuBarContent()
@@ -203,10 +213,12 @@ struct MenuBarLabel: View {
         label
             .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
             .onChange(of: backgroundOnly, initial: true) { _, _ in FlowlightApp.windowsChanged() }
+            #if !APP_STORE
             // The menu bar item always exists, so a found update opens its window even with the main window closed.
             .onChange(of: updater.showWindow) { _, show in
                 if show { openWindow(id: "update"); updater.showWindow = false }
             }
+            #endif
     }
 
     @ViewBuilder private var label: some View {

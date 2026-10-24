@@ -85,7 +85,14 @@ private struct CoverageContent: View {
     private var captureTitle: String {
         switch monitor.mode {
         case .networkExtension:
-            return monitor.extensionFellBack ? L("Sampling with nettop, not the filter") : L("The filter sees connections as they open")
+            if monitor.extensionFellBack {
+                #if APP_STORE
+                return L("The content filter is unavailable")
+                #else
+                return L("Sampling with nettop, not the filter")
+                #endif
+            }
+            return L("The filter sees connections as they open")
         case .nettop:
             return L("Sampling with nettop every second")
         }
@@ -96,7 +103,11 @@ private struct CoverageContent: View {
         case .networkExtension where !monitor.extensionFellBack:
             return L("Every eligible TCP and UDP flow is attributed as it opens, including connections too short for a sampler to catch.")
         case .networkExtension:
+            #if APP_STORE
+            return L("The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh.")
+            #else
             return L("The filter isn't answering, so these figures come from the sampler: a connection that opens and closes between two readings is missing entirely, and no percentage below can show it.")
+            #endif
         case .nettop:
             return L("Byte counts are exact, but a connection that opens and closes between two readings is never recorded — a quick DNS lookup, a fast API call, a script that runs curl and exits. Only the filter sees those.")
         }

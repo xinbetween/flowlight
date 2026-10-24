@@ -47,7 +47,9 @@ struct SettingsView: View {
                 }
                 Toggle(L("Show live rates in the menu bar"), isOn: $menuBarRates)
                 Toggle(L("Show notifications for warnings"), isOn: $notifications)
+                #if !APP_STORE
                 UpdateSettingsRow()
+                #endif
             }
             .formStyle(.grouped)
             .frame(height: 340)
@@ -108,8 +110,10 @@ struct SettingsView: View {
             .frame(height: 150)
             .tabItem { Label(L("Storage"), systemImage: "internaldrive") }
 
+            #if !APP_STORE
             PluginSettingsView()
                 .tabItem { Label(L("Plugins"), systemImage: "puzzlepiece.extension") }
+            #endif
 
             ExportSettingsTab()
                 .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
@@ -169,11 +173,12 @@ struct MenuBarContent: View {
         }
         if monitor.unacknowledgedAlerts > 0 {
             Button(L("Review Alerts…")) {
-                nav.selection = .alerts
+                nav.show(.alerts)
                 openWindow(id: "main")
                 NSApp.activate()
             }
         }
+        #if !APP_STORE
         if let update = updater.pendingUpdate {
             Button(L("Update Available: Flowlight %@…", update.version)) {
                 openWindow(id: "update")
@@ -182,6 +187,7 @@ struct MenuBarContent: View {
         } else {
             CheckForUpdatesButton()
         }
+        #endif
         Button(L("Quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 }

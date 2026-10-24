@@ -21,6 +21,9 @@ final class ResponseScriptRunner: @unchecked Sendable {
     private init() {}
 
     func transform(rules: [ResponseTransformRule], request: ResponseTransformRequest, responseHead: HTTPHead, responseBody: Data) -> Result? {
+        #if APP_STORE
+        return nil
+        #else
         guard responseBody.count <= Self.maxPayloadBytes,
               let representation = ResponseRepresentation.detect(headers: responseHead.headers, body: responseBody) else { return nil }
         var body = responseBody
@@ -34,6 +37,7 @@ final class ResponseScriptRunner: @unchecked Sendable {
         }
         guard !names.isEmpty, body != responseBody else { return nil }
         return Result(body: body, note: names.joined(separator: " · "))
+        #endif
     }
 
     private func run(rule: ResponseTransformRule, request: ResponseTransformRequest, representation: ResponseRepresentation, body: Data) -> Data? {

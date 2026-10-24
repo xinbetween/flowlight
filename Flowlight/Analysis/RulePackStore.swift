@@ -68,11 +68,13 @@ final class RulePackStore: ObservableObject {
     @Published private(set) var status: ApplyStatus = .off
     @Published private(set) var version = 0
     @Published private(set) var definitions: [RulePackDefinition]
+    @Published private(set) var isRecoveringCatalog = false
 
     var onChange: (RulePackSnapshot?) -> Void = { _ in }
     private weak var db: TrafficDatabase?
     private var definitionsValid = true
     private var catalogReceipt: RulePackCatalogReceipt?
+    private var pendingReviewPackIDs = Set<String>()
     private var committedSnapshot: RulePackSnapshot?
     private var revision = 0
     private var activityRevision = 0
@@ -93,6 +95,13 @@ final class RulePackStore: ObservableObject {
 
     var enabledCount: Int { committedSnapshot?.configurations.count ?? 0 }
     var hasEnabledPacks: Bool { committedSnapshot != nil }
+    var hasPackNavigation: Bool { !definitions.isEmpty || isRecoveringCatalog }
+    var pendingReviewCount: Int { isRecoveringCatalog ? 0 : pendingReviewPackIDs.count }
+    var unavailableReviewConfigurations: [RulePackConfiguration] {
+        guard !isRecoveringCatalog else { return [] }
+        let available = Set(definitions.map(\.id))
+        return configurations.filter { pendingReviewPackIDs.contains($0.packID) && !available.contains($0.packID) }
+    }
     var failureMessage: String? {
         if case .failed(let message) = status { return message }
         return nil
@@ -110,8 +119,7 @@ final class RulePackStore: ObservableObject {
     }
 
     func needsReview(_ definition: RulePackDefinition) -> Bool {
-        guard let configuration = configurations.first(where: { $0.packID == definition.id }) else { return false }
-        return configuration.consentedVersion != nil && !configuration.isConsented(to: definition)
+        pendingReviewPackIDs.contains(definition.id)
     }
 
     func reviewReceipt(for definition: RulePackDefinition) -> RulePackReviewReceipt? {
@@ -140,11 +148,13 @@ final class RulePackStore: ObservableObject {
                 let loaded = try await db.asyncResult { db in
                     (try db.loadRulePackConfigurations(), try db.loadRulePackOverrides(),
                      try db.rulePackEvents(limit: 300), try db.rulePackDeliveryStats(),
-                     try db.loadRulePackCatalogState(catalogID: RulePackCatalogVerifier.catalogID).receipt)
+                     try db.loadRulePackCatalogState(catalogID: RulePackCatalogVerifier.catalogID).receipt,
+                     try db.loadRulePackReviewPackIDs())
                 }
                 guard let self else { return }
                 if self.revision == expectedRevision {
                     self.catalogReceipt = loaded.4
+                    self.pendingReviewPackIDs = loaded.5
                     self.applyLoaded(configurations: loaded.0, overrides: loaded.1,
                                      events: loaded.2, deliveryStats: loaded.3)
                 }
@@ -167,7 +177,9 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = []
         definitionsValid = true
+        isRecoveringCatalog = true
         catalogReceipt = nil
+        pendingReviewPackIDs = []
         configurations = []
         overrides = []
         committedSnapshot = nil
@@ -194,7 +206,9 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = catalog.definitions.sorted { $0.id < $1.id }
         definitionsValid = true
+        isRecoveringCatalog = false
         catalogReceipt = acceptance.state.receipt
+        pendingReviewPackIDs = acceptance.pendingReviewPackIDs
         configurations = effectiveConfigurations(from: acceptance.configurations)
         let known = Set(definitions.map(\.id))
         overrides = acceptance.overrides.filter { known.contains($0.packID) }
@@ -245,7 +259,7 @@ final class RulePackStore: ObservableObject {
         if cleaned.scope == .selectedApps && cleaned.apps.isEmpty { cleaned.enabled = false }
 
         var durableReceipt: RulePackReviewReceipt?
-        if cleaned.enabled {
+        if cleaned.enabled || pendingReviewPackIDs.contains(cleaned.packID) {
             guard let reviewedDefinition, reviewedDefinition == current,
                   let receipt, receipt.packID == current.id,
                   receipt.version == current.manifest.version,
@@ -274,6 +288,7 @@ final class RulePackStore: ObservableObject {
                 self.configurations.append(committed)
                 self.configurations.sort { $0.packID < $1.packID }
             }
+            if committedReceipt != nil { self.pendingReviewPackIDs.remove(committed.packID) }
             self.publish()
             completion?(.saved)
         }, onFailure: { error in
@@ -289,6 +304,22 @@ final class RulePackStore: ObservableObject {
         var value = configuration(for: packID)
         value.enabled = enabled
         save(value)
+    }
+
+    func acknowledgeUnavailableReview(_ packID: String, completion: ((Bool) -> Void)? = nil) {
+        guard pendingReviewPackIDs.contains(packID),
+              configurations.contains(where: { $0.packID == packID }),
+              !definitions.contains(where: { $0.id == packID }) else {
+            completion?(false)
+            return
+        }
+        persist({ try $0.setRulePackReviewRequired(false, packID: packID) }, then: { [weak self] in
+            guard let self else { completion?(false); return }
+            self.revision += 1
+            self.pendingReviewPackIDs.remove(packID)
+            self.publish()
+            completion?(true)
+        }, onFailure: { _ in completion?(false) })
     }
 
     func addOverride(_ override: RulePackOverride, completion: ((Bool) -> Void)? = nil) {
@@ -399,15 +430,11 @@ final class RulePackStore: ObservableObject {
     }
 
     private func effectiveConfigurations(from saved: [RulePackConfiguration]) -> [RulePackConfiguration] {
-        definitions.map { definition in
-            guard var configuration = saved.first(where: { $0.packID == definition.id }) else {
-                return RulePackConfiguration(packID: definition.id)
-            }
-            if configuration.enabled, !configuration.isConsented(to: definition) {
-                configuration.enabled = false
-            }
-            return configuration
+        var values = saved
+        for definition in definitions where !values.contains(where: { $0.packID == definition.id }) {
+            values.append(RulePackConfiguration(packID: definition.id))
         }
+        return values.sorted { $0.packID < $1.packID }
     }
 
     private func persist(_ write: @escaping @Sendable (TrafficDatabase) throws -> Void,

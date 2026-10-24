@@ -110,7 +110,13 @@ final class RulePackCatalogUpdater: ObservableObject {
                         allowExpiredLastKnownGood: true
                     )
                     let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
-                    store.installCommittedCatalog(composed, acceptance: bootstrap)
+                    let reconciled = try await db.asyncResult {
+                        try $0.reconcileRulePackCatalogBootstrap(
+                            bootstrap,
+                            definitions: composed.definitions
+                        )
+                    }
+                    store.installCommittedCatalog(composed, acceptance: reconciled)
                     recoveryNeeded = false
                     status = verified.stale ? .stale : .current
                 } catch {

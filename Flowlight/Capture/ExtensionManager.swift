@@ -1,7 +1,9 @@
 import Foundation
 @preconcurrency import NetworkExtension
 import Security
+#if !APP_STORE
 import SystemExtensions
+#endif
 
 /// Installs the system extension and enables the content filter configuration.
 @MainActor
@@ -14,11 +16,26 @@ final class ExtensionManager: NSObject, ObservableObject {
         var label: String {
             switch self {
             case .unknown: return L("Unknown")
-            case .notInstalled: return L("Not installed")
+            case .notInstalled:
+                #if APP_STORE
+                return L("Filter disabled")
+                #else
+                return L("Not installed")
+                #endif
             case .awaitingApproval: return L("Waiting for approval in System Settings › General › Login Items & Extensions")
-            case .installing: return L("Installing…")
+            case .installing:
+                #if APP_STORE
+                return L("Enabling…")
+                #else
+                return L("Installing…")
+                #endif
             case .enabled: return L("Filter enabled")
-            case .disabled: return L("Installed, filter disabled")
+            case .disabled:
+                #if APP_STORE
+                return L("Filter disabled")
+                #else
+                return L("Installed, filter disabled")
+                #endif
             case .needsReboot: return L("Restart this Mac to finish replacing the filter")
             case .failed(let m): return L("Failed: %@", m)
             }
@@ -65,6 +82,7 @@ final class ExtensionManager: NSObject, ObservableObject {
         Self.current = self
     }
 
+    #if !APP_STORE
     /// The properties request in flight, if any. The delegate callbacks are shared with installation requests
     /// and a version check is otherwise indistinguishable from one.
     private var versionCheck: OSSystemExtensionRequest?
@@ -74,6 +92,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     private var deactivation: OSSystemExtensionRequest?
     /// Set while `reinstall()` is deactivating, so the deactivation's completion re-activates instead of stopping.
     private var reinstalling = false
+    #endif
 
     /// This app's version — the one the extension it ships was built alongside.
     nonisolated static var appVersion: String {
@@ -88,9 +107,16 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// therefore no "restart to finish the update". Falls back to the app version if the embedded copy can't be read,
     /// which is the old behaviour and errs towards not crying "stale".
     nonisolated static var expectedExtensionVersion: String {
+        #if APP_STORE
+        let directory = "Contents/PlugIns"
+        let product = "\(FlowlightConstants.extensionBundleIdentifier).appex"
+        #else
+        let directory = "Contents/Library/SystemExtensions"
+        let product = "\(FlowlightConstants.extensionBundleIdentifier).systemextension"
+        #endif
         let url = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
-            .appendingPathComponent("\(FlowlightConstants.extensionBundleIdentifier).systemextension", isDirectory: true)
+            .appendingPathComponent(directory, isDirectory: true)
+            .appendingPathComponent(product, isDirectory: true)
         guard let bundle = Bundle(url: url),
               let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
               !version.isEmpty else { return appVersion }
@@ -102,20 +128,37 @@ final class ExtensionManager: NSObject, ObservableObject {
     static let isEntitled: Bool = {
         guard let task = SecTaskCreateFromSelf(nil) else { return false }
         let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.networking.networkextension" as CFString, nil)
-        return (value as? [String])?.contains("content-filter-provider-systemextension") == true
+        #if APP_STORE
+        let required = "content-filter-provider"
+        #else
+        let required = "content-filter-provider-systemextension"
+        #endif
+        return (value as? [String])?.contains(required) == true
     }()
 
     var hasEntitlement: Bool { Self.isEntitled }
 
-    /// macOS only activates system extensions from apps in /Applications.
-    var isInApplications: Bool { Bundle.main.bundlePath.hasPrefix("/Applications/") }
+    /// Developer ID system extensions must live in /Applications; Store app extensions have no such requirement.
+    var isInApplications: Bool {
+        #if APP_STORE
+        true
+        #else
+        Bundle.main.bundlePath.hasPrefix("/Applications/")
+        #endif
+    }
 
     /// Why activation cannot work right now, if anything.
     var blocker: String? {
         if !hasEntitlement {
+            #if APP_STORE
+            return L("This build isn't signed with the Network Extension entitlement.")
+            #else
             return L("This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension.")
+            #endif
         }
+        #if !APP_STORE
         if !isInApplications { return L("Move Flowlight to /Applications. macOS only activates system extensions from there.") }
+        #endif
         return nil
     }
 
@@ -127,6 +170,9 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// `completion` is called once, when macOS has finished answering, with what it said. Capture uses it to
     /// report a repair it has just asked for rather than going quiet for another thirty seconds.
     func matchExtensionToApp(completion: ((VersionCheck) -> Void)? = nil) {
+        #if APP_STORE
+        completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion))
+        #else
         guard hasEntitlement, isInApplications else { completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion)); return }
         // One at a time. The ladder in ExtensionRecovery asks for this once per session, but a user pressing
         // Refresh while it is in flight shouldn't start a second conversation with the same delegate.
@@ -138,8 +184,10 @@ final class ExtensionManager: NSObject, ObservableObject {
         request.delegate = self
         versionCheck = request
         OSSystemExtensionManager.shared.submitRequest(request)
+        #endif
     }
 
+    #if !APP_STORE
     /// Ends the version check, whichever way it went, and hands the answer back exactly once.
     private func finishVersionCheck() {
         versionCheck = nil
@@ -147,6 +195,7 @@ final class ExtensionManager: NSObject, ObservableObject {
         versionCheckCompletion = nil
         completion?(versionCheckResult)
     }
+    #endif
 
     func refresh() {
         guard hasEntitlement else { state = .notInstalled; return }
@@ -156,8 +205,12 @@ final class ExtensionManager: NSObject, ObservableObject {
                 if let error { self.state = .failed(error.localizedDescription); return }
                 let manager = NEFilterManager.shared()
                 if manager.providerConfiguration == nil { self.state = .notInstalled }
-                else if manager.isEnabled { self.state = .enabled; self.upgradeToNeedsRebootIfHeld() }
-                else { self.state = .disabled }
+                else if manager.isEnabled {
+                    self.state = .enabled
+                    #if !APP_STORE
+                    self.upgradeToNeedsRebootIfHeld()
+                    #endif
+                } else { self.state = .disabled }
             }
         }
     }
@@ -168,6 +221,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// ground truth `systemextensionsctl` reports and upgrades the state to `.needsReboot`, which the Capture banner
     /// turns into the restart-or-reinstall tip. Run after settling on `.enabled`, and only upgrades from it, so it
     /// can't fight a state the user just changed.
+    #if !APP_STORE
     private func upgradeToNeedsRebootIfHeld() {
         Task { @MainActor in
             let extensions = await SystemExtensionScan.read()
@@ -176,6 +230,7 @@ final class ExtensionManager: NSObject, ObservableObject {
             self.state = .needsReboot
         }
     }
+    #endif
 
     /// Whether the scan shows *our* previous copies holding the slot until a restart: the current build enabled and
     /// at least one earlier copy "waiting to uninstall on reboot". This is the reliable signal — read from what
@@ -193,13 +248,20 @@ final class ExtensionManager: NSObject, ObservableObject {
     func activate() {
         if let blocker { state = .failed(blocker); return }
         state = .installing
+        #if APP_STORE
+        setFilterEnabled(true)
+        #else
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                  queue: .main)
         request.delegate = self
         OSSystemExtensionManager.shared.submitRequest(request)
+        #endif
     }
 
     func deactivate() {
+        #if APP_STORE
+        setFilterEnabled(false)
+        #else
         setFilterEnabled(false) { [weak self] in
             guard let self else { return }
             let request = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
@@ -208,6 +270,7 @@ final class ExtensionManager: NSObject, ObservableObject {
             self.deactivation = request
             OSSystemExtensionManager.shared.submitRequest(request)
         }
+        #endif
     }
 
     /// Uninstall the filter and install it again, without a restart. macOS runs one content filter at a time, and
@@ -215,8 +278,12 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// the current build should have. Deactivating drops those copies; activating brings the current build back —
     /// into the slot this time. It is the alternative to restarting the Mac when it is holding the old filter.
     func reinstall() {
+        #if APP_STORE
+        setFilterEnabled(false) { [weak self] in self?.setFilterEnabled(true) }
+        #else
         reinstalling = true
         deactivate()
+        #endif
     }
 
     func setFilterEnabled(_ enabled: Bool, completion: (() -> Void)? = nil) {
@@ -225,12 +292,13 @@ final class ExtensionManager: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 if let loadError { self.state = .failed(loadError.localizedDescription); completion?(); return }
-                if manager.providerConfiguration == nil {
-                    let config = NEFilterProviderConfiguration()
-                    config.filterSockets = true
-                    config.filterPackets = false
-                    manager.providerConfiguration = config
-                }
+                let config = manager.providerConfiguration ?? NEFilterProviderConfiguration()
+                #if APP_STORE
+                config.filterDataProviderBundleIdentifier = FlowlightConstants.extensionBundleIdentifier
+                #endif
+                config.filterSockets = true
+                config.filterPackets = false
+                manager.providerConfiguration = config
                 manager.localizedDescription = "Flowlight"
                 manager.isEnabled = enabled
                 manager.saveToPreferences { saveError in
@@ -245,6 +313,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
 }
 
+#if !APP_STORE
 extension ExtensionManager: OSSystemExtensionRequestDelegate {
     nonisolated private static func versionIdentity(_ properties: OSSystemExtensionProperties) -> String {
         let version = properties.bundleShortVersion
@@ -320,3 +389,4 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
         }
     }
 }
+#endif

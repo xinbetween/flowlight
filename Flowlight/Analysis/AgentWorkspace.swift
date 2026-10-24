@@ -230,6 +230,7 @@ final class AgentWorkspaceStore: ObservableObject {
         static let workspaces = "agents.workspaces"
         static let scannedAt = "agents.scannedAt"
         static let roots = "agents.roots"
+        static let rootBookmarks = "agents.rootBookmarks"
     }
 
     @Published private(set) var workspaces: [AgentWorkspace] = []
@@ -242,10 +243,18 @@ final class AgentWorkspaceStore: ObservableObject {
     static let staleAfter: TimeInterval = 14 * 86400
 
     private let defaults: UserDefaults
+    #if APP_STORE
+    private var securityScopedRoots: [URL] = []
+    #endif
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        #if APP_STORE
+        roots = Self.restoreBookmarks(defaults.data(forKey: Keys.rootBookmarks))
+        securityScopedRoots = roots.filter { $0.startAccessingSecurityScopedResource() }
+        #else
         roots = (defaults.array(forKey: Keys.roots) as? [String] ?? []).map { URL(fileURLWithPath: $0) }
+        #endif
         scannedAt = defaults.object(forKey: Keys.scannedAt) as? Date
         if let data = defaults.data(forKey: Keys.workspaces),
            let stored = try? JSONDecoder().decode([AgentWorkspace].self, from: data) {
@@ -268,21 +277,41 @@ final class AgentWorkspaceStore: ObservableObject {
         scanning = true
         let extraRoots = roots
         Task.detached(priority: .utility) {
+            #if APP_STORE
+            let found = AgentWorkspaceScanner.scan(home: FileManager.default.temporaryDirectory, extraRoots: extraRoots)
+            #else
             let found = AgentWorkspaceScanner.scan(extraRoots: extraRoots)
+            #endif
             await MainActor.run { self.store(found) }
         }
     }
 
     func addRoot(_ url: URL) {
-        guard !roots.contains(url) else { return }
-        roots.append(url)
+        let root = url.standardizedFileURL
+        guard !roots.contains(root) else { return }
+        #if APP_STORE
+        guard let bookmark = try? root.bookmarkData(options: .withSecurityScope) else { return }
+        guard root.startAccessingSecurityScopedResource() else { return }
+        securityScopedRoots.append(root)
+        roots.append(root)
+        saveBookmarks(adding: bookmark)
+        #else
+        roots.append(root)
         defaults.set(roots.map(\.path), forKey: Keys.roots)
+        #endif
         refresh(force: true)
     }
 
     func removeRoot(_ url: URL) {
+        #if APP_STORE
+        securityScopedRoots.filter { $0 == url }.forEach { $0.stopAccessingSecurityScopedResource() }
+        securityScopedRoots.removeAll { $0 == url }
+        roots.removeAll { $0 == url }
+        saveBookmarks()
+        #else
         roots.removeAll { $0 == url }
         defaults.set(roots.map(\.path), forKey: Keys.roots)
+        #endif
         refresh(force: true)
     }
 
@@ -301,6 +330,33 @@ final class AgentWorkspaceStore: ObservableObject {
         defaults.set(try? JSONEncoder().encode(found), forKey: Keys.workspaces)
         defaults.set(scannedAt, forKey: Keys.scannedAt)
     }
+
+    #if APP_STORE
+    private static func restoreBookmarks(_ data: Data?) -> [URL] {
+        guard let data,
+              let bookmarks = try? PropertyListDecoder().decode([Data].self, from: data) else { return [] }
+        var seen = Set<String>()
+        return bookmarks.compactMap { bookmark in
+            var stale = false
+            guard let url = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: [.withSecurityScope, .withoutUI],
+                relativeTo: nil,
+                bookmarkDataIsStale: &stale
+            ), !stale, seen.insert(url.standardizedFileURL.path).inserted else { return nil }
+            return url.standardizedFileURL
+        }
+    }
+
+    private func saveBookmarks(adding bookmark: Data? = nil) {
+        var bookmarks = roots.compactMap {
+            try? $0.bookmarkData(options: .withSecurityScope)
+        }
+        if let bookmark, bookmarks.isEmpty { bookmarks = [bookmark] }
+        defaults.set(try? PropertyListEncoder().encode(bookmarks), forKey: Keys.rootBookmarks)
+        defaults.removeObject(forKey: Keys.roots)
+    }
+    #endif
 
     /// Workspaces belonging to an agent, its own first, then the projects it's configured in.
     func workspaces(bundleID: String, name: String) -> [AgentWorkspace] {

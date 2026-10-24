@@ -26,6 +26,17 @@ extension TrafficSource {
     func setRulePacks(_ snapshot: RulePackSnapshot?) {}
 }
 
+/// A truthful fail-closed capture source for builds that cannot use their only supported provider.
+final class UnavailableTrafficSource: TrafficSource {
+    let message: String
+    var displayName: String { L("Network Extension") }
+
+    init(message: String) { self.message = message }
+
+    func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) { status(message) }
+    func stop() {}
+}
+
 enum CaptureMode: String, CaseIterable, Identifiable {
     case networkExtension, nettop
     var id: String { rawValue }

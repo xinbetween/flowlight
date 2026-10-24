@@ -16,4 +16,18 @@ final class DemoDataTests: XCTestCase {
         XCTAssertFalse(day.isEmpty, "the last day has no hourly rollups, so every view that reads history is empty")
         XCTAssertTrue(day.contains { !$0.bundleID.isEmpty }, "rollups exist but name no app")
     }
+
+    func testPackReviewFixtureWritesStaleConsentWithoutEnablingThePack() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-pack-review-\(UUID()).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+
+        try DemoData.seedPackReview(db)
+
+        let saved = try XCTUnwrap(db.loadRulePackConfigurations().first)
+        XCTAssertEqual(saved.packID, BuiltInRulePacks.advertising.id)
+        XCTAssertFalse(saved.enabled)
+        XCTAssertFalse(saved.isConsented(to: BuiltInRulePacks.advertising))
+        XCTAssertEqual(try db.loadRulePackReviewPackIDs(), [saved.packID])
+    }
 }

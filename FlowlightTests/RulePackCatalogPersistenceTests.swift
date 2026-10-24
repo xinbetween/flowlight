@@ -103,6 +103,8 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
 
         let state = try db.loadRulePackCatalogState(catalogID: catalogID)
         XCTAssertEqual(state.receipt?.sequence, 2)
+        XCTAssertEqual(state.receipt?.acceptedAt, acceptedAt,
+                       "reaccepting identical content must preserve migration evidence")
         XCTAssertEqual(state.cache?.rawEnvelope, recovered.rawEnvelope)
         XCTAssertEqual(state.cache?.etag, "new")
     }
@@ -140,6 +142,67 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         XCTAssertEqual(accepted.configurations.first { $0.packID == dormant.packID }, dormant)
         XCTAssertEqual(try db.loadRulePackConfigurations().sorted { $0.packID < $1.packID },
                        accepted.configurations)
+    }
+
+    func testBootstrapDoesNotInferReviewForLegacyDisabledStalePack() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-no-disabled-inference"))
+        let original = BuiltInRulePacks.advertising
+        var changed = original
+        changed.manifest.version = "2"
+        changed.entries.append(RulePackEntry(id: 999, host: "changed.example", category: .advertising))
+        changed.entries.sort { "\($0.host)|\($0.match.rawValue)" < "\($1.host)|\($1.match.rawValue)" }
+        changed.manifest.entryCount = changed.entries.count
+        changed.manifest.contentSHA256 = RulePackValidator.digest(changed.entries)
+        let catalog = verifiedCatalog(
+            sequence: 2,
+            digest: String(repeating: "b", count: 64),
+            definitions: [changed]
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: acceptedAt,
+            nextEligibleAt: nextCheck
+        )
+        var disabled = RulePackConfiguration(packID: original.id)
+        disabled.consentedVersion = original.manifest.version
+        disabled.consentedContentSHA256 = original.manifest.contentSHA256
+        try db.saveRulePackConfiguration(disabled)
+
+        let repaired = try db.reconcileRulePackCatalogBootstrap(
+            db.loadRulePackCatalogBootstrap(catalogID: catalogID),
+            definitions: catalog.definitions
+        )
+
+        XCTAssertTrue(repaired.pendingReviewPackIDs.isEmpty)
+        XCTAssertFalse(try XCTUnwrap(repaired.configurations.first).enabled)
+    }
+
+    func testBootstrapDisablesAndPersistsLegacyOmittedActivePack() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-omitted-backfill"))
+        let catalog = verifiedCatalog(
+            sequence: 2,
+            digest: String(repeating: "b", count: 64),
+            definitions: []
+        )
+        _ = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: acceptedAt,
+            nextEligibleAt: nextCheck
+        )
+        var legacyActive = RulePackConfiguration(packID: "official.legacy-omitted", enabled: true)
+        legacyActive.consentedVersion = "1"
+        legacyActive.consentedContentSHA256 = String(repeating: "a", count: 64)
+        try db.saveRulePackConfiguration(legacyActive)
+
+        let bootstrap = try db.loadRulePackCatalogBootstrap(catalogID: catalogID)
+        let repaired = try db.reconcileRulePackCatalogBootstrap(
+            bootstrap,
+            definitions: catalog.definitions
+        )
+
+        XCTAssertEqual(repaired.pendingReviewPackIDs, [legacyActive.packID])
+        XCTAssertFalse(try XCTUnwrap(repaired.configurations.first).enabled)
+        XCTAssertFalse(try XCTUnwrap(db.loadRulePackConfigurations().first).enabled)
     }
 
     func testFailedCacheWriteRollsBackReceiptAndConsentReconciliation() throws {
@@ -216,6 +279,7 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         }
         configuration.enabled = false
         XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: nil))
+        XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: current))
     }
 
     func testAsyncResultReturnsValuesAndPropagatesErrors() async throws {

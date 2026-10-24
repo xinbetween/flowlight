@@ -192,11 +192,14 @@
 "Not installed" = "Nicht installiert";
 "Waiting for approval in System Settings › General › Login Items & Extensions" = "Warten auf Freigabe in Systemeinstellungen › Allgemein › Anmeldeobjekte & Erweiterungen";
 "Installing…" = "Wird installiert…";
+"Enabling…" = "Wird aktiviert…";
 "Filter enabled" = "Filter aktiviert";
+"Filter disabled" = "Filter deaktiviert";
 "Installed, filter disabled" = "Installiert, Filter deaktiviert";
 "Restart this Mac to finish replacing the filter" = "Diesen Mac neu starten, um den Filterwechsel abzuschließen";
 "Failed: %@" = "Fehlgeschlagen: %@";
 "unknown" = "unbekannt";
+"This build isn't signed with the Network Extension entitlement." = "Dieser Build ist nicht mit der Berechtigung für die Netzwerkerweiterung signiert.";
 "This build isn't signed with the Network Extension entitlement. Build with scripts/build-signed.sh using a team that Apple has granted content-filter-provider-systemextension." = "Dieser Build ist nicht mit der Berechtigung für die Netzwerkerweiterung signiert. Mit scripts/build-signed.sh und einem Team bauen, dem Apple content-filter-provider-systemextension gewährt hat.";
 "Move Flowlight to /Applications. macOS only activates system extensions from there." = "Flowlight nach /Applications verschieben. macOS aktiviert Systemerweiterungen nur von dort.";
 
@@ -623,6 +626,15 @@
 "Delete all recorded traffic, baselines and alerts?" = "Allen aufgezeichneten Datenverkehr, alle Basislinien und Warnungen löschen?";
 "Delete everything" = "Alles löschen";
 "nettop sampler · the extension didn't answer" = "nettop-Sampler · die Erweiterung hat nicht geantwortet";
+"Network Extension · unavailable" = "Netzwerkerweiterung · nicht verfügbar";
+"Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "Die Filtererweiterung ist nicht erreichbar. Aktiviere sie unter Inhaltsfilter und klicke dann auf Aktualisieren.";
+"%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — aktiviere Flowlight unter Inhaltsfilter und klicke dann auf Aktualisieren.";
+"%@ — the content filter is unavailable" = "%@ — der Inhaltsfilter ist nicht verfügbar";
+"The content filter is unavailable" = "Der Inhaltsfilter ist nicht verfügbar";
+"Flowlight couldn't reach the embedded content filter. Enable it in System Settings, then press Refresh." = "Flowlight konnte den eingebetteten Inhaltsfilter nicht erreichen. Aktiviere ihn in den Systemeinstellungen und klicke dann auf Aktualisieren.";
+"Reconnect to the content filter" = "Erneut mit dem Inhaltsfilter verbinden";
+"If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "Wenn ein VPN oder Sicherheitsagent diesen Platz bereits belegt – Palo Alto Networks GlobalProtect, CrowdStrike Falcon und ähnliche verwenden ihn –, kann der Flowlight-Filter keinen Datenverkehr empfangen, bis dieser Filter deaktiviert wird.";
+"The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "Der Filter antwortet nicht, daher empfängt Flowlight keinen Datenverkehr. Aktiviere ihn unter Inhaltsfilter und klicke dann auf Aktualisieren.";
 "%@ · receiving" = "%@ · empfängt";
 "%@ · nothing arriving yet" = "%@ · noch kommt nichts an";
 "Source" = "Quelle";
@@ -634,6 +646,9 @@
 "Nothing is arriving" = "Es kommt nichts an";
 "Flowlight couldn't reach the filter extension and is sampling with nettop so you still get data. Your chosen source is still the extension." = "Flowlight konnte die Filtererweiterung nicht erreichen und tastet mit nettop ab, damit Sie weiter Daten erhalten. Ihre gewählte Quelle ist weiterhin die Erweiterung.";
 "Install & Enable Filter" = "Filter installieren & aktivieren";
+"Enable Filter" = "Filter aktivieren";
+"The content filter (NEFilterDataProvider) attributes eligible TCP and UDP flows to their source apps via audit tokens, extracts TLS SNI, HTTP Host and DNS answers, and sends one-second summaries to this app over XPC. It is embedded in the App Store app and uses the Network Extension entitlement (content-filter-provider). It only refuses a connection where a rule says to; with no enforcing rule it reports and nothing else." = "Der Inhaltsfilter (NEFilterDataProvider) ordnet geeignete TCP- und UDP-Flows über Audit-Token ihren Quell-Apps zu, entnimmt TLS-SNI, HTTP-Host und DNS-Antworten und sendet Sekundenzusammenfassungen über XPC an diese App. Er ist in die App-Store-App eingebettet und verwendet die Berechtigung für die Netzwerkerweiterung (content-filter-provider). Er verweigert eine Verbindung nur dort, wo eine Regel es verlangt; ohne durchsetzende Regel meldet er und sonst nichts.";
+"The embedded filter remains active until you select Disable. While the Flowlight app is closed, summaries are buffered by the extension for later delivery, subject to its retention limit." = "Der eingebettete Filter bleibt aktiv, bis Sie Deaktivieren wählen. Während die Flowlight-App geschlossen ist, puffert die Erweiterung Zusammenfassungen zur späteren Übertragung bis zu ihrem Aufbewahrungslimit.";
 "Disable Filter" = "Filter deaktivieren";
 "Uninstall" = "Deinstallieren";
 "Refresh" = "Aktualisieren";
@@ -1188,6 +1203,8 @@
 "Blocking" = "Blockieren";
 "Needs extension update" = "Erweiterung muss aktualisiert werden";
 "Needs review" = "Überprüfung erforderlich";
+"One pack needs review" = "Ein Paket muss überprüft werden";
+"%lld packs need review" = "%lld Pakete müssen überprüft werden";
 "Test against recent traffic" = "Mit kürzlich erfasstem Datenverkehr testen";
 "Apply this pack to every app?" = "Dieses Paket auf jede App anwenden?";
 "Apply to every app" = "Auf jede App anwenden";
@@ -1734,3 +1751,5 @@
 "Suggests reviewed actions" = "Suggests reviewed actions";
 "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic." = "Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic.";
 "Couldn't delete the captured data: %@" = "Die erfassten Daten konnten nicht gelöscht werden: %@";
+"This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "Dieses zuvor aktivierte offizielle Paket ist nicht mehr im Katalog. Die Blockierung wurde automatisch beendet.";
+"Could not prepare managed-pack review demo: %@" = "Die Demo zur Überprüfung verwalteter Pakete konnte nicht vorbereitet werden: %@";

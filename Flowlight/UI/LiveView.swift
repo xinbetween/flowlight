@@ -108,7 +108,7 @@ struct LiveView: View {
                         Text(monitor.status)
                     }
                 } actions: {
-                    Button(L("Open Capture Settings")) { nav.selection = .capture }
+                    Button(L("Open Capture Settings")) { nav.show(.capture) }
                 }
             }
         }

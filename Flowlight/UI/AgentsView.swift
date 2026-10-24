@@ -1121,7 +1121,11 @@ struct AgentSetupBar: View {
                 Text(L("Flowlight can also list what %@ is set up with: its skills, subagents, slash commands, hooks and MCP servers. It reads those config files on this Mac and keeps only their names; nothing is sent anywhere.", agent))
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
+                    #if APP_STORE
+                    Button(L("Add project folder…")) { pickFolder() }
+                    #else
                     Button(L("Look for agent configuration")) { store.refresh(force: true) }
+                    #endif
                     Button(L("Why?")) { openURL(Help.agentConfiguration) }.buttonStyle(.link)
                 }
             } else {
@@ -1211,11 +1215,14 @@ struct InspectionHint: View {
     private var inspecting: Bool { inspection.enabled && inspection.running }
 
     var body: some View {
+        #if APP_STORE
+        EmptyView()
+        #else
         VStack(alignment: .leading, spacing: 6) {
             Text(message)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if !inspecting {
-                Button(L("Set up HTTPS inspection")) { nav.selection = .inspect }
+                Button(L("Set up HTTPS inspection")) { nav.show(.inspect) }
                     .controlSize(.small)
             } else if !seen {
                 HStack(spacing: 8) {
@@ -1229,7 +1236,7 @@ struct InspectionHint: View {
                         Button(L("Relaunch Through the Proxy")) { confirmingRelaunch = true }
                             .controlSize(.small)
                     }
-                    Button(L("Open Inspected Terminal")) { nav.selection = .inspect }
+                    Button(L("Open Inspected Terminal")) { nav.show(.inspect) }
                         .controlSize(.small)
                 }
                 if let relaunchError {
@@ -1256,6 +1263,7 @@ struct InspectionHint: View {
             Text(L("%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight.",
                    supervisor?.name ?? "", agent, supervisor?.name ?? ""))
         }
+        #endif
     }
 
     /// What is actually starting this agent, when it is something other than a terminal.

@@ -63,11 +63,15 @@ struct ExtensionRecovery {
             return .fallBack
         }
         let after = Self.delay(forAttempt: attempts)
+        #if APP_STORE
+        return .redial(after: after)
+        #else
         if attempts >= Self.attemptsBeforeVersionCheck, !versionChecked {
             versionChecked = true
             return .repairVersion(after: after)
         }
         return .redial(after: after)
+        #endif
     }
 
     /// The connection came up and the extension registered. The ladder starts again from the bottom, but what
@@ -100,7 +104,11 @@ struct ExtensionRecovery {
             return L("%@ — checking whether the installed extension matches this app, then reconnecting in %llds",
                      message, Int(after))
         case .fallBack:
+            #if APP_STORE
+            return L("%@ — the content filter is unavailable", message)
+            #else
             return L("%@ — switching to the nettop sampler", message)
+            #endif
         }
     }
 }

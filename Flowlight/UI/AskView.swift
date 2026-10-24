@@ -76,7 +76,7 @@ private struct AskContent: View {
                         guard let filter = call.filter else { return }
                         nav.showReport(filter: filter, end: call.to)
                     } go: { screen in
-                        nav.selection = screen
+                        nav.show(screen)
                     }
                     .entrance()
                     if turn.id != ask.turns.last?.id { Divider() }

@@ -19,10 +19,17 @@ final class PluginScriptRunner: @unchecked Sendable {
     private init() {}
 
     func evaluate(exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {
-        manifests.flatMap { evaluate(exchange: exchange, manifest: $0) }
+        #if APP_STORE
+        return []
+        #else
+        return manifests.flatMap { evaluate(exchange: exchange, manifest: $0) }
+        #endif
     }
 
     func evaluate(exchange: HTTPExchange, manifest: PluginManifest) -> [PluginFindingDraft] {
+        #if APP_STORE
+        return []
+        #else
         guard manifest.enabled, manifest.source == .installed, !manifest.script.isEmpty,
               manifest.script.lengthOfBytes(using: .utf8) <= Self.maxScriptBytes else { return [] }
         let input: [String: Any] = [
@@ -69,6 +76,7 @@ final class PluginScriptRunner: @unchecked Sendable {
               let object = try? JSONSerialization.jsonObject(with: captured) as? [String: Any],
               let rawFindings = object["findings"] as? [[String: Any]] else { return [] }
         return rawFindings.prefix(8).compactMap { draft(from: $0, manifest: manifest, exchange: exchange) }
+        #endif
     }
 
     private func draft(from object: [String: Any], manifest: PluginManifest, exchange: HTTPExchange) -> PluginFindingDraft? {

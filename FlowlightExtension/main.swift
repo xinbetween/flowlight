@@ -1,3 +1,4 @@
+#if !APP_STORE
 import Foundation
 import NetworkExtension
 
@@ -7,3 +8,4 @@ autoreleasepool {
 }
 
 dispatchMain()
+#endif

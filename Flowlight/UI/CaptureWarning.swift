@@ -101,11 +101,13 @@ struct CaptureWarningBanner: View {
                     Text(warning)
                         .font(.caption).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    #if !APP_STORE
                     if showSwitch, monitor.mode == .networkExtension {
                         Button(L("Use the nettop Sampler")) { monitor.setMode(.nettop) }
                             .controlSize(.small)
                             .padding(.top, 2)
                     }
+                    #endif
                 }
             }
             .padding(12)

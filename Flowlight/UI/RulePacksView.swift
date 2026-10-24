@@ -47,8 +47,20 @@ private struct RulePacksContent: View {
                         .font(.caption).foregroundStyle(FL.warning)
                         .padding(10).background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
-                ForEach(packs.definitions) { pack in
-                    card(pack)
+                if catalog.status == .idle {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(L("Loading…")).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                } else {
+                    ForEach(packs.definitions) { pack in
+                        card(pack)
+                    }
+                    ForEach(packs.unavailableReviewConfigurations) { configuration in
+                        unavailableCard(configuration)
+                    }
                 }
             }
             .padding(Measure.gutter)
@@ -209,6 +221,40 @@ private struct RulePacksContent: View {
         }
         .padding(14)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func unavailableCard(_ configuration: RulePackConfiguration) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "shippingbox.and.arrow.backward")
+                    .font(.title3).foregroundStyle(FL.warning)
+                    .frame(width: 34, height: 34).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(configuration.packID).font(.body.weight(.semibold)).textSelection(.enabled)
+                    Text(L("This previously enabled official pack is no longer in the catalog. Blocking stopped automatically."))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button(L("Acknowledge")) {
+                    saves.begin(configuration.packID)
+                    saveErrors[configuration.packID] = nil
+                    packs.acknowledgeUnavailableReview(configuration.packID) { success in
+                        saves.finish(configuration.packID)
+                        if !success {
+                            saveErrors[configuration.packID] = packs.failureMessage ?? L("Failed: %@", L("Save"))
+                        }
+                    }
+                }
+                .disabled(saves.contains(configuration.packID))
+            }
+            if let saveError = saveErrors[configuration.packID] {
+                Label(saveError, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.critical)
+            }
+        }
+        .padding(14)
+        .background(FL.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
     }
 
     private func status(_ configuration: RulePackConfiguration,
