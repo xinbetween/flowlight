@@ -5,7 +5,8 @@ Internals, build options and the Network Extension path. For an overview, see th
 ## Layout
 
 ```
-project.yml                 XcodeGen spec (run `xcodegen generate` to regenerate the .xcodeproj)
+project.yml                 XcodeGen source of truth
+Flowlight.xcodeproj/         Committed shared output so Xcode Cloud can discover the project before build scripts run
 Shared/                     Compiled into both targets
   TrafficModels.swift         FlowKey (pid, bundle, ip, domain, port, protocol) → bytes in/out, flows
   IPCProtocol.swift           XPC contract between the extension and the app
@@ -78,6 +79,11 @@ TEAM_ID=ABCDE12345 scripts/build-signed.sh
 ```
 
 Run the tests with `xcodebuild -scheme Flowlight test CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`.
+
+`project.yml` remains the editable project definition. After changing it, run
+`scripts/check_xcode_project.sh --write`, verify with `scripts/check_xcode_project.sh`, and commit the four shared files under
+`Flowlight.xcodeproj/`. The generated project is deliberately committed because Xcode Cloud must find its selected
+container before a post-clone script can run. User data and Xcode Cloud's local manifest remain ignored.
 
 **If the checkout is under `~/Desktop`, `~/Documents` or `~/Downloads`, two tests will hang for two minutes
 each and the run will fail.** `HelpTests` reads the built `docs/docs/index.html` to check that every screen's

@@ -352,7 +352,8 @@ same local database.
 ```sh
 brew install xcodegen
 git clone https://github.com/xinbetween/flowlight.git && cd flowlight
-xcodegen generate
+scripts/check_xcode_project.sh --write  # regenerate the committed shared Xcode project
+scripts/check_xcode_project.sh          # verify it still matches project.yml
 scripts/build-local.sh                  # ad-hoc signed, no Apple account needed
 open build/Build/Products/Release/Flowlight.app
 scripts/build-dmg.sh                    # optional: drag-to-install disk image (build/Flowlight.dmg)

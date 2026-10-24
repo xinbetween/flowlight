@@ -6,7 +6,8 @@ Thanks for helping make network activity on macOS understandable.
 
 ```sh
 brew install xcodegen
-xcodegen generate
+scripts/check_xcode_project.sh --write
+scripts/check_xcode_project.sh
 scripts/build-local.sh
 open build/Build/Products/Release/Flowlight.app --args -FLDemo YES   # synthetic data, safe for screenshots
 ```
