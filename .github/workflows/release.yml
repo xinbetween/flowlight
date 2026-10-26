@@ -64,9 +64,13 @@ jobs:
       - name: Read the version and check it matches the tag
         id: version
         run: |
+          set -euo pipefail
           VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          BUILD=$(sed -n 's/.*CURRENT_PROJECT_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          [[ -n "$VERSION" && -n "$BUILD" ]] || { echo "::error::Missing version metadata in project.yml."; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           if [[ "$TAG" != "v$VERSION" ]]; then
             echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION in project.yml."
@@ -80,8 +84,22 @@ jobs:
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
-      # The committed project is the exact graph reviewed by CI and selected by Xcode Cloud. Release builds consume
-      # it directly; regeneration belongs only in the explicit drift gate before the commit is tagged.
+      # The committed project is the exact graph reviewed by CI and selected by Xcode Cloud. Verify its release
+      # metadata before consuming it so a stale project can never publish under a newer project.yml/tag.
+      - name: Check committed project version
+        run: |
+          set -euo pipefail
+          for target in Flowlight FlowlightAppStore; do
+            settings="$RUNNER_TEMP/$target-settings.txt"
+            xcodebuild -project Flowlight.xcodeproj -target "$target" -configuration Release -showBuildSettings > "$settings"
+            project_version=$(sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' "$settings")
+            project_build=$(sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' "$settings")
+            if [[ "$project_version" != "${{ steps.version.outputs.version }}" || "$project_build" != "${{ steps.version.outputs.build }}" ]]; then
+              echo "::error::$target committed project is $project_version/$project_build; project.yml is ${{ steps.version.outputs.version }}/${{ steps.version.outputs.build }}."
+              exit 1
+            fi
+          done
+
       - name: Test
         timeout-minutes: 40
         run: |
