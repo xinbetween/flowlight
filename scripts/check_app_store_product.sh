@@ -6,9 +6,10 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 contents="$app/Contents"
 extension="$contents/PlugIns/com.flowlight.app.filter.appex"
 app_binary="$contents/MacOS/Flowlight"
+extension_binary="$extension/Contents/MacOS/com.flowlight.app.filter"
 extension_info="$extension/Contents/Info.plist"
-app_entitlements="$repo/Flowlight/Flowlight-AppStore.entitlements"
-extension_entitlements="$repo/FlowlightExtension/FlowlightExtension-AppStore.entitlements"
+temporary=$(mktemp -d "${TMPDIR:-/tmp}/flowlight-store-product.XXXXXX")
+trap 'rm -rf "$temporary"' EXIT
 
 fail() {
   echo "App Store product check failed: $*" >&2
@@ -19,17 +20,29 @@ plist_true() {
   [ "$(/usr/libexec/PlistBuddy -c "Print :$2" "$1" 2>/dev/null)" = true ]
 }
 
+extract_entitlements() {
+  local executable=$1 destination=$2 label=$3
+  codesign -d --entitlements :- "$executable" > "$destination" 2>/dev/null ||
+    fail "cannot read entitlements from signed Store $label"
+  plutil -lint "$destination" >/dev/null || fail "Store $label has no readable signed entitlements"
+}
+
+[ -x "$app_binary" ] || fail "missing app executable"
+[ -x "$extension_binary" ] || fail "missing embedded content-filter executable"
+extract_entitlements "$app_binary" "$temporary/app-entitlements.plist" app
+extract_entitlements "$extension_binary" "$temporary/extension-entitlements.plist" extension
+
 # The Store build disables HTTPS inspection: it neither installs a root certificate nor starts the local proxy.
-# Nothing in this product listens for inbound connections, so a server entitlement on either executable is a
+# Nothing in this product listens for inbound connections, so a server entitlement on either signed executable is a
 # least-privilege regression and will also stop automated App Review before the submission can proceed.
-if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' "$app_entitlements" >/dev/null 2>&1; then
-  fail "Store app declares network.server even though Store inspection is disabled"
+if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' "$temporary/app-entitlements.plist" >/dev/null 2>&1; then
+  fail "signed Store app declares network.server even though Store inspection is disabled"
 fi
-if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' "$extension_entitlements" >/dev/null 2>&1; then
-  fail "Store extension declares network.server but has no inbound listener"
+if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' "$temporary/extension-entitlements.plist" >/dev/null 2>&1; then
+  fail "signed Store extension declares network.server but has no inbound listener"
 fi
-plist_true "$app_entitlements" com.apple.security.network.client || fail "Store app is missing network.client"
-plist_true "$extension_entitlements" com.apple.security.network.client || fail "Store extension is missing network.client"
+plist_true "$temporary/app-entitlements.plist" com.apple.security.network.client || fail "signed Store app is missing network.client"
+plist_true "$temporary/extension-entitlements.plist" com.apple.security.network.client || fail "signed Store extension is missing network.client"
 
 ruby -ryaml -e '
   project = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
@@ -43,7 +56,6 @@ ruby -ryaml -e '
   end
 ' "$repo/project.yml" || fail "Store targets use the wrong entitlement files"
 
-[ -x "$app_binary" ] || fail "missing app executable"
 [ -d "$extension" ] || fail "missing embedded content-filter app extension"
 [ ! -d "$contents/Library/SystemExtensions" ] || fail "contains a direct-distribution system extension"
 [ ! -e "$contents/Library/Helpers/FlowlightResponseScriptHelper" ] || fail "contains the response-script helper"

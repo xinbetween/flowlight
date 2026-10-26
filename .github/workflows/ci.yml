@@ -178,16 +178,23 @@ jobs:
       - name: Generate the project and reject drift
         run: scripts/check_xcode_project.sh
 
-      # This compiles a different product graph and activation path from the Developer ID build. Ad-hoc signing
-      # deliberately strips protected entitlements; archive signing validates those with the distribution profiles.
+      # This compiles a different product graph and activation path from the Developer ID build. The build clears
+      # protected entitlements because CI has no Store profiles; the next step re-signs the isolated product with the
+      # repository plists so the product gate still inspects the actual executable entitlements it is meant to police.
       - name: Build the Mac App Store product
         run: |
           xcodebuild build -project Flowlight.xcodeproj -scheme "Flowlight App Store" \
             -configuration AppStore -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/store-build" \
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=
 
-      - name: Check the Mac App Store product structure
-        run: scripts/check_app_store_product.sh "$RUNNER_TEMP/store-build/Build/Products/AppStore/Flowlight.app"
+      - name: Check the Mac App Store product structure and signed entitlements
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/store-build/Build/Products/AppStore/Flowlight.app"
+          EXTENSION="$APP/Contents/PlugIns/com.flowlight.app.filter.appex"
+          codesign --force --sign - --entitlements FlowlightExtension/FlowlightExtension-AppStore.entitlements "$EXTENSION"
+          codesign --force --sign - --entitlements Flowlight/Flowlight-AppStore.entitlements "$APP"
+          scripts/check_app_store_product.sh "$APP"
 
       # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
       - name: Test

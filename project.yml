@@ -20,7 +20,6 @@ settings:
   configs:
     AppStore:
       DEVELOPMENT_TEAM: 38RJUJHKZS
-      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE"
 targets:
   Flowlight:
     type: application

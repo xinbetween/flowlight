@@ -67,8 +67,8 @@ Reports group any traffic still without a hostname under its network owner.
 ## Building
 
 ```sh
-brew install xcodegen
-xcodegen generate
+brew install xcodegen  # project regeneration requires exactly 2.46.0
+scripts/check_xcode_project.sh --write
 
 # Any Mac, no entitlements: ad-hoc signed, nettop fallback only
 scripts/build-local.sh

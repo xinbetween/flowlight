@@ -12,8 +12,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${TEAM_ID:?Set TEAM_ID to your Apple Developer team ID}"
-command -v xcodegen >/dev/null && xcodegen generate >/dev/null
-
 APP_PROFILE="${APP_PROFILE:-Flowlight Developer ID}"
 EXT_PROFILE="${EXT_PROFILE:-Flowlight Extension Developer ID}"
 ARCHIVE=build/Flowlight.xcarchive

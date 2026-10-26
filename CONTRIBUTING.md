@@ -5,7 +5,7 @@ Thanks for helping make network activity on macOS understandable.
 ## Getting started
 
 ```sh
-brew install xcodegen
+brew install xcodegen  # project regeneration requires exactly 2.46.0
 scripts/check_xcode_project.sh --write
 scripts/check_xcode_project.sh
 scripts/build-local.sh

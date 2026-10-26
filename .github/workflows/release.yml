@@ -82,12 +82,8 @@ jobs:
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate the project
-        run: xcodegen generate
-
+      # The committed project is the exact graph reviewed by CI and selected by Xcode Cloud. Release builds consume
+      # it directly; regeneration belongs only in the explicit drift gate before the commit is tagged.
       - name: Test
         timeout-minutes: 40
         run: |

@@ -1632,15 +1632,14 @@ Releases
  0.15.7
 October 25, 2026Latest
 
- Give Xcode Cloud a stable App Store project. The shared XcodeGen project and Store archive scheme are now
- committed so Apple can discover the selected container before any cloud build script runs.
-
- Keep the generated project honest. A repeatable drift gate regenerates the project from
- project.yml, canonicalizes XcodeGen’s one equivalent copy-phase ordering, and rejects drift in both the working tree
- and the exact Git index while continuing to ignore user-specific and Xcode-managed state.
-
  Minimize the Store extension’s network access. The sandboxed content filter no longer declares an unused
- inbound-listener entitlement, and the Store product gate now rejects that entitlement on either executable.
+ inbound-listener entitlement.
+
+ Validate what will actually ship. The Store product gate now extracts entitlements from the built app and
+ extension, rejecting forbidden inbound-listener access and missing outbound access on the signed executables themselves.
+
+ Keep distribution graphs isolated. Store-only compilation flags are scoped to Store targets, and release,
+ CodeQL, and local build paths consume the exact committed project reviewed by CI instead of regenerating it.
 
  0.15.6
 October 23, 2026

@@ -350,7 +350,7 @@ same local database.
 ### Build from source
 
 ```sh
-brew install xcodegen
+brew install xcodegen  # project regeneration requires exactly 2.46.0
 git clone https://github.com/xinbetween/flowlight.git && cd flowlight
 scripts/check_xcode_project.sh --write  # regenerate the committed shared Xcode project
 scripts/check_xcode_project.sh          # verify it still matches project.yml
