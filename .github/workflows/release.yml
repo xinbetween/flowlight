@@ -1,10 +1,8 @@
 name: Release
 
-# Builds, signs, notarizes and publishes on a version tag:
-#
-#   git tag -a v0.2.3 -m "Flowlight 0.2.3" && git push origin v0.2.3
-#
-# The secrets this needs are listed in docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
+# A version-tag push builds, signs, notarizes and verifies without publishing. After that dry run passes, dispatch
+# this workflow for the existing tag with dry_run=false to publish it. The secrets this needs are listed in
+# docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
 # GitHub. Without them the job fails at the import step rather than publishing something unsigned.
 #
 # It runs without waiting for an approval. What gates it instead: the release environment only accepts v* tags,
@@ -66,9 +64,13 @@ jobs:
       - name: Read the version and check it matches the tag
         id: version
         run: |
+          set -euo pipefail
           VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          BUILD=$(sed -n 's/.*CURRENT_PROJECT_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          [[ -n "$VERSION" && -n "$BUILD" ]] || { echo "::error::Missing version metadata in project.yml."; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           if [[ "$TAG" != "v$VERSION" ]]; then
             echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION in project.yml."
@@ -82,15 +84,28 @@ jobs:
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate the project
-        run: xcodegen generate
+      # The committed project is the exact graph reviewed by CI and selected by Xcode Cloud. Verify its release
+      # metadata before consuming it so a stale project can never publish under a newer project.yml/tag.
+      - name: Check committed project version
+        run: |
+          set -euo pipefail
+          for target in Flowlight FlowlightAppStore; do
+            settings="$RUNNER_TEMP/$target-settings.txt"
+            xcodebuild -project Flowlight.xcodeproj -target "$target" -configuration Release -showBuildSettings > "$settings"
+            project_version=$(sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' "$settings")
+            project_build=$(sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' "$settings")
+            if [[ "$project_version" != "${{ steps.version.outputs.version }}" || "$project_build" != "${{ steps.version.outputs.build }}" ]]; then
+              echo "::error::$target committed project is $project_version/$project_build; project.yml is ${{ steps.version.outputs.version }}/${{ steps.version.outputs.build }}."
+              exit 1
+            fi
+          done
 
       - name: Test
         timeout-minutes: 40
         run: |
+          # GitHub starts run blocks with bash -e. This step records the first attempt's status so it can retry a
+          # timeout, then exits explicitly if the final attempt failed.
+          set +e
           set -uo pipefail
           # xcodebuild occasionally never returns here — the same suite passes locally and on most runs, and the
           # per-test allowance below doesn't always catch it, so the whole invocation gets a watchdog. One retry:
@@ -227,7 +242,7 @@ jobs:
           ( cd build && shasum -a 256 Flowlight.dmg "Flowlight-$VERSION.pkg" | tee SHA256SUMS.txt )
 
       - name: Publish the release
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -261,7 +276,7 @@ jobs:
       # was invisible because verification used to pass when it found nothing. Checked against the published
       # release rather than the build directory, because what matters is what people can actually download.
       - name: The release must carry the checksums the updater looks for
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -285,7 +300,7 @@ jobs:
 
       # The cask points at the release that was just published, so this runs last.
       - name: Update the Homebrew cask
-        if: ${{ env.TAP_TOKEN != '' && github.event.inputs.dry_run != 'true' }}
+        if: ${{ env.TAP_TOKEN != '' && github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
           git clone "https://x-access-token:$TAP_TOKEN@github.com/xinbetween/homebrew-tap.git" "$RUNNER_TEMP/tap"
@@ -295,7 +310,7 @@ jobs:
           git -C "$RUNNER_TEMP/tap" push
 
       - name: Say what a dry run produced
-        if: ${{ github.event.inputs.dry_run == 'true' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'true' }}
         run: |
           set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
@@ -306,6 +321,6 @@ jobs:
             echo '```'
             cat build/SHA256SUMS.txt
             echo '```'
-            echo "Re-run without **dry_run** to publish \`${{ steps.version.outputs.tag }}\`."
+            echo "Dispatch this workflow for \`${{ steps.version.outputs.tag }}\` with **dry_run=false** to publish."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Dry run complete — Flowlight $VERSION built and verified, nothing published."

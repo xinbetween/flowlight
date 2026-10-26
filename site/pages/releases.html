@@ -13,7 +13,34 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.5</h2><time datetime="2026-10-22">October 22, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.7</h2><time datetime="2026-10-25">October 25, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Minimize the Store extension’s network access.</strong> The sandboxed content filter no longer declares an unused
+            inbound-listener entitlement.</li>
+          <li><strong>Validate what will actually ship.</strong> The Store product gate now extracts entitlements from the built app and
+            extension, rejecting forbidden inbound-listener access and missing outbound access on the signed executables themselves.</li>
+          <li><strong>Keep distribution graphs isolated.</strong> Store-only compilation flags are scoped to Store targets, and release,
+            CodeQL, and local build paths consume the exact committed project reviewed by CI instead of regenerating it.</li>
+          <li><strong>Make release ordering deterministic.</strong> Tag pushes can only run the signed, notarized dry run; publishing now
+            requires an explicit dispatch for that immutable tag after verification succeeds.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.6</h2><time datetime="2026-10-23">October 23, 2026</time></header>
+        <ul>
+          <li><strong>Give Xcode Cloud a stable App Store project.</strong> The shared XcodeGen project and Store archive scheme are now
+            committed so Apple can discover the selected container before any cloud build script runs.</li>
+          <li><strong>Keep the generated project honest.</strong> A repeatable drift gate regenerates the project from
+            <code>project.yml</code>, canonicalizes XcodeGen’s one equivalent copy-phase ordering, and fails CI if shared project files are
+            stale while continuing to ignore user-specific and Xcode-managed state.</li>
+          <li><strong>Preserve both distribution channels.</strong> The committed project builds the sandboxed App Store content-filter
+            extension and the Developer ID system extension as separate product graphs, with Store packaging checks unchanged.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.5</h2><time datetime="2026-10-22">October 22, 2026</time></header>
         <ul>
           <li><strong>Keep changed packs visible until fresh consent.</strong> A catalog update that disables an active pack now raises a
             persistent app-wide notice and Rules badge. Changed and removed packs stay off and visible until acknowledged or freshly

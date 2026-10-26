@@ -5,7 +5,8 @@ Internals, build options and the Network Extension path. For an overview, see th
 ## Layout
 
 ```
-project.yml                 XcodeGen spec (run `xcodegen generate` to regenerate the .xcodeproj)
+project.yml                 XcodeGen source of truth
+Flowlight.xcodeproj/         Committed shared output so Xcode Cloud can discover the project before build scripts run
 Shared/                     Compiled into both targets
   TrafficModels.swift         FlowKey (pid, bundle, ip, domain, port, protocol) → bytes in/out, flows
   IPCProtocol.swift           XPC contract between the extension and the app
@@ -66,8 +67,8 @@ Reports group any traffic still without a hostname under its network owner.
 ## Building
 
 ```sh
-brew install xcodegen
-xcodegen generate
+brew install xcodegen  # project regeneration requires exactly 2.46.0
+scripts/check_xcode_project.sh --write
 
 # Any Mac, no entitlements: ad-hoc signed, nettop fallback only
 scripts/build-local.sh
@@ -78,6 +79,11 @@ TEAM_ID=ABCDE12345 scripts/build-signed.sh
 ```
 
 Run the tests with `xcodebuild -scheme Flowlight test CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`.
+
+`project.yml` remains the editable project definition. After changing it, run
+`scripts/check_xcode_project.sh --write`, verify with `scripts/check_xcode_project.sh`, and commit the four shared files under
+`Flowlight.xcodeproj/`. The generated project is deliberately committed because Xcode Cloud must find its selected
+container before a post-clone script can run. User data and Xcode Cloud's local manifest remain ignored.
 
 **If the checkout is under `~/Desktop`, `~/Documents` or `~/Downloads`, two tests will hang for two minutes
 each and the run will fail.** `HelpTests` reads the built `docs/docs/index.html` to check that every screen's
@@ -408,12 +414,9 @@ gh pr create --base main --title "Flowlight 0.13.4"
 # wait for review and every required PR check to pass
 
 git tag -a v0.13.4 -m "Flowlight 0.13.4"
-git push origin v0.13.4
-# cancel the automatic publish run, then exercise the immutable tag first:
-gh run cancel <id>
-gh workflow run Release --ref v0.13.4 -f dry_run=true
-# inspect the successful signed/notarized/Gatekeeper dry run, then publish from the same tag:
-gh workflow run Release --ref v0.13.4
+git push origin v0.13.4  # automatically runs the signed dry run; it cannot publish
+# inspect that successful signed/notarized/Gatekeeper run, then publish from the same tag:
+gh workflow run Release --ref v0.13.4 -f tag=v0.13.4
 # verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
 gh pr merge --merge --delete-branch
 ```
@@ -423,22 +426,22 @@ comes after publication so the site can only ever describe something downloadabl
 force-push or move a pushed version. If a tag is wrong or a release needs another change, bump the patch version and
 begin a new release branch and tag.
 
-A tag push starts `release.yml` automatically. Cancel that run before it publishes, then dispatch the signed dry run
-from the immutable tag. The dry run must build, sign, notarize and pass Gatekeeper verification before production
-publication is allowed. After production succeeds, verify the GitHub release page and downloaded DMG, PKG and
+A tag push starts `release.yml` automatically in dry-run-only mode; push-triggered runs cannot publish. It must build,
+sign, notarize and pass Gatekeeper verification before an explicit production dispatch for the immutable tag. After
+production succeeds, verify the GitHub release page and downloaded DMG, PKG and
 `SHA256SUMS.txt` checksums before merging the release PR.
 
 ## Releasing from CI
 
-`.github/workflows/release.yml` does all of the above on a version tag: it checks the tag matches
-`MARKETING_VERSION`, runs the tests, signs, notarizes, verifies with `spctl`, publishes the release and updates the
-Homebrew cask. `.github/workflows/ci.yml` builds and tests every push and pull request, and fails if `docs/` is out
+`.github/workflows/release.yml` checks the tag matches `MARKETING_VERSION`, runs the tests, signs, notarizes and
+verifies with `spctl`. A tag push always stops there; an explicit dispatch for that tag publishes the release and updates
+the Homebrew cask. `.github/workflows/ci.yml` builds and tests every push and pull request, and fails if `docs/` is out
 of date with `site/`.
 
 ```sh
 scripts/ci-secrets.sh                                  # upload the secrets once
-git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0
-gh workflow run Release --ref v0.3.0 -f dry_run=true   # build and verify, publish nothing
+git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0  # automatic dry run
+gh workflow run Release --ref v0.3.0 -f tag=v0.3.0     # after it passes: publish
 ```
 
 `--ref` has to name a tag whose tree *contains* the workflow: `gh` reads the workflow file from the ref you give
@@ -446,9 +449,9 @@ it, so tags older than `.github/workflows/release.yml` fail with "Workflow does 
 trigger". The environment only accepts `v*` tags, so dispatching from a branch is refused at the approval gate —
 which is the point of it.
 
-**dry_run** builds, signs, notarizes and asks Gatekeeper for a verdict, then stops without creating a release or
-touching the cask. It is the safe way to exercise the path the first time, or after changing anything about
-signing.
+A tag push—and an explicit dispatch with **dry_run=true**—builds, signs, notarizes and asks Gatekeeper for a verdict,
+then stops without creating a release or touching the cask. Production requires an explicit dispatch with the tag input
+and **dry_run=false**.
 
 Release notes come from `packaging/release-notes/<version>.md` when that file exists (checksums are appended), and
 from generated notes when it doesn't.

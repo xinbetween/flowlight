@@ -5,8 +5,9 @@ Thanks for helping make network activity on macOS understandable.
 ## Getting started
 
 ```sh
-brew install xcodegen
-xcodegen generate
+brew install xcodegen  # project regeneration requires exactly 2.46.0
+scripts/check_xcode_project.sh --write
+scripts/check_xcode_project.sh
 scripts/build-local.sh
 open build/Build/Products/Release/Flowlight.app --args -FLDemo YES   # synthetic data, safe for screenshots
 ```
@@ -67,11 +68,9 @@ gh pr create --base main --title "Flowlight 0.13.4"
 # wait for review and every required PR check to pass
 
 git tag -a v0.13.4 -m "Flowlight 0.13.4"
-git push origin v0.13.4
-# cancel the automatic publish run, then exercise the immutable tag first:
-gh workflow run Release --ref v0.13.4 -f dry_run=true
-# inspect the successful signed/notarized/Gatekeeper dry run, then publish from the same tag:
-gh workflow run Release --ref v0.13.4
+git push origin v0.13.4  # automatically runs the signed dry run; it cannot publish
+# inspect that successful signed/notarized/Gatekeeper run, then publish from the same tag:
+gh workflow run Release --ref v0.13.4 -f tag=v0.13.4
 # verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
 gh pr merge --merge --delete-branch
 ```
@@ -84,9 +83,9 @@ will be signed. Publishing before merging keeps the GitHub Pages site from annou
 `docs/` is served from `main`, its Download button resolves to the latest GitHub release, CI requires `docs/` to match
 `site/`, and the site builder reads `MARKETING_VERSION`.
 
-A tag push starts `release.yml`; cancel that automatic publication before it reaches its publish step and dispatch the
-dry run from the immutable tag. A dry run must prove tests, signing, notarization and Gatekeeper verification before a
-production dispatch is allowed. After production succeeds, verify the release page and downloaded DMG, PKG and
+A tag push starts `release.yml` in dry-run-only mode; push-triggered runs cannot publish. It must prove tests, signing,
+notarization and Gatekeeper verification before an explicit production dispatch for that immutable tag. After production
+succeeds, verify the release page and downloaded DMG, PKG and
 `SHA256SUMS.txt` checksums, then merge the release PR into `main`.
 
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) documents the signing inputs and workflow internals.
