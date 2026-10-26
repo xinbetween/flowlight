@@ -103,6 +103,9 @@ jobs:
       - name: Test
         timeout-minutes: 40
         run: |
+          # GitHub starts run blocks with bash -e. This step records the first attempt's status so it can retry a
+          # timeout, then exits explicitly if the final attempt failed.
+          set +e
           set -uo pipefail
           # xcodebuild occasionally never returns here — the same suite passes locally and on most runs, and the
           # per-test allowance below doesn't always catch it, so the whole invocation gets a watchdog. One retry:
