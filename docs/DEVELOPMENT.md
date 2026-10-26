@@ -386,7 +386,9 @@ git -C "$(brew --repository xinbetween/tap)" push          # publishes it
   runner the layout step is skipped with a warning and the DMG still works.
 - `scripts/notarize.sh` does the submit-and-staple for all three scripts. It takes either `NOTARY_PROFILE` (a
   keychain profile, on your own Mac) or `NOTARY_KEY` + `NOTARY_KEY_ID` + `NOTARY_ISSUER` (an App Store Connect key,
-  which is what CI uses). With neither, it prints why it did nothing and exits 0.
+  which is what CI uses). With neither, it prints why it did nothing and exits 0. After Apple accepts an upload,
+  stapling retries a bounded four times only for `NSURLErrorDomain -1005`; every other stapler failure stops
+  immediately, and the upload is never submitted twice.
 
 ## Release branches
 

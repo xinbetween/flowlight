@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.8, macOS 15 or later.
 
  On this page
 
@@ -894,7 +894,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1629,8 +1629,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.8
+October 26, 2026Latest
+
+ Recover from transient Apple stapling failures. After notarization succeeds, app, DMG, and package ticket
+ stapling now retries bounded connection-loss failures without submitting the artifact to Apple a second time.
+
+ Fail fast on permanent release errors. Stapler failures outside the known NSURLErrorDomain -1005
+ transport fault still stop immediately, while repeated transient failures stop after four attempts.
+
+ Prove the release gate can fail. Deterministic CI fixtures cover immediate success, transient recovery,
+ retry exhaustion, permanent errors, and failed notarization submissions without contacting Apple.
+
  0.15.7
-October 25, 2026Latest
+October 25, 2026
 
  Minimize the Store extension’s network access. The sandboxed content filter no longer declares an unused
  inbound-listener entitlement.

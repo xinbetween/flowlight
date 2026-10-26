@@ -178,6 +178,10 @@ jobs:
       - name: Generate the project and reject drift
         run: scripts/check_xcode_project.sh
 
+      - name: Check bounded notarization retries
+        if: matrix.xcode == 'newest'
+        run: scripts/test-notarize.sh
+
       # This compiles a different product graph and activation path from the Developer ID build. The build clears
       # protected entitlements because CI has no Store profiles; the next step re-signs the isolated product with the
       # repository plists so the product gate still inspects the actual executable entitlements it is meant to police.

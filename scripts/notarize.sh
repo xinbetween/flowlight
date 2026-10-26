@@ -27,16 +27,48 @@ else
   exit 0
 fi
 
+CLEANUP=$(mktemp -d "${TMPDIR:-/tmp}/flowlight-notarize.XXXXXX")
+cleanup() {
+  rm -rf -- "$CLEANUP"
+}
+trap cleanup EXIT
+
 UPLOAD="$TARGET"
-CLEANUP=""
 if [[ "$TARGET" == *.app ]]; then
-  UPLOAD="${TMPDIR:-/tmp}/$(basename "$TARGET" .app)-notarize.zip"
-  CLEANUP="$UPLOAD"
-  rm -f "$UPLOAD"
+  UPLOAD="$CLEANUP/$(basename "$TARGET" .app).zip"
   ditto -c -k --keepParent "$TARGET" "$UPLOAD"
 fi
 
 xcrun notarytool submit "$UPLOAD" "${CREDENTIALS[@]}" --wait
-xcrun stapler staple "$TARGET"
-[[ -n "$CLEANUP" ]] && rm -f "$CLEANUP"
+
+# Apple's stapler occasionally loses its CloudKit connection after the notary service has already accepted the
+# upload (NSURLErrorDomain -1005). Re-submitting would create a second notarization request, so retry only the
+# idempotent staple operation, only for that known transport failure, and with a short bounded backoff.
+staple_attempt=1
+staple_delay=2
+staple_max_attempts=4
+while true; do
+  staple_log="$CLEANUP/stapler-$staple_attempt.log"
+  set +e
+  xcrun stapler staple "$TARGET" 2>&1 | tee "$staple_log"
+  staple_status=${pipestatus[1]}
+  set -e
+  if (( staple_status == 0 )); then
+    break
+  fi
+
+  if ! grep -Eq 'NSURLErrorDomain( |:|,).*Code=-1005([^0-9]|$)' "$staple_log"; then
+    exit "$staple_status"
+  fi
+  if (( staple_attempt >= staple_max_attempts )); then
+    print -u2 -- "Stapling failed after $staple_attempt attempts: transient Apple connection loss did not recover."
+    exit "$staple_status"
+  fi
+
+  print -u2 -- "Stapling hit transient Apple connection loss; retrying in ${staple_delay}s ($staple_attempt/$staple_max_attempts)."
+  sleep "$staple_delay"
+  (( staple_attempt += 1 ))
+  (( staple_delay *= 2 ))
+done
+
 echo "Notarized and stapled: $TARGET"
