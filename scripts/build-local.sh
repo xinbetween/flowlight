@@ -4,6 +4,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodebuild -project Flowlight.xcodeproj -scheme Flowlight -configuration Release -derivedDataPath build \
-  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= \
-  build | grep -E "error:|BUILD"
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= build
 echo "Built: build/Build/Products/Release/Flowlight.app"
