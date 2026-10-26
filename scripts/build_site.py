@@ -160,26 +160,32 @@ def stamp_dimensions(text):
     return re.sub(r'<img[^>]*assets/screenshots/([\w-]+\.png)[^>]*>', one, text)
 
 
-def last_changed(path):
-    """The date of the commit that last touched a file — or today, if it has been edited since.
+def last_changed(*paths):
+    """The newest date among a generated page's inputs — or today, if any input is edited.
 
     A page is almost always rebuilt *before* the commit that changes it, so asking git alone answers with the
     previous commit's date, and the same build run after committing answers with today's. The site is then
     permanently one rebuild behind itself and CI fails on a one-line sitemap diff that nobody can see the cause
-    of. An edited file is dated today, which is what the commit about to be made will say.
+    of. An edited input is dated today, which is what the commit about to be made will say. Every page also embeds
+    the version from project.yml, so a release bump is a real modification even when that page's own source is not.
     """
     try:
-        dirty = subprocess.run(["git", "status", "--porcelain", "--", str(path)],
+        arguments = [str(path) for path in paths]
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", *arguments],
                                cwd=ROOT, capture_output=True, text=True, timeout=10)
         if dirty.returncode == 0 and dirty.stdout.strip():
             return datetime.date.today().isoformat()
-        out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", str(path)],
-                             cwd=ROOT, capture_output=True, text=True, timeout=10)
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
+        dates = []
+        for path in paths:
+            out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", str(path)],
+                                 cwd=ROOT, capture_output=True, text=True, timeout=10)
+            if out.returncode == 0 and out.stdout.strip():
+                dates.append(out.stdout.strip())
+        if dates:
+            return max(dates)
     except Exception:
         pass
-    return datetime.date.fromtimestamp(pathlib.Path(path).stat().st_mtime).isoformat()
+    return max(datetime.date.fromtimestamp(pathlib.Path(path).stat().st_mtime).isoformat() for path in paths)
 
 def asset_hash(rel):
     return hashlib.sha256((OUT / rel).read_bytes()).hexdigest()[:8]
@@ -201,7 +207,7 @@ def structured_data(meta, body, lang="en", docs_url=f"{DOMAIN}/docs/#install"):
     page = {"@type": "WebPage", "@id": f"{DOMAIN}{path}#webpage", "url": f"{DOMAIN}{path}",
             "name": title, "description": desc, "inLanguage": lang, "isPartOf": {"@id": site["@id"]}}
     if meta.get("source"):
-        page["dateModified"] = last_changed(meta["source"])
+        page["dateModified"] = last_changed(meta["source"], ROOT / "project.yml")
 
     graph = [site, publisher, page]
 
@@ -408,10 +414,10 @@ def build():
 <h1>{{t:notfound.title}}</h1><p class="lede">{{t:notfound.lede}}</p></div></section></main>""" + footer, nf_ctx)
     (OUT / "404.html").write_text(document(notfound, nf_body, "/", f"/assets/site.css?v={css_version}", index=False))
 
-    # lastmod comes from the commit that last touched each page's source, so it says something true even when
-    # a rebuild touches every file. Google reads lastmod and ignores changefreq and priority, so neither is here.
+    # lastmod comes from the newest version-bearing input for each page, so a release bump updates the pages whose
+    # rendered metadata changed without dating them from generated output. Google ignores changefreq and priority.
     entries = "".join(
-        f"  <url><loc>{DOMAIN}{m['path']}</loc><lastmod>{last_changed(m['source'])}</lastmod></url>\n"
+        f"  <url><loc>{DOMAIN}{m['path']}</loc><lastmod>{last_changed(m['source'], ROOT / 'project.yml')}</lastmod></url>\n"
         for m, _, _ in pages)
     (OUT / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + entries + "</urlset>\n")
