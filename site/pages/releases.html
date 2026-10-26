@@ -13,7 +13,20 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.6</h2><time datetime="2026-10-23">October 23, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.7</h2><time datetime="2026-10-25">October 25, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Give Xcode Cloud a stable App Store project.</strong> The shared XcodeGen project and Store archive scheme are now
+            committed so Apple can discover the selected container before any cloud build script runs.</li>
+          <li><strong>Keep the generated project honest.</strong> A repeatable drift gate regenerates the project from
+            <code>project.yml</code>, canonicalizes XcodeGen’s one equivalent copy-phase ordering, and rejects drift in both the working tree
+            and the exact Git index while continuing to ignore user-specific and Xcode-managed state.</li>
+          <li><strong>Minimize the Store extension’s network access.</strong> The sandboxed content filter no longer declares an unused
+            inbound-listener entitlement, and the Store product gate now rejects that entitlement on either executable.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.6</h2><time datetime="2026-10-23">October 23, 2026</time></header>
         <ul>
           <li><strong>Give Xcode Cloud a stable App Store project.</strong> The shared XcodeGen project and Store archive scheme are now
             committed so Apple can discover the selected container before any cloud build script runs.</li>
