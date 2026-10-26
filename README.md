@@ -513,8 +513,8 @@ feature branch → release branch → reviewed green PR → immutable tag → si
    green.
 4. Create and push an annotated `v<version>` tag on that exact release commit. Tags are immutable: never retag, move or
    force-push one. If it is wrong, issue the next patch release instead.
-5. Run the signed/notarized/Gatekeeper **dry run from that tag** before production publication. Then publish from the
-   same tag.
+5. The tag push automatically runs the signed/notarized/Gatekeeper **dry run** and cannot publish. After it passes,
+   explicitly dispatch production for that same tag.
 6. Verify the GitHub release and its DMG, PKG and `SHA256SUMS.txt` assets/checksums. Only then merge the release PR into
    `main`, allowing GitHub Pages to advertise the downloadable release.
 

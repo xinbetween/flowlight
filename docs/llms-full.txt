@@ -1641,6 +1641,9 @@ October 25, 2026Latest
  Keep distribution graphs isolated. Store-only compilation flags are scoped to Store targets, and release,
  CodeQL, and local build paths consume the exact committed project reviewed by CI instead of regenerating it.
 
+ Make release ordering deterministic. Tag pushes can only run the signed, notarized dry run; publishing now
+ requires an explicit dispatch for that immutable tag after verification succeeds.
+
  0.15.6
 October 23, 2026
 

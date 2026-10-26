@@ -1,10 +1,8 @@
 name: Release
 
-# Builds, signs, notarizes and publishes on a version tag:
-#
-#   git tag -a v0.2.3 -m "Flowlight 0.2.3" && git push origin v0.2.3
-#
-# The secrets this needs are listed in docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
+# A version-tag push builds, signs, notarizes and verifies without publishing. After that dry run passes, dispatch
+# this workflow for the existing tag with dry_run=false to publish it. The secrets this needs are listed in
+# docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
 # GitHub. Without them the job fails at the import step rather than publishing something unsigned.
 #
 # It runs without waiting for an approval. What gates it instead: the release environment only accepts v* tags,
@@ -223,7 +221,7 @@ jobs:
           ( cd build && shasum -a 256 Flowlight.dmg "Flowlight-$VERSION.pkg" | tee SHA256SUMS.txt )
 
       - name: Publish the release
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -257,7 +255,7 @@ jobs:
       # was invisible because verification used to pass when it found nothing. Checked against the published
       # release rather than the build directory, because what matters is what people can actually download.
       - name: The release must carry the checksums the updater looks for
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -281,7 +279,7 @@ jobs:
 
       # The cask points at the release that was just published, so this runs last.
       - name: Update the Homebrew cask
-        if: ${{ env.TAP_TOKEN != '' && github.event.inputs.dry_run != 'true' }}
+        if: ${{ env.TAP_TOKEN != '' && github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
           git clone "https://x-access-token:$TAP_TOKEN@github.com/xinbetween/homebrew-tap.git" "$RUNNER_TEMP/tap"
@@ -291,7 +289,7 @@ jobs:
           git -C "$RUNNER_TEMP/tap" push
 
       - name: Say what a dry run produced
-        if: ${{ github.event.inputs.dry_run == 'true' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'true' }}
         run: |
           set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
@@ -302,6 +300,6 @@ jobs:
             echo '```'
             cat build/SHA256SUMS.txt
             echo '```'
-            echo "Re-run without **dry_run** to publish \`${{ steps.version.outputs.tag }}\`."
+            echo "Dispatch this workflow for \`${{ steps.version.outputs.tag }}\` with **dry_run=false** to publish."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Dry run complete — Flowlight $VERSION built and verified, nothing published."
