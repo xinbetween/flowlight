@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.9, macOS 15 or later.
 
  On this page
 
@@ -894,7 +894,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.9macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1629,8 +1629,20 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.9
+October 27, 2026Latest
+
+ Make Store builds warning-free. Ambiguous optionals, isolation boundaries, sendable callbacks,
+ capture ownership, and stale compatibility code now compile cleanly with current Xcode.
+
+ Turn new warnings into release failures. Store targets promote Swift warnings to errors, while CI
+ separately rejects first-party diagnostics the compiler does not elevate.
+
+ Keep toolchain notices actionable. Xcode metadata notices and dependency warnings remain visible
+ without being mistaken for Flowlight source regressions.
+
  0.15.8
-October 26, 2026Latest
+October 26, 2026
 
  Recover from transient Apple stapling failures. After notarization succeeds, app, DMG, and package ticket
  stapling now retries bounded connection-loss failures without submitting the artifact to Apple a second time.

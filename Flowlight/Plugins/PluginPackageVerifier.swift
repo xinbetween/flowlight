@@ -154,7 +154,7 @@ enum PluginPackageVerifier {
 
     private static func verify(_ signature: PluginSignature, digest: String, signer: PluginTrustedSigner) throws {
         guard let signatureData = Data(base64Encoded: signature.value),
-              let publicKey = publicKey(fromPEM: signer.publicKeyPEM),
+              let publicKey = publicKey(from: signer.publicKeyPEM),
               let parsed = try? P256.Signing.ECDSASignature(derRepresentation: signatureData) else {
             throw PluginPackageError.invalidSignature
         }
@@ -163,10 +163,13 @@ enum PluginPackageVerifier {
         }
     }
 
-    private static func publicKey(fromPEM pem: String) -> P256.Signing.PublicKey? {
+    private static func publicKey(from pem: String) -> P256.Signing.PublicKey? {
+        if pem.contains("-----BEGIN ") {
+            return try? P256.Signing.PublicKey(pemRepresentation: pem)
+        }
         let lines = pem.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.hasPrefix("-----") }
         guard let data = Data(base64Encoded: lines.joined()) else { return nil }
-        return try? P256.Signing.PublicKey(pemRepresentation: pem) ?? (try? P256.Signing.PublicKey(derRepresentation: data))
+        return try? P256.Signing.PublicKey(derRepresentation: data)
     }
 
     private static func signatureMessage(digest: String, keyID: String) -> Data {

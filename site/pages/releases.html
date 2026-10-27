@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.8</h2><time datetime="2026-10-26">October 26, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.9</h2><time datetime="2026-10-27">October 27, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Make Store builds warning-free.</strong> Ambiguous optionals, isolation boundaries, sendable callbacks,
+            capture ownership, and stale compatibility code now compile cleanly with current Xcode.</li>
+          <li><strong>Turn new warnings into release failures.</strong> Store targets promote Swift warnings to errors, while CI
+            separately rejects first-party diagnostics the compiler does not elevate.</li>
+          <li><strong>Keep toolchain notices actionable.</strong> Xcode metadata notices and dependency warnings remain visible
+            without being mistaken for Flowlight source regressions.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.8</h2><time datetime="2026-10-26">October 26, 2026</time></header>
         <ul>
           <li><strong>Recover from transient Apple stapling failures.</strong> After notarization succeeds, app, DMG, and package ticket
             stapling now retries bounded connection-loss failures without submitting the artifact to Apple a second time.</li>

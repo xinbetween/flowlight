@@ -9,7 +9,7 @@ import Foundation
 final class RuleStore: ObservableObject {
     /// This run of Flowlight. A rule that lasts "until I quit" is measured against it, so nothing has to be swept
     /// at quit — which a crash or a forced restart would skip anyway.
-    static let session = UUID().uuidString
+    nonisolated static let session = UUID().uuidString
 
     @Published private(set) var rules: [Rule] = []
     @Published private(set) var events: [RuleEventRecord] = []

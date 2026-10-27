@@ -146,6 +146,43 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(review.manifest.provenance.approvalFingerprint, review.approvalFingerprint)
     }
 
+    func testSignedCommunityPackageAcceptsBase64DERPublicKey() throws {
+        var manifest = PluginManifest(id: "thirdparty.der-key", name: "DER key", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Signed plugin.", privacySummary: "Uses metadata only.",
+                                      privacy: PluginPrivacyDisclosure(categories: [.metadataOnly], summary: "Metadata only."))
+        manifest.script = "function evaluate(context) { return []; }"
+        let privateKey = P256.Signing.PrivateKey()
+        let signer = PluginTrustedSigner(
+            keyID: "test-der-v1", publisher: .thirdParty, publisherName: "Test DER",
+            channel: .community, publicKeyPEM: privateKey.publicKey.derRepresentation.base64EncodedString()
+        )
+        let package = try PluginPackageVerifier.signedPackage(
+            manifest: manifest, keyID: signer.keyID, privateKey: privateKey
+        )
+        let review = try PluginPackageVerifier.review(data: JSONEncoder().encode(package), trustedSigners: [signer])
+        XCTAssertEqual(review.signatureStatus, .verifiedCommunity)
+    }
+
+    func testSignedPackageRejectsMalformedTrustedKey() throws {
+        var manifest = PluginManifest(id: "thirdparty.bad-key", name: "Bad key", version: "0.1.0", kind: .traffic,
+                                      source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+                                      description: "Signed plugin.", privacySummary: "Uses metadata only.",
+                                      privacy: PluginPrivacyDisclosure(categories: [.metadataOnly], summary: "Metadata only."))
+        manifest.script = "function evaluate(context) { return []; }"
+        let privateKey = P256.Signing.PrivateKey()
+        let signer = PluginTrustedSigner(keyID: "test-bad-v1", publisher: .thirdParty, publisherName: "Bad Key",
+                                         channel: .community, publicKeyPEM: "not a key")
+        let package = try PluginPackageVerifier.signedPackage(
+            manifest: manifest, keyID: signer.keyID, privateKey: privateKey
+        )
+        XCTAssertThrowsError(
+            try PluginPackageVerifier.review(data: JSONEncoder().encode(package), trustedSigners: [signer])
+        ) { error in
+            XCTAssertEqual(error as? PluginPackageError, .invalidSignature)
+        }
+    }
+
     func testSignedPackageRejectsTamperedManifest() throws {
         var manifest = PluginManifest(id: "thirdparty.tamper", name: "Tamper", version: "0.1.0", kind: .traffic,
                                       source: .installed, publisher: .thirdParty, guardrailProvider: .custom,

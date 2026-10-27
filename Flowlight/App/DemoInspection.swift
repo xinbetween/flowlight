@@ -35,7 +35,7 @@ extension DemoData {
                 HTTPHeader(name: "Host", value: host), HTTPHeader(name: "Content-Type", value: "application/json"),
                 HTTPHeader(name: "Content-Length", value: "\(req.count)"),
             ] : requestHeaders
-            try db.insertExchange(HTTPExchange(
+            _ = try db.insertExchange(HTTPExchange(
                 id: nil, started: clock, duration: duration, scheme: "https", host: host, port: 443, method: method, path: path,
                 status: status, requestHeaders: HeaderRedaction.redact(headers), requestBody: req, requestSize: req.count, requestTruncated: false,
                 responseHeaders: [HTTPHeader(name: "Content-Type", value: contentType), HTTPHeader(name: "Date", value: "demo")],
