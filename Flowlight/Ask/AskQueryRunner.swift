@@ -148,7 +148,7 @@ enum AskQueryRunner {
                                     "apps": Int64(Set(matching.map(\.bundleID)).count)]),
                       summary: who.map { L("%@ in, %@ out for %@", received, sent, $0) }
                         ?? L("%@ in, %@ out", received, sent),
-                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
+                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? TrafficFilter.none,
                       from: window.from, to: window.to,
                       chart: AskChart(kind: kind,
                                       title: who.map { L("Received and sent for %@", $0) } ?? L("Received and sent"),
@@ -174,7 +174,7 @@ enum AskQueryRunner {
         return Result(json: encode(payload),
                       summary: top.isEmpty ? L("nothing moved")
                         : top.map { "\($0.value.name) \(ByteFormat.string($0.value.counters.total))" }.joined(separator: ", "),
-                      filter: .none, from: window.from, to: window.to,
+                      filter: TrafficFilter.none, from: window.from, to: window.to,
                       chart: AskChart(kind: AskChart.kind(requested: chart, natural: points.isEmpty ? .none : .bar),
                                       title: L("Busiest apps"), unit: .bytes,
                                       points: AskChart.trimmed(points, kind: .bar)))
@@ -201,7 +201,7 @@ enum AskQueryRunner {
         let points = top.map { AskChart.Point(label: $0.key, value: Double($0.value.counters.total)) }
         return Result(json: encode(payload),
                       summary: top.isEmpty ? L("no destinations") : top.prefix(3).map(\.key).joined(separator: ", "),
-                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? .none,
+                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: rows)) } ?? TrafficFilter.none,
                       from: window.from, to: window.to,
                       chart: AskChart(kind: kind, title: L("Busiest destinations"), unit: .bytes,
                                       points: AskChart.trimmed(points, kind: kind), primaryName: L("Total")))
@@ -229,7 +229,7 @@ enum AskQueryRunner {
         return Result(json: encode(payload),
                       summary: top.isEmpty ? L("nothing new")
                         : top.prefix(3).map { "\($0.app) → \($0.destination)" }.joined(separator: ", "),
-                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: inWindow)) } ?? .none,
+                      filter: app.map { TrafficFilter(bundleID: bundleID(of: $0, in: inWindow)) } ?? TrafficFilter.none,
                       from: window.from, to: window.to)
     }
 
@@ -244,7 +244,7 @@ enum AskQueryRunner {
         return Result(json: encode(payload),
                       summary: inWindow.isEmpty ? L("no alerts")
                         : L("%lld alerts, newest %@", inWindow.count, inWindow.first?.kind ?? ""),
-                      filter: .none, from: window.from, to: window.to)
+                      filter: TrafficFilter.none, from: window.from, to: window.to)
     }
 
     private static func agents(db: TrafficDatabase, window: (from: Date, to: Date), grain: Granularity) throws -> Result {
@@ -273,7 +273,7 @@ enum AskQueryRunner {
         }
         return Result(json: encode(payload),
                       summary: payload.isEmpty ? L("no agents") : payload.compactMap { $0["agent"] }.joined(separator: ", "),
-                      filter: .none, from: window.from, to: window.to)
+                      filter: TrafficFilter.none, from: window.from, to: window.to)
     }
 
     private static func overTime(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,

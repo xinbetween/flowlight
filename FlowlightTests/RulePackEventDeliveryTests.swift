@@ -27,6 +27,22 @@ final class RulePackEventDeliveryTests: XCTestCase {
         XCTAssertEqual(captured[0].events, captured[1].events)
     }
 
+    func testClaimCanCrossAQueueBoundaryAndCommit() {
+        let committed = expectation(description: "cross-queue claim committed")
+        let delivery = RulePackEventDelivery(retryDelay: 0.01, attemptTimeout: 1) { _, claim, completion in
+            DispatchQueue.global().async {
+                XCTAssertTrue(claim())
+                completion(true)
+            }
+        }
+
+        delivery.enqueue(event()) { result in
+            XCTAssertTrue(result)
+            committed.fulfill()
+        }
+        wait(for: [committed], timeout: 2)
+    }
+
     func testTwoFailedAttemptsFailOpen() {
         let attempts = LockedValue(0)
         let allowed = expectation(description: "refusal abandoned")

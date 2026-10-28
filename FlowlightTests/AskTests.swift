@@ -146,6 +146,17 @@ final class AskTests: XCTestCase {
         XCTAssertEqual(rows.first?["app"], "claude")
     }
 
+    func testUnscopedTrafficAnswersKeepAnEmptyReportsFilter() throws {
+        try seed()
+        for query in [AskQuery.trafficTotals, .topApps, .topDestinations, .newDestinations, .alerts, .agents] {
+            let result = try AskQueryRunner.run(
+                AskCall(query: query, arguments: ["from": window.from, "to": window.to]), db: db
+            )
+            XCTAssertNotNil(result.filter, "\(query.rawValue) should remain openable in Reports")
+            XCTAssertTrue(result.filter?.isEmpty == true, "\(query.rawValue) should show every row in its window")
+        }
+    }
+
     func testTopDestinationsNamesWhereItWent() throws {
         try seed()
         let result = try AskQueryRunner.run(AskCall(query: .topDestinations, arguments: ["from": window.from, "to": window.to]), db: db)

@@ -104,7 +104,8 @@ final class RulePackEventDelivery: @unchecked Sendable {
         item.attemptID = thisAttempt
         item.lease = lease
         pending[deliveryID] = item
-        sink(item.batch, lease.claim) { [weak self] committed in
+        let claim: Claim = { lease.claim() }
+        sink(item.batch, claim) { [weak self] committed in
             self?.queue.async {
                 self?.finished(committed: committed, deliveryID: deliveryID, attemptID: thisAttempt)
             }

@@ -140,7 +140,7 @@ final class Localization: ObservableObject {
 enum LanguageBundle {
     nonisolated(unsafe) static var current: Bundle = .main
     /// English, for the fallback below. Resolved once: a bundle lookup per string would be wasteful.
-    nonisolated(unsafe) static let english: Bundle? =
+    nonisolated static let english: Bundle? =
         Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:))
 
     static func string(_ key: String) -> String {

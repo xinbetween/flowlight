@@ -406,6 +406,16 @@ final class RuleTemplateTests: XCTestCase {
                        .allow)
     }
 
+    func testAnAppSessionBlockUsesTheCurrentRunAndExpiresInTheNext() {
+        guard let template = RuleTemplate.all.first(where: { $0.id == "investigate.app-everywhere-this-session" }),
+              let rule = template.rules(for: subject).first else {
+            return XCTFail("the app session template is gone")
+        }
+        XCTAssertEqual(rule.schedule.session, RuleStore.session)
+        XCTAssertEqual(RuleBook.decide(facts(host: "example.com"), rules: [rule], session: RuleStore.session).verdict, .block)
+        XCTAssertEqual(RuleBook.decide(facts(host: "example.com"), rules: [rule], session: "a-later-run").verdict, .allow)
+    }
+
     /// The narrow investigation rule has to lose to nothing and bite nothing else: it is the one someone reaches
     /// for precisely because they don't want to disturb the rest of the Mac.
     func testBlockingOneAppFromOneDestinationLeavesEveryoneElseAlone() {
