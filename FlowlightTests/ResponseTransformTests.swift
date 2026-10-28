@@ -297,7 +297,7 @@ final class ResponseTransformProvenanceTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("response-transform-\(UUID()).sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
         let db = try TrafficDatabase(url: url)
-        try db.insertExchange(try XCTUnwrap(exchange))
+        _ = try db.insertExchange(try XCTUnwrap(exchange))
         let stored = try XCTUnwrap(db.exchanges(since: .distantPast).first)
         XCTAssertEqual(stored.responseTransform, "Rewrite status")
         XCTAssertNil(stored.mockRule)

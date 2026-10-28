@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.9</h2><time datetime="2026-10-27">October 27, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.10</h2><time datetime="2026-10-28">October 28, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Make the full test target warning-free.</strong> Concurrency captures, redundant actor awaits, and intentionally ignored
+            database insert IDs now compile cleanly with current Xcode.</li>
+          <li><strong>Treat test warnings as release failures.</strong> The test bundle promotes compiler warnings to errors, while the log
+            gate separately rejects first-party diagnostics the compiler leaves nonfatal.</li>
+          <li><strong>Keep release checks explicit.</strong> Deterministic fixtures prove warnings from app and test sources both fail the gate
+            while Xcode metadata and dependency notices remain visible.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.9</h2><time datetime="2026-10-27">October 27, 2026</time></header>
         <ul>
           <li><strong>Make Store builds warning-free.</strong> Ambiguous optionals, isolation boundaries, sendable callbacks,
             capture ownership, and stale compatibility code now compile cleanly with current Xcode.</li>

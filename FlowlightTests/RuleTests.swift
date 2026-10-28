@@ -553,15 +553,13 @@ final class RuleTests: XCTestCase {
             generation: store.ruleSet.generation
         )
         let completed = expectation(description: "retirement completed")
-        var saved: Bool?
 
         store.retireBoundedClaim(claim) { result in
-            saved = result
+            XCTAssertFalse(result)
             completed.fulfill()
         }
         await fulfillment(of: [completed], timeout: 2)
 
-        XCTAssertEqual(saved, false)
         XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 1)
         XCTAssertNil(store.live.flowDecision(facts()).externalClaim)
     }

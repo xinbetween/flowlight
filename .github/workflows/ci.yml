@@ -268,3 +268,5 @@ jobs:
             grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
             exit 1
           fi
+          set -e
+          scripts/check-swift-warnings.sh "$LOG"
