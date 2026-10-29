@@ -26,6 +26,7 @@ struct AskEnvironment: Sendable, Equatable {
     var backgroundOnly = false
     var watchingBluetooth = false
     var watchingUSB = false
+    var watchingCamera = false
     var rules: [String] = []
     var guardrails: [String] = []
     var agentAllowlists = 0

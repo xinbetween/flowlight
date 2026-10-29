@@ -99,6 +99,7 @@ enum AskQueryRunner {
             "runsInBackground": environment.backgroundOnly ? "yes" : "no",
             "watchingBluetooth": environment.watchingBluetooth ? "yes" : "no",
             "watchingUSB": environment.watchingUSB ? "yes" : "no",
+            "watchingCameraActivity": environment.watchingCamera ? "yes" : "no",
             "rules": "\(environment.rules.count)",
             "guardrails": "\(environment.guardrails.count)",
             "agentAllowlists": "\(environment.agentAllowlists)",

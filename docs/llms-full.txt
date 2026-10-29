@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.11, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.12, macOS 15 or later.
 
  On this page
 
@@ -163,7 +163,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Inspect⌘7Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
 
- Devices⌘8Off until you turn it on: Bluetooth, USB and external storage, which a Mac uses as much as it uses the network.
+ Devices⌘8Off until you turn it on: camera activity, Bluetooth, USB and external storage.
 
  Coverage⌘9What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.
 
@@ -682,11 +682,16 @@ open build/Build/Products/Release/Flowlight.app
  absent from these figures too — a coverage number that counted only what it could see would be a reassurance rather than a
  fact.
 
- Devices: Bluetooth, USB and external storage
+ Devices: camera activity, Bluetooth, USB and external storage
 
- A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, and it is off
- until you turn it on — not because it needs a permission Flowlight doesn't already have, but because watching more of your
- Mac should be your decision rather than something an update did.
+ A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, with every channel
+ off until you turn it on because watching more of your Mac should be your decision rather than something an update did.
+
+ Camera activity shows whether each camera is active and records confirmed start and stop transitions.
+ Flowlight reads the public CoreMediaIO device state; it never opens a capture session, requests camera access, or reads a
+ frame. This signal does not identify the process using the camera, so Flowlight names the camera and does not guess the app.
+ The sandboxed Mac App Store product declares Apple's camera hardware capability so CoreMediaIO can expose the device list,
+ but it still never requests capture consent.
 
  Bluetooth shows which devices are paired, which are connected, and when that changed, read from the system
  every half minute. Beside it is the list of applications built to use Bluetooth, taken from each app's own
@@ -901,7 +906,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.11macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.12macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1637,8 +1642,24 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.12
+October 29, 2026Latest
+
+ See when a camera is active without opening it. The opt-in Devices channel now reads each camera's public
+ CoreMediaIO running state and records confirmed start and stop transitions without requesting capture access or reading frames.
+
+ Name the boundary instead of guessing the app. macOS exposes camera activity through this signal but not the
+ owning process, so Flowlight names the camera, preserves unavailable state as unknown, and never infers attribution from logs.
+
+ Keep both distribution products truthful. The direct build reads passive device metadata without a new
+ entitlement; the sandboxed Store app declares camera hardware access so it can see the device list, while its filter extension
+ remains least-privileged and neither product starts capture.
+
+ Delete device history when asked. Delete everything now removes retained Bluetooth, USB, storage, and camera
+ events and clears the visible Devices history only after the database transaction succeeds.
+
  0.15.11
-October 28, 2026Latest
+October 28, 2026
 
  Block tracking traffic without blocking the product. The Tracking pack now targets documented dedicated
  collection, replay, and tracker-bootstrap hosts while leaving provider dashboards, login, billing, documentation, and

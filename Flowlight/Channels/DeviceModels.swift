@@ -8,13 +8,14 @@ import Foundation
 /// connected, which apps are built to use it, and when that changed.
 struct PeripheralDevice: Identifiable, Equatable, Sendable, Codable {
     enum Kind: String, Codable, Sendable, CaseIterable {
-        case bluetooth, usb, volume
+        case bluetooth, usb, volume, camera
 
         var title: String {
             switch self {
             case .bluetooth: return L("Bluetooth")
             case .usb: return "USB"
             case .volume: return L("External storage")
+            case .camera: return L("Camera")
             }
         }
 
@@ -23,6 +24,7 @@ struct PeripheralDevice: Identifiable, Equatable, Sendable, Codable {
             case .bluetooth: return "dot.radiowaves.right"
             case .usb: return "cable.connector"
             case .volume: return "externaldrive"
+            case .camera: return "video"
             }
         }
     }
@@ -47,7 +49,7 @@ struct PeripheralDevice: Identifiable, Equatable, Sendable, Codable {
 /// One change worth recording: something connected, disconnected, or was seen for the first time.
 struct DeviceEvent: Identifiable, Equatable, Sendable {
     enum Change: String, Sendable {
-        case appeared, connected, disconnected, removed
+        case appeared, connected, disconnected, removed, started, stopped
 
         var title: String {
             switch self {
@@ -55,6 +57,8 @@ struct DeviceEvent: Identifiable, Equatable, Sendable {
             case .connected: return L("Connected")
             case .disconnected: return L("Disconnected")
             case .removed: return L("Unpaired")
+            case .started: return L("Started")
+            case .stopped: return L("Stopped")
             }
         }
     }
@@ -72,6 +76,40 @@ struct DeviceEvent: Identifiable, Equatable, Sendable {
 ///
 /// A pure function over two lists, so the part that decides what counts as an event can be tested without a Mac
 /// with anything plugged into it.
+struct CameraDevice: Identifiable, Equatable, Sendable {
+    enum State: String, Sendable {
+        case active, inactive, unknown
+    }
+
+    var id: String
+    var name: String
+    var manufacturer: String
+    var state: State
+}
+
+/// A camera arriving is a baseline, not evidence that it just started. Only a confirmed transition between the two
+/// known states becomes history; a failed property read must never be presented as "off".
+enum CameraDiff {
+    static func events(from old: [CameraDevice], to new: [CameraDevice], at now: Date = Date(),
+                       firstSighting: Bool = false) -> [DeviceEvent] {
+        guard !firstSighting else { return [] }
+        let before = Dictionary(old.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return new.compactMap { camera in
+            guard let was = before[camera.id], was.state != camera.state,
+                  was.state != .unknown, camera.state != .unknown else { return nil }
+            return DeviceEvent(
+                at: now,
+                kind: .camera,
+                deviceID: camera.id,
+                name: camera.name,
+                detail: camera.manufacturer,
+                change: camera.state == .active ? .started : .stopped
+            )
+        }
+        .sorted { $0.name < $1.name }
+    }
+}
+
 enum DeviceDiff {
     static func events(from old: [PeripheralDevice], to new: [PeripheralDevice], at now: Date = Date(),
                        firstSighting: Bool = false) -> [DeviceEvent] {

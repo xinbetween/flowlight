@@ -102,6 +102,149 @@ final class DeviceTests: XCTestCase {
     }
 }
 
+private final class CameraMonitorSpy: CameraMonitoring {
+    var onDevices: ([CameraDevice], UInt64) -> Void = { _, _ in }
+    var onEvents: ([DeviceEvent], UInt64) -> Void = { _, _ in }
+    private(set) var starts: [UInt64] = []
+    private(set) var stopCount = 0
+
+    func start(generation: UInt64) { starts.append(generation) }
+    func stop() { stopCount += 1 }
+    func refresh() {}
+
+    func send(_ events: [DeviceEvent]) {
+        guard let generation = starts.last else { return }
+        onEvents(events, generation)
+    }
+}
+
+@MainActor
+final class CameraStoreTests: XCTestCase {
+    private var savedCamera: Any?
+    private var savedUSB: Any?
+
+    override func setUp() {
+        super.setUp()
+        savedCamera = UserDefaults.standard.object(forKey: DeviceStore.Keys.camera)
+        savedUSB = UserDefaults.standard.object(forKey: DeviceStore.Keys.usb)
+        UserDefaults.standard.set(false, forKey: DeviceStore.Keys.camera)
+        UserDefaults.standard.set(false, forKey: DeviceStore.Keys.usb)
+    }
+
+    override func tearDown() {
+        restore(savedCamera, key: DeviceStore.Keys.camera)
+        restore(savedUSB, key: DeviceStore.Keys.usb)
+        super.tearDown()
+    }
+
+    func testChangingAnotherChannelDoesNotRestartCameraBaseline() {
+        let monitor = CameraMonitorSpy()
+        let store = DeviceStore(cameraMonitor: monitor)
+        store.watchingCamera = true
+        XCTAssertEqual(monitor.starts.count, 1)
+
+        store.watchingUSB = true
+        store.watchingUSB = false
+        XCTAssertEqual(monitor.starts.count, 1, "unrelated channel changes preserve the camera transition baseline")
+    }
+
+    func testCameraEventDuringDeleteEverythingIsPersistedAfterClear() async throws {
+        let monitor = CameraMonitorSpy()
+        let store = DeviceStore(cameraMonitor: monitor)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-camera-clear-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        store.attach(db: db)
+        try await db.asyncResult { _ in }
+        await Task.yield()
+        store.watchingCamera = true
+
+        store.beginHistoryClear()
+        monitor.send([DeviceEvent(
+            at: Date(), kind: .camera, deviceID: "built-in", name: "Camera", detail: "",
+            change: .started
+        )])
+        await Task.yield()
+        try await db.asyncResult { try $0.clearAll() }
+        store.finishHistoryClear(succeeded: true)
+        try await db.asyncResult { _ in }
+
+        XCTAssertEqual(store.events.map(\.change), [.started])
+        XCTAssertEqual(try db.deviceEvents().map(\.change), [.started],
+                       "an event crossing the clear boundary must not be hidden until relaunch")
+    }
+
+    private func restore(_ value: Any?, key: String) {
+        if let value { UserDefaults.standard.set(value, forKey: key) }
+        else { UserDefaults.standard.removeObject(forKey: key) }
+    }
+}
+
+final class CameraTests: XCTestCase {
+    private func camera(_ id: String, _ state: CameraDevice.State, name: String? = nil) -> CameraDevice {
+        CameraDevice(id: id, name: name ?? id, manufacturer: "Acme", state: state)
+    }
+
+    func testFirstCameraReadingIsABaseline() {
+        let events = CameraDiff.events(
+            from: [],
+            to: [camera("built-in", .active), camera("desk-view", .inactive)],
+            firstSighting: true
+        )
+        XCTAssertTrue(events.isEmpty, "cameras already active when watching starts are not new activity")
+    }
+
+    func testConfirmedCameraStartAndStopAreRecorded() {
+        let inactive = [camera("built-in", .inactive, name: "MacBook Pro Camera")]
+        let active = [camera("built-in", .active, name: "MacBook Pro Camera")]
+        XCTAssertEqual(CameraDiff.events(from: inactive, to: active).map(\.change), [.started])
+        XCTAssertEqual(CameraDiff.events(from: active, to: inactive).map(\.change), [.stopped])
+    }
+
+    func testUnknownCameraStateNeverPretendsToStartOrStop() {
+        let unknown = [camera("built-in", .unknown)]
+        let active = [camera("built-in", .active)]
+        let inactive = [camera("built-in", .inactive)]
+        XCTAssertTrue(CameraDiff.events(from: active, to: unknown).isEmpty)
+        XCTAssertTrue(CameraDiff.events(from: unknown, to: inactive).isEmpty)
+        XCTAssertTrue(CameraDiff.events(from: unknown, to: active).isEmpty)
+    }
+
+    func testHotPluggedAndRenamedCamerasDoNotFabricateActivity() {
+        XCTAssertTrue(CameraDiff.events(from: [], to: [camera("external", .active)]).isEmpty)
+        XCTAssertTrue(CameraDiff.events(
+            from: [camera("built-in", .inactive, name: "Old")],
+            to: [camera("built-in", .inactive, name: "New")]
+        ).isEmpty)
+    }
+
+    func testDuplicateCameraCallbacksAreQuiet() {
+        let cameras = [camera("built-in", .active)]
+        XCTAssertTrue(CameraDiff.events(from: cameras, to: cameras).isEmpty)
+    }
+
+    func testCameraEventHistoryIsPrunedAndDeletedWithEverythingElse() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-camera-events-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let old = DeviceEvent(
+            at: Date(timeIntervalSince1970: 100), kind: .camera, deviceID: "old",
+            name: "Old Camera", detail: "", change: .started
+        )
+        let recent = DeviceEvent(
+            at: Date(timeIntervalSince1970: 200), kind: .camera, deviceID: "recent",
+            name: "Recent Camera", detail: "Acme", change: .stopped
+        )
+        try db.recordDeviceEvents([old, recent])
+
+        XCTAssertEqual(try db.deviceEvents().map(\.change), [.stopped, .started])
+        try db.pruneDeviceEvents(before: Date(timeIntervalSince1970: 150))
+        XCTAssertEqual(try db.deviceEvents().map(\.deviceID), ["recent"])
+        try db.clearAll()
+        XCTAssertTrue(try db.deviceEvents().isEmpty, "Delete everything includes device and camera history")
+    }
+}
+
 /// USB and the volumes that appear. Nothing is plugged into a build machine, so the rules about what counts are
 /// tested against the shapes `system_profiler` and the file system actually produce.
 final class USBTests: XCTestCase {

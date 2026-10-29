@@ -28,6 +28,7 @@ Flowlight/                  SwiftUI host app
   Inspection/                 HTTPS inspection: local CA, decrypting proxy, HTTP parser, recorder, mock rules
   Export/                     opt-in export to a collector the user chooses: OTLP/NDJSON payloads, queue, Keychain
   UI/                         Live, AI Agents, Reports (charts + three breakdown groupings + CSV), Alerts, Capture
+  Channels/                   Opt-in Bluetooth, USB/storage and CoreMediaIO camera-activity monitors
 Shared/Classification/ProtocolCatalog.swift   108 protocols in 13 families, used by both capture engines
 FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent and anomaly tests
 ```
@@ -106,6 +107,22 @@ without a test host, so it is the quicker way to check that particular thing any
    `log stream --predicate 'subsystem == "com.flowlight.app.filter"'`
 
 The App Group and Mach service names come from `$(TeamIdentifierPrefix)com.flowlight.shared`.
+
+## Device activity
+
+The **Devices** screen is opt-in per channel. Bluetooth and USB/storage report attachment, while camera monitoring
+uses public CoreMediaIO device metadata only: `kCMIOHardwarePropertyDevices` for enumeration and
+`kCMIODevicePropertyDeviceIsRunningSomewhere` for active state. A property listener reports transitions without
+opening an `AVCaptureSession`, requesting TCC capture access, or reading frames. The public signal is per camera and
+does not identify the process using it; missing or failed reads remain unknown instead of being presented as inactive.
+
+The direct product needs no camera entitlement for this metadata. App Sandbox hides the CoreMediaIO device list, so
+the separate Store app target declares `com.apple.security.device.camera`; the Store content-filter extension does
+not. Both products share the same passive monitor and never call `AVCaptureDevice.requestAccess`.
+
+Device and camera transitions use `device_events`. **Delete everything** removes that table and clears the published
+history only after the database transaction succeeds. Turning a channel off stops its listeners and clears its live
+snapshot without rewriting prior history.
 
 ## Storage and reports
 

@@ -26,6 +26,8 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>Flowlight installs a network filter extension to attribute connections to apps and can refuse only the rules and managed packs you enable. It records metadata locally, and nothing leaves your Mac.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Flowlight can show whether a camera is active. It never opens the camera or reads frames.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Flowlight looks for AI agent configuration (skills, MCP servers, hooks) in the project folder you pick, so it can show what each agent is set up to do. It reads only those config files, and nothing leaves your Mac.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

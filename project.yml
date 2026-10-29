@@ -15,8 +15,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.15.11"
-    CURRENT_PROJECT_VERSION: "58"
+    MARKETING_VERSION: "0.15.12"
+    CURRENT_PROJECT_VERSION: "59"
   configs:
     AppStore:
       DEVELOPMENT_TEAM: 38RJUJHKZS
@@ -53,6 +53,7 @@ targets:
       - sdk: libsqlite3.tbd
       - sdk: NetworkExtension.framework
       - sdk: SystemExtensions.framework
+      - sdk: CoreMediaIO.framework
   FlowlightResponseScriptHelper:
     type: tool
     platform: macOS
@@ -132,6 +133,7 @@ targets:
         codeSign: true
       - sdk: libsqlite3.tbd
       - sdk: NetworkExtension.framework
+      - sdk: CoreMediaIO.framework
   FlowlightTests:
     type: bundle.unit-test
     platform: macOS
