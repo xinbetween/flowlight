@@ -296,6 +296,16 @@ final class InspectionStorageTests: XCTestCase {
         XCTAssertTrue(Rule(action: .block, destination: "2001:db8::/32").matches(v6))
     }
 
+    func testRequestLevelExactRuleDoesNotWidenToAChildHost() {
+        var rule = Rule(action: .block, destination: "api.example.com", destinationMatch: .exact)
+        rule.path = "/v1/*"
+        let exact = InspectionController.proxyDestination("api.example.com")
+        let child = InspectionController.proxyDestination("child.api.example.com")
+
+        XCTAssertTrue(rule.destinationMatches(host: exact.host, ip: exact.ip))
+        XCTAssertFalse(rule.destinationMatches(host: child.host, ip: child.ip))
+    }
+
     func testProxyFactsKeepNamesAndExemptLocalAddresses() {
         let owner = InspectionRecorder.Owner(bundleID: "com.example.app")
         let named = InspectionController.proxyFlowFacts(host: "API.Example.com", port: 443, owner: owner)

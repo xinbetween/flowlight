@@ -21,6 +21,49 @@ final class RulePackTests: XCTestCase {
         XCTAssertTrue(matcher.matches(host: "sub.exact.example", bundleID: "com.example.app").isEmpty)
     }
 
+    func testOfficialTrackingPackBlocksCollectorsWithoutBlockingProducts() throws {
+        let definition = BuiltInRulePacks.all.first { $0.id == "official.tracking" }
+        let tracking = try XCTUnwrap(definition)
+        let matcher = try RulePackMatcher(snapshot: snapshot(tracking))
+        let bundleID = "com.apple.Safari"
+
+        let productHosts = [
+            "analytics.google.com",
+            "analytics.amplitude.com",
+            "app.fullstory.com",
+            "heapanalytics.com",
+            "app.heapanalytics.com",
+            "customer.matomo.cloud",
+            "mixpanel.com",
+            "app.mixpanel.com",
+            "app.posthog.com",
+            "app.segment.com",
+            "console.statsig.com",
+            "api.statsig.com",
+        ]
+        for host in productHosts {
+            XCTAssertTrue(matcher.matches(host: host, bundleID: bundleID).isEmpty,
+                          "the tracking pack must leave product host \(host) reachable")
+        }
+
+        let collectorHosts = [
+            "api2.amplitude.com",
+            "browser-intake-us3-datadoghq.com",
+            "www.google-analytics.com",
+            "rs.fullstory.com",
+            "c.us.heap-api.com",
+            "r.logrocket.com",
+            "api-eu.mixpanel.com",
+            "eu.i.posthog.com",
+            "events.eu1.segmentapis.com",
+            "events.statsigapi.net",
+        ]
+        for host in collectorHosts {
+            XCTAssertEqual(matcher.matches(host: host, bundleID: bundleID).count, 1,
+                           "the tracking pack must still block collector host \(host)")
+        }
+    }
+
     func testSelectedAppScopeUsesConnectionOpeningBundleID() throws {
         let definition = pack(entries: [RulePackEntry(id: 1, host: "ads.example", category: .advertising)])
         let value = RulePackSnapshot.make(

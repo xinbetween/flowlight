@@ -17,8 +17,10 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
     /// A bundle identifier or a process name; empty means any app. Matched against the process that opened the
     /// connection *and* the agent it belongs to, so naming Claude Code also covers the `curl` it ran.
     var app = ""
-    /// A domain (subdomains included), an IP address or a CIDR range; empty means anywhere.
+    /// A domain, an IP address or a CIDR range; empty means anywhere. Host rules include subdomains unless
+    /// `destinationMatch` says this is one exact collector host.
     var destination = ""
+    var destinationMatch: DestinationMatch = .suffix
     /// A path glob (`/v1/*`), empty for any path. A path can only be matched where the request can be read, which
     /// is the HTTPS inspection proxy — `engine` says so and the list shows it.
     var path = ""
@@ -29,6 +31,8 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
 
     var schedule = Schedule()
     var origin: Origin = .typed
+    /// Stable identity for a library-generated policy. A display-name edit must never change what the rule matches.
+    var presetID = ""
     /// What the person called it. Empty falls back to a sentence built from the subject.
     var name = ""
     var created = Date()
@@ -49,6 +53,10 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
     /// through in a hurry is distinguishable from one they sat down and wrote.
     enum Origin: String, Codable, Sendable {
         case typed, preset, alert, allowOnce
+    }
+
+    enum DestinationMatch: String, Codable, Sendable {
+        case suffix, exact
     }
 
     /// Which part of Flowlight can carry this rule out.
@@ -86,7 +94,8 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
         if !app.isEmpty { score += 4 }
         if !destination.isEmpty {
             // An exact address or host is narrower than a domain that carries its subdomains with it.
-            score += AgentPolicy.isIPAddress(destination) ? 5 : (AgentPolicy.isCIDR(destination) ? 3 : 4)
+            score += AgentPolicy.isIPAddress(destination) ? 5
+                : (AgentPolicy.isCIDR(destination) ? 3 : (destinationMatch == .exact ? 5 : 4))
         }
         if !path.isEmpty { score += path.contains("*") ? 1 : 2 }
         if !method.isEmpty { score += 1 }
@@ -96,6 +105,37 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
     /// A rule that names nothing at all would decide every connection on the Mac. That is never what someone
     /// meant, so it is treated as unfinished rather than obeyed.
     var isComplete: Bool { !app.isEmpty || !destination.isEmpty }
+}
+
+extension Rule {
+    /// Written out so rules saved before exact-host matching existed keep their original suffix semantics.
+    /// Synthesized Codable does not use property defaults when a key is absent.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        action = try container.decodeIfPresent(Action.self, forKey: .action) ?? .block
+        app = try container.decodeIfPresent(String.self, forKey: .app) ?? ""
+        destination = try container.decodeIfPresent(String.self, forKey: .destination) ?? ""
+        destinationMatch = try container.decodeIfPresent(DestinationMatch.self, forKey: .destinationMatch) ?? .suffix
+        path = try container.decodeIfPresent(String.self, forKey: .path) ?? ""
+        method = try container.decodeIfPresent(String.self, forKey: .method) ?? ""
+        status = try container.decodeIfPresent(Int.self, forKey: .status) ?? 403
+        schedule = try container.decodeIfPresent(Schedule.self, forKey: .schedule) ?? Schedule()
+        origin = try container.decodeIfPresent(Origin.self, forKey: .origin) ?? .typed
+        presetID = try container.decodeIfPresent(String.self, forKey: .presetID) ?? ""
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        if presetID.isEmpty,
+           origin == .preset,
+           name == "no product analytics" || name.hasSuffix(": no product analytics"),
+           Self.legacyProductAnalyticsReplacements[destination] != nil {
+            presetID = "telemetry.product-analytics"
+        }
+        created = try container.decodeIfPresent(Date.self, forKey: .created) ?? Date()
+        hits = try container.decodeIfPresent(Int.self, forKey: .hits) ?? 0
+        lastHit = try container.decodeIfPresent(Date.self, forKey: .lastHit)
+        maxHits = try container.decodeIfPresent(Int.self, forKey: .maxHits) ?? 0
+    }
 }
 
 // MARK: When a rule applies
@@ -195,10 +235,60 @@ extension Rule {
         if !destination.isEmpty {
             // An unnamed destination can't be ruled out yet; the hostname may still arrive.
             guard !facts.host.isEmpty || facts.hostSettled else { return false }
-            guard AgentPolicy.matches(destination, host: facts.host, ip: facts.ip) else { return false }
+            guard destinationMatches(host: facts.host, ip: facts.ip) else { return false }
         }
         return true
     }
+
+    func destinationMatches(host: String, ip: String) -> Bool {
+        // 0.15.0–0.15.10 wrote broad suffix rules for this preset. Interpret only that exact generated shape as
+        // the reviewed collectors it meant, without rewriting the person's database or changing a typed/renamed rule.
+        // An empty target list deliberately retires a shared product/configuration host with no safe replacement.
+        if let collectors = legacyProductAnalyticsCollectors {
+            guard let actual = HostCanonicalizer.host(host) else { return false }
+            return collectors.contains { HostCanonicalizer.host($0) == actual }
+        }
+        if destinationMatch == .exact,
+           !AgentPolicy.isIPAddress(destination),
+           !AgentPolicy.isCIDR(destination) {
+            guard let expected = HostCanonicalizer.host(destination),
+                  let actual = HostCanonicalizer.host(host) else { return false }
+            return expected == actual
+        }
+        return AgentPolicy.matches(destination, host: host, ip: ip)
+    }
+
+    private var legacyProductAnalyticsCollectors: [String]? {
+        guard origin == .preset,
+              presetID == "telemetry.product-analytics",
+              action == .block,
+              destinationMatch == .suffix,
+              path.isEmpty,
+              method.isEmpty,
+              maxHits == 0 else { return nil }
+        return Self.legacyProductAnalyticsReplacements[destination]
+    }
+
+    static let legacyProductAnalyticsReplacements: [String: [String]] = [
+        "analytics.google.com": [],
+        "segment.io": ["api.segment.io"],
+        "segment.com": [],
+        "segmentapis.com": ["events.eu1.segmentapis.com"],
+        "mixpanel.com": ["api-eu.mixpanel.com", "api-in.mixpanel.com", "api-js.mixpanel.com", "api.mixpanel.com"],
+        "mxpnl.com": ["cdn.mxpnl.com"],
+        "amplitude.com": ["api.eu.amplitude.com", "api2.amplitude.com"],
+        "posthog.com": ["eu-assets.i.posthog.com", "eu.i.posthog.com", "us-assets.i.posthog.com", "us.i.posthog.com"],
+        "heapanalytics.com": ["cdn.heapanalytics.com"],
+        "fullstory.com": ["edge.eu1.fullstory.com", "edge.fullstory.com", "rs.eu1.fullstory.com",
+                          "rs.fullstory.com", "services.fullstory.com"],
+        "matomo.cloud": ["cdn.matomo.cloud"],
+        "statsig.com": [],
+        "statsigapi.net": ["events.statsigapi.net"],
+        "featuregates.org": [],
+        "featureassets.org": [],
+        "assetsconfigcdn.org": [],
+        "beyondwickedmapping.org": [],
+    ]
 
     /// Whether this rule answers one request, once the connection it arrived on already matches. Only the proxy
     /// ever asks.

@@ -418,6 +418,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         pack would otherwise refuse. The global <strong>Pause Blocking</strong> control pauses managed packs along with the rest of
         connection blocking. Pack exceptions are narrower conveniences; ordinary rules remain the place for a deliberate policy that
         should apply beyond one pack.</p>
+      <p><strong>Block collection, not the product.</strong> Cross-site tracking entries use documented dedicated collection, replay and
+        tracker-bootstrap hosts, while provider dashboards, login, billing, documentation and administration stay reachable. When a
+        collection path shares the product hostname — for example <code>analytics.google.com/g/collect</code> or a Matomo tenant's
+        <code>/matomo.php</code> — hostname blocking must allow it. HTTPS inspection can apply an explicit URL rule only when that path is
+        visible; a pinned or otherwise opaque TLS connection cannot be separated safely. First-party tracking proxies are not discoverable
+        from a vendor-host list.</p>
       <p><strong>This is hostname-level network blocking, not content filtering.</strong> A Network Extension can refuse a connection,
         but it cannot edit what a browser or app draws. Packs therefore cannot remove first-party ads, DOM or layout gaps left behind by
         blocked content, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and

@@ -4,9 +4,9 @@
     "catalogID": "flowlight.official",
     "channel": "official",
     "sourceURL": "https://flowlight.xinbetween.com/packs/v1/official.json",
-    "sequence": 1,
-    "issuedAt": 1792368000,
-    "expiresAt": 1823904000,
+    "sequence": 2,
+    "issuedAt": 1793253368,
+    "expiresAt": 1824789368,
     "publisher": "Flowlight",
     "packs": [
       {
@@ -314,15 +314,15 @@
       {
         "manifest": {
           "id": "official.tracking",
-          "version": "1",
-          "generatedAt": 1792220400,
-          "entryCount": 23,
-          "contentSHA256": "57bdd11c751ebc24a785d429afd7d6a9282bb93e4cbe42f6725bd387fef64386",
+          "version": "2",
+          "generatedAt": 1793253368,
+          "entryCount": 43,
+          "contentSHA256": "2fa7a05ad9aba7c8ffe5fea8f7f33ca63e32a5759a4f8efe976497d6132d47b9",
           "minimumAppVersion": "0.15.0",
           "minimumExtensionProtocol": 1,
           "titleKey": "Cross-site tracking",
-          "summaryKey": "Common analytics, session replay, and cross-site measurement hosts.",
-          "caveatKey": "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable.",
+          "summaryKey": "Dedicated analytics collection, session replay, and tracker bootstrap hosts.",
+          "caveatKey": "Product dashboards stay reachable. Shared-host collection paths and first-party tracking proxies cannot be separated by hostname blocking.",
           "source": "Flowlight curated built-in list",
           "license": "GPL-3.0",
           "format": 1
@@ -330,140 +330,260 @@
         "entries": [
           {
             "id": 1,
-            "host": "amplitude.com",
-            "match": "suffix",
+            "host": "api-eu.mixpanel.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
             "id": 2,
-            "host": "analytics.google.com",
-            "match": "suffix",
+            "host": "api-in.mixpanel.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
             "id": 3,
-            "host": "assetsconfigcdn.org",
-            "match": "suffix",
+            "host": "api-js.mixpanel.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
             "id": 4,
-            "host": "beyondwickedmapping.org",
-            "match": "suffix",
+            "host": "api.eu.amplitude.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
             "id": 5,
+            "host": "api.mixpanel.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 6,
+            "host": "api.segment.io",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 7,
+            "host": "api2.amplitude.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 8,
+            "host": "browser-intake-ap1-datadoghq.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 9,
+            "host": "browser-intake-ap2-datadoghq.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 10,
             "host": "browser-intake-datadoghq.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 6,
+            "id": 11,
+            "host": "browser-intake-datadoghq.eu",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 12,
+            "host": "browser-intake-ddog-gov.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 13,
+            "host": "browser-intake-uk1-datadoghq.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 14,
+            "host": "browser-intake-us2-ddog-gov.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 15,
+            "host": "browser-intake-us3-datadoghq.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 16,
+            "host": "browser-intake-us5-datadoghq.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 17,
+            "host": "c.eu.heap-api.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 18,
+            "host": "c.us.heap-api.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 19,
+            "host": "cdn.eu.heap-api.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 20,
+            "host": "cdn.heapanalytics.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 21,
+            "host": "cdn.matomo.cloud",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 22,
+            "host": "cdn.mxpnl.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 23,
+            "host": "cdn.us.heap-api.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 24,
             "host": "clarity.ms",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 7,
-            "host": "featureassets.org",
-            "match": "suffix",
+            "id": 25,
+            "host": "edge.eu1.fullstory.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 8,
-            "host": "featuregates.org",
-            "match": "suffix",
+            "id": 26,
+            "host": "edge.fullstory.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 9,
-            "host": "fullstory.com",
-            "match": "suffix",
+            "id": 27,
+            "host": "eu-assets.i.posthog.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 10,
+            "id": 28,
+            "host": "eu.i.posthog.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 29,
+            "host": "events.eu1.segmentapis.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 30,
+            "host": "events.statsigapi.net",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 31,
             "host": "google-analytics.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 11,
+            "id": 32,
             "host": "googletagmanager.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 12,
-            "host": "heapanalytics.com",
+            "id": 33,
+            "host": "lr-ingest.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 13,
+            "id": 34,
             "host": "lr-ingest.io",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 14,
-            "host": "matomo.cloud",
+            "id": 35,
+            "host": "lr-intake.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 15,
-            "host": "mixpanel.com",
+            "id": 36,
+            "host": "lrkt-in.com",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 16,
-            "host": "mxpnl.com",
-            "match": "suffix",
-            "category": "tracking"
-          },
-          {
-            "id": 17,
-            "host": "posthog.com",
-            "match": "suffix",
-            "category": "tracking"
-          },
-          {
-            "id": 18,
+            "id": 37,
             "host": "prodregistryv2.org",
             "match": "suffix",
             "category": "tracking"
           },
           {
-            "id": 19,
-            "host": "segment.com",
-            "match": "suffix",
+            "id": 38,
+            "host": "r.logrocket.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 20,
-            "host": "segment.io",
-            "match": "suffix",
+            "id": 39,
+            "host": "rs.eu1.fullstory.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 21,
-            "host": "segmentapis.com",
-            "match": "suffix",
+            "id": 40,
+            "host": "rs.fullstory.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 22,
-            "host": "statsig.com",
-            "match": "suffix",
+            "id": 41,
+            "host": "services.fullstory.com",
+            "match": "exact",
             "category": "tracking"
           },
           {
-            "id": 23,
-            "host": "statsigapi.net",
-            "match": "suffix",
+            "id": 42,
+            "host": "us-assets.i.posthog.com",
+            "match": "exact",
+            "category": "tracking"
+          },
+          {
+            "id": 43,
+            "host": "us.i.posthog.com",
+            "match": "exact",
             "category": "tracking"
           }
         ]
@@ -474,7 +594,7 @@
     {
       "algorithm": "p256-sha256",
       "keyID": "flowlight-rule-packs-2026-01",
-      "value": "MEQCIHugfQ8odXRdT6TKDoM7j22LzsvRMKUrCAqOSAs4eB1GAiBR15TV4oaid3NW/qkq9QXoF++0G4IrckUmod1ClDhdTg=="
+      "value": "MEUCIGfUrVoocSM9MzBY8lza2UgWgJzS6o7fMS8A5MU0FoqkAiEA65tGvNTF6Lzmc/tyvTcOLDWZb9v9QIy3RpxsDYoL+6g="
     }
   ]
 }

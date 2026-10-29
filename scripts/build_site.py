@@ -18,7 +18,7 @@ from site/i18n), {{langpicker}}, {{repo}}, {{dmg}}, {{version}}, {{year}}, {{age
 active nav link). Also writes sitemap.xml, robots.txt, llms.txt, llms-full.txt and 404.html, and
 build/site-preview/index.html (self-contained home page).
 """
-import os, re, sys, html, json, datetime, pathlib, hashlib, subprocess
+import os, re, sys, html, json, pathlib, hashlib, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE, OUT = ROOT / "site", ROOT / "docs"
@@ -28,6 +28,14 @@ DOMAIN = "https://flowlight.xinbetween.com"
 REPO = os.environ.get("GITHUB_REPO", "xinbetween/flowlight")
 DMG = f"https://github.com/{REPO}/releases/latest/download/Flowlight.dmg"
 VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', (ROOT / "project.yml").read_text()).group(1)
+RELEASES_SOURCE = SITE / "pages/releases.html"
+release_match = re.search(
+    rf'<h2>{re.escape(VERSION)}</h2><time datetime="(\d{{4}}-\d{{2}}-\d{{2}})">',
+    RELEASES_SOURCE.read_text(),
+)
+if not release_match:
+    sys.exit(f"site/pages/releases.html has no dated release entry for {VERSION}")
+SOURCE_DATE = release_match.group(1)
 
 
 def counts():
@@ -48,7 +56,7 @@ def counts():
 
 
 COUNTS = counts()
-YEAR = str(datetime.date.today().year)
+YEAR = SOURCE_DATE[:4]
 # The fonts are in site.css and served from this domain, so a page needs no third-party stylesheet and makes
 # no request to Google to render itself. See the @font-face block at the top of site/site.css.
 FONTS = ""
@@ -161,20 +169,21 @@ def stamp_dimensions(text):
 
 
 def last_changed(*paths):
-    """The newest date among a generated page's inputs — or today, if any input is edited.
+    """The newest committed date among a page's inputs, bounded by the release source date.
 
     A page is almost always rebuilt *before* the commit that changes it, so asking git alone answers with the
-    previous commit's date, and the same build run after committing answers with today's. The site is then
+    previous commit's date, and the same build run after committing answers with the release date. The site is then
     permanently one rebuild behind itself and CI fails on a one-line sitemap diff that nobody can see the cause
-    of. An edited input is dated today, which is what the commit about to be made will say. Every page also embeds
-    the version from project.yml, so a release bump is a real modification even when that page's own source is not.
+    of. An edited input therefore uses the dated release entry. Every page also embeds the version from project.yml,
+    so a release bump is a real modification even when that page's own source is not. The release date is also the
+    deterministic fallback when Git metadata is unavailable; filesystem mtimes must never affect published bytes.
     """
     try:
         arguments = [str(path) for path in paths]
         dirty = subprocess.run(["git", "status", "--porcelain", "--", *arguments],
                                cwd=ROOT, capture_output=True, text=True, timeout=10)
         if dirty.returncode == 0 and dirty.stdout.strip():
-            return datetime.date.today().isoformat()
+            return SOURCE_DATE
         dates = []
         for path in paths:
             out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", str(path)],
@@ -182,10 +191,10 @@ def last_changed(*paths):
             if out.returncode == 0 and out.stdout.strip():
                 dates.append(out.stdout.strip())
         if dates:
-            return max(dates)
+            return min(max(dates), SOURCE_DATE)
     except Exception:
         pass
-    return max(datetime.date.fromtimestamp(pathlib.Path(path).stat().st_mtime).isoformat() for path in paths)
+    return SOURCE_DATE
 
 def asset_hash(rel):
     return hashlib.sha256((OUT / rel).read_bytes()).hexdigest()[:8]

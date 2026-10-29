@@ -22,7 +22,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         await updater.bootstrap()
 
         XCTAssertEqual(counter.calls, 0)
-        XCTAssertEqual(updater.receipt?.sequence, 1)
+        XCTAssertEqual(updater.receipt?.sequence, 2)
         XCTAssertEqual(updater.status, .current)
         XCTAssertEqual(store.definitions, BuiltInRulePacks.all.sorted { $0.id < $1.id })
         XCTAssertFalse(updater.isDownloadedUpdate(BuiltInRulePacks.advertising))

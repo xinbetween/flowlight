@@ -178,10 +178,11 @@ jobs:
       - name: Generate the project and reject drift
         run: scripts/check_xcode_project.sh
 
-      - name: Check bounded notarization retries and warning gate
+      - name: Check bounded notarization retries, catalog policy, and warning gate
         if: matrix.xcode == 'newest'
         run: |
           scripts/test-notarize.sh
+          scripts/test-rule-pack-policy.sh
           scripts/test-swift-warnings.sh
 
       # This compiles a different product graph and activation path from the Developer ID build. The build clears

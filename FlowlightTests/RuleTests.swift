@@ -39,6 +39,68 @@ final class RuleTests: XCTestCase {
         XCTAssertFalse(rule.matches(facts(host: "notexample.com")))
     }
 
+    func testAnExactHostDoesNotCarryItsSubdomains() {
+        let rule = Rule(action: .block, destination: "api.example.com", destinationMatch: .exact)
+        XCTAssertTrue(rule.matches(facts(host: "API.EXAMPLE.COM.")))
+        XCTAssertFalse(rule.matches(facts(host: "child.api.example.com")))
+        XCTAssertFalse(rule.matches(facts(host: "example.com")))
+    }
+
+    func testAnExactAllowBeatsABroaderSuffixBlock() {
+        let block = Rule(action: .block, destination: "example.com")
+        let allow = Rule(action: .allow, destination: "api.example.com", destinationMatch: .exact)
+        XCTAssertEqual(RuleBook.decide(facts(), rules: [block, allow], session: session).verdict, .allow)
+    }
+
+    func testLegacyProductAnalyticsPresetRuleStopsBlockingTheProduct() throws {
+        let json = Data(#"{"action":"block","destination":"mixpanel.com","origin":"preset","name":"no product analytics"}"#.utf8)
+        var legacy = try JSONDecoder().decode(Rule.self, from: json)
+        XCTAssertEqual(legacy.presetID, "telemetry.product-analytics")
+        XCTAssertFalse(legacy.matches(facts(host: "mixpanel.com")))
+        XCTAssertFalse(legacy.matches(facts(host: "app.mixpanel.com")))
+        XCTAssertTrue(legacy.matches(facts(host: "api.mixpanel.com")))
+        XCTAssertFalse(legacy.matches(facts(host: "child.api.mixpanel.com")))
+        legacy.name = "My analytics policy"
+        XCTAssertFalse(legacy.matches(facts(host: "app.mixpanel.com")), "renaming must not restore the broad block")
+        XCTAssertTrue(legacy.matches(facts(host: "api.mixpanel.com")))
+    }
+
+    func testLegacyAppScopedProductAnalyticsRuleKeepsItsScope() throws {
+        let json = Data(#"{"action":"block","app":"com.example.app","destination":"amplitude.com","origin":"preset","name":"Example: no product analytics"}"#.utf8)
+        let legacy = try JSONDecoder().decode(Rule.self, from: json)
+        XCTAssertTrue(legacy.matches(facts(host: "api2.amplitude.com")))
+        XCTAssertFalse(legacy.matches(facts(app: "com.example.other", agent: "com.example.other",
+                                            host: "api2.amplitude.com")))
+    }
+
+    func testTypedAndRenamedBroadRulesKeepTheirAuthoredMeaning() {
+        let typed = Rule(action: .block, destination: "mixpanel.com")
+        let renamed = Rule(action: .block, destination: "mixpanel.com", origin: .preset, name: "My block")
+        XCTAssertTrue(typed.matches(facts(host: "app.mixpanel.com")))
+        XCTAssertTrue(renamed.matches(facts(host: "app.mixpanel.com")))
+    }
+
+    func testLegacySharedProductRuleWithNoSafeCollectorIsRetired() throws {
+        let json = Data(#"{"action":"block","destination":"segment.com","origin":"preset","name":"no product analytics"}"#.utf8)
+        let legacy = try JSONDecoder().decode(Rule.self, from: json)
+        XCTAssertFalse(legacy.matches(facts(host: "segment.com")))
+        XCTAssertFalse(legacy.matches(facts(host: "app.segment.com")))
+    }
+
+    func testEveryLegacyProductAnalyticsMappingLeavesTheBroadProductDomainReachable() {
+        for (domain, collectors) in Rule.legacyProductAnalyticsReplacements {
+            let legacy = Rule(action: .block, destination: domain, origin: .preset,
+                              presetID: "telemetry.product-analytics", name: "no product analytics")
+            XCTAssertFalse(legacy.matches(facts(host: domain)), domain)
+            XCTAssertFalse(legacy.matches(facts(host: "app.\(domain)")), domain)
+            for collector in collectors {
+                XCTAssertTrue(legacy.matches(facts(host: collector)), "\(domain) must retain \(collector)")
+                XCTAssertFalse(legacy.matches(facts(host: "child.\(collector)")),
+                               "legacy collector \(collector) must be exact")
+            }
+        }
+    }
+
     func testNamingAnAgentCoversTheToolsItStarted() {
         let rule = Rule(action: .block, app: "claude")
         // curl, started by Claude Code: its own bundle id is curl's, its agent key is the agent's.
@@ -757,11 +819,42 @@ final class RuleTests: XCTestCase {
     // MARK: Storing them
 
     func testARuleSurvivesARoundTrip() throws {
-        var rule = Rule(action: .block, app: "claude", destination: "example.com")
+        var rule = Rule(action: .block, app: "claude", destination: "example.com", destinationMatch: .exact)
         rule.schedule = Rule.Schedule(kind: .window, days: [2, 3], start: 60, end: 120)
         rule.hits = 4
         let decoded = try JSONDecoder().decode(Rule.self, from: JSONEncoder().encode(rule))
         XCTAssertEqual(decoded, rule)
+    }
+
+    func testARuleStoredBeforeExactMatchingDefaultsToSuffix() throws {
+        let json = Data(#"{"destination":"example.com","action":"block"}"#.utf8)
+        let decoded = try JSONDecoder().decode(Rule.self, from: json)
+        XCTAssertEqual(decoded.destinationMatch, .suffix)
+        XCTAssertTrue(decoded.matches(facts(host: "api.example.com")))
+    }
+
+    func testSavingAWildcardDestinationSelectsSuffixMatching() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-wildcard-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { !store.rules.isEmpty || store.ruleSet.generation > 0 }
+        let rule = Rule(action: .block, destination: "*.example.com", destinationMatch: .exact)
+
+        store.save(rule)
+
+        let saved = try XCTUnwrap(store.rules.first(where: { $0.id == rule.id }))
+        XCTAssertEqual(saved.destination, "example.com")
+        XCTAssertEqual(saved.destinationMatch, .suffix)
+        XCTAssertTrue(saved.matches(facts(host: "api.example.com")))
+    }
+
+    func testRuleSetTransportPreservesExactMatching() throws {
+        let set = RuleSet(rules: [Rule(action: .block, destination: "api.example.com", destinationMatch: .exact)])
+        let decoded = try XCTUnwrap(BlockCoding.decode(RuleSet.self, from: BlockCoding.encode(set)))
+        XCTAssertEqual(decoded, set)
+        XCTAssertEqual(decoded.rules.first?.destinationMatch, .exact)
     }
 
     func testARefusalCarriesAReadableAnswer() {

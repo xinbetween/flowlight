@@ -303,9 +303,13 @@ serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. CI and Page
 P-256 signature against `Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem`. They never sign it and have
 no private key.
 
-Validate edits before asking the offline signer to sign them:
+Validate edits before asking the offline signer to sign them. The catalog validator also enforces an explicit,
+evidence-backed allowlist for `official.tracking`: dedicated collection, replay and tracker-bootstrap hosts are allowed,
+while product/shared domains fail before signing. Add a new endpoint only with vendor documentation and regression
+coverage showing both its collector behavior and the product surfaces that must remain reachable.
 
 ```sh
+scripts/test-rule-pack-policy.sh
 python3 -I scripts/rule_pack_catalog.py validate rule-packs/official-source.json
 python3 -I scripts/rule_pack_catalog.py digest rule-packs/official-source.json
 ```
@@ -323,6 +327,8 @@ python3 -I scripts/rule_pack_catalog.py compare \
   rule-packs/official-source.json site/packs/v1/official.json
 python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
   --previous-ref origin/main
+# Use `verify --historical` only for an immutable prior catalog; it still verifies structure and signature but does
+# not retroactively apply today's endpoint allowlist to content published before that policy existed.
 python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
   --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
   --expected-key-id flowlight-rule-packs-2026-01

@@ -61,7 +61,20 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.10</h2><time datetime="2026-10-28">October 28, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.11</h2><time datetime="2026-10-28">October 28, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Block tracking traffic without blocking the product.</strong> The Tracking pack now targets documented dedicated
+            collection, replay, and tracker-bootstrap hosts while leaving provider dashboards, login, billing, documentation, and
+            administration reachable.</li>
+          <li><strong>Keep broad vendor domains out.</strong> Exact collector rules replace shared product and feature-configuration
+            suffixes across Amplitude, FullStory, Heap, Matomo, Mixpanel, PostHog, Segment, Statsig, and other providers.</li>
+          <li><strong>Make the boundary durable and explicit.</strong> Catalog policy fixtures reject unreviewed tracking destinations,
+            matcher tests cover product and collector hosts, and the docs explain shared-host TLS paths and first-party proxy limits.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.10</h2><time datetime="2026-10-28">October 28, 2026</time></header>
         <ul>
           <li><strong>Make the full test target warning-free.</strong> Concurrency captures, redundant actor awaits, and intentionally ignored
             database insert IDs now compile cleanly with current Xcode.</li>
@@ -1373,7 +1386,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.15.10 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.15.11 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

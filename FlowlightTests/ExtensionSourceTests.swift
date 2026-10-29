@@ -40,6 +40,14 @@ final class ExtensionSourceTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testRulePublicationRequiresTheExactExtensionBuildIdentity() {
+        XCTAssertTrue(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4/27", expected: "0.15.4/27"))
+        XCTAssertFalse(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4", expected: "0.15.4/27"))
+        XCTAssertFalse(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4/26", expected: "0.15.4/27"))
+        XCTAssertFalse(ExtensionTrafficSource.acceptsRegisteredVersion("", expected: "0.15.4/27"))
+        XCTAssertFalse(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4/27", expected: ""))
+    }
+
     func testRulePackPushGateAbsorbsDuplicateStartupPush() {
         var gate = RulePackPushGate()
 

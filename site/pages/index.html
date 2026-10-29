@@ -185,9 +185,10 @@ nav: home
             <p>With the Network Extension, apply one to every app or only selected apps; preview it against retained traffic,
               see grouped, explainable activity, and add pack-specific exceptions for an app. Ordinary allow rules remain the universal
               escape hatch, global Pause Blocking applies, and essential system traffic stays allowed.</p>
-            <p>They block by hostname, so they cannot remove first-party ads, DOM or layout gaps, browser overlays, scripted popups, or
-              native app windows. ECH, QUIC, encrypted DNS, direct IPs and shared CDNs can limit coverage. Cosmetic popup filtering needs
-              a later browser extension that can change the page.</p>
+            <p>They block dedicated collection hosts while keeping analytics dashboards and administration reachable. Shared-host
+              collection paths and first-party tracking proxies cannot always be separated safely; ECH, QUIC, encrypted DNS, direct IPs
+              and shared CDNs also limit coverage. Packs cannot remove first-party ads, page gaps, overlays or popups — cosmetic filtering
+              needs a browser extension that can change the page.</p>
             <p class="example">Safari · Advertising matched doubleclick.net · 18 connections grouped</p></div>
         </div>
         <div class="rule">

@@ -216,7 +216,7 @@ final class RuleTemplateTests: XCTestCase {
     /// neither — that is how "read but don't write" and "not at night or at the weekend" are said.
     private func signature(_ rule: Rule) -> String {
         let schedule = rule.schedule
-        return [rule.action.rawValue, rule.app, rule.destination, rule.method, rule.path,
+        return [rule.action.rawValue, rule.app, rule.destination, rule.destinationMatch.rawValue, rule.method, rule.path,
                 schedule.kind.rawValue, schedule.days.map(String.init).joined(separator: ","),
                 "\(schedule.start)", "\(schedule.end)"].joined(separator: "|")
     }
@@ -274,8 +274,8 @@ final class RuleTemplateTests: XCTestCase {
 
     /// The reason a whole-Mac template shows up on a row at all: the row is where someone noticed the category.
     func testADestinationRowIsOfferedTheTemplateThatAlreadyCoversIt() {
-        let segment = RuleTemplate.Subject(destination: "api.segment.io")
-        let offered = RuleTemplate.applicable(to: segment).map(\.id)
+        let tracker = RuleTemplate.Subject(destination: "cdn.lr-ingest.io")
+        let offered = RuleTemplate.applicable(to: tracker).map(\.id)
         XCTAssertTrue(offered.contains("telemetry.product-analytics"), offered.description)
         XCTAssertFalse(offered.contains("exfil.paste-sites"), "a paste-site template on an analytics row")
     }
@@ -285,6 +285,35 @@ final class RuleTemplateTests: XCTestCase {
         for template in RuleTemplate.applicable(to: unrelated) {
             XCTAssertNotEqual(template.needs, .nothing,
                               "\(template.id) was offered to a row it has nothing to say about")
+        }
+    }
+
+    func testProductAnalyticsTemplateMatchesTheReviewedTrackingPackInventory() throws {
+        let template = try XCTUnwrap(RuleTemplate.all.first { $0.id == "telemetry.product-analytics" })
+        let ordinary = Set(template.rules().map { "\($0.destination)|\($0.destinationMatch.rawValue)" })
+        let managed = Set(BuiltInRulePacks.tracking.entries.map { "\($0.host)|\($0.match.rawValue)" })
+        XCTAssertEqual(ordinary, managed)
+    }
+
+    func testProductAnalyticsTemplateLeavesProviderProductsReachable() throws {
+        let template = try XCTUnwrap(RuleTemplate.all.first { $0.id == "telemetry.product-analytics" })
+        let rules = template.rules(for: subject)
+        for host in ["analytics.google.com", "analytics.amplitude.com", "app.fullstory.com",
+                     "customer.matomo.cloud", "app.mixpanel.com", "app.posthog.com",
+                     "app.segment.com", "console.statsig.com"] {
+            XCTAssertEqual(RuleBook.decide(facts(host: host), rules: rules, session: session).verdict, .allow,
+                           "the template must leave product host \(host) reachable")
+        }
+        for host in ["www.google-analytics.com", "cdn.lr-ingest.io", "events.prodregistryv2.org",
+                     "api2.amplitude.com", "api.mixpanel.com", "api.segment.io", "events.statsigapi.net",
+                     "rs.fullstory.com", "eu.i.posthog.com", "cdn.heapanalytics.com", "cdn.matomo.cloud"] {
+            XCTAssertEqual(RuleBook.decide(facts(host: host), rules: rules, session: session).verdict, .block,
+                           "the template must still block dedicated tracking host \(host)")
+        }
+        for host in ["child.api2.amplitude.com", "child.api.mixpanel.com", "child.api.segment.io",
+                     "child.events.statsigapi.net", "child.rs.fullstory.com", "child.eu.i.posthog.com"] {
+            XCTAssertEqual(RuleBook.decide(facts(host: host), rules: rules, session: session).verdict, .allow,
+                           "an exact collector rule must not widen to \(host)")
         }
     }
 

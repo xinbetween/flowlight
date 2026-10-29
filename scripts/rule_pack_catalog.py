@@ -43,6 +43,55 @@ SIGNATURE_FIELDS = {"algorithm", "keyID", "value"}
 PACK_ID = re.compile(r"official\.[A-Za-z0-9.-]+\Z")
 HEX_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
+# official.tracking is deliberately an evidence-backed allowlist. Hostname filtering cannot separate a provider's
+# product/control plane from collection paths on the same host, so every accepted entry must be a dedicated collector
+# or tracker-bootstrap endpoint reviewed alongside this policy. Adding a destination requires changing both files.
+TRACKING_ALLOWED_ENTRIES = {
+    ("api.eu.amplitude.com", "exact"),
+    ("api-eu.mixpanel.com", "exact"),
+    ("api-in.mixpanel.com", "exact"),
+    ("api-js.mixpanel.com", "exact"),
+    ("api.mixpanel.com", "exact"),
+    ("api.segment.io", "exact"),
+    ("api2.amplitude.com", "exact"),
+    ("browser-intake-ap1-datadoghq.com", "exact"),
+    ("browser-intake-ap2-datadoghq.com", "exact"),
+    ("browser-intake-datadoghq.com", "suffix"),
+    ("browser-intake-datadoghq.eu", "exact"),
+    ("browser-intake-ddog-gov.com", "exact"),
+    ("browser-intake-uk1-datadoghq.com", "exact"),
+    ("browser-intake-us2-ddog-gov.com", "exact"),
+    ("browser-intake-us3-datadoghq.com", "exact"),
+    ("browser-intake-us5-datadoghq.com", "exact"),
+    ("c.eu.heap-api.com", "exact"),
+    ("c.us.heap-api.com", "exact"),
+    ("cdn.eu.heap-api.com", "exact"),
+    ("cdn.heapanalytics.com", "exact"),
+    ("cdn.matomo.cloud", "exact"),
+    ("cdn.mxpnl.com", "exact"),
+    ("cdn.us.heap-api.com", "exact"),
+    ("clarity.ms", "suffix"),
+    ("edge.eu1.fullstory.com", "exact"),
+    ("edge.fullstory.com", "exact"),
+    ("eu-assets.i.posthog.com", "exact"),
+    ("eu.i.posthog.com", "exact"),
+    ("events.eu1.segmentapis.com", "exact"),
+    ("events.statsigapi.net", "exact"),
+    ("google-analytics.com", "suffix"),
+    ("googletagmanager.com", "suffix"),
+    ("lr-ingest.com", "suffix"),
+    ("lr-ingest.io", "suffix"),
+    ("lr-intake.com", "suffix"),
+    ("lrkt-in.com", "suffix"),
+    ("prodregistryv2.org", "suffix"),
+    ("r.logrocket.com", "exact"),
+    ("rs.eu1.fullstory.com", "exact"),
+    ("rs.fullstory.com", "exact"),
+    ("services.fullstory.com", "exact"),
+    ("us-assets.i.posthog.com", "exact"),
+    ("us.i.posthog.com", "exact"),
+}
+
 
 class CatalogError(ValueError):
     """The catalog cannot be validated or canonicalized."""
@@ -163,7 +212,7 @@ def validate_der_signature(data, where):
         fail(f"{where} has extra DER elements")
 
 
-def validate(catalog, *, require_signature=False):
+def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
     exact_fields(catalog, ENVELOPE_FIELDS, "catalog")
     integer(catalog["format"], "catalog.format", 1, 1)
     payload = catalog["payload"]
@@ -232,6 +281,10 @@ def validate(catalog, *, require_signature=False):
             match = string(entry["match"], f"{entry_where}.match")
             if match not in ("exact", "suffix"):
                 fail(f"{entry_where}.match must be exact or suffix")
+            if (enforce_tracking_policy and pack_id == "official.tracking"
+                    and (host, match) not in TRACKING_ALLOWED_ENTRIES):
+                fail(f"{entry_where}.host is not an approved dedicated tracking endpoint: "
+                     f"{host!r} with {match} matching")
             host_key = f"{host}|{match}"
             if host_key in host_keys:
                 fail(f"{entry_where}.host and match are duplicated")
@@ -239,6 +292,8 @@ def validate(catalog, *, require_signature=False):
             category = string(entry["category"], f"{entry_where}.category")
             if category not in ("advertising", "tracking", "telemetry"):
                 fail(f"{entry_where}.category is unsupported")
+            if pack_id == "official.tracking" and category != "tracking":
+                fail(f"{entry_where}.category must be tracking for official.tracking")
             if previous_key is not None and previous_key >= host_key:
                 fail(f"{pack_where}.entries are not strictly sorted by host|match")
             previous_key = host_key
@@ -295,9 +350,9 @@ def text(value):
     return u32(len(encoded)) + encoded
 
 
-def canonical_bytes(catalog):
+def canonical_bytes(catalog, *, enforce_tracking_policy=True):
     """Return canonical signed bytes, raising CatalogError for every invalid input."""
-    validate(catalog)
+    validate(catalog, enforce_tracking_policy=enforce_tracking_policy)
     payload = catalog["payload"]
     out = bytearray(text(DOMAIN))
     out += u16(catalog["format"])
@@ -337,7 +392,7 @@ def no_duplicate_object(pairs):
     return result
 
 
-def decode(raw, source, *, require_signature=False):
+def decode(raw, source, *, require_signature=False, enforce_tracking_policy=True):
     if len(raw) > MAX_FILE_BYTES:
         fail(f"{source} exceeds the {MAX_FILE_BYTES}-byte limit")
     try:
@@ -346,19 +401,21 @@ def decode(raw, source, *, require_signature=False):
         fail(f"{source} is not UTF-8")
     except json.JSONDecodeError as error:
         fail(f"{source} is not valid JSON: {error.msg} at line {error.lineno}, column {error.colno}")
-    return validate(catalog, require_signature=require_signature)
+    return validate(catalog, require_signature=require_signature,
+                    enforce_tracking_policy=enforce_tracking_policy)
 
 
-def load(path, *, require_signature=False):
+def load(path, *, require_signature=False, enforce_tracking_policy=True):
     path = pathlib.Path(path)
     try:
         raw = path.read_bytes()
     except OSError as error:
         fail(f"cannot read {path}: {error.strerror}")
-    return decode(raw, str(path), require_signature=require_signature)
+    return decode(raw, str(path), require_signature=require_signature,
+                  enforce_tracking_policy=enforce_tracking_policy)
 
 
-def load_git(ref, path, *, require_signature=False):
+def load_git(ref, path, *, require_signature=False, enforce_tracking_policy=True):
     repository = pathlib.Path(__file__).resolve().parent.parent
     try:
         result = subprocess.run(
@@ -368,7 +425,8 @@ def load_git(ref, path, *, require_signature=False):
         fail("git could not read the previous catalog")
     if result.returncode:
         fail(f"git could not read previous catalog {ref}:{path}")
-    return decode(result.stdout, f"{ref}:{path}", require_signature=require_signature)
+    return decode(result.stdout, f"{ref}:{path}", require_signature=require_signature,
+                  enforce_tracking_policy=enforce_tracking_policy)
 
 
 def serialized(catalog):
@@ -450,12 +508,13 @@ def command_compare(args):
 
 def command_compare_previous(args):
     current = load(args.current, require_signature=True)
-    previous = (load(args.previous, require_signature=True) if args.previous else
-                load_git(args.previous_ref, args.previous_path, require_signature=True))
+    previous = (load(args.previous, require_signature=True, enforce_tracking_policy=False) if args.previous else
+                load_git(args.previous_ref, args.previous_path, require_signature=True,
+                         enforce_tracking_policy=False))
     current_sequence = current["payload"]["sequence"]
     previous_sequence = previous["payload"]["sequence"]
     current_digest = hashlib.sha256(canonical_bytes(current)).hexdigest()
-    previous_digest = hashlib.sha256(canonical_bytes(previous)).hexdigest()
+    previous_digest = hashlib.sha256(canonical_bytes(previous, enforce_tracking_policy=False)).hexdigest()
     if current_sequence < previous_sequence:
         fail(f"catalog sequence rolled back from {previous_sequence} to {current_sequence}")
     if current_sequence == previous_sequence and current_digest != previous_digest:
@@ -484,7 +543,8 @@ def command_sign(args):
 
 
 def command_verify(args):
-    catalog = load(args.input, require_signature=True)
+    catalog = load(args.input, require_signature=True,
+                   enforce_tracking_policy=not args.historical)
     if args.current_app_version is not None:
         current = version_tuple(args.current_app_version, "--current-app-version")
         for pack in catalog["payload"]["packs"]:
@@ -509,7 +569,7 @@ def command_verify(args):
             fail("catalog is expired")
     if len(args.public_key) != len(args.expected_key_id):
         fail("each --expected-key-id must have one corresponding --public-key")
-    canonical = canonical_bytes(catalog)
+    canonical = canonical_bytes(catalog, enforce_tracking_policy=not args.historical)
     for expected_value, public_key in zip(args.expected_key_id, args.public_key):
         expected = string(expected_value, "--expected-key-id")
         matches = [signature for signature in catalog["signatures"] if signature["keyID"] == expected]
@@ -570,6 +630,8 @@ def parser():
     verify.add_argument("--current-app-version")
     verify.add_argument("--extension-protocol", type=int)
     verify.add_argument("--now", type=int, help="also require the signed acceptance window to contain this Unix time")
+    verify.add_argument("--historical", action="store_true",
+                        help="verify an immutable prior catalog without applying the current endpoint policy")
     verify.set_defaults(run=command_verify)
     digest = commands.add_parser("digest", help="print each validated pack's entry digest")
     digest.add_argument("input", type=pathlib.Path)

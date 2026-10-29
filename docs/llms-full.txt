@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.10, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.11, macOS 15 or later.
 
  On this page
 
@@ -547,6 +547,13 @@ open build/Build/Products/Release/Flowlight.app
  connection blocking. Pack exceptions are narrower conveniences; ordinary rules remain the place for a deliberate policy that
  should apply beyond one pack.
 
+ Block collection, not the product. Cross-site tracking entries use documented dedicated collection, replay and
+ tracker-bootstrap hosts, while provider dashboards, login, billing, documentation and administration stay reachable. When a
+ collection path shares the product hostname — for example analytics.google.com/g/collect or a Matomo tenant's
+ /matomo.php — hostname blocking must allow it. HTTPS inspection can apply an explicit URL rule only when that path is
+ visible; a pinned or otherwise opaque TLS connection cannot be separated safely. First-party tracking proxies are not discoverable
+ from a vendor-host list.
+
  This is hostname-level network blocking, not content filtering. A Network Extension can refuse a connection,
  but it cannot edit what a browser or app draws. Packs therefore cannot remove first-party ads, DOM or layout gaps left behind by
  blocked content, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and
@@ -894,7 +901,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.10macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.11macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1052,9 +1059,10 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
  see grouped, explainable activity, and add pack-specific exceptions for an app. Ordinary allow rules remain the universal
  escape hatch, global Pause Blocking applies, and essential system traffic stays allowed.
 
- They block by hostname, so they cannot remove first-party ads, DOM or layout gaps, browser overlays, scripted popups, or
- native app windows. ECH, QUIC, encrypted DNS, direct IPs and shared CDNs can limit coverage. Cosmetic popup filtering needs
- a later browser extension that can change the page.
+ They block dedicated collection hosts while keeping analytics dashboards and administration reachable. Shared-host
+ collection paths and first-party tracking proxies cannot always be separated safely; ECH, QUIC, encrypted DNS, direct IPs
+ and shared CDNs also limit coverage. Packs cannot remove first-party ads, page gaps, overlays or popups — cosmetic filtering
+ needs a browser extension that can change the page.
 
  Safari · Advertising matched doubleclick.net · 18 connections grouped
 
@@ -1629,8 +1637,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.15.10
+ 0.15.11
 October 28, 2026Latest
+
+ Block tracking traffic without blocking the product. The Tracking pack now targets documented dedicated
+ collection, replay, and tracker-bootstrap hosts while leaving provider dashboards, login, billing, documentation, and
+ administration reachable.
+
+ Keep broad vendor domains out. Exact collector rules replace shared product and feature-configuration
+ suffixes across Amplitude, FullStory, Heap, Matomo, Mixpanel, PostHog, Segment, Statsig, and other providers.
+
+ Make the boundary durable and explicit. Catalog policy fixtures reject unreviewed tracking destinations,
+ matcher tests cover product and collector hosts, and the docs explain shared-host TLS paths and first-party proxy limits.
+
+ 0.15.10
+October 28, 2026
 
  Make the full test target warning-free. Concurrency captures, redundant actor awaits, and intentionally ignored
  database insert IDs now compile cleanly with current Xcode.

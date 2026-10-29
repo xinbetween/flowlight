@@ -69,7 +69,9 @@ final class RuleStore: ObservableObject {
 
     func save(_ rule: Rule) {
         var rule = rule
+        let enteredWildcard = rule.destination.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("*.")
         rule.destination = Self.cleaned(rule.destination)
+        if enteredWildcard { rule.destinationMatch = .suffix }
         if let index = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[index] = rule
         } else {

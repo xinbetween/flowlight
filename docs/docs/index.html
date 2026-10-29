@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.15.10, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.15.11, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -486,6 +486,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         pack would otherwise refuse. The global <strong>Pause Blocking</strong> control pauses managed packs along with the rest of
         connection blocking. Pack exceptions are narrower conveniences; ordinary rules remain the place for a deliberate policy that
         should apply beyond one pack.</p>
+      <p><strong>Block collection, not the product.</strong> Cross-site tracking entries use documented dedicated collection, replay and
+        tracker-bootstrap hosts, while provider dashboards, login, billing, documentation and administration stay reachable. When a
+        collection path shares the product hostname — for example <code>analytics.google.com/g/collect</code> or a Matomo tenant's
+        <code>/matomo.php</code> — hostname blocking must allow it. HTTPS inspection can apply an explicit URL rule only when that path is
+        visible; a pinned or otherwise opaque TLS connection cannot be separated safely. First-party tracking proxies are not discoverable
+        from a vendor-host list.</p>
       <p><strong>This is hostname-level network blocking, not content filtering.</strong> A Network Extension can refuse a connection,
         but it cannot edit what a browser or app draws. Packs therefore cannot remove first-party ads, DOM or layout gaps left behind by
         blocked content, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and
@@ -793,7 +799,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.15.10 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.15.11 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>
