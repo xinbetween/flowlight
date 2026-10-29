@@ -319,7 +319,7 @@ final class InspectionStorageTests: XCTestCase {
             requestBody: Data("{}".utf8), requestSize: 2, requestTruncated: false, responseHeaders: [], responseBody: Data([0, 1, 2]),
             responseSize: 3, responseTruncated: false, contentType: "text/event-stream", pid: 42, bundleID: "claude", appName: "claude",
             agent: "claude", agentName: "Claude Code", mcpServer: nil, toolCalls: [call], note: nil)
-        try db.insertExchange(exchange)
+        _ = try db.insertExchange(exchange)
         let rows = try db.exchanges(since: Date().addingTimeInterval(-60))
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].toolCalls, [call])

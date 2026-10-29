@@ -153,6 +153,8 @@ jobs:
             grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
             exit 1
           fi
+          set -e
+          scripts/check-swift-warnings.sh "$LOG"
 
       # A keychain of its own, unlocked only for this job, so nothing lands in the runner's login keychain.
       - name: Import the signing certificates

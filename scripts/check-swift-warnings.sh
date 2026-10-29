@@ -9,7 +9,7 @@ if [[ $# -ne 1 || ! -f "$1" ]]; then
 fi
 
 log=$1
-warnings=$(grep -E '^/.*/(Flowlight|FlowlightExtension|FlowlightResponseScriptHelper|Shared)/.*\.swift:[0-9]+:[0-9]+: warning:' "$log" || true)
+warnings=$(grep -E '^/.*/(Flowlight|FlowlightExtension|FlowlightResponseScriptHelper|FlowlightTests|Shared)/.*\.swift:[0-9]+:[0-9]+: warning:' "$log" || true)
 if [[ -n "$warnings" ]]; then
   echo "Flowlight Swift compiler warnings are release blockers:" >&2
   echo "$warnings" >&2

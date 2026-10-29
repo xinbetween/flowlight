@@ -296,11 +296,11 @@ final class MockRuleStorageTests: XCTestCase {
             responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false, contentType: "", pid: 1,
             bundleID: "b", appName: "a", agent: nil, agentName: nil, mcpServer: nil, toolCalls: [])
         exchange.mockRule = "down"
-        try db.insertExchange(exchange)
-        try db.insertExchange(exchange)   // a second row, left real
+        _ = try db.insertExchange(exchange)
+        _ = try db.insertExchange(exchange)   // a second row, left real
         var real = exchange
         real.mockRule = nil
-        try db.insertExchange(real)
+        _ = try db.insertExchange(real)
         let rows = try db.exchanges(since: .distantPast)
         XCTAssertEqual(rows.compactMap(\.mockRule), ["down", "down"])
         XCTAssertEqual(rows.count, 3)

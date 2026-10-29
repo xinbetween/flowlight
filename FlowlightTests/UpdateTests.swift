@@ -92,7 +92,7 @@ final class UpdateTests: XCTestCase {
 
     @MainActor
     func testCleanRelaunchPromotionOpensWindowForNewerRelease() async {
-        let release = await fixtureChecker(version: nextMajorVersion())
+        let release = fixtureChecker(version: nextMajorVersion())
 
         await release.checker.check(userInitiated: false, promoteIfAvailable: true)
 
@@ -105,7 +105,7 @@ final class UpdateTests: XCTestCase {
 
     @MainActor
     func testCleanRelaunchPromotionSkipsSkippedRelease() async {
-        let release = await fixtureChecker(version: nextMajorVersion())
+        let release = fixtureChecker(version: nextMajorVersion())
         UserDefaults.standard.set(release.version, forKey: UpdateChecker.Keys.skipped)
 
         await release.checker.check(userInitiated: false, promoteIfAvailable: true)
@@ -119,7 +119,7 @@ final class UpdateTests: XCTestCase {
 
     @MainActor
     func testCleanRelaunchPromotionDoesNotOpenForCurrentRelease() async {
-        let checker = await fixtureChecker(version: currentVersion())
+        let checker = fixtureChecker(version: currentVersion())
 
         await checker.checker.check(userInitiated: false, promoteIfAvailable: true)
 

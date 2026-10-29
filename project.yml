@@ -15,8 +15,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.15.9"
-    CURRENT_PROJECT_VERSION: "56"
+    MARKETING_VERSION: "0.15.10"
+    CURRENT_PROJECT_VERSION: "57"
   configs:
     AppStore:
       DEVELOPMENT_TEAM: 38RJUJHKZS
@@ -147,6 +147,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Flowlight.app/Contents/MacOS/Flowlight"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     dependencies:
       - target: Flowlight
 schemes:

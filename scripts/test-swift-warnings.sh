@@ -13,14 +13,24 @@ cat > "$temporary/clean.log" <<'LOG'
 LOG
 scripts/check-swift-warnings.sh "$temporary/clean.log"
 
-cat > "$temporary/dirty.log" <<'LOG'
+cat > "$temporary/app-warning.log" <<'LOG'
 /tmp/checkout/Flowlight/Analysis/RuleStore.swift:412:90: warning: actor-isolated property used from nonisolated context
 ** BUILD SUCCEEDED **
 LOG
-if scripts/check-swift-warnings.sh "$temporary/dirty.log" > "$temporary/output" 2>&1; then
-  echo "first-party Swift warning was not rejected" >&2
+if scripts/check-swift-warnings.sh "$temporary/app-warning.log" > "$temporary/app-output" 2>&1; then
+  echo "first-party app warning was not rejected" >&2
   exit 1
 fi
-grep -Fq 'RuleStore.swift:412:90: warning:' "$temporary/output"
+grep -Fq 'RuleStore.swift:412:90: warning:' "$temporary/app-output"
 
-echo "Swift warning fixtures passed: toolchain and dependency notices allowed, first-party warning rejected."
+cat > "$temporary/test-warning.log" <<'LOG'
+/tmp/checkout/FlowlightTests/RuleTests.swift:559:13: warning: mutation of captured var 'saved' in concurrently-executing code
+** TEST BUILD SUCCEEDED **
+LOG
+if scripts/check-swift-warnings.sh "$temporary/test-warning.log" > "$temporary/test-output" 2>&1; then
+  echo "first-party test warning was not rejected" >&2
+  exit 1
+fi
+grep -Fq 'RuleTests.swift:559:13: warning:' "$temporary/test-output"
+
+echo "Swift warning fixtures passed: toolchain and dependency notices allowed, first-party app and test warnings rejected."

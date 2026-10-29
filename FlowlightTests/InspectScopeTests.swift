@@ -25,8 +25,8 @@ final class InspectScopeTests: XCTestCase {
     /// The exact shape of the bug: a page that merely mentions the app's name.
     func testScopingToAnAppExcludesAPageThatOnlyMentionsIt() throws {
         let db = try database()
-        try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com"))
-        try db.insertExchange(exchange(app: ("com.google.Chrome", "Google Chrome"), host: "github.com",
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com"))
+        _ = try db.insertExchange(exchange(app: ("com.google.Chrome", "Google Chrome"), host: "github.com",
                                        body: "<p>Generated with Claude Code</p>"))
 
         let scoped = try db.exchanges(since: Date().addingTimeInterval(-60), app: "claude")
@@ -39,9 +39,9 @@ final class InspectScopeTests: XCTestCase {
 
     func testScopingToAHostKeepsItsSubdomains() throws {
         let db = try database()
-        try db.insertExchange(exchange(app: ("a", "A"), host: "api.github.com"))
-        try db.insertExchange(exchange(app: ("b", "B"), host: "github.com"))
-        try db.insertExchange(exchange(app: ("c", "C"), host: "example.com"))
+        _ = try db.insertExchange(exchange(app: ("a", "A"), host: "api.github.com"))
+        _ = try db.insertExchange(exchange(app: ("b", "B"), host: "github.com"))
+        _ = try db.insertExchange(exchange(app: ("c", "C"), host: "example.com"))
 
         let scoped = try db.exchanges(since: Date().addingTimeInterval(-60), host: "github.com")
         XCTAssertEqual(Set(scoped.map(\.host)), ["github.com", "api.github.com"])
@@ -50,8 +50,8 @@ final class InspectScopeTests: XCTestCase {
     /// A scope and a search have to compose, or narrowing a scoped list would silently widen it.
     func testAScopeAndASearchBothApply() throws {
         let db = try database()
-        try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com"))
-        try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "registry.npmjs.org"))
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com"))
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "registry.npmjs.org"))
 
         let both = try db.exchanges(since: Date().addingTimeInterval(-60), search: "npmjs", app: "claude")
         XCTAssertEqual(both.count, 1)
@@ -60,8 +60,8 @@ final class InspectScopeTests: XCTestCase {
 
     func testNoScopeStillReturnsEverything() throws {
         let db = try database()
-        try db.insertExchange(exchange(app: ("a", "A"), host: "one.example"))
-        try db.insertExchange(exchange(app: ("b", "B"), host: "two.example"))
+        _ = try db.insertExchange(exchange(app: ("a", "A"), host: "one.example"))
+        _ = try db.insertExchange(exchange(app: ("b", "B"), host: "two.example"))
         XCTAssertEqual(try db.exchanges(since: Date().addingTimeInterval(-60)).count, 2)
     }
 }
