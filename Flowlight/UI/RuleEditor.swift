@@ -14,6 +14,17 @@ struct RuleEditor: View {
     @State private var showAdvanced = false
     @State private var apps: [InstalledApps.App] = []
 
+    private var isHostDestination: Bool {
+        !rule.destination.isEmpty && !AgentPolicy.isIPAddress(rule.destination) && !AgentPolicy.isCIDR(rule.destination)
+    }
+
+    private var destinationHelp: String {
+        if isHostDestination, rule.destinationMatch == .exact {
+            return L("Exactly that host. Write *.example.com to cover the domain and its subdomains.")
+        }
+        return L("A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started.")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -32,7 +43,14 @@ struct RuleEditor: View {
                     }
                     TextField(L("Destination"), text: $rule.destination,
                               prompt: Text(L("Anywhere — or a domain, an IP address, or a range")))
-                    Text(L("A domain carries its subdomains with it: `example.com` covers `api.example.com`. Naming an agent covers the tools and MCP servers it started."))
+                    if isHostDestination {
+                        Picker(L("Destination"), selection: $rule.destinationMatch) {
+                            Text(L("Host")).tag(Rule.DestinationMatch.exact)
+                            Text(L("Hostnames")).tag(Rule.DestinationMatch.suffix)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    Text(destinationHelp)
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
 

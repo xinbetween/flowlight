@@ -347,8 +347,8 @@ final class RulePackCatalogTests: XCTestCase {
             currentAppVersion: "0.15.3"
         )
         XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-01")
-        XCTAssertEqual(verified.sequence, 1)
-        XCTAssertEqual(verified.digest, "61e413b20d155f6698ee6d928b40bda33de7aa1fdb1ae590fad8869071569670")
+        XCTAssertEqual(verified.sequence, 2)
+        XCTAssertEqual(verified.digest, "2d8694c6874cb7458e2f22aa419f1cc3eb592e4541da77801c503aec53759eaf")
         XCTAssertEqual(
             verified.definitions.sorted { $0.id < $1.id },
             BuiltInRulePacks.all.sorted { $0.id < $1.id }

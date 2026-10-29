@@ -168,10 +168,13 @@ From any grouped event, add an exception for that app and destination in that pa
 universal escape hatch, global **Pause Blocking** pauses packs too, and essential system traffic for accounts, push,
 updates, certificates and iCloud remains allowed.
 
-These are hostname-level network blocks, not page or window cleaners. They cannot remove first-party ads, DOM or layout
-gaps, browser overlays, scripted popups, or native app windows. ECH, QUIC, encrypted DNS, direct-IP connections and
-shared CDNs can hide or blur the hostname and limit coverage. Cosmetic popup filtering needs a later browser extension
-that can see and change page content; the Network Extension cannot do that job.
+These are hostname-level network blocks, not page or window cleaners. The tracking pack blocks documented dedicated
+collection, replay and tracker-bootstrap hosts while keeping provider dashboards, login, billing, documentation and
+administration reachable. When collection shares a product hostname—such as `analytics.google.com/g/collect` or a
+Matomo tenant's `/matomo.php`—the hostname layer must allow it; HTTPS inspection may still apply an explicit URL rule
+when the path is visible. First-party tracking proxies, ECH, QUIC, encrypted DNS, direct-IP connections and shared CDNs
+can also limit coverage. Packs cannot remove first-party ads, DOM gaps, overlays, scripted popups or native app windows;
+cosmetic filtering needs a browser extension that can see and change page content.
 
 ### Agent guardrails
 *Which tools may this agent use* is a different question from *which hosts may it reach*, so it gets its own tab in

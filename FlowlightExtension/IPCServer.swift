@@ -142,7 +142,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.flushDecisionsLocked()
             self.flushPackEventsLocked()
             // Registration is the synchronization barrier: the app may publish rules only after this reset is done.
-            reply(true, Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+            let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+            reply(true, build.isEmpty ? shortVersion : "\(shortVersion)/\(build)")
         }
     }
 

@@ -210,8 +210,8 @@ extension RuleTemplate {
         guard !destination.isEmpty else { return false }
         let isAddress = AgentPolicy.isIPAddress(destination)
         return rules().contains {
-            AgentPolicy.matches($0.destination, host: isAddress ? "" : destination,
-                                ip: isAddress ? destination : "")
+            $0.destinationMatches(host: isAddress ? "" : destination,
+                                  ip: isAddress ? destination : "")
         }
     }
 
@@ -220,10 +220,13 @@ extension RuleTemplate {
     /// One block per destination, all sharing a name so the Rules screen reads as a set rather than as nine
     /// unrelated rules someone wrote on the same afternoon.
     private static func blocks(_ destinations: [String], app: Subject, label: String,
-                               schedule: Rule.Schedule = Rule.Schedule()) -> [Rule] {
+                               schedule: Rule.Schedule = Rule.Schedule(),
+                               destinationMatch: Rule.DestinationMatch = .suffix) -> [Rule] {
         destinations.map { destination in
-            var rule = Rule(action: .block, app: app.app, destination: destination, origin: .preset)
+            var rule = Rule(action: .block, app: app.app, destination: destination,
+                            destinationMatch: destinationMatch, origin: .preset)
             rule.schedule = schedule
+            if label == "no product analytics" { rule.presetID = "telemetry.product-analytics" }
             rule.name = app.hasApp ? "\(app.appName): \(label)" : label
             return rule
         }
@@ -570,12 +573,15 @@ extension RuleTemplate {
             summary: "The usage-measurement services Mac apps and developer tools send events to. Refusing them "
                 + "costs you nothing the app does for you.",
             category: .telemetry, needs: .nothing,
-            caveat: "Statsig serves feature flags from the same domains as its analytics, so an app that uses it "
-                + "may fall back to its built-in defaults rather than simply measuring less. And some products "
-                + "route analytics through their own domain, which is indistinguishable from the rest of what "
-                + "they do and so can't be on a list like this at all.",
+            caveat: "Provider dashboards and shared feature-configuration hosts stay reachable. Collection paths "
+                + "that share a product hostname, plus first-party tracking proxies, are indistinguishable at the "
+                + "connection layer and cannot be on a hostname list like this.",
             scopesToApp: true,
-            build: { subject in blocks(analyticsHosts, app: subject, label: "no product analytics") }),
+            build: { subject in
+                blocks(analyticsHosts, app: subject, label: "no product analytics")
+                    + blocks(analyticsExactHosts, app: subject, label: "no product analytics",
+                             destinationMatch: .exact)
+            }),
 
         RuleTemplate(
             id: "telemetry.crash-reporting",
@@ -616,32 +622,55 @@ extension RuleTemplate {
             build: { subject in blocks(attributionHosts, app: subject, label: "no install attribution") }),
     ]
 
-    /// Statsig is the reason a list like this is worth having at all: five of its ingestion domains are named
-    /// after nothing, so nobody scanning Live would ever pick them out.
+    /// Dedicated families where every subdomain is part of collection rather than the provider's product surface.
     static let analyticsHosts = [
         "google-analytics.com",
-        "analytics.google.com",
         "googletagmanager.com",
-        "segment.io",   // api.segment.io
-        "segment.com",
-        "segmentapis.com",   // the EU workspaces
-        "mixpanel.com",
-        "mxpnl.com",
-        "amplitude.com",   // api2.amplitude.com is the ingest host
-        "posthog.com",
-        "heapanalytics.com",
-        "fullstory.com",
-        "lr-ingest.io",   // LogRocket
-        "matomo.cloud",   // the hosted one; self-hosted is any host at all
-        "clarity.ms",
         "browser-intake-datadoghq.com",
-        "statsig.com",
-        "statsigapi.net",
-        "featuregates.org",
-        "featureassets.org",
+        "clarity.ms",
+        "lr-ingest.com",
+        "lr-ingest.io",
+        "lr-intake.com",
+        "lrkt-in.com",
         "prodregistryv2.org",
-        "assetsconfigcdn.org",
-        "beyondwickedmapping.org",
+    ]
+
+    /// Reviewed collector and tracker-bootstrap names that cannot safely widen to their neighboring product hosts.
+    static let analyticsExactHosts = [
+        "api-eu.mixpanel.com",
+        "api-in.mixpanel.com",
+        "api-js.mixpanel.com",
+        "api.eu.amplitude.com",
+        "api.mixpanel.com",
+        "api.segment.io",
+        "api2.amplitude.com",
+        "browser-intake-ap1-datadoghq.com",
+        "browser-intake-ap2-datadoghq.com",
+        "browser-intake-datadoghq.eu",
+        "browser-intake-ddog-gov.com",
+        "browser-intake-uk1-datadoghq.com",
+        "browser-intake-us2-ddog-gov.com",
+        "browser-intake-us3-datadoghq.com",
+        "browser-intake-us5-datadoghq.com",
+        "c.eu.heap-api.com",
+        "c.us.heap-api.com",
+        "cdn.eu.heap-api.com",
+        "cdn.heapanalytics.com",
+        "cdn.matomo.cloud",
+        "cdn.mxpnl.com",
+        "cdn.us.heap-api.com",
+        "edge.eu1.fullstory.com",
+        "edge.fullstory.com",
+        "eu-assets.i.posthog.com",
+        "eu.i.posthog.com",
+        "events.eu1.segmentapis.com",
+        "events.statsigapi.net",
+        "r.logrocket.com",
+        "rs.eu1.fullstory.com",
+        "rs.fullstory.com",
+        "services.fullstory.com",
+        "us-assets.i.posthog.com",
+        "us.i.posthog.com",
     ]
 
     static let crashReportingHosts = [

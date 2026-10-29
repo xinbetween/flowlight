@@ -30,6 +30,9 @@ struct RulePackPushGate {
 
 /// Receives per-second batches from the system extension over XPC.
 final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @unchecked Sendable {
+    static func acceptsRegisteredVersion(_ actual: String, expected: String) -> Bool {
+        !expected.isEmpty && actual == expected
+    }
     var displayName: String { L("Network Extension") }
     private var connection: NSXPCConnection?
     private var sink: (([TrafficBatch]) -> Void)?
@@ -136,6 +139,17 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 // A refusal used to end here, with a line of status text and no timer: connected, registered at
                 // nothing, and never going to try again. It is a failure like any other, so it goes on the ladder.
                 guard ok else { self.scheduleReconnect(L("Extension refused registration"), from: connection); return }
+                // Exact ordinary rules are encoded as an additive Rule field. An older filter would ignore that field
+                // and widen a collector host to its whole product domain, so publish nothing until the full embedded
+                // version/build is running. Registration reset the old filter to fail-open before this check.
+                let expected = ExtensionManager.expectedExtensionVersion
+                guard Self.acceptsRegisteredVersion(version, expected: expected) else {
+                    self.status?(L("The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has.",
+                                   version, expected))
+                    self.onRepairRequested?()
+                    self.scheduleReconnect(L("Trying the filter extension again…"), from: connection)
+                    return
+                }
                 self.recovery.succeeded()
                 self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
                                              : L("Connected to filter extension %@ — no traffic from it yet", version))

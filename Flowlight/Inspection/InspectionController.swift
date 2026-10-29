@@ -189,7 +189,7 @@ final class InspectionController: ObservableObject {
             let destination = Self.proxyDestination(host)
             var refusals = (self?.requestRules() ?? []).filter {
                 $0.action == .block && ($0.destination.isEmpty
-                    || AgentPolicy.matches($0.destination, host: destination.host, ip: destination.ip))
+                    || $0.destinationMatches(host: destination.host, ip: destination.ip))
             }
             if refusals.contains(where: { !$0.app.isEmpty }) {
                 // Only then is it worth asking who opened this connection: naming an app is the uncommon case,

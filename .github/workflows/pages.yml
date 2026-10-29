@@ -90,7 +90,7 @@ jobs:
               curl --fail --silent --show-error --connect-timeout 10 --max-time 30 --max-filesize 8388608 \
                 --output "$PREVIOUS_CATALOG" "$LIVE_CATALOG_URL"
             fi
-            python3 -I scripts/rule_pack_catalog.py verify "$PREVIOUS_CATALOG" \
+            python3 -I scripts/rule_pack_catalog.py verify "$PREVIOUS_CATALOG" --historical \
               --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
               --expected-key-id flowlight-rule-packs-2026-01
             python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
