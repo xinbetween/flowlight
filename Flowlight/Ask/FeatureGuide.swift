@@ -157,13 +157,14 @@ extension FeatureGuide {
             keywords: ["airdrop", "awdl", "handoff", "airplay", "sidecar", "peer to peer", "nearby"]),
 
         FeatureGuide(
-            id: "devices", title: "Devices: Bluetooth and USB",
-            summary: "Which devices are paired or attached, which are connected, and when that changed. Off until you turn it on.",
-            steps: ["Open Devices.", "Press Watch Bluetooth or Watch USB and external storage."],
+            id: "devices", title: "Devices: camera, Bluetooth and USB",
+            summary: "Whether each camera is active, which Bluetooth and USB devices are paired or attached, and when that changed. Every channel is off until you turn it on.",
+            steps: ["Open Devices.", "Turn on Watch camera activity, Watch Bluetooth, or Watch USB and external storage."],
             screen: .devices,
-            caveats: ["No byte counts: macOS keeps no per-app accounting for these channels.",
-                      "The app list is who asked for Bluetooth access, not who was granted it."],
-            keywords: ["bluetooth", "usb", "drive", "paired", "airpods", "external storage"]),
+            caveats: ["Camera activity names the camera, not the app using it; Flowlight never reads frames or requests camera access.",
+                      "No Bluetooth or USB byte counts: macOS keeps no per-app accounting for those channels.",
+                      "The Bluetooth app list is who asked for access, not who was granted it."],
+            keywords: ["camera", "webcam", "active", "bluetooth", "usb", "drive", "paired", "airpods", "external storage"]),
 
         FeatureGuide(
             id: "export", title: "Export to OpenTelemetry or a SIEM",

@@ -36,10 +36,12 @@ private struct DevicesContent: View {
         var on: [String] = []
         if store.watchingBluetooth { on.append(L("Bluetooth")) }
         if store.watchingUSB { on.append(L("USB")) }
+        if store.watchingCamera { on.append(L("Camera")) }
         guard !on.isEmpty else { return L("Not watching") }
-        let live = store.bluetooth.filter(\.connected).count + store.usb.count
+        let active = store.bluetooth.filter(\.connected).count + store.usb.count
+            + store.cameras.filter { $0.state == .active }.count
         let channels = on.joined(separator: " · ")
-        return live == 0 ? L("%@ · nothing connected", channels) : L("%@ · %lld connected", channels, live)
+        return active == 0 ? L("%@ · nothing active", channels) : L("%@ · %lld active", channels, active)
     }
 
     @ToolbarContentBuilder
@@ -55,6 +57,8 @@ private struct DevicesContent: View {
                                                         set: { store.watchingBluetooth = $0 }))
                 Toggle(L("Watch USB and external storage"), isOn: Binding(get: { store.watchingUSB },
                                                                        set: { store.watchingUSB = $0 }))
+                Toggle(L("Watch camera activity"), isOn: Binding(get: { store.watchingCamera },
+                                                                set: { store.watchingCamera = $0 }))
             } label: {
                 Label(L("Channels"), systemImage: "switch.2")
             }
@@ -68,10 +72,11 @@ private struct DevicesContent: View {
         ContentUnavailableView {
             Label(L("Nothing but the network is being watched"), systemImage: "dot.radiowaves.left.and.right")
         } description: {
-            Text(L("Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed."))
+            Text(L("Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames."))
         } actions: {
             Button(L("Watch Bluetooth")) { store.watchingBluetooth = true }
             Button(L("Watch USB and external storage")) { store.watchingUSB = true }
+            Button(L("Watch camera activity")) { store.watchingCamera = true }
         }
     }
 
@@ -83,6 +88,7 @@ private struct DevicesContent: View {
                 accounting
                 if store.watchingBluetooth { bluetoothSection }
                 if store.watchingUSB { usbSection }
+                if store.watchingCamera { cameraSection }
                 if !store.events.isEmpty { historySection }
             }
             .padding(Measure.gutter)
@@ -95,7 +101,7 @@ private struct DevicesContent: View {
     private var accounting: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "number").font(.caption)
-            Text(L("No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed."))
+            Text(L("No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames."))
                 .font(.caption)
             Spacer(minLength: 0)
         }
@@ -176,6 +182,33 @@ private struct DevicesContent: View {
             }
             footnote(L("Devices attached over USB and volumes that appear, with the moment each arrived and left. Throughput isn't here for the same reason it isn't under Bluetooth: macOS doesn't account for it per app."))
         }
+    }
+
+    // MARK: Camera
+
+    private var cameraSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            heading(cameraHeading)
+            card {
+                if store.cameras.isEmpty {
+                    placeholder(L("No camera is available, or the device list hasn't been read yet."))
+                } else {
+                    ForEach(Array(store.cameras.enumerated()), id: \.element.id) { index, camera in
+                        if index > 0 { Divider().padding(.leading, 50) }
+                        CameraRow(camera: camera).entrance()
+                    }
+                }
+            }
+            footnote(L("Flowlight reads only whether each camera is active somewhere on this Mac. macOS does not expose the owning app through this public device signal, so Flowlight does not guess. It never opens a capture session, requests camera access or reads frames."))
+        }
+    }
+
+    private var cameraHeading: String {
+        let active = store.cameras.filter { $0.state == .active }.count
+        guard !store.cameras.isEmpty else { return L("Camera activity") }
+        return active == 0
+            ? L("Camera activity · none active")
+            : L("Camera activity · %lld active", active)
     }
 
     // MARK: What changed
@@ -289,6 +322,7 @@ private struct DeviceRow: View {
         case .bluetooth: return device.connected ? L("Connected") : L("Not connected")
         case .usb: return L("Attached")
         case .volume: return L("Mounted")
+        case .camera: return device.connected ? L("Active") : L("Inactive")
         }
     }
 
@@ -298,6 +332,58 @@ private struct DeviceRow: View {
         if !device.subtitle.isEmpty { parts.append(device.subtitle) }
         if device.capacity > 0 { parts.append(ByteFormat.string(device.capacity)) }
         return parts.joined(separator: " · ")
+    }
+}
+
+private struct CameraRow: View {
+    let camera: CameraDevice
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "video")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 26, height: 26)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(camera.name).font(.body.weight(.medium)).lineLimit(1).truncationMode(.middle)
+                HStack(spacing: 6) {
+                    if !camera.manufacturer.isEmpty {
+                        Text(camera.manufacturer).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                        Text("·").font(.caption).foregroundStyle(.quaternary)
+                    }
+                    Text(camera.id)
+                        .font(.caption.monospaced()).foregroundStyle(.tertiary)
+                        .lineLimit(1).truncationMode(.middle)
+                        .help(L("How Flowlight recognises this camera between sightings"))
+                }
+            }
+            Spacer(minLength: 8)
+            HStack(spacing: 5) {
+                LiveDot(color: tint, active: camera.state == .active, size: 6)
+                Text(stateWord).font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.top, 3)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(stateWord)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+    }
+
+    private var stateWord: String {
+        switch camera.state {
+        case .active: return L("Active")
+        case .inactive: return L("Inactive")
+        case .unknown: return L("State unavailable")
+        }
+    }
+
+    private var tint: Color {
+        switch camera.state {
+        case .active: return FL.warning
+        case .inactive, .unknown: return .secondary
+        }
     }
 }
 
@@ -355,6 +441,8 @@ private struct DeviceEventRow: View {
         case .disconnected: return .secondary
         case .appeared: return .blue
         case .removed: return FL.warning
+        case .started: return FL.warning
+        case .stopped: return .secondary
         }
     }
 }

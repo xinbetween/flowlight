@@ -2132,7 +2132,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "rule_events", "rule_pack_event_rollups"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "device_events", "rule_events", "rule_pack_event_rollups"] {
                 try conn.run("DELETE FROM \(t)")
             }
             // Keep event batch IDs so an acknowledgment lost before "Delete everything" cannot resurrect activity.

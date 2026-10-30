@@ -772,16 +772,12 @@
 /* UI/DevicesView.swift */
 "USB" = "USB";
 "Not watching" = "未監看";
-"%@ · nothing connected" = "%@ · 沒有連接任何東西";
-"%@ · %lld connected" = "%@ · 已連接 %lld 個";
 "Read the device list again now (⌘R)" = "立即重新讀取裝置列表（⌘R）";
 "Watch Bluetooth" = "監看藍牙";
 "Watch USB and external storage" = "監看 USB 與外接儲存裝置";
 "Channels" = "通道";
 "Choose which channels Flowlight watches" = "選擇 Flowlight 要監看哪些通道";
 "Nothing but the network is being watched" = "目前只監看網路";
-"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "藍牙和 USB 要等你開啟才會作用。兩者都不需要 Flowlight 還沒有的權限 — 預設關閉是因為監看它們會擴大這個 App 觀察的範圍，而這應該由你決定，不該是某次更新替你決定的。\n\n兩者都無法回報位元組數。macOS 不會為這些通道記錄各 App 的用量，所以 Flowlight 能誠實顯示的，是有什麼連著、哪些 App 本來就會用它，以及這些狀況何時改變。";
-"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "這些通道沒有位元組計數。macOS 不會為藍牙或 USB 記錄各 App 的用量，所以這裡若出現數字也只是編出來的。能誠實呈現的，是有什麼連著、哪些 App 本來就會用它，以及這些狀況何時改變。";
 "Nothing paired, or the list hasn't been read yet." = "沒有配對的裝置，或列表還沒有讀取。";
 "Paired devices and whether they're connected, read from the system every half minute. The byte-level traces that would give a throughput number need Apple's PacketLogger profile, which an app can't read." = "已配對的裝置以及它們是否連接，每半分鐘從系統讀取一次。要算出傳輸量所需的位元組層級追蹤資料，需要 Apple 的 PacketLogger 描述檔，而 App 讀不到那個。";
 "Bluetooth · %lld connected of %lld paired" = "藍牙 · 已連接 %lld 個，共配對 %lld 個";
@@ -797,6 +793,23 @@
 "Attached" = "已接上";
 "Mounted" = "已掛載";
 "Yesterday %@" = "昨天 %@";
+"Camera" = "相機";
+"Started" = "已啟動";
+"Unknown camera" = "未知相機";
+"%@ · nothing active" = "%@ · 沒有活動項目";
+"%@ · %lld active" = "%@ · %lld 個活動項目";
+"Watch camera activity" = "監看相機活動";
+"Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "藍牙、USB 和相機活動要等你開啟才會作用。它們不需要新的權限 — 預設關閉是因為監看它們會擴大 Flowlight 觀察的範圍，而這應該由你決定，不該是某次更新替你決定的。\n\n藍牙和 USB 會顯示連接的裝置。相機活動會顯示每部相機是否正在使用，但不會顯示是哪個 App 在使用它。Flowlight 絕不會開啟相機或讀取畫面。";
+"No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "不讀取內容，也不捏造歸屬。藍牙和 USB 顯示連接狀態，相機監看只讀取各裝置是否正在使用。macOS 不會在這裡公開使用相機的 App，因此 Flowlight 只標示相機，絕不猜測 App，也不讀取畫面。";
+"No camera is available, or the device list hasn't been read yet." = "沒有可用的相機，或裝置列表還沒有讀取。";
+"Flowlight reads only whether each camera is active somewhere on this Mac. macOS does not expose the owning app through this public device signal, so Flowlight does not guess. It never opens a capture session, requests camera access or reads frames." = "Flowlight 只讀取每部相機是否正在這台 Mac 上的某處使用。macOS 不會透過這個公開的裝置信號透露使用它的 App，因此 Flowlight 不會猜測。它絕不開啟擷取工作階段、不要求相機存取權，也不讀取畫面。";
+"Camera activity" = "相機活動";
+"Camera activity · none active" = "相機活動 · 均未使用";
+"Camera activity · %lld active" = "相機活動 · %lld 部正在使用";
+"How Flowlight recognises this camera between sightings" = "Flowlight 如何在不同次出現之間認出這部相機";
+"Active" = "使用中";
+"Inactive" = "未使用";
+"State unavailable" = "狀態無法取得";
 
 /* UI/FocusView.swift */
 "Focus on" = "焦點已開啟";

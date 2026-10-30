@@ -749,16 +749,12 @@
 /* UI/DevicesView.swift */
 "USB" = "USB";
 "Not watching" = "Non surveillé";
-"%@ · nothing connected" = "%@ · rien de connecté";
-"%@ · %lld connected" = "%@ · %lld connectés";
 "Read the device list again now (⌘R)" = "Relire la liste des appareils maintenant (⌘R)";
 "Watch Bluetooth" = "Surveiller le Bluetooth";
 "Watch USB and external storage" = "Surveiller l'USB et le stockage externe";
 "Channels" = "Canaux";
 "Choose which channels Flowlight watches" = "Choisir les canaux que Flowlight surveille";
 "Nothing but the network is being watched" = "Seul le réseau est surveillé";
-"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Le Bluetooth et l'USB restent désactivés tant qu'ils ne sont pas activés. Aucun des deux ne demande d'autorisation dont Flowlight ne dispose pas déjà : ils sont désactivés parce que les surveiller élargit ce que l'app regarde, et que cela doit être votre décision plutôt que celle d'une mise à jour.\n\nAucun des deux ne peut rapporter d'octets. macOS ne tient aucune comptabilité par app sur ces canaux ; ce que Flowlight peut montrer honnêtement, c'est ce qui est connecté, quelles apps sont conçues pour s'en servir, et quand cela a changé.";
-"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "Aucun décompte d'octets sur ces canaux. macOS ne tient pas de comptabilité par app pour le Bluetooth ni l'USB : un chiffre affiché ici serait inventé. Ce qui est honnête, c'est ce qui est connecté, quelles apps sont conçues pour s'en servir, et quand cela a changé.";
 "Nothing paired, or the list hasn't been read yet." = "Rien de jumelé, ou la liste n'a pas encore été lue.";
 "Paired devices and whether they're connected, read from the system every half minute. The byte-level traces that would give a throughput number need Apple's PacketLogger profile, which an app can't read." = "Les appareils jumelés et leur état de connexion, relus depuis le système toutes les trente secondes. Les traces au niveau de l'octet qui donneraient un débit exigent le profil PacketLogger d'Apple, qu'une app ne peut pas lire.";
 "Bluetooth · %lld connected of %lld paired" = "Bluetooth · %lld connectés sur %lld jumelés";
@@ -774,6 +770,23 @@
 "Attached" = "Connecté";
 "Mounted" = "Monté";
 "Yesterday %@" = "Hier %@";
+"Camera" = "Caméra";
+"Started" = "Démarrée";
+"Unknown camera" = "Caméra inconnue";
+"%@ · nothing active" = "%@ · rien d'actif";
+"%@ · %lld active" = "%@ · %lld actifs";
+"Watch camera activity" = "Surveiller l'activité de la caméra";
+"Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Le Bluetooth, l'USB et l'activité de la caméra restent désactivés tant que vous ne les activez pas. Ils ne demandent aucune nouvelle autorisation : ils sont désactivés parce que leur surveillance élargit ce que Flowlight observe, et cette décision doit vous appartenir, plutôt qu'à une mise à jour.\n\nLe Bluetooth et l'USB indiquent ce qui est connecté. L'activité de la caméra indique si chaque caméra est active, pas quelle app l'utilise. Flowlight n'ouvre jamais la caméra et ne lit aucune image.";
+"No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "Aucun contenu ni attribution inventée. Le Bluetooth et l'USB indiquent les connexions, tandis que la surveillance de la caméra lit uniquement l'état actif de chaque appareil. macOS ne révèle ici publiquement aucune identité de l'app qui utilise la caméra : Flowlight nomme donc la caméra, ne devine jamais l'app et ne lit aucune image.";
+"No camera is available, or the device list hasn't been read yet." = "Aucune caméra n'est disponible, ou la liste des appareils n'a pas encore été lue.";
+"Flowlight reads only whether each camera is active somewhere on this Mac. macOS does not expose the owning app through this public device signal, so Flowlight does not guess. It never opens a capture session, requests camera access or reads frames." = "Flowlight lit uniquement si chaque caméra est active quelque part sur ce Mac. macOS ne révèle pas l'app qui l'utilise par ce signal public de l'appareil, donc Flowlight ne fait aucune supposition. Il n'ouvre jamais de session de capture, ne demande pas l'accès à la caméra et ne lit aucune image.";
+"Camera activity" = "Activité de la caméra";
+"Camera activity · none active" = "Activité de la caméra · aucune active";
+"Camera activity · %lld active" = "Activité de la caméra · %lld actives";
+"How Flowlight recognises this camera between sightings" = "Comment Flowlight reconnaît cette caméra d'une détection à l'autre";
+"Active" = "Active";
+"Inactive" = "Inactive";
+"State unavailable" = "État indisponible";
 
 /* UI/FocusView.swift */
 "Focus on" = "Focus activé";

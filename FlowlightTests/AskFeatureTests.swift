@@ -68,7 +68,8 @@ final class AskSettingsQueryTests: XCTestCase {
         AskEnvironment(appVersion: "0.5.1", captureSource: "Network Extension", captureStatus: "Connected",
                        receiving: true, extensionState: "Filter enabled", canBlock: true,
                        inspecting: false, exportEnabled: false, exportConfigured: false,
-                       watchingBluetooth: true, rules: ["Block example.com — on, Always, fired 2×"],
+                       watchingBluetooth: true, watchingCamera: true,
+                       rules: ["Block example.com — on, Always, fired 2×"],
                        guardrails: [], agentAllowlists: 1, askProvider: "On-device model")
     }
 
@@ -80,6 +81,7 @@ final class AskSettingsQueryTests: XCTestCase {
         XCTAssertEqual(json["captureSource"] as? String, "Network Extension")
         XCTAssertEqual(json["httpsInspection"] as? String, "off")
         XCTAssertEqual(json["canRefuseConnections"] as? String, "yes")
+        XCTAssertEqual(json["watchingCameraActivity"] as? String, "yes")
         XCTAssertEqual(result.screen, .capture)
     }
 

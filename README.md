@@ -220,9 +220,13 @@ rewritten, blocking is switched off while the sampler stands in (the sampler can
 shouldn't claim otherwise), and **Try the extension again** starts over.
 
 ### Devices: channels that aren't the network
-A Mac sends and receives over more than TCP and UDP. The **Devices** screen covers the rest, off until you turn it
-on — not for want of a permission, but because watching more of your Mac should be a decision rather than something
-an update did.
+A Mac sends and receives over more than TCP and UDP. The **Devices** screen covers the rest, with every channel off
+until you turn it on because watching more of your Mac should be a decision rather than something an update did.
+
+**Camera activity**: whether each camera is active and when it started or stopped. Flowlight reads the public
+CoreMediaIO device state; it never opens a capture session, requests camera access, or reads frames. That signal does
+not identify the owning app, so Flowlight names the camera and does not guess. The sandboxed Mac App Store product
+carries Apple's camera hardware entitlement so it can see the device list, but still never asks for capture consent.
 
 **Bluetooth**: which devices are paired, which are connected, when that changed, and which applications are built
 to use the radio. No byte counts — macOS keeps no per-app accounting for Bluetooth, and the traces that would give
@@ -452,6 +456,7 @@ Shipped:
 - [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
 - [x] Bluetooth: which devices are paired and connected, which apps are built to use it (0.4.2)
 - [x] USB and external storage: what is attached, and when each volume arrived and left (0.4.3)
+- [x] Camera activity: which camera is active and when it started or stopped, without reading frames (0.15.12)
 - [x] Ask Flowlight: questions in plain language, answered from the local history (0.5.0)
 - [x] Mock responses in HTTPS inspection (from 0.3.1)
 - [x] Export to OpenTelemetry / SIEM (from 0.3.2)

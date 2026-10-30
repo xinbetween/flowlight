@@ -749,16 +749,12 @@
 /* UI/DevicesView.swift */
 "USB" = "USB";
 "Not watching" = "監視していません";
-"%@ · nothing connected" = "%@ · 接続なし";
-"%@ · %lld connected" = "%@ · %lld 台接続中";
 "Read the device list again now (⌘R)" = "デバイスのリストをいま読み直します（⌘R）";
 "Watch Bluetooth" = "Bluetooth を監視";
 "Watch USB and external storage" = "USB と外部ストレージを監視";
 "Channels" = "チャンネル";
 "Choose which channels Flowlight watches" = "Flowlight が監視するチャンネルを選びます";
 "Nothing but the network is being watched" = "ネットワーク以外は監視していません";
-"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Bluetooth と USB は、オンにするまで監視しません。どちらも Flowlight がすでに持っている以外の権限を必要とするものではありません。オフになっているのは、監視するとアプリが見る範囲が広がるからです。それはアップデートが勝手に決めることではなく、あなたが決めることです。\n\nどちらもバイト数は報告できません。macOS はこれらのチャンネルについてアプリごとの集計を行わないため、Flowlight が正直に示せるのは、何が接続されているか、どのアプリがそれを使うように作られているか、そしてそれがいつ変わったかです。";
-"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "これらのチャンネルにバイト数はありません。macOS は Bluetooth や USB についてアプリごとの集計を行わないため、ここに数値を出しても作り物になります。正直に示せるのは、何が接続されているか、どのアプリがそれを使うように作られているか、そしてそれがいつ変わったかです。";
 "Nothing paired, or the list hasn't been read yet." = "ペアリング済みのデバイスがない、またはリストをまだ読み取っていません。";
 "Paired devices and whether they're connected, read from the system every half minute. The byte-level traces that would give a throughput number need Apple's PacketLogger profile, which an app can't read." = "ペアリング済みのデバイスと、その接続状態を 30 秒ごとにシステムから読み取ります。スループットの数値を出せるバイト単位のトレースには Apple の PacketLogger プロファイルが必要で、アプリからは読み取れません。";
 "Bluetooth · %lld connected of %lld paired" = "Bluetooth · ペアリング済み %2$lld 件中 %1$lld 件が接続中";
@@ -774,6 +770,23 @@
 "Attached" = "接続";
 "Mounted" = "マウント";
 "Yesterday %@" = "昨日 %@";
+"Camera" = "カメラ";
+"Started" = "開始";
+"Unknown camera" = "不明なカメラ";
+"%@ · nothing active" = "%@ · アクティブなし";
+"%@ · %lld active" = "%@ · %lld 台がアクティブ";
+"Watch camera activity" = "カメラの動作を監視";
+"Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Bluetooth、USB、カメラの動作は、オンにするまで監視されません。新しい権限は必要ありません。オフになっているのは、監視すると Flowlight が見る範囲が広がるためであり、それはアップデートではなく、あなたが決めることです。\n\nBluetooth と USB では接続中のものを表示します。カメラの動作では各カメラがアクティブかどうかを表示しますが、使用中のアプリは表示しません。Flowlight がカメラを開いたり、フレームを読み取ったりすることはありません。";
+"No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "内容を読み取ることも、根拠のないアプリへの関連付けをすることもありません。Bluetooth と USB では接続を表示し、カメラの監視では各デバイスがアクティブかどうかだけを読み取ります。macOS はここでカメラを使用中のアプリを公開していないため、Flowlight はカメラ名のみを示し、アプリを推測せず、フレームも読み取りません。";
+"No camera is available, or the device list hasn't been read yet." = "利用できるカメラがないか、デバイスのリストをまだ読み取っていません。";
+"Flowlight reads only whether each camera is active somewhere on this Mac. macOS does not expose the owning app through this public device signal, so Flowlight does not guess. It never opens a capture session, requests camera access or reads frames." = "Flowlight が読み取るのは、この Mac 上で各カメラがアクティブかどうかだけです。macOS はこの公開デバイス信号から使用中のアプリを明らかにしないため、Flowlight は推測しません。キャプチャセッションを開いたり、カメラへのアクセスを要求したり、フレームを読み取ったりすることはありません。";
+"Camera activity" = "カメラの動作";
+"Camera activity · none active" = "カメラの動作 · アクティブなし";
+"Camera activity · %lld active" = "カメラの動作 · %lld 台がアクティブ";
+"How Flowlight recognises this camera between sightings" = "検出をまたいでこのカメラを識別する方法";
+"Active" = "アクティブ";
+"Inactive" = "非アクティブ";
+"State unavailable" = "状態を取得できません";
 
 /* UI/FocusView.swift */
 "Focus on" = "フォーカスオン";

@@ -306,6 +306,7 @@
 		ACC7529D79C19667761AEAD2 /* RulePackEventDeliveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0C0840C443F8AEDD254AE0 /* RulePackEventDeliveryTests.swift */; };
 		AD57CBF846824C0BE9878BF1 /* LLMFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95765A2F0D026D17736C9D9D /* LLMFacts.swift */; };
 		ADC857099AB3E324DEC334BC /* ProxyJanitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45076E14820DDD4CFF352226 /* ProxyJanitorTests.swift */; };
+		ADD5FA4D7E77D7FD053E4ADA /* CoreMediaIO.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7221CF8195DB26B06F97150C /* CoreMediaIO.framework */; };
 		AF1BB39DC13C09CAC6253943 /* ProxyJanitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18286421CD591157CF1E1FD /* ProxyJanitor.swift */; };
 		AF8A26B4F8FFA3C94F0D276E /* InspectionProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FD96902AACB4B557DEFFBCD /* InspectionProxy.swift */; };
 		AF9E41AC8E40F018E642A73E /* MockRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FBB33595155CF835AF14D5 /* MockRule.swift */; };
@@ -419,10 +420,12 @@
 		E25A53EA4362FCC71BCE5A80 /* ExportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF216452A0F90D9E90A6BD34 /* ExportModels.swift */; };
 		E384EA8E1EEBA1689E638B8C /* official-rule-packs-v1-public.pem in Resources */ = {isa = PBXBuildFile; fileRef = 1F49F6CFAF06DFBB9416246D /* official-rule-packs-v1-public.pem */; };
 		E3C7DC93B1AC66ECA40B7820 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92FDE4C87CC59491B70BF3F3 /* ContentView.swift */; };
+		E3E40EA30BB779B2FE83AFD0 /* CoreMediaIO.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7221CF8195DB26B06F97150C /* CoreMediaIO.framework */; };
 		E3F2CFD47F40B6A9481C5777 /* PluginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22D460484C8D6DFA5D495132 /* PluginTests.swift */; };
 		E4D30933B930F00B7CAADE20 /* MCPDomainsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1888DEE22E9C2FCFB5DC064 /* MCPDomainsSection.swift */; };
 		E592D3A1D73A580676FA5696 /* InspectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE93ABADFF46C961FCABAB8 /* InspectView.swift */; };
 		E5973D84F73F277220538694 /* RulePackCatalogComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E858E52F162361C6FD039F16 /* RulePackCatalogComposition.swift */; };
+		E5B215C772B00C6BD4A55C42 /* CameraMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC4A606DBADA3102190858E /* CameraMonitor.swift */; };
 		E62BAD317B20BE6E16A21FA3 /* IPCServer.txt in Resources */ = {isa = PBXBuildFile; fileRef = 76B6293D3AAFF511F855C4E6 /* IPCServer.txt */; };
 		E69786240DE2CC058F7A307A /* ResponseScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D6646248D4CDF3EB86A893 /* ResponseScriptRunner.swift */; };
 		E6B53114FFB3F672BA02FE69 /* LLMFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95765A2F0D026D17736C9D9D /* LLMFacts.swift */; };
@@ -439,6 +442,7 @@
 		ECE292CA7FBB8A6CE372B4F5 /* RulePackTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AC102A5B36107D8B6B31F /* RulePackTransfer.swift */; };
 		ED1CF3BBC1C4D317658D07A0 /* ProxyRelaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D29667127E5DE57908D936 /* ProxyRelaunchTests.swift */; };
 		ED2148A66082B969315461CA /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F186517132592B36ED2B9F80 /* main.swift */; };
+		ED587CD66B1EA36986651943 /* CameraMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC4A606DBADA3102190858E /* CameraMonitor.swift */; };
 		EDAB8186A2117A6EE711A8B9 /* RulePackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B5736850B28B462739C2CD /* RulePackStore.swift */; };
 		EDB017EC114FFAF18CEC2786 /* PacketSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F062E6D35F98D8EEF1EBE47C /* PacketSniffer.swift */; };
 		EDEAECD3FA4B513114C0B581 /* CodeSignatureCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168D824382963305ED7E6C04 /* CodeSignatureCheck.swift */; };
@@ -647,6 +651,7 @@
 		5C0F9AC24A75E20F3FA0B2BB /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		5C34C9D0A9B302B4CF4C7125 /* HTTPDataTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDataTransport.swift; sourceTree = "<group>"; };
 		5D8BAA4EB36D9B7D7BF56AD1 /* RuleSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSimulation.swift; sourceTree = "<group>"; };
+		5DC4A606DBADA3102190858E /* CameraMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraMonitor.swift; sourceTree = "<group>"; };
 		6053ADC7641DB8CAEA9390D6 /* FlowlightAppStore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowlightAppStore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6096AB6A3EF78490BE10DF50 /* TrafficModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficModels.swift; sourceTree = "<group>"; };
 		61080233ED162067497EE2E3 /* FocusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusView.swift; sourceTree = "<group>"; };
@@ -667,6 +672,7 @@
 		70965BF26E0B4B3F9719122B /* WindowVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowVisibilityTests.swift; sourceTree = "<group>"; };
 		70F169CF4776BE3FAF69AE73 /* InspectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionTests.swift; sourceTree = "<group>"; };
 		719C08673D2446F21DAF9F54 /* ExportQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportQueue.swift; sourceTree = "<group>"; };
+		7221CF8195DB26B06F97150C /* CoreMediaIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMediaIO.framework; path = System/Library/Frameworks/CoreMediaIO.framework; sourceTree = SDKROOT; };
 		738E050AC8811051BF14E529 /* RulePackCatalogUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackCatalogUpdater.swift; sourceTree = "<group>"; };
 		74F1DEAAAAAA607CEA5EC303 /* OnDeviceRiskProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceRiskProvider.swift; sourceTree = "<group>"; };
 		7611E8788B3B6AF18F1CEDF7 /* AskEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskEnvironment.swift; sourceTree = "<group>"; };
@@ -841,6 +847,7 @@
 				B141482792DF3953D575CFF9 /* libsqlite3.tbd in Frameworks */,
 				7A572D1F12B86CB4F91E72A0 /* NetworkExtension.framework in Frameworks */,
 				06C9D883620A08BF10DBF82A /* SystemExtensions.framework in Frameworks */,
+				E3E40EA30BB779B2FE83AFD0 /* CoreMediaIO.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -850,6 +857,7 @@
 			files = (
 				C6E8C518995B36DB53128B05 /* libsqlite3.tbd in Frameworks */,
 				2AFEE6E1F9393DE9D219552F /* NetworkExtension.framework in Frameworks */,
+				ADD5FA4D7E77D7FD053E4ADA /* CoreMediaIO.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -895,6 +903,7 @@
 			isa = PBXGroup;
 			children = (
 				B9B6A48D086EF16CF6E438FF /* BluetoothMonitor.swift */,
+				5DC4A606DBADA3102190858E /* CameraMonitor.swift */,
 				CD774DADE526BE4F507BE06C /* DeviceModels.swift */,
 				CFC1036E5ABBFDB8740405F3 /* DeviceStore.swift */,
 				A903BAF9BBDCFEAEC2F023FF /* USBMonitor.swift */,
@@ -1208,6 +1217,7 @@
 		ADA9F48B47F7D9E8BA6C8F1C /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				7221CF8195DB26B06F97150C /* CoreMediaIO.framework */,
 				C087727B358A400DCFD7E0E6 /* JavaScriptCore.framework */,
 				0A12EC605B35B8042A369205 /* libsqlite3.tbd */,
 				8ACA1ABA6B37B6457004C94A /* NetworkExtension.framework */,
@@ -1699,6 +1709,7 @@
 				046D743441B8528AD853BF2D /* BluetoothMonitor.swift in Sources */,
 				1C699CA261A1C0963BF36120 /* BoundedHTTPDataTransport.swift in Sources */,
 				42F74C2DB00410D8FB790B70 /* BuiltInRulePacks.swift in Sources */,
+				E5B215C772B00C6BD4A55C42 /* CameraMonitor.swift in Sources */,
 				D662DA2727A039F0137E0472 /* CaptureAccess.swift in Sources */,
 				CDFFBF64E8D14CAB558D87F7 /* CaptureView.swift in Sources */,
 				679B74263454FB76473F1006 /* CaptureWarning.swift in Sources */,
@@ -1906,6 +1917,7 @@
 				5AA48BB88F9E0F6F858DC553 /* BluetoothMonitor.swift in Sources */,
 				1D11256FDE7183EBBED5D308 /* BoundedHTTPDataTransport.swift in Sources */,
 				C513F5D1936E202D0D6ECEFD /* BuiltInRulePacks.swift in Sources */,
+				ED587CD66B1EA36986651943 /* CameraMonitor.swift in Sources */,
 				7FBA685D695EA14B08E9F18A /* CaptureAccess.swift in Sources */,
 				D3EB4913132CAEA7FA827B08 /* CaptureView.swift in Sources */,
 				A7369F9D640FCFDAC459E5F6 /* CaptureWarning.swift in Sources */,
@@ -2184,7 +2196,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2199,7 +2211,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.15.11;
+				MARKETING_VERSION = 0.15.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2245,7 +2257,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 38RJUJHKZS;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2260,7 +2272,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.15.11;
+				MARKETING_VERSION = 0.15.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2325,7 +2337,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2346,7 +2358,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.15.11;
+				MARKETING_VERSION = 0.15.12;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

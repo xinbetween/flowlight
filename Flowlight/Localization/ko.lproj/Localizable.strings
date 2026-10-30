@@ -772,16 +772,12 @@
 /* UI/DevicesView.swift */
 "USB" = "USB";
 "Not watching" = "감시하지 않음";
-"%@ · nothing connected" = "%@ · 연결된 기기 없음";
-"%@ · %lld connected" = "%@ · %lld대 연결됨";
 "Read the device list again now (⌘R)" = "지금 기기 목록 다시 읽기 (⌘R)";
 "Watch Bluetooth" = "Bluetooth 감시";
 "Watch USB and external storage" = "USB 및 외장 저장 장치 감시";
 "Channels" = "채널";
 "Choose which channels Flowlight watches" = "Flowlight가 감시할 채널 선택";
 "Nothing but the network is being watched" = "네트워크만 감시하고 있습니다";
-"Bluetooth and USB are off until you turn them on. Neither needs a permission Flowlight doesn't already have — they're off because watching them widens what the app looks at, and that should be your decision rather than something an update did.\n\nNeither can report bytes. macOS keeps no per-app accounting for these channels, so what Flowlight can honestly show is what is connected, which apps are built to use it, and when that changed." = "Bluetooth와 USB는 직접 켤 때까지 꺼져 있습니다. 둘 다 Flowlight가 이미 가진 권한 외에 추가 권한이 필요하지는 않습니다. 이 채널을 감시하면 앱이 들여다보는 범위가 넓어지므로, 업데이트가 정해 주는 것이 아니라 사용자가 결정하도록 기본적으로 꺼 두었습니다.\n\n두 채널 모두 바이트 수는 알려주지 못합니다. macOS가 이 채널에 대해 앱별 집계를 남기지 않기 때문입니다. Flowlight가 정직하게 보여줄 수 있는 것은 무엇이 연결되어 있고, 어떤 앱이 그것을 쓰도록 만들어졌으며, 언제 그 상태가 바뀌었는지입니다.";
-"No byte counts on these channels. macOS keeps no per-app accounting for Bluetooth or USB, so a figure here would be invented. What is honest is what's connected, which apps are built to use it, and when that changed." = "이 채널에는 바이트 수가 없습니다. macOS는 Bluetooth나 USB에 대해 앱별 집계를 남기지 않으므로, 여기에 숫자를 적는다면 지어낸 값일 것입니다. 정직하게 보여줄 수 있는 것은 무엇이 연결되어 있고, 어떤 앱이 그것을 쓰도록 만들어졌으며, 언제 그 상태가 바뀌었는지입니다.";
 "Nothing paired, or the list hasn't been read yet." = "페어링된 기기가 없거나 목록을 아직 읽지 않았습니다.";
 "Paired devices and whether they're connected, read from the system every half minute. The byte-level traces that would give a throughput number need Apple's PacketLogger profile, which an app can't read." = "페어링된 기기와 연결 여부를 30초마다 시스템에서 읽어 옵니다. 처리량 수치를 낼 수 있는 바이트 단위 추적은 Apple의 PacketLogger 프로파일이 필요하며, 앱은 그것을 읽을 수 없습니다.";
 "Bluetooth · %lld connected of %lld paired" = "Bluetooth · 페어링 %2$lld대 중 %1$lld대 연결됨";
@@ -797,6 +793,23 @@
 "Attached" = "연결됨";
 "Mounted" = "마운트됨";
 "Yesterday %@" = "어제 %@";
+"Camera" = "카메라";
+"Started" = "시작됨";
+"Unknown camera" = "알 수 없는 카메라";
+"%@ · nothing active" = "%@ · 활성 항목 없음";
+"%@ · %lld active" = "%@ · %lld개 활성";
+"Watch camera activity" = "카메라 활동 감시";
+"Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Bluetooth, USB 및 카메라 활동은 직접 켤 때까지 꺼져 있습니다. 새 권한은 필요하지 않습니다. 감시하면 Flowlight가 들여다보는 범위가 넓어지므로, 업데이트가 아니라 사용자가 결정하도록 꺼 두었습니다.\n\nBluetooth와 USB는 연결된 항목을 보여 줍니다. 카메라 활동은 각 카메라의 활성 여부만 보여 주며 어떤 앱이 사용하는지는 보여 주지 않습니다. Flowlight는 카메라를 열거나 프레임을 읽지 않습니다.";
+"No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "내용을 읽거나 근거 없이 앱에 귀속하지 않습니다. Bluetooth와 USB는 연결 상태를 보여 주고, 카메라 감시는 각 기기의 활성 상태만 읽습니다. macOS는 여기서 카메라를 사용하는 앱의 신원을 공개하지 않으므로 Flowlight는 카메라 이름만 표시하고 앱을 추측하거나 프레임을 읽지 않습니다.";
+"No camera is available, or the device list hasn't been read yet." = "사용할 수 있는 카메라가 없거나 기기 목록을 아직 읽지 않았습니다.";
+"Flowlight reads only whether each camera is active somewhere on this Mac. macOS does not expose the owning app through this public device signal, so Flowlight does not guess. It never opens a capture session, requests camera access or reads frames." = "Flowlight는 이 Mac 어딘가에서 각 카메라가 활성 상태인지 여부만 읽습니다. macOS는 이 공개 기기 신호를 통해 사용 중인 앱을 밝히지 않으므로 Flowlight는 추측하지 않습니다. 캡처 세션을 열거나 카메라 접근을 요청하거나 프레임을 읽지 않습니다.";
+"Camera activity" = "카메라 활동";
+"Camera activity · none active" = "카메라 활동 · 활성 카메라 없음";
+"Camera activity · %lld active" = "카메라 활동 · %lld개 활성";
+"How Flowlight recognises this camera between sightings" = "Flowlight가 이 카메라를 다시 만났을 때 알아보는 방법";
+"Active" = "활성";
+"Inactive" = "비활성";
+"State unavailable" = "상태를 확인할 수 없음";
 
 /* UI/FocusView.swift */
 "Focus on" = "집중 켬";

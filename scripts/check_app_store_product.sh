@@ -42,7 +42,14 @@ if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' "$tempo
   fail "signed Store extension declares network.server but has no inbound listener"
 fi
 plist_true "$temporary/app-entitlements.plist" com.apple.security.network.client || fail "signed Store app is missing network.client"
+plist_true "$temporary/app-entitlements.plist" com.apple.security.device.camera || fail "signed Store app is missing camera status access"
 plist_true "$temporary/extension-entitlements.plist" com.apple.security.network.client || fail "signed Store extension is missing network.client"
+if plist_true "$temporary/extension-entitlements.plist" com.apple.security.device.camera; then
+  fail "signed Store extension declares camera access even though only the app reads device status"
+fi
+camera_description=$(/usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$contents/Info.plist" 2>/dev/null) ||
+  fail "Store app has no camera activity usage description"
+[ -n "$camera_description" ] || fail "Store app has an empty camera activity usage description"
 
 ruby -ryaml -e '
   project = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)

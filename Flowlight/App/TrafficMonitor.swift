@@ -886,6 +886,7 @@ final class TrafficMonitor: ObservableObject {
 
     func clearAllData() {
         rulePacks.beginActivityClear()
+        devices.beginHistoryClear()
         proxyRulePackEvents.invalidate { [weak self, db] in
             Task { @MainActor [weak self, db] in
                 guard let self else { return }
@@ -897,10 +898,12 @@ final class TrafficMonitor: ObservableObject {
                     self.sessionOut = 0
                     self.rulePacks.finishActivityClear(succeeded: true)
                     self.rules.clearPublishedEventsAfterDurableDeletion()
+                    self.devices.finishHistoryClear(succeeded: true)
                     self.dataVersion += 1
                     self.refreshAlertCount()
                 } catch {
                     self.rulePacks.finishActivityClear(succeeded: false)
+                    self.devices.finishHistoryClear(succeeded: false)
                     self.lastError = L("Couldn't delete the captured data: %@", error.localizedDescription)
                 }
             }
@@ -952,6 +955,7 @@ final class TrafficMonitor: ObservableObject {
             backgroundOnly: UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly),
             watchingBluetooth: devices.watchingBluetooth,
             watchingUSB: devices.watchingUSB,
+            watchingCamera: devices.watchingCamera,
             rules: rules.rules.map { rule in
                 "\(rule.title) — \(rule.enabled ? "on" : "off"), \(rule.schedule.describe(session: RuleStore.session)), fired \(rule.hits)×"
             },
