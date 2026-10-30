@@ -97,6 +97,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>In diretta</td><td>⌘1</td><td>Cosa si muove adesso: velocità per app negli ultimi secondi e la destinazione più trafficata.</td></tr>
         <tr><td><a href="#agents">Agenti IA</a></td><td>⌘2</td><td>Quali agenti sono attivi, quali provider IA usano e cos'altro hanno contattato.</td></tr>
         <tr><td>Rapporti</td><td>⌘3</td><td>Dove è andato il traffico, dal secondo all'anno. Raggruppa per App, Destinazione o IP; passa a Grafici o a <a href="#worth-a-look">Vale un'occhiata</a>; esporta in CSV.</td></tr>
+        <tr><td><a href="#visualize">Visualizza</a></td><td>—</td><td>Una mappa stabile delle app e delle destinazioni esatte, con percorsi ponderati, indicatori di direzione in movimento, conteggi delle connessioni e un elenco equivalente.</td></tr>
         <tr><td><a href="#alerts">Avvisi</a></td><td>⌘4</td><td>Tutto ciò che è sembrato insolito, con l'app, la destinazione e il numero che ha fatto scattare la regola.</td></tr>
         <tr><td><a href="#rules">Regole</a></td><td>⌘5</td><td>Ogni elenco consentiti e ogni rifiuto che hai impostato, cosa copre ciascuno e cosa ha fermato davvero.</td></tr>
         <tr><td><a href="#ask">Chiedi</a></td><td>⌘6</td><td>Domande sul tuo traffico in linguaggio naturale, a cui un modello locale o ospitato risponde a partire dalla cronologia registrata.</td></tr>
@@ -110,6 +111,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="La schermata In diretta: un elenco di applicazioni con le loro velocità attuali di invio e ricezione e la destinazione più trafficata."></div>
         <figcaption class="caption">In diretta, la schermata con cui Flowlight si apre.</figcaption></figure>
       <p>In Rapporti, passa il puntatore su una barra per vedere quali app l'hanno generata, fai clic per ingrandire e doppio clic su una riga per limitare il rapporto a essa.</p>
+      <h2 id="visualize">Visualizzare il traffico</h2>
+      <p>Visualizza mostra app e destinazioni esatte come nodi stabili. La larghezza rappresenta i byte e le particelle indicano la direzione. L’elenco contiene gli stessi valori. Connessioni significa flussi di rete, non richieste HTTP; Osservato non è una decisione di autorizzazione.</p>
 
       <h2 id="agents">Regole per gli agenti IA</h2>
       <p>Un'app conta come agente se Flowlight la conosce per nome (oggi 16, tra cui Claude Code, Codex, Cursor, GitHub Copilot,

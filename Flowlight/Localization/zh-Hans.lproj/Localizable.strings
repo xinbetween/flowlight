@@ -1770,3 +1770,28 @@
 "Couldn't delete the captured data: %@" = "无法删除捕获的数据：%@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "此先前启用的官方包已不在目录中。阻止功能已自动停止。";
 "Could not prepare managed-pack review demo: %@" = "无法准备托管包审查演示：%@";
+
+/* 0.16.0 流量可视化 */
+"Visualize" = "可视化";
+"Map" = "地图";
+"List" = "列表";
+"App, domain, or IP" = "应用、域名或 IP";
+"Traffic map" = "流量地图";
+"All applications" = "所有应用";
+"Observed connections during %@" = "%@期间观察到的连接";
+"%lld quieter connections hidden" = "已隐藏 %lld 个活动较少的连接";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "地图仅显示最活跃的关系以保持清晰。列表使用相同的有界选择。";
+"Period" = "时间段";
+"No traffic to visualize" = "没有可视化的流量";
+"Flowlight has not observed any connections in this period." = "Flowlight 在此时间段内未观察到任何连接。";
+"No observed connections match this search." = "没有观察到的连接与此搜索匹配。";
+"Select to inspect this traffic" = "选择以检查此流量";
+"%lld connections" = "%lld 个连接";
+"%@, received %@, sent %@, %lld connections" = "%@，接收 %@，发送 %@，%lld 个连接";
+"Select a node or connection" = "选择节点或连接";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "流量数值更新时地图位置保持不变。移动的粒子表示方向；使用列表可查看相同数值且无动画。";
+"Observed" = "已观察";
+"Write a blocking rule…" = "编写阻止规则…";
+"Connections" = "连接";
+"Traffic connections" = "流量连接";
+"Unknown destination" = "未知目标";

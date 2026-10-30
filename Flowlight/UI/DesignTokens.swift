@@ -30,6 +30,12 @@ enum FL {
     /// Tools and MCP servers — a violet kept distinct from the primary accent so "something ran" reads apart from
     /// "something needs a decision".
     static let tool     = Color(light: 0x6f4bc7, dark: 0xb4a2f2)
+
+    // Graph relationships. These stay separate from status colours: they say which way activity moved, not whether
+    // Flowlight approved or refused it. The values are validated against the graph's light and dark surfaces.
+    static let graphReceived   = Color(light: 0x1879b0, dark: 0x168eae)
+    static let graphSent       = Color(light: 0xc43c6e, dark: 0xc44568)
+    static let graphInvocation = Color(light: 0xa26c16, dark: 0xc08432)
 }
 
 /// Consistent spacing, so groups line up and gaps read as intentional rather than arbitrary.

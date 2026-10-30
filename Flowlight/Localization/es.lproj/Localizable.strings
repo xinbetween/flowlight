@@ -1771,3 +1771,28 @@
 "Couldn't delete the captured data: %@" = "No se pudieron eliminar los datos capturados: %@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "Este paquete oficial, que estaba activado, ya no figura en el catálogo. El bloqueo se detuvo automáticamente.";
 "Could not prepare managed-pack review demo: %@" = "No se pudo preparar la demostración de revisión de paquetes administrados: %@";
+
+/* Visualización del tráfico 0.16.0 */
+"Visualize" = "Visualizar";
+"Map" = "Mapa";
+"List" = "Lista";
+"App, domain, or IP" = "App, dominio o IP";
+"Traffic map" = "Mapa de tráfico";
+"All applications" = "Todas las aplicaciones";
+"Observed connections during %@" = "Conexiones observadas durante %@";
+"%lld quieter connections hidden" = "%lld conexiones menos activas ocultas";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "El mapa se mantiene legible mostrando las relaciones con más actividad. La lista usa la misma selección limitada.";
+"Period" = "Periodo";
+"No traffic to visualize" = "No hay tráfico que visualizar";
+"Flowlight has not observed any connections in this period." = "Flowlight no ha observado conexiones en este periodo.";
+"No observed connections match this search." = "Ninguna conexión observada coincide con esta búsqueda.";
+"Select to inspect this traffic" = "Selecciona para examinar este tráfico";
+"%lld connections" = "%lld conexiones";
+"%@, received %@, sent %@, %lld connections" = "%@, recibió %@, envió %@, %lld conexiones";
+"Select a node or connection" = "Selecciona un nodo o una conexión";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "El mapa permanece estable mientras se actualizan los valores. Las partículas muestran la dirección; usa Lista para ver los mismos valores sin movimiento.";
+"Observed" = "Observado";
+"Write a blocking rule…" = "Escribir una regla de bloqueo…";
+"Connections" = "Conexiones";
+"Traffic connections" = "Conexiones de tráfico";
+"Unknown destination" = "Destino desconocido";

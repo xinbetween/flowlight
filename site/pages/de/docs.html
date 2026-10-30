@@ -97,6 +97,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Live</td><td>⌘1</td><td>Was sich gerade bewegt: Raten pro App über die letzten Sekunden und das meistgenutzte Ziel.</td></tr>
         <tr><td><a href="#agents">KI-Agenten</a></td><td>⌘2</td><td>Welche Agenten aktiv sind, welche KI-Anbieter sie nutzen und mit wem sie sonst gesprochen haben.</td></tr>
         <tr><td>Berichte</td><td>⌘3</td><td>Wohin der Datenverkehr ging, von der Sekunde bis zum Jahr. Gruppiert nach App, Ziel oder IP; umschaltbar auf Diagramme oder <a href="#worth-a-look">Genauer hinsehen</a>; CSV-Export.</td></tr>
+        <tr><td><a href="#visualize">Visualisieren</a></td><td>—</td><td>Eine stabile Karte der Apps und ihrer genauen Ziele mit gewichteten Pfaden, bewegten Richtungsmarkern, Verbindungszahlen und einer gleichwertigen Liste.</td></tr>
         <tr><td><a href="#alerts">Warnungen</a></td><td>⌘4</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
         <tr><td><a href="#rules">Regeln</a></td><td>⌘5</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
         <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
@@ -110,6 +111,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
         <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
       <p>Fahre in Berichte über einen Balken, um zu sehen, welche Apps ihn getrieben haben, klicke ihn an, um hineinzuzoomen, und doppelklicke eine Zeile, um den Bericht darauf einzugrenzen.</p>
+
+      <h2 id="visualize">Datenverkehr visualisieren</h2>
+      <p><strong>Visualisieren</strong> zeichnet jede sichtbare App und jedes Ziel als nativen, auswählbaren Knoten. Die Pfadbreite folgt den
+        Bytes; rosafarbene Punkte laufen für gesendeten Verkehr von der App weg und blaue für empfangenen Verkehr zurück. Es gibt keine
+        Pfeilspitzen, und die Knoten bleiben stehen, wenn sich nur Zähler ändern. „Bewegung reduzieren“ entfernt die wandernden Punkte.</p>
+      <p>Wähle einen Knoten oder eine Verbindung für genaue Werte zu Empfang, Versand und Verbindungen und gehe dann mit derselben App und
+        demselben exakten Host oder derselben Adresse zu Berichte, Inspizieren oder in einen ungespeicherten Regeleditor. <strong>Liste</strong>
+        zeigt dieselben begrenzten Daten für Tastatur und VoiceOver. „Verbindungen“ sind Netzwerkflüsse, keine HTTP-Anfragen. „Beobachtet“
+        ist keine Erlaubnisentscheidung.</p>
 
       <h2 id="agents">Regeln für KI-Agenten</h2>
       <p>Eine App gilt als Agent, wenn Flowlight sie am Namen kennt (heute 16, darunter Claude Code, Codex, Cursor, GitHub Copilot,

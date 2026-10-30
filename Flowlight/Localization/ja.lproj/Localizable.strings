@@ -1771,3 +1771,28 @@
 "Couldn't delete the captured data: %@" = "キャプチャしたデータを削除できませんでした：%@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "以前有効にした公式パックはカタログから削除されました。ブロックは自動的に停止しました。";
 "Could not prepare managed-pack review demo: %@" = "管理対象パックのレビューデモを準備できませんでした：%@";
+
+/* 0.16.0 トラフィック可視化 */
+"Visualize" = "可視化";
+"Map" = "マップ";
+"List" = "リスト";
+"App, domain, or IP" = "アプリ、ドメイン、またはIP";
+"Traffic map" = "トラフィックマップ";
+"All applications" = "すべてのアプリ";
+"Observed connections during %@" = "%@に観測された接続";
+"%lld quieter connections hidden" = "%lld件の低活動接続を非表示";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "最も活発な関係を表示してマップを読みやすくしています。リストも同じ制限された選択を使用します。";
+"Period" = "期間";
+"No traffic to visualize" = "可視化するトラフィックがありません";
+"Flowlight has not observed any connections in this period." = "この期間にFlowlightが観測した接続はありません。";
+"No observed connections match this search." = "この検索に一致する観測済み接続はありません。";
+"Select to inspect this traffic" = "選択してこのトラフィックを調べる";
+"%lld connections" = "%lld件の接続";
+"%@, received %@, sent %@, %lld connections" = "%@、受信%@、送信%@、%lld件の接続";
+"Select a node or connection" = "ノードまたは接続を選択";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "値が更新されてもマップの位置は変わりません。動く粒子が方向を示します。動きなしで同じ値を見るにはリストを使用してください。";
+"Observed" = "観測済み";
+"Write a blocking rule…" = "ブロックルールを作成…";
+"Connections" = "接続";
+"Traffic connections" = "トラフィック接続";
+"Unknown destination" = "不明な宛先";

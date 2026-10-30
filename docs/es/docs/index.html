@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentación</p>
     <h1>Usar Flowlight</h1>
-    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.15.14, macOS 15 o posterior.</p>
+    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.16.0, macOS 15 o posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="En esta página">
@@ -166,6 +166,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>En vivo</td><td>⌘1</td><td>Qué se mueve ahora mismo: tasas por app en los últimos segundos y el destino más activo.</td></tr>
         <tr><td><a href="#agents">Agentes de IA</a></td><td>⌘2</td><td>Qué agentes están activos, qué proveedores de IA usan y con qué más han contactado.</td></tr>
         <tr><td>Informes</td><td>⌘3</td><td>Adónde fue el tráfico, del segundo al año. Agrupa por App, Destino o IP; cambia a Gráficos o a <a href="#worth-a-look">Merece un vistazo</a>; exporta a CSV.</td></tr>
+        <tr><td><a href="#visualize">Visualizar</a></td><td>—</td><td>Un mapa estable de apps y sus destinos exactos, con rutas ponderadas, marcadores de dirección en movimiento, recuentos de conexiones y una lista equivalente.</td></tr>
         <tr><td><a href="#alerts">Alertas</a></td><td>⌘4</td><td>Todo lo que ha resultado inusual, con la app, el destino y la cifra que activó la regla.</td></tr>
         <tr><td><a href="#rules">Reglas</a></td><td>⌘5</td><td>Cada lista de permitidos y cada rechazo que hayas puesto, qué abarca cada uno y qué ha detenido realmente.</td></tr>
         <tr><td><a href="#ask">Preguntar</a></td><td>⌘6</td><td>Preguntas sobre tu propio tráfico en lenguaje corriente, respondidas a partir del historial registrado por un modelo local o alojado.</td></tr>
@@ -179,6 +180,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="La pantalla En vivo: una lista de aplicaciones con sus tasas actuales de envío y recepción y su destino más activo."></div>
         <figcaption class="caption">En vivo, la pantalla con la que se abre Flowlight.</figcaption></figure>
       <p>En Informes, pasa el cursor por una barra para ver qué apps la generaron, haz clic para ampliar y haz doble clic en cualquier fila para limitar el informe a ella.</p>
+      <h2 id="visualize">Visualizar el tráfico</h2>
+      <p>Visualizar muestra apps y destinos exactos como nodos estables. El ancho representa bytes y las partículas muestran la dirección. La lista contiene los mismos valores. Conexiones significa flujos de red, no peticiones HTTP; Observado no es una decisión de permiso.</p>
 
       <h2 id="agents">Reglas de los agentes de IA</h2>
       <p>Una app cuenta como agente si Flowlight la conoce por su nombre (16 hoy, entre ellas Claude Code, Codex, Cursor, GitHub Copilot,
@@ -751,7 +754,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quienes contribuyen a Flowlight. Flowlight es software libre, publicado bajo la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versión 0.15.14 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
+      <span>Versión 0.16.0 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
     </div>
   </div>
 </footer>

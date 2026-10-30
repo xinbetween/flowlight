@@ -150,6 +150,17 @@ extension FeatureGuide {
             keywords: ["history", "chart", "csv", "export csv", "breakdown", "worth a look", "group"]),
 
         FeatureGuide(
+            id: "visualize", title: "Traffic visualization",
+            summary: "A native map of observed app-to-destination connections. Edge width follows byte volume, moving particles show received and sent direction, and the list presents the same values without motion.",
+            steps: ["Open Visualize.", "Pick a time period and select a node or connection for exact byte and connection totals.",
+                    "Use Show in Reports, Inspect or Write a blocking rule to continue with that exact app and destination."],
+            screen: .visualize,
+            caveats: ["Connections are network flows, not HTTP request counts.",
+                      "Observed means traffic exists. It is not an allow decision, and warning or block evidence is shown only when Flowlight can prove it."],
+            keywords: ["visualize", "graph", "map", "topology", "nodes", "edges", "connections", "traffic universe"],
+        ),
+
+        FeatureGuide(
             id: "channels", title: "Peer-to-peer Wi-Fi",
             summary: "AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the room over AWDL. Flowlight labels those flows rather than showing them as traffic to an address with no name.",
             steps: ["Open Reports.", "Use the Way out menu in the toolbar and choose Peer-to-peer Wi-Fi."],

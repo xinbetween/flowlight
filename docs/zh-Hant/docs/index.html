@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.15.14，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.16.0，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -165,6 +165,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>即時</td><td>⌘1</td><td>現在有什麼在傳：最近幾秒各 App 的速率，以及最忙的目標。</td></tr>
         <tr><td><a href="#agents">AI 代理</a></td><td>⌘2</td><td>哪些代理在活動、它們用哪些 AI 供應商，以及它們還連過什麼。</td></tr>
         <tr><td>報告</td><td>⌘3</td><td>流量去了哪裡，從秒到年。依 App、目標或 IP 分組；切換到「圖表」或<a href="#worth-a-look">「值得一看」</a>；匯出 CSV。</td></tr>
+        <tr><td><a href="#visualize">視覺化</a></td><td>—</td><td>應用程式與精確目的地的穩定地圖，包含加權路徑、移動方向標記、連線數與等價列表。</td></tr>
         <tr><td><a href="#alerts">警示</a></td><td>⌘4</td><td>所有看起來不尋常的事，附上 App、目標，以及觸發規則的那個數字。</td></tr>
         <tr><td><a href="#rules">規則</a></td><td>⌘5</td><td>你設過的每一條允許清單和拒絕，各自管到哪裡，以及實際攔下了什麼。</td></tr>
         <tr><td><a href="#ask">提問</a></td><td>⌘6</td><td>用平常的話問你自己的流量，由本機模型或託管模型從記錄下來的歷史裡作答。</td></tr>
@@ -178,6 +179,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="即時畫面：一列 App，各自帶著目前的傳送與接收速率，以及最忙的目標。"></div>
         <figcaption class="caption">即時，Flowlight 開啟時的那個畫面。</figcaption></figure>
       <p>在「報告」中，把指標移到長條上可以看出是哪些 App 造成的，點一下可以放大，任一列雙按則把報告縮小到那一列。</p>
+      <h2 id="visualize">流量視覺化</h2>
+      <p>視覺化以穩定節點顯示應用程式與精確目的地。寬度代表位元組數，移動粒子表示方向，列表則提供相同數值。連線代表網路流，不是 HTTP 請求數；已觀察並不是允許決定。</p>
 
       <h2 id="agents">AI 代理規則</h2>
       <p>只要 Flowlight 認得一個 App 的名字（目前有 16 個，包含 Claude Code、Codex、Cursor、GitHub Copilot、
@@ -714,7 +717,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.15.14 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.16.0 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

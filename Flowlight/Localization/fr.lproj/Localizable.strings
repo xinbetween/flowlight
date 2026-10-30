@@ -1771,3 +1771,28 @@
 "Couldn't delete the captured data: %@" = "Impossible de supprimer les données capturées : %@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "Ce pack officiel précédemment activé ne figure plus dans le catalogue. Le blocage s’est arrêté automatiquement.";
 "Could not prepare managed-pack review demo: %@" = "Impossible de préparer la démonstration de vérification des packs gérés : %@";
+
+/* Visualisation du trafic 0.16.0 */
+"Visualize" = "Visualiser";
+"Map" = "Carte";
+"List" = "Liste";
+"App, domain, or IP" = "App, domaine ou IP";
+"Traffic map" = "Carte du trafic";
+"All applications" = "Toutes les applications";
+"Observed connections during %@" = "Connexions observées pendant %@";
+"%lld quieter connections hidden" = "%lld connexions moins actives masquées";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "La carte reste lisible en affichant les relations les plus actives. La liste utilise la même sélection limitée.";
+"Period" = "Période";
+"No traffic to visualize" = "Aucun trafic à visualiser";
+"Flowlight has not observed any connections in this period." = "Flowlight n’a observé aucune connexion pendant cette période.";
+"No observed connections match this search." = "Aucune connexion observée ne correspond à cette recherche.";
+"Select to inspect this traffic" = "Sélectionnez pour examiner ce trafic";
+"%lld connections" = "%lld connexions";
+"%@, received %@, sent %@, %lld connections" = "%@, %@ reçus, %@ envoyés, %lld connexions";
+"Select a node or connection" = "Sélectionnez un nœud ou une connexion";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "La carte reste stable pendant la mise à jour des valeurs. Les particules indiquent le sens ; utilisez Liste pour les mêmes valeurs sans mouvement.";
+"Observed" = "Observé";
+"Write a blocking rule…" = "Écrire une règle de blocage…";
+"Connections" = "Connexions";
+"Traffic connections" = "Connexions réseau";
+"Unknown destination" = "Destination inconnue";

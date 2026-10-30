@@ -34,7 +34,7 @@ struct AppIconView: View {
     var body: some View {
         if let bundle = AppIcons.bundlePath(forExecutable: path) {
             if FileManager.default.fileExists(atPath: bundle), let image = AppIcons.icon(forExecutable: path) {
-                Image(nsImage: image).resizable().frame(width: size, height: size)
+                Image(nsImage: image).resizable().frame(width: size, height: size).accessibilityHidden(true)
             } else {
                 // App isn't installed here (e.g. data imported from another Mac): monogram instead of a blank page.
                 let name = (bundle as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")

@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.14, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.0, macOS 15 or later.
 
  On this page
 
@@ -155,6 +155,8 @@ open build/Build/Products/Release/Flowlight.app
 
  Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts or Worth a look; export CSV.
 
+ Visualize—A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.
+
  Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
 
  Rules⌘5Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.
@@ -173,6 +175,17 @@ open build/Build/Products/Release/Flowlight.app
 
  Live, the screen Flowlight opens on.
  In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
+
+ Visualize traffic
+
+ Visualize draws every visible app and destination as a native, selectable node. Path width follows total bytes;
+ rose particles travel from an app for sent traffic and blue particles travel back for received traffic. There are no arrowheads,
+ and the nodes stay in place when only the counters change. Reduce Motion removes the travelling particles.
+
+ Select a node or connection for exact received, sent and connection totals, then continue to Reports, Inspect, or an unsaved
+ blocking-rule editor with the same app and exact host or address. List exposes the same bounded data for keyboard,
+ VoiceOver and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic
+ exists; it is not an allow verdict.
 
  AI agent rules
 
@@ -908,7 +921,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.14macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1646,8 +1659,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.15.14
+ 0.16.0
 October 30, 2026Latest
+
+ See app traffic as a native map. Apps and exact destinations are selectable nodes joined by weighted curved paths; moving particles show sent and received direction without oversized arrowheads.
+
+ Keep the map readable and accessible. Deterministic collision-aware placement stays fixed when counters change, Reduce Motion removes travelling particles, and a keyboard- and VoiceOver-friendly list exposes the same bounded values.
+
+ Drill into evidence without overclaiming it. The inspector links the exact app and host or address to Reports, Inspect, and an unsaved blocking-rule editor. Counts are labelled connections rather than requests, and ordinary traffic is Observed rather than falsely classified as allowed.
+
+ 0.15.14
+October 30, 2026
 
  Review executable plugin code before installing it. Package review now includes a visible,
  read-only view of the exact embedded JavaScript, with selection and bounded scrolling for large scripts.

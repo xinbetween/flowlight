@@ -98,6 +98,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Live</td><td>⌘1</td><td>What's moving right now: per-app rates over the last few seconds and the busiest destination.</td></tr>
         <tr><td><a href="#agents">AI Agents</a></td><td>⌘2</td><td>Which agents are active, which AI providers they use, and what else they contacted.</td></tr>
         <tr><td>Reports</td><td>⌘3</td><td>Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts or <a href="#worth-a-look">Worth a look</a>; export CSV.</td></tr>
+        <tr><td><a href="#visualize">Visualize</a></td><td>—</td><td>A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.</td></tr>
         <tr><td><a href="#alerts">Alerts</a></td><td>⌘4</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
         <tr><td><a href="#rules">Rules</a></td><td>⌘5</td><td>Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.</td></tr>
         <tr><td><a href="#ask">Ask</a></td><td>⌘6</td><td>Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.</td></tr>
@@ -111,6 +112,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="The Live screen: a list of applications with their current send and receive rates and busiest destination."></div>
         <figcaption class="caption">Live, the screen Flowlight opens on.</figcaption></figure>
       <p>In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.</p>
+
+      <h2 id="visualize">Visualize traffic</h2>
+      <p><strong>Visualize</strong> draws every visible app and destination as a native, selectable node. Path width follows total bytes;
+        rose particles travel from an app for sent traffic and blue particles travel back for received traffic. There are no arrowheads,
+        and the nodes stay in place when only the counters change. Reduce Motion removes the travelling particles.</p>
+      <p>Select a node or connection for exact received, sent and connection totals, then continue to Reports, Inspect, or an unsaved
+        blocking-rule editor with the same app and exact host or address. <strong>List</strong> exposes the same bounded data for keyboard,
+        VoiceOver and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic
+        exists; it is not an allow verdict.</p>
 
       <h2 id="agents">AI agent rules</h2>
       <p>An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,
