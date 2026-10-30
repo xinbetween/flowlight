@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.15.12，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.15.13，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -275,10 +275,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="ask">提問</h2>
       <p>用日常語言提問 — <em>Claude Code 昨天上傳了什麼？</em>、<em>這星期哪個 App 開始連到新的
         地方？</em>、<em>幫我總結最近一小時</em> — 答案來自這台 Mac 上記錄的歷史。</p>
-      <p><strong>模型永遠拿不到你的歷史記錄。</strong>它只會收到一份可以呼叫的七個唯讀查詢清單，
-        別無其他：總量、主要 App、主要目標、新目標、警示、代理，以及一段時間的序列。沒有任何查詢接受
-        SQL，也不會有 — 一個能自己寫查詢的模型就能讀到任何東西。Flowlight 會在本機執行模型指名的
-        那一個，然後把總量和名稱交回去。真正離開這台 Mac 的（如果有的話）只有你的問題和那些數字 — 絕不包含資料庫。</p>
+      <p><strong>模型永遠拿不到你的歷史記錄。</strong>它只會收到一份固定的唯讀查詢清單：總量、主要 App 與目標、
+        新目標、警示、代理、一段時間的序列，以及已記錄攝影機、藍牙、USB 和儲存裝置變動的有界摘要。
+        裝置摘要只包含名稱、變動次數，以及精確到分鐘的首次與末次時間，絕不包含穩定的硬體識別碼。
+        它只描述 Flowlight 觀察到的變化，不證明持續使用，也不推測負責的 App。沒有任何查詢接受 SQL，也不會有。
+        Flowlight 會在本機執行模型指名的查詢，只交回彙總結果。真正離開這台 Mac 的（如果有的話）只有你的問題和該結果 —
+        絕不包含資料庫。</p>
       <p><strong>優先在本機。</strong>只要 macOS 提供裝置端的模型，那就是預設值：不花錢、離線
         可用，而且一個位元組也不往外送。否則，你已經在跑的模型伺服器 — Ollama、LM Studio、llama.cpp —
         也做得到同樣的事。這兩者都排在託管選項之上，因為一個以不需帳號、不需雲端為承諾的工具，
@@ -294,8 +296,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>形狀重要的時候就畫圖。</strong>隨時間的變化會回傳成折線，比較是長條，整體的
         切分是圓餅。Flowlight 用查詢回傳的同一批資料列來畫，所以圖和文字不可能互相矛盾，
         而模型也可以要求換一種形狀，或完全不要圖。</p>
-      <p><strong>每一條查詢都列在答案下方，點一下就能在「報告」中打開那些資料列。</strong>無法
-        查證的答案，只是文法比較好的猜測。</p>
+      <p><strong>每一條查詢都列在答案下方，點一下會在「報告」中開啟流量依據，裝置和設定答案則開啟相關畫面。</strong>
+        無法查證的答案，只是文法比較好的猜測。</p>
       <p><strong>Flowlight 用同一套標準檢視自己。</strong>這項功能送出的任何內容，都會像其他 App 的流量一樣
         出現在「即時」和「報告」中 — 包含模型伺服器就在這台 Mac 上的情況，而那正是最容易被默默
         省略掉的一種。</p>
@@ -712,7 +714,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.15.12 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.15.13 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

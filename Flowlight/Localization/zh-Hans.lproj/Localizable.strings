@@ -164,6 +164,9 @@
 "no alerts" = "没有警报";
 "%lld alerts, newest %@" = "%lld 条警报，最新一条 %@";
 "no agents" = "没有代理";
+"kind must be camera, bluetooth, usb or volume, not '%@'" = "kind 必须是 camera、bluetooth、usb 或 volume，而不是 '%@'";
+"no device changes" = "没有设备变化";
+"%@ · %lld changes" = "%@ · %lld 次变化";
 "busiest %@: %@ — %@" = "流量最高的 %1$@：%2$@，共 %3$@";
 "nothing in this window" = "此时间窗口内没有内容";
 "Over time, by %@" = "随时间变化，按 %@";

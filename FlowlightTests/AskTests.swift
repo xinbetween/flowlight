@@ -48,12 +48,12 @@ final class AskTests: XCTestCase {
         // If a case ever appears that takes free text and runs it, this is the test that should fail.
         XCTAssertEqual(Set(AskQuery.allCases.map(\.rawValue)),
                        ["trafficTotals", "topApps", "topDestinations", "newDestinations", "alerts", "agents",
-                        "overTime", "settings", "howTo", "rules", "guardrails"])
+                        "overTime", "deviceActivity", "settings", "howTo", "rules", "guardrails"])
         // Every argument a model may fill in, listed once. A new name here should be a deliberate decision taken
         // in the open, which is what this assertion is for — not a thing that slipped in with a feature.
         for query in AskQuery.allCases {
             let names = Set(query.parameters.map(\.name))
-            XCTAssertTrue(names.isSubset(of: ["from", "to", "app", "limit", "granularity", "chart", "topic"]),
+            XCTAssertTrue(names.isSubset(of: ["from", "to", "app", "limit", "granularity", "chart", "topic", "kind"]),
                           "\(query.rawValue) takes an argument nobody vetted: \(names)")
         }
         // The queries about the app take no window: they describe how it is set up, not when.
@@ -66,6 +66,8 @@ final class AskTests: XCTestCase {
         let properties = try XCTUnwrap(RemoteProvider.schema["properties"] as? [String: Any])
         let allowed = try XCTUnwrap((properties["query"] as? [String: Any])?["enum"] as? [String])
         XCTAssertEqual(Set(allowed), Set(AskQuery.allCases.map(\.rawValue)))
+        XCTAssertEqual((properties["kind"] as? [String: String])?["type"], "string")
+        XCTAssertTrue((properties["kind"] as? [String: String])?["description"]?.contains("camera") == true)
         XCTAssertEqual(RemoteProvider.schema["required"] as? [String], ["query", "from"])
     }
 
@@ -162,6 +164,109 @@ final class AskTests: XCTestCase {
         let result = try AskQueryRunner.run(AskCall(query: .topDestinations, arguments: ["from": window.from, "to": window.to]), db: db)
         let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [[String: String]])
         XCTAssertEqual(rows.first?["destination"], "api.anthropic.com")
+    }
+
+    func testDeviceActivityIsBoundedAggregateHistoryWithoutStableIDs() throws {
+        let start = Date(timeIntervalSince1970: TimeInterval(t0 + 60))
+        let stop = Date(timeIntervalSince1970: TimeInterval(t0 + 120))
+        try db.recordDeviceEvents([
+            DeviceEvent(at: start, kind: .camera, deviceID: "private-camera-uid", name: "Desk Camera",
+                        detail: "Acme", change: .started),
+            DeviceEvent(at: stop, kind: .camera, deviceID: "private-camera-uid", name: "Desk Camera",
+                        detail: "Acme", change: .stopped),
+            DeviceEvent(at: stop, kind: .usb, deviceID: "private-usb-serial", name: "Backup Drive",
+                        detail: "Storage", change: .connected),
+        ])
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .deviceActivity,
+                    arguments: ["from": window.from, "to": window.to, "kind": "camera", "limit": "1"]),
+            db: db
+        )
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [[String: Any]])
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?["kind"] as? String, "camera")
+        XCTAssertEqual(rows.first?["device"] as? String, "Desk Camera")
+        XCTAssertEqual(rows.first?["started"] as? Int, 1)
+        XCTAssertEqual(rows.first?["stopped"] as? Int, 1)
+        XCTAssertEqual(result.screen, .devices)
+        XCTAssertFalse(result.json.contains("private-camera-uid"), "stable hardware identifiers never leave the Mac")
+        XCTAssertFalse(result.json.contains("private-usb-serial"))
+    }
+
+    func testDeviceActivityKeepsOneIdentityTogetherAcrossRenames() throws {
+        try db.recordDeviceEvents([
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 60)), kind: .bluetooth,
+                        deviceID: "renamed-device", name: "Old Name", detail: "", change: .connected),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 120)), kind: .bluetooth,
+                        deviceID: "renamed-device", name: "New Name", detail: "", change: .disconnected),
+        ])
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .deviceActivity,
+                    arguments: ["from": window.from, "to": window.to, "kind": "bluetooth"]),
+            db: db
+        )
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [[String: Any]])
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?["device"] as? String, "New Name")
+        XCTAssertEqual(rows.first?["connected"] as? Int, 1)
+        XCTAssertEqual(rows.first?["disconnected"] as? Int, 1)
+        XCTAssertFalse(result.json.contains("renamed-device"))
+    }
+
+    func testDeviceActivityRejectsUnknownKindsInsteadOfGuessing() throws {
+        XCTAssertThrowsError(try AskQueryRunner.run(
+            AskCall(query: .deviceActivity, arguments: ["from": window.from, "to": window.to, "kind": "microphone"]),
+            db: db
+        )) { error in
+            XCTAssertTrue("\(error)".contains("kind"))
+        }
+    }
+
+    func testDeviceActivityRoundsTimesAndBoundsRowsAcrossChannels() throws {
+        try db.recordDeviceEvents([
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 61)), kind: .camera,
+                        deviceID: "camera-a", name: "Desk Camera", detail: "", change: .started),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 119)), kind: .camera,
+                        deviceID: "camera-a", name: "Desk Camera", detail: "", change: .stopped),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 121)), kind: .usb,
+                        deviceID: "usb-b", name: "Backup Drive", detail: "", change: .connected),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 122)), kind: .camera,
+                        deviceID: "camera-b", name: "Desk Camera", detail: "", change: .started),
+        ])
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .deviceActivity,
+                    arguments: ["from": window.from, "to": window.to, "limit": "2"]),
+            db: db
+        )
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [[String: Any]])
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.compactMap { $0["kind"] as? String }), ["camera", "usb"])
+        XCTAssertEqual(rows.first?["firstAt"] as? String,
+                       ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: TimeInterval(t0 + 120))))
+        XCTAssertFalse(result.json.contains("camera-a"))
+        XCTAssertFalse(result.json.contains("camera-b"))
+        XCTAssertFalse(result.json.contains("usb-b"))
+    }
+
+    func testDeviceActivityUsesTheRequestedWindow() throws {
+        try db.recordDeviceEvents([
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 - 1)), kind: .camera,
+                        deviceID: "before", name: "Before", detail: "", change: .started),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0)), kind: .camera,
+                        deviceID: "inside", name: "Inside", detail: "", change: .started),
+            DeviceEvent(at: Date(timeIntervalSince1970: TimeInterval(t0 + 3600)), kind: .camera,
+                        deviceID: "end", name: "At End", detail: "", change: .stopped),
+        ])
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .deviceActivity, arguments: ["from": window.from, "to": window.to]), db: db
+        )
+        XCTAssertTrue(result.json.contains("Inside"))
+        XCTAssertFalse(result.json.contains("Before"))
+        XCTAssertFalse(result.json.contains("At End"), "windows are half-open just like traffic queries")
     }
 
     func testAnEmptyWindowSaysNothingHappenedRatherThanFailing() throws {

@@ -212,11 +212,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="ask">Chiedi</h2>
       <p>Chiedi in linguaggio naturale — <em>cosa ha caricato Claude Code ieri?</em>, <em>quale app ha iniziato a parlare con un posto nuovo
         questa settimana?</em>, <em>riassumi l'ultima ora</em> — e ottieni una risposta dalla cronologia registrata su questo Mac.</p>
-      <p><strong>Il modello non riceve mai la tua cronologia.</strong> Gli viene consegnato un elenco di sette query di sola lettura che può
-        richiamare e nient'altro: totali, app principali, destinazioni principali, nuove destinazioni, avvisi, agenti e una serie nel tempo. Non esiste
-        una query che accetti SQL, e non ci sarà: un modello che può scrivere la propria query può leggere qualsiasi cosa. Flowlight esegue
-        in locale quella che il modello indica e restituisce totali e nomi. Ciò che lascia il Mac, se qualcosa lo lascia, è la tua
-        domanda e quei numeri — mai il database.</p>
+      <p><strong>Il modello non riceve mai la tua cronologia.</strong> Riceve soltanto un elenco fisso di query di sola lettura:
+        totali, app e destinazioni principali, nuove destinazioni, avvisi, agenti, una serie nel tempo e riepiloghi limitati delle
+        transizioni registrate di fotocamere, Bluetooth, USB e archiviazione. I riepiloghi dei dispositivi contengono nomi, conteggi
+        e il primo e l’ultimo orario arrotondati al minuto, mai identificatori hardware stabili. Riportano solo i cambiamenti osservati
+        da Flowlight, non un uso continuo o l’app responsabile. Nessuna query accetta SQL e non accadrà mai. Flowlight esegue in locale
+        la query indicata e restituisce solo il risultato aggregato. Se qualcosa lascia il Mac, è la tua domanda e quel risultato —
+        mai il database.</p>
       <p><strong>Prima il locale.</strong> Dove macOS mette a disposizione un modello sul dispositivo, quella è la scelta predefinita: non costa nulla, funziona
         offline e non invia un solo byte da nessuna parte. Altrimenti fa lo stesso un server di modelli che già gestisci — Ollama, LM Studio, llama.cpp.
         Entrambi sono elencati sopra le opzioni ospitate, perché uno strumento che promette nessun account e nessun cloud non dovrebbe
@@ -232,8 +234,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Grafici quando conta la forma.</strong> Un andamento nel tempo torna come linea, un confronto come barre, la ripartizione di un
         intero come torta. Flowlight li disegna dalle stesse righe restituite dalla query, così immagine e frase non possono contraddirsi,
         e il modello può chiedere una forma diversa o nessuna.</p>
-      <p><strong>Ogni query è elencata sotto la risposta, e facendo clic su una si aprono quelle righe in Rapporti.</strong> Una risposta che non
-        puoi verificare è un'ipotesi con una grammatica migliore.</p>
+      <p><strong>Ogni query è elencata sotto la risposta e un clic apre Rapporti per i dati sul traffico o la schermata pertinente
+        per le risposte su dispositivi e configurazione.</strong> Una risposta che non puoi verificare è un'ipotesi con una grammatica migliore.</p>
       <p><strong>Flowlight applica a sé stesso il proprio standard.</strong> Tutto ciò che questa funzione invia compare in In diretta e Rapporti
         come il traffico di qualsiasi altra app — anche quando il server del modello è su questo stesso Mac, che è il caso che sarebbe stato
         più facile lasciar fuori in silenzio.</p>

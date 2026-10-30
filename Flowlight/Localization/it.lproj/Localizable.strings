@@ -164,6 +164,9 @@
 "no alerts" = "nessun avviso";
 "%lld alerts, newest %@" = "%lld avvisi, il più recente %@";
 "no agents" = "nessun agente";
+"kind must be camera, bluetooth, usb or volume, not '%@'" = "kind deve essere camera, bluetooth, usb o volume, non '%@'";
+"no device changes" = "nessuna modifica ai dispositivi";
+"%@ · %lld changes" = "%@ · %lld modifiche";
 "busiest %@: %@ — %@" = "%@ di punta: %@ — %@";
 "nothing in this window" = "nulla in questo intervallo";
 "Over time, by %@" = "Nel tempo, per %@";

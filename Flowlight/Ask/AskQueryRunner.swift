@@ -77,6 +77,8 @@ enum AskQueryRunner {
             return try agents(db: db, window: window, grain: grain)
         case .overTime:
             return try overTime(db: db, window: window, app: app, grain: grain, chart: call.arguments["chart"])
+        case .deviceActivity:
+            return try deviceActivity(db: db, window: window, kind: call.arguments["kind"], limit: limit)
         case .settings, .howTo, .rules, .guardrails:
             // Handled above, before a window was required.
             throw Failure.badArgument(L("that query takes no time window"))
@@ -275,6 +277,37 @@ enum AskQueryRunner {
         return Result(json: encode(payload),
                       summary: payload.isEmpty ? L("no agents") : payload.compactMap { $0["agent"] }.joined(separator: ", "),
                       filter: TrafficFilter.none, from: window.from, to: window.to)
+    }
+
+    private static func deviceActivity(db: TrafficDatabase, window: (from: Date, to: Date), kind rawKind: String?,
+                                       limit: Int) throws -> Result {
+        let kind: PeripheralDevice.Kind?
+        if let rawKind, !rawKind.isEmpty {
+            guard let parsed = PeripheralDevice.Kind(rawValue: rawKind.lowercased()) else {
+                throw Failure.badArgument(L("kind must be camera, bluetooth, usb or volume, not '%@'", rawKind))
+            }
+            kind = parsed
+        } else {
+            kind = nil
+        }
+
+        let rows = try db.deviceActivity(from: window.from, to: window.to, kind: kind, limit: limit)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        let minute: (Date) -> String = { date in
+            let rounded = Date(timeIntervalSince1970: floor(date.timeIntervalSince1970 / 60) * 60)
+            return iso.string(from: rounded)
+        }
+        let payload: [[String: Any]] = rows.map { row in
+            ["kind": row.kind.rawValue, "device": row.name, "changes": row.total,
+             "appeared": row.appeared, "connected": row.connected, "disconnected": row.disconnected,
+             "removed": row.removed, "started": row.started, "stopped": row.stopped,
+             "firstAt": minute(row.firstAt), "lastAt": minute(row.lastAt)]
+        }
+        return Result(json: encode(payload),
+                      summary: rows.isEmpty ? L("no device changes")
+                        : rows.prefix(3).map { L("%@ · %lld changes", $0.name, $0.total) }.joined(separator: ", "),
+                      from: window.from, to: window.to, screen: .devices)
     }
 
     private static func overTime(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,

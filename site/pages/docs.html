@@ -213,11 +213,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="ask">Ask</h2>
       <p>Ask in plain language — <em>what did Claude Code upload yesterday?</em>, <em>which app started talking to somewhere new
         this week?</em>, <em>summarise the last hour</em> — and get an answer from the history recorded on this Mac.</p>
-      <p><strong>The model never gets your history.</strong> It is handed a list of seven read-only queries it may call and
-        nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
-        query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
-        whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
-        question and those numbers — never the database.</p>
+      <p><strong>The model never gets your history.</strong> It is handed a fixed list of read-only queries it may call and
+        nothing else: totals, top apps, top destinations, new destinations, alerts, agents, a series over time, and bounded
+        summaries of recorded camera, Bluetooth, USB and storage transitions. Device summaries contain names, transition counts,
+        and minute-rounded first and last times, never stable hardware identifiers. They report only changes Flowlight observed,
+        not continuous use or the app responsible. There is no query that takes SQL, and there will not be one — a model that can
+        write its own query can read anything. Flowlight runs whichever query the model names locally and returns the aggregate
+        answer. What leaves the Mac, if anything does, is your question and that answer — never the database.</p>
       <p><strong>Local first.</strong> Where macOS provides an on-device model, that is the default: it costs nothing, works
         offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
         does the same. Both are listed above the hosted options because a tool whose promise is no account and no cloud should
@@ -233,8 +235,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Charts when the shape matters.</strong> Change over time comes back as a line, a comparison as bars, a split of one
         whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
         and the model can ask for a different shape or for none at all.</p>
-      <p><strong>Every query is listed under the answer, and clicking one opens those rows in Reports.</strong> An answer you
-        can't check is a guess with better grammar.</p>
+      <p><strong>Every query is listed under the answer, and clicking one opens Reports for traffic evidence or the relevant
+        app screen for device and configuration answers.</strong> An answer you can't check is a guess with better grammar.</p>
       <p><strong>Flowlight holds itself to its own standard.</strong> Whatever this feature sends appears in Live and Reports
         like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
         easiest to quietly leave out.</p>

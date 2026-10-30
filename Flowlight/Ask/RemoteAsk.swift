@@ -205,6 +205,7 @@ struct RemoteProvider: AskProviding {
             "app": ["type": "string", "description": "One app, by name or bundle identifier; omit for every app."],
             "limit": ["type": "string", "description": "How many rows, 1-50; omit for 10."],
             "granularity": ["type": "string", "description": "second, minute, hour or day; omit to let Flowlight choose."],
+            "kind": ["type": "string", "description": "Device channel: camera, bluetooth, usb or volume; omit for every channel."],
         ],
         "required": ["query", "from"],
     ]

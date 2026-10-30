@@ -164,6 +164,9 @@
 "no alerts" = "沒有警示";
 "%lld alerts, newest %@" = "%lld 則警示，最新的是 %@";
 "no agents" = "沒有代理";
+"kind must be camera, bluetooth, usb or volume, not '%@'" = "kind 必須是 camera、bluetooth、usb 或 volume，而不是 '%@'";
+"no device changes" = "沒有裝置變化";
+"%@ · %lld changes" = "%@ · %lld 次變化";
 "busiest %@: %@ — %@" = "最忙碌的 %@：%@，於 %@";
 "nothing in this window" = "此時間範圍內沒有任何項目";
 "Over time, by %@" = "隨時間變化，依 %@";

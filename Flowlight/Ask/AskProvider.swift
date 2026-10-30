@@ -82,13 +82,13 @@ struct AskRecordedCall: Identifiable, Equatable, Sendable {
     var call: AskCall
     var summary: String
     var failed = false
-    /// Where clicking this should take you in Reports.
+    /// Which Reports rows clicking should show, when this is a traffic query.
     var filter: TrafficFilter?
     var from: Date?
     var to: Date?
     /// Drawn under the answer when the result has a shape worth seeing.
     var chart: AskChart?
-    /// Where an answer about the app itself points.
+    /// Which app screen clicking should open when Reports cannot represent this result.
     var screen: SidebarItem?
 }
 

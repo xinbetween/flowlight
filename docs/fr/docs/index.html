@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.15.12, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.15.13, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -282,11 +282,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="ask">Demander</h2>
       <p>Posez la question en langage courant — <em>qu’a envoyé Claude Code hier&nbsp;?</em>, <em>quelle app s’est mise à parler à un endroit nouveau
         cette semaine&nbsp;?</em>, <em>résume la dernière heure</em> — et obtenez une réponse tirée de l’historique enregistré sur ce Mac.</p>
-      <p><strong>Le modèle ne reçoit jamais votre historique.</strong> On lui remet une liste de sept requêtes en lecture seule qu’il peut appeler, et
-        rien d’autre&nbsp;: les totaux, les principales apps, les principales destinations, les nouvelles destinations, les alertes, les agents et une série dans le temps. Il n’existe aucune
-        requête qui accepte du SQL, et il n’en existera pas — un modèle capable d’écrire sa propre requête peut tout lire. Flowlight exécute
-        celle que le modèle nomme, localement, et rend les totaux et les noms. Ce qui quitte le Mac, si quelque chose le quitte, c’est votre
-        question et ces chiffres — jamais la base de données.</p>
+      <p><strong>Le modèle ne reçoit jamais votre historique.</strong> Il ne reçoit qu’une liste fixe de requêtes en lecture seule&nbsp;:
+        totaux, principales apps et destinations, nouvelles destinations, alertes, agents, série temporelle et résumés bornés des
+        transitions enregistrées des caméras, du Bluetooth, de l’USB et du stockage. Les résumés d’appareils contiennent les noms,
+        les nombres de transitions et les premières et dernières heures arrondies à la minute, jamais d’identifiant matériel stable.
+        Ils ne décrivent que les changements observés par Flowlight, pas une utilisation continue ni l’app responsable. Aucune requête
+        n’accepte du SQL et aucune ne le fera. Flowlight exécute localement la requête indiquée et ne rend que le résultat agrégé.
+        Ce qui quitte le Mac, le cas échéant, c’est votre question et ce résultat — jamais la base de données.</p>
       <p><strong>Local d’abord.</strong> Là où macOS fournit un modèle sur l’appareil, c’est celui-là par défaut&nbsp;: il ne coûte rien, fonctionne
         hors ligne et n’envoie pas un octet où que ce soit. Sinon, un serveur de modèle que vous faites déjà tourner — Ollama, LM Studio, llama.cpp —
         fait la même chose. Les deux sont listés au-dessus des options hébergées, parce qu’un outil dont la promesse est «&nbsp;pas de compte, pas de cloud&nbsp;» ne devrait
@@ -302,8 +304,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Des graphiques quand la forme compte.</strong> Une évolution dans le temps revient en courbe, une comparaison en barres, la répartition d’un
         tout en camembert. Flowlight les dessine à partir des lignes mêmes que la requête a renvoyées, donc l’image et la phrase ne peuvent pas se contredire,
         et le modèle peut demander une autre forme, ou aucune.</p>
-      <p><strong>Chaque requête est listée sous la réponse, et cliquer dessus ouvre ces lignes dans Rapports.</strong> Une réponse que vous ne
-        pouvez pas vérifier est une supposition en meilleure grammaire.</p>
+      <p><strong>Chaque requête est listée sous la réponse, et un clic ouvre Rapports pour les données de trafic ou l’écran
+        approprié pour les réponses sur les appareils et la configuration.</strong> Une réponse que vous ne pouvez pas vérifier est une supposition en meilleure grammaire.</p>
       <p><strong>Flowlight s’applique à lui-même sa propre exigence.</strong> Tout ce que cette fonctionnalité envoie apparaît dans En direct et Rapports
         comme le trafic de n’importe quelle autre app — y compris quand le serveur de modèle est sur ce Mac même, le cas qu’il aurait été le
         plus facile de passer discrètement sous silence.</p>
@@ -755,7 +757,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.15.12 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.15.13 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>
