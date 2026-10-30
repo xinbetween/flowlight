@@ -1691,6 +1691,8 @@
 "Channel" = "Channel";
 "Package digest" = "Package digest";
 "Script digest" = "Script digest";
+"JavaScript source" = "Código fuente JavaScript";
+"Plugin scripts cannot contain invisible Unicode formatting controls." = "Los scripts de plugins no pueden contener controles de formato Unicode invisibles.";
 "Permissions" = "Permissions";
 "Install" = "Install";
 "Not declared" = "Not declared";

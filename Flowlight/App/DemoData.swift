@@ -6,6 +6,12 @@ import Foundation
 enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
     static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
+    static var pluginReviewURL: URL? {
+        guard isEnabled,
+              let path = UserDefaults.standard.string(forKey: "FLDemoPluginReview"),
+              !path.isEmpty else { return nil }
+        return URL(fileURLWithPath: path)
+    }
 
     static var databaseURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Flowlight")

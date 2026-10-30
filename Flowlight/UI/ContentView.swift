@@ -8,6 +8,7 @@ struct ContentView: View {
     @EnvironmentObject var updater: UpdateChecker
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    @State private var demoPluginReview: PluginPackageReview?
 
     var body: some View {
         NavigationSplitView {
@@ -99,6 +100,15 @@ struct ContentView: View {
             }
         }
         .id(localization.revision)
+        .task {
+            guard demoPluginReview == nil, let url = DemoData.pluginReviewURL else { return }
+            if let data = try? Data(contentsOf: url) {
+                demoPluginReview = try? monitor.plugins.reviewPackage(data: data)
+            }
+        }
+        .sheet(item: $demoPluginReview) { review in
+            PluginPackageReviewSheet(review: review) { _ in demoPluginReview = nil }
+        }
         #if !APP_STORE
         .onReceive(NotificationCenter.default.publisher(for: .flowlightOpenUpdate)) { _ in openWindow(id: "update") }
         #endif

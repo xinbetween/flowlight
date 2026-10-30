@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.13, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.14, macOS 15 or later.
 
  On this page
 
@@ -908,7 +908,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.13macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.14macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1396,7 +1396,7 @@ Plugins
 
  Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest reviewed Flowlight actions that open existing editors, but it does not block, rewrite, mock, transform, or save settings by itself.
 
- Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.
+ Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, the full package and script digests, and the exact embedded JavaScript in a read-only source view. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.
 
  Manifest
 
@@ -1437,7 +1437,7 @@ Plugins
 
  Installed packages may include a detached P-256 signature envelope next to the manifest. Flowlight binds the plugin ID, version, rule version, publisher identity, permissions, privacy categories and script digest to the reviewed package. If those values change, the package needs review again.
 
- Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as enabled and configuration are not part of the signed payload, so toggling a plugin or changing local metadata does not invalidate package identity.
+ Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as enabled and configuration are not part of the signed payload, so package-supplied configuration is discarded during review and local changes do not invalidate package identity.
 
  Findings
 
@@ -1512,6 +1512,8 @@ node validate.js
  Review checklist
 
  The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.
+
+ For an unsigned local package, inspect the exact embedded JavaScript and compare its full digest before installing. Flowlight rejects invisible Unicode formatting controls that could misrepresent the source view; a visible preview still does not prove the code is safe.
 
  Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.
 
@@ -1644,8 +1646,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.15.14
+October 30, 2026Latest
+
+ Review executable plugin code before installing it. Package review now includes a visible,
+ read-only view of the exact embedded JavaScript, with selection and bounded scrolling for large scripts.
+
+ Compare the complete package identity. The consent sheet shows full 64-character SHA-256 package
+ and script digests instead of shortening them to a display prefix, rejects deceptive invisible source formatting,
+ and discards package-supplied values for locally managed plugin configuration.
+
+ Keep plugin power unchanged. This adds no permission, signer, update channel, or automatic action:
+ installed JavaScript remains advisory, receives only declared sanitized metadata, and fails open.
+
  0.15.13
-October 29, 2026Latest
+October 29, 2026
 
  Ask about recorded device activity without exposing device identifiers. Ask can now summarize bounded camera,
  Bluetooth, USB, and external-storage transition history by channel, device name, counts, and minute-rounded first and last times.

@@ -27,7 +27,7 @@ nav: plugins
     <article class="prose">
       <h2 id="trust">The trust boundary</h2>
       <p>Flowlight plugins are scoped to HTTPS inspection. They run after a request and response have already been captured, redacted, clipped, attributed to an app or agent, and written to the local database. A plugin can add findings and suggest reviewed Flowlight actions that open existing editors, but it does not block, rewrite, mock, transform, or save settings by itself.</p>
-      <p>Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, package digest and script digest. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.</p>
+      <p>Flowlight reviews a plugin package before installation. The review shows provenance, signature status, permissions, privacy categories, the full package and script digests, and the exact embedded JavaScript in a read-only source view. Package import fails closed when a signed package is malformed or tampered with; runtime JavaScript still fails open so capture remains complete.</p>
 
       <h2 id="manifest">Manifest</h2>
       <p>A manifest tells Flowlight what the plugin is, who publishes it, what sanitized metadata it uses, whether it can suggest reviewed actions, and optionally the JavaScript <code>evaluate(context)</code> script to run.</p>
@@ -61,7 +61,7 @@ nav: plugins
 
       <h2 id="provenance">Provenance and package review</h2>
       <p>Installed packages may include a detached P-256 <code>signature</code> envelope next to the manifest. Flowlight binds the plugin ID, version, rule version, publisher identity, permissions, privacy categories and script digest to the reviewed package. If those values change, the package needs review again.</p>
-      <p>Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as <code>enabled</code> and <code>configuration</code> are not part of the signed payload, so toggling a plugin or changing local metadata does not invalidate package identity.</p>
+      <p>Unsigned local packages are allowed for development and internal sharing, but the review sheet labels them as unsigned local packages and they cannot claim official provenance. Local settings such as <code>enabled</code> and <code>configuration</code> are not part of the signed payload, so package-supplied configuration is discarded during review and local changes do not invalidate package identity.</p>
 
       <h2 id="findings">Findings</h2>
       <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing only the metadata families declared in <code>permissions</code>. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
@@ -122,6 +122,7 @@ node validate.js</pre>
       <h2 id="review">Review checklist</h2>
       <ul>
         <li>The plugin is advisory unless it creates a normal Flowlight rule or guardrail for the user to review.</li>
+        <li>For an unsigned local package, inspect the exact embedded JavaScript and compare its full digest before installing. Flowlight rejects invisible Unicode formatting controls that could misrepresent the source view; a visible preview still does not prove the code is safe.</li>
         <li>Evidence is bounded and redacted; no raw bodies, prompts, completions, header values or tool inputs.</li>
         <li>Permissions match the sanitized metadata the script actually reads.</li>
         <li>Provider-side MCP connector findings say local network rules cannot reach provider-run calls.</li>

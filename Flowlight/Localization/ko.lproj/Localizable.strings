@@ -1690,6 +1690,8 @@
 "Channel" = "Channel";
 "Package digest" = "Package digest";
 "Script digest" = "Script digest";
+"JavaScript source" = "JavaScript 소스 코드";
+"Plugin scripts cannot contain invisible Unicode formatting controls." = "플러그인 스크립트에는 보이지 않는 유니코드 서식 제어 문자를 포함할 수 없습니다.";
 "Permissions" = "Permissions";
 "Install" = "Install";
 "Not declared" = "Not declared";

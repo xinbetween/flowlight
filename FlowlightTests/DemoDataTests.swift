@@ -5,6 +5,25 @@ import XCTest
 /// worth a test that says it actually wrote something.
 final class DemoDataTests: XCTestCase {
 
+    func testPluginReviewFixtureRequiresDemoMode() {
+        let defaults = UserDefaults.standard
+        let previousDemo = defaults.object(forKey: "FLDemo")
+        let previousPath = defaults.object(forKey: "FLDemoPluginReview")
+        defer {
+            if let previousDemo { defaults.set(previousDemo, forKey: "FLDemo") }
+            else { defaults.removeObject(forKey: "FLDemo") }
+            if let previousPath { defaults.set(previousPath, forKey: "FLDemoPluginReview") }
+            else { defaults.removeObject(forKey: "FLDemoPluginReview") }
+        }
+
+        defaults.set("/tmp/review-plugin.json", forKey: "FLDemoPluginReview")
+        defaults.set(false, forKey: "FLDemo")
+        XCTAssertNil(DemoData.pluginReviewURL)
+
+        defaults.set(true, forKey: "FLDemo")
+        XCTAssertEqual(DemoData.pluginReviewURL?.path, "/tmp/review-plugin.json")
+    }
+
     func testSeedingFillsTheRollupsTheViewsRead() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-\(UUID()).sqlite")
         defer { try? FileManager.default.removeItem(at: url) }

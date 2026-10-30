@@ -125,6 +125,65 @@ final class PluginTests: XCTestCase {
         XCTAssertTrue(review.warnings.joined(separator: "\n").contains("cannot claim official"))
     }
 
+    func testPackageReviewPreservesExactJavaScriptAndFullDigest() throws {
+        let script = """
+        function evaluate(context) {
+          return [{ severity: 'low', title: 'Café ☕️', summary: 'Exact source', evidence: [] }];
+        }
+        """
+        var manifest = PluginManifest(
+            id: "thirdparty.source-review",
+            name: "Source Review",
+            version: "0.1.0",
+            kind: .traffic,
+            source: .installed,
+            publisher: .thirdParty,
+            guardrailProvider: .custom,
+            description: "Source review plugin.",
+            privacySummary: "Uses metadata only."
+        )
+        manifest.configuration = ["mode": "package-supplied"]
+        manifest.script = script
+
+        let review = try PluginPackageVerifier.review(data: JSONEncoder().encode(PluginPackage(manifest: manifest)))
+        let expectedDigest = SHA256.hash(data: Data(script.utf8)).map { String(format: "%02x", $0) }.joined()
+
+        XCTAssertEqual(review.manifest.script, script)
+        XCTAssertTrue(review.manifest.configuration.isEmpty)
+        XCTAssertEqual(review.scriptDigest, expectedDigest)
+        XCTAssertEqual(review.scriptDigest.count, 64)
+
+        manifest.script += "\n// one-byte review change"
+        let changed = try PluginPackageVerifier.review(data: JSONEncoder().encode(PluginPackage(manifest: manifest)))
+        XCTAssertNotEqual(changed.scriptDigest, review.scriptDigest)
+        XCTAssertNotEqual(changed.approvalFingerprint, review.approvalFingerprint)
+    }
+
+    func testPackageReviewRejectsInvisibleScriptFormattingControls() throws {
+        for control in ["\u{061C}", "\u{200B}", "\u{202E}", "\u{2066}", "\u{206A}", "\u{FEFF}"] {
+            var manifest = PluginManifest(
+                id: "thirdparty.source-formatting",
+                name: "Source Formatting",
+                version: "0.1.0",
+                kind: .traffic,
+                source: .installed,
+                publisher: .thirdParty,
+                guardrailProvider: .custom,
+                description: "Source formatting plugin.",
+                privacySummary: "Uses metadata only."
+            )
+            manifest.script = "function evaluate(context) { return []; } // \(control)"
+
+            XCTAssertThrowsError(
+                try PluginPackageVerifier.review(
+                    data: JSONEncoder().encode(PluginPackage(manifest: manifest))
+                )
+            ) { error in
+                XCTAssertEqual(error as? PluginPackageError, .unsafeScriptFormatting)
+            }
+        }
+    }
+
     func testSignedCommunityPackageReviewBindsDigestAndApproval() throws {
         var manifest = PluginManifest(id: "thirdparty.signed", name: "Signed", version: "0.1.0", kind: .llmMCP,
                                       source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
