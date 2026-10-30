@@ -164,6 +164,9 @@
 "no alerts" = "アラートなし";
 "%lld alerts, newest %@" = "アラート %lld 件、最新は %@";
 "no agents" = "エージェントなし";
+"kind must be camera, bluetooth, usb or volume, not '%@'" = "kind は camera、bluetooth、usb、volume のいずれかでなければなりません。'%@' は使えません";
+"no device changes" = "デバイスの変化なし";
+"%@ · %lld changes" = "%@ · %lld 件の変化";
 "busiest %@: %@ — %@" = "最も多い %@: %@ · %@";
 "nothing in this window" = "この期間には何もありません";
 "Over time, by %@" = "時間の推移（%@ 別）";

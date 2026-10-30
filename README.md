@@ -241,9 +241,12 @@ throughput, for the same reason.
 Ask in plain language and get an answer from what Flowlight recorded. *What did Claude Code upload yesterday?*
 *Which app started talking to somewhere new this week?* *Summarise the last hour.*
 
-**The model never gets your history.** It is handed seven read-only queries it may call — totals, top apps, top
-destinations, new destinations, alerts, agents, a series over time — and nothing else. There is no query that takes
-SQL, and there will not be one. Flowlight runs whichever the model names, locally, and hands back the numbers.
+**The model never gets your history.** It is handed a fixed list of read-only queries it may call — totals, top apps,
+top destinations, new destinations, alerts, agents, a series over time, and bounded summaries of recorded device
+transitions — and nothing else. Device summaries contain names, transition counts, and minute-rounded first and last
+times, never stable hardware identifiers. They report only changes Flowlight observed, not continuous use or the app
+responsible. There is no query that takes SQL, and there will not be one. Flowlight runs whichever the model names,
+locally, and hands back the aggregate answer.
 
 It answers questions about **Flowlight itself** as well — *how do I turn on HTTPS inspection?*, *why am I not
 seeing any traffic?* — from the app's own guide to every feature and a snapshot of how this Mac is set up, never
@@ -256,8 +259,9 @@ llama.cpp). Both send nothing. **Or bring your own key** for Anthropic, OpenAI, 
 endpoint — the key lives in your login Keychain, the screen says when a question will leave the Mac, and every
 request is shown in full under the answer.
 
-Every query is listed under the answer, and clicking one opens those rows in Reports. And Ask's own traffic shows
-up in Live like any other app's — including when the model is a server on this same Mac.
+Every query is listed under the answer. Clicking one opens Reports for traffic evidence, or the relevant app screen
+for device and configuration answers. And Ask's own traffic shows up in Live like any other app's — including when
+the model is a server on this same Mac.
 
 ### Worth a look
 A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and

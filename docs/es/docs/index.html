@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentación</p>
     <h1>Usar Flowlight</h1>
-    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.15.12, macOS 15 o posterior.</p>
+    <p class="lede">Todo, desde el primer arranque hasta el ajuste de las reglas de agentes. Flowlight 0.15.13, macOS 15 o posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="En esta página">
@@ -282,11 +282,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="ask">Preguntar</h2>
       <p>Pregunta en lenguaje corriente —<em>¿qué subió ayer Claude Code?</em>, <em>¿qué app empezó a hablar con un sitio nuevo
         esta semana?</em>, <em>resume la última hora</em>— y obtén una respuesta a partir del historial registrado en este Mac.</p>
-      <p><strong>El modelo nunca recibe tu historial.</strong> Se le entrega una lista de siete consultas de solo lectura que puede invocar, y
-        nada más: totales, apps principales, destinos principales, destinos nuevos, alertas, agentes y una serie temporal. No hay ninguna
-        consulta que acepte SQL, y no la habrá: un modelo que puede escribir su propia consulta puede leer cualquier cosa. Flowlight ejecuta
-        en local la que nombre el modelo y devuelve los totales y los nombres. Lo que sale del Mac, si sale algo, es tu
-        pregunta y esas cifras; nunca la base de datos.</p>
+      <p><strong>El modelo nunca recibe tu historial.</strong> Solo recibe una lista fija de consultas de lectura: totales,
+        apps y destinos principales, destinos nuevos, alertas, agentes, una serie temporal y resúmenes acotados de las transiciones
+        registradas de cámaras, Bluetooth, USB y almacenamiento. Los resúmenes de dispositivos contienen nombres, recuentos y la
+        primera y última hora redondeadas al minuto, nunca identificadores de hardware estables. Solo indican cambios observados por
+        Flowlight, no un uso continuo ni la app responsable. Ninguna consulta acepta SQL ni lo aceptará. Flowlight ejecuta en local
+        la consulta indicada y devuelve solo el resultado agregado. Lo que sale del Mac, si sale algo, es tu pregunta y ese resultado;
+        nunca la base de datos.</p>
       <p><strong>Primero, en local.</strong> Donde macOS ofrece un modelo en el dispositivo, ese es el predeterminado: no cuesta nada, funciona
         sin conexión y no envía ni un byte a ninguna parte. Si no, un servidor de modelos que ya tengas en marcha —Ollama, LM Studio, llama.cpp—
         hace lo mismo. Los dos aparecen por encima de las opciones alojadas porque una herramienta cuya promesa es no tener cuenta ni nube no
@@ -302,8 +304,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Gráficos cuando la forma importa.</strong> La evolución en el tiempo vuelve como una línea, una comparación como barras y el reparto de un
         total como un gráfico de sectores. Flowlight los dibuja con las mismas filas que devolvió la consulta, así que la imagen y la frase no pueden contradecirse,
         y el modelo puede pedir otra forma o ninguna.</p>
-      <p><strong>Cada consulta se lista debajo de la respuesta, y al hacer clic en una se abren esas filas en Informes.</strong> Una respuesta que
-        no puedes comprobar es una conjetura con mejor gramática.</p>
+      <p><strong>Cada consulta aparece debajo de la respuesta y, al hacer clic, se abre Informes para las pruebas de tráfico o
+        la pantalla correspondiente para las respuestas sobre dispositivos y configuración.</strong> Una respuesta que no puedes comprobar es una conjetura con mejor gramática.</p>
       <p><strong>Flowlight se aplica su propio criterio.</strong> Lo que esta función envíe aparece en En vivo y en Informes
         como el tráfico de cualquier otra app, también cuando el servidor de modelos está en este mismo Mac, que era justo el caso más
         fácil de omitir sin decir nada.</p>
@@ -749,7 +751,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quienes contribuyen a Flowlight. Flowlight es software libre, publicado bajo la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versión 0.15.12 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
+      <span>Versión 0.15.13 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
     </div>
   </div>
 </footer>

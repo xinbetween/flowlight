@@ -1551,6 +1551,60 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    struct DeviceActivitySummary: Sendable {
+        var kind: PeripheralDevice.Kind
+        var name: String
+        var firstAt: Date
+        var lastAt: Date
+        var appeared: Int
+        var connected: Int
+        var disconnected: Int
+        var removed: Int
+        var started: Int
+        var stopped: Int
+
+        var total: Int { appeared + connected + disconnected + removed + started + stopped }
+    }
+
+    /// Bounded aggregate history for Ask. Stable device IDs are grouping keys inside SQLite only and never leave
+    /// this method; two devices with the same display name remain separate rows without exposing their identities.
+    func deviceActivity(from: Date, to: Date, kind: PeripheralDevice.Kind?, limit: Int) throws
+        -> [DeviceActivitySummary] {
+        var sql = """
+            SELECT e.kind, e.device_id,
+                   (SELECT latest.name FROM device_events AS latest
+                    WHERE latest.kind = e.kind AND latest.device_id = e.device_id
+                      AND latest.ts >= ? AND latest.ts < ?
+                    ORDER BY latest.ts DESC, latest.id DESC LIMIT 1),
+                   MIN(e.ts), MAX(e.ts),
+                   SUM(CASE WHEN e.change = 'appeared' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN e.change = 'connected' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN e.change = 'disconnected' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN e.change = 'removed' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN e.change = 'started' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN e.change = 'stopped' THEN 1 ELSE 0 END)
+            FROM device_events AS e WHERE e.ts >= ? AND e.ts < ?
+            """
+        let fromValue = SQLValue.int(Int64(from.timeIntervalSince1970))
+        let toValue = SQLValue.int(Int64(to.timeIntervalSince1970))
+        var values: [SQLValue] = [fromValue, toValue, fromValue, toValue]
+        if let kind {
+            sql += " AND e.kind = ?"
+            values.append(.text(kind.rawValue))
+        }
+        sql += " GROUP BY e.kind, e.device_id ORDER BY MAX(e.ts) DESC, name COLLATE NOCASE LIMIT \(max(1, limit))"
+        return try conn.query(sql, values) { row in
+            DeviceActivitySummary(
+                kind: PeripheralDevice.Kind(rawValue: row.text(0)) ?? .bluetooth,
+                name: row.text(2),
+                firstAt: Date(timeIntervalSince1970: TimeInterval(row.int(3))),
+                lastAt: Date(timeIntervalSince1970: TimeInterval(row.int(4))),
+                appeared: Int(row.int(5)), connected: Int(row.int(6)), disconnected: Int(row.int(7)),
+                removed: Int(row.int(8)), started: Int(row.int(9)), stopped: Int(row.int(10))
+            )
+        }
+    }
+
     func pruneDeviceEvents(before date: Date) throws {
         try conn.run("DELETE FROM device_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
     }

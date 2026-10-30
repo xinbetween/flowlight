@@ -24,6 +24,8 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
     case agents
     /// A series over time, for "when did it happen" rather than "how much".
     case overTime
+    /// Recorded Bluetooth, USB, storage and camera transitions, aggregated without stable device identifiers.
+    case deviceActivity
     /// What Flowlight is currently set to do — which capture source, what is switched on, what is configured.
     case settings
     /// What a feature of Flowlight is and how to turn it on, from the app's own written-down guide.
@@ -42,6 +44,7 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
         case .alerts: return "Alerts raised in a window: which rule fired, for which app, and the sentence explaining it."
         case .agents: return "AI agents active in a window, their model providers, and where else they went."
         case .overTime: return "Bytes per second, minute, hour or day across a window, for spotting when something happened."
+        case .deviceActivity: return "Recorded device transitions in a window, optionally for camera, Bluetooth, USB or external storage. This reports transitions Flowlight saw, not continuous usage or the app responsible."
         case .settings: return "How Flowlight is set up right now: capture source, what is switched on, how many rules and guardrails exist. Use this for questions about the app rather than about traffic."
         case .howTo: return "What a Flowlight feature does and the steps to turn it on, from the app's own guide. Use this for \"how do I…\" and \"can Flowlight…\" questions, and never answer those from memory."
         case .rules: return "The block and allow rules that exist, what each one names, when it applies and how often it has fired."
@@ -72,6 +75,10 @@ enum AskQuery: String, Codable, CaseIterable, Sendable {
         case .overTime:
             return window + [app, chart, Parameter(name: "granularity", kind: .string, required: false,
                                                    detail: "second, minute, hour, day, week, month or year. Defaults to a sensible fit for the window.")]
+        case .deviceActivity:
+            return window + [Parameter(name: "kind", kind: .string, required: false,
+                                       detail: "Restrict to camera, bluetooth, usb or volume. Leave empty for every device channel."),
+                             limit]
         case .settings, .rules, .guardrails:
             return []
         case .howTo:

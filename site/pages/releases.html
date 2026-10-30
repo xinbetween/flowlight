@@ -13,7 +13,21 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.12</h2><time datetime="2026-10-29">October 29, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.13</h2><time datetime="2026-10-29">October 29, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Ask about recorded device activity without exposing device identifiers.</strong> Ask can now summarize bounded camera,
+            Bluetooth, USB, and external-storage transition history by channel, device name, counts, and minute-rounded first and last times.</li>
+          <li><strong>Describe observations honestly.</strong> Device answers report only transitions Flowlight recorded, not proof of continuous
+            use or which app owned a camera, and the model-visible result never contains stable hardware identifiers.</li>
+          <li><strong>Keep the privacy boundary fixed.</strong> Hosted and on-device models receive one additional named read-only query with a
+            one-year maximum window and a 50-row ceiling; neither receives SQL access or raw device-event rows.</li>
+          <li><strong>Keep the website aligned with the app.</strong> The homepage now lists camera activity under Devices and derives Ask and
+            Inspect shortcut checks from the shipped sidebar order.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.12</h2><time datetime="2026-10-29">October 29, 2026</time></header>
         <ul>
           <li><strong>See when a camera is active without opening it.</strong> The opt-in Devices channel now reads each camera's public
             CoreMediaIO running state and records confirmed start and stop transitions without requesting capture access or reading frames.</li>

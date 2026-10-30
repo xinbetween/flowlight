@@ -41,6 +41,7 @@ WH = re.compile(r'\b(width|height)="(\d+)"')
 HELP_ANCHOR = re.compile(r'case \.(\w+): return "([\w-]+)"')
 SIDEBAR = re.compile(r"enum SidebarItem[^{]*\{\s*case ([\w, ]+)")
 ROW = re.compile(r"<tr><td>(?:<a[^>]*>)?([^<]+)(?:</a>)?</td><td>\u2318(.)</td>")
+HOME_CARD = re.compile(r'<div class="view-card"><span class="glyph ([\w-]+)".*?<span class="keys">\u2318(.)</span></div>', re.S)
 H1 = re.compile(r"<h1[ >]")
 TITLE = re.compile(r"<title>([^<]+)</title>", re.I)
 META = re.compile(r'<meta\s+(?:name|property)="([^"]+)"\s+content="([^"]*)"', re.I)
@@ -258,6 +259,46 @@ def problems():
         elif rows[title] != key:
             found.append(f"docs/docs/index.html: the views table gives {title} \u2318{rows[title]}, "
                          f"but the sidebar puts it at \u2318{key}")
+
+    # 14. The homepage repeats the same shortcut badges and a compact Devices promise. Both drifted in 0.15.12:
+    #     Ask and Inspect were swapped, and camera activity shipped without ever reaching the landing-page card.
+    glyphs = {"ai-agents": "agents"}
+    home_paths = [OUT / "index.html"] + [OUT / lang / "index.html" for lang in LANGS]
+    channel_terms = {
+        "en": ["Bluetooth", "USB", "camera"],
+        "de": ["Bluetooth", "USB", "Kamera"],
+        "es": ["Bluetooth", "USB", "c\u00e1mara"],
+        "fr": ["Bluetooth", "USB", "cam\u00e9ra"],
+        "it": ["Bluetooth", "USB", "fotocamer"],
+        "ja": ["Bluetooth", "USB", "\u30ab\u30e1\u30e9"],
+        "ko": ["Bluetooth", "USB", "\uce74\uba54\ub77c"],
+        "pt-PT": ["Bluetooth", "USB", "c\u00e2mara"],
+        "zh-Hans": ["\u84dd\u7259", "USB", "\u6444\u50cf\u5934"],
+        "zh-Hant": ["\u85cd\u7259", "USB", "\u651d\u5f71\u6a5f"],
+    }
+    expected_glyphs = {
+        next((name for name, mapped in glyphs.items() if mapped == screen), screen): (screen, index)
+        for index, screen in enumerate(order[:8])
+    }
+    for home_path in home_paths:
+        home_text = home_path.read_text()
+        cards = dict(HOME_CARD.findall(home_text))
+        label = str(home_path.relative_to(ROOT))
+        for glyph, (screen, index) in expected_glyphs.items():
+            key = "0" if index == 9 else str(index + 1)
+            if glyph not in cards:
+                found.append(f"{label}: the {screen} card is missing or has no readable shortcut")
+            elif cards[glyph] != key:
+                found.append(f"{label}: the {screen} card gives \u2318{cards[glyph]}, "
+                             f"but the sidebar puts it at \u2318{key}")
+        device_card = re.search(r'<span class="glyph devices".*?</div>', home_text, re.S)
+        if device_card is None:
+            found.append(f"{label}: the Devices card is missing")
+            continue
+        lang = home_path.parent.name if home_path.parent != OUT else "en"
+        for channel in channel_terms[lang]:
+            if channel.casefold() not in device_card.group(0).casefold():
+                found.append(f"{label}: the Devices card never mentions {channel}")
 
     # 10. A screenshot nothing shows, or a screenshot that isn't there. Both happen while rearranging a page:
     #     the file outlives the <img> that referenced it, and nobody notices a megabyte being served for nothing.

@@ -73,8 +73,11 @@ private struct AskContent: View {
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(ask.turns) { turn in
                     AskTurnView(turn: turn, thinking: ask.thinking && turn.id == ask.turns.first?.id) { call in
-                        guard let filter = call.filter else { return }
-                        nav.showReport(filter: filter, end: call.to)
+                        if let filter = call.filter {
+                            nav.showReport(filter: filter, end: call.to)
+                        } else if let screen = call.screen {
+                            nav.show(screen)
+                        }
                     } go: { screen in
                         nav.show(screen)
                     }
@@ -283,7 +286,7 @@ private struct AskTurnView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 8)
-                        if call.filter != nil {
+                        if call.filter != nil || call.screen != nil {
                             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                         }
                     }
@@ -291,8 +294,9 @@ private struct AskTurnView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(call.filter == nil)
-                .help(call.filter == nil ? call.summary : L("Open these rows in Reports"))
+                .disabled(call.filter == nil && call.screen == nil)
+                .help(call.filter != nil ? L("Open these rows in Reports")
+                      : call.screen != nil ? L("Open %@", call.screen!.title) : call.summary)
                 if index < turn.calls.count - 1 { Divider() }
             }
         }

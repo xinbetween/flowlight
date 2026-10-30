@@ -82,7 +82,7 @@ struct HistoryTool: Tool {
 
     @Generable
     struct Arguments {
-        @Guide(description: "One of: trafficTotals, topApps, topDestinations, newDestinations, alerts, agents, overTime.")
+        @Guide(description: "One of: trafficTotals, topApps, topDestinations, newDestinations, alerts, agents, overTime, deviceActivity.")
         var query: String
         @Guide(description: "Start of the window: '24h', '7d', 'today', 'yesterday', or an ISO-8601 timestamp.")
         var from: String
@@ -94,6 +94,8 @@ struct HistoryTool: Tool {
         var limit: String
         @Guide(description: "second, minute, hour or day. Leave empty to let Flowlight choose.")
         var granularity: String
+        @Guide(description: "Device channel: camera, bluetooth, usb or volume. Leave empty for every channel.")
+        var kind: String
     }
 
     func call(arguments: Arguments) async throws -> String {
@@ -103,7 +105,8 @@ struct HistoryTool: Tool {
         }
         var fields: [String: String] = ["from": arguments.from]
         for (key, value) in [("to", arguments.to), ("app", arguments.app), ("limit", arguments.limit),
-                             ("granularity", arguments.granularity)] where !value.trimmingCharacters(in: .whitespaces).isEmpty {
+                             ("granularity", arguments.granularity), ("kind", arguments.kind)]
+        where !value.trimmingCharacters(in: .whitespaces).isEmpty {
             fields[key] = value
         }
         return await run(AskCall(query: query, arguments: fields))

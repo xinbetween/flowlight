@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.15.12, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.15.13, macOS 15 or later.
 
  On this page
 
@@ -301,11 +301,13 @@ open build/Build/Products/Release/Flowlight.app
  Ask in plain language — what did Claude Code upload yesterday?, which app started talking to somewhere new
  this week?, summarise the last hour — and get an answer from the history recorded on this Mac.
 
- The model never gets your history. It is handed a list of seven read-only queries it may call and
- nothing else: totals, top apps, top destinations, new destinations, alerts, agents, and a series over time. There is no
- query that takes SQL, and there will not be one — a model that can write its own query can read anything. Flowlight runs
- whichever the model names, locally, and hands back the totals and names. What leaves the Mac, if anything does, is your
- question and those numbers — never the database.
+ The model never gets your history. It is handed a fixed list of read-only queries it may call and
+ nothing else: totals, top apps, top destinations, new destinations, alerts, agents, a series over time, and bounded
+ summaries of recorded camera, Bluetooth, USB and storage transitions. Device summaries contain names, transition counts,
+ and minute-rounded first and last times, never stable hardware identifiers. They report only changes Flowlight observed,
+ not continuous use or the app responsible. There is no query that takes SQL, and there will not be one — a model that can
+ write its own query can read anything. Flowlight runs whichever query the model names locally and returns the aggregate
+ answer. What leaves the Mac, if anything does, is your question and that answer — never the database.
 
  Local first. Where macOS provides an on-device model, that is the default: it costs nothing, works
  offline, and sends not one byte anywhere. Otherwise a model server you already run — Ollama, LM Studio, llama.cpp —
@@ -326,8 +328,8 @@ open build/Build/Products/Release/Flowlight.app
  whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
  and the model can ask for a different shape or for none at all.
 
- Every query is listed under the answer, and clicking one opens those rows in Reports. An answer you
- can't check is a guess with better grammar.
+ Every query is listed under the answer, and clicking one opens Reports for traffic evidence or the relevant
+ app screen for device and configuration answers. An answer you can't check is a guess with better grammar.
 
  Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and Reports
  like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
@@ -906,7 +908,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.15.12macOS 15+UniversalGPL-3.0No telemetry
+ v0.15.13macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -993,15 +995,15 @@ What have I refused, and is it happening? Every rule, what each has blocked, and
 
  Ask
 Questions in plain language, answered from the history — with every query it ran listed underneath.
-⌘7
+⌘6
 
  Devices
-Bluetooth and USB: what's paired, what's attached, and when that changed. Off until you turn it on.
+Bluetooth, USB, and cameras: what's paired, what's attached or active, and when that changed. Off until you turn it on.
 ⌘8
 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
-⌘6
+⌘7
 
  Capture
 
@@ -1642,8 +1644,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.15.12
+ 0.15.13
 October 29, 2026Latest
+
+ Ask about recorded device activity without exposing device identifiers. Ask can now summarize bounded camera,
+ Bluetooth, USB, and external-storage transition history by channel, device name, counts, and minute-rounded first and last times.
+
+ Describe observations honestly. Device answers report only transitions Flowlight recorded, not proof of continuous
+ use or which app owned a camera, and the model-visible result never contains stable hardware identifiers.
+
+ Keep the privacy boundary fixed. Hosted and on-device models receive one additional named read-only query with a
+ one-year maximum window and a 50-row ceiling; neither receives SQL access or raw device-event rows.
+
+ Keep the website aligned with the app. The homepage now lists camera activity under Devices and derives Ask and
+ Inspect shortcut checks from the shipped sidebar order.
+
+ 0.15.12
+October 29, 2026
 
  See when a camera is active without opening it. The opt-in Devices channel now reads each camera's public
  CoreMediaIO running state and records confirmed start and stop transitions without requesting capture access or reading frames.
