@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.2, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1671,8 +1671,13 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.1
+ 0.16.2
 October 31, 2026Latest
+
+ Keep blocked history attached to the right app. Upgrades that had already repaired a version-number process identity now recover its ordinary-rule and managed-pack refusal history from the retained executable path, without guessing when evidence conflicts.
+
+ 0.16.1
+October 31, 2026
 
  Read traffic as flow, not spaghetti. Visualize now uses a native Sankey map with compact application and destination cards, smooth ribbons whose width shows traffic volume, and stable source and destination ports ordered to reduce crossings.
 
