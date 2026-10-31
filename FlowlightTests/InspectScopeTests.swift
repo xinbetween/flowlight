@@ -13,13 +13,14 @@ final class InspectScopeTests: XCTestCase {
         try TrafficDatabase(url: FileManager.default.temporaryDirectory.appendingPathComponent("scope-\(UUID()).sqlite"))
     }
 
-    private func exchange(app: (String, String), host: String, body: String = "") -> HTTPExchange {
+    private func exchange(app: (String, String), host: String, body: String = "",
+                          agent: String? = nil, mcpServer: String? = nil) -> HTTPExchange {
         HTTPExchange(
             id: nil, started: Date(), duration: 0.1, scheme: "https", host: host, port: 443, method: "GET",
             path: "/", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
             responseHeaders: [], responseBody: Data(body.utf8), responseSize: body.count, responseTruncated: false,
-            contentType: "text/html", pid: 1, bundleID: app.0, appName: app.1, agent: nil, agentName: nil,
-            mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
+            contentType: "text/html", pid: 1, bundleID: app.0, appName: app.1, agent: agent, agentName: agent,
+            mcpServer: mcpServer, toolCalls: [], toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
     }
 
     /// The exact shape of the bug: a page that merely mentions the app's name.
@@ -56,6 +57,31 @@ final class InspectScopeTests: XCTestCase {
         let both = try db.exchanges(since: Date().addingTimeInterval(-60), search: "npmjs", app: "claude")
         XCTAssertEqual(both.count, 1)
         XCTAssertEqual(both.first?.host, "registry.npmjs.org")
+    }
+
+    func testInspectLinkQueryKeepsAttributionScopeWhileDroppingSearch() throws {
+        let db = try database()
+        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                           agent: "claude", mcpServer: "github"))
+        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                           agent: "cursor", mcpServer: "github"))
+        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                           agent: "claude", mcpServer: "filesystem"))
+
+        let linked = try InspectLinkQuery.load(
+            from: db,
+            since: Date().addingTimeInterval(-60),
+            focus: .none,
+            app: "node",
+            host: "api.github.com",
+            includeAttributedChildren: false,
+            agentParent: "claude",
+            mcpServer: "github"
+        )
+
+        XCTAssertEqual(linked.count, 1)
+        XCTAssertEqual(linked.first?.agent, "claude")
+        XCTAssertEqual(linked.first?.mcpServer, "github")
     }
 
     func testNoScopeStillReturnsEverything() throws {

@@ -1,5 +1,13 @@
 import SwiftUI
 
+@MainActor
+enum VisualizeActionScope {
+    static func blockRule(for filter: TrafficFilter) -> Rule {
+        RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "",
+                        destination: filter.domain?.isEmpty == false ? filter.domain! : filter.remoteIP ?? "")
+    }
+}
+
 struct VisualizeView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case traffic, ai
@@ -560,8 +568,7 @@ private struct TrafficGraphInspector: View {
             }
             #endif
             Button(L("Block…")) {
-                let destination = host(filter)
-                nav.writeRule(RuleStore.block(app: filter.bundleID ?? "", destination: destination))
+                nav.writeRule(VisualizeActionScope.blockRule(for: filter))
             }
         }
         .controlSize(.small)

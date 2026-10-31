@@ -88,11 +88,15 @@ final class TrafficGraphTests: XCTestCase {
                 mcp: "remote-docs")
         ], limits: .unbounded)
 
-        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .mcp }.map(\.title), ["remote-docs MCP"])
+        let mcp = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .mcp })
+        XCTAssertEqual(mcp.title, "remote-docs MCP")
+        XCTAssertEqual(mcp.filter.bundleID, "claude")
+        XCTAssertNil(mcp.filter.agentParent,
+                     "direct remote MCP evidence has no stored process parent to filter by")
+        XCTAssertEqual(mcp.filter.mcpServer, "remote-docs")
         XCTAssertFalse(snapshot.edges.contains { $0.relationship == .worksFor },
                        "remote MCP attribution is not stored process-lineage evidence")
-        XCTAssertEqual(snapshot.edges.first { $0.relationship == .observed }?.source,
-                       snapshot.nodes.first { $0.kind == .mcp }?.id)
+        XCTAssertEqual(snapshot.edges.first { $0.relationship == .observed }?.source, mcp.id)
     }
 
     func testAIWorksForRelationshipReadsToolToAgent() {
@@ -157,6 +161,20 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(Set(service.members.map(\.id)).count, 2)
         XCTAssertEqual(Set(service.members.compactMap(\.filter.agentParent)), ["agent.one", "agent.two"])
         XCTAssertEqual(Set(service.members.compactMap(\.filter.mcpServer)), ["github", "filesystem"])
+    }
+
+    func testAISharedOrdinaryDestinationKeepsExactDestinationScope() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "claude", domain: "shared.example", ip: "203.0.113.42", bytesOut: 40),
+            row(app: "codex", name: "codex", domain: "shared.example", ip: "203.0.113.42", bytesOut: 60)
+        ], limits: .unbounded)
+
+        let destination = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .destination })
+        XCTAssertEqual(destination.members.count, 2)
+        XCTAssertNil(destination.filter.bundleID,
+                     "a shared destination node must cover every visible source")
+        XCTAssertEqual(destination.filter.domain, "shared.example")
+        XCTAssertEqual(destination.filter.remoteIP, "203.0.113.42")
     }
 
     func testAIBoundedNodeValuesMatchVisibleRelationships() {

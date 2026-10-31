@@ -9,6 +9,16 @@ struct InspectView: View {
     }
 }
 
+enum InspectLinkQuery {
+    static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
+                     app: String?, host: String?, includeAttributedChildren: Bool,
+                     agentParent: String?, mcpServer: String?) throws -> [HTTPExchange] {
+        try database.exchanges(since: since, focus: focus, app: app, host: host,
+                               includeAttributedChildren: includeAttributedChildren,
+                               agentParent: agentParent, mcpServer: mcpServer)
+    }
+}
+
 private struct InspectContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var focus: FocusStore
@@ -237,8 +247,13 @@ private struct InspectContent: View {
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
             selection = exchanges.first { $0.host.localizedCaseInsensitiveContains(wanted) }?.id
         }
-        // Link with the unfiltered list, so a search for "curl" still shows which tool call started it.
-        let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since, focus: scope) }) ?? [])
+        // Drop only the text term for causal linking. The explicit app/host/attribution scope still defines which
+        // activity can be associated with the visible exchange.
+        let all = term.isEmpty ? exchanges : ((try? await monitor.read {
+            try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, host: host,
+                                      includeAttributedChildren: includeChildren,
+                                      agentParent: parent, mcpServer: mcp)
+        }) ?? [])
         links = ToolCallLinks.link(all)
         var found: [String: ToolResult] = [:]
         for e in all { for r in e.toolResults where found[r.callID] == nil { found[r.callID] = r } }

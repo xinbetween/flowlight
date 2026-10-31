@@ -158,7 +158,8 @@ enum AITrafficGraphBuilder {
                 detail: tool.mcpServer.isEmpty ? L("Works for %@", allNodes[agentID(tool.agent)]?.title ?? tool.agent.bundleID)
                     : L("MCP service for %@", allNodes[agentID(tool.agent)]?.title ?? tool.agent.bundleID),
                 appPath: metadata.path,
-                filter: TrafficFilter(bundleID: tool.bundleID, agentParent: tool.agent.bundleID,
+                filter: TrafficFilter(bundleID: tool.bundleID,
+                                      agentParent: metadata.hasLineage ? tool.agent.bundleID : nil,
                                       mcpServer: tool.mcpServer.isEmpty ? nil : tool.mcpServer),
                 counters: metadata.counters
             )
@@ -206,7 +207,7 @@ enum AITrafficGraphBuilder {
             allNodes[id] = TrafficGraphNode(
                 id: id, kind: destination.isProvider ? .service : .destination,
                 title: destinationTitle(destination), detail: destinationDetail(destination), appPath: "",
-                filter: members.count == 1 ? members[0].filter : TrafficFilter.none,
+                filter: destinationFilter(destination, members: members),
                 counters: counters, members: members
             )
         }
@@ -308,6 +309,14 @@ enum AITrafficGraphBuilder {
     private static func sourceFilter(_ source: TrafficGraphNodeID,
                                      nodes: [TrafficGraphNodeID: TrafficGraphNode]) -> TrafficFilter {
         nodes[source]?.filter ?? .none
+    }
+
+    private static func destinationFilter(_ destination: DestinationIdentity,
+                                          members: [TrafficGraphMember]) -> TrafficFilter {
+        if members.count == 1 { return members[0].filter }
+        guard !destination.isProvider else { return .none }
+        return TrafficFilter(domain: destination.domain.isEmpty ? nil : destination.domain,
+                             remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP)
     }
 
     private static func makeMembers<S: Sequence>(_ values: S) -> [TrafficGraphMember]
