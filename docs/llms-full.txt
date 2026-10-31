@@ -1682,6 +1682,8 @@ October 31, 2026Latest
 
  Keep direction calm and accessible. Sparse slow particles distinguish sent and received activity; Reduce Motion keeps the static left-to-right flow; keyboard and VoiceOver relationship controls and List mode expose the same exact values.
 
+ Keep relationships visible without inventing them. Capture-time evidence now shows which terminal started an agent, which tools and MCP services the agent runs, when observed traffic used Flowlight's proxy route, and which analytics or telemetry attempts a policy blocked—without counting relationship edges as traffic.
+
  See the new map before downloading. The homepage now leads with the real demo-only Sankey candidate and names Visualize among the app's nine focused views.
 
  0.16.0
