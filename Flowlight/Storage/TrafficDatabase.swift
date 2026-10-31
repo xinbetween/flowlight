@@ -1924,20 +1924,44 @@ final class TrafficDatabase: @unchecked Sendable {
         var clause = "e.ts >= ?"
         var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
         if let to { clause += " AND e.ts <= ?"; values.append(.double(to.timeIntervalSince1970)) }
-        if let app = filter.bundleID, !app.isEmpty { clause += " AND e.bundle_id = ?"; values.append(.text(app)) }
-        if let host = filter.domain, !host.isEmpty { clause += " AND (e.host = ? OR e.host LIKE ?)"; values += [.text(host), .text("%." + host)] }
-        if let suffix = filter.domainSuffix, !suffix.isEmpty { clause += " AND (e.host = ? OR e.host LIKE ?)"; values += [.text(suffix), .text("%." + suffix)] }
-        if !filter.focus.bundleIDs.isEmpty {
-            clause += " AND e.bundle_id IN (\(Array(repeating: "?", count: filter.focus.bundleIDs.count).joined(separator: ",")))"
-            values += filter.focus.bundleIDs.map { .text($0) }
+        if let app = filter.bundleID, !app.isEmpty {
+            clause += filter.includeAttributedChildren
+                ? " AND (e.bundle_id = ? OR e.agent = ?)" : " AND e.bundle_id = ?"
+            values.append(.text(app))
+            if filter.includeAttributedChildren { values.append(.text(app)) }
         }
-        if !filter.focus.hosts.isEmpty {
-            let names = filter.focus.hosts.filter { !AgentPolicy.isIPAddress($0) }
-            if names.isEmpty { clause += " AND 0" }
-            else {
-                clause += " AND (" + Array(repeating: "(e.host = ? OR e.host LIKE ?)", count: names.count).joined(separator: " OR ") + ")"
-                for name in names { values += [.text(name), .text("%." + name)] }
+        if let parent = filter.agentParent, !parent.isEmpty {
+            clause += " AND e.agent = ?"
+            values.append(.text(parent))
+        }
+        if let mcp = filter.mcpServer, !mcp.isEmpty {
+            clause += " AND e.mcp_server = ?"
+            values.append(.text(mcp))
+        }
+        if let host = filter.domain, !host.isEmpty {
+            clause += " AND (e.host = ? OR e.host LIKE ?)"
+            values += [.text(host), .text("%." + host)]
+        } else if filter.remoteIP != nil {
+            // Inspected exchanges retain hostnames, not destination addresses. An IP-only traffic scope has no
+            // corresponding request rows and must not silently widen the Potential harm card.
+            clause += " AND 0"
+        }
+        if let suffix = filter.domainSuffix, !suffix.isEmpty {
+            clause += " AND (e.host = ? OR e.host LIKE ?)"
+            values += [.text(suffix), .text("%." + suffix)]
+        }
+        if !filter.focus.isEmpty {
+            var focusParts: [String] = []
+            if !filter.focus.bundleIDs.isEmpty {
+                let marks = Array(repeating: "?", count: filter.focus.bundleIDs.count).joined(separator: ",")
+                focusParts.append("e.bundle_id IN (\(marks))")
+                values += filter.focus.bundleIDs.map { .text($0) }
             }
+            for host in filter.focus.hosts where !AgentPolicy.isIPAddress(host) {
+                focusParts.append("(e.host = ? OR e.host LIKE ?)")
+                values += [.text(host), .text("%." + host)]
+            }
+            clause += focusParts.isEmpty ? " AND 0" : " AND (" + focusParts.joined(separator: " OR ") + ")"
         }
         return try conn.query("""
             SELECT

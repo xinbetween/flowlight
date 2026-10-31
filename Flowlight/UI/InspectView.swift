@@ -13,9 +13,18 @@ enum InspectLinkQuery {
     static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
                      app: String?, host: String?, includeAttributedChildren: Bool,
                      agentParent: String?, mcpServer: String?) throws -> [HTTPExchange] {
-        try database.exchanges(since: since, focus: focus, app: app, host: host,
-                               includeAttributedChildren: includeAttributedChildren,
-                               agentParent: agentParent, mcpServer: mcpServer)
+        let visible = try database.exchanges(
+            since: since, focus: focus, app: app, host: host,
+            includeAttributedChildren: includeAttributedChildren,
+            agentParent: agentParent, mcpServer: mcpServer
+        )
+        guard let root = agentParent ?? ((includeAttributedChildren || mcpServer != nil) ? app : nil),
+              !root.isEmpty else { return visible }
+        // A child request's initiating tool call is recorded on the root agent's LLM exchange, which naturally has
+        // a different app, host and MCP scope. These rows support linking only; `exchanges` remains the visible list.
+        let supporting = try database.exchanges(since: since, app: root)
+        let visibleIDs = Set(visible.compactMap(\.id))
+        return visible + supporting.filter { $0.id.map { !visibleIDs.contains($0) } ?? true }
     }
 }
 

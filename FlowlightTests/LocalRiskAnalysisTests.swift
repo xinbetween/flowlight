@@ -21,15 +21,17 @@ final class LocalRiskAnalysisTests: XCTestCase {
     private func database() throws -> TrafficDatabase { try TrafficDatabase(url: url) }
 
     private func exchange(host: String = "127.0.0.1", path: String = "/admin/config", requestBytes: Int = 600_000,
-                          responseBytes: Int = 1_000, tools: [ToolCall] = []) -> HTTPExchange {
+                          responseBytes: Int = 1_000, tools: [ToolCall] = [], bundleID: String = "agent",
+                          agent: String? = "agent", mcpServer: String? = nil) -> HTTPExchange {
         HTTPExchange(id: nil, started: Date(), duration: 0.1, scheme: "https", host: host, port: 443, method: "POST", path: path,
                      status: 200,
                      requestHeaders: [HTTPHeader(name: "Authorization", value: "Bearer very-secret-token"),
                                       HTTPHeader(name: "Cookie", value: "session=secret"), HTTPHeader(name: "Content-Type", value: "application/json")],
                      requestBody: Data("{\"token\":\"do-not-leak\"}".utf8), requestSize: requestBytes, requestTruncated: false,
                      responseHeaders: [], responseBody: Data(), responseSize: responseBytes, responseTruncated: false,
-                     contentType: "application/json", pid: 1, bundleID: "agent", appName: "Agent", agent: "agent", agentName: "Agent",
-                     mcpServer: nil, toolCalls: tools, toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
+                     contentType: "application/json", pid: 1, bundleID: bundleID, appName: bundleID,
+                     agent: agent, agentName: agent, mcpServer: mcpServer, toolCalls: tools,
+                     toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
     }
 
     func testTriageNeedsIndependentEvidenceAndNeverIncludesSecretValues() throws {
@@ -90,6 +92,35 @@ final class LocalRiskAnalysisTests: XCTestCase {
         XCTAssertNotNil(try db.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id])
         try db.pruneExchanges(olderThan: Date().addingTimeInterval(60))
         XCTAssertNil(try db.localRiskAssessments(exchangeIDs: [id], visibleOnly: false)[id])
+    }
+
+    func testRiskCountsHonorAgentChildAndMCPScopes() throws {
+        let db = try database()
+        let tool = ToolCall(source: .anthropic, callID: "risk", name: "Bash", mcpServer: nil,
+                            input: "", summary: nil)
+        for exchange in [
+            exchange(host: "api.github.com", tools: [tool], bundleID: "node", agent: "claude", mcpServer: "github"),
+            exchange(host: "api.github.com", tools: [tool], bundleID: "node", agent: "cursor", mcpServer: "github"),
+            exchange(host: "api.github.com", tools: [tool], bundleID: "node", agent: "claude", mcpServer: "filesystem"),
+            exchange(host: "api.anthropic.com", tools: [tool], bundleID: "claude", agent: "claude")
+        ] {
+            _ = try db.insertExchange(exchange, enqueueLocalRisk: true)
+        }
+        let since = Date().addingTimeInterval(-60)
+
+        let root = try db.localRiskCounts(
+            since: since,
+            filter: TrafficFilter(bundleID: "claude", includeAttributedChildren: true),
+            visibleOnly: false
+        )
+        XCTAssertEqual(root.unassessed, 3, "the root and both Claude-attributed children belong to the agent scope")
+
+        let exact = try db.localRiskCounts(
+            since: since,
+            filter: TrafficFilter(bundleID: "node", agentParent: "claude", mcpServer: "github"),
+            visibleOnly: false
+        )
+        XCTAssertEqual(exact.unassessed, 1, "other agents and MCP servers must stay outside the visible exact scope")
     }
 
     func testCoordinatorDoesNotClaimWhenAvailabilityGateIsOff() async throws {

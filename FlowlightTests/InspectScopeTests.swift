@@ -14,13 +14,14 @@ final class InspectScopeTests: XCTestCase {
     }
 
     private func exchange(app: (String, String), host: String, body: String = "",
-                          agent: String? = nil, mcpServer: String? = nil) -> HTTPExchange {
+                          agent: String? = nil, mcpServer: String? = nil,
+                          toolCalls: [ToolCall] = [], started: Date = Date()) -> HTTPExchange {
         HTTPExchange(
-            id: nil, started: Date(), duration: 0.1, scheme: "https", host: host, port: 443, method: "GET",
+            id: nil, started: started, duration: 0.1, scheme: "https", host: host, port: 443, method: "GET",
             path: "/", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
             responseHeaders: [], responseBody: Data(body.utf8), responseSize: body.count, responseTruncated: false,
             contentType: "text/html", pid: 1, bundleID: app.0, appName: app.1, agent: agent, agentName: agent,
-            mcpServer: mcpServer, toolCalls: [], toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
+            mcpServer: mcpServer, toolCalls: toolCalls, toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
     }
 
     /// The exact shape of the bug: a page that merely mentions the app's name.
@@ -59,16 +60,22 @@ final class InspectScopeTests: XCTestCase {
         XCTAssertEqual(both.first?.host, "registry.npmjs.org")
     }
 
-    func testInspectLinkQueryKeepsAttributionScopeWhileDroppingSearch() throws {
+    func testInspectLinkQueryKeepsVisibleScopeAndAddsParentCalls() throws {
         let db = try database()
-        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
-                                           agent: "claude", mcpServer: "github"))
+        let call = LLMToolCallReader.make(.anthropic, id: "call-1", name: "mcp__github__create_issue",
+                                          input: ["url": "https://api.github.com/repos/flowlight/issues"])
+        let now = Date()
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com",
+                                           agent: "claude", toolCalls: [call],
+                                           started: now.addingTimeInterval(-2)))
+        let childID = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                                     agent: "claude", mcpServer: "github", started: now))
         _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
                                            agent: "cursor", mcpServer: "github"))
         _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
                                            agent: "claude", mcpServer: "filesystem"))
 
-        let linked = try InspectLinkQuery.load(
+        let set = try InspectLinkQuery.load(
             from: db,
             since: Date().addingTimeInterval(-60),
             focus: .none,
@@ -79,9 +86,23 @@ final class InspectScopeTests: XCTestCase {
             mcpServer: "github"
         )
 
-        XCTAssertEqual(linked.count, 1)
-        XCTAssertEqual(linked.first?.agent, "claude")
-        XCTAssertEqual(linked.first?.mcpServer, "github")
+        XCTAssertEqual(set.filter { $0.bundleID == "node" }.count, 1,
+                       "supporting rows must not widen the visible child scope")
+        XCTAssertEqual(ToolCallLinks.link(set)[childID]?.call.callID, "call-1",
+                       "the parent agent exchange carries the initiating tool call")
+
+        let rootSet = try InspectLinkQuery.load(
+            from: db,
+            since: Date().addingTimeInterval(-60),
+            focus: .none,
+            app: "claude",
+            host: nil,
+            includeAttributedChildren: true,
+            agentParent: nil,
+            mcpServer: nil
+        )
+        XCTAssertEqual(ToolCallLinks.link(rootSet)[childID]?.call.callID, "call-1",
+                       "an agent-root scope also keeps its root exchanges for child linking")
     }
 
     func testNoScopeStillReturnsEverything() throws {
