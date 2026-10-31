@@ -187,50 +187,70 @@ private struct PluginSettingsRow: View {
     }
 }
 
-private struct PluginPackageReviewSheet: View {
+struct PluginPackageReviewSheet: View {
     var review: PluginPackageReview
     var close: (Bool) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("Review Plugin Package")).font(.headline)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text(review.manifest.name).font(.callout.bold())
-                    PluginPill(review.signatureStatus.title)
-                    PluginPill(review.manifest.kind.title)
-                    if !review.manifest.script.isEmpty { PluginPill(L("JavaScript")) }
-                }
-                Text(review.manifest.description).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text(review.manifest.privacySummary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Divider()
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                reviewRow(L("Plugin ID"), review.manifest.id)
-                reviewRow(L("Version"), review.manifest.version)
-                reviewRow(L("Publisher"), review.manifest.publisher.title)
-                reviewRow(L("Provider"), review.manifest.guardrailProvider.title)
-                reviewRow(L("Channel"), review.manifest.provenance.distributionChannel.title)
-                reviewRow(L("Package digest"), review.packageDigest.shortDigest)
-                reviewRow(L("Script digest"), review.scriptDigest.shortDigest)
-            }
-            GroupBox(L("Permissions")) {
-                FlowPillLine(items: review.manifest.permissions.map(\.title))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            GroupBox(L("Privacy")) {
-                FlowPillLine(items: review.manifest.privacy.categories.map(\.title))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if !review.warnings.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(review.warnings, id: \.self) { warning in
-                        Text(warning).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Text(review.manifest.name).font(.callout.bold())
+                            PluginPill(review.signatureStatus.title)
+                            PluginPill(review.manifest.kind.title)
+                            if !review.manifest.script.isEmpty { PluginPill(L("JavaScript")) }
+                        }
+                        Text(review.manifest.description).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(review.manifest.privacySummary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
+                    Divider()
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                        reviewRow(L("Plugin ID"), review.manifest.id)
+                        reviewRow(L("Version"), review.manifest.version)
+                        reviewRow(L("Publisher"), review.manifest.publisher.title)
+                        reviewRow(L("Provider"), review.manifest.guardrailProvider.title)
+                        reviewRow(L("Channel"), review.manifest.provenance.distributionChannel.title)
+                    }
+                    digestRow(L("Package digest"), review.packageDigest)
+                    digestRow(L("Script digest"), review.scriptDigest)
+                    GroupBox(L("Permissions")) {
+                        FlowPillLine(items: review.manifest.permissions.map(\.title))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    GroupBox(L("Privacy")) {
+                        FlowPillLine(items: review.manifest.privacy.categories.map(\.title))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if !review.manifest.script.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(L("JavaScript source")).font(.caption.bold()).foregroundStyle(.secondary)
+                            ScrollView([.horizontal, .vertical]) {
+                                Text(review.manifest.script)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: true, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
+                            .frame(height: 180)
+                            .padding(8)
+                            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    if !review.warnings.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(review.warnings, id: \.self) { warning in
+                                Text(warning).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    Text(L("Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic."))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(L("Plugins are advisory. Installing this package does not let it block, rewrite, mock, transform, save settings, upload, or export traffic."))
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button(L("Cancel")) { close(false) }
@@ -238,13 +258,27 @@ private struct PluginPackageReviewSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 620)
+        .frame(width: 680, height: 650)
     }
 
     private func reviewRow(_ key: String, _ value: String) -> some View {
         GridRow {
             Text(key).font(.caption).foregroundStyle(.secondary)
-            Text(value.isEmpty ? L("Not declared") : value).font(.caption).textSelection(.enabled)
+            Text(value.isEmpty ? L("Not declared") : value)
+                .font(.caption)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func digestRow(_ key: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(key).font(.caption).foregroundStyle(.secondary)
+            Text(value.isEmpty ? L("Not declared") : value.digestGroups)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -262,7 +296,7 @@ private struct WrappingHStack<Item: Hashable, Content: View>: View {
     var content: (Item) -> Content
 
     var body: some View {
-        HStack(spacing: 6) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 6)], alignment: .leading, spacing: 6) {
             ForEach(items, id: \.self) { item in content(item) }
         }
     }
@@ -357,5 +391,13 @@ private extension String {
     var shortDigest: String {
         guard count > 12 else { return self }
         return String(prefix(12))
+    }
+
+    var digestGroups: String {
+        stride(from: 0, to: count, by: 16).map { offset in
+            let start = index(startIndex, offsetBy: offset)
+            let end = index(start, offsetBy: Swift.min(16, count - offset))
+            return String(self[start..<end])
+        }.joined(separator: " ")
     }
 }

@@ -13,7 +13,20 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.15.13</h2><time datetime="2026-10-29">October 29, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.15.14</h2><time datetime="2026-10-30">October 30, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Review executable plugin code before installing it.</strong> Package review now includes a visible,
+            read-only view of the exact embedded JavaScript, with selection and bounded scrolling for large scripts.</li>
+          <li><strong>Compare the complete package identity.</strong> The consent sheet shows full 64-character SHA-256 package
+            and script digests instead of shortening them to a display prefix, rejects deceptive invisible source formatting,
+            and discards package-supplied values for locally managed plugin configuration.</li>
+          <li><strong>Keep plugin power unchanged.</strong> This adds no permission, signer, update channel, or automatic action:
+            installed JavaScript remains advisory, receives only declared sanitized metadata, and fails open.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.15.13</h2><time datetime="2026-10-29">October 29, 2026</time></header>
         <ul>
           <li><strong>Ask about recorded device activity without exposing device identifiers.</strong> Ask can now summarize bounded camera,
             Bluetooth, USB, and external-storage transition history by channel, device name, counts, and minute-rounded first and last times.</li>

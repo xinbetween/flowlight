@@ -1690,6 +1690,8 @@
 "Channel" = "Channel";
 "Package digest" = "Package digest";
 "Script digest" = "Script digest";
+"JavaScript source" = "JavaScript 原始碼";
+"Plugin scripts cannot contain invisible Unicode formatting controls." = "外掛程式指令碼不能包含不可見的 Unicode 格式控制字元。";
 "Permissions" = "Permissions";
 "Install" = "Install";
 "Not declared" = "Not declared";

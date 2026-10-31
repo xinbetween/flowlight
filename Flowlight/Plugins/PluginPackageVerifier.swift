@@ -5,6 +5,7 @@ enum PluginPackageError: LocalizedError, Equatable {
     case reservedBuiltInID
     case invalidID
     case scriptTooLarge
+    case unsafeScriptFormatting
     case unsupportedPackage
     case unknownSigner(String)
     case wrongPublisher
@@ -16,6 +17,7 @@ enum PluginPackageError: LocalizedError, Equatable {
         case .reservedBuiltInID: return L("Installed plugin IDs cannot reuse a built-in plugin ID.")
         case .invalidID: return L("Plugin IDs must contain only letters, numbers, dots, underscores, and hyphens.")
         case .scriptTooLarge: return L("Plugin scripts must be 128 KB or smaller.")
+        case .unsafeScriptFormatting: return L("Plugin scripts cannot contain invisible Unicode formatting controls.")
         case .unsupportedPackage: return L("This plugin package format is not supported.")
         case .unknownSigner(let key): return L("The plugin package was signed by an unknown key: %@.", key)
         case .wrongPublisher: return L("The plugin package signature does not match the declared publisher.")
@@ -42,6 +44,7 @@ enum PluginPackageVerifier {
         var manifest = package.manifest
         try validateBase(manifest)
         manifest.source = .installed
+        manifest.configuration = [:]
         if manifest.capabilities.isEmpty { manifest.capabilities = [.annotate] }
         manifest.permissions = normalizedPermissions(manifest)
         if manifest.privacy.categories.isEmpty { manifest.privacy.categories = [.metadataOnly] }
@@ -117,6 +120,11 @@ enum PluginPackageVerifier {
         guard manifest.id.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil else { throw PluginPackageError.invalidID }
         guard !PluginEngine.builtInManifests.contains(where: { $0.id == manifest.id }) else { throw PluginPackageError.reservedBuiltInID }
         guard manifest.script.lengthOfBytes(using: .utf8) <= PluginScriptRunner.maxScriptBytes else { throw PluginPackageError.scriptTooLarge }
+        guard !manifest.script.unicodeScalars.contains(where: {
+            $0.properties.generalCategory == .format
+        }) else {
+            throw PluginPackageError.unsafeScriptFormatting
+        }
     }
 
     private static func normalizedPermissions(_ manifest: PluginManifest) -> [PluginPermission] {
