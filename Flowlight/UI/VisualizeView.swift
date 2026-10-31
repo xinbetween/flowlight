@@ -2,9 +2,23 @@ import SwiftUI
 
 @MainActor
 enum VisualizeActionScope {
+    static func canInspect(_ filter: TrafficFilter) -> Bool {
+        filter.domain?.isEmpty == false
+    }
+
+    static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil) {
+        guard canInspect(filter), let host = filter.domain else { return }
+        let app = filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
+        nav.showInspect(app: app, host: host, hostIncludesSubdomains: false,
+                        includeAttributedChildren: filter.includeAttributedChildren,
+                        agentParent: filter.agentParent, mcpServer: filter.mcpServer)
+    }
+
     static func blockRule(for filter: TrafficFilter) -> Rule {
-        RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "",
-                        destination: filter.domain?.isEmpty == false ? filter.domain! : filter.remoteIP ?? "")
+        var rule = RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "",
+                                   destination: filter.domain?.isEmpty == false ? filter.domain! : filter.remoteIP ?? "")
+        rule.destinationMatch = .exact
+        return rule
     }
 }
 
@@ -486,7 +500,11 @@ private struct TrafficGraphInspector: View {
                 Button(L("Show in Reports")) { nav.showReport(filter: node.filter, granularity: granularity) }
                 #if !APP_STORE
                 if node.kind == .destination || node.kind == .service {
-                    Button(L("Inspect")) { nav.showInspect(host: host(node.filter)) }
+                    if VisualizeActionScope.canInspect(node.filter) {
+                        Button(L("Inspect")) {
+                            VisualizeActionScope.showInspect(nav, filter: node.filter)
+                        }
+                    }
                 } else {
                     Button(L("Inspect")) {
                         nav.showInspect(app: (node.filter.bundleID ?? "", node.title),
@@ -560,11 +578,10 @@ private struct TrafficGraphInspector: View {
         HStack(spacing: Spacing.s) {
             Button(L("Reports")) { nav.showReport(filter: filter, granularity: granularity) }
             #if !APP_STORE
-            Button(L("Inspect")) {
-                nav.showInspect(app: source.flatMap { ($0.filter.bundleID ?? "").isEmpty ? nil : ($0.filter.bundleID!, $0.title) },
-                                host: host(filter),
-                                includeAttributedChildren: filter.includeAttributedChildren,
-                                agentParent: filter.agentParent, mcpServer: filter.mcpServer)
+            if VisualizeActionScope.canInspect(filter) {
+                Button(L("Inspect")) {
+                    VisualizeActionScope.showInspect(nav, filter: filter, sourceTitle: source?.title)
+                }
             }
             #endif
             Button(L("Block…")) {
@@ -599,7 +616,6 @@ private struct TrafficGraphInspector: View {
         }.font(.caption)
     }
 
-    private func host(_ filter: TrafficFilter) -> String { filter.domain?.isEmpty == false ? filter.domain! : filter.remoteIP ?? "" }
 }
 
 private struct TrafficGraphList: View {

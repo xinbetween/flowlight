@@ -217,10 +217,12 @@ final class AppNavigation: ObservableObject {
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
     func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil,
+                     hostIncludesSubdomains: Bool = true,
                      includeAttributedChildren: Bool = false, agentParent: String? = nil,
                      mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
+                                       hostIncludesSubdomains: hostIncludesSubdomains,
                                        includeAttributedChildren: includeAttributedChildren,
                                        agentParent: agentParent, mcpServer: mcpServer,
                                        potentialHarmOnly: potentialHarmOnly)
@@ -235,6 +237,7 @@ struct InspectRequest: Equatable {
     var appID: String? = nil
     var appName: String? = nil
     var host: String? = nil
+    var hostIncludesSubdomains = true
     var includeAttributedChildren = false
     var agentParent: String? = nil
     var mcpServer: String? = nil

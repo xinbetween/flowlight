@@ -92,6 +92,14 @@ struct AgentRootProof: Sendable {
 }
 
 enum AgentsModel {
+    static func rows(from database: TrafficDatabase, granularity: Granularity,
+                     from: Date, to: Date, focus: FocusScope) throws -> [BreakdownRow] {
+        try database.aiVisualizationRows(
+            granularity, from: from, to: to,
+            filter: TrafficFilter(focus: focus)
+        )
+    }
+
     private static func mergedPorts(_ a: String, _ b: String) -> String {
         var ports = Set<String>()
         for part in (a + "," + b).split(separator: ",") {

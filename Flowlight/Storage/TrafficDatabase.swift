@@ -374,21 +374,10 @@ final class TrafficDatabase: @unchecked Sendable {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
             }
             // `_key2` treated attribution as mutable metadata, so one row may already contain bytes from several
-            // parents while retaining one arbitrary label. Preserve every field and counter, but mark provenance:
-            // only rows written under the attribution-aware schema may be used as lineage evidence.
-            let hadLegacyAttributionKey = try conn.query(
-                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ? LIMIT 1",
-                [.text("\(table)_key2")]
-            ) { _ in true }.first == true
-            let hadExactAttributionKey = try conn.query(
-                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ? LIMIT 1",
-                [.text("\(table)_key3")]
-            ) { _ in true }.first == true
+            // parents while retaining one arbitrary label. A prerelease `_key3` upgrade could not recover that
+            // provenance either. Preserve every field and counter, but trust only rows written under `_key4`.
             if !columns.contains("attribution_exact") {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN attribution_exact INTEGER NOT NULL DEFAULT 0")
-                if hadExactAttributionKey && !hadLegacyAttributionKey {
-                    try conn.run("UPDATE \(table) SET attribution_exact = 1")
-                }
             }
             // v0.4.0: which way the bytes left the Mac. It joins the unique key rather than riding along as an
             // attribute — the same app on the same port over Wi-Fi and over AWDL is two different things, and
@@ -2116,8 +2105,9 @@ final class TrafficDatabase: @unchecked Sendable {
     ///   response body that merely mentions the app's name — which is how asking for Claude Code's traffic
     ///   returned every GitHub page whose HTML says "Claude Code".
     func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
-                   app: String? = nil, host: String? = nil, includeAttributedChildren: Bool = false,
-                   agentParent: String? = nil, mcpServer: String? = nil) throws -> [HTTPExchange] {
+                   app: String? = nil, host: String? = nil, hostIncludesSubdomains: Bool = true,
+                   includeAttributedChildren: Bool = false, agentParent: String? = nil,
+                   mcpServer: String? = nil) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -2135,9 +2125,9 @@ final class TrafficDatabase: @unchecked Sendable {
             scopeValues.append(.text(mcpServer))
         }
         if let host, !host.isEmpty {
-            scopeClause += " AND (host = ? OR host LIKE ?)"
+            scopeClause += hostIncludesSubdomains ? " AND (host = ? OR host LIKE ?)" : " AND host = ?"
             scopeValues.append(.text(host))
-            scopeValues.append(.text("%." + host))
+            if hostIncludesSubdomains { scopeValues.append(.text("%." + host)) }
         }
         // An exchange records the host it went to but not the address behind it, so an IP target can't match here.
         var focusClause = ""

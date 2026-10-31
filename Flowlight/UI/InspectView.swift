@@ -18,10 +18,12 @@ enum InspectLinkQuery {
     }
 
     static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
-                     app: String?, host: String?, includeAttributedChildren: Bool,
-                     agentParent: String?, mcpServer: String?) throws -> [HTTPExchange] {
+                     app: String?, host: String?, hostIncludesSubdomains: Bool = true,
+                     includeAttributedChildren: Bool, agentParent: String?,
+                     mcpServer: String?) throws -> [HTTPExchange] {
         let visible = try database.exchanges(
             since: since, focus: focus, app: app, host: host,
+            hostIncludesSubdomains: hostIncludesSubdomains,
             includeAttributedChildren: includeAttributedChildren,
             agentParent: agentParent, mcpServer: mcpServer
         )
@@ -60,6 +62,7 @@ private struct InspectContent: View {
     /// it is as visible and as removable as a search term, which is what the search field was chosen for.
     @State private var scopeApp: (id: String, name: String)?
     @State private var scopeHost: String?
+    @State private var scopeHostIncludesSubdomains = true
     @State private var scopeIncludesChildren = false
     @State private var scopeAgentParent: String?
     @State private var scopeMCPServer: String?
@@ -136,6 +139,7 @@ private struct InspectContent: View {
             search = request.search
             scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
             scopeHost = request.host
+            scopeHostIncludesSubdomains = request.hostIncludesSubdomains
             scopeIncludesChildren = request.includeAttributedChildren
             scopeAgentParent = request.agentParent
             scopeMCPServer = request.mcpServer
@@ -165,6 +169,7 @@ private struct InspectContent: View {
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
                           search: search, window: window, enabled: inspection.enabled,
                           potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost,
+                          hostIncludesSubdomains: scopeHostIncludesSubdomains,
                           includeChildren: scopeIncludesChildren, parent: scopeAgentParent, mcp: scopeMCPServer)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
@@ -175,7 +180,7 @@ private struct InspectContent: View {
     private struct LoadKey: Equatable {
         var version: Int; var localRiskVersion: Int; var pluginVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
         var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
-        var includeChildren: Bool; var parent: String?; var mcp: String?
+        var hostIncludesSubdomains: Bool; var includeChildren: Bool; var parent: String?; var mcp: String?
     }
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
@@ -253,10 +258,12 @@ private struct InspectContent: View {
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
-        let app = scopeApp?.id, host = scopeHost, includeChildren = scopeIncludesChildren
+        let app = scopeApp?.id, host = scopeHost, hostIncludesSubdomains = scopeHostIncludesSubdomains
+        let includeChildren = scopeIncludesChildren
         let parent = scopeAgentParent, mcp = scopeMCPServer
         let loaded = (try? await monitor.read {
             try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host,
+                             hostIncludesSubdomains: hostIncludesSubdomains,
                              includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp)
         }) ?? []
         let ids = loaded.compactMap(\.id)
@@ -282,6 +289,7 @@ private struct InspectContent: View {
         )
         let all = needsSupport ? ((try? await monitor.read {
             try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, host: host,
+                                      hostIncludesSubdomains: hostIncludesSubdomains,
                                       includeAttributedChildren: includeChildren,
                                       agentParent: parent, mcpServer: mcp)
         }) ?? []) : exchanges
@@ -351,6 +359,7 @@ private struct InspectContent: View {
                 Button {
                     scopeApp = nil
                     scopeHost = nil
+                    scopeHostIncludesSubdomains = true
                     scopeIncludesChildren = false
                     scopeAgentParent = nil
                     scopeMCPServer = nil

@@ -187,8 +187,9 @@ open build/Build/Products/Release/Flowlight.app
  because someone opened an AI service in it. Tool traffic counts toward its parent agent while the tool remains selectable; the
  dashed works for relationship is process-lineage evidence, not a claimed invocation.
 
- Select a node or connection for exact received, sent and connection totals, then continue to Reports, Inspect, or an unsaved
- blocking-rule editor with the same app and exact host or address. LLM service grouping is visual only: choose one of its exact
+ Select a node or connection for exact received, sent and connection totals, then continue to Reports or an unsaved
+ blocking-rule editor with the same app and exact destination. Inspect is also available when that destination has a recorded
+ hostname; HTTP exchanges do not store the resolved destination address. LLM service grouping is visual only: choose one of its exact
  hostname and address members before any action. List exposes the same bounded data for keyboard, VoiceOver and
  anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
  not an allow verdict.
@@ -1674,7 +1675,7 @@ October 30, 2026Latest
 
  See AI activity without guessing. A separate mode maps proved agents, attributed tools and MCP servers, LLM services, and every other destination they reached. Browsers stay excluded from provider-only discovery, and process lineage says “works for” rather than inventing an invocation.
 
- Drill into evidence without overclaiming it. The inspector links the exact app and host or address to Reports, Inspect, and an unsaved blocking-rule editor. Provider grouping keeps exact members underneath; counts are connections rather than requests, and ordinary traffic is Observed rather than falsely classified as allowed.
+ Drill into evidence without overclaiming it. The inspector links the exact app and destination to Reports and an unsaved blocking-rule editor, and to Inspect when the recorded destination has a hostname. Provider grouping keeps exact members underneath; counts are connections rather than requests, and ordinary traffic is Observed rather than falsely classified as allowed.
 
  0.15.14
 October 30, 2026

@@ -47,6 +47,13 @@ final class InspectScopeTests: XCTestCase {
 
         let scoped = try db.exchanges(since: Date().addingTimeInterval(-60), host: "github.com")
         XCTAssertEqual(Set(scoped.map(\.host)), ["github.com", "api.github.com"])
+
+        let exact = try db.exchanges(
+            since: Date().addingTimeInterval(-60),
+            host: "github.com",
+            hostIncludesSubdomains: false
+        )
+        XCTAssertEqual(exact.map(\.host), ["github.com"])
     }
 
     /// A scope and a search have to compose, or narrowing a scoped list would silently widen it.

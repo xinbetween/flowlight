@@ -287,9 +287,18 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(projected[0].parentAgent, "")
         XCTAssertEqual(projected[0].parentAgentName, "")
         XCTAssertEqual(projected[0].mcpServer, "")
+        XCTAssertTrue(AgentsModel.build(rows: projected, alerts: []).isEmpty,
+                      "AI Agents must not infer a parent or tool from untrusted historical labels")
+        let ordinary = try migrated.breakdown(
+            .second,
+            from: Date(timeIntervalSince1970: 1_700_000_000),
+            to: Date(timeIntervalSince1970: 1_700_000_001)
+        )
+        XCTAssertEqual(ordinary.first?.parentAgent, "claude",
+                       "ordinary Reports retain historical labels; AI screens must use the guarded projection")
     }
 
-    func testExactAttributionSchemaPromotesExistingRows() throws {
+    func testPrereleaseExactKeyDoesNotPromoteUnknownProvenance() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("exact-attribution-\(UUID()).sqlite")
         let previous = try SQLiteConnection(path: url.path)
         try previous.execute("""
@@ -316,14 +325,14 @@ final class DatabaseTests: XCTestCase {
         }
 
         let migrated = try TrafficDatabase(url: url)
-        XCTAssertEqual(try migrated.raw("SELECT attribution_exact FROM flows_1s") { $0.int(0) }, [1])
+        XCTAssertEqual(try migrated.raw("SELECT attribution_exact FROM flows_1s") { $0.int(0) }, [0])
         let projected = try migrated.aiVisualizationRows(
             .second,
             from: Date(timeIntervalSince1970: 1_700_000_000),
             to: Date(timeIntervalSince1970: 1_700_000_001)
         )
-        XCTAssertEqual(projected.first?.parentAgent, "claude")
-        XCTAssertEqual(projected.first?.mcpServer, "github")
+        XCTAssertEqual(projected.first?.parentAgent, "")
+        XCTAssertEqual(projected.first?.mcpServer, "")
     }
 
     func testUnacknowledgedCountAndReadOnlyConnection() throws {

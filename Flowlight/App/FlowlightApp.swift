@@ -151,8 +151,12 @@ struct FlowlightApp: App {
             }
             CommandGroup(before: .sidebar) {
                 ForEach(SidebarItem.availableCases) { item in
-                    Button(item.title) { nav.show(item) }
-                        .keyboardShortcut(item.shortcut ?? .init(" "), modifiers: item.shortcut == nil ? [] : .command)
+                    if let shortcut = item.shortcut {
+                        Button(item.title) { nav.show(item) }
+                            .keyboardShortcut(shortcut, modifiers: .command)
+                    } else {
+                        Button(item.title) { nav.show(item) }
+                    }
                 }
                 Divider()
                 Button(focus.isOn ? L("Turn Focus Off") : L("Turn Focus On")) { focus.isOn.toggle() }
