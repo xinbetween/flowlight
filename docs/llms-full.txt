@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.1, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -956,6 +956,8 @@ Understand your AI agents.
 
  Cursorapi2.cursor.sh · POST /v1/chat503
  ✎ answered by Flowlight, never sent upstream
+
+ Visualize traffic as a Sankey map: agents and their attributed tools flow into domain families and LLM services, with ribbon width showing volume and exact destinations one click away. Shown with demo data.
 
  The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.
 
@@ -991,7 +993,7 @@ Understand your AI agents.
 
  Inside the app
 
- Eight views, one question each
+ Nine views, one question each
 
  Live
 What's moving right now? Per-app rates, the last two minutes, the busiest destination.
@@ -1024,6 +1026,9 @@ Bluetooth, USB, and cameras: what's paired, what's attached or active, and when 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
 ⌘7
+
+ Visualize
+What is communicating? A zoomable Sankey map for app traffic and proved AI-agent paths, with exact list parity.
 
  Capture
 
@@ -1666,8 +1671,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.16.1
+October 31, 2026Latest
+
+ Read traffic as flow, not spaghetti. Visualize now uses a native Sankey map with compact application and destination cards, smooth ribbons whose width shows traffic volume, and stable source and destination ports ordered to reduce crossings.
+
+ Group the internet without losing evidence. Subdomains roll up under their registrable domain family while the inspector retains every exact hostname, IP address, protocol, channel, source application, agent parent, and MCP attribution for Reports, Inspect, and blocking actions.
+
+ Explore the whole map comfortably. The transparent canvas fits itself by default, supports zooming and panning, keeps nodes collision-free and stable as counters update, and offers explicit Fit and Reset controls.
+
+ Keep direction calm and accessible. Sparse slow particles distinguish sent and received activity; Reduce Motion keeps the static left-to-right flow; keyboard and VoiceOver relationship controls and List mode expose the same exact values.
+
+ See the new map before downloading. The homepage now leads with the real demo-only Sankey candidate and names Visualize among the app's nine focused views.
+
  0.16.0
-October 30, 2026Latest
+October 30, 2026
 
  See app traffic as a native map. Apps and exact destinations are selectable nodes joined by weighted curved paths; moving particles show sent and received direction without oversized arrowheads.
 

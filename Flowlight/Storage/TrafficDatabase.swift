@@ -926,16 +926,17 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
-                       '', GROUP_CONCAT(DISTINCT protocol),
-                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows)
+                       '', protocol,
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows), channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip
+                GROUP BY bundle_id, domain, remote_ip, protocol, channel
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(10), asn: Int(row.int(11)))
+                         owner: row.text(11), asn: Int(row.int(12)),
+                         channel: NetworkChannel(rawValue: row.text(10)) ?? .ip)
         }
     }
 
@@ -948,7 +949,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
-                       GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
+                       GROUP_CONCAT(DISTINCT port), protocol,
                        SUM(bytes_in), SUM(bytes_out), SUM(flows),
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
@@ -959,7 +960,7 @@ final class TrafficDatabase: @unchecked Sendable {
                          CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
                          CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
                          CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
-                         channel
+                         channel, protocol
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),

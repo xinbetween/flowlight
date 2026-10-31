@@ -1813,3 +1813,17 @@
 "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "El linaje de procesos almacenado demuestra que esta herramienta trabaja para el agente. No demuestra que se haya invocado la herramienta.";
 "Block…" = "Bloquear…";
 "Direction and evidence" = "Dirección y evidencia";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "Mapa de relaciones de tráfico";
+"Drag to pan, pinch to zoom, or use the map controls." = "Arrastra para desplazar, pellizca para ampliar o usa los controles del mapa.";
+"Zoom in" = "Acercar";
+"Zoom out" = "Alejar";
+"Fit" = "Ajustar";
+"Fit the map in the window" = "Ajustar el mapa a la ventana";
+"Reset" = "Restablecer";
+"Reset zoom and position" = "Restablecer zoom y posición";
+"Select to inspect this connection" = "Selecciona para examinar esta conexión";
+"%lld exact destinations" = "%lld destinos exactos";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@ a %@, recibió %@, envió %@, %lld conexiones";
+"Show domain family in Reports" = "Mostrar la familia de dominios en Informes";

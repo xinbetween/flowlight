@@ -89,6 +89,29 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(nodes.first { $0.bundleID == "com.a" }?.children?.first?.children?.first?.remoteIP, "1.2.3.4")
     }
 
+    func testTrafficVisualizationProjectionPreservesProtocolAndChannelScope() throws {
+        let t0: Int64 = 1_700_000_000
+        var https = key("com.example", "api.example.com", ip: "203.0.113.8")
+        https.channel = .ip
+        var quicTunnel = https
+        quicTunnel.appProtocol = "quic"
+        quicTunnel.transport = .udp
+        quicTunnel.channel = .tunnel
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: https, counters: FlowCounters(bytesIn: 10, flows: 1)),
+            TrafficRecord(key: quicTunnel, counters: FlowCounters(bytesOut: 20, flows: 1))
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let rows = try db.appDestinationRows(.second, from: from, to: to)
+
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.map(\.protocols)), ["https", "quic"])
+        XCTAssertEqual(Set(rows.map(\.channel)), [.ip, .tunnel])
+        XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.total }, 30)
+    }
+
     func testAIVisualizationProjectionPreservesAttributionAndScope() throws {
         let t0: Int64 = 1_700_000_000
         var attributed = key("node", "api.github.com", ip: "203.0.113.9")
@@ -98,8 +121,12 @@ final class DatabaseTests: XCTestCase {
         attributed.parentAgentName = "Claude Code"
         attributed.mcpServer = "github"
         attributed.channel = .tunnel
+        var attributedQUIC = attributed
+        attributedQUIC.appProtocol = "quic"
+        attributedQUIC.transport = .udp
         try db.insert([TrafficBatch(timestamp: t0, records: [
             TrafficRecord(key: attributed, counters: FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1)),
+            TrafficRecord(key: attributedQUIC, counters: FlowCounters(bytesIn: 5, bytesOut: 5, flows: 1)),
             TrafficRecord(key: key("other", "example.com"), counters: FlowCounters(bytesIn: 99, bytesOut: 0, flows: 1)),
         ])])
 
@@ -108,19 +135,20 @@ final class DatabaseTests: XCTestCase {
         let rows = try db.aiVisualizationRows(.second, from: from, to: to,
                                                filter: TrafficFilter(focus: FocusScope(bundleIDs: ["node"])))
 
-        XCTAssertEqual(rows.count, 1)
-        XCTAssertEqual(rows[0].bundleID, "node")
-        XCTAssertEqual(rows[0].appPath, "/usr/local/bin/node")
-        XCTAssertEqual(rows[0].parentAgent, "claude")
-        XCTAssertEqual(rows[0].parentAgentName, "Claude Code")
-        XCTAssertEqual(rows[0].mcpServer, "github")
-        XCTAssertEqual(rows[0].channel, .tunnel)
-        XCTAssertEqual(rows[0].counters, FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1))
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(rows.allSatisfy { $0.bundleID == "node" })
+        XCTAssertTrue(rows.allSatisfy { $0.appPath == "/usr/local/bin/node" })
+        XCTAssertTrue(rows.allSatisfy { $0.parentAgent == "claude" })
+        XCTAssertTrue(rows.allSatisfy { $0.parentAgentName == "Claude Code" })
+        XCTAssertTrue(rows.allSatisfy { $0.mcpServer == "github" })
+        XCTAssertTrue(rows.allSatisfy { $0.channel == .tunnel })
+        XCTAssertEqual(Set(rows.map(\.protocols)), ["https", "quic"])
+        XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.total }, 40)
         XCTAssertTrue(try db.aiVisualizationRows(.second, from: to, to: to.addingTimeInterval(1)).isEmpty,
                       "the projection keeps the database's half-open time window")
         let parentFocus = try db.aiVisualizationRows(.second, from: from, to: to,
                                                       filter: TrafficFilter(focus: FocusScope(bundleIDs: ["claude"])))
-        XCTAssertEqual(parentFocus.map(\.bundleID), ["node"],
+        XCTAssertEqual(parentFocus.map(\.bundleID), ["node", "node"],
                        "focusing an AI root retains traffic from its attributed children")
 
         let exactChild = TrafficFilter(
@@ -129,6 +157,8 @@ final class DatabaseTests: XCTestCase {
             mcpServer: "github",
             domain: "api.github.com",
             remoteIP: "203.0.113.9",
+            appProtocol: "https",
+            channel: .tunnel,
             focus: FocusScope(bundleIDs: ["claude"])
         )
         let report = try db.series(.second, from: from, to: to, filter: exactChild, calendar: Calendar(identifier: .gregorian))

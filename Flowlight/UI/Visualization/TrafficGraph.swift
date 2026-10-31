@@ -88,6 +88,26 @@ struct TrafficGraphLimits: Equatable, Sendable {
     static let unbounded = TrafficGraphLimits(maxApps: .max, maxDestinations: .max, maxEdges: .max)
 }
 
+enum VisualizationDomainFamily {
+    /// These suffixes assign independent hostnames to unrelated customers. Keep one tenant label instead of
+    /// collapsing every customer into the hosting provider's shared suffix.
+    private static let tenantSuffixes: Set<String> = [
+        "appspot.com", "azurewebsites.net", "firebaseapp.com", "github.io", "herokuapp.com",
+        "netlify.app", "pages.dev", "vercel.app", "web.app"
+    ]
+
+    static func group(_ host: String) -> String {
+        let canonical = host.lowercased()
+        for suffix in tenantSuffixes where canonical == suffix || canonical.hasSuffix("." + suffix) {
+            let labels = canonical.split(separator: ".")
+            let suffixLabels = suffix.split(separator: ".").count
+            guard labels.count > suffixLabels else { return canonical }
+            return labels.suffix(suffixLabels + 1).joined(separator: ".")
+        }
+        return AnomalyEngine.registrableDomain(canonical)
+    }
+}
+
 enum TrafficGraphBuilder {
     private struct AppIdentity: Hashable {
         var bundleID: String
@@ -111,9 +131,25 @@ enum TrafficGraphBuilder {
         var destination: DestinationIdentity
     }
 
+    private struct ExactMemberIdentity: Hashable {
+        var app: AppIdentity
+        var domain: String
+        var remoteIP: String
+        var protocols: String
+        var channel: NetworkChannel
+    }
+
+    private struct MemberValue {
+        var identity: ExactMemberIdentity
+        var owner: String
+        var asn: Int
+        var counters = FlowCounters()
+    }
+
     static func build<Rows: Sequence>(rows: Rows, limits: TrafficGraphLimits = .standard) -> TrafficGraphSnapshot
     where Rows.Element == BreakdownRow {
         var relationships: [Relationship: FlowCounters] = [:]
+        var relationshipMembers: [Relationship: [ExactMemberIdentity: MemberValue]] = [:]
         var appMetadata: [AppIdentity: AppMetadata] = [:]
         var total = FlowCounters()
 
@@ -124,8 +160,21 @@ enum TrafficGraphBuilder {
             if current == nil || prefersMetadata(candidate, over: current!) {
                 appMetadata[app] = candidate
             }
-            let destination = DestinationIdentity(domain: row.domain, remoteIP: row.remoteIP, owner: row.owner, asn: row.asn)
-            relationships[Relationship(app: app, destination: destination), default: FlowCounters()] += row.counters
+            let groupedDomain = row.domain.isEmpty ? "" : VisualizationDomainFamily.group(row.domain)
+            let destination = DestinationIdentity(
+                domain: groupedDomain,
+                remoteIP: groupedDomain.isEmpty ? row.remoteIP : "",
+                owner: groupedDomain.isEmpty ? row.owner : "",
+                asn: groupedDomain.isEmpty ? row.asn : 0
+            )
+            let relationship = Relationship(app: app, destination: destination)
+            relationships[relationship, default: FlowCounters()] += row.counters
+            let memberIdentity = ExactMemberIdentity(app: app, domain: row.domain, remoteIP: row.remoteIP,
+                                                     protocols: row.protocols, channel: row.channel)
+            var member = relationshipMembers[relationship]?[memberIdentity]
+                ?? MemberValue(identity: memberIdentity, owner: row.owner, asn: row.asn)
+            member.counters += row.counters
+            relationshipMembers[relationship, default: [:]][memberIdentity] = member
             total += row.counters
         }
 
@@ -157,23 +206,23 @@ enum TrafficGraphBuilder {
         let rankedDestinations = ranked(destinationTotals).map(\.0).filter { visibleDestinations.contains($0) }
 
         let edges = selectedRelationships.map { relationship, counters in
-            TrafficGraphEdge(
+            let members = makeMembers(relationshipMembers[relationship]?.values ?? [:].values)
+            return TrafficGraphEdge(
                 id: relationshipID(relationship),
                 source: appID(relationship.app),
                 target: destinationID(relationship.destination),
                 counters: counters,
-                filter: TrafficFilter(
-                    bundleID: relationship.app.bundleID,
-                    domain: relationship.destination.domain,
-                    remoteIP: relationship.destination.remoteIP
-                )
+                filter: relationshipFilter(relationship, members: members),
+                members: members
             )
         }.sorted { $0.id < $1.id }
 
         var visibleNodeCounters: [TrafficGraphNodeID: FlowCounters] = [:]
+        var visibleDestinationMembers: [TrafficGraphNodeID: [TrafficGraphMember]] = [:]
         for edge in edges {
             visibleNodeCounters[edge.source, default: FlowCounters()] += edge.counters
             visibleNodeCounters[edge.target, default: FlowCounters()] += edge.counters
+            visibleDestinationMembers[edge.target, default: []] += edge.members
         }
 
         var nodes: [TrafficGraphNode] = []
@@ -194,14 +243,16 @@ enum TrafficGraphBuilder {
         for destination in rankedDestinations {
             let id = destinationID(destination)
             guard let counters = visibleNodeCounters[id] else { continue }
+            let members = mergedMembers(visibleDestinationMembers[id] ?? [])
             nodes.append(TrafficGraphNode(
                 id: id,
                 kind: .destination,
                 title: destinationTitle(destination),
-                detail: destinationDetail(destination),
+                detail: destinationDetail(destination, memberCount: members.count),
                 appPath: "",
-                filter: TrafficFilter(domain: destination.domain, remoteIP: destination.remoteIP),
-                counters: counters
+                filter: destinationFilter(destination),
+                counters: counters,
+                members: members
             ))
         }
         nodes.sort { $0.id < $1.id }
@@ -243,14 +294,64 @@ enum TrafficGraphBuilder {
         return candidate.path < current.path
     }
 
+    private static func relationshipFilter(_ relationship: Relationship,
+                                           members: [TrafficGraphMember]) -> TrafficFilter {
+        if members.count == 1 { return members[0].filter }
+        if !relationship.destination.domain.isEmpty {
+            return TrafficFilter(bundleID: relationship.app.bundleID,
+                                 domainSuffix: relationship.destination.domain)
+        }
+        return TrafficFilter(bundleID: relationship.app.bundleID,
+                             remoteIP: relationship.destination.remoteIP)
+    }
+
+    private static func destinationFilter(_ destination: DestinationIdentity) -> TrafficFilter {
+        if !destination.domain.isEmpty { return TrafficFilter(domainSuffix: destination.domain) }
+        return TrafficFilter(remoteIP: destination.remoteIP)
+    }
+
+    private static func makeMembers<S: Sequence>(_ values: S) -> [TrafficGraphMember]
+    where S.Element == MemberValue {
+        values.map { value in
+            let destination = DestinationIdentity(domain: value.identity.domain, remoteIP: value.identity.remoteIP,
+                                                  owner: value.owner, asn: value.asn)
+            return TrafficGraphMember(
+                id: component(value.identity.app.bundleID) + component(value.identity.domain)
+                    + component(value.identity.remoteIP) + component(value.identity.protocols)
+                    + component(value.identity.channel.rawValue),
+                title: destinationTitle(destination), detail: destinationDetail(destination, memberCount: 1),
+                filter: TrafficFilter(bundleID: value.identity.app.bundleID,
+                                      domain: value.identity.domain.isEmpty ? nil : value.identity.domain,
+                                      remoteIP: value.identity.remoteIP.isEmpty ? nil : value.identity.remoteIP,
+                                      appProtocol: value.identity.protocols.isEmpty ? nil : value.identity.protocols,
+                                      channel: value.identity.channel),
+                counters: value.counters, protocols: value.identity.protocols, channel: value.identity.channel
+            )
+        }.sorted { $0.id < $1.id }
+    }
+
+    private static func mergedMembers(_ members: [TrafficGraphMember]) -> [TrafficGraphMember] {
+        Dictionary(grouping: members, by: \.id).values.map { duplicates in
+            var member = duplicates[0]
+            member.counters = duplicates.dropFirst().reduce(member.counters) { counters, duplicate in
+                var result = counters
+                result += duplicate.counters
+                return result
+            }
+            return member
+        }.sorted { $0.id < $1.id }
+    }
+
     private static func destinationTitle(_ destination: DestinationIdentity) -> String {
         if !destination.domain.isEmpty { return destination.domain }
         if !destination.owner.isEmpty { return destination.owner }
         return destination.remoteIP.isEmpty ? L("Unknown destination") : destination.remoteIP
     }
 
-    private static func destinationDetail(_ destination: DestinationIdentity) -> String {
-        if !destination.domain.isEmpty { return destination.remoteIP }
+    private static func destinationDetail(_ destination: DestinationIdentity, memberCount: Int) -> String {
+        if !destination.domain.isEmpty {
+            return memberCount > 1 ? L("%lld exact destinations", Int64(memberCount)) : destination.remoteIP
+        }
         if !destination.owner.isEmpty, destination.asn > 0 { return "AS\(destination.asn) · \(destination.remoteIP)" }
         return ""
     }

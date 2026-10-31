@@ -1812,3 +1812,17 @@
 "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "저장된 프로세스 계보는 이 도구가 에이전트를 위해 작동함을 입증합니다. 도구 호출을 입증하지는 않습니다.";
 "Block…" = "차단…";
 "Direction and evidence" = "방향 및 증거";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "트래픽 관계 지도";
+"Drag to pan, pinch to zoom, or use the map controls." = "드래그하여 이동하고, 핀치하여 확대/축소하거나 지도 컨트롤을 사용하세요.";
+"Zoom in" = "확대";
+"Zoom out" = "축소";
+"Fit" = "맞춤";
+"Fit the map in the window" = "창에 지도 맞추기";
+"Reset" = "재설정";
+"Reset zoom and position" = "확대/축소 및 위치 재설정";
+"Select to inspect this connection" = "선택하여 이 연결 조사";
+"%lld exact destinations" = "정확한 대상 %lld개";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@에서 %@, 수신 %@, 송신 %@, 연결 %lld개";
+"Show domain family in Reports" = "보고서에서 도메인 계열 보기";

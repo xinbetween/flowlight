@@ -51,6 +51,14 @@ nav: home
 
   <section class="shot" aria-label="スクリーンショット">
     <div class="wrap">
+      <div class="frame"><img src="{{root}}assets/screenshots/visualize.png" width="1600" height="994"
+        alt="Flowlight の AI アクティビティマップ。左のエージェントカードから、関連付けられたツールと MCP サービスを経て、右のドメインファミリーと LLM サービスへつながります。帯の幅は通信量、破線はプロセス系統を示します。"></div>
+      <p class="caption">トラフィックを Sankey マップで可視化。エージェントと関連付けられたツールからドメインファミリーや LLM サービスへ流れ、帯の幅で通信量を示します。正確な接続先は 1 クリックで確認できます。デモデータで表示しています。</p>
+    </div>
+  </section>
+
+  <section class="shot" aria-label="スクリーンショット">
+    <div class="wrap">
       <div class="frame"><img src="{{root}}assets/screenshots/agents.png" width="1600" height="1075"
         alt="Flowlight の AI エージェントビュー。Claude Code、Cursor、Codex、Python スクリプトが、利用している AI プロバイダ、ほかへ送ったトラフィック、SMTP・SSH・FTP・大量送信・生 IP のリスクバッジとともに並んでいます。"></div>
       <p class="caption">AI エージェントビュー。各エージェントのモデルプロバイダと、それ以外に通信した相手のすべて。デモデータで表示しています。</p>
@@ -83,7 +91,7 @@ nav: home
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">アプリの中身</p>
-        <h2>8 つのビュー、それぞれ 1 つの問い</h2>
+        <h2>9 つのビュー、それぞれ 1 つの問い</h2>
       </div>
       <div class="views">
         <div class="view-card"><span class="glyph live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
@@ -102,6 +110,8 @@ nav: home
           <h3>デバイス</h3><p>Bluetooth、USB、カメラ。何がペアリング、接続、使用中で、いつ変わったか。自分でオンにするまではオフです。</p><span class="keys">⌘8</span></div>
         <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
           <h3>インスペクト</h3><p>任意。エージェントは実際に何を送り、どのツール呼び出しが原因だった？復号したリクエスト、ツール呼び出し、結果。</p><span class="keys">⌘7</span></div>
+        <div class="view-card"><span class="glyph visualize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6c5 0 6-1 10-1M7 7c5 1 6 9 10 11"/></svg></span>
+          <h3>可視化</h3><p>何が通信している？アプリのトラフィックと確認済み AI エージェント経路を、ズームできる Sankey マップと同じ内容のリストで表示します。</p></div>
       </div>
     </div>
   </section>

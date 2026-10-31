@@ -1812,3 +1812,17 @@
 "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "儲存的程序譜系證明此工具為該代理程式工作，但不能證明工具已被呼叫。";
 "Block…" = "封鎖…";
 "Direction and evidence" = "方向和證據";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "流量關係圖";
+"Drag to pan, pinch to zoom, or use the map controls." = "拖移以平移，雙指開合以縮放，或使用地圖控制按鈕。";
+"Zoom in" = "放大";
+"Zoom out" = "縮小";
+"Fit" = "符合視窗";
+"Fit the map in the window" = "使地圖符合視窗";
+"Reset" = "重設";
+"Reset zoom and position" = "重設縮放和位置";
+"Select to inspect this connection" = "選取以檢查此連線";
+"%lld exact destinations" = "%lld 個精確目的地";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@ 到 %@，接收 %@，傳送 %@，%lld 個連線";
+"Show domain family in Reports" = "在報告中顯示網域族";

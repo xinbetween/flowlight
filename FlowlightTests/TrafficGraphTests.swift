@@ -16,6 +16,7 @@ final class TrafficGraphTests: XCTestCase {
         parent: String = "",
         parentName: String = "",
         mcp: String = "",
+        protocol appProtocol: String = "https",
         channel: NetworkChannel = .ip
     ) -> BreakdownRow {
         BreakdownRow(
@@ -25,7 +26,7 @@ final class TrafficGraphTests: XCTestCase {
             domain: domain,
             remoteIP: ip,
             ports: "",
-            protocols: "https",
+            protocols: appProtocol,
             counters: FlowCounters(bytesIn: bytesIn, bytesOut: bytesOut, flows: flows),
             owner: owner,
             parentAgent: parent,
@@ -164,7 +165,22 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(edge.members.count, 2)
         XCTAssertEqual(Set(edge.members.compactMap(\.filter.domain)), ["api.anthropic.com", "console.anthropic.com"])
         XCTAssertEqual(Set(edge.members.compactMap(\.filter.remoteIP)), ["160.79.104.10", "160.79.104.11"])
+        XCTAssertEqual(Set(edge.members.map(\.detail)), ["160.79.104.10", "160.79.104.11"])
         XCTAssertTrue(edge.members.allSatisfy { $0.filter.bundleID == "claude" })
+    }
+
+    func testAIOrdinaryDestinationsGroupByRegistrableDomainAndKeepExactMembers() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "claude", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 40),
+            row(app: "claude", name: "claude", domain: "deep.api.example.com", ip: "203.0.113.9", bytesOut: 60)
+        ], limits: .unbounded)
+
+        let destination = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .destination })
+        XCTAssertEqual(destination.title, "example.com")
+        XCTAssertEqual(destination.filter.domainSuffix, "example.com")
+        XCTAssertEqual(Set(destination.members.compactMap(\.filter.domain)),
+                       ["api.example.com", "deep.api.example.com"])
+        XCTAssertEqual(snapshot.edges.first { $0.relationship == .observed }?.members.count, 2)
     }
 
     func testAISingleMemberProviderUsesItsExactFilter() {
@@ -203,8 +219,12 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(destination.members.count, 2)
         XCTAssertNil(destination.filter.bundleID,
                      "a shared destination node must cover every visible source")
-        XCTAssertEqual(destination.filter.domain, "shared.example")
-        XCTAssertEqual(destination.filter.remoteIP, "203.0.113.42")
+        XCTAssertEqual(destination.filter.domainSuffix, "shared.example")
+        XCTAssertNil(destination.filter.domain)
+        XCTAssertNil(destination.filter.remoteIP)
+        XCTAssertTrue(destination.members.allSatisfy {
+            $0.filter.domain == "shared.example" && $0.filter.remoteIP == "203.0.113.42"
+        })
     }
 
     func testAIBoundedNodeValuesMatchVisibleRelationships() {
@@ -291,20 +311,71 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.total, FlowCounters(bytesIn: 1_000, bytesOut: 140, flows: 3))
     }
 
-    func testDestinationIdentityPreservesExactHostAndAddress() {
+    func testDestinationGroupsSubdomainsAndPreservesExactMembers() {
         let rows = [
             row(app: "a", domain: "api.example.com", ip: "203.0.113.8", bytesIn: 10),
-            row(app: "a", domain: "api.example.com", ip: "203.0.113.9", bytesIn: 20),
-            row(app: "a", domain: "cdn.example.com", ip: "203.0.113.8", bytesIn: 30)
+            row(app: "a", domain: "deep.api.example.com", ip: "203.0.113.9", bytesIn: 20),
+            row(app: "a", domain: "cdn.example.com", ip: "203.0.113.10", bytesIn: 30),
+            row(app: "a", domain: "api.example.co.uk", ip: "203.0.113.11", bytesIn: 40)
         ]
 
         let snapshot = TrafficGraphBuilder.build(rows: rows, limits: .unbounded)
         let destinations = snapshot.nodes.filter { $0.kind == .destination }
 
-        XCTAssertEqual(destinations.count, 3)
-        XCTAssertEqual(Set(destinations.map(\.filter.domain)), ["api.example.com", "cdn.example.com"])
-        XCTAssertEqual(Set(destinations.map(\.filter.remoteIP)), ["203.0.113.8", "203.0.113.9"])
-        XCTAssertEqual(Set(snapshot.edges.map(\.id.rawValue)).count, 3)
+        XCTAssertEqual(destinations.count, 2)
+        let example = try! XCTUnwrap(destinations.first { $0.title == "example.com" })
+        XCTAssertEqual(example.filter.domainSuffix, "example.com")
+        XCTAssertNil(example.filter.domain)
+        XCTAssertEqual(example.counters.bytesIn, 60)
+        XCTAssertEqual(Set(example.members.map(\.filter.domain)),
+                       ["api.example.com", "deep.api.example.com", "cdn.example.com"])
+        XCTAssertEqual(Set(example.members.compactMap(\.filter.remoteIP)),
+                       ["203.0.113.8", "203.0.113.9", "203.0.113.10"])
+        XCTAssertEqual(destinations.first { $0.title == "example.co.uk" }?.filter.domainSuffix, "example.co.uk")
+        XCTAssertEqual(snapshot.edges.count, 2)
+        XCTAssertEqual(snapshot.edges.first { $0.target == example.id }?.members.count, 3)
+    }
+
+    func testHostedTenantsRemainSeparateDomainFamilies() {
+        for hosts in [
+            ["alice.github.io", "bob.github.io"],
+            ["alice.appspot.com", "bob.appspot.com"]
+        ] {
+            let snapshot = TrafficGraphBuilder.build(rows: [
+                row(app: "a", domain: hosts[0], ip: "203.0.113.8", bytesIn: 10),
+                row(app: "a", domain: hosts[1], ip: "203.0.113.9", bytesIn: 20)
+            ], limits: .unbounded)
+            let destinations = snapshot.nodes.filter { $0.kind == .destination }
+
+            XCTAssertEqual(Set(destinations.map(\.title)), Set(hosts))
+            XCTAssertEqual(Set(destinations.compactMap(\.filter.domainSuffix)), Set(hosts))
+            XCTAssertEqual(snapshot.edges.count, 2)
+        }
+    }
+
+    func testExactMembersPreserveProtocolAndChannelScope() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "a", domain: "api.example.com", ip: "203.0.113.8", bytesIn: 10,
+                protocol: "https", channel: .ip),
+            row(app: "a", domain: "api.example.com", ip: "203.0.113.8", bytesIn: 20,
+                protocol: "quic", channel: .tunnel)
+        ], limits: .unbounded)
+        let members = try! XCTUnwrap(snapshot.edges.first).members
+
+        XCTAssertEqual(members.count, 2)
+        XCTAssertEqual(Set(members.compactMap(\.filter.appProtocol)), ["https", "quic"])
+        XCTAssertEqual(Set(members.compactMap(\.filter.channel)), [.ip, .tunnel])
+    }
+
+    func testHostnameLessDestinationsRemainExactByAddress() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "a", domain: "", ip: "203.0.113.8", owner: "Example Network", bytesIn: 10),
+            row(app: "a", domain: "", ip: "203.0.113.9", owner: "Example Network", bytesIn: 20)
+        ], limits: .unbounded)
+
+        let destinations = snapshot.nodes.filter { $0.kind == .destination }
+        XCTAssertEqual(destinations.count, 2)
+        XCTAssertEqual(Set(destinations.compactMap(\.filter.remoteIP)), ["203.0.113.8", "203.0.113.9"])
     }
 
     func testAppIdentityUsesBundleIDRatherThanChangingDisplayMetadata() {
@@ -454,10 +525,32 @@ final class TrafficGraphTests: XCTestCase {
     func testEdgeWidthIsBoundedAndMonotonic() {
         let totals: [Int64] = [0, 1_000, 1_000_000, 1_000_000_000]
         let widths = totals.map { TrafficGraphLayout.edgeWidth(bytes: $0, maximum: totals.last!) }
+        let trafficWidths = totals.map { TrafficGraphLayout.trafficWidth(bytes: $0, maximum: totals.last!) }
 
         XCTAssertEqual(widths, widths.sorted())
         XCTAssertGreaterThanOrEqual(widths.first!, 1.5)
         XCTAssertLessThanOrEqual(widths.last!, 9)
+        XCTAssertEqual(trafficWidths, trafficWidths.sorted())
+        XCTAssertEqual(trafficWidths.first!, 0)
+        XCTAssertLessThanOrEqual(trafficWidths.last!, 3.25)
+        XCTAssertGreaterThan(trafficWidths[2], trafficWidths[1])
+    }
+
+    func testEdgeHitTestingCoversLongCurvesAtMaximumZoom() {
+        let edgeID = TrafficGraphEdgeID(rawValue: "long")
+        let curve = TrafficGraphCurve(
+            start: CGPoint(x: 0, y: 0),
+            control1: CGPoint(x: 1_600, y: 0),
+            control2: CGPoint(x: 2_400, y: 1_200),
+            end: CGPoint(x: 4_000, y: 1_200)
+        )
+        let layout = TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [edgeID: curve],
+                                                edgeWidths: [edgeID: 3])
+
+        for step in 0...200 {
+            let point = curve.point(at: CGFloat(step) / 200)
+            XCTAssertEqual(layout.edge(at: point, tolerance: 12 / TrafficGraphViewport.maximumScale), edgeID)
+        }
     }
 
     func testEdgeHitTestingUsesTheStableCurveGeometry() {
@@ -484,5 +577,217 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(first, second)
         XCTAssertFalse(first.isEmpty)
         XCTAssertTrue(layout.particles(for: edge, at: 123.45, reduceMotion: true).isEmpty)
+    }
+
+    func testLayoutPreservesSurvivingNodeFramesWhenTopologyChanges() {
+        let initial = TrafficGraphBuilder.build(rows: [
+            row(app: "app.a", domain: "one.example", ip: "203.0.113.1", bytesIn: 100),
+            row(app: "app.b", domain: "two.example", ip: "203.0.113.2", bytesIn: 100)
+        ], limits: .unbounded)
+        let expanded = TrafficGraphBuilder.build(rows: [
+            row(app: "app.a", domain: "one.example", ip: "203.0.113.1", bytesIn: 100),
+            row(app: "app.b", domain: "two.example", ip: "203.0.113.2", bytesIn: 100),
+            row(app: "app.c", domain: "three.example", ip: "203.0.113.3", bytesIn: 100)
+        ], limits: .unbounded)
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 760)
+        let first = TrafficGraphLayout.layout(snapshot: initial, in: bounds)
+        let second = TrafficGraphLayout.layout(snapshot: expanded, in: bounds, preserving: first)
+
+        for node in initial.nodes {
+            XCTAssertEqual(second.nodeFrames[node.id], first.nodeFrames[node.id],
+                           "adding unrelated topology must not shuffle surviving cards")
+        }
+    }
+
+    func testResizeMovesSurvivingNodesToNewSemanticColumns() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 10,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+        let wide = TrafficGraphLayout.layout(snapshot: snapshot,
+                                             in: CGRect(x: 0, y: 0, width: 1_400, height: 760))
+        let narrow = TrafficGraphLayout.layout(snapshot: snapshot,
+                                               in: CGRect(x: 0, y: 0, width: 900, height: 760), preserving: wide)
+
+        for node in snapshot.nodes {
+            let wideFrame = try! XCTUnwrap(wide.nodeFrames[node.id])
+            let narrowFrame = try! XCTUnwrap(narrow.nodeFrames[node.id])
+            XCTAssertEqual(narrowFrame.midY, wideFrame.midY, accuracy: 0.001)
+            switch node.kind {
+            case .app, .agent:
+                XCTAssertEqual(narrowFrame.midX, 24 + TrafficGraphLayout.appSize.width / 2, accuracy: 0.001)
+            case .tool, .mcp:
+                XCTAssertEqual(narrowFrame.midX, 450, accuracy: 0.001)
+                XCTAssertNotEqual(narrowFrame.midX, wideFrame.midX)
+            case .destination, .service:
+                XCTAssertEqual(narrowFrame.midX, 900 - 24 - TrafficGraphLayout.destinationSize.width / 2,
+                               accuracy: 0.001)
+                XCTAssertNotEqual(narrowFrame.midX, wideFrame.midX)
+            }
+        }
+        let orderedX = snapshot.nodes.compactMap { narrow.nodeFrames[$0.id]?.midX }.sorted()
+        XCTAssertEqual(Set(orderedX).count, 3)
+    }
+
+    func testRoutesDoNotCrossUnrelatedNodeFrames() {
+        let rows = (0..<6).flatMap { app in
+            (0..<6).map { destination in
+                row(app: "app.\(app)", domain: "host\(destination).example",
+                    ip: "203.0.113.\(destination)", bytesIn: 100)
+            }
+        }
+        let snapshot = TrafficGraphBuilder.build(rows: rows, limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_200, height: 760))
+
+        for edge in snapshot.edges {
+            let curve = try! XCTUnwrap(layout.edgeCurves[edge.id])
+            let obstacles = layout.nodeFrames.filter { id, _ in id != edge.source && id != edge.target }
+            for step in 1..<100 {
+                let point = curve.point(at: CGFloat(step) / 100)
+                XCTAssertFalse(obstacles.values.contains { $0.insetBy(dx: -5, dy: -5).contains(point) },
+                               "route \(edge.id.rawValue) enters an unrelated card near \(point)")
+            }
+        }
+    }
+
+    func testDirectAIRibbonAvoidsIntermediaryCards() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "160.79.104.10",
+                bytesOut: 100),
+            row(app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 50,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 600))
+        let direct = try! XCTUnwrap(snapshot.edges.first { edge in
+            edge.relationship == .observed
+                && snapshot.nodes.first { $0.id == edge.source }?.kind == .agent
+        })
+        let curve = try! XCTUnwrap(layout.edgeCurves[direct.id])
+        let intermediaries = snapshot.nodes.filter { $0.kind == .tool || $0.kind == .mcp }
+            .compactMap { layout.nodeFrames[$0.id] }
+
+        for step in 1..<100 {
+            let point = curve.point(at: CGFloat(step) / 100)
+            XCTAssertFalse(intermediaries.contains { $0.insetBy(dx: -5, dy: -5).contains(point) })
+        }
+    }
+
+    func testSankeyRibbonsStayInsideNodePortsAndScaleWithTraffic() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "app.a", domain: "api.example.com", ip: "203.0.113.1", bytesIn: 100),
+            row(app: "app.a", domain: "other.test", ip: "203.0.113.2", bytesIn: 10_000),
+            row(app: "app.b", domain: "cdn.example.com", ip: "203.0.113.3", bytesIn: 1_000_000)
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 600))
+        let observed = snapshot.edges.sorted { $0.counters.total < $1.counters.total }
+        let widths = observed.compactMap { layout.edgeWidths[$0.id] }
+
+        XCTAssertEqual(widths, widths.sorted())
+        XCTAssertGreaterThan(widths.first ?? 0, 0)
+        XCTAssertLessThanOrEqual(widths.last ?? 0, 24)
+        for edge in observed {
+            let curve = try! XCTUnwrap(layout.edgeCurves[edge.id])
+            let width = try! XCTUnwrap(layout.edgeWidths[edge.id])
+            let source = try! XCTUnwrap(layout.nodeFrames[edge.source])
+            let target = try! XCTUnwrap(layout.nodeFrames[edge.target])
+            XCTAssertTrue(source.insetBy(dx: 0, dy: -width / 2).contains(curve.start))
+            XCTAssertTrue(target.insetBy(dx: 0, dy: -width / 2).contains(curve.end))
+        }
+    }
+
+    func testSankeyOrdersPortsByOppositeLaneAndKeepsLineageSeparate() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "Node", domain: "z.test", ip: "203.0.113.1", bytesOut: 1_000,
+                parent: "claude", parentName: "Claude Code"),
+            row(app: "node", name: "Node", domain: "a.test", ip: "203.0.113.2", bytesOut: 2_000,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 600))
+        let observed = snapshot.edges.filter { $0.relationship == .observed }
+            .sorted { left, right in
+                let leftTarget = layout.nodeFrames[left.target]?.midY ?? 0
+                let rightTarget = layout.nodeFrames[right.target]?.midY ?? 0
+                return leftTarget < rightTarget
+            }
+        let sourcePorts = observed.compactMap { layout.edgeCurves[$0.id]?.start.y }
+
+        XCTAssertEqual(sourcePorts, sourcePorts.sorted())
+        XCTAssertTrue(observed.allSatisfy { (layout.edgeWidths[$0.id] ?? 0) > 1.5 })
+        for edge in snapshot.edges where edge.relationship == .worksFor {
+            XCTAssertEqual(layout.edgeWidths[edge.id], 1.5)
+        }
+    }
+
+    func testRepresentativeParticleMovesCalmly() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "a", domain: "example.com", ip: "203.0.113.8", bytesOut: 1_000_000)
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 500))
+        let edge = snapshot.edges[0]
+        let first = try! XCTUnwrap(layout.particles(for: edge, at: 120, reduceMotion: false).first)
+        let second = try! XCTUnwrap(layout.particles(for: edge, at: 121, reduceMotion: false).first)
+
+        XCTAssertLessThan(hypot(first.position.x - second.position.x, first.position.y - second.position.y), 55,
+                          "one second should communicate activity without racing across the map")
+    }
+
+    func testViewportClampsScaleAndRoundTripsCoordinates() {
+        var viewport = TrafficGraphViewport()
+        viewport.zoom(by: 20, around: CGPoint(x: 420, y: 260))
+        XCTAssertEqual(viewport.scale, TrafficGraphViewport.maximumScale)
+        viewport.pan(by: CGSize(width: 73, height: -41))
+
+        let graphPoint = CGPoint(x: 310, y: 155)
+        let screenPoint = viewport.screenPoint(for: graphPoint)
+        let restored = viewport.graphPoint(for: screenPoint)
+        XCTAssertEqual(restored.x, graphPoint.x, accuracy: 0.001)
+        XCTAssertEqual(restored.y, graphPoint.y, accuracy: 0.001)
+
+        viewport.zoom(by: 0.001, around: CGPoint(x: 300, y: 200))
+        XCTAssertEqual(viewport.scale, TrafficGraphViewport.minimumScale)
+    }
+
+    func testViewportFitCanScaleBelowInteractiveZoomFloor() {
+        let content = CGRect(x: 24, y: 22, width: 852, height: 716)
+        let bounds = CGRect(x: 0, y: 0, width: 560, height: 350)
+        var viewport = TrafficGraphViewport()
+
+        viewport.fit(content: content, in: bounds)
+
+        XCTAssertLessThan(viewport.scale, TrafficGraphViewport.minimumScale)
+        let fitScale = viewport.scale
+        viewport.zoom(by: 1 / 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY))
+        XCTAssertEqual(viewport.scale, fitScale, accuracy: 0.001)
+        viewport.zoom(by: 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY))
+        XCTAssertGreaterThan(viewport.scale, fitScale)
+        viewport.fit(content: content, in: bounds)
+        let topLeft = viewport.screenPoint(for: content.origin)
+        let bottomRight = viewport.screenPoint(for: CGPoint(x: content.maxX, y: content.maxY))
+        XCTAssertGreaterThanOrEqual(topLeft.x, bounds.minX + 31.9)
+        XCTAssertGreaterThanOrEqual(topLeft.y, bounds.minY + 31.9)
+        XCTAssertLessThanOrEqual(bottomRight.x, bounds.maxX - 31.9)
+        XCTAssertLessThanOrEqual(bottomRight.y, bounds.maxY - 31.9)
+    }
+
+    func testViewportFitCentersTheWholeGraphByDefault() {
+        let content = CGRect(x: 80, y: 60, width: 900, height: 700)
+        let bounds = CGRect(x: 0, y: 0, width: 720, height: 520)
+        var viewport = TrafficGraphViewport(scale: 1.8, offset: CGSize(width: 90, height: -30))
+
+        viewport.fit(content: content, in: bounds)
+
+        let topLeft = viewport.screenPoint(for: content.origin)
+        let bottomRight = viewport.screenPoint(for: CGPoint(x: content.maxX, y: content.maxY))
+        XCTAssertGreaterThanOrEqual(topLeft.x, bounds.minX + 31.9)
+        XCTAssertGreaterThanOrEqual(topLeft.y, bounds.minY + 31.9)
+        XCTAssertLessThanOrEqual(bottomRight.x, bounds.maxX - 31.9)
+        XCTAssertLessThanOrEqual(bottomRight.y, bounds.maxY - 31.9)
+        XCTAssertEqual((topLeft.x + bottomRight.x) / 2, bounds.midX, accuracy: 0.001)
+        XCTAssertEqual((topLeft.y + bottomRight.y) / 2, bounds.midY, accuracy: 0.001)
     }
 }

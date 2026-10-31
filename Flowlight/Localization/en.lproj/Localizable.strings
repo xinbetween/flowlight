@@ -1812,3 +1812,17 @@
 "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation.";
 "Block…" = "Block…";
 "Direction and evidence" = "Direction and evidence";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "Traffic relationship map";
+"Drag to pan, pinch to zoom, or use the map controls." = "Drag to pan, pinch to zoom, or use the map controls.";
+"Zoom in" = "Zoom in";
+"Zoom out" = "Zoom out";
+"Fit" = "Fit";
+"Fit the map in the window" = "Fit the map in the window";
+"Reset" = "Reset";
+"Reset zoom and position" = "Reset zoom and position";
+"Select to inspect this connection" = "Select to inspect this connection";
+"%lld exact destinations" = "%lld exact destinations";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@ to %@, received %@, sent %@, %lld connections";
+"Show domain family in Reports" = "Show domain family in Reports";

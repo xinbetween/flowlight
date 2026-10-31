@@ -134,11 +134,14 @@ enum AITrafficGraphBuilder {
                 }
 
                 let provider = AgentCatalog.provider(domain: row.domain, owner: row.owner) ?? ""
-                let destination = DestinationIdentity(provider: provider,
-                                                      domain: provider.isEmpty ? row.domain : "",
-                                                      remoteIP: provider.isEmpty ? row.remoteIP : "",
-                                                      owner: provider.isEmpty ? row.owner : "",
-                                                      asn: provider.isEmpty ? row.asn : 0)
+                let groupedDomain = row.domain.isEmpty ? "" : VisualizationDomainFamily.group(row.domain)
+                let destination = DestinationIdentity(
+                    provider: provider,
+                    domain: provider.isEmpty ? groupedDomain : "",
+                    remoteIP: provider.isEmpty && groupedDomain.isEmpty ? row.remoteIP : "",
+                    owner: provider.isEmpty && groupedDomain.isEmpty ? row.owner : "",
+                    asn: provider.isEmpty && groupedDomain.isEmpty ? row.asn : 0
+                )
                 let relationship = ObservedRelationship(source: sourceID, destination: destination)
                 observedCounters[relationship, default: FlowCounters()] += row.counters
                 let memberIdentity = ExactMemberIdentity(source: sourceID, bundleID: row.bundleID,
@@ -330,10 +333,11 @@ enum AITrafficGraphBuilder {
 
     private static func destinationFilter(_ destination: DestinationIdentity,
                                           members: [TrafficGraphMember]) -> TrafficFilter {
-        if members.count == 1 { return members[0].filter }
-        guard !destination.isProvider else { return .none }
-        return TrafficFilter(domain: destination.domain.isEmpty ? nil : destination.domain,
-                             remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP)
+        guard !destination.isProvider else {
+            return members.count == 1 ? members[0].filter : .none
+        }
+        if !destination.domain.isEmpty { return TrafficFilter(domainSuffix: destination.domain) }
+        return TrafficFilter(remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP)
     }
 
     private static func makeMembers<S: Sequence>(_ values: S) -> [TrafficGraphMember]
@@ -352,6 +356,7 @@ enum AITrafficGraphBuilder {
                                       agentParent: value.identity.agentParent.isEmpty ? nil : value.identity.agentParent,
                                       mcpServer: value.identity.mcpServer.isEmpty ? nil : value.identity.mcpServer,
                                       domain: value.identity.domain, remoteIP: value.identity.remoteIP,
+                                      appProtocol: value.identity.protocols.isEmpty ? nil : value.identity.protocols,
                                       channel: value.identity.channel),
                 counters: value.counters, protocols: value.identity.protocols, channel: value.identity.channel
             )

@@ -1813,3 +1813,17 @@
 "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "保存されたプロセス系統は、このツールがエージェントのために動作することを示します。ツールの呼び出しを示すものではありません。";
 "Block…" = "ブロック…";
 "Direction and evidence" = "方向と証拠";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "トラフィック関係マップ";
+"Drag to pan, pinch to zoom, or use the map controls." = "ドラッグで移動、ピンチで拡大縮小、またはマップ操作を使用します。";
+"Zoom in" = "拡大";
+"Zoom out" = "縮小";
+"Fit" = "全体表示";
+"Fit the map in the window" = "マップ全体をウインドウに表示";
+"Reset" = "リセット";
+"Reset zoom and position" = "拡大率と位置をリセット";
+"Select to inspect this connection" = "選択してこの接続を調べる";
+"%lld exact destinations" = "%lld件の正確な宛先";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@から%@、受信%@、送信%@、%lld件の接続";
+"Show domain family in Reports" = "ドメインファミリーをレポートに表示";
