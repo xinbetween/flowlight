@@ -185,6 +185,44 @@ final class AskTests: XCTestCase {
         XCTAssertTrue(result.json.contains("Claude Code"), "corrected epoch-1 child attribution remains visible")
     }
 
+    func testAgentsFallBackWhenCoarseTrafficContainsNoAgentEvidence() throws {
+        let url = try makePreviouslyPromotedKey4Database(named: "ask-agent-tier-fallback")
+        let coarse = try SQLiteConnection(path: url.path)
+        try coarse.execute("""
+            DELETE FROM agg_1h;
+            INSERT INTO agg_1h (
+                ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol,
+                bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel,
+                attribution_exact
+            ) VALUES (
+                1699999200, 10, 'python', 'python', '/usr/bin/python', '203.0.113.10', 'api.openai.com', 443,
+                'tcp', 'https', 0, 7, 1, '', '', '', '', 0
+            );
+            """)
+        db = try TrafficDatabase(url: url)
+        try db.setRollupWatermarks(1_700_000_040)
+        var recent = key("node", "api.github.com")
+        recent.parentAgent = "claude"
+        recent.parentAgentName = "Claude Code"
+        recent.mcpServer = "github"
+        try db.insert([TrafficBatch(timestamp: 1_700_000_060, records: [
+            TrafficRecord(key: recent, counters: FlowCounters(bytesOut: 5, flows: 1))
+        ])])
+        let iso = ISO8601DateFormatter()
+        let from = iso.string(from: Date(timeIntervalSince1970: 1_699_999_000))
+        let to = iso.string(from: Date(timeIntervalSince1970: 1_700_025_000))
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .agents, arguments: ["from": from, "to": to]),
+            db: db
+        )
+
+        XCTAssertTrue(result.json.contains("python"), "the completed hourly prefix remains in the answer")
+        XCTAssertTrue(result.json.contains("Claude Code"),
+                      "an older coarse agent must not hide a different agent in the recent minute tail")
+        XCTAssertFalse(result.json.contains("Fabricated Parent"))
+    }
+
     func testTopDestinationsNamesWhereItWent() throws {
         try seed()
         let result = try AskQueryRunner.run(AskCall(query: .topDestinations, arguments: ["from": window.from, "to": window.to]), db: db)

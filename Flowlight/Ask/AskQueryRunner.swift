@@ -256,7 +256,8 @@ enum AskQueryRunner {
         for row in rows {
             let key = row.parentAgent.isEmpty ? row.bundleID : row.parentAgent
             let name = row.parentAgentName.isEmpty ? row.appName : row.parentAgentName
-            let isAgent = !row.parentAgent.isEmpty || AgentCatalog.knownAgent(bundleID: row.bundleID, appName: row.appName) != nil
+            let isAgent = !row.parentAgent.isEmpty
+                || AgentCatalog.knownAgent(bundleID: row.bundleID, appName: row.appName) != nil
                 || AgentCatalog.provider(domain: row.domain) != nil
             guard isAgent else { continue }
             var entry = byAgent[key] ?? (name, [], [], FlowCounters())
@@ -352,9 +353,20 @@ enum AskQueryRunner {
 
     private static func agentRows(db: TrafficDatabase, window: (from: Date, to: Date),
                                   grain: Granularity) throws -> [BreakdownRow] {
-        try rows(window: window, grain: grain) { tier in
-            try AgentsModel.rows(from: db, granularity: tier, from: window.from, to: window.to, focus: .none)
+        var rows: [BreakdownRow] = []
+        var from = window.from
+        var tier = grain
+        while from < window.to {
+            let watermark = try db.rollupWatermark(for: tier)
+            let to = tier == .second ? window.to : min(watermark ?? from, window.to)
+            if from < to {
+                rows += try AgentsModel.rows(from: db, granularity: tier, from: from, to: to, focus: .none)
+                from = to
+            }
+            guard from < window.to, let finer = finer(than: tier) else { break }
+            tier = finer
         }
+        return rows
     }
 
     private static func rows(window: (from: Date, to: Date), grain: Granularity,

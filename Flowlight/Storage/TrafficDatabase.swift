@@ -678,6 +678,18 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.query("SELECT watermark FROM rollup_state WHERE tier = ?", [.text(tier)]) { $0.int(0) }.first ?? 0
     }
 
+    func rollupWatermark(for granularity: Granularity) throws -> Date? {
+        let tier: String
+        switch granularity {
+        case .second: return nil
+        case .minute: tier = "1m"
+        case .hour: tier = "1h"
+        case .day, .week, .month, .year: tier = "1d"
+        }
+        let timestamp = try watermark(tier)
+        return timestamp > 0 ? Date(timeIntervalSince1970: TimeInterval(timestamp)) : nil
+    }
+
     private func setWatermark(_ tier: String, _ value: Int64) throws {
         try conn.run("INSERT INTO rollup_state (tier, watermark) VALUES (?, ?) ON CONFLICT(tier) DO UPDATE SET watermark = excluded.watermark",
                      [.text(tier), .int(value)])
