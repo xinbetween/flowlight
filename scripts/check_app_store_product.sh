@@ -1,13 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-app=${1:?usage: check_app_store_product.sh /path/to/Flowlight.app}
 repo=$(cd "$(dirname "$0")/.." && pwd)
-contents="$app/Contents"
-extension="$contents/PlugIns/com.flowlight.app.filter.appex"
-app_binary="$contents/MacOS/Flowlight"
-extension_binary="$extension/Contents/MacOS/com.flowlight.app.filter"
-extension_info="$extension/Contents/Info.plist"
 temporary=$(mktemp -d "${TMPDIR:-/tmp}/flowlight-store-product.XXXXXX")
 trap 'rm -rf "$temporary"' EXIT
 
@@ -26,6 +20,49 @@ extract_entitlements() {
     fail "cannot read entitlements from signed Store $label"
   plutil -lint "$destination" >/dev/null || fail "Store $label has no readable signed entitlements"
 }
+
+check_forbidden_linkage() {
+  local executable=$1 libraries=$2 symbols=$3
+
+  otool -L "$executable" > "$libraries" || fail "cannot inspect Store app libraries"
+  if grep -q SystemExtensions.framework "$libraries"; then
+    fail "links SystemExtensions.framework"
+  fi
+
+  nm -u "$executable" > "$symbols" || fail "cannot inspect Store app symbols"
+  if grep -q OSSystemExtension "$symbols"; then
+    fail "references OSSystemExtension symbols"
+  fi
+}
+
+if [ "${1:-}" = --self-test-forbidden-symbol ]; then
+  fake_tool="$temporary/fake-tool"
+  fake_binary="$temporary/fake-binary"
+  : > "$fake_binary"
+  chmod +x "$fake_binary"
+  cat > "$fake_tool" <<'EOF'
+#!/bin/bash
+if [ "$(basename "$0")" = otool ]; then
+  printf '%s\n' '/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation'
+else
+  printf '%s\n' '_OBJC_CLASS_$_OSSystemExtensionRequest'
+fi
+EOF
+  chmod +x "$fake_tool"
+  mkdir "$temporary/tools"
+  ln -s "$fake_tool" "$temporary/tools/otool"
+  ln -s "$fake_tool" "$temporary/tools/nm"
+  PATH="$temporary/tools:$PATH"
+  check_forbidden_linkage "$fake_binary" "$temporary/self-test-libraries.txt" "$temporary/self-test-symbols.txt"
+  fail "forbidden-linkage self-test was not rejected"
+fi
+
+app=${1:?usage: check_app_store_product.sh /path/to/Flowlight.app}
+contents="$app/Contents"
+extension="$contents/PlugIns/com.flowlight.app.filter.appex"
+app_binary="$contents/MacOS/Flowlight"
+extension_binary="$extension/Contents/MacOS/com.flowlight.app.filter"
+extension_info="$extension/Contents/Info.plist"
 
 [ -x "$app_binary" ] || fail "missing app executable"
 [ -x "$extension_binary" ] || fail "missing embedded content-filter executable"
@@ -79,11 +116,7 @@ app_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$contents/Info.
 extension_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$extension_info")
 [ "$app_build" = "$extension_build" ] || fail "app and extension builds differ"
 
-if otool -L "$app_binary" | grep -q SystemExtensions.framework; then
-  fail "links SystemExtensions.framework"
-fi
-if nm -u "$app_binary" | grep -q OSSystemExtension; then
-  fail "references OSSystemExtension symbols"
-fi
+check_forbidden_linkage "$app_binary" "$temporary/app-libraries.txt" \
+  "$temporary/app-undefined-symbols.txt"
 
 printf 'Mac App Store product is structurally valid: Flowlight %s/%s\n' "$app_version" "$app_build"

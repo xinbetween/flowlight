@@ -1701,6 +1701,23 @@
 "Remove this setting" = "Remove this setting";
 "Add Setting" = "Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ to %@, %lld blocked attempts";
+"A policy stopped this attempt before it became observed traffic." = "A policy stopped this attempt before it became observed traffic.";
+"Blocked" = "Blocked";
+"Blocked attempts" = "Blocked attempts";
+"Capture-time process ancestry proves this application started the agent." = "Capture-time process ancestry proves this application started the agent.";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "Capture-time proxy attribution proves this application's observed traffic used this route.";
+"Inspected request evidence proves this invocation." = "Inspected request evidence proves this invocation.";
+"Observed route" = "Observed route";
+"Relationship evidence" = "Relationship evidence";
+"Routed through" = "Routed through";
+"Started agent" = "Started agent";
+"Managed pack: %@" = "Managed pack: %@";
+"Ordinary rule" = "Ordinary rule";
+"Telemetry" = "Telemetry";
+"Tracking" = "Tracking";
+"Connections / attempts" = "Connections / attempts";
+"Loading visualization…" = "Loading visualization…";
 "%lld medium or high local assessment%@ in this window." = "%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "%lld eligible request%@ did not receive a contextual verdict.";
@@ -1796,7 +1813,7 @@
 "Unknown destination" = "Unknown destination";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "Works for %@";
+"Run by %@" = "Run by %@";
 "MCP service for %@" = "MCP service for %@";
 "LLM service" = "LLM service";
 "AI activity" = "AI activity";
@@ -1807,9 +1824,9 @@
 "No AI activity to visualize" = "No AI activity to visualize";
 "Flowlight has not observed any proved AI agent activity in this period." = "Flowlight has not observed any proved AI agent activity in this period.";
 "Exact destinations" = "Exact destinations";
-"Works for" = "Works for";
+"Runs" = "Runs";
 "Invoked" = "Invoked";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation.";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "Stored process lineage proves this agent runs the tool. It does not prove a tool invocation.";
 "Block…" = "Block…";
 "Direction and evidence" = "Direction and evidence";
 

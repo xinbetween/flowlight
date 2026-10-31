@@ -69,11 +69,16 @@ final class SystemProcessTable: @unchecked Sendable {
 /// Fills in `parentAgent` / `mcpServer` on flow keys before they're stored.
 final class AgentAttributor: @unchecked Sendable {
     static let shared = AgentAttributor()
+    private let processLookup: (Int32) -> ProcessSnapshot?
     private var servers: [MCPServerConfig] = []
     private var loadedAt = Date.distantPast
     private var cache: [Int32: (context: AgentContext?, at: Date)] = [:]
     private let lock = NSLock()
     var enabled = true
+
+    init(processLookup: @escaping (Int32) -> ProcessSnapshot? = SystemProcessTable.shared.snapshot) {
+        self.processLookup = processLookup
+    }
 
     var mcpServers: [MCPServerConfig] {
         lock.lock(); defer { lock.unlock() }
@@ -91,13 +96,24 @@ final class AgentAttributor: @unchecked Sendable {
             var batch = batch
             batch.records = batch.records.map { record in
                 var record = record
-                guard record.key.parentAgent == nil, record.key.pid > 1 else { return record }
+                guard record.key.pid > 1 else { return record }
                 if let context = context(for: record.key, servers: servers) {
-                    record.key.parentAgent = context.agentBundleID
-                    record.key.parentAgentName = context.agentName
-                    record.key.mcpServer = context.mcpServer
-                } else if let remote = AgentLineage.remoteServer(forHost: record.key.domain, servers: servers) {
-                    record.key.mcpServer = remote.name   // the agent talking to a remote MCP server itself
+                    if record.key.parentAgent == nil {
+                        record.key.parentAgent = context.agentBundleID
+                        record.key.parentAgentName = context.agentName
+                        record.key.mcpServer = context.mcpServer
+                    }
+                    if record.key.parentAgent == context.agentBundleID {
+                        applyLauncher(forAgentPID: context.agentPID, to: &record.key)
+                    }
+                } else if record.key.parentAgent == nil {
+                    if let remote = AgentLineage.remoteServer(forHost: record.key.domain, servers: servers) {
+                        record.key.mcpServer = remote.name   // the agent talking to a remote MCP server itself
+                    }
+                    if AgentRegistry.shared.name(bundleID: record.key.bundleID,
+                                                 appName: record.key.appName) != nil {
+                        applyLauncher(forAgentPID: record.key.pid, to: &record.key)
+                    }
                 }
                 return record
             }
@@ -110,11 +126,20 @@ final class AgentAttributor: @unchecked Sendable {
         context(for: key, servers: mcpServers)
     }
 
+    private func applyLauncher(forAgentPID pid: Int32, to key: inout FlowKey) {
+        guard pid > 1,
+              let launcher = AgentLineage.launcher(forAgentPID: pid, lookup: processLookup)
+        else { return }
+        key.launcherBundleID = launcher.bundleID
+        key.launcherName = launcher.name
+        key.launcherPath = launcher.argv.first
+    }
+
     private func context(for key: FlowKey, servers: [MCPServerConfig]) -> AgentContext? {
         lock.lock()
         if let hit = cache[key.pid], Date().timeIntervalSince(hit.at) < 30 { lock.unlock(); return hit.context }
         lock.unlock()
-        let context = AgentLineage.context(for: key.pid, lookup: SystemProcessTable.shared.snapshot,
+        let context = AgentLineage.context(for: key.pid, lookup: processLookup,
                                            agentName: AgentRegistry.shared.name, servers: servers)
         lock.lock()
         if cache.count > 4000 { cache.removeAll() }

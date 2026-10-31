@@ -20,6 +20,8 @@ struct TrafficGraphNode: Identifiable, Sendable {
         case service
         case tool
         case mcp
+        case launcher
+        case proxy
     }
 
     var id: TrafficGraphNodeID
@@ -34,8 +36,18 @@ struct TrafficGraphNode: Identifiable, Sendable {
 
 enum TrafficGraphRelationship: String, Sendable {
     case observed
-    case worksFor
+    case runs
+    case launched
+    case routedThrough
+    case blocked
     case invoked
+}
+
+struct TrafficGraphEnforcement: Sendable, Equatable {
+    var count: Int64
+    var category: String
+    var source: String
+    var detail: String
 }
 
 struct TrafficGraphMember: Identifiable, Sendable, Equatable {
@@ -56,6 +68,7 @@ struct TrafficGraphEdge: Identifiable, Sendable {
     var filter: TrafficFilter
     var relationship: TrafficGraphRelationship = .observed
     var members: [TrafficGraphMember] = []
+    var enforcement: TrafficGraphEnforcement? = nil
 }
 
 struct TrafficGraphHidden: Equatable, Sendable {
@@ -83,9 +96,13 @@ struct TrafficGraphLimits: Equatable, Sendable {
     var maxApps: Int
     var maxDestinations: Int
     var maxEdges: Int
+    var maxBlockedEdges: Int = 12
+    var maxRelays: Int = 6
 
-    static let standard = TrafficGraphLimits(maxApps: 8, maxDestinations: 10, maxEdges: 28)
-    static let unbounded = TrafficGraphLimits(maxApps: .max, maxDestinations: .max, maxEdges: .max)
+    static let standard = TrafficGraphLimits(maxApps: 8, maxDestinations: 10, maxEdges: 28,
+                                              maxBlockedEdges: 12, maxRelays: 6)
+    static let unbounded = TrafficGraphLimits(maxApps: .max, maxDestinations: .max, maxEdges: .max,
+                                               maxBlockedEdges: .max, maxRelays: .max)
 }
 
 enum VisualizationDomainFamily {
@@ -126,9 +143,39 @@ enum TrafficGraphBuilder {
         var asn: Int
     }
 
+    private struct RelayIdentity: Hashable {
+        var bundleID: String
+    }
+
+    private struct RelayMetadata {
+        var name: String
+        var path: String
+        var weight: Int64
+    }
+
     private struct Relationship: Hashable {
         var app: AppIdentity
         var destination: DestinationIdentity
+        var relay: RelayIdentity?
+    }
+
+    private struct RouteIdentity: Hashable {
+        var app: AppIdentity
+        var relay: RelayIdentity
+    }
+
+    private struct BlockedIdentity: Hashable {
+        var app: AppIdentity
+        var destination: String
+        var port: UInt16
+    }
+
+    private struct BlockedValue {
+        var appName: String
+        var count: Int64 = 0
+        var categories: Set<String> = []
+        var sources: Set<String> = []
+        var details: Set<String> = []
     }
 
     private struct ExactMemberIdentity: Hashable {
@@ -146,11 +193,14 @@ enum TrafficGraphBuilder {
         var counters = FlowCounters()
     }
 
-    static func build<Rows: Sequence>(rows: Rows, limits: TrafficGraphLimits = .standard) -> TrafficGraphSnapshot
+    static func build<Rows: Sequence>(rows: Rows, blockedAttempts: [BlockedAttemptRow] = [],
+                                      limits: TrafficGraphLimits = .standard) -> TrafficGraphSnapshot
     where Rows.Element == BreakdownRow {
         var relationships: [Relationship: FlowCounters] = [:]
         var relationshipMembers: [Relationship: [ExactMemberIdentity: MemberValue]] = [:]
         var appMetadata: [AppIdentity: AppMetadata] = [:]
+        var relayMetadata: [RelayIdentity: RelayMetadata] = [:]
+        var blocked: [BlockedIdentity: BlockedValue] = [:]
         var total = FlowCounters()
 
         for row in rows where !row.counters.isEmpty {
@@ -167,7 +217,21 @@ enum TrafficGraphBuilder {
                 owner: groupedDomain.isEmpty ? row.owner : "",
                 asn: groupedDomain.isEmpty ? row.asn : 0
             )
-            let relationship = Relationship(app: app, destination: destination)
+            let relay = row.routeProxyBundleID.isEmpty ? nil : RelayIdentity(
+                bundleID: row.routeProxyBundleID
+            )
+            if let relay {
+                let current = relayMetadata[relay]
+                let candidate = RelayMetadata(
+                    name: row.routeProxyName,
+                    path: row.routeProxyPath,
+                    weight: row.counters.total
+                )
+                if current == nil || prefersMetadata(candidate, over: current!) {
+                    relayMetadata[relay] = candidate
+                }
+            }
+            let relationship = Relationship(app: app, destination: destination, relay: relay)
             relationships[relationship, default: FlowCounters()] += row.counters
             let memberIdentity = ExactMemberIdentity(app: app, domain: row.domain, remoteIP: row.remoteIP,
                                                      protocols: row.protocols, channel: row.channel)
@@ -176,6 +240,24 @@ enum TrafficGraphBuilder {
             member.counters += row.counters
             relationshipMembers[relationship, default: [:]][memberIdentity] = member
             total += row.counters
+        }
+        for attempt in blockedAttempts where attempt.count > 0 && !attempt.destination.isEmpty {
+            let app = AppIdentity(bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID)
+            guard !app.bundleID.isEmpty else { continue }
+            let identity = BlockedIdentity(app: app, destination: attempt.destination.lowercased(), port: attempt.port)
+            var value = blocked[identity] ?? BlockedValue(appName: attempt.appName)
+            value.count += attempt.count
+            if !attempt.category.isEmpty { value.categories.insert(attempt.category) }
+            if !attempt.source.isEmpty { value.sources.insert(attempt.source) }
+            if !attempt.detail.isEmpty { value.details.insert(attempt.detail) }
+            blocked[identity] = value
+            if appMetadata[app] == nil {
+                appMetadata[app] = AppMetadata(
+                    name: attempt.appName.isEmpty ? attempt.agentName : attempt.appName,
+                    path: "",
+                    weight: 0
+                )
+            }
         }
 
         var appTotals: [AppIdentity: FlowCounters] = [:]
@@ -189,46 +271,123 @@ enum TrafficGraphBuilder {
             if left.value.total != right.value.total { return left.value.total > right.value.total }
             return relationshipID(left.key).rawValue < relationshipID(right.key).rawValue
         }
-        var visibleApps: Set<AppIdentity> = []
+        let rankedBlocked = blocked.sorted {
+            if $0.value.count != $1.value.count { return $0.value.count > $1.value.count }
+            return blockedID($0.key) < blockedID($1.key)
+        }
+        var observedAppCandidates: Set<AppIdentity> = []
         var visibleDestinations: Set<DestinationIdentity> = []
+        var relayCandidates: Set<RelayIdentity> = []
+        // Pick source applications from byte-bearing relationships first, so low-volume enforcement evidence cannot
+        // evict a busy app. Reserve a small destination slice for blocked evidence on those selected apps, then fill
+        // the rest with the busiest traffic and finally admit blocked-only apps into any capacity left over.
+        for relationship in rankedRelationships {
+            let addsApp = !observedAppCandidates.contains(relationship.key.app)
+            guard !addsApp || observedAppCandidates.count < max(0, limits.maxApps) else { continue }
+            observedAppCandidates.insert(relationship.key.app)
+        }
+        for relationship in rankedRelationships where observedAppCandidates.contains(relationship.key.app) {
+            guard let relay = relationship.key.relay, !relayCandidates.contains(relay),
+                  relayCandidates.count < max(0, limits.maxRelays) else { continue }
+            relayCandidates.insert(relay)
+        }
+        var selectedBlocked: [(key: BlockedIdentity, value: BlockedValue)] = []
+        let blockedDestinationReserve = min(max(0, limits.maxBlockedEdges), max(0, limits.maxDestinations) / 2)
+        for entry in rankedBlocked where observedAppCandidates.contains(entry.key.app) {
+            let destination = blockedDestination(entry.key)
+            let addsDestination = !visibleDestinations.contains(destination)
+            guard (!addsDestination || visibleDestinations.count < blockedDestinationReserve),
+                  selectedBlocked.count < max(0, limits.maxBlockedEdges) else { continue }
+            selectedBlocked.append(entry)
+            visibleDestinations.insert(destination)
+        }
         var selectedRelationships: [(key: Relationship, value: FlowCounters)] = []
         for relationship in rankedRelationships {
-            let addsApp = !visibleApps.contains(relationship.key.app)
             let addsDestination = !visibleDestinations.contains(relationship.key.destination)
-            guard (!addsApp || visibleApps.count < max(0, limits.maxApps)),
+            guard observedAppCandidates.contains(relationship.key.app),
+                  relationship.key.relay.map({ relayCandidates.contains($0) }) ?? true,
                   (!addsDestination || visibleDestinations.count < max(0, limits.maxDestinations)),
                   selectedRelationships.count < max(0, limits.maxEdges) else { continue }
             selectedRelationships.append(relationship)
-            visibleApps.insert(relationship.key.app)
             visibleDestinations.insert(relationship.key.destination)
         }
-        let rankedApps = ranked(appTotals).map(\.0).filter { visibleApps.contains($0) }
-        let rankedDestinations = ranked(destinationTotals).map(\.0).filter { visibleDestinations.contains($0) }
-
-        let edges = selectedRelationships.map { relationship, counters in
+        var visibleApps = Set(selectedRelationships.map { $0.key.app })
+        let visibleRelays = Set(selectedRelationships.compactMap { $0.key.relay })
+        visibleApps.formUnion(selectedBlocked.map { $0.key.app })
+        let alreadyBlocked = Set(selectedBlocked.map(\.key))
+        for entry in rankedBlocked where !alreadyBlocked.contains(entry.key) {
+            let destination = blockedDestination(entry.key)
+            let addsApp = !visibleApps.contains(entry.key.app)
+            let addsDestination = !visibleDestinations.contains(destination)
+            guard (!addsApp || visibleApps.count < max(0, limits.maxApps)),
+                  (!addsDestination || visibleDestinations.count < max(0, limits.maxDestinations)),
+                  selectedBlocked.count < max(0, limits.maxBlockedEdges) else { continue }
+            selectedBlocked.append(entry)
+            visibleApps.insert(entry.key.app)
+            visibleDestinations.insert(destination)
+        }
+        var edges = selectedRelationships.map { relationship, counters in
             let members = makeMembers(relationshipMembers[relationship]?.values ?? [:].values)
             return TrafficGraphEdge(
                 id: relationshipID(relationship),
-                source: appID(relationship.app),
+                source: relationship.relay.map(relayID) ?? appID(relationship.app),
                 target: destinationID(relationship.destination),
                 counters: counters,
                 filter: relationshipFilter(relationship, members: members),
                 members: members
             )
-        }.sorted { $0.id < $1.id }
+        }
+        let visibleRoutes = Set(selectedRelationships.compactMap { entry -> RouteIdentity? in
+            guard let relay = entry.key.relay else { return nil }
+            return RouteIdentity(app: entry.key.app, relay: relay)
+        })
+        for route in visibleRoutes {
+            edges.append(TrafficGraphEdge(
+                id: routeID(route), source: appID(route.app), target: relayID(route.relay),
+                counters: FlowCounters(), filter: TrafficFilter(bundleID: route.app.bundleID),
+                relationship: .routedThrough
+            ))
+        }
+        for (identity, value) in selectedBlocked {
+            let exactHost = HostCanonicalizer.host(identity.destination)
+            let destination = blockedDestination(identity)
+            let target = destinationID(destination)
+            visibleApps.insert(identity.app)
+            visibleDestinations.insert(destination)
+            edges.append(TrafficGraphEdge(
+                id: blockedID(identity), source: appID(identity.app), target: target,
+                counters: FlowCounters(),
+                filter: TrafficFilter(
+                    bundleID: identity.app.bundleID,
+                    domain: exactHost,
+                    remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP
+                ),
+                relationship: .blocked,
+                enforcement: TrafficGraphEnforcement(
+                    count: value.count,
+                    category: value.categories.sorted().joined(separator: ", "),
+                    source: value.sources.sorted().joined(separator: ", "),
+                    detail: (["Port \(identity.port)"] + value.details.sorted()).joined(separator: ", ")
+                )
+            ))
+        }
+        edges.sort { $0.id < $1.id }
 
         var visibleNodeCounters: [TrafficGraphNodeID: FlowCounters] = [:]
         var visibleDestinationMembers: [TrafficGraphNodeID: [TrafficGraphMember]] = [:]
-        for edge in edges {
+        for edge in edges where edge.relationship == .observed {
             visibleNodeCounters[edge.source, default: FlowCounters()] += edge.counters
             visibleNodeCounters[edge.target, default: FlowCounters()] += edge.counters
             visibleDestinationMembers[edge.target, default: []] += edge.members
         }
+        for (relationship, counters) in selectedRelationships {
+            visibleNodeCounters[appID(relationship.app), default: FlowCounters()] += counters
+        }
 
         var nodes: [TrafficGraphNode] = []
-        for app in rankedApps {
+        for app in visibleApps.sorted(by: { appID($0) < appID($1) }) {
             let id = appID(app)
-            guard let counters = visibleNodeCounters[id] else { continue }
+            let counters = visibleNodeCounters[id] ?? FlowCounters()
             let metadata = appMetadata[app] ?? AppMetadata(name: "", path: "", weight: 0)
             nodes.append(TrafficGraphNode(
                 id: id,
@@ -240,9 +399,21 @@ enum TrafficGraphBuilder {
                 counters: counters
             ))
         }
-        for destination in rankedDestinations {
+        for relay in visibleRelays.sorted(by: { relayID($0) < relayID($1) }) {
+            let id = relayID(relay)
+            let metadata = relayMetadata[relay] ?? RelayMetadata(name: "", path: "", weight: 0)
+            let counters = selectedRelationships.reduce(into: FlowCounters()) { result, entry in
+                if entry.key.relay == relay { result += entry.value }
+            }
+            nodes.append(TrafficGraphNode(
+                id: id, kind: .proxy, title: metadata.name.isEmpty ? relay.bundleID : metadata.name,
+                detail: L("Observed route"), appPath: metadata.path,
+                filter: TrafficFilter(), counters: counters
+            ))
+        }
+        for destination in visibleDestinations.sorted(by: { destinationID($0) < destinationID($1) }) {
             let id = destinationID(destination)
-            guard let counters = visibleNodeCounters[id] else { continue }
+            let counters = visibleNodeCounters[id] ?? FlowCounters()
             let members = mergedMembers(visibleDestinationMembers[id] ?? [])
             nodes.append(TrafficGraphNode(
                 id: id,
@@ -257,10 +428,19 @@ enum TrafficGraphBuilder {
         }
         nodes.sort { $0.id < $1.id }
 
-        let visibleTotal = edges.reduce(into: FlowCounters()) { $0 += $1.counters }
+        let visibleTotal = edges.filter { $0.relationship == .observed }
+            .reduce(into: FlowCounters()) { $0 += $1.counters }
         let hidden = TrafficGraphHidden(
-            nodeCount: appTotals.count + destinationTotals.count - nodes.count,
-            edgeCount: relationships.count - edges.count,
+            nodeCount: max(
+                0,
+                Set(appTotals.keys).union(blocked.keys.map(\.app)).count
+                    + Set(destinationTotals.keys).union(blocked.keys.map(blockedDestination)).count
+                    - visibleApps.count - visibleDestinations.count
+            ),
+            edgeCount: max(
+                0,
+                relationships.count + blocked.count - selectedRelationships.count - selectedBlocked.count
+            ),
             counters: subtract(total, visibleTotal)
         )
         return TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: hidden)
@@ -277,16 +457,53 @@ enum TrafficGraphBuilder {
         TrafficGraphNodeID(rawValue: "app:" + component(app.bundleID))
     }
 
+    private static func relayID(_ relay: RelayIdentity) -> TrafficGraphNodeID {
+        TrafficGraphNodeID(rawValue: "proxy:" + component(relay.bundleID))
+    }
+
+    private static func routeID(_ route: RouteIdentity) -> TrafficGraphEdgeID {
+        TrafficGraphEdgeID(rawValue: appID(route.app).rawValue + "→route→" + relayID(route.relay).rawValue)
+    }
+
+    private static func blockedDestination(_ blocked: BlockedIdentity) -> DestinationIdentity {
+        let exactHost = HostCanonicalizer.host(blocked.destination)
+        return DestinationIdentity(
+            domain: exactHost.map(VisualizationDomainFamily.group) ?? "",
+            remoteIP: HostCanonicalizer.address(blocked.destination) ?? "",
+            owner: "",
+            asn: 0
+        )
+    }
+
+    private static func blockedID(_ blocked: BlockedIdentity) -> TrafficGraphEdgeID {
+        TrafficGraphEdgeID(
+            rawValue: appID(blocked.app).rawValue + "→blocked→" + component(blocked.destination)
+                + "→port→\(blocked.port)"
+        )
+    }
+
     private static func destinationID(_ destination: DestinationIdentity) -> TrafficGraphNodeID {
         TrafficGraphNodeID(rawValue: "destination:" + component(destination.domain) + component(destination.remoteIP))
     }
 
     private static func relationshipID(_ relationship: Relationship) -> TrafficGraphEdgeID {
-        TrafficGraphEdgeID(rawValue: appID(relationship.app).rawValue + "→" + destinationID(relationship.destination).rawValue)
+        let source = relationship.relay.map(relayID) ?? appID(relationship.app)
+        let appScope = relationship.relay == nil ? "" : "→for→" + appID(relationship.app).rawValue
+        return TrafficGraphEdgeID(
+            rawValue: source.rawValue + appScope + "→" + destinationID(relationship.destination).rawValue
+        )
     }
 
     private static func component(_ value: String) -> String { "\(value.utf8.count):\(value)" }
     private static func prefersMetadata(_ candidate: AppMetadata, over current: AppMetadata) -> Bool {
+        if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
+        if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
+        if candidate.weight != current.weight { return candidate.weight > current.weight }
+        if candidate.name != current.name { return candidate.name < current.name }
+        return candidate.path < current.path
+    }
+
+    private static func prefersMetadata(_ candidate: RelayMetadata, over current: RelayMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
         if candidate.weight != current.weight { return candidate.weight > current.weight }

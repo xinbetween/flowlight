@@ -35,6 +35,30 @@ final class MCPAttributionTests: XCTestCase {
         XCTAssertEqual(MCPConfigReader.parseJSON(Data(vscode.utf8), client: "VS Code", keys: ["servers"]).first?.url?.host, "x.example")
     }
 
+    func testAttributorPreservesProxyParentAndAddsLauncherEvidence() {
+        let table: [Int32: ProcessSnapshot] = [
+            200: ProcessSnapshot(pid: 200, ppid: 150, bundleID: "curl", name: "curl", argv: ["curl"]),
+            150: ProcessSnapshot(pid: 150, ppid: 100, bundleID: "zsh", name: "zsh", argv: ["zsh"]),
+            100: ProcessSnapshot(pid: 100, ppid: 50, bundleID: "claude", name: "claude", argv: ["claude"]),
+            50: ProcessSnapshot(pid: 50, ppid: 1, bundleID: "com.mitchellh.ghostty", name: "Ghostty",
+                                argv: ["/Applications/Ghostty.app/Contents/MacOS/ghostty"])
+        ]
+        let attributor = AgentAttributor(processLookup: { table[$0] })
+        var key = FlowKey(pid: 200, bundleID: "curl", appName: "curl", appPath: "/usr/bin/curl",
+                          remoteIP: "203.0.113.8", domain: "example.com", port: 443,
+                          transport: .tcp, appProtocol: "https")
+        key.parentAgent = "claude"
+        key.parentAgentName = "Claude Code"
+
+        let enriched = attributor.enrich([
+            TrafficBatch(timestamp: 1, records: [TrafficRecord(key: key, counters: FlowCounters(flows: 1))])
+        ])[0].records[0].key
+
+        XCTAssertEqual(enriched.parentAgent, "claude")
+        XCTAssertEqual(enriched.launcherBundleID, "com.mitchellh.ghostty")
+        XCTAssertEqual(enriched.launcherName, "Ghostty")
+    }
+
     func testSignatureAndMatching() {
         XCTAssertEqual(servers[0].signature, "@modelcontextprotocol/server-github")
         XCTAssertEqual(servers[1].signature, "mcp-server-fetch")
@@ -64,11 +88,17 @@ final class MCPAttributionTests: XCTestCase {
         func name(_ bundle: String, _ app: String) -> String? { AgentCatalog.knownAgent(bundleID: bundle, appName: app)?.name }
         func context(_ pid: Int32) -> AgentContext? { AgentLineage.context(for: pid, lookup: { table[$0] }, agentName: name, servers: servers) }
 
-        XCTAssertEqual(context(200), AgentContext(agentBundleID: "claude", agentName: "Claude Code", mcpServer: nil), "a shell tool's curl belongs to Claude Code")
-        XCTAssertEqual(context(300), AgentContext(agentBundleID: "claude", agentName: "Claude Code", mcpServer: "github"))
+        XCTAssertEqual(context(200), AgentContext(agentBundleID: "claude", agentName: "Claude Code", mcpServer: nil,
+                                                  agentPID: 100), "a shell tool's curl belongs to Claude Code")
+        XCTAssertEqual(context(300), AgentContext(agentBundleID: "claude", agentName: "Claude Code", mcpServer: "github",
+                                                  agentPID: 100))
         XCTAssertNil(context(400), "your own terminal's curl isn't attributed to anyone")
         XCTAssertNil(context(100), "an agent works for itself")
         XCTAssertNil(context(500), "an agent started by another agent keeps its own identity")
+        let launcher = AgentLineage.launcher(forAgentPID: 100, lookup: { table[$0] })
+        XCTAssertEqual(launcher?.bundleID, "com.apple.Terminal")
+        XCTAssertNil(AgentLineage.launcher(forAgentPID: 999, lookup: { table[$0] }),
+                     "a launcher relationship requires capture-time process proof")
         XCTAssertEqual(AgentLineage.remoteServer(forHost: "mcp.linear.app", servers: servers)?.name, "linear")
     }
 }

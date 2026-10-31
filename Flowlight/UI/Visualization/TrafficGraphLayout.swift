@@ -449,8 +449,8 @@ enum TrafficGraphLayout {
 
     private static func lane(for node: TrafficGraphNode) -> Lane {
         switch node.kind {
-        case .app, .agent: return .source
-        case .tool, .mcp: return .intermediary
+        case .app, .agent, .launcher: return .source
+        case .tool, .mcp, .proxy: return .intermediary
         case .destination, .service: return .destination
         }
     }

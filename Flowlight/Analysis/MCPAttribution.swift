@@ -162,9 +162,25 @@ struct AgentContext: Equatable, Sendable {
     var agentBundleID: String
     var agentName: String
     var mcpServer: String?
+    /// The live agent process whose ancestry was inspected. Zero only for older synthetic callers.
+    var agentPID: Int32 = 0
 }
 
 enum AgentLineage {
+    /// Capture-time launcher evidence for an agent. Historical PIDs are never consulted by visualization queries.
+    static func launcher(forAgentPID pid: Int32, lookup: (Int32) -> ProcessSnapshot?,
+                         maxDepth: Int = 8) -> AgentLauncher.Launcher? {
+        var ancestors: [(pid: Int32, name: String, bundleID: String, argv: [String])] = []
+        var current = pid
+        for _ in 0..<maxDepth {
+            guard let snapshot = lookup(current), snapshot.ppid > 1, snapshot.ppid != current,
+                  let parent = lookup(snapshot.ppid) else { break }
+            ancestors.append((parent.pid, parent.name, parent.bundleID, parent.argv))
+            current = parent.pid
+        }
+        return AgentLauncher.find(ancestors: ancestors)
+    }
+
     /// Walks up from `pid` to the nearest ancestor that is an agent. The process itself being an agent means it
     /// works for itself (no context). `agentName` returns a display name for agents, nil otherwise.
     static func context(for pid: Int32, lookup: (Int32) -> ProcessSnapshot?, agentName: (String, String) -> String?,
@@ -177,7 +193,8 @@ enum AgentLineage {
             if let name = agentName(parent.bundleID, parent.name) {
                 let server = visited.lazy.compactMap { MCPMatcher.match(argv: $0.argv, servers: servers)?.name }.first
                     ?? visited.lazy.compactMap { MCPMatcher.heuristicName(argv: $0.argv) }.first
-                return AgentContext(agentBundleID: parent.bundleID, agentName: name, mcpServer: server)
+                return AgentContext(agentBundleID: parent.bundleID, agentName: name, mcpServer: server,
+                                    agentPID: parent.pid)
             }
             visited.append(parent)
             current = parent

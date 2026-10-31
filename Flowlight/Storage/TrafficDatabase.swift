@@ -126,6 +126,13 @@ struct BreakdownRow: Sendable {
     var parentAgent: String = ""
     var parentAgentName: String = ""
     var mcpServer: String = ""
+    /// Capture-time process and route evidence. Empty means unknown, never "direct" or inferred.
+    var launcherBundleID: String = ""
+    var launcherName: String = ""
+    var launcherPath: String = ""
+    var routeProxyBundleID: String = ""
+    var routeProxyName: String = ""
+    var routeProxyPath: String = ""
     /// Which way these bytes left the Mac. Ordinary network traffic unless something said otherwise.
     var channel: NetworkChannel = .ip
 }
@@ -206,6 +213,19 @@ struct RuleEventRecord: Identifiable, Sendable, Hashable {
 
 /// Aggregated managed-pack activity. One row may represent many matching connections in a minute; pack activity
 /// answers what was blocked without turning every ad request into an alert or an unbounded event row.
+struct BlockedAttemptRow: Sendable, Hashable {
+    var bundleID: String
+    var appName: String
+    var agentKey: String
+    var agentName: String
+    var destination: String
+    var port: UInt16
+    var count: Int64
+    var category: String
+    var source: String
+    var detail: String
+}
+
 struct RulePackEventRecord: Identifiable, Sendable, Hashable {
     var id: Int64
     var bucket: Date
@@ -325,8 +345,9 @@ final class TrafficDatabase: @unchecked Sendable {
         guard !realName.isEmpty else { return }
 
         let columns = "ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, " +
-                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel, " +
-                      "attribution_exact, attribution_epoch"
+                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, " +
+                      "launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, " +
+                      "route_proxy_path, channel, attribution_exact, attribution_epoch"
         for (version, real) in realName {
             for table in Self.tables {
                 // Re-inserted rather than updated, because `bundle_id` is part of the unique key: renaming can
@@ -335,26 +356,89 @@ final class TrafficDatabase: @unchecked Sendable {
                 try conn.run("""
                     INSERT INTO \(table) (\(columns))
                     SELECT ts, pid, ?, ?, app_path, remote_ip, domain, port, transport, protocol,
-                           bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel,
-                           attribution_exact, attribution_epoch
+                           bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server,
+                           launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name,
+                           route_proxy_path, channel, attribution_exact, attribution_epoch
                     FROM \(table) WHERE bundle_id = ?
-                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch)
+                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
+                                agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name,
+                                launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                                attribution_exact, attribution_epoch)
                     DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
                                   bytes_out = bytes_out + excluded.bytes_out,
                                   flows = flows + excluded.flows;
                     """, [.text(real.id), .text(real.name), .text(version)])
                 try conn.run("DELETE FROM \(table) WHERE bundle_id = ?", [.text(version)])
             }
-            // Everything else keyed by the identity follows it, or the agent keeps a split history by another route.
-            for (table, column) in [("seen_destinations", "bundle_id"), ("seen_ports", "bundle_id"),
-                                    ("baselines", "bundle_id"), ("alerts", "bundle_id"), ("apps", "bundle_id"),
-                                    ("agent_policies", "agent_id"), ("http_exchanges", "bundle_id")] {
-                try conn.run("UPDATE OR IGNORE \(table) SET \(column) = ? WHERE \(column) = ?",
-                                 [.text(real.id), .text(version)])
-            }
-            try conn.run("UPDATE http_exchanges SET app_name = ? WHERE app_name = ?", [.text(real.name), .text(version)])
-            try conn.run("UPDATE alerts SET app_name = ? WHERE app_name = ?", [.text(real.name), .text(version)])
+            // Merge keyed support tables explicitly. `UPDATE OR IGNORE` leaves the obsolete identity behind when
+            // the corrected key already exists, splitting first-seen state, baselines and agent policy forever.
+            try conn.run("""
+                INSERT INTO seen_destinations (bundle_id, domain, first_seen)
+                SELECT ?, domain, first_seen FROM seen_destinations WHERE bundle_id = ?
+                ON CONFLICT(bundle_id, domain) DO UPDATE SET first_seen = MIN(first_seen, excluded.first_seen)
+                """, [.text(real.id), .text(version)])
+            try conn.run("DELETE FROM seen_destinations WHERE bundle_id = ?", [.text(version)])
+            try conn.run("""
+                INSERT INTO seen_ports (bundle_id, port, first_seen)
+                SELECT ?, port, first_seen FROM seen_ports WHERE bundle_id = ?
+                ON CONFLICT(bundle_id, port) DO UPDATE SET first_seen = MIN(first_seen, excluded.first_seen)
+                """, [.text(real.id), .text(version)])
+            try conn.run("DELETE FROM seen_ports WHERE bundle_id = ?", [.text(version)])
+            try conn.run("""
+                INSERT INTO apps (bundle_id, first_seen)
+                SELECT ?, first_seen FROM apps WHERE bundle_id = ?
+                ON CONFLICT(bundle_id) DO UPDATE SET first_seen = MIN(first_seen, excluded.first_seen)
+                """, [.text(real.id), .text(version)])
             try conn.run("DELETE FROM apps WHERE bundle_id = ?", [.text(version)])
+            try conn.run("""
+                INSERT INTO baselines (bundle_id, metric, mean, variance, samples, updated)
+                SELECT ?, metric, mean, variance, samples, updated FROM baselines WHERE bundle_id = ?
+                ON CONFLICT(bundle_id, metric) DO UPDATE SET
+                    mean = excluded.mean, variance = excluded.variance, samples = excluded.samples,
+                    updated = excluded.updated
+                WHERE excluded.updated > baselines.updated
+                """, [.text(real.id), .text(version)])
+            try conn.run("DELETE FROM baselines WHERE bundle_id = ?", [.text(version)])
+
+            if let sourcePolicy = try conn.query(
+                "SELECT policy, updated FROM agent_policies WHERE agent_id = ?", [.text(version)],
+                map: { ($0.text(0), $0.int(1)) }
+            ).first {
+                let targetUpdated = try conn.query(
+                    "SELECT updated FROM agent_policies WHERE agent_id = ?", [.text(real.id)],
+                    map: { $0.int(0) }
+                ).first ?? .min
+                if sourcePolicy.1 > targetUpdated,
+                   var policy = try? JSONDecoder().decode(AgentPolicy.self, from: Data(sourcePolicy.0.utf8)) {
+                    policy.agentID = real.id
+                    let json = String(decoding: try JSONEncoder().encode(policy), as: UTF8.self)
+                    try conn.run("""
+                        INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
+                        ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
+                        """, [.text(real.id), .text(json), .int(sourcePolicy.1)])
+                }
+                try conn.run("DELETE FROM agent_policies WHERE agent_id = ?", [.text(version)])
+            }
+
+            try conn.run("UPDATE http_exchanges SET bundle_id = ?, app_name = ? WHERE bundle_id = ?",
+                         [.text(real.id), .text(real.name), .text(version)])
+            try conn.run("UPDATE alerts SET bundle_id = ?, app_name = ? WHERE bundle_id = ?",
+                         [.text(real.id), .text(real.name), .text(version)])
+            try conn.run("UPDATE rule_events SET bundle_id = ?, app_name = ? WHERE bundle_id = ?",
+                         [.text(real.id), .text(real.name), .text(version)])
+            try conn.run("""
+                INSERT INTO rule_pack_event_rollups
+                    (bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
+                     bundle_id, app_name, agent, agent_name, host, matched_host, port)
+                SELECT bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
+                       ?, ?, agent, agent_name, host, matched_host, port
+                FROM rule_pack_event_rollups WHERE bundle_id = ?
+                ON CONFLICT(\(Self.rulePackEventKeySQL)) DO UPDATE SET
+                    count = count + excluded.count,
+                    first_at = MIN(first_at, excluded.first_at),
+                    last_at = MAX(last_at, excluded.last_at)
+                """, [.text(real.id), .text(real.name), .text(version)])
+            try conn.run("DELETE FROM rule_pack_event_rollups WHERE bundle_id = ?", [.text(version)])
         }
     }
 
@@ -371,7 +455,9 @@ final class TrafficDatabase: @unchecked Sendable {
             // v0.1.2 added agent attribution. Parent and MCP identity became key parts in 0.16.0 so traffic
             // from one executable working for different agents or MCP services cannot merge before visualization.
             let columns = Set(try conn.query("PRAGMA table_info(\(table))") { $0.text(1) })
-            for column in ["agent_parent", "agent_parent_name", "mcp_server"] where !columns.contains(column) {
+            for column in ["agent_parent", "agent_parent_name", "mcp_server", "launcher_bundle_id", "launcher_name",
+                           "launcher_path", "route_proxy_bundle_id", "route_proxy_name", "route_proxy_path"]
+            where !columns.contains(column) {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
             }
             // `_key2` treated attribution as mutable metadata, so one row may already contain bytes from several
@@ -400,9 +486,11 @@ final class TrafficDatabase: @unchecked Sendable {
             DROP INDEX IF EXISTS \(table)_key2;
             DROP INDEX IF EXISTS \(table)_key3;
             DROP INDEX IF EXISTS \(table)_key4;
-            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key5 ON \(table)(
+            DROP INDEX IF EXISTS \(table)_key5;
+            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key6 ON \(table)(
                 ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch
+                agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                route_proxy_bundle_id, route_proxy_name, route_proxy_path, attribution_exact, attribution_epoch
             );
             """)
         }
@@ -591,13 +679,16 @@ final class TrafficDatabase: @unchecked Sendable {
             }
         }
 
-        // Runs once. `rollup_state` already exists to remember how far a job has got, so the repair uses it
-        // rather than introducing a second way to record the same kind of fact.
+        // Version 2 also merges colliding support/enforcement rows. Existing installations already carry the v1
+        // watermark, so comparing the version is required for the corrected repair to run on upgrade.
+        let repairVersion: Int64 = 2
         let repaired = try conn.query("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
-                                      map: { $0.int(0) }).first
-        if repaired == nil {
-            try conn.transaction { try repairVersionedNames() }
-            try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 1)")
+                                      map: { $0.int(0) }).first ?? 0
+        if repaired < repairVersion {
+            try conn.transaction {
+                try repairVersionedNames()
+                try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 2)")
+            }
         }
     }
 
@@ -606,14 +697,14 @@ final class TrafficDatabase: @unchecked Sendable {
     func insert(_ batches: [TrafficBatch]) throws {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel,
+                              agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                              route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                               attribution_exact, attribution_epoch)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
-            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
-            agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
-            agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
-            mcp_server = CASE WHEN excluded.mcp_server != '' THEN excluded.mcp_server ELSE mcp_server END
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
+                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    attribution_exact, attribution_epoch) DO UPDATE SET
+            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """
         try conn.transaction {
             for batch in batches {
@@ -624,6 +715,8 @@ final class TrafficDatabase: @unchecked Sendable {
                                        .text(k.transport.rawValue), .text(k.appProtocol), .int(r.counters.bytesIn),
                                        .int(r.counters.bytesOut), .int(r.counters.flows),
                                        .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
+                                       .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
+                                       .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
                                        .text(k.channel.rawValue)])
                 }
             }
@@ -639,14 +732,14 @@ final class TrafficDatabase: @unchecked Sendable {
         precondition(Self.tables.contains(table))
         let sql = """
         INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel,
+                              agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                              route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                               attribution_exact, attribution_epoch)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
-            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
-            agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
-            agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
-            mcp_server = CASE WHEN excluded.mcp_server != '' THEN excluded.mcp_server ELSE mcp_server END
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
+                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    attribution_exact, attribution_epoch) DO UPDATE SET
+            bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """
         try conn.transaction {
             for r in rows {
@@ -655,6 +748,8 @@ final class TrafficDatabase: @unchecked Sendable {
                                    .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)), .text(k.transport.rawValue),
                                    .text(k.appProtocol), .int(r.counters.bytesIn), .int(r.counters.bytesOut), .int(r.counters.flows),
                                    .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
+                                   .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
+                                   .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
                                    .text(k.channel.rawValue)])
             }
         }
@@ -698,15 +793,20 @@ final class TrafficDatabase: @unchecked Sendable {
     private func fold(from source: String, into target: String, bucket: String, lower: Int64, upper: Int64) throws {
         try conn.run("""
         INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                               agent_parent, agent_parent_name, mcp_server, channel,
+                               agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                               route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                                attribution_exact, attribution_epoch)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
-               SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server, channel,
-               attribution_exact, attribution_epoch
+               SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server,
+               launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+               channel, attribution_exact, attribution_epoch
         FROM \(source) WHERE ts >= ? AND ts < ?
         GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                 agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
+                 agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                 route_proxy_bundle_id, route_proxy_name, route_proxy_path, attribution_exact, attribution_epoch
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
+                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """, [.int(lower), .int(upper)])
     }
@@ -927,16 +1027,27 @@ final class TrafficDatabase: @unchecked Sendable {
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
                        '', protocol,
-                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows), channel
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows),
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_path ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
+                       channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip, protocol, channel
+                GROUP BY bundle_id, domain, remote_ip, protocol, channel, attribution_exact, attribution_epoch,
+                         launcher_bundle_id, launcher_name, launcher_path,
+                         route_proxy_bundle_id, route_proxy_name, route_proxy_path
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(11), asn: Int(row.int(12)),
-                         channel: NetworkChannel(rawValue: row.text(10)) ?? .ip)
+                         owner: row.text(17), asn: Int(row.int(18)),
+                         launcherBundleID: row.text(10), launcherName: row.text(11), launcherPath: row.text(12),
+                         routeProxyBundleID: row.text(13), routeProxyName: row.text(14), routeProxyPath: row.text(15),
+                         channel: NetworkChannel(rawValue: row.text(16)) ?? .ip)
         }
     }
 
@@ -954,21 +1065,27 @@ final class TrafficDatabase: @unchecked Sendable {
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_path ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
                        channel
                 FROM \(granularity.table) WHERE \(clause)
                 GROUP BY bundle_id, domain, remote_ip, attribution_exact, attribution_epoch,
-                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
-                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
-                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
-                         channel, protocol
+                         agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                         route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel, protocol
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(14), asn: Int(row.int(15)), parentAgent: row.text(10),
+                         owner: row.text(20), asn: Int(row.int(21)), parentAgent: row.text(10),
                          parentAgentName: row.text(11), mcpServer: row.text(12),
-                         channel: NetworkChannel(rawValue: row.text(13)) ?? .ip)
+                         launcherBundleID: row.text(13), launcherName: row.text(14), launcherPath: row.text(15),
+                         routeProxyBundleID: row.text(16), routeProxyName: row.text(17), routeProxyPath: row.text(18),
+                         channel: NetworkChannel(rawValue: row.text(19)) ?? .ip)
         }
     }
 
@@ -1200,6 +1317,47 @@ final class TrafficDatabase: @unchecked Sendable {
                             bundleID: row.text(5), appName: row.text(6), agentKey: row.text(7),
                             agentName: row.text(8), host: row.text(9), ip: row.text(10),
                             port: UInt16(clamping: row.int(11)), path: row.text(12), method: row.text(13))
+        }
+    }
+
+    /// Blocked enforcement evidence for a graph window. Ordinary decisions are exact; managed-pack rows are
+    /// minute rollups, so overlap uses first/last evidence and keeps their indivisible count intact.
+    func blockedAttempts(from: Date, to: Date) throws -> [BlockedAttemptRow] {
+        let lower = Int64(from.timeIntervalSince1970)
+        let upper = Int64(to.timeIntervalSince1970)
+        var attempts = try conn.query("""
+            SELECT bundle_id, app_name, agent, agent_name,
+                   CASE WHEN host <> '' THEN host ELSE ip END, port, COUNT(*), rule_id,
+                   CASE WHEN engine = 'flow' THEN 'Flow rule' ELSE 'Request rule' END
+            FROM rule_events
+            WHERE action = 'block' AND ts >= ? AND ts < ?
+            GROUP BY bundle_id, app_name, agent, agent_name, host, ip, port, rule_id, engine
+            """, [.int(lower), .int(upper)]) { row in
+                BlockedAttemptRow(
+                    bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
+                    destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
+                    category: "rule", source: "ordinary-rule", detail: "\(row.text(8)) · \(row.text(7))"
+                )
+            }
+        attempts += try conn.query("""
+            SELECT bundle_id, app_name, agent, agent_name, host, port, SUM(count), category, pack_id,
+                   GROUP_CONCAT(DISTINCT matched_host)
+            FROM rule_pack_event_rollups
+            WHERE action = 'block' AND first_at < ? AND last_at >= ?
+            GROUP BY bundle_id, app_name, agent, agent_name, host, port, category, pack_id
+            """, [.int(upper), .int(lower)]) { row in
+                BlockedAttemptRow(
+                    bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
+                    destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
+                    category: row.text(7), source: "managed-pack:\(row.text(8))",
+                    detail: row.text(9)
+                )
+            }
+        return attempts.sorted {
+            if $0.count != $1.count { return $0.count > $1.count }
+            if $0.bundleID != $1.bundleID { return $0.bundleID < $1.bundleID }
+            if $0.destination != $1.destination { return $0.destination < $1.destination }
+            return $0.source < $1.source
         }
     }
 

@@ -1702,6 +1702,23 @@
 "Remove this setting" = "Remove this setting";
 "Add Setting" = "Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ a %@, %lld intentos bloqueados";
+"A policy stopped this attempt before it became observed traffic." = "Una política detuvo este intento antes de que se convirtiera en tráfico observado.";
+"Blocked" = "Bloqueado";
+"Blocked attempts" = "Intentos bloqueados";
+"Capture-time process ancestry proves this application started the agent." = "La ascendencia de procesos observada durante la captura demuestra que esta aplicación inició el agente.";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "La atribución de proxy observada durante la captura demuestra que el tráfico de esta aplicación usó esta ruta.";
+"Inspected request evidence proves this invocation." = "La solicitud inspeccionada demuestra esta invocación.";
+"Observed route" = "Ruta observada";
+"Relationship evidence" = "Evidencia de relaciones";
+"Routed through" = "Enrutado mediante";
+"Started agent" = "Agente iniciado";
+"Managed pack: %@" = "Paquete administrado: %@";
+"Ordinary rule" = "Regla normal";
+"Telemetry" = "Telemetría";
+"Tracking" = "Seguimiento";
+"Connections / attempts" = "Conexiones / intentos";
+"Loading visualization…" = "Cargando visualización…";
 "%lld medium or high local assessment%@ in this window." = "%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "%lld eligible request%@ did not receive a contextual verdict.";
@@ -1797,7 +1814,7 @@
 "Unknown destination" = "Destino desconocido";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "Trabaja para %@";
+"Run by %@" = "Ejecutado por %@";
 "MCP service for %@" = "Servicio MCP de %@";
 "LLM service" = "Servicio LLM";
 "AI activity" = "Actividad de IA";
@@ -1808,9 +1825,9 @@
 "No AI activity to visualize" = "No hay actividad de IA que visualizar";
 "Flowlight has not observed any proved AI agent activity in this period." = "Flowlight no ha observado actividad comprobada de agentes de IA en este periodo.";
 "Exact destinations" = "Destinos exactos";
-"Works for" = "Trabaja para";
+"Runs" = "Ejecuta";
 "Invoked" = "Invocado";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "El linaje de procesos almacenado demuestra que esta herramienta trabaja para el agente. No demuestra que se haya invocado la herramienta.";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "El linaje de procesos almacenado demuestra que este agente ejecuta la herramienta. No demuestra que se haya invocado la herramienta.";
 "Block…" = "Bloquear…";
 "Direction and evidence" = "Dirección y evidencia";
 

@@ -1701,6 +1701,23 @@
 "Remove this setting" = "Remove this setting";
 "Add Setting" = "Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ 到 %@，已阻擋 %lld 次嘗試";
+"A policy stopped this attempt before it became observed traffic." = "政策在此嘗試成為已觀察流量之前將其阻擋。";
+"Blocked" = "已阻擋";
+"Blocked attempts" = "已阻擋的嘗試";
+"Capture-time process ancestry proves this application started the agent." = "擷取時的程序層級證明此應用程式啟動了該代理程式。";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "擷取時的代理歸屬證明此應用程式的已觀察流量使用了此路由。";
+"Inspected request evidence proves this invocation." = "已檢查的要求證據證明了此次叫用。";
+"Observed route" = "已觀察路由";
+"Relationship evidence" = "關係證據";
+"Routed through" = "路由經過";
+"Started agent" = "已啟動代理程式";
+"Managed pack: %@" = "受管理規則包：%@";
+"Ordinary rule" = "一般規則";
+"Telemetry" = "遙測";
+"Tracking" = "追蹤";
+"Connections / attempts" = "連線 / 嘗試";
+"Loading visualization…" = "正在載入視覺化…";
 "%lld medium or high local assessment%@ in this window." = "%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "%lld eligible request%@ did not receive a contextual verdict.";
@@ -1796,7 +1813,7 @@
 "Unknown destination" = "未知目的地";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "為 %@ 工作";
+"Run by %@" = "由 %@ 執行";
 "MCP service for %@" = "%@ 的 MCP 服務";
 "LLM service" = "LLM 服務";
 "AI activity" = "AI 活動";
@@ -1807,9 +1824,9 @@
 "No AI activity to visualize" = "沒有可視覺化的 AI 活動";
 "Flowlight has not observed any proved AI agent activity in this period." = "Flowlight 在此期間未觀察到已證實的 AI 代理程式活動。";
 "Exact destinations" = "精確目的地";
-"Works for" = "為其工作";
+"Runs" = "執行";
 "Invoked" = "已呼叫";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "儲存的程序譜系證明此工具為該代理程式工作，但不能證明工具已被呼叫。";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "儲存的程序譜系證明此代理程式執行該工具，但不能證明工具已被呼叫。";
 "Block…" = "封鎖…";
 "Direction and evidence" = "方向和證據";
 

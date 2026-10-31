@@ -46,11 +46,17 @@ enum DemoData {
         var flows: [Flow]
         /// Set for tools and MCP servers an agent started: (agent bundle ID, agent name, MCP server).
         var parent: (id: String, name: String, mcp: String?)? = nil
+        var launcher: (id: String, name: String, path: String)? = nil
+        var routedThroughFlowlight = false
 
         func key(_ flow: Flow) -> FlowKey {
             FlowKey(pid: Int32(abs(bundleID.hashValue % 30_000) + 200), bundleID: bundleID, appName: name, appPath: path,
                     remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport, appProtocol: flow.proto,
-                    channel: flow.channel, parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp)
+                    channel: flow.channel, parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp,
+                    launcherBundleID: launcher?.id, launcherName: launcher?.name, launcherPath: launcher?.path,
+                    routeProxyBundleID: routedThroughFlowlight ? "com.flowlight.app" : nil,
+                    routeProxyName: routedThroughFlowlight ? "Flowlight" : nil,
+                    routeProxyPath: routedThroughFlowlight ? "/Applications/Flowlight.app" : nil)
         }
     }
 
@@ -88,7 +94,8 @@ enum DemoData {
             Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 700_000, outRate: 1_400_000),
             Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 300_000, outRate: 10_000),
             Flow(host: "github.com", ip: "198.51.100.11", port: 22, proto: "ssh", inRate: 50_000, outRate: 30_000),
-        ]),
+        ], launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"),
+           routedThroughFlowlight: true),
         App(bundleID: "git", name: "git", path: "/usr/bin/git", weight: 0.5, flows: [
             Flow(host: "github.com", ip: "198.51.100.11", port: 443, proto: "https", inRate: 400_000, outRate: 60_000),
         ], parent: ("claude", "Claude Code", nil)),
@@ -104,7 +111,7 @@ enum DemoData {
         App(bundleID: "codex", name: "codex", path: "/opt/homebrew/bin/codex", weight: 0.6, flows: [
             Flow(host: "api.openai.com", ip: "198.51.100.90", port: 443, proto: "https", inRate: 500_000, outRate: 900_000),
             Flow(host: "pypi.org", ip: "198.51.100.91", port: 443, proto: "https", inRate: 200_000, outRate: 6_000),
-        ]),
+        ], launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
         App(bundleID: "com.todesktop.230313mzl4w4u92", name: "Cursor", path: "/Applications/Cursor.app", weight: 0.7, flows: [
             Flow(host: "api2.cursor.sh", ip: "198.51.100.100", port: 443, proto: "https", inRate: 600_000, outRate: 800_000),
             Flow(host: "repo42.cursor.sh", ip: "198.51.100.101", port: 443, proto: "https", inRate: 80_000, outRate: 200_000),
@@ -223,6 +230,7 @@ enum DemoData {
         try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
                                       patterns: ["github.com", "npmjs.org", "githubusercontent.com"]))
         try seedAlerts(db, now: now)
+        try seedBlockedAttempts(db, now: now)
         try seedInspection(db, now: now)
     }
 
@@ -235,6 +243,32 @@ enum DemoData {
         configuration.consentedContentSHA256 = String(repeating: "0", count: 64)
         try db.saveRulePackConfiguration(configuration)
         try db.setRulePackReviewRequired(true, packID: configuration.packID)
+    }
+
+    private static func seedBlockedAttempts(_ db: TrafficDatabase, now: Date) throws {
+        let nowTs = Int64(now.timeIntervalSince1970)
+        let ruleID = UUID(uuidString: "A14DA4C2-7930-45C0-A8B9-3B8CD69C4A4E")!
+        try db.recordRuleEvents([
+            RuleEvent(at: nowTs - 4 * 60, ruleID: ruleID, action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: "Google Chrome",
+                      bundleID: "com.google.Chrome", host: "www.google-analytics.com", ip: "", port: 443),
+            RuleEvent(at: nowTs - 17 * 60, ruleID: ruleID, action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: "Safari",
+                      bundleID: "com.apple.Safari", host: "browser.events.data.microsoft.com", ip: "", port: 443)
+        ])
+        let bucket = ((nowTs - 8 * 60) / 60) * 60
+        try db.recordRulePackEvents([
+            RulePackEvent(bucket: bucket, packID: "official.tracking", packVersion: "demo",
+                          entryID: 1, category: .tracking, action: .block, count: 18,
+                          firstAt: bucket, lastAt: bucket + 48, bundleID: "com.google.Chrome",
+                          appName: "Google Chrome", agentKey: "", agentName: "",
+                          host: "www.googletagmanager.com", matchedHost: "googletagmanager.com", port: 443),
+            RulePackEvent(bucket: bucket, packID: "official.telemetry", packVersion: "demo",
+                          entryID: 2, category: .telemetry, action: .block, count: 7,
+                          firstAt: bucket + 5, lastAt: bucket + 51, bundleID: "claude",
+                          appName: "claude", agentKey: "claude", agentName: "Claude Code",
+                          host: "telemetry.example", matchedHost: "telemetry.example", port: 443)
+        ])
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {

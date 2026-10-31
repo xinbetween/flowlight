@@ -16,6 +16,7 @@ final class TrafficGraphTests: XCTestCase {
         parent: String = "",
         parentName: String = "",
         mcp: String = "",
+        launcher: (id: String, name: String, path: String)? = nil,
         protocol appProtocol: String = "https",
         channel: NetworkChannel = .ip
     ) -> BreakdownRow {
@@ -32,6 +33,9 @@ final class TrafficGraphTests: XCTestCase {
             parentAgent: parent,
             parentAgentName: parentName,
             mcpServer: mcp,
+            launcherBundleID: launcher?.id ?? "",
+            launcherName: launcher?.name ?? "",
+            launcherPath: launcher?.path ?? "",
             channel: channel
         )
     }
@@ -64,7 +68,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(agent.counters.bytesOut, 180)
         XCTAssertEqual(snapshot.nodes.filter { $0.kind == .tool }.count, 1)
         XCTAssertEqual(snapshot.nodes.filter { $0.kind == .mcp }.count, 1)
-        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .worksFor }.count, 2)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .runs }.count, 2)
         XCTAssertFalse(snapshot.edges.contains { $0.relationship == .invoked },
                        "stored process lineage is not inspected invocation evidence")
         XCTAssertEqual(snapshot.total.bytesOut, 180, "folding child traffic must not double count it")
@@ -95,7 +99,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertNil(mcp.filter.agentParent,
                      "direct remote MCP evidence has no stored process parent to filter by")
         XCTAssertEqual(mcp.filter.mcpServer, "remote-docs")
-        XCTAssertFalse(snapshot.edges.contains { $0.relationship == .worksFor },
+        XCTAssertFalse(snapshot.edges.contains { $0.relationship == .runs },
                        "remote MCP attribution is not stored process-lineage evidence")
         XCTAssertEqual(snapshot.edges.first { $0.relationship == .observed }?.source, mcp.id)
     }
@@ -113,7 +117,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.title, "node",
                        "the heaviest row supplies display metadata deterministically")
         XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.counters.bytesOut, 30)
-        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .worksFor }.count, 1)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .runs }.count, 1)
 
         let reversed = AITrafficGraphBuilder.build(rows: [
             row(app: "node", name: "node", domain: "two.example", ip: "203.0.113.21", bytesOut: 20,
@@ -130,15 +134,73 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(reversed.hidden, snapshot.hidden, "row order must not change graph accounting")
     }
 
-    func testAIWorksForRelationshipReadsToolToAgent() {
+    func testAIRunsRelationshipReadsAgentToTool() {
         let snapshot = AITrafficGraphBuilder.build(rows: [
             row(app: "curl", name: "curl", domain: "example.com", ip: "203.0.113.10", bytesOut: 25,
                 parent: "claude", parentName: "Claude Code")
         ], limits: .unbounded)
 
-        let lineage = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .worksFor })
-        XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.source }?.kind, .tool)
-        XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.target }?.kind, .agent)
+        let lineage = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .runs })
+        XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.source }?.kind, .agent)
+        XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.target }?.kind, .tool)
+    }
+
+    func testAIBuilderShowsPersistedLauncherEvidenceOnly() {
+        let proved = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.10",
+                bytesOut: 25, launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"))
+        ], limits: .unbounded)
+        let launch = try! XCTUnwrap(proved.edges.first { $0.relationship == .launched })
+        XCTAssertEqual(proved.nodes.first { $0.id == launch.source }?.kind, .launcher)
+        XCTAssertEqual(proved.nodes.first { $0.id == launch.target }?.kind, .agent)
+
+        let unknown = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.10",
+                bytesOut: 25)
+        ], limits: .unbounded)
+        XCTAssertFalse(unknown.edges.contains { $0.relationship == .launched })
+    }
+
+    func testAIBuilderPreservesMultiplePersistedLaunchersDeterministically() {
+        let rows = [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.10",
+                bytesOut: 25, launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
+            row(app: "claude", name: "Claude Code", domain: "github.com", ip: "203.0.113.11",
+                bytesOut: 10, launcher: ("com.apple.Terminal", "Terminal", "/System/Applications/Utilities/Terminal.app"))
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, limits: .unbounded)
+        let reversed = AITrafficGraphBuilder.build(rows: rows.reversed(), limits: .unbounded)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .launcher }.count, 2)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .launched }.count, 2)
+        XCTAssertEqual(reversed.nodes.map(\.id), snapshot.nodes.map(\.id))
+        XCTAssertEqual(reversed.edges.map(\.id), snapshot.edges.map(\.id))
+        XCTAssertEqual(snapshot.visibleTotal.total, 35)
+    }
+
+    func testAIBuilderCapsSharedLaunchersAndKeepsHiddenAccountingTruthful() {
+        let rows = [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.10",
+                bytesOut: 25, launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
+            row(app: "codex", name: "Codex", domain: "api.openai.com", ip: "203.0.113.11",
+                bytesOut: 20, launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
+            row(app: "claude", name: "Claude Code", domain: "github.com", ip: "203.0.113.12",
+                bytesOut: 10, launcher: ("com.apple.Terminal", "Terminal", "/System/Applications/Utilities/Terminal.app"))
+        ]
+        let limits = AITrafficGraphLimits(maxAgents: 2, maxTools: 2, maxDestinations: 2,
+                                          maxObservedEdges: 2, maxLaunchers: 1)
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, limits: limits)
+        let reversed = AITrafficGraphBuilder.build(rows: rows.reversed(), limits: limits)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .launcher }.count, 1)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .launched }.count, 2)
+        XCTAssertGreaterThan(snapshot.hidden.nodeCount, 0)
+        XCTAssertGreaterThan(snapshot.hidden.edgeCount, 0)
+        XCTAssertEqual(reversed.nodes.map(\.id), snapshot.nodes.map(\.id))
+        XCTAssertEqual(reversed.nodes.map(\.title), snapshot.nodes.map(\.title))
+        XCTAssertEqual(reversed.hidden, snapshot.hidden)
     }
 
     func testAIBuilderAcceptsStoredParentIdentityWithoutDisplayName() {
@@ -292,6 +354,177 @@ final class TrafficGraphTests: XCTestCase {
                                "AI node frames \(frames[left]) and \(frames[right]) overlap")
             }
         }
+    }
+
+    func testTrafficBuilderShowsExplicitProxyRouteWithoutDoubleCounting() {
+        var routed = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                         ip: "203.0.113.8", bytesIn: 100, bytesOut: 50, flows: 2)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        routed.routeProxyPath = "/Applications/Flowlight.app"
+
+        let snapshot = TrafficGraphBuilder.build(rows: [routed], limits: .unbounded)
+        let route = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
+        let observed = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+
+        XCTAssertEqual(snapshot.nodes.first { $0.id == route.source }?.kind, .app)
+        XCTAssertEqual(snapshot.nodes.first { $0.id == route.target }?.kind, .proxy)
+        XCTAssertEqual(observed.source, route.target)
+        XCTAssertEqual(route.counters, FlowCounters())
+        XCTAssertEqual(observed.counters, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
+        XCTAssertEqual(snapshot.total, observed.counters)
+        XCTAssertEqual(snapshot.visibleTotal, observed.counters)
+        XCTAssertEqual(snapshot.hidden.nodeCount, 0)
+        XCTAssertEqual(snapshot.hidden.edgeCount, 0)
+    }
+
+    func testTrafficBuilderDeduplicatesOneRouteAcrossDestinationsAndKeepsStableProxyIdentity() {
+        var first = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                        ip: "203.0.113.8", bytesOut: 50)
+        first.routeProxyBundleID = "com.flowlight.app"
+        first.routeProxyName = "Flowlight"
+        var second = row(app: "claude", name: "Claude Code", domain: "github.com",
+                         ip: "203.0.113.9", bytesIn: 75)
+        second.routeProxyBundleID = "com.flowlight.app"
+        second.routeProxyName = "Flowlight renamed"
+
+        let snapshot = TrafficGraphBuilder.build(rows: [first, second], limits: .unbounded)
+
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .routedThrough }.count, 1)
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .proxy }.count, 1)
+        XCTAssertEqual(snapshot.nodes.first { $0.kind == .proxy }?.title, "Flowlight renamed")
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 2)
+        XCTAssertEqual(snapshot.total.total, 125)
+        XCTAssertEqual(snapshot.visibleTotal.total, 125)
+        XCTAssertEqual(snapshot.hidden.nodeCount, 0)
+        XCTAssertEqual(snapshot.hidden.edgeCount, 0)
+
+        let reversed = TrafficGraphBuilder.build(rows: [second, first], limits: .unbounded)
+        XCTAssertEqual(reversed.nodes.map(\.id), snapshot.nodes.map(\.id))
+        XCTAssertEqual(reversed.nodes.map(\.title), snapshot.nodes.map(\.title))
+        XCTAssertEqual(reversed.edges.map(\.id), snapshot.edges.map(\.id))
+        XCTAssertEqual(reversed.total, snapshot.total)
+        XCTAssertEqual(reversed.hidden, snapshot.hidden)
+    }
+
+    func testRoutedObservedEdgesRemainDistinctPerOriginatingApp() {
+        var first = row(app: "claude", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 50)
+        first.routeProxyBundleID = "com.flowlight.app"
+        first.routeProxyName = "Flowlight"
+        var second = row(app: "codex", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 75)
+        second.routeProxyBundleID = "com.flowlight.app"
+        second.routeProxyName = "Flowlight"
+
+        let snapshot = TrafficGraphBuilder.build(rows: [first, second], limits: .unbounded)
+        let observed = snapshot.edges.filter { $0.relationship == .observed }
+
+        XCTAssertEqual(observed.count, 2)
+        XCTAssertEqual(Set(observed.map(\.id)).count, 2)
+        XCTAssertEqual(Set(observed.compactMap(\.filter.bundleID)), ["claude", "codex"])
+        XCTAssertEqual(snapshot.visibleTotal.total, 125)
+    }
+
+    func testBlockedAttemptsStaySeparateFromTrafficTotalsAndAllowBlockedOnlyDestinations() {
+        let observed = row(app: "com.browser", name: "Browser", domain: "example.com",
+                           ip: "203.0.113.8", bytesIn: 100, bytesOut: 25, flows: 2)
+        let blocked = [
+            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                              destination: "www.google-analytics.com", port: 443, count: 4,
+                              category: "tracking", source: "Managed pack · official.privacy",
+                              detail: "google-analytics.com"),
+            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                              destination: "www.google-analytics.com", port: 443, count: 2,
+                              category: "Rule", source: "Ordinary rule",
+                              detail: "google-analytics.com")
+        ]
+
+        let snapshot = TrafficGraphBuilder.build(rows: [observed], blockedAttempts: blocked, limits: .unbounded)
+        let edge = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .blocked }.count, 1)
+        XCTAssertEqual(edge.enforcement?.count, 6)
+        XCTAssertEqual(edge.enforcement?.category, "Rule, tracking")
+        XCTAssertEqual(edge.enforcement?.source, "Managed pack · official.privacy, Ordinary rule")
+        XCTAssertEqual(edge.counters, FlowCounters())
+        XCTAssertEqual(edge.filter.domain, "www.google-analytics.com")
+        XCTAssertEqual(snapshot.nodes.first { $0.id == edge.target }?.title, "google-analytics.com")
+        XCTAssertEqual(snapshot.total, observed.counters)
+        XCTAssertEqual(snapshot.visibleTotal, observed.counters)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 1)
+    }
+
+    func testBlockedAttemptsKeepPortsDistinct() {
+        let blocked = [
+            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                              destination: "example.com", port: 22, count: 2,
+                              category: "rule", source: "ordinary-rule", detail: "ssh"),
+            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                              destination: "example.com", port: 443, count: 3,
+                              category: "rule", source: "ordinary-rule", detail: "https")
+        ]
+
+        let snapshot = TrafficGraphBuilder.build(rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded)
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }
+
+        XCTAssertEqual(edges.count, 2)
+        XCTAssertEqual(Set(edges.compactMap { $0.enforcement?.count }), [2, 3])
+        XCTAssertTrue(edges.contains { $0.enforcement?.detail.contains("Port 22") == true })
+        XCTAssertTrue(edges.contains { $0.enforcement?.detail.contains("Port 443") == true })
+    }
+
+    func testBlockedEvidenceSharesTheGlobalNodeBudget() {
+        let observed = (0..<10).map { index in
+            row(app: "app.\(index)", domain: "observed-\(index).example", ip: "203.0.113.\(index + 1)",
+                bytesIn: Int64(100 - index))
+        }
+        let blocked = (0..<5).map { index in
+            BlockedAttemptRow(bundleID: "app.\(index)", appName: "App \(index)", agentKey: "", agentName: "",
+                              destination: "blocked-\(index).example", port: 443, count: Int64(20 - index),
+                              category: "tracking", source: "managed-pack:official.privacy", detail: "")
+        }
+        let limits = TrafficGraphLimits(maxApps: 8, maxDestinations: 10, maxEdges: 28, maxBlockedEdges: 12)
+
+        let snapshot = TrafficGraphBuilder.build(rows: observed, blockedAttempts: blocked, limits: limits)
+
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .app }.count, limits.maxApps)
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .destination }.count, limits.maxDestinations)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .blocked }.count, 5)
+        XCTAssertGreaterThan(snapshot.hidden.edgeCount, 0)
+    }
+
+    func testBlockedOnlyAppsCannotStarveBusyObservedTraffic() {
+        let observed = row(app: "busy.app", name: "Busy", domain: "api.example.com",
+                           ip: "203.0.113.8", bytesIn: 1_000_000)
+        let blocked = (0..<8).map { index in
+            BlockedAttemptRow(bundleID: "blocked.\(index)", appName: "Blocked \(index)", agentKey: "", agentName: "",
+                              destination: "tracker-\(index).example", port: 443, count: Int64(100 - index),
+                              category: "tracking", source: "managed-pack:test", detail: "")
+        }
+        let limits = TrafficGraphLimits(maxApps: 8, maxDestinations: 10, maxEdges: 28,
+                                        maxBlockedEdges: 12, maxRelays: 6)
+
+        let snapshot = TrafficGraphBuilder.build(rows: [observed], blockedAttempts: blocked, limits: limits)
+
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .observed && $0.filter.bundleID == "busy.app" })
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .app }.count, limits.maxApps)
+    }
+
+    func testProxyNodesRespectIntermediaryBudget() {
+        let rows = (0..<8).map { index -> BreakdownRow in
+            var result = row(app: "app.\(index)", domain: "api-\(index).example", ip: "203.0.113.\(index + 1)",
+                             bytesIn: Int64(100 - index))
+            result.routeProxyBundleID = "proxy.\(index)"
+            result.routeProxyName = "Proxy \(index)"
+            return result
+        }
+        let limits = TrafficGraphLimits(maxApps: 8, maxDestinations: 10, maxEdges: 28,
+                                        maxBlockedEdges: 12, maxRelays: 3)
+
+        let snapshot = TrafficGraphBuilder.build(rows: rows, limits: limits)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .proxy }.count, 3)
+        XCTAssertGreaterThan(snapshot.hidden.edgeCount, 0)
+        XCTAssertGreaterThan(snapshot.hidden.counters.total, 0)
     }
 
     func testBuilderAggregatesDuplicateExactRelationships() {
@@ -614,9 +847,9 @@ final class TrafficGraphTests: XCTestCase {
             let narrowFrame = try! XCTUnwrap(narrow.nodeFrames[node.id])
             XCTAssertEqual(narrowFrame.midY, wideFrame.midY, accuracy: 0.001)
             switch node.kind {
-            case .app, .agent:
+            case .app, .agent, .launcher:
                 XCTAssertEqual(narrowFrame.midX, 24 + TrafficGraphLayout.appSize.width / 2, accuracy: 0.001)
-            case .tool, .mcp:
+            case .tool, .mcp, .proxy:
                 XCTAssertEqual(narrowFrame.midX, 450, accuracy: 0.001)
                 XCTAssertNotEqual(narrowFrame.midX, wideFrame.midX)
             case .destination, .service:
@@ -717,7 +950,7 @@ final class TrafficGraphTests: XCTestCase {
 
         XCTAssertEqual(sourcePorts, sourcePorts.sorted())
         XCTAssertTrue(observed.allSatisfy { (layout.edgeWidths[$0.id] ?? 0) > 1.5 })
-        for edge in snapshot.edges where edge.relationship == .worksFor {
+        for edge in snapshot.edges where edge.relationship == .runs {
             XCTAssertEqual(layout.edgeWidths[edge.id], 1.5)
         }
     }

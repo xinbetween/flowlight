@@ -44,6 +44,118 @@ final class DatabaseTests: XCTestCase {
         FlowKey(pid: 10, bundleID: app, appName: app, appPath: "", remoteIP: ip, domain: domain, port: port, transport: .tcp, appProtocol: "https")
     }
 
+    func testVersionedNameRepairMergesCollidingIdentityState() throws {
+        let timestamp: Int64 = 1_700_000_000
+        var versioned = key("2.1.260", "api.example.com")
+        versioned.appName = "2.1.260"
+        versioned.appPath = "/usr/local/bin/claude"
+        var named = versioned
+        named.bundleID = "claude"
+        named.appName = "Claude Code"
+        try db.insert([TrafficBatch(timestamp: timestamp, records: [
+            TrafficRecord(key: versioned, counters: FlowCounters(bytesIn: 10, flows: 1)),
+            TrafficRecord(key: named, counters: FlowCounters(bytesIn: 20, flows: 1))
+        ])])
+        try db.markSeen(destinations: [("claude", "api.example.com")], ports: [("claude", 443)],
+                        apps: ["claude"], at: timestamp + 10)
+        try db.markSeen(destinations: [("2.1.260", "api.example.com")], ports: [("2.1.260", 443)],
+                        apps: ["2.1.260"], at: timestamp)
+        try db.saveBaseline(bundleID: "claude", metric: "upload", .init(mean: 2, variance: 1, samples: 2))
+        try db.saveBaseline(bundleID: "2.1.260", metric: "upload", .init(mean: 3, variance: 1, samples: 3))
+        try db.savePolicy(AgentPolicy(agentID: "claude", patterns: ["target.example"]))
+        try db.savePolicy(AgentPolicy(agentID: "2.1.260", patterns: ["version.example"]))
+
+        try db.repairVersionedNames()
+
+        let traffic = try db.raw(
+            "SELECT bundle_id, bytes_in, flows FROM flows_1s",
+            map: { ($0.text(0), $0.int(1), $0.int(2)) }
+        )
+        XCTAssertEqual(traffic.count, 1)
+        XCTAssertEqual(traffic.first?.0, "claude")
+        XCTAssertEqual(traffic.first?.1, 30)
+        XCTAssertEqual(traffic.first?.2, 2)
+        let seen = try db.loadSeen()
+        XCTAssertEqual(seen.destinations, ["claude|api.example.com"])
+        XCTAssertEqual(seen.ports, ["claude|443"])
+        XCTAssertEqual(seen.apps, ["claude": timestamp])
+        XCTAssertEqual(try db.raw("SELECT COUNT(*) FROM baselines WHERE bundle_id = '2.1.260'",
+                                  map: { $0.int(0) }).first, 0)
+        XCTAssertEqual(try db.raw("SELECT COUNT(*) FROM agent_policies WHERE agent_id = '2.1.260'",
+                                  map: { $0.int(0) }).first, 0)
+        XCTAssertNotNil(try db.baselines(metric: "upload")["claude"])
+        XCTAssertNotNil(try db.loadPolicies()["claude"])
+    }
+
+    func testVersionedNameRepairRunsAgainForLegacyWatermarkAndUpdatesEnforcementHistory() throws {
+        let url = db.url
+        var versioned = key("2.1.260", "api.example.com")
+        versioned.appName = "2.1.260"
+        versioned.appPath = "/usr/local/bin/claude"
+        try db.insert([TrafficBatch(timestamp: 1_700_000_000, records: [
+            TrafficRecord(key: versioned, counters: FlowCounters(bytesIn: 1, flows: 1))
+        ])])
+        try db.recordRuleEvents([
+            RuleEvent(at: 1_700_000_001, ruleID: UUID(), action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: "2.1.260", bundleID: "2.1.260",
+                      host: "telemetry.example", ip: "", port: 443)
+        ])
+        try db.recordRulePackEvents([
+            RulePackEvent(bucket: 1_700_000_000, packID: "official.telemetry", packVersion: "1",
+                          entryID: 1, category: .telemetry, action: .block, count: 2,
+                          firstAt: 1_700_000_001, lastAt: 1_700_000_002, bundleID: "2.1.260",
+                          appName: "2.1.260", agentKey: "", agentName: "", host: "metrics.example",
+                          matchedHost: "metrics.example", port: 443)
+        ])
+        db = nil
+        let legacy = try SQLiteConnection(path: url.path)
+        try legacy.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 1)")
+
+        let reopened = try TrafficDatabase(url: url)
+
+        XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
+                                        map: { $0.int(0) }).first, 2)
+        XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), ["claude"])
+        XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_pack_event_rollups",
+                                        map: { $0.text(0) }), ["claude"])
+    }
+
+    func testBlockedAttemptProjectionIsWindowedAndExcludesAllows() throws {
+        let from = Date(timeIntervalSince1970: 1_700_000_000)
+        let ruleID = UUID()
+        try db.recordRuleEvents([
+            RuleEvent(at: 1_700_000_010, ruleID: ruleID, action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
+                      host: "www.google-analytics.com", ip: "", port: 443),
+            RuleEvent(at: 1_700_000_011, ruleID: ruleID, action: .allow, engine: .flow,
+                      agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
+                      host: "analytics.google.com", ip: "", port: 443),
+            RuleEvent(at: 1_700_000_100, ruleID: ruleID, action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
+                      host: "outside.example", ip: "", port: 443)
+        ])
+        try db.recordRulePackEvents([
+            RulePackEvent(bucket: 1_700_000_020, packID: "official.privacy", packVersion: "1",
+                          entryID: 7, category: .tracking, action: .block, count: 3,
+                          firstAt: 1_700_000_020, lastAt: 1_700_000_029, bundleID: "com.browser",
+                          appName: "Browser", agentKey: "", agentName: "", host: "telemetry.example",
+                          matchedHost: "telemetry.example", port: 443),
+            RulePackEvent(bucket: 1_700_000_020, packID: "official.privacy", packVersion: "1",
+                          entryID: 8, category: .tracking, action: .allow, count: 9,
+                          firstAt: 1_700_000_020, lastAt: 1_700_000_029, bundleID: "com.browser",
+                          appName: "Browser", agentKey: "", agentName: "", host: "analytics.google.com",
+                          matchedHost: "analytics.google.com", port: 443)
+        ])
+
+        let attempts = try db.blockedAttempts(from: from, to: from.addingTimeInterval(60))
+
+        XCTAssertEqual(attempts.reduce(Int64(0)) { $0 + $1.count }, 4)
+        XCTAssertEqual(Set(attempts.map(\.destination)), ["www.google-analytics.com", "telemetry.example"])
+        XCTAssertFalse(attempts.contains { $0.destination == "analytics.google.com" })
+        XCTAssertFalse(attempts.contains { $0.destination == "outside.example" })
+        XCTAssertTrue(attempts.contains { $0.source == "managed-pack:official.privacy" && $0.count == 3 })
+    }
+
     func testRollupsAndQueries() throws {
         let utc = TimeZone(identifier: "UTC")!
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = utc
@@ -298,6 +410,35 @@ final class DatabaseTests: XCTestCase {
         let legacy = #"[{"timestamp":1,"records":[{"key":{"pid":1,"bundleID":"a","appName":"a","appPath":"","remoteIP":"1.1.1.1","domain":"","port":443,"transport":"tcp","appProtocol":"https"},"counters":{"bytesIn":1,"bytesOut":1,"flows":0}}]}]"#
         let decoded = try JSONDecoder().decode([TrafficBatch].self, from: Data(legacy.utf8))
         XCTAssertNil(decoded[0].records[0].key.parentAgent)
+        XCTAssertNil(decoded[0].records[0].key.launcherBundleID)
+        XCTAssertNil(decoded[0].records[0].key.routeProxyBundleID)
+    }
+
+    func testVisualizationProvenanceRoundTripsThroughRollups() throws {
+        let t0: Int64 = 1_700_000_000 - (1_700_000_000 % 3600)
+        var routed = key("claude", "api.anthropic.com", ip: "203.0.113.8")
+        routed.launcherBundleID = "com.mitchellh.ghostty"
+        routed.launcherName = "Ghostty"
+        routed.launcherPath = "/Applications/Ghostty.app"
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        routed.routeProxyPath = "/Applications/Flowlight.app"
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: routed, counters: FlowCounters(bytesIn: 10, bytesOut: 20, flows: 1))
+        ])])
+        try db.rollup(now: Date(timeIntervalSince1970: TimeInterval(t0 + 3_700)),
+                      timeZone: TimeZone(secondsFromGMT: 0)!)
+
+        for granularity in [Granularity.second, .minute, .hour] {
+            let rows = try db.appDestinationRows(
+                granularity,
+                from: Date(timeIntervalSince1970: TimeInterval(t0)),
+                to: Date(timeIntervalSince1970: TimeInterval(t0 + 3_600))
+            )
+            XCTAssertEqual(rows.first?.launcherBundleID, "com.mitchellh.ghostty")
+            XCTAssertEqual(rows.first?.routeProxyBundleID, "com.flowlight.app")
+            XCTAssertEqual(rows.first?.counters, FlowCounters(bytesIn: 10, bytesOut: 20, flows: 1))
+        }
     }
 
     func testLegacyMergedAttributionIsUntrustedWithoutLosingTraffic() throws {

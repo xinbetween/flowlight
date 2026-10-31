@@ -460,7 +460,12 @@ final class ProxyAttributionTests: XCTestCase {
         XCTAssertEqual(out.count, 2)
         XCTAssertEqual(out[0].key.bundleID, "curl")
         XCTAssertEqual(out[0].key.parentAgent, "claude")
+        XCTAssertEqual(out[0].key.routeProxyBundleID, "com.flowlight.app")
+        XCTAssertEqual(out[0].key.routeProxyName, "Flowlight")
+        XCTAssertEqual(out[0].counters, FlowCounters(bytesIn: 100, bytesOut: 10, flows: 1),
+                       "the explicit route must not restore or double-count hidden loopback legs")
         XCTAssertEqual(out[1].key.bundleID, "com.flowlight.app")
+        XCTAssertNil(out[1].key.routeProxyBundleID, "ordinary Flowlight traffic is not proxy-route evidence")
     }
 }
 

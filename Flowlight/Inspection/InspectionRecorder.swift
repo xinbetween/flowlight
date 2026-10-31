@@ -381,6 +381,9 @@ final class ProxyAttribution: @unchecked Sendable {
                 record.key.bundleID = owner.bundleID
                 record.key.appName = owner.appName
                 record.key.appPath = owner.appPath
+                record.key.routeProxyBundleID = "com.flowlight.app"
+                record.key.routeProxyName = "Flowlight"
+                record.key.routeProxyPath = Bundle.main.bundleURL.path
                 if let agent = owner.agent, agent != owner.bundleID {
                     record.key.parentAgent = agent
                     record.key.parentAgentName = owner.agentName

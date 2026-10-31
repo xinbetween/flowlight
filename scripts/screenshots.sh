@@ -37,6 +37,7 @@ SHOTS=(
   "reports:reports::"
   "alerts:alerts::"
   "inspect:inspect::"
+  "visualize:visualize::1600x994"
 )
 
 capture() {
