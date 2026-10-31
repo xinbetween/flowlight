@@ -10,6 +10,13 @@ struct InspectView: View {
 }
 
 enum InspectLinkQuery {
+    static func needsSupportingRows(search: String, app: String?, includeAttributedChildren: Bool,
+                                    agentParent: String?, mcpServer: String?) -> Bool {
+        if !search.isEmpty { return true }
+        if agentParent?.isEmpty == false { return true }
+        return app?.isEmpty == false && (includeAttributedChildren || mcpServer?.isEmpty == false)
+    }
+
     static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
                      app: String?, host: String?, includeAttributedChildren: Bool,
                      agentParent: String?, mcpServer: String?) throws -> [HTTPExchange] {
@@ -25,6 +32,17 @@ enum InspectLinkQuery {
         let supporting = try database.exchanges(since: since, app: root)
         let visibleIDs = Set(visible.compactMap(\.id))
         return visible + supporting.filter { $0.id.map { !visibleIDs.contains($0) } ?? true }
+    }
+}
+
+enum InspectScopeSummary {
+    static func text(appName: String?, host: String?, potentialHarmOnly: Bool) -> String {
+        if potentialHarmOnly { return L("Showing only requests with medium or high potential harm") }
+        if let appName, let host {
+            return L("Showing only traffic from %@", appName) + " · " + L("Showing only traffic to %@", host)
+        }
+        if let appName { return L("Showing only traffic from %@", appName) }
+        return L("Showing only traffic to %@", host ?? "")
     }
 }
 
@@ -256,13 +274,17 @@ private struct InspectContent: View {
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
             selection = exchanges.first { $0.host.localizedCaseInsensitiveContains(wanted) }?.id
         }
-        // Drop only the text term for causal linking. The explicit app/host/attribution scope still defines which
-        // activity can be associated with the visible exchange.
-        let all = term.isEmpty ? exchanges : ((try? await monitor.read {
+        // Drop only the text term for causal linking. Exact visible rows stay on screen, while an attributed child
+        // also receives its root agent's private supporting exchanges even when navigation supplied no search text.
+        let needsSupport = InspectLinkQuery.needsSupportingRows(
+            search: term, app: app, includeAttributedChildren: includeChildren,
+            agentParent: parent, mcpServer: mcp
+        )
+        let all = needsSupport ? ((try? await monitor.read {
             try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, host: host,
                                       includeAttributedChildren: includeChildren,
                                       agentParent: parent, mcpServer: mcp)
-        }) ?? [])
+        }) ?? []) : exchanges
         links = ToolCallLinks.link(all)
         var found: [String: ToolResult] = [:]
         for e in all { for r in e.toolResults where found[r.callID] == nil { found[r.callID] = r } }
@@ -320,9 +342,12 @@ private struct InspectContent: View {
         if scopeApp != nil || scopeHost != nil || potentialHarmOnly {
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal.decrease.circle.fill").foregroundStyle(.tint)
-                Text(potentialHarmOnly ? L("Showing only requests with medium or high potential harm")
-                                       : (scopeApp.map { L("Showing only traffic from %@", $0.name) } ?? L("Showing only traffic to %@", scopeHost ?? "")))
-                    .font(.callout)
+                Text(InspectScopeSummary.text(
+                    appName: scopeApp?.name,
+                    host: scopeHost,
+                    potentialHarmOnly: potentialHarmOnly
+                ))
+                .font(.callout)
                 Button {
                     scopeApp = nil
                     scopeHost = nil

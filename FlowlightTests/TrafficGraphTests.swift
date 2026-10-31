@@ -99,6 +99,36 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.edges.first { $0.relationship == .observed }?.source, mcp.id)
     }
 
+    func testAIToolIdentityDoesNotSplitWhenDisplayNamesChange() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "Node", domain: "one.example", ip: "203.0.113.20", bytesOut: 10,
+                parent: "claude", parentName: "Claude Code"),
+            row(app: "node", name: "node", domain: "two.example", ip: "203.0.113.21", bytesOut: 20,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .tool }.count, 1,
+                       "mutable display metadata must not create separate tool identities")
+        XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.title, "node",
+                       "the heaviest row supplies display metadata deterministically")
+        XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.counters.bytesOut, 30)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .worksFor }.count, 1)
+
+        let reversed = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "node", domain: "two.example", ip: "203.0.113.21", bytesOut: 20,
+                parent: "claude", parentName: "Claude Code"),
+            row(app: "node", name: "Node", domain: "one.example", ip: "203.0.113.20", bytesOut: 10,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+        XCTAssertEqual(reversed.nodes.map(\.id), snapshot.nodes.map(\.id))
+        XCTAssertEqual(reversed.nodes.map(\.title), snapshot.nodes.map(\.title))
+        XCTAssertEqual(reversed.nodes.map(\.counters), snapshot.nodes.map(\.counters))
+        XCTAssertEqual(reversed.edges.map(\.id), snapshot.edges.map(\.id))
+        XCTAssertEqual(reversed.edges.map(\.counters), snapshot.edges.map(\.counters))
+        XCTAssertEqual(reversed.total, snapshot.total)
+        XCTAssertEqual(reversed.hidden, snapshot.hidden, "row order must not change graph accounting")
+    }
+
     func testAIWorksForRelationshipReadsToolToAgent() {
         let snapshot = AITrafficGraphBuilder.build(rows: [
             row(app: "curl", name: "curl", domain: "example.com", ip: "203.0.113.10", bytesOut: 25,

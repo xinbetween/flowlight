@@ -325,7 +325,7 @@ final class TrafficDatabase: @unchecked Sendable {
         guard !realName.isEmpty else { return }
 
         let columns = "ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, " +
-                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel"
+                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel, attribution_exact"
         for (version, real) in realName {
             for table in Self.tables {
                 // Re-inserted rather than updated, because `bundle_id` is part of the unique key: renaming can
@@ -334,9 +334,10 @@ final class TrafficDatabase: @unchecked Sendable {
                 try conn.run("""
                     INSERT INTO \(table) (\(columns))
                     SELECT ts, pid, ?, ?, app_path, remote_ip, domain, port, transport, protocol,
-                           bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel
+                           bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel,
+                           attribution_exact
                     FROM \(table) WHERE bundle_id = ?
-                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server)
+                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact)
                     DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
                                   bytes_out = bytes_out + excluded.bytes_out,
                                   flows = flows + excluded.flows;
@@ -372,6 +373,23 @@ final class TrafficDatabase: @unchecked Sendable {
             for column in ["agent_parent", "agent_parent_name", "mcp_server"] where !columns.contains(column) {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
             }
+            // `_key2` treated attribution as mutable metadata, so one row may already contain bytes from several
+            // parents while retaining one arbitrary label. Preserve every field and counter, but mark provenance:
+            // only rows written under the attribution-aware schema may be used as lineage evidence.
+            let hadLegacyAttributionKey = try conn.query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ? LIMIT 1",
+                [.text("\(table)_key2")]
+            ) { _ in true }.first == true
+            let hadExactAttributionKey = try conn.query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ? LIMIT 1",
+                [.text("\(table)_key3")]
+            ) { _ in true }.first == true
+            if !columns.contains("attribution_exact") {
+                try conn.execute("ALTER TABLE \(table) ADD COLUMN attribution_exact INTEGER NOT NULL DEFAULT 0")
+                if hadExactAttributionKey && !hadLegacyAttributionKey {
+                    try conn.run("UPDATE \(table) SET attribution_exact = 1")
+                }
+            }
             // v0.4.0: which way the bytes left the Mac. It joins the unique key rather than riding along as an
             // attribute — the same app on the same port over Wi-Fi and over AWDL is two different things, and
             // merging them is exactly how peer-to-peer traffic stayed invisible. Existing rows default to the
@@ -383,9 +401,10 @@ final class TrafficDatabase: @unchecked Sendable {
             try conn.execute("""
             DROP INDEX IF EXISTS \(table)_key;
             DROP INDEX IF EXISTS \(table)_key2;
-            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key3 ON \(table)(
+            DROP INDEX IF EXISTS \(table)_key3;
+            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key4 ON \(table)(
                 ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                agent_parent, agent_parent_name, mcp_server
+                agent_parent, agent_parent_name, mcp_server, attribution_exact
             );
             """)
         }
@@ -589,9 +608,9 @@ final class TrafficDatabase: @unchecked Sendable {
     func insert(_ batches: [TrafficBatch]) throws {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -621,9 +640,9 @@ final class TrafficDatabase: @unchecked Sendable {
         precondition(Self.tables.contains(table))
         let sql = """
         INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -667,13 +686,14 @@ final class TrafficDatabase: @unchecked Sendable {
     private func fold(from source: String, into target: String, bucket: String, lower: Int64, upper: Int64) throws {
         try conn.run("""
         INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                               agent_parent, agent_parent_name, mcp_server, channel)
+                               agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
-               SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server, channel
+               SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server, channel,
+               attribution_exact
         FROM \(source) WHERE ts >= ? AND ts < ?
         GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                 agent_parent, agent_parent_name, mcp_server
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server) DO UPDATE SET
+                 agent_parent, agent_parent_name, mcp_server, attribution_exact
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """, [.int(lower), .int(upper)])
     }
@@ -726,14 +746,22 @@ final class TrafficDatabase: @unchecked Sendable {
                              includeAttributedChildren: Bool = false) -> (String, [SQLValue]) {
         var clauses = ["ts >= ?", "ts < ?"]
         var values: [SQLValue] = [.int(Int64(from.timeIntervalSince1970)), .int(Int64(to.timeIntervalSince1970))]
+        let includeChildren = includeAttributedChildren || filter.includeAttributedChildren
         if let v = filter.bundleID {
-            let includeChildren = includeAttributedChildren || filter.includeAttributedChildren
-            clauses.append(includeChildren ? "(bundle_id = ? OR agent_parent = ?)" : "bundle_id = ?")
+            clauses.append(includeChildren
+                ? "(bundle_id = ? OR (attribution_exact = 1 AND agent_parent = ?))"
+                : "bundle_id = ?")
             values.append(.text(v))
             if includeChildren { values.append(.text(v)) }
         }
-        if let v = filter.agentParent { clauses.append("agent_parent = ?"); values.append(.text(v)) }
-        if let v = filter.mcpServer { clauses.append("mcp_server = ?"); values.append(.text(v)) }
+        if let v = filter.agentParent {
+            clauses.append("attribution_exact = 1 AND agent_parent = ?")
+            values.append(.text(v))
+        }
+        if let v = filter.mcpServer {
+            clauses.append("attribution_exact = 1 AND mcp_server = ?")
+            values.append(.text(v))
+        }
         if let v = filter.domain { clauses.append("domain = ?"); values.append(.text(v)) }
         if let v = filter.remoteIP { clauses.append("remote_ip = ?"); values.append(.text(v)) }
         if let v = filter.owner { clauses.append("remote_ip IN (SELECT ip FROM ip_owners WHERE owner = ?)"); values.append(.text(v)) }
@@ -743,8 +771,10 @@ final class TrafficDatabase: @unchecked Sendable {
         }
         if let v = filter.appProtocol { clauses.append("protocol = ?"); values.append(.text(v)) }
         if let v = filter.channel { clauses.append("channel = ?"); values.append(.text(v.rawValue)) }
-        if let (clause, focusValues) = Self.focusClause(filter.focus,
-                                                        includeAttributedChildren: includeAttributedChildren) {
+        if let (clause, focusValues) = Self.focusClause(
+            filter.focus,
+            includeAttributedChildren: includeChildren || filter.agentParent != nil || filter.mcpServer != nil
+        ) {
             clauses.append(clause)
             values += focusValues
         }
@@ -761,7 +791,7 @@ final class TrafficDatabase: @unchecked Sendable {
         if !focus.bundleIDs.isEmpty {
             let placeholders = Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")
             parts.append(includeAttributedChildren
-                         ? "(\(bundleColumn) IN (\(placeholders)) OR agent_parent IN (\(placeholders)))"
+                         ? "(\(bundleColumn) IN (\(placeholders)) OR (attribution_exact = 1 AND agent_parent IN (\(placeholders))))"
                          : "\(bundleColumn) IN (\(placeholders))")
             values += focus.bundleIDs.map { .text($0) }
             if includeAttributedChildren { values += focus.bundleIDs.map { .text($0) } }
@@ -875,9 +905,16 @@ final class TrafficDatabase: @unchecked Sendable {
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
                        GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
                        SUM(bytes_in), SUM(bytes_out), SUM(flows),
-                       agent_parent, agent_parent_name, mcp_server, channel
+                       CASE WHEN attribution_exact = 1 THEN agent_parent ELSE '' END,
+                       CASE WHEN attribution_exact = 1 THEN agent_parent_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 THEN mcp_server ELSE '' END,
+                       channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip, agent_parent, agent_parent_name, mcp_server, channel
+                GROUP BY bundle_id, domain, remote_ip, attribution_exact,
+                         CASE WHEN attribution_exact = 1 THEN agent_parent ELSE '' END,
+                         CASE WHEN attribution_exact = 1 THEN agent_parent_name ELSE '' END,
+                         CASE WHEN attribution_exact = 1 THEN mcp_server ELSE '' END,
+                         channel
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
@@ -1939,8 +1976,8 @@ final class TrafficDatabase: @unchecked Sendable {
             values.append(.text(mcp))
         }
         if let host = filter.domain, !host.isEmpty {
-            clause += " AND (e.host = ? OR e.host LIKE ?)"
-            values += [.text(host), .text("%." + host)]
+            clause += " AND e.host = ?"
+            values.append(.text(host))
         } else if filter.remoteIP != nil {
             // Inspected exchanges retain hostnames, not destination addresses. An IP-only traffic scope has no
             // corresponding request rows and must not silently widen the Potential harm card.
@@ -1954,8 +1991,12 @@ final class TrafficDatabase: @unchecked Sendable {
             var focusParts: [String] = []
             if !filter.focus.bundleIDs.isEmpty {
                 let marks = Array(repeating: "?", count: filter.focus.bundleIDs.count).joined(separator: ",")
-                focusParts.append("e.bundle_id IN (\(marks))")
+                let matchesParent = filter.includeAttributedChildren || filter.agentParent != nil || filter.mcpServer != nil
+                focusParts.append(matchesParent
+                    ? "(e.bundle_id IN (\(marks)) OR e.agent IN (\(marks)))"
+                    : "e.bundle_id IN (\(marks))")
                 values += filter.focus.bundleIDs.map { .text($0) }
+                if matchesParent { values += filter.focus.bundleIDs.map { .text($0) } }
             }
             for host in filter.focus.hosts where !AgentPolicy.isIPAddress(host) {
                 focusParts.append("(e.host = ? OR e.host LIKE ?)")
@@ -2104,8 +2145,13 @@ final class TrafficDatabase: @unchecked Sendable {
         if !focus.isEmpty {
             var parts: [String] = []
             if !focus.bundleIDs.isEmpty {
-                parts.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+                let marks = Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")
+                let matchesParent = includeAttributedChildren || agentParent != nil || mcpServer != nil
+                parts.append(matchesParent
+                    ? "(bundle_id IN (\(marks)) OR agent IN (\(marks)))"
+                    : "bundle_id IN (\(marks))")
                 focusValues += focus.bundleIDs.map { .text($0) }
+                if matchesParent { focusValues += focus.bundleIDs.map { .text($0) } }
             }
             for host in focus.hosts where !AgentPolicy.isIPAddress(host) {
                 parts.append("(host = ? OR host LIKE ?)")

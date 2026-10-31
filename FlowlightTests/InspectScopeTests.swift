@@ -78,7 +78,7 @@ final class InspectScopeTests: XCTestCase {
         let set = try InspectLinkQuery.load(
             from: db,
             since: Date().addingTimeInterval(-60),
-            focus: .none,
+            focus: FocusScope(bundleIDs: ["claude"]),
             app: "node",
             host: "api.github.com",
             includeAttributedChildren: false,
@@ -103,6 +103,30 @@ final class InspectScopeTests: XCTestCase {
         )
         XCTAssertEqual(ToolCallLinks.link(rootSet)[childID]?.call.callID, "call-1",
                        "an agent-root scope also keeps its root exchanges for child linking")
+    }
+
+    func testEmptySearchStillLoadsParentSupportForCausalLinks() {
+        XCTAssertTrue(InspectLinkQuery.needsSupportingRows(
+            search: "",
+            app: "node",
+            includeAttributedChildren: false,
+            agentParent: "claude",
+            mcpServer: "github"
+        ))
+        XCTAssertFalse(InspectLinkQuery.needsSupportingRows(
+            search: "",
+            app: "Safari",
+            includeAttributedChildren: false,
+            agentParent: nil,
+            mcpServer: nil
+        ))
+    }
+
+    func testScopeSummaryDisclosesBothAppAndHost() {
+        XCTAssertEqual(
+            InspectScopeSummary.text(appName: "Node", host: "api.github.com", potentialHarmOnly: false),
+            L("Showing only traffic from %@", "Node") + " · " + L("Showing only traffic to %@", "api.github.com")
+        )
     }
 
     func testNoScopeStillReturnsEverything() throws {

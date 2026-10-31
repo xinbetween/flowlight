@@ -121,6 +121,35 @@ final class LocalRiskAnalysisTests: XCTestCase {
             visibleOnly: false
         )
         XCTAssertEqual(exact.unassessed, 1, "other agents and MCP servers must stay outside the visible exact scope")
+
+        let focused = try db.localRiskCounts(
+            since: since,
+            filter: TrafficFilter(
+                bundleID: "node",
+                agentParent: "claude",
+                mcpServer: "github",
+                domain: "api.github.com",
+                focus: FocusScope(bundleIDs: ["claude"])
+            ),
+            visibleOnly: false
+        )
+        XCTAssertEqual(focused.unassessed, 1, "Focus on the parent agent must retain the visible attributed child")
+    }
+
+    func testRiskCountsKeepExactHostSeparateFromSubdomains() throws {
+        let db = try database()
+        let tool = ToolCall(source: .anthropic, callID: "risk", name: "Bash", mcpServer: nil,
+                            input: "", summary: nil)
+        for host in ["api.github.com", "child.api.github.com"] {
+            _ = try db.insertExchange(exchange(host: host, tools: [tool]), enqueueLocalRisk: true)
+        }
+
+        let exact = try db.localRiskCounts(
+            since: Date().addingTimeInterval(-60),
+            filter: TrafficFilter(domain: "api.github.com"),
+            visibleOnly: false
+        )
+        XCTAssertEqual(exact.unassessed, 1, "an exact traffic hostname must not include subdomain assessments")
     }
 
     func testCoordinatorDoesNotClaimWhenAvailabilityGateIsOff() async throws {

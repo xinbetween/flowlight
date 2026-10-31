@@ -19,7 +19,6 @@ enum AITrafficGraphBuilder {
     private struct ToolIdentity: Hashable {
         var agent: AgentIdentity
         var bundleID: String
-        var name: String
         var mcpServer: String
     }
 
@@ -60,6 +59,7 @@ enum AITrafficGraphBuilder {
         var name: String
         var path: String
         var hasLineage: Bool
+        var weight: Int64
         var counters = FlowCounters()
     }
 
@@ -112,13 +112,22 @@ enum AITrafficGraphBuilder {
                 let sourceID: TrafficGraphNodeID
                 if let tool {
                     sourceID = toolID(tool)
-                    var metadata = toolMetadata[tool] ?? ToolMetadata(
+                    let candidate = ToolMetadata(
                         name: tool.mcpServer.isEmpty ? displayName(row) : tool.mcpServer,
                         path: row.appPath,
-                        hasLineage: !row.parentAgent.isEmpty
+                        hasLineage: !row.parentAgent.isEmpty,
+                        weight: row.counters.total,
+                        counters: row.counters
                     )
-                    metadata.counters += row.counters
-                    if metadata.path.isEmpty { metadata.path = row.appPath }
+                    let current = toolMetadata[tool]
+                    var metadata = current ?? candidate
+                    if let current, prefersMetadata(candidate, over: current) {
+                        metadata.name = candidate.name
+                        metadata.path = candidate.path
+                        metadata.weight = candidate.weight
+                    }
+                    metadata.hasLineage = metadata.hasLineage || candidate.hasLineage
+                    if current != nil { metadata.counters += row.counters }
                     toolMetadata[tool] = metadata
                 } else {
                     sourceID = agentNodeID
@@ -267,11 +276,19 @@ enum AITrafficGraphBuilder {
 
     private static func toolIdentity(_ row: BreakdownRow, agent: AgentIdentity) -> ToolIdentity? {
         guard !row.parentAgent.isEmpty || !row.mcpServer.isEmpty else { return nil }
-        return ToolIdentity(agent: agent, bundleID: row.bundleID, name: displayName(row), mcpServer: row.mcpServer)
+        return ToolIdentity(agent: agent, bundleID: row.bundleID, mcpServer: row.mcpServer)
     }
 
     private static func displayName(_ row: BreakdownRow) -> String {
         !row.appName.isEmpty ? row.appName : row.bundleID
+    }
+
+    private static func prefersMetadata(_ candidate: ToolMetadata, over current: ToolMetadata) -> Bool {
+        if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
+        if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
+        if candidate.weight != current.weight { return candidate.weight > current.weight }
+        if candidate.name != current.name { return candidate.name < current.name }
+        return candidate.path < current.path
     }
 
     private static func agentID(_ agent: AgentIdentity) -> TrafficGraphNodeID {
@@ -284,7 +301,7 @@ enum AITrafficGraphBuilder {
 
     private static func toolID(_ tool: ToolIdentity) -> TrafficGraphNodeID {
         TrafficGraphNodeID(rawValue: toolPrefix(tool.agent) + component(tool.bundleID)
-                           + component(tool.name) + component(tool.mcpServer))
+                           + component(tool.mcpServer))
     }
 
     private static func destinationID(_ destination: DestinationIdentity) -> TrafficGraphNodeID {
