@@ -66,6 +66,31 @@ struct AgentTool: Identifiable, Sendable, Equatable {
     var displayName: String { isMCP ? "\(label) MCP" : label }
 }
 
+struct AgentRootProof: Sendable {
+    var bundleID: String
+    var name: String
+    var path: String
+    var known: KnownAgent?
+
+    static func identify(bundleID: String, rows: [BreakdownRow]) -> AgentRootProof? {
+        let ownRows = rows.filter { $0.bundleID == bundleID }
+        let parentName = rows.first { !$0.parentAgentName.isEmpty }?.parentAgentName ?? ""
+        let hasParentEvidence = rows.contains { $0.parentAgent == bundleID }
+        let appName = ownRows.first { !$0.appName.isEmpty }?.appName ?? parentName
+        let known = AgentCatalog.knownAgent(bundleID: bundleID, appName: appName)
+        let usesAI = rows.contains {
+            AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil && !$0.counters.isEmpty
+        }
+        guard known != nil || hasParentEvidence || (usesAI && !AgentCatalog.isBrowser(bundleID)) else { return nil }
+        return AgentRootProof(
+            bundleID: bundleID,
+            name: known?.name ?? (!parentName.isEmpty ? parentName : (!appName.isEmpty ? appName : bundleID)),
+            path: ownRows.first { !$0.appPath.isEmpty }?.appPath ?? "",
+            known: known
+        )
+    }
+}
+
 enum AgentsModel {
     private static func mergedPorts(_ a: String, _ b: String) -> String {
         var ports = Set<String>()
@@ -83,13 +108,8 @@ enum AgentsModel {
         let byApp = Dictionary(grouping: TrafficNode.backfilled(rows)) { $0.parentAgent.isEmpty ? $0.bundleID : $0.parentAgent }
         let alertCounts = Dictionary(grouping: alerts, by: \.bundleID).mapValues(\.count)
         return byApp.compactMap { bundleID, appRows -> AgentSummary? in
-            let ownRows = appRows.filter { $0.bundleID == bundleID }
-            let parentName = appRows.first { !$0.parentAgentName.isEmpty }?.parentAgentName
-            let appName = ownRows.first { !$0.appName.isEmpty }?.appName ?? parentName ?? bundleID
-            let known = AgentCatalog.knownAgent(bundleID: bundleID, appName: appName)
+            guard let root = AgentRootProof.identify(bundleID: bundleID, rows: appRows) else { return nil }
             let providerOf: (BreakdownRow) -> String? = { AgentCatalog.provider(domain: $0.domain, owner: $0.owner) }
-            let usesAI = appRows.contains { providerOf($0) != nil && $0.counters.total > 0 }
-            guard known != nil || parentName != nil || (usesAI && !AgentCatalog.isBrowser(bundleID)) else { return nil }
             var tools: [String: AgentTool] = [:]
             var toolDestinations: [String: Set<String>] = [:]
 
@@ -127,9 +147,9 @@ enum AgentsModel {
             let toolList = tools.values.map { tool -> AgentTool in
                 var t = tool; t.destinations = toolDestinations[tool.id]?.count ?? 0; return t
             }.sorted { $0.counters.total > $1.counters.total }
-            return AgentSummary(bundleID: bundleID, name: known?.name ?? parentName ?? appName, vendor: known?.vendor,
-                                isKnown: known != nil || parentName != nil,
-                                appPath: ownRows.first { !$0.appPath.isEmpty }?.appPath ?? "", ai: ai, egress: egress,
+            return AgentSummary(bundleID: bundleID, name: root.name, vendor: root.known?.vendor,
+                                isKnown: root.known != nil || appRows.contains { $0.parentAgent == bundleID },
+                                appPath: root.path, ai: ai, egress: egress,
                                 providers: providers.sorted { $0.value.total > $1.value.total }.map { ($0.key, $0.value) },
                                 destinations: sortedDestinations, tools: toolList, alerts: alertCounts[bundleID] ?? 0)
         }

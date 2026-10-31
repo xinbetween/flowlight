@@ -479,14 +479,13 @@ Shipped:
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
 
-Planned, in order:
+- [x] AI visualization: a separate mode for proved agent clients, attributed tools and MCP servers, LLM providers,
+  and every other destination they reached (0.16.0). Tool traffic folds into its parent agent without erasing the
+  selectable tool node; provider grouping keeps exact hosts underneath for honest Reports, Inspect and Rules
+  navigation. Process lineage is labelled “works for,” never an invocation count without inspected evidence. The
+  full evidence, data, status and acceptance contract lives in [docs/VISUALIZATION.md](docs/VISUALIZATION.md).
 
-- **0.16.x — AI visualization.** The same native map will add an AI mode for proved agent clients, the tools and
-  MCP servers attributed to them, LLM providers, and every other destination they reached. Tool traffic folds into
-  its parent agent without erasing the tool node; provider grouping keeps exact hosts underneath for honest Reports,
-  Inspect and Rules navigation. Process lineage is labelled “works for,” never an invocation count unless inspected
-  tool-call evidence proves one. The full evidence, data, status and acceptance contract lives in
-  [docs/VISUALIZATION.md](docs/VISUALIZATION.md).
+Planned, in order:
 
 - **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
   unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration

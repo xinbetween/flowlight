@@ -185,10 +185,15 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Visualize</strong> draws every visible app and destination as a native, selectable node. Path width follows total bytes;
         rose particles travel from an app for sent traffic and blue particles travel back for received traffic. There are no arrowheads,
         and the nodes stay in place when only the counters change. Reduce Motion removes the travelling particles.</p>
+      <p>Choose <strong>Traffic</strong> for every observed application, or <strong>AI activity</strong> for proved agent clients, their
+        attributed tools and MCP servers, LLM services, and every other destination they reached. A browser is never called an agent only
+        because someone opened an AI service in it. Tool traffic counts toward its parent agent while the tool remains selectable; the
+        dashed <em>works for</em> relationship is process-lineage evidence, not a claimed invocation.</p>
       <p>Select a node or connection for exact received, sent and connection totals, then continue to Reports, Inspect, or an unsaved
-        blocking-rule editor with the same app and exact host or address. <strong>List</strong> exposes the same bounded data for keyboard,
-        VoiceOver and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic
-        exists; it is not an allow verdict.</p>
+        blocking-rule editor with the same app and exact host or address. LLM service grouping is visual only: choose one of its exact
+        hostname and address members before any action. <strong>List</strong> exposes the same bounded data for keyboard, VoiceOver and
+        anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
+        not an allow verdict.</p>
 
       <h2 id="agents">AI agent rules</h2>
       <p>An app counts as an agent if Flowlight knows it by name (16 today, including Claude Code, Codex, Cursor, GitHub Copilot,

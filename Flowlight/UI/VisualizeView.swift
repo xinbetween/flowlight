@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct VisualizeView: View {
+    enum Mode: String, CaseIterable, Identifiable {
+        case traffic, ai
+        var id: String { rawValue }
+        var title: String { self == .traffic ? L("Traffic") : L("AI activity") }
+        var icon: String { self == .traffic ? "network" : "sparkles" }
+    }
+
     enum Presentation: String, CaseIterable, Identifiable {
         case map, list
         var id: String { rawValue }
@@ -12,6 +19,7 @@ struct VisualizeView: View {
     @EnvironmentObject private var nav: AppNavigation
     @EnvironmentObject private var focus: FocusStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("visualize.mode") private var mode: Mode = .traffic
     @AppStorage("visualize.granularity") private var granularity: Granularity = .minute
     @AppStorage("visualize.presentation") private var presentation: Presentation = .map
     @State private var rows: [BreakdownRow] = []
@@ -24,11 +32,6 @@ struct VisualizeView: View {
 
     private var endDate: Date { Date() }
     private var startDate: Date { endDate.addingTimeInterval(-granularity.defaultWindow) }
-    private var scopedFilter: TrafficFilter {
-        var filter = TrafficFilter.none
-        filter.focus = focus.scope
-        return filter
-    }
     private var selection: GraphSelection? {
         if let selectedEdge, let edge = snapshot.edges.first(where: { $0.id == selectedEdge }) {
             return .edge(edge, source: node(edge.source), target: node(edge.target))
@@ -52,7 +55,7 @@ struct VisualizeView: View {
         .background(FL.ground)
         .navigationTitle(L("Visualize"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, or IP"))
-        .task(id: LoadKey(granularity: granularity, focus: focus.scope, version: monitor.dataVersion)) { await reload() }
+        .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope, version: monitor.dataVersion)) { await reload() }
         .task(id: granularity) {
             guard granularity == .second else { return }
             while !Task.isCancelled {
@@ -60,7 +63,14 @@ struct VisualizeView: View {
                 if !Task.isCancelled { await reload() }
             }
         }
-        .task(id: RebuildKey(loadID: loadID, query: query)) { await rebuild() }
+        .task(id: RebuildKey(loadID: loadID, query: query, mode: mode)) { await rebuild() }
+        .onChange(of: mode) { _, _ in
+            rows = []
+            snapshot = .empty
+            selectedNode = nil
+            selectedEdge = nil
+            loadID = UUID()
+        }
         .onChange(of: snapshot.edges.map(\.id)) { _, ids in
             if let selectedEdge, !ids.contains(selectedEdge) { self.selectedEdge = nil }
             if let selectedNode, !snapshot.nodes.map(\.id).contains(selectedNode) { self.selectedNode = nil }
@@ -71,11 +81,14 @@ struct VisualizeView: View {
         HStack(spacing: Spacing.m) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: Spacing.s) {
-                    Text(L("Traffic map")).font(.title2.bold()).foregroundStyle(FL.ink)
-                    FLPill(text: focus.isActive ? L("Focus: %@", focus.summary) : L("All applications"),
-                           systemImage: focus.isActive ? "scope" : "app.dashed", color: FL.accent)
+                    Text(mode == .traffic ? L("Traffic map") : L("AI activity map"))
+                        .font(.title2.bold()).foregroundStyle(FL.ink)
+                    FLPill(text: focus.isActive ? L("Focus: %@", focus.summary)
+                           : mode == .traffic ? L("All applications") : L("Proved AI agents"),
+                           systemImage: focus.isActive ? "scope" : mode.icon, color: FL.accent)
                 }
-                Text(L("Observed connections during %@", granularity.periodName))
+                Text(mode == .traffic ? L("Observed connections during %@", granularity.periodName)
+                     : L("Observed agent, tool, and service activity during %@", granularity.periodName))
                     .font(.caption).foregroundStyle(FL.muted)
             }
             Spacer()
@@ -84,6 +97,11 @@ struct VisualizeView: View {
                     .font(.caption).foregroundStyle(FL.muted)
                     .help(hiddenSummary)
             }
+            Picker(L("Mode"), selection: $mode) {
+                ForEach(Mode.allCases) { Label($0.title, systemImage: $0.icon).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
             Picker(L("Period"), selection: $granularity) {
                 ForEach(Granularity.allCases) { Text($0.title).tag($0) }
             }
@@ -134,10 +152,12 @@ struct VisualizeView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(L("No traffic to visualize"), systemImage: "point.3.connected.trianglepath.dotted")
+            Label(mode == .traffic ? L("No traffic to visualize") : L("No AI activity to visualize"),
+                  systemImage: "point.3.connected.trianglepath.dotted")
         } description: {
             Text(query.isEmpty
-                 ? L("Flowlight has not observed any connections in this period.")
+                 ? mode == .traffic ? L("Flowlight has not observed any connections in this period.")
+                    : L("Flowlight has not observed any proved AI agent activity in this period.")
                  : L("No observed connections match this search."))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -152,12 +172,21 @@ struct VisualizeView: View {
         loading = true
         defer { loading = false }
         let granularity = granularity
+        let mode = mode
         let to = Date()
         let from = to.addingTimeInterval(-granularity.defaultWindow)
-        let filter = scopedFilter
+        let filter: TrafficFilter = {
+            guard mode == .traffic else { return .none }
+            return TrafficFilter(focus: focus.scope)
+        }()
         do {
             let loaded = try await monitor.read { database in
-                try database.appDestinationRows(granularity, from: from, to: to, filter: filter)
+                switch mode {
+                case .traffic:
+                    return try database.appDestinationRows(granularity, from: from, to: to, filter: filter)
+                case .ai:
+                    return try database.aiVisualizationRows(granularity, from: from, to: to)
+                }
             }
             guard !Task.isCancelled else { return }
             rows = loaded
@@ -173,22 +202,39 @@ struct VisualizeView: View {
     @MainActor
     private func rebuild() async {
         let source = rows
+        let mode = mode
+        let focusScope = focus.scope
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let built = await Task.detached(priority: .userInitiated) {
-            let filtered = query.isEmpty ? source : source.filter { row in
+            let searched = query.isEmpty ? source : source.filter { row in
                 row.appName.lowercased().contains(query)
                     || row.bundleID.lowercased().contains(query)
                     || row.domain.lowercased().contains(query)
                     || row.remoteIP.lowercased().contains(query)
                     || row.owner.lowercased().contains(query)
+                    || row.parentAgent.lowercased().contains(query)
+                    || row.parentAgentName.lowercased().contains(query)
+                    || row.mcpServer.lowercased().contains(query)
             }
-            return TrafficGraphBuilder.build(rows: filtered)
+            switch mode {
+            case .traffic:
+                return TrafficGraphBuilder.build(rows: searched)
+            case .ai:
+                let visible = searched.filter {
+                    focusScope.isEmpty || focusScope.matches(bundleID: $0.bundleID,
+                                                              domain: $0.domain,
+                                                              remoteIP: $0.remoteIP)
+                        || (!$0.parentAgent.isEmpty && focusScope.bundleIDs.contains($0.parentAgent))
+                }
+                return AITrafficGraphBuilder.build(rows: source, visibleRows: visible)
+            }
         }.value
         guard !Task.isCancelled else { return }
         snapshot = built
     }
 
     private struct LoadKey: Equatable {
+        var mode: Mode
         var granularity: Granularity
         var focus: FocusScope
         var version: Int
@@ -197,6 +243,7 @@ struct VisualizeView: View {
     private struct RebuildKey: Equatable {
         var loadID: UUID
         var query: String
+        var mode: Mode
     }
 }
 
@@ -258,6 +305,12 @@ private struct TrafficGraphCanvas: View {
             for edge in snapshot.edges {
                 guard let curve = layout.edgeCurves[edge.id] else { continue }
                 let emphasized = selectedEdge == edge.id || hoveredEdge == edge.id
+                if edge.relationship == .worksFor {
+                    context.stroke(path(curve), with: .color(FL.graphInvocation.opacity(emphasized ? 0.95 : 0.7)),
+                                   style: StrokeStyle(lineWidth: emphasized ? 3 : 2, lineCap: .round,
+                                                      dash: [7, 5]))
+                    continue
+                }
                 let totalWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.total, maximum: maximum)
                 let sentWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.bytesOut, maximum: maximum)
                 let receivedWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.bytesIn, maximum: maximum)
@@ -315,7 +368,7 @@ private struct TrafficGraphNodeView: View {
 
     var body: some View {
         Button(action: action) {
-            if node.kind == .app { appContent } else { destinationContent }
+            if node.kind == .app || node.kind == .agent { appContent } else { destinationContent }
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
@@ -342,7 +395,8 @@ private struct TrafficGraphNodeView: View {
     private var destinationContent: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
-                Image(systemName: "network").foregroundStyle(FL.accent).accessibilityHidden(true)
+                Image(systemName: nodeIcon).foregroundStyle(node.kind == .tool || node.kind == .mcp ? FL.tool : FL.accent)
+                    .accessibilityHidden(true)
                 Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(1)
             }
             if !node.detail.isEmpty { Text(node.detail).font(.caption2).foregroundStyle(FL.faint).lineLimit(1) }
@@ -353,6 +407,15 @@ private struct TrafficGraphNodeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(FL.surface, in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.line, lineWidth: 1))
+    }
+
+    private var nodeIcon: String {
+        switch node.kind {
+        case .service: return "sparkles"
+        case .tool: return "hammer"
+        case .mcp: return "shippingbox"
+        default: return "network"
+        }
     }
 
     private var directionSummary: some View {
@@ -404,14 +467,27 @@ private struct TrafficGraphInspector: View {
             FLPill(text: L("Observed"), systemImage: "eye", color: FL.muted)
             metrics(node.counters)
             Divider()
-            Button(L("Show in Reports")) { nav.showReport(filter: node.filter, granularity: granularity) }
-            #if !APP_STORE
-            if node.kind == .destination {
-                Button(L("Inspect")) { nav.showInspect(host: host(node.filter)) }
+            if node.kind == .service, node.members.count > 1 {
+                Text(L("Exact destinations")).font(.caption.bold()).foregroundStyle(FL.muted)
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(node.members) { member in exactMember(member, source: memberSource(member)) }
+                    }
+                }
             } else {
-                Button(L("Inspect")) { nav.showInspect(app: (node.filter.bundleID ?? "", node.title)) }
+                Button(L("Show in Reports")) { nav.showReport(filter: node.filter, granularity: granularity) }
+                #if !APP_STORE
+                if node.kind == .destination || node.kind == .service {
+                    Button(L("Inspect")) { nav.showInspect(host: host(node.filter)) }
+                } else {
+                    Button(L("Inspect")) {
+                        nav.showInspect(app: (node.filter.bundleID ?? "", node.title),
+                                        includeAttributedChildren: node.filter.includeAttributedChildren,
+                                        agentParent: node.filter.agentParent, mcpServer: node.filter.mcpServer)
+                    }
+                }
+                #endif
             }
-            #endif
             Spacer()
             legend
         }
@@ -422,23 +498,73 @@ private struct TrafficGraphInspector: View {
             Text(L("Connection")).font(.caption.bold()).foregroundStyle(FL.muted)
             Text("\(source?.title ?? L("App")) → \(target?.title ?? L("Destination"))")
                 .font(.title3.bold()).foregroundStyle(FL.ink)
-            FLPill(text: L("Observed"), systemImage: "eye", color: FL.muted)
-            metrics(edge.counters)
-            Divider()
-            Button(L("Show in Reports")) { nav.showReport(filter: edge.filter, granularity: granularity) }
-            #if !APP_STORE
-            Button(L("Inspect")) {
-                nav.showInspect(app: source.flatMap { ($0.filter.bundleID ?? "").isEmpty ? nil : ($0.filter.bundleID!, $0.title) },
-                                host: host(edge.filter))
-            }
-            #endif
-            Button(L("Write a blocking rule…")) {
-                let destination = edge.filter.remoteIP?.isEmpty == false ? edge.filter.remoteIP! : host(edge.filter)
-                nav.writeRule(RuleStore.block(app: edge.filter.bundleID ?? "", destination: destination))
+            FLPill(text: edge.relationship == .observed ? L("Observed")
+                   : edge.relationship == .worksFor ? L("Works for") : L("Invoked"),
+                   systemImage: edge.relationship == .observed ? "eye"
+                    : edge.relationship == .worksFor ? "point.topleft.down.to.point.bottomright.curvepath" : "bolt",
+                   color: edge.relationship == .observed ? FL.muted : FL.graphInvocation)
+            if edge.relationship == .observed {
+                metrics(edge.counters)
+                Divider()
+                if edge.members.count > 1 {
+                    Text(L("Exact destinations")).font(.caption.bold()).foregroundStyle(FL.muted)
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            ForEach(edge.members) { member in exactMember(member, source: source) }
+                        }
+                    }
+                } else {
+                    exactActions(edge.filter, source: source)
+                }
+            } else {
+                Text(L("Stored process lineage proves this tool works for the agent. It does not prove a tool invocation."))
+                    .font(.callout).foregroundStyle(FL.muted)
             }
             Spacer()
             legend
         }
+    }
+
+    private func memberSource(_ member: TrafficGraphMember) -> TrafficGraphNode? {
+        guard let bundleID = member.filter.bundleID else { return nil }
+        return TrafficGraphNode(id: TrafficGraphNodeID(rawValue: "member-app:" + bundleID), kind: .app,
+                                title: bundleID, detail: bundleID, appPath: "",
+                                filter: TrafficFilter(bundleID: bundleID), counters: member.counters)
+    }
+
+    private func exactMember(_ member: TrafficGraphMember, source: TrafficGraphNode?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(member.title).font(.callout.bold()).foregroundStyle(FL.ink)
+                    if !member.detail.isEmpty { Text(member.detail).font(.caption2).foregroundStyle(FL.muted) }
+                }
+                Spacer()
+                Text(ByteFormat.string(member.counters.total)).font(.caption.monospacedDigit()).foregroundStyle(FL.muted)
+            }
+            exactActions(member.filter, source: source)
+        }
+        .padding(8)
+        .background(FL.surfaceDeep, in: RoundedRectangle(cornerRadius: Radius.chip))
+    }
+
+    private func exactActions(_ filter: TrafficFilter, source: TrafficGraphNode?) -> some View {
+        HStack(spacing: Spacing.s) {
+            Button(L("Reports")) { nav.showReport(filter: filter, granularity: granularity) }
+            #if !APP_STORE
+            Button(L("Inspect")) {
+                nav.showInspect(app: source.flatMap { ($0.filter.bundleID ?? "").isEmpty ? nil : ($0.filter.bundleID!, $0.title) },
+                                host: host(filter),
+                                includeAttributedChildren: filter.includeAttributedChildren,
+                                agentParent: filter.agentParent, mcpServer: filter.mcpServer)
+            }
+            #endif
+            Button(L("Block…")) {
+                let destination = host(filter)
+                nav.writeRule(RuleStore.block(app: filter.bundleID ?? "", destination: destination))
+            }
+        }
+        .controlSize(.small)
     }
 
     private func metrics(_ counters: FlowCounters) -> some View {
@@ -459,9 +585,10 @@ private struct TrafficGraphInspector: View {
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(L("Direction")).font(.caption.bold()).foregroundStyle(FL.muted)
+            Text(L("Direction and evidence")).font(.caption.bold()).foregroundStyle(FL.muted)
             Label(L("Received"), systemImage: "circle.fill").foregroundStyle(FL.graphReceived)
             Label(L("Sent"), systemImage: "circle.fill").foregroundStyle(FL.graphSent)
+            Label(L("Works for"), systemImage: "line.diagonal").foregroundStyle(FL.graphInvocation)
         }.font(.caption)
     }
 
@@ -519,10 +646,13 @@ private struct TrafficGraphList: View {
                         Text(detail).font(.caption2).foregroundStyle(FL.muted)
                     }
                 }
-                Text(ByteFormat.string(edge.counters.bytesIn)).monospacedDigit()
-                Text(ByteFormat.string(edge.counters.bytesOut)).monospacedDigit()
-                Text(edge.counters.flows.formatted()).monospacedDigit()
-                FLPill(text: L("Observed"), systemImage: "eye", color: FL.muted)
+                Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesIn) : "—").monospacedDigit()
+                Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesOut) : "—").monospacedDigit()
+                Text(edge.relationship == .observed ? edge.counters.flows.formatted() : "—").monospacedDigit()
+                FLPill(text: edge.relationship == .observed ? L("Observed")
+                       : edge.relationship == .worksFor ? L("Works for") : L("Invoked"),
+                       systemImage: edge.relationship == .observed ? "eye" : "point.topleft.down.to.point.bottomright.curvepath",
+                       color: edge.relationship == .observed ? FL.muted : FL.graphInvocation)
             }
             .padding(.horizontal, Spacing.m).padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -544,6 +674,8 @@ private struct TrafficGraphList: View {
     private func rowAccessibilityLabel(_ edge: TrafficGraphEdge) -> String {
         let app = node(edge.source)?.title ?? L("App")
         let destination = node(edge.target)?.title ?? L("Destination")
+        if edge.relationship == .worksFor { return "\(app), \(L("Works for")), \(destination)" }
+        if edge.relationship == .invoked { return "\(app), \(L("Invoked")), \(destination)" }
         return "\(app), \(destination), \(L("Received")) \(ByteFormat.string(edge.counters.bytesIn)), "
             + "\(L("Sent")) \(ByteFormat.string(edge.counters.bytesOut)), \(L("%lld connections", edge.counters.flows))"
     }

@@ -58,6 +58,73 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(nodes.first { $0.bundleID == "com.a" }?.children?.first?.children?.first?.remoteIP, "1.2.3.4")
     }
 
+    func testAIVisualizationProjectionPreservesAttributionAndScope() throws {
+        let t0: Int64 = 1_700_000_000
+        var attributed = key("node", "api.github.com", ip: "203.0.113.9")
+        attributed.appName = "node"
+        attributed.appPath = "/usr/local/bin/node"
+        attributed.parentAgent = "claude"
+        attributed.parentAgentName = "Claude Code"
+        attributed.mcpServer = "github"
+        attributed.channel = .tunnel
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: attributed, counters: FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1)),
+            TrafficRecord(key: key("other", "example.com"), counters: FlowCounters(bytesIn: 99, bytesOut: 0, flows: 1)),
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let rows = try db.aiVisualizationRows(.second, from: from, to: to,
+                                               filter: TrafficFilter(focus: FocusScope(bundleIDs: ["node"])))
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0].bundleID, "node")
+        XCTAssertEqual(rows[0].appPath, "/usr/local/bin/node")
+        XCTAssertEqual(rows[0].parentAgent, "claude")
+        XCTAssertEqual(rows[0].parentAgentName, "Claude Code")
+        XCTAssertEqual(rows[0].mcpServer, "github")
+        XCTAssertEqual(rows[0].channel, .tunnel)
+        XCTAssertEqual(rows[0].counters, FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1))
+        XCTAssertTrue(try db.aiVisualizationRows(.second, from: to, to: to.addingTimeInterval(1)).isEmpty,
+                      "the projection keeps the database's half-open time window")
+        let parentFocus = try db.aiVisualizationRows(.second, from: from, to: to,
+                                                      filter: TrafficFilter(focus: FocusScope(bundleIDs: ["claude"])))
+        XCTAssertEqual(parentFocus.map(\.bundleID), ["node"],
+                       "focusing an AI root retains traffic from its attributed children")
+    }
+
+    func testAIRollupsKeepDistinctParentAndMCPAttribution() throws {
+        let utc = TimeZone(identifier: "UTC")!
+        let t0: Int64 = 1_700_000_000 - (1_700_000_000 % 86400)
+        var first = key("node", "api.example", ip: "203.0.113.20")
+        first.parentAgent = "agent.one"
+        first.parentAgentName = "Agent One"
+        first.mcpServer = "github"
+        var second = first
+        second.parentAgent = "agent.two"
+        second.parentAgentName = "Agent Two"
+        second.mcpServer = "filesystem"
+        try db.insert([
+            TrafficBatch(timestamp: t0, records: [
+                TrafficRecord(key: first, counters: FlowCounters(bytesOut: 10, flows: 1)),
+                TrafficRecord(key: second, counters: FlowCounters(bytesOut: 20, flows: 1))
+            ])
+        ])
+        try db.rollup(now: Date(timeIntervalSince1970: TimeInterval(t0 + 3_700)), timeZone: utc)
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        for granularity in [Granularity.second, .minute, .hour, .day] {
+            let to = granularity == .day
+                ? Date(timeIntervalSince1970: TimeInterval(t0 + 86_400))
+                : Date(timeIntervalSince1970: TimeInterval(t0 + 3_600))
+            let rows = try db.aiVisualizationRows(granularity, from: from, to: to)
+            XCTAssertEqual(rows.count, 2, "\(granularity) must preserve attribution identity")
+            XCTAssertEqual(Set(rows.map(\.parentAgent)), ["agent.one", "agent.two"])
+            XCTAssertEqual(Set(rows.map(\.mcpServer)), ["github", "filesystem"])
+            XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.bytesOut }, 30)
+        }
+    }
+
     func testTreeBackfillsDomainsAndFilters() {
         func row(_ app: String, _ domain: String, _ ip: String, _ bytes: Int64, port: String = "443") -> BreakdownRow {
             BreakdownRow(bundleID: app, appName: app, appPath: "", domain: domain, remoteIP: ip, ports: port, protocols: "https",

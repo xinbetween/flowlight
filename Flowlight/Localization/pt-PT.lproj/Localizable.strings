@@ -1791,7 +1791,24 @@
 "Select a node or connection" = "Selecione um nó ou uma ligação";
 "The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "O mapa mantém-se estável enquanto os valores são atualizados. As partículas mostram a direção; utilize Lista para ver os mesmos valores sem movimento.";
 "Observed" = "Observado";
-"Write a blocking rule…" = "Escrever uma regra de bloqueio…";
 "Connections" = "Ligações";
 "Traffic connections" = "Ligações de tráfego";
 "Unknown destination" = "Destino desconhecido";
+
+/* 0.16.0 AI visualization */
+"Works for %@" = "Trabalha para %@";
+"MCP service for %@" = "Serviço MCP de %@";
+"LLM service" = "Serviço LLM";
+"AI activity" = "Atividade de IA";
+"AI activity map" = "Mapa de atividade de IA";
+"Proved AI agents" = "Agentes de IA comprovados";
+"Observed agent, tool, and service activity during %@" = "Atividade observada de agentes, ferramentas e serviços durante %@";
+"Mode" = "Modo";
+"No AI activity to visualize" = "Sem atividade de IA para visualizar";
+"Flowlight has not observed any proved AI agent activity in this period." = "O Flowlight não observou atividade comprovada de agentes de IA neste período.";
+"Exact destinations" = "Destinos exatos";
+"Works for" = "Trabalha para";
+"Invoked" = "Invocado";
+"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "A linhagem de processos guardada prova que esta ferramenta trabalha para o agente. Não prova uma invocação da ferramenta.";
+"Block…" = "Bloquear…";
+"Direction and evidence" = "Direção e prova";

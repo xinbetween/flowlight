@@ -15,9 +15,11 @@ struct TrafficGraphEdgeID: Hashable, Sendable, Comparable {
 struct TrafficGraphNode: Identifiable, Sendable {
     enum Kind: String, Sendable {
         case app
+        case agent
         case destination
         case service
         case tool
+        case mcp
     }
 
     var id: TrafficGraphNodeID
@@ -27,6 +29,23 @@ struct TrafficGraphNode: Identifiable, Sendable {
     var appPath: String
     var filter: TrafficFilter
     var counters: FlowCounters
+    var members: [TrafficGraphMember] = []
+}
+
+enum TrafficGraphRelationship: String, Sendable {
+    case observed
+    case worksFor
+    case invoked
+}
+
+struct TrafficGraphMember: Identifiable, Sendable, Equatable {
+    var id: String
+    var title: String
+    var detail: String
+    var filter: TrafficFilter
+    var counters: FlowCounters
+    var protocols: String
+    var channel: NetworkChannel
 }
 
 struct TrafficGraphEdge: Identifiable, Sendable {
@@ -35,6 +54,8 @@ struct TrafficGraphEdge: Identifiable, Sendable {
     var target: TrafficGraphNodeID
     var counters: FlowCounters
     var filter: TrafficFilter
+    var relationship: TrafficGraphRelationship = .observed
+    var members: [TrafficGraphMember] = []
 }
 
 struct TrafficGraphHidden: Equatable, Sendable {
@@ -99,9 +120,9 @@ enum TrafficGraphBuilder {
         for row in rows where !row.counters.isEmpty {
             let app = AppIdentity(bundleID: row.bundleID)
             let current = appMetadata[app]
-            if current == nil || row.counters.total > current!.weight
-                || row.counters.total == current!.weight && metadata(row.appName, row.appPath) > metadata(current!.name, current!.path) {
-                appMetadata[app] = AppMetadata(name: row.appName, path: row.appPath, weight: row.counters.total)
+            let candidate = AppMetadata(name: row.appName, path: row.appPath, weight: row.counters.total)
+            if current == nil || prefersMetadata(candidate, over: current!) {
+                appMetadata[app] = candidate
             }
             let destination = DestinationIdentity(domain: row.domain, remoteIP: row.remoteIP, owner: row.owner, asn: row.asn)
             relationships[Relationship(app: app, destination: destination), default: FlowCounters()] += row.counters
@@ -214,7 +235,13 @@ enum TrafficGraphBuilder {
     }
 
     private static func component(_ value: String) -> String { "\(value.utf8.count):\(value)" }
-    private static func metadata(_ name: String, _ path: String) -> String { "\(path.isEmpty ? 0 : 1)|\(name)|\(path)" }
+    private static func prefersMetadata(_ candidate: AppMetadata, over current: AppMetadata) -> Bool {
+        if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
+        if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
+        if candidate.weight != current.weight { return candidate.weight > current.weight }
+        if candidate.name != current.name { return candidate.name < current.name }
+        return candidate.path < current.path
+    }
 
     private static func destinationTitle(_ destination: DestinationIdentity) -> String {
         if !destination.domain.isEmpty { return destination.domain }

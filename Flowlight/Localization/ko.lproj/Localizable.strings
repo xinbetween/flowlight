@@ -1791,7 +1791,24 @@
 "Select a node or connection" = "노드 또는 연결 선택";
 "The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "트래픽 값이 업데이트되어도 지도 위치는 유지됩니다. 움직이는 입자가 방향을 보여 줍니다. 움직임 없이 같은 값을 보려면 목록을 사용하세요.";
 "Observed" = "관찰됨";
-"Write a blocking rule…" = "차단 규칙 작성…";
 "Connections" = "연결";
 "Traffic connections" = "트래픽 연결";
 "Unknown destination" = "알 수 없는 대상";
+
+/* 0.16.0 AI visualization */
+"Works for %@" = "%@을 위해 작동";
+"MCP service for %@" = "%@의 MCP 서비스";
+"LLM service" = "LLM 서비스";
+"AI activity" = "AI 활동";
+"AI activity map" = "AI 활동 지도";
+"Proved AI agents" = "입증된 AI 에이전트";
+"Observed agent, tool, and service activity during %@" = "%@ 동안 관찰된 에이전트, 도구 및 서비스 활동";
+"Mode" = "모드";
+"No AI activity to visualize" = "시각화할 AI 활동 없음";
+"Flowlight has not observed any proved AI agent activity in this period." = "이 기간에 Flowlight가 입증된 AI 에이전트 활동을 관찰하지 못했습니다.";
+"Exact destinations" = "정확한 대상";
+"Works for" = "다음을 위해 작동";
+"Invoked" = "호출됨";
+"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "저장된 프로세스 계보는 이 도구가 에이전트를 위해 작동함을 입증합니다. 도구 호출을 입증하지는 않습니다.";
+"Block…" = "차단…";
+"Direction and evidence" = "방향 및 증거";

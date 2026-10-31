@@ -182,10 +182,16 @@ open build/Build/Products/Release/Flowlight.app
  rose particles travel from an app for sent traffic and blue particles travel back for received traffic. There are no arrowheads,
  and the nodes stay in place when only the counters change. Reduce Motion removes the travelling particles.
 
+ Choose Traffic for every observed application, or AI activity for proved agent clients, their
+ attributed tools and MCP servers, LLM services, and every other destination they reached. A browser is never called an agent only
+ because someone opened an AI service in it. Tool traffic counts toward its parent agent while the tool remains selectable; the
+ dashed works for relationship is process-lineage evidence, not a claimed invocation.
+
  Select a node or connection for exact received, sent and connection totals, then continue to Reports, Inspect, or an unsaved
- blocking-rule editor with the same app and exact host or address. List exposes the same bounded data for keyboard,
- VoiceOver and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic
- exists; it is not an allow verdict.
+ blocking-rule editor with the same app and exact host or address. LLM service grouping is visual only: choose one of its exact
+ hostname and address members before any action. List exposes the same bounded data for keyboard, VoiceOver and
+ anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
+ not an allow verdict.
 
  AI agent rules
 
@@ -1666,7 +1672,9 @@ October 30, 2026Latest
 
  Keep the map readable and accessible. Deterministic collision-aware placement stays fixed when counters change, Reduce Motion removes travelling particles, and a keyboard- and VoiceOver-friendly list exposes the same bounded values.
 
- Drill into evidence without overclaiming it. The inspector links the exact app and host or address to Reports, Inspect, and an unsaved blocking-rule editor. Counts are labelled connections rather than requests, and ordinary traffic is Observed rather than falsely classified as allowed.
+ See AI activity without guessing. A separate mode maps proved agents, attributed tools and MCP servers, LLM services, and every other destination they reached. Browsers stay excluded from provider-only discovery, and process lineage says “works for” rather than inventing an invocation.
+
+ Drill into evidence without overclaiming it. The inspector links the exact app and host or address to Reports, Inspect, and an unsaved blocking-rule editor. Provider grouping keeps exact members underneath; counts are connections rather than requests, and ordinary traffic is Observed rather than falsely classified as allowed.
 
  0.15.14
 October 30, 2026

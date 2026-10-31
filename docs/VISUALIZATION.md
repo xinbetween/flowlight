@@ -17,7 +17,7 @@ Traffic mode answers: **which applications moved traffic, and where did it go?**
 
 The first slice reads the uncapped `TrafficDatabase.appDestinationRows` projection and builds a pure `TrafficGraphSnapshot`. Layout depends on stable topology IDs and viewport size, not counter values, so refreshes do not make nodes jump.
 
-## 0.16.x — AI
+## 0.16.0 — AI
 
 AI mode answers: **which AI agent clients and attributed tools moved traffic, which AI or MCP services did they use, and what else did they reach?**
 

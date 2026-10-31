@@ -147,6 +147,7 @@
 		4B7736E9D3BEAB93A4AA8B4E /* ToolResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A7703953570391821257DD /* ToolResults.swift */; };
 		4BAEC22536747CFB9525934A /* ExportDisclosureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA72D307E4B1A08BE4B8AEF8 /* ExportDisclosureSheet.swift */; };
 		4C028FF54CB024B6DAEA2DBA /* HTTPHostParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 228B5C4135EAD9D85F91ED0E /* HTTPHostParser.swift */; };
+		4C4410D4E752D72D1934FDE9 /* AITrafficGraph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5F3C5C8A0175A409580782 /* AITrafficGraph.swift */; };
 		4D676BCFC2B27CB77015BDFA /* FocusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61080233ED162067497EE2E3 /* FocusView.swift */; };
 		4EF5727ADC37F80E20EF4327 /* TrafficMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC0A436E879000F8F5FF9E7 /* TrafficMonitor.swift */; };
 		4F732CB0B9C2FB627217CC17 /* RulePackCatalogUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8507D8801643823A18134BF8 /* RulePackCatalogUpdaterTests.swift */; };
@@ -336,6 +337,7 @@
 		B88D4DE798915EA469DF73B3 /* PacketSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F062E6D35F98D8EEF1EBE47C /* PacketSniffer.swift */; };
 		B8AF34F3100E3ABF6190BE68 /* FilterDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F212ADB3B37A2EF68A7CFB84 /* FilterDataProvider.swift */; };
 		B8B770675C09113D28BDF3F1 /* SettingsEnforcer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8251DBDC21C44CB92CC1C67 /* SettingsEnforcer.swift */; };
+		B9C2B47C6EC39C01E90F055B /* AITrafficGraph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5F3C5C8A0175A409580782 /* AITrafficGraph.swift */; };
 		BA072680D0A6AC1C40DB8608 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1CF4C48AA260D71155C022 /* Components.swift */; };
 		BA5C8DE36B0484931B6652E0 /* ProcessLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E489125D1DBF3EF98AEED4EB /* ProcessLookup.swift */; };
 		BB4533F39F79A5D13D438C34 /* ExtensionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218F146542CC01A417469F9 /* ExtensionRecovery.swift */; };
@@ -661,6 +663,7 @@
 		5C34C9D0A9B302B4CF4C7125 /* HTTPDataTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDataTransport.swift; sourceTree = "<group>"; };
 		5D8BAA4EB36D9B7D7BF56AD1 /* RuleSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSimulation.swift; sourceTree = "<group>"; };
 		5DC4A606DBADA3102190858E /* CameraMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraMonitor.swift; sourceTree = "<group>"; };
+		5E5F3C5C8A0175A409580782 /* AITrafficGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITrafficGraph.swift; sourceTree = "<group>"; };
 		6053ADC7641DB8CAEA9390D6 /* FlowlightAppStore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowlightAppStore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6096AB6A3EF78490BE10DF50 /* TrafficModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficModels.swift; sourceTree = "<group>"; };
 		61080233ED162067497EE2E3 /* FocusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusView.swift; sourceTree = "<group>"; };
@@ -904,6 +907,7 @@
 		0BAA33D59F050BAA04A53C5F /* Visualization */ = {
 			isa = PBXGroup;
 			children = (
+				5E5F3C5C8A0175A409580782 /* AITrafficGraph.swift */,
 				6FC671A9A89894CBF750C52C /* TrafficGraph.swift */,
 				75E1EF6318AD069F7C33DD91 /* TrafficGraphLayout.swift */,
 			);
@@ -1710,6 +1714,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B9C2B47C6EC39C01E90F055B /* AITrafficGraph.swift in Sources */,
 				89E518A6DD4F49D012E47AFE /* ActivityMonitor.swift in Sources */,
 				B1E5CA21DA13E924DD50CB51 /* AgentAttributor.swift in Sources */,
 				2D10E8EE0B452C5746D2AF73 /* AgentCatalog.swift in Sources */,
@@ -1921,6 +1926,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C4410D4E752D72D1934FDE9 /* AITrafficGraph.swift in Sources */,
 				D30F3B5A02E089EEADBDE98B /* ActivityMonitor.swift in Sources */,
 				C35F10A4B87D29525A740DD5 /* AgentAttributor.swift in Sources */,
 				DDE2B0B0A807C428B9F78120 /* AgentCatalog.swift in Sources */,

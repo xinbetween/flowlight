@@ -23,6 +23,9 @@ private struct InspectContent: View {
     /// it is as visible and as removable as a search term, which is what the search field was chosen for.
     @State private var scopeApp: (id: String, name: String)?
     @State private var scopeHost: String?
+    @State private var scopeIncludesChildren = false
+    @State private var scopeAgentParent: String?
+    @State private var scopeMCPServer: String?
     @State private var potentialHarmOnly = false
     @State private var assessments: [Int64: RiskAssessment] = [:]
     @State private var pluginFindings: [Int64: [PluginFinding]] = [:]
@@ -96,6 +99,9 @@ private struct InspectContent: View {
             search = request.search
             scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
             scopeHost = request.host
+            scopeIncludesChildren = request.includeAttributedChildren
+            scopeAgentParent = request.agentParent
+            scopeMCPServer = request.mcpServer
             potentialHarmOnly = request.potentialHarmOnly
             nav.inspectRequest = nil
         }
@@ -121,7 +127,8 @@ private struct InspectContent: View {
         }
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
                           search: search, window: window, enabled: inspection.enabled,
-                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
+                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost,
+                          includeChildren: scopeIncludesChildren, parent: scopeAgentParent, mcp: scopeMCPServer)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
@@ -131,6 +138,7 @@ private struct InspectContent: View {
     private struct LoadKey: Equatable {
         var version: Int; var localRiskVersion: Int; var pluginVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
         var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
+        var includeChildren: Bool; var parent: String?; var mcp: String?
     }
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
@@ -208,9 +216,11 @@ private struct InspectContent: View {
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
-        let app = scopeApp?.id, host = scopeHost
+        let app = scopeApp?.id, host = scopeHost, includeChildren = scopeIncludesChildren
+        let parent = scopeAgentParent, mcp = scopeMCPServer
         let loaded = (try? await monitor.read {
-            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host)
+            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host,
+                             includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp)
         }) ?? []
         let ids = loaded.compactMap(\.id)
         let risk = (try? await monitor.read {
@@ -292,6 +302,9 @@ private struct InspectContent: View {
                 Button {
                     scopeApp = nil
                     scopeHost = nil
+                    scopeIncludesChildren = false
+                    scopeAgentParent = nil
+                    scopeMCPServer = nil
                     potentialHarmOnly = false
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)

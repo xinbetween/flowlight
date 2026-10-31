@@ -69,7 +69,8 @@ struct TrafficGraphLayoutSnapshot: Sendable {
     }
 
     func particles(for edge: TrafficGraphEdge, at time: TimeInterval, reduceMotion: Bool) -> [TrafficGraphParticle] {
-        guard !reduceMotion, let curve = edgeCurves[edge.id] else { return [] }
+        guard !reduceMotion, edge.relationship == .observed,
+              let curve = edgeCurves[edge.id] else { return [] }
         var result: [TrafficGraphParticle] = []
         appendParticles(direction: .sent, bytes: edge.counters.bytesOut, curve: curve.offset(by: 2.5), reverse: false,
                         edgeID: edge.id, time: time, into: &result)
@@ -115,14 +116,17 @@ enum TrafficGraphLayout {
         }
 
         let insetBounds = bounds.insetBy(dx: 18, dy: 18)
-        let apps = snapshot.nodes.filter { $0.kind == .app }.sorted { $0.id < $1.id }
-        let others = snapshot.nodes.filter { $0.kind != .app }.sorted { $0.id < $1.id }
+        let apps = snapshot.nodes.filter { $0.kind == .app || $0.kind == .agent }.sorted { $0.id < $1.id }
+        let tools = snapshot.nodes.filter { $0.kind == .tool || $0.kind == .mcp }.sorted { $0.id < $1.id }
+        let destinations = snapshot.nodes.filter { $0.kind == .destination || $0.kind == .service }.sorted { $0.id < $1.id }
         let appColumn = insetBounds.minX + appSize.width / 2
+        let toolColumn = insetBounds.midX
         let destinationColumn = insetBounds.maxX - destinationSize.width / 2
 
         var placements: [Placement] = []
         placements += seeded(apps, column: appColumn, size: appSize, in: insetBounds)
-        placements += seeded(others, column: destinationColumn, size: destinationSize, in: insetBounds)
+        placements += seeded(tools, column: toolColumn, size: destinationSize, in: insetBounds)
+        placements += seeded(destinations, column: destinationColumn, size: destinationSize, in: insetBounds)
         var frames: [TrafficGraphNodeID: CGRect] = [:]
         var placedFrames: [CGRect] = []
 

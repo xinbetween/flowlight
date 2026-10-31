@@ -216,9 +216,13 @@ final class AppNavigation: ObservableObject {
     /// The first version of this put the name in the search field, which reads well — visible, editable — but
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
-    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil, potentialHarmOnly: Bool = false) {
+    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil,
+                     includeAttributedChildren: Bool = false, agentParent: String? = nil,
+                     mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
+                                       includeAttributedChildren: includeAttributedChildren,
+                                       agentParent: agentParent, mcpServer: mcpServer,
                                        potentialHarmOnly: potentialHarmOnly)
         show(.inspect)
     }
@@ -231,6 +235,9 @@ struct InspectRequest: Equatable {
     var appID: String? = nil
     var appName: String? = nil
     var host: String? = nil
+    var includeAttributedChildren = false
+    var agentParent: String? = nil
+    var mcpServer: String? = nil
     /// Explicitly displayed and removable in Inspect; Reports uses it for the potential-harm drill-in.
     var potentialHarmOnly = false
     var id = UUID()
