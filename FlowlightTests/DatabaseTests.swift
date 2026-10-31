@@ -1,6 +1,37 @@
 import XCTest
 @testable import Flowlight
 
+func makePreviouslyPromotedKey4Database(named name: String = "promoted-attribution") throws -> URL {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID()).sqlite")
+    let candidate = try SQLiteConnection(path: url.path)
+    try candidate.execute("""
+        CREATE TABLE flows_1s (
+            ts INTEGER NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+            app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
+            transport TEXT NOT NULL, protocol TEXT NOT NULL, bytes_in INTEGER NOT NULL DEFAULT 0,
+            bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0,
+            agent_parent TEXT NOT NULL DEFAULT '', agent_parent_name TEXT NOT NULL DEFAULT '',
+            mcp_server TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT '',
+            attribution_exact INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX flows_1s_key4 ON flows_1s(
+            ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
+            agent_parent, agent_parent_name, mcp_server, attribution_exact
+        );
+        INSERT INTO flows_1s VALUES(
+            1700000000, 10, 'node', 'node', '/usr/bin/node', '203.0.113.9', 'api.github.com', 443,
+            'tcp', 'https', 10, 20, 2, 'fabricated-parent', 'Fabricated Parent', 'fabricated-mcp', '', 1
+        );
+        """)
+    for table in ["agg_1m", "agg_1h", "agg_1d"] {
+        try candidate.execute("CREATE TABLE \(table) AS SELECT * FROM flows_1s WHERE 0")
+        try candidate.execute("CREATE UNIQUE INDEX \(table)_key4 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact)")
+    }
+    try candidate.execute("INSERT INTO agg_1m SELECT * FROM flows_1s")
+    try candidate.execute("UPDATE agg_1m SET ts = (ts / 60) * 60")
+    return url
+}
+
 final class DatabaseTests: XCTestCase {
     var db: TrafficDatabase!
 
@@ -336,32 +367,7 @@ final class DatabaseTests: XCTestCase {
     }
 
     func testPreviouslyPromotedKey4RowsStayQuarantinedAcrossReopen() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("promoted-attribution-\(UUID()).sqlite")
-        let candidate = try SQLiteConnection(path: url.path)
-        try candidate.execute("""
-            CREATE TABLE flows_1s (
-                ts INTEGER NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
-                app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
-                transport TEXT NOT NULL, protocol TEXT NOT NULL, bytes_in INTEGER NOT NULL DEFAULT 0,
-                bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0,
-                agent_parent TEXT NOT NULL DEFAULT '', agent_parent_name TEXT NOT NULL DEFAULT '',
-                mcp_server TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT '',
-                attribution_exact INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE UNIQUE INDEX flows_1s_key4 ON flows_1s(
-                ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                agent_parent, agent_parent_name, mcp_server, attribution_exact
-            );
-            INSERT INTO flows_1s VALUES(
-                1700000000, 10, 'node', 'node', '/usr/bin/node', '203.0.113.9', 'api.github.com', 443,
-                'tcp', 'https', 10, 20, 2, 'claude', 'Claude Code', 'github', '', 1
-            );
-            """)
-        for table in ["agg_1m", "agg_1h", "agg_1d"] {
-            try candidate.execute("CREATE TABLE \(table) AS SELECT * FROM flows_1s WHERE 0")
-            try candidate.execute("CREATE UNIQUE INDEX \(table)_key4 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact)")
-        }
-
+        let url = try makePreviouslyPromotedKey4Database()
         let repaired = try TrafficDatabase(url: url)
         XCTAssertEqual(
             try repaired.raw("SELECT attribution_exact, attribution_epoch FROM flows_1s") {
@@ -378,14 +384,24 @@ final class DatabaseTests: XCTestCase {
             ).first?.parentAgent,
             ""
         )
+        XCTAssertEqual(
+            try repaired.flowsForSimulation(since: Date(timeIntervalSince1970: 1_699_999_900)).first?.agentKey,
+            "node",
+            "rule simulation must not act on quarantined parent labels"
+        )
 
         var fresh = key("node", "api.github.com", ip: "203.0.113.9")
         fresh.parentAgent = "claude"
         fresh.parentAgentName = "Claude Code"
         fresh.mcpServer = "github"
-        try repaired.insert([TrafficBatch(timestamp: 1_700_000_001, records: [
+        try repaired.setRollupWatermarks(1_700_000_040)
+        try repaired.insert([TrafficBatch(timestamp: 1_700_000_060, records: [
             TrafficRecord(key: fresh, counters: FlowCounters(bytesOut: 5, flows: 1))
         ])])
+        try repaired.rollup(
+            now: Date(timeIntervalSince1970: 1_700_000_186),
+            timeZone: TimeZone(secondsFromGMT: 0)!
+        )
 
         let reopened = try TrafficDatabase(url: url)
         XCTAssertEqual(
@@ -394,6 +410,13 @@ final class DatabaseTests: XCTestCase {
             }.map { "\($0.0):\($0.1)" },
             ["1:0", "1:1"],
             "reopening must preserve both quarantined history and exact corrected writes"
+        )
+        XCTAssertEqual(
+            Set(try reopened.flowsForSimulation(
+                since: Date(timeIntervalSince1970: 1_699_999_900)
+            ).map(\.agentKey)),
+            ["node", "claude"],
+            "corrected attribution remains actionable while quarantined history belongs to its observed process"
         )
     }
 

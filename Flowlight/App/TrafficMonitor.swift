@@ -264,11 +264,11 @@ final class TrafficMonitor: ObservableObject {
                 self?.rules.record([event])
             }
         }
-        // Export reads what Reports reads — the same minute rollups, through the same read-only connection — so
-        // there is nothing it can send that isn't already on a screen the user can look at.
+        // Export reads ordinary traffic from the same minute rollups as Reports, but lineage metadata crosses an
+        // external trust boundary and therefore comes from the provenance-aware projection.
         exporter.start(rollups: { [weak self] from, to in
             guard let self else { return [] }
-            return try await self.read { try $0.breakdown(.minute, from: from, to: to) }
+            return try await self.read { try $0.exportRows(.minute, from: from, to: to) }
                 .map { ExportRollup($0, from: from, to: to) }
         }, recentAlerts: { [weak self] limit in
             guard let self else { return [] }

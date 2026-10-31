@@ -251,7 +251,7 @@ enum AskQueryRunner {
     }
 
     private static func agents(db: TrafficDatabase, window: (from: Date, to: Date), grain: Granularity) throws -> Result {
-        let rows = try Self.rows(db: db, window: window, grain: grain)
+        let rows = try Self.agentRows(db: db, window: window, grain: grain)
         var byAgent: [String: (name: String, providers: Set<String>, other: Set<String>, counters: FlowCounters)] = [:]
         for row in rows {
             let key = row.parentAgent.isEmpty ? row.bundleID : row.parentAgent
@@ -345,11 +345,25 @@ enum AskQueryRunner {
     /// reached the hourly one yet. Without this, "what happened in the last hour" could answer "nothing" purely
     /// because a rollup hadn't run — an answer that is wrong in the worst way, because it sounds definite.
     static func rows(db: TrafficDatabase, window: (from: Date, to: Date), grain: Granularity) throws -> [BreakdownRow] {
+        try rows(window: window, grain: grain) { tier in
+            try db.breakdown(tier, from: window.from, to: window.to, limit: TrafficDatabase.breakdownLimit)
+        }
+    }
+
+    private static func agentRows(db: TrafficDatabase, window: (from: Date, to: Date),
+                                  grain: Granularity) throws -> [BreakdownRow] {
+        try rows(window: window, grain: grain) { tier in
+            try AgentsModel.rows(from: db, granularity: tier, from: window.from, to: window.to, focus: .none)
+        }
+    }
+
+    private static func rows(window: (from: Date, to: Date), grain: Granularity,
+                             load: (Granularity) throws -> [BreakdownRow]) throws -> [BreakdownRow] {
         var tiers = [grain]
         if let finer = finer(than: grain) { tiers.append(finer) }
         if let finest = tiers.last.flatMap(finer(than:)) { tiers.append(finest) }
         for tier in tiers {
-            let rows = try db.breakdown(tier, from: window.from, to: window.to, limit: TrafficDatabase.breakdownLimit)
+            let rows = try load(tier)
             if !rows.isEmpty { return rows }
         }
         return []

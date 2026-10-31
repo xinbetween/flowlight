@@ -870,6 +870,38 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    /// What an external collector may receive. Ordinary traffic remains exportable, but historical attribution
+    /// labels are projected only when both provenance markers prove they came from a corrected exact write.
+    func exportRows(_ granularity: Granularity, from: Date, to: Date,
+                    limit: Int = TrafficDatabase.breakdownLimit) throws -> [BreakdownRow] {
+        let (clause, values) = whereClause(from: from, to: to, filter: .none)
+        return try conn.query("""
+            SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
+                SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
+                       GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows),
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
+                       channel
+                FROM \(granularity.table) WHERE \(clause)
+                GROUP BY bundle_id, domain, remote_ip,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
+                         channel
+                ORDER BY bin + bout DESC LIMIT \(limit)
+            ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
+            """, values) { row in
+            BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
+                         remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
+                         counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
+                         owner: row.text(14), asn: Int(row.int(15)), parentAgent: row.text(10),
+                         parentAgentName: row.text(11), mcpServer: row.text(12),
+                         channel: NetworkChannel(rawValue: row.text(13)) ?? .ip)
+        }
+    }
+
     /// Every app's destinations, with no row cap.
     ///
     /// `breakdown` stops at `breakdownLimit` because it feeds a table someone scrolls. Anything judging apps
@@ -1851,10 +1883,13 @@ final class TrafficDatabase: @unchecked Sendable {
     /// of rows that collapse to a handful of destinations.
     func flowsForSimulation(since: Date, limit: Int = 20000) throws -> [RuleSimulation.Flow] {
         try conn.query("""
-            SELECT MAX(ts), bundle_id, app_name, agent_parent, domain, remote_ip, port,
-                   SUM(bytes_in + bytes_out), SUM(flows)
+            SELECT MAX(ts), bundle_id, app_name,
+                   CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                   domain, remote_ip, port, SUM(bytes_in + bytes_out), SUM(flows)
             FROM agg_1m WHERE ts >= ?
-            GROUP BY bundle_id, agent_parent, domain, remote_ip, port
+            GROUP BY bundle_id,
+                     CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                     domain, remote_ip, port
             ORDER BY SUM(flows) DESC LIMIT ?
             """, [.int(Int64(since.timeIntervalSince1970)), .int(Int64(limit))]) { row in
             RuleSimulation.Flow(

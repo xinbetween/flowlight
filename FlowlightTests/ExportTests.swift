@@ -417,6 +417,46 @@ final class ExportQueueTests: XCTestCase {
 
 /// The conversion from what the database holds to what an export carries.
 final class ExportRowTests: XCTestCase {
+    func testQuarantinedLineageDoesNotBecomeExportMetadata() throws {
+        let db = try TrafficDatabase(url: makePreviouslyPromotedKey4Database(named: "export-attribution"))
+        let from = Date(timeIntervalSince1970: 1_699_999_900)
+        let to = Date(timeIntervalSince1970: 1_700_000_060)
+        let row = try XCTUnwrap(db.exportRows(.minute, from: from, to: to).first)
+        let rollup = ExportRollup(row, from: from, to: to)
+
+        XCTAssertEqual(rollup.agentID, "")
+        XCTAssertEqual(rollup.agentName, "")
+        XCTAssertEqual(rollup.mcpServer, "")
+        let payload = String(
+            decoding: try ExportPayload.otlpMetrics(
+                [rollup],
+                resource: ExportResource(serviceName: "flowlight", serviceVersion: "0.16.0", hostName: "")
+            ),
+            as: UTF8.self
+        )
+        XCTAssertFalse(payload.contains("flowlight.agent.id"))
+        XCTAssertFalse(payload.contains("flowlight.agent.name"))
+        XCTAssertFalse(payload.contains("flowlight.mcp.server"))
+
+        var exact = FlowKey(pid: 10, bundleID: "node", appName: "node", appPath: "/usr/bin/node",
+                            remoteIP: "203.0.113.9", domain: "api.github.com", port: 443,
+                            transport: .tcp, appProtocol: "https")
+        exact.parentAgent = "claude"
+        exact.parentAgentName = "Claude Code"
+        exact.mcpServer = "github"
+        try db.insert([TrafficBatch(timestamp: 1_700_000_060, records: [
+            TrafficRecord(key: exact, counters: FlowCounters(bytesOut: 5, flows: 1))
+        ])])
+        let exactRow = try XCTUnwrap(db.exportRows(
+            .second,
+            from: Date(timeIntervalSince1970: 1_700_000_060),
+            to: Date(timeIntervalSince1970: 1_700_000_061)
+        ).first)
+        XCTAssertEqual(exactRow.parentAgent, "claude")
+        XCTAssertEqual(exactRow.parentAgentName, "Claude Code")
+        XCTAssertEqual(exactRow.mcpServer, "github")
+    }
+
     func testABreakdownRowBecomesARollupWithoutItsPath() {
         let row = BreakdownRow(bundleID: "com.example.App", appName: "App", appPath: "/Users/someone/Secret/App.app",
                                domain: "example.com", remoteIP: "203.0.113.1", ports: "443", protocols: "https",

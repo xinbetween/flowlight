@@ -159,6 +159,32 @@ final class AskTests: XCTestCase {
         }
     }
 
+    func testAgentsIgnoreQuarantinedParentsButKeepCorrectedAttribution() throws {
+        db = try TrafficDatabase(url: makePreviouslyPromotedKey4Database(named: "ask-attribution"))
+        var child = key("node", "api.github.com")
+        child.parentAgent = "claude"
+        child.parentAgentName = "Claude Code"
+        child.mcpServer = "github"
+        try db.setRollupWatermarks(1_700_000_040)
+        try db.insert([TrafficBatch(timestamp: 1_700_000_060, records: [
+            TrafficRecord(key: child, counters: FlowCounters(bytesOut: 5, flows: 1))
+        ])])
+        try db.rollup(now: Date(timeIntervalSince1970: 1_700_000_186),
+                      timeZone: TimeZone(secondsFromGMT: 0)!)
+        let iso = ISO8601DateFormatter()
+        let from = iso.string(from: Date(timeIntervalSince1970: 1_699_999_900))
+        let to = iso.string(from: Date(timeIntervalSince1970: 1_700_000_300))
+
+        let result = try AskQueryRunner.run(
+            AskCall(query: .agents, arguments: ["from": from, "to": to]),
+            db: db
+        )
+
+        XCTAssertFalse(result.json.contains("Fabricated Parent"))
+        XCTAssertFalse(result.json.contains("fabricated-parent"))
+        XCTAssertTrue(result.json.contains("Claude Code"), "corrected epoch-1 child attribution remains visible")
+    }
+
     func testTopDestinationsNamesWhereItWent() throws {
         try seed()
         let result = try AskQueryRunner.run(AskCall(query: .topDestinations, arguments: ["from": window.from, "to": window.to]), db: db)
