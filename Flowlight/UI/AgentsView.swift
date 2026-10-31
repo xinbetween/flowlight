@@ -193,7 +193,7 @@ struct AgentsView: View {
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
         let scope = focus.scope
         let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange]) in
-            (try db.breakdown(g, from: from, to: to, filter: TrafficFilter(focus: scope)),
+            (try AgentsModel.rows(from: db, granularity: g, from: from, to: to, focus: scope),
              try db.alerts(limit: 2000, focus: scope).filter { $0.timestamp >= from }, try db.loadPolicies(),
              try db.exchanges(since: from, limit: 5000, focus: scope))
         }

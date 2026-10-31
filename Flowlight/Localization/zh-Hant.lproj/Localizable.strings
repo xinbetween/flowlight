@@ -1770,3 +1770,45 @@
 "Couldn't delete the captured data: %@" = "無法刪除擷取的資料：%@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "這個先前啟用的官方套件已不在目錄中。封鎖功能已自動停止。";
 "Could not prepare managed-pack review demo: %@" = "無法準備受管理套件審查示範：%@";
+
+/* 0.16.0 流量視覺化 */
+"Visualize" = "視覺化";
+"Map" = "地圖";
+"List" = "列表";
+"App, domain, or IP" = "應用程式、網域或 IP";
+"Traffic map" = "流量地圖";
+"All applications" = "所有應用程式";
+"Observed connections during %@" = "%@期間觀察到的連線";
+"%lld quieter connections hidden" = "已隱藏 %lld 個活動較少的連線";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "地圖只顯示最活躍的關係以保持清晰。列表使用相同的有限選擇。";
+"Period" = "期間";
+"No traffic to visualize" = "沒有可視覺化的流量";
+"Flowlight has not observed any connections in this period." = "Flowlight 在此期間未觀察到任何連線。";
+"No observed connections match this search." = "沒有觀察到的連線符合此搜尋。";
+"Select to inspect this traffic" = "選取以檢查此流量";
+"%lld connections" = "%lld 個連線";
+"%@, received %@, sent %@, %lld connections" = "%@，接收 %@，傳送 %@，%lld 個連線";
+"Select a node or connection" = "選取節點或連線";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "流量數值更新時地圖位置保持不變。移動的粒子表示方向；使用列表可查看相同數值且無動畫。";
+"Observed" = "已觀察";
+"Connections" = "連線";
+"Traffic connections" = "流量連線";
+"Unknown destination" = "未知目的地";
+
+/* 0.16.0 AI visualization */
+"Works for %@" = "為 %@ 工作";
+"MCP service for %@" = "%@ 的 MCP 服務";
+"LLM service" = "LLM 服務";
+"AI activity" = "AI 活動";
+"AI activity map" = "AI 活動地圖";
+"Proved AI agents" = "已證實的 AI 代理程式";
+"Observed agent, tool, and service activity during %@" = "%@期間觀察到的代理程式、工具和服務活動";
+"Mode" = "模式";
+"No AI activity to visualize" = "沒有可視覺化的 AI 活動";
+"Flowlight has not observed any proved AI agent activity in this period." = "Flowlight 在此期間未觀察到已證實的 AI 代理程式活動。";
+"Exact destinations" = "精確目的地";
+"Works for" = "為其工作";
+"Invoked" = "已呼叫";
+"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "儲存的程序譜系證明此工具為該代理程式工作，但不能證明工具已被呼叫。";
+"Block…" = "封鎖…";
+"Direction and evidence" = "方向和證據";

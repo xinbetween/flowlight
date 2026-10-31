@@ -9,6 +9,45 @@ struct InspectView: View {
     }
 }
 
+enum InspectLinkQuery {
+    static func needsSupportingRows(search: String, app: String?, includeAttributedChildren: Bool,
+                                    agentParent: String?, mcpServer: String?) -> Bool {
+        if !search.isEmpty { return true }
+        if agentParent?.isEmpty == false { return true }
+        return app?.isEmpty == false && (includeAttributedChildren || mcpServer?.isEmpty == false)
+    }
+
+    static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
+                     app: String?, host: String?, hostIncludesSubdomains: Bool = true,
+                     includeAttributedChildren: Bool, agentParent: String?,
+                     mcpServer: String?) throws -> [HTTPExchange] {
+        let visible = try database.exchanges(
+            since: since, focus: focus, app: app, host: host,
+            hostIncludesSubdomains: hostIncludesSubdomains,
+            includeAttributedChildren: includeAttributedChildren,
+            agentParent: agentParent, mcpServer: mcpServer
+        )
+        guard let root = agentParent ?? ((includeAttributedChildren || mcpServer != nil) ? app : nil),
+              !root.isEmpty else { return visible }
+        // A child request's initiating tool call is recorded on the root agent's LLM exchange, which naturally has
+        // a different app, host and MCP scope. These rows support linking only; `exchanges` remains the visible list.
+        let supporting = try database.exchanges(since: since, app: root)
+        let visibleIDs = Set(visible.compactMap(\.id))
+        return visible + supporting.filter { $0.id.map { !visibleIDs.contains($0) } ?? true }
+    }
+}
+
+enum InspectScopeSummary {
+    static func text(appName: String?, host: String?, potentialHarmOnly: Bool) -> String {
+        if potentialHarmOnly { return L("Showing only requests with medium or high potential harm") }
+        if let appName, let host {
+            return L("Showing only traffic from %@", appName) + " · " + L("Showing only traffic to %@", host)
+        }
+        if let appName { return L("Showing only traffic from %@", appName) }
+        return L("Showing only traffic to %@", host ?? "")
+    }
+}
+
 private struct InspectContent: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var focus: FocusStore
@@ -23,6 +62,10 @@ private struct InspectContent: View {
     /// it is as visible and as removable as a search term, which is what the search field was chosen for.
     @State private var scopeApp: (id: String, name: String)?
     @State private var scopeHost: String?
+    @State private var scopeHostIncludesSubdomains = true
+    @State private var scopeIncludesChildren = false
+    @State private var scopeAgentParent: String?
+    @State private var scopeMCPServer: String?
     @State private var potentialHarmOnly = false
     @State private var assessments: [Int64: RiskAssessment] = [:]
     @State private var pluginFindings: [Int64: [PluginFinding]] = [:]
@@ -96,6 +139,10 @@ private struct InspectContent: View {
             search = request.search
             scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
             scopeHost = request.host
+            scopeHostIncludesSubdomains = request.hostIncludesSubdomains
+            scopeIncludesChildren = request.includeAttributedChildren
+            scopeAgentParent = request.agentParent
+            scopeMCPServer = request.mcpServer
             potentialHarmOnly = request.potentialHarmOnly
             nav.inspectRequest = nil
         }
@@ -121,7 +168,9 @@ private struct InspectContent: View {
         }
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
                           search: search, window: window, enabled: inspection.enabled,
-                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost)) {
+                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost,
+                          hostIncludesSubdomains: scopeHostIncludesSubdomains,
+                          includeChildren: scopeIncludesChildren, parent: scopeAgentParent, mcp: scopeMCPServer)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
             await load()
@@ -131,6 +180,7 @@ private struct InspectContent: View {
     private struct LoadKey: Equatable {
         var version: Int; var localRiskVersion: Int; var pluginVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
         var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
+        var hostIncludesSubdomains: Bool; var includeChildren: Bool; var parent: String?; var mcp: String?
     }
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
@@ -208,9 +258,13 @@ private struct InspectContent: View {
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
-        let app = scopeApp?.id, host = scopeHost
+        let app = scopeApp?.id, host = scopeHost, hostIncludesSubdomains = scopeHostIncludesSubdomains
+        let includeChildren = scopeIncludesChildren
+        let parent = scopeAgentParent, mcp = scopeMCPServer
         let loaded = (try? await monitor.read {
-            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host)
+            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host,
+                             hostIncludesSubdomains: hostIncludesSubdomains,
+                             includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp)
         }) ?? []
         let ids = loaded.compactMap(\.id)
         let risk = (try? await monitor.read {
@@ -227,8 +281,18 @@ private struct InspectContent: View {
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {
             selection = exchanges.first { $0.host.localizedCaseInsensitiveContains(wanted) }?.id
         }
-        // Link with the unfiltered list, so a search for "curl" still shows which tool call started it.
-        let all = term.isEmpty ? exchanges : ((try? await monitor.read { try $0.exchanges(since: since, focus: scope) }) ?? [])
+        // Drop only the text term for causal linking. Exact visible rows stay on screen, while an attributed child
+        // also receives its root agent's private supporting exchanges even when navigation supplied no search text.
+        let needsSupport = InspectLinkQuery.needsSupportingRows(
+            search: term, app: app, includeAttributedChildren: includeChildren,
+            agentParent: parent, mcpServer: mcp
+        )
+        let all = needsSupport ? ((try? await monitor.read {
+            try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, host: host,
+                                      hostIncludesSubdomains: hostIncludesSubdomains,
+                                      includeAttributedChildren: includeChildren,
+                                      agentParent: parent, mcpServer: mcp)
+        }) ?? []) : exchanges
         links = ToolCallLinks.link(all)
         var found: [String: ToolResult] = [:]
         for e in all { for r in e.toolResults where found[r.callID] == nil { found[r.callID] = r } }
@@ -286,12 +350,19 @@ private struct InspectContent: View {
         if scopeApp != nil || scopeHost != nil || potentialHarmOnly {
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal.decrease.circle.fill").foregroundStyle(.tint)
-                Text(potentialHarmOnly ? L("Showing only requests with medium or high potential harm")
-                                       : (scopeApp.map { L("Showing only traffic from %@", $0.name) } ?? L("Showing only traffic to %@", scopeHost ?? "")))
-                    .font(.callout)
+                Text(InspectScopeSummary.text(
+                    appName: scopeApp?.name,
+                    host: scopeHost,
+                    potentialHarmOnly: potentialHarmOnly
+                ))
+                .font(.callout)
                 Button {
                     scopeApp = nil
                     scopeHost = nil
+                    scopeHostIncludesSubdomains = true
+                    scopeIncludesChildren = false
+                    scopeAgentParent = nil
+                    scopeMCPServer = nil
                     potentialHarmOnly = false
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)

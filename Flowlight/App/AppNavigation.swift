@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, ask, inspect, devices, coverage, capture
+    case live, agents, reports, alerts, rules, ask, inspect, devices, coverage, capture, visualize
     var id: String { rawValue }
 
     static var availableCases: [SidebarItem] {
@@ -22,6 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .live: return "views"
         case .agents: return "agents"
         case .reports: return "worth-a-look"
+        case .visualize: return "visualize"
         case .alerts: return "alerts"
         case .rules: return "rules"
         case .ask: return "ask"
@@ -39,6 +40,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .live: return "Live"
         case .agents: return "AI Agents"
         case .reports: return "Reports"
+        case .visualize: return "Visualize"
         case .alerts: return "Alerts"
         case .rules: return "Rules"
         case .ask: return "Ask"
@@ -54,6 +56,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .live: return L("Live")
         case .agents: return L("AI Agents")
         case .reports: return L("Reports")
+        case .visualize: return L("Visualize")
         case .alerts: return L("Alerts")
         case .rules: return L("Rules")
         case .ask: return L("Ask")
@@ -68,6 +71,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .live: return "waveform.path.ecg"
         case .agents: return "sparkles"
         case .reports: return "chart.bar.xaxis"
+        case .visualize: return "point.3.connected.trianglepath.dotted"
         case .alerts: return "exclamationmark.triangle"
         case .rules: return "hand.raised"
         case .ask: return "text.bubble"
@@ -87,7 +91,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var section: SidebarSection {
         switch self {
-        case .live, .agents, .reports, .alerts: return .traffic
+        case .live, .agents, .reports, .visualize, .alerts: return .traffic
         case .ask, .inspect: return .investigate
         case .rules: return .control
         case .devices, .coverage, .capture: return .sources
@@ -95,9 +99,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     }
 }
 
-/// The sidebar in groups rather than one column of nine.
+/// The sidebar in task-focused groups rather than one long column.
 ///
-/// Nine is where a flat list stops being scannable: the eye has to read every label to find the one it wants.
+/// A flat list stops being scannable quickly: the eye has to read every label to find the one it wants.
 /// The grouping is by what someone is trying to do — see what happened, look closer at it, refuse something, or
 /// change where the data comes from — rather than by which part of the app the code lives in.
 enum SidebarSection: String, CaseIterable, Identifiable {
@@ -114,7 +118,16 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var items: [SidebarItem] { SidebarItem.availableCases.filter { $0.section == self } }
+    var items: [SidebarItem] {
+        let order: [SidebarItem]
+        switch self {
+        case .traffic: order = [.live, .agents, .reports, .visualize, .alerts]
+        case .investigate: order = [.ask, .inspect]
+        case .control: order = [.rules]
+        case .sources: order = [.devices, .coverage, .capture]
+        }
+        return order.filter { SidebarItem.availableCases.contains($0) }
+    }
 }
 
 /// The three views inside Rules. This lives with the shared navigation state so an app-wide notice can take someone
@@ -203,9 +216,15 @@ final class AppNavigation: ObservableObject {
     /// The first version of this put the name in the search field, which reads well — visible, editable — but
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
-    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil, potentialHarmOnly: Bool = false) {
+    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil,
+                     hostIncludesSubdomains: Bool = true,
+                     includeAttributedChildren: Bool = false, agentParent: String? = nil,
+                     mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
+                                       hostIncludesSubdomains: hostIncludesSubdomains,
+                                       includeAttributedChildren: includeAttributedChildren,
+                                       agentParent: agentParent, mcpServer: mcpServer,
                                        potentialHarmOnly: potentialHarmOnly)
         show(.inspect)
     }
@@ -218,6 +237,10 @@ struct InspectRequest: Equatable {
     var appID: String? = nil
     var appName: String? = nil
     var host: String? = nil
+    var hostIncludesSubdomains = true
+    var includeAttributedChildren = false
+    var agentParent: String? = nil
+    var mcpServer: String? = nil
     /// Explicitly displayed and removable in Inspect; Reports uses it for the potential-harm drill-in.
     var potentialHarmOnly = false
     var id = UUID()

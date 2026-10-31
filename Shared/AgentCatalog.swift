@@ -128,5 +128,7 @@ enum AgentCatalog {
         return providerOwners.first { owner.localizedCaseInsensitiveContains($0.fragment) }?.name
     }
 
-    static func isBrowser(_ bundleID: String) -> Bool { browsers.contains(bundleID) }
+    static func isBrowser(_ bundleID: String) -> Bool {
+        browsers.contains { bundleID == $0 || bundleID.hasPrefix($0 + ".") }
+    }
 }

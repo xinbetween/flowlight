@@ -93,6 +93,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>实时</td><td>⌘1</td><td>现在什么在动：最近几秒按应用的速率，以及最忙的目标。</td></tr>
         <tr><td><a href="#agents">AI 代理</a></td><td>⌘2</td><td>哪些代理在活动、它们用哪些 AI 提供方，以及它们还联系了什么。</td></tr>
         <tr><td>报告</td><td>⌘3</td><td>流量去了哪里，从秒到年。按应用、目标或 IP 分组；切到图表或<a href="#worth-a-look">值得一看</a>；导出 CSV。</td></tr>
+        <tr><td><a href="#visualize">可视化</a></td><td>—</td><td>应用与其精确目标的稳定地图，带有按流量加权的路径、移动的方向标记、连接数以及等价列表。</td></tr>
         <tr><td><a href="#alerts">警报</a></td><td>⌘4</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
         <tr><td><a href="#rules">规则</a></td><td>⌘5</td><td>你设过的每一条允许列表和拒绝，各自管到哪里，以及实际拦下了什么。</td></tr>
         <tr><td><a href="#ask">提问</a></td><td>⌘6</td><td>用平常的话问你自己的流量，由本地模型或托管模型从记录下来的历史里作答。</td></tr>
@@ -106,6 +107,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="实时视图：一列应用，各自带着当前的发送与接收速率，以及最忙的目标。"></div>
         <figcaption class="caption">实时，Flowlight 打开时进入的那个视图。</figcaption></figure>
       <p>在报告里，把指针停在某根柱子上就能看到是哪些应用造成的，点它可以放大，双击任意一行则把报告收窄到那一项。</p>
+
+      <h2 id="visualize">流量可视化</h2>
+      <p><strong>可视化</strong>把每个可见应用和目标绘制成原生、可选择的节点。路径宽度表示总字节数；玫红色粒子从应用向外移动表示发送，
+        蓝色粒子向应用移动表示接收。没有大箭头，而且仅数值变化时节点不会跳动。“减少动态效果”会移除移动粒子。</p>
+      <p>选择节点或连接即可查看精确的接收、发送和连接总数，然后携带同一应用及精确主机或地址前往“报告”、“检查”或未保存的阻止规则编辑器。
+        <strong>列表</strong>为键盘、VoiceOver 和不喜欢空间视图的用户提供同一组有界数据。“连接”表示网络流，不是 HTTP 请求；“已观察”表示存在流量，并不表示允许决定。</p>
 
       <h2 id="agents">AI 代理规则</h2>
       <p>一个应用被算作代理，要么是 Flowlight 按名字认得它（目前 16 个，包括 Claude Code、Codex、Cursor、GitHub Copilot、

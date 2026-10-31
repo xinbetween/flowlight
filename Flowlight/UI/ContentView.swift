@@ -69,6 +69,7 @@ struct ContentView: View {
                 case .live: LiveView()
                 case .agents: AgentsView()
                 case .reports: ReportsView()
+                case .visualize: VisualizeView()
                 case .alerts: AlertsView()
                 case .rules: RulesView()
                 case .inspect:
@@ -87,7 +88,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if rulePacks.pendingReviewCount > 0 { packReviewBanner }
             }
-            // One help button for all nine screens, because the documentation is grouped the way this sidebar
+            // One help button for every screen, because the documentation is grouped the way this sidebar
             // is: whatever is on screen, the button opens the section about it rather than the top of the page.
             .toolbar {
                 ToolbarItem {

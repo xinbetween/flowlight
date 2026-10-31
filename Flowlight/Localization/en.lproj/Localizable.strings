@@ -1770,3 +1770,45 @@
 "Couldn't delete the captured data: %@" = "Couldn't delete the captured data: %@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically.";
 "Could not prepare managed-pack review demo: %@" = "Could not prepare managed-pack review demo: %@";
+
+/* 0.16.0 traffic visualization */
+"Visualize" = "Visualize";
+"Map" = "Map";
+"List" = "List";
+"App, domain, or IP" = "App, domain, or IP";
+"Traffic map" = "Traffic map";
+"All applications" = "All applications";
+"Observed connections during %@" = "Observed connections during %@";
+"%lld quieter connections hidden" = "%lld quieter connections hidden";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "The map stays readable by showing the busiest relationships. The list uses the same bounded selection.";
+"Period" = "Period";
+"No traffic to visualize" = "No traffic to visualize";
+"Flowlight has not observed any connections in this period." = "Flowlight has not observed any connections in this period.";
+"No observed connections match this search." = "No observed connections match this search.";
+"Select to inspect this traffic" = "Select to inspect this traffic";
+"%lld connections" = "%lld connections";
+"%@, received %@, sent %@, %lld connections" = "%@, received %@, sent %@, %lld connections";
+"Select a node or connection" = "Select a node or connection";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion.";
+"Observed" = "Observed";
+"Connections" = "Connections";
+"Traffic connections" = "Traffic connections";
+"Unknown destination" = "Unknown destination";
+
+/* 0.16.0 AI visualization */
+"Works for %@" = "Works for %@";
+"MCP service for %@" = "MCP service for %@";
+"LLM service" = "LLM service";
+"AI activity" = "AI activity";
+"AI activity map" = "AI activity map";
+"Proved AI agents" = "Proved AI agents";
+"Observed agent, tool, and service activity during %@" = "Observed agent, tool, and service activity during %@";
+"Mode" = "Mode";
+"No AI activity to visualize" = "No AI activity to visualize";
+"Flowlight has not observed any proved AI agent activity in this period." = "Flowlight has not observed any proved AI agent activity in this period.";
+"Exact destinations" = "Exact destinations";
+"Works for" = "Works for";
+"Invoked" = "Invoked";
+"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "Stored process lineage proves this tool works for the agent. It does not prove a tool invocation.";
+"Block…" = "Block…";
+"Direction and evidence" = "Direction and evidence";

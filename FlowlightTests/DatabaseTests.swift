@@ -1,6 +1,37 @@
 import XCTest
 @testable import Flowlight
 
+func makePreviouslyPromotedKey4Database(named name: String = "promoted-attribution") throws -> URL {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID()).sqlite")
+    let candidate = try SQLiteConnection(path: url.path)
+    try candidate.execute("""
+        CREATE TABLE flows_1s (
+            ts INTEGER NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+            app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
+            transport TEXT NOT NULL, protocol TEXT NOT NULL, bytes_in INTEGER NOT NULL DEFAULT 0,
+            bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0,
+            agent_parent TEXT NOT NULL DEFAULT '', agent_parent_name TEXT NOT NULL DEFAULT '',
+            mcp_server TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT '',
+            attribution_exact INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX flows_1s_key4 ON flows_1s(
+            ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
+            agent_parent, agent_parent_name, mcp_server, attribution_exact
+        );
+        INSERT INTO flows_1s VALUES(
+            1700000000, 10, 'node', 'node', '/usr/bin/node', '203.0.113.9', 'api.github.com', 443,
+            'tcp', 'https', 10, 20, 2, 'fabricated-parent', 'Fabricated Parent', 'fabricated-mcp', '', 1
+        );
+        """)
+    for table in ["agg_1m", "agg_1h", "agg_1d"] {
+        try candidate.execute("CREATE TABLE \(table) AS SELECT * FROM flows_1s WHERE 0")
+        try candidate.execute("CREATE UNIQUE INDEX \(table)_key4 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact)")
+    }
+    try candidate.execute("INSERT INTO agg_1m SELECT * FROM flows_1s")
+    try candidate.execute("UPDATE agg_1m SET ts = (ts / 60) * 60")
+    return url
+}
+
 final class DatabaseTests: XCTestCase {
     var db: TrafficDatabase!
 
@@ -56,6 +87,85 @@ final class DatabaseTests: XCTestCase {
         let nodes = TrafficNode.tree(from: breakdown)
         XCTAssertEqual(nodes.count, 2)
         XCTAssertEqual(nodes.first { $0.bundleID == "com.a" }?.children?.first?.children?.first?.remoteIP, "1.2.3.4")
+    }
+
+    func testAIVisualizationProjectionPreservesAttributionAndScope() throws {
+        let t0: Int64 = 1_700_000_000
+        var attributed = key("node", "api.github.com", ip: "203.0.113.9")
+        attributed.appName = "node"
+        attributed.appPath = "/usr/local/bin/node"
+        attributed.parentAgent = "claude"
+        attributed.parentAgentName = "Claude Code"
+        attributed.mcpServer = "github"
+        attributed.channel = .tunnel
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: attributed, counters: FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1)),
+            TrafficRecord(key: key("other", "example.com"), counters: FlowCounters(bytesIn: 99, bytesOut: 0, flows: 1)),
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let rows = try db.aiVisualizationRows(.second, from: from, to: to,
+                                               filter: TrafficFilter(focus: FocusScope(bundleIDs: ["node"])))
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0].bundleID, "node")
+        XCTAssertEqual(rows[0].appPath, "/usr/local/bin/node")
+        XCTAssertEqual(rows[0].parentAgent, "claude")
+        XCTAssertEqual(rows[0].parentAgentName, "Claude Code")
+        XCTAssertEqual(rows[0].mcpServer, "github")
+        XCTAssertEqual(rows[0].channel, .tunnel)
+        XCTAssertEqual(rows[0].counters, FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1))
+        XCTAssertTrue(try db.aiVisualizationRows(.second, from: to, to: to.addingTimeInterval(1)).isEmpty,
+                      "the projection keeps the database's half-open time window")
+        let parentFocus = try db.aiVisualizationRows(.second, from: from, to: to,
+                                                      filter: TrafficFilter(focus: FocusScope(bundleIDs: ["claude"])))
+        XCTAssertEqual(parentFocus.map(\.bundleID), ["node"],
+                       "focusing an AI root retains traffic from its attributed children")
+
+        let exactChild = TrafficFilter(
+            bundleID: "node",
+            agentParent: "claude",
+            mcpServer: "github",
+            domain: "api.github.com",
+            remoteIP: "203.0.113.9",
+            focus: FocusScope(bundleIDs: ["claude"])
+        )
+        let report = try db.series(.second, from: from, to: to, filter: exactChild, calendar: Calendar(identifier: .gregorian))
+        XCTAssertEqual(report.reduce(Int64(0)) { $0 + $1.bytesIn + $1.bytesOut }, 30,
+                       "a child visible through its focused parent must remain visible after Reports drill-down")
+    }
+
+    func testAIRollupsKeepDistinctParentAndMCPAttribution() throws {
+        let utc = TimeZone(identifier: "UTC")!
+        let t0: Int64 = 1_700_000_000 - (1_700_000_000 % 86400)
+        var first = key("node", "api.example", ip: "203.0.113.20")
+        first.parentAgent = "agent.one"
+        first.parentAgentName = "Agent One"
+        first.mcpServer = "github"
+        var second = first
+        second.parentAgent = "agent.two"
+        second.parentAgentName = "Agent Two"
+        second.mcpServer = "filesystem"
+        try db.insert([
+            TrafficBatch(timestamp: t0, records: [
+                TrafficRecord(key: first, counters: FlowCounters(bytesOut: 10, flows: 1)),
+                TrafficRecord(key: second, counters: FlowCounters(bytesOut: 20, flows: 1))
+            ])
+        ])
+        try db.rollup(now: Date(timeIntervalSince1970: TimeInterval(t0 + 3_700)), timeZone: utc)
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        for granularity in [Granularity.second, .minute, .hour, .day] {
+            let to = granularity == .day
+                ? Date(timeIntervalSince1970: TimeInterval(t0 + 86_400))
+                : Date(timeIntervalSince1970: TimeInterval(t0 + 3_600))
+            let rows = try db.aiVisualizationRows(granularity, from: from, to: to)
+            XCTAssertEqual(rows.count, 2, "\(granularity) must preserve attribution identity")
+            XCTAssertEqual(Set(rows.map(\.parentAgent)), ["agent.one", "agent.two"])
+            XCTAssertEqual(Set(rows.map(\.mcpServer)), ["github", "filesystem"])
+            XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.bytesOut }, 30)
+        }
     }
 
     func testTreeBackfillsDomainsAndFilters() {
@@ -158,6 +268,156 @@ final class DatabaseTests: XCTestCase {
         let legacy = #"[{"timestamp":1,"records":[{"key":{"pid":1,"bundleID":"a","appName":"a","appPath":"","remoteIP":"1.1.1.1","domain":"","port":443,"transport":"tcp","appProtocol":"https"},"counters":{"bytesIn":1,"bytesOut":1,"flows":0}}]}]"#
         let decoded = try JSONDecoder().decode([TrafficBatch].self, from: Data(legacy.utf8))
         XCTAssertNil(decoded[0].records[0].key.parentAgent)
+    }
+
+    func testLegacyMergedAttributionIsUntrustedWithoutLosingTraffic() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-attribution-\(UUID()).sqlite")
+        let legacy = try SQLiteConnection(path: url.path)
+        try legacy.execute("""
+            CREATE TABLE flows_1s (
+                ts INTEGER NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+                app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
+                transport TEXT NOT NULL, protocol TEXT NOT NULL, bytes_in INTEGER NOT NULL DEFAULT 0,
+                bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0,
+                agent_parent TEXT NOT NULL DEFAULT '', agent_parent_name TEXT NOT NULL DEFAULT '',
+                mcp_server TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT ''
+            );
+            CREATE UNIQUE INDEX flows_1s_key2 ON flows_1s(
+                ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel
+            );
+            INSERT INTO flows_1s VALUES(
+                1700000000, 10, 'node', 'node', '/usr/bin/node', '203.0.113.9', 'api.github.com', 443,
+                'tcp', 'https', 10, 20, 2, 'claude', 'Claude Code', 'github', ''
+            );
+            """)
+        for table in ["agg_1m", "agg_1h", "agg_1d"] {
+            try legacy.execute("CREATE TABLE \(table) AS SELECT * FROM flows_1s WHERE 0")
+            try legacy.execute("CREATE UNIQUE INDEX \(table)_key2 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel)")
+        }
+
+        let migrated = try TrafficDatabase(url: url)
+        let rows = try migrated.raw(
+            "SELECT bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server FROM flows_1s"
+        ) { ($0.int(0), $0.int(1), $0.int(2), $0.text(3), $0.text(4), $0.text(5)) }
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0].0, 10)
+        XCTAssertEqual(rows[0].1, 20)
+        XCTAssertEqual(rows[0].2, 2)
+        XCTAssertEqual(rows[0].3, "claude", "migration preserves historical fields and counters")
+        XCTAssertEqual(rows[0].4, "Claude Code")
+        XCTAssertEqual(rows[0].5, "github")
+        let exact = try migrated.raw("SELECT attribution_exact FROM flows_1s") { $0.int(0) }
+        XCTAssertEqual(exact, [0], "legacy merged attribution remains stored but cannot be used as lineage proof")
+        let projected = try migrated.aiVisualizationRows(
+            .second,
+            from: Date(timeIntervalSince1970: 1_700_000_000),
+            to: Date(timeIntervalSince1970: 1_700_000_001)
+        )
+        XCTAssertEqual(projected.count, 1)
+        XCTAssertEqual(projected[0].counters, FlowCounters(bytesIn: 10, bytesOut: 20, flows: 2))
+        XCTAssertEqual(projected[0].parentAgent, "")
+        XCTAssertEqual(projected[0].parentAgentName, "")
+        XCTAssertEqual(projected[0].mcpServer, "")
+        XCTAssertTrue(AgentsModel.build(rows: projected, alerts: []).isEmpty,
+                      "AI Agents must not infer a parent or tool from untrusted historical labels")
+        let ordinary = try migrated.breakdown(
+            .second,
+            from: Date(timeIntervalSince1970: 1_700_000_000),
+            to: Date(timeIntervalSince1970: 1_700_000_001)
+        )
+        XCTAssertEqual(ordinary.first?.parentAgent, "claude",
+                       "ordinary Reports retain historical labels; AI screens must use the guarded projection")
+    }
+
+    func testPrereleaseExactKeyDoesNotPromoteUnknownProvenance() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("exact-attribution-\(UUID()).sqlite")
+        let previous = try SQLiteConnection(path: url.path)
+        try previous.execute("""
+            CREATE TABLE flows_1s (
+                ts INTEGER NOT NULL, pid INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+                app_path TEXT NOT NULL, remote_ip TEXT NOT NULL, domain TEXT NOT NULL, port INTEGER NOT NULL,
+                transport TEXT NOT NULL, protocol TEXT NOT NULL, bytes_in INTEGER NOT NULL DEFAULT 0,
+                bytes_out INTEGER NOT NULL DEFAULT 0, flows INTEGER NOT NULL DEFAULT 0,
+                agent_parent TEXT NOT NULL DEFAULT '', agent_parent_name TEXT NOT NULL DEFAULT '',
+                mcp_server TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL DEFAULT ''
+            );
+            CREATE UNIQUE INDEX flows_1s_key3 ON flows_1s(
+                ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
+                agent_parent, agent_parent_name, mcp_server
+            );
+            INSERT INTO flows_1s VALUES(
+                1700000000, 10, 'node', 'node', '/usr/bin/node', '203.0.113.9', 'api.github.com', 443,
+                'tcp', 'https', 10, 20, 2, 'claude', 'Claude Code', 'github', ''
+            );
+            """)
+        for table in ["agg_1m", "agg_1h", "agg_1d"] {
+            try previous.execute("CREATE TABLE \(table) AS SELECT * FROM flows_1s WHERE 0")
+            try previous.execute("CREATE UNIQUE INDEX \(table)_key3 ON \(table)(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server)")
+        }
+
+        let migrated = try TrafficDatabase(url: url)
+        XCTAssertEqual(try migrated.raw("SELECT attribution_exact FROM flows_1s") { $0.int(0) }, [0])
+        let projected = try migrated.aiVisualizationRows(
+            .second,
+            from: Date(timeIntervalSince1970: 1_700_000_000),
+            to: Date(timeIntervalSince1970: 1_700_000_001)
+        )
+        XCTAssertEqual(projected.first?.parentAgent, "")
+        XCTAssertEqual(projected.first?.mcpServer, "")
+    }
+
+    func testPreviouslyPromotedKey4RowsStayQuarantinedAcrossReopen() throws {
+        let url = try makePreviouslyPromotedKey4Database()
+        let repaired = try TrafficDatabase(url: url)
+        XCTAssertEqual(
+            try repaired.raw("SELECT attribution_exact, attribution_epoch FROM flows_1s") {
+                ($0.int(0), $0.int(1))
+            }.map { "\($0.0):\($0.1)" },
+            ["1:0"],
+            "the bad candidate's bit is preserved but cannot satisfy the corrected provenance epoch"
+        )
+        XCTAssertEqual(
+            try repaired.aiVisualizationRows(
+                .second,
+                from: Date(timeIntervalSince1970: 1_700_000_000),
+                to: Date(timeIntervalSince1970: 1_700_000_001)
+            ).first?.parentAgent,
+            ""
+        )
+        XCTAssertEqual(
+            try repaired.flowsForSimulation(since: Date(timeIntervalSince1970: 1_699_999_900)).first?.agentKey,
+            "node",
+            "rule simulation must not act on quarantined parent labels"
+        )
+
+        var fresh = key("node", "api.github.com", ip: "203.0.113.9")
+        fresh.parentAgent = "claude"
+        fresh.parentAgentName = "Claude Code"
+        fresh.mcpServer = "github"
+        try repaired.setRollupWatermarks(1_700_000_040)
+        try repaired.insert([TrafficBatch(timestamp: 1_700_000_060, records: [
+            TrafficRecord(key: fresh, counters: FlowCounters(bytesOut: 5, flows: 1))
+        ])])
+        try repaired.rollup(
+            now: Date(timeIntervalSince1970: 1_700_000_186),
+            timeZone: TimeZone(secondsFromGMT: 0)!
+        )
+
+        let reopened = try TrafficDatabase(url: url)
+        XCTAssertEqual(
+            try reopened.raw("SELECT attribution_exact, attribution_epoch FROM flows_1s ORDER BY ts") {
+                ($0.int(0), $0.int(1))
+            }.map { "\($0.0):\($0.1)" },
+            ["1:0", "1:1"],
+            "reopening must preserve both quarantined history and exact corrected writes"
+        )
+        XCTAssertEqual(
+            Set(try reopened.flowsForSimulation(
+                since: Date(timeIntervalSince1970: 1_699_999_900)
+            ).map(\.agentKey)),
+            ["node", "claude"],
+            "corrected attribution remains actionable while quarantined history belongs to its observed process"
+        )
     }
 
     func testUnacknowledgedCountAndReadOnlyConnection() throws {

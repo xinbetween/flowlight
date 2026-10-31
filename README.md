@@ -443,6 +443,8 @@ The [threat model](https://flowlight.xinbetween.com/threat-model/) says what is 
 
 Shipped:
 
+- [x] Traffic visualization: every observed application and its exact destinations, with stable weighted paths,
+  animated direction, exact drill-down, Reduce Motion and an accessible list (0.16.0)
 - [x] Signed and notarized releases (Developer ID, from 0.1.6)
 - [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
 - [x] Tool and MCP server attribution (which process an agent started opened the socket)
@@ -476,6 +478,12 @@ Shipped:
   no app release of its own, since the app itself did not change)
 - [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
+
+- [x] AI visualization: a separate mode for proved agent clients, attributed tools and MCP servers, LLM providers,
+  and every other destination they reached (0.16.0). Tool traffic folds into its parent agent without erasing the
+  selectable tool node; provider grouping keeps exact hosts underneath for honest Reports, Inspect and Rules
+  navigation. Process lineage is labelled “works for,” never an invocation count without inspected evidence. The
+  full evidence, data, status and acceptance contract lives in [docs/VISUALIZATION.md](docs/VISUALIZATION.md).
 
 Planned, in order:
 

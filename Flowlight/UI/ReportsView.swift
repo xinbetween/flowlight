@@ -290,7 +290,8 @@ struct ReportsView: View {
 
     /// What the charts are scoped to, for their titles ("Destinations · claude").
     private var scopeName: String? {
-        [filter.bundleID.map(appName(for:)), filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
+        [filter.bundleID.map(appName(for:)), filter.agentParent.map(appName(for:)), filter.mcpServer,
+         filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
          filter.remoteIP, filter.appProtocol, filter.channel.map(\.localizedTitle)].compactMap { $0 }.first
     }
 
@@ -333,7 +334,21 @@ struct ReportsView: View {
     private var filterChips: some View {
         HStack(spacing: 6) {
             Text(L("Showing only:")).font(.caption).foregroundStyle(.secondary)
-            if let app = filter.bundleID { chip(L("App: %@", appName(for: app))) { filter.bundleID = nil } }
+            if let app = filter.bundleID {
+                chip(L("App: %@", appName(for: app))) {
+                    filter.bundleID = nil
+                    filter.includeAttributedChildren = false
+                }
+            }
+            if filter.includeAttributedChildren {
+                chip(L("Tools & MCP servers")) { filter.includeAttributedChildren = false }
+            }
+            if let parent = filter.agentParent {
+                chip("\(L("Agent")): \(appName(for: parent))") { filter.agentParent = nil }
+            }
+            if let mcp = filter.mcpServer {
+                chip("\(L("MCP server")): \(mcp)") { filter.mcpServer = nil }
+            }
             if let owner = filter.owner { chip(L("Owner: %@", owner)) { filter.owner = nil; filter.domain = nil; filter.remoteIP = nil } }
             else if let domain = filter.domain { chip(L("Domain: %@", domain.isEmpty ? L("(none)") : domain)) { filter.domain = nil; filter.remoteIP = nil } }
             if let suffix = filter.domainSuffix { chip(L("Domain: *.%@", suffix)) { filter.domainSuffix = nil; filter.remoteIP = nil } }

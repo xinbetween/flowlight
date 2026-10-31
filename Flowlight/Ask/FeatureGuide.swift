@@ -150,6 +150,19 @@ extension FeatureGuide {
             keywords: ["history", "chart", "csv", "export csv", "breakdown", "worth a look", "group"]),
 
         FeatureGuide(
+            id: "visualize", title: "Traffic and AI visualization",
+            summary: "One native map with separate Traffic and AI activity modes. Traffic shows every app-to-destination connection; AI activity shows proved agent clients, their attributed tools and MCP servers, LLM services, and every other destination they reached.",
+            steps: ["Open Visualize and choose Traffic or AI activity.",
+                    "Pick a time period and select a node or connection for exact byte and connection totals.",
+                    "For a grouped LLM service, choose an exact host and address before opening Reports, Inspect, or an unsaved blocking rule."],
+            screen: .visualize,
+            caveats: ["Connections are network flows, not HTTP request counts.",
+                      "Observed means traffic exists. Works for means stored process lineage; it is not a proved invocation.",
+                      "Browsers are never called agents only because someone opened an AI provider in them."],
+            keywords: ["visualize", "graph", "map", "topology", "nodes", "edges", "connections", "traffic universe", "AI activity", "works for", "provider"],
+        ),
+
+        FeatureGuide(
             id: "channels", title: "Peer-to-peer Wi-Fi",
             summary: "AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the room over AWDL. Flowlight labels those flows rather than showing them as traffic to an address with no name.",
             steps: ["Open Reports.", "Use the Way out menu in the toolbar and choose Peer-to-peer Wi-Fi."],

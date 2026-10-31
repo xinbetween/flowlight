@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">문서</p>
     <h1>Flowlight 사용하기</h1>
-    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.15.14, macOS 15 이상.</p>
+    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.16.0, macOS 15 이상.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="이 페이지 안에서">
@@ -165,6 +165,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>실시간</td><td>⌘1</td><td>지금 무엇이 움직이나. 지난 몇 초 동안의 앱별 속도와 가장 바쁜 목적지.</td></tr>
         <tr><td><a href="#agents">AI 에이전트</a></td><td>⌘2</td><td>어떤 에이전트가 활동 중이고, 어떤 AI 제공업체를 쓰며, 그 밖에 어디에 접속했나.</td></tr>
         <tr><td>보고서</td><td>⌘3</td><td>트래픽이 어디로 갔나. 초에서 연까지. 앱, 목적지, IP로 묶고, 차트나 <a href="#worth-a-look">눈여겨볼 것</a>으로 바꾸고, CSV로 내보냅니다.</td></tr>
+        <tr><td><a href="#visualize">시각화</a></td><td>—</td><td>앱과 정확한 목적지를 가중 경로, 움직이는 방향 표시, 연결 수, 동등한 목록으로 보여 주는 안정적인 지도입니다.</td></tr>
         <tr><td><a href="#alerts">알림</a></td><td>⌘4</td><td>이상해 보인 모든 것. 앱과 목적지, 그리고 규칙의 기준을 넘긴 수치와 함께.</td></tr>
         <tr><td><a href="#rules">규칙</a></td><td>⌘5</td><td>설정해 둔 모든 허용 목록과 거부, 각각이 무엇을 포괄하는지, 그리고 실제로 무엇을 막았는지.</td></tr>
         <tr><td><a href="#ask">질문</a></td><td>⌘6</td><td>내 트래픽에 대한 평범한 말로 된 질문. 기록된 이력에서 로컬 모델이나 호스팅 모델이 답합니다.</td></tr>
@@ -178,6 +179,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="실시간 뷰: 앱 목록에 각각의 현재 보내기·받기 속도와 가장 바쁜 목적지가 함께 나열되어 있습니다."></div>
         <figcaption class="caption">실시간, Flowlight가 처음 여는 화면.</figcaption></figure>
       <p>보고서에서는 막대에 포인터를 올려 어떤 앱이 만든 것인지 보고, 클릭해 확대하고, 아무 행이나 두 번 클릭해 보고서를 그 항목으로 좁힐 수 있습니다.</p>
+      <h2 id="visualize">트래픽 시각화</h2>
+      <p>시각화는 앱과 정확한 목적지를 안정적인 노드로 표시합니다. 너비는 바이트 수를, 입자는 방향을 나타내며 목록에도 같은 값이 있습니다. 연결은 네트워크 흐름이며 HTTP 요청 수가 아닙니다. 관찰됨은 허용 결정이 아닙니다.</p>
 
       <h2 id="agents">AI 에이전트 규칙</h2>
       <p>Flowlight가 이름으로 아는 앱(현재 16종, Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, Ollama, ZCode 등)이거나
@@ -745,7 +748,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.15.14 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.16.0 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>

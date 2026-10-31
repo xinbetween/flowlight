@@ -1771,3 +1771,45 @@
 "Couldn't delete the captured data: %@" = "Die erfassten Daten konnten nicht gelöscht werden: %@";
 "This previously enabled official pack is no longer in the catalog. Blocking stopped automatically." = "Dieses zuvor aktivierte offizielle Paket ist nicht mehr im Katalog. Die Blockierung wurde automatisch beendet.";
 "Could not prepare managed-pack review demo: %@" = "Die Demo zur Überprüfung verwalteter Pakete konnte nicht vorbereitet werden: %@";
+
+/* 0.16.0 Datenverkehrsvisualisierung */
+"Visualize" = "Visualisieren";
+"Map" = "Karte";
+"List" = "Liste";
+"App, domain, or IP" = "App, Domain oder IP";
+"Traffic map" = "Datenverkehrskarte";
+"All applications" = "Alle Anwendungen";
+"Observed connections during %@" = "Beobachtete Verbindungen während %@";
+"%lld quieter connections hidden" = "%lld weniger aktive Verbindungen ausgeblendet";
+"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "Die Karte bleibt lesbar, indem sie die aktivsten Beziehungen zeigt. Die Liste verwendet dieselbe begrenzte Auswahl.";
+"Period" = "Zeitraum";
+"No traffic to visualize" = "Kein Datenverkehr zum Visualisieren";
+"Flowlight has not observed any connections in this period." = "Flowlight hat in diesem Zeitraum keine Verbindungen beobachtet.";
+"No observed connections match this search." = "Keine beobachteten Verbindungen entsprechen dieser Suche.";
+"Select to inspect this traffic" = "Auswählen, um diesen Datenverkehr zu untersuchen";
+"%lld connections" = "%lld Verbindungen";
+"%@, received %@, sent %@, %lld connections" = "%@, %@ empfangen, %@ gesendet, %lld Verbindungen";
+"Select a node or connection" = "Knoten oder Verbindung auswählen";
+"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "Die Karte bleibt ruhig, während sich Verkehrswerte aktualisieren. Bewegte Punkte zeigen die Richtung; die Liste zeigt dieselben Werte ohne Bewegung.";
+"Observed" = "Beobachtet";
+"Connections" = "Verbindungen";
+"Traffic connections" = "Datenverkehrsverbindungen";
+"Unknown destination" = "Unbekanntes Ziel";
+
+/* 0.16.0 AI visualization */
+"Works for %@" = "Arbeitet für %@";
+"MCP service for %@" = "MCP-Dienst für %@";
+"LLM service" = "LLM-Dienst";
+"AI activity" = "KI-Aktivität";
+"AI activity map" = "Karte der KI-Aktivität";
+"Proved AI agents" = "Nachgewiesene KI-Agenten";
+"Observed agent, tool, and service activity during %@" = "Beobachtete Agenten-, Werkzeug- und Dienstaktivität während %@";
+"Mode" = "Modus";
+"No AI activity to visualize" = "Keine KI-Aktivität zum Visualisieren";
+"Flowlight has not observed any proved AI agent activity in this period." = "Flowlight hat in diesem Zeitraum keine nachgewiesene KI-Agentenaktivität beobachtet.";
+"Exact destinations" = "Exakte Ziele";
+"Works for" = "Arbeitet für";
+"Invoked" = "Aufgerufen";
+"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "Die gespeicherte Prozessabstammung belegt, dass dieses Werkzeug für den Agenten arbeitet. Sie belegt keinen Werkzeugaufruf.";
+"Block…" = "Blockieren…";
+"Direction and evidence" = "Richtung und Nachweis";

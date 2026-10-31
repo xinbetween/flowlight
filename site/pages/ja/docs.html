@@ -95,6 +95,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>ライブ</td><td>⌘1</td><td>いま何が動いているか。直近数秒間のアプリごとの速度と、最も忙しい接続先。</td></tr>
         <tr><td><a href="#agents">AI エージェント</a></td><td>⌘2</td><td>どのエージェントが動いていて、どの AI プロバイダを使い、ほかに何と通信したか。</td></tr>
         <tr><td>レポート</td><td>⌘3</td><td>トラフィックがどこへ行ったか。秒から年まで。アプリ・接続先・IP でグループ化し、グラフや<a href="#worth-a-look">気になるもの</a>に切り替え、CSV に書き出せます。</td></tr>
+        <tr><td><a href="#visualize">可視化</a></td><td>—</td><td>アプリと正確な接続先を、重み付き経路、動く方向マーカー、接続数、同等のリストで示す安定したマップ。</td></tr>
         <tr><td><a href="#alerts">アラート</a></td><td>⌘4</td><td>いつもと違って見えたものすべて。アプリ、接続先、そしてルールのしきい値を超えた数値とともに。</td></tr>
         <tr><td><a href="#rules">ルール</a></td><td>⌘5</td><td>設定したすべての許可リストと拒否。それぞれが何を対象にし、実際に何を止めたか。</td></tr>
         <tr><td><a href="#ask">質問</a></td><td>⌘6</td><td>自分のトラフィックについての、ふつうの言葉での質問。記録された履歴から、ローカルまたはホスト型のモデルが答えます。</td></tr>
@@ -108,6 +109,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="ライブビュー。アプリの一覧に、現在の送信と受信の速度、そして最も忙しい接続先が並んでいます。"></div>
         <figcaption class="caption">ライブ。Flowlight が最初に開く画面です。</figcaption></figure>
       <p>レポートでは、棒にポインタを重ねるとどのアプリが押し上げたかがわかり、クリックすると拡大、どの行でもダブルクリックするとその行だけにレポートを絞り込めます。</p>
+      <h2 id="visualize">トラフィックを可視化</h2>
+      <p>可視化ではアプリと正確な接続先を安定したノードで表示します。幅はバイト数、粒子は方向を表し、リストにも同じ値があります。接続はネットワークフローであり HTTP リクエスト数ではありません。「観測済み」は許可の判断ではありません。</p>
 
       <h2 id="agents">AI エージェントのルール</h2>
       <p>Flowlight が名前で知っているアプリ（現在 16 種類。Claude Code、Codex、Cursor、GitHub Copilot、Gemini CLI、Ollama、ZCode を含みます）か、

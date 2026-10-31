@@ -97,6 +97,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>En direct</td><td>⌘1</td><td>Ce qui circule en ce moment&nbsp;: les débits par app sur les dernières secondes et la destination la plus active.</td></tr>
         <tr><td><a href="#agents">Agents IA</a></td><td>⌘2</td><td>Quels agents sont actifs, quels fournisseurs d’IA ils utilisent, et quoi d’autre ils ont contacté.</td></tr>
         <tr><td>Rapports</td><td>⌘3</td><td>Où le trafic est parti, de la seconde à l’année. Groupez par App, Destination ou IP&nbsp;; passez aux Graphiques ou à <a href="#worth-a-look">À regarder de près</a>&nbsp;; exportez en CSV.</td></tr>
+        <tr><td><a href="#visualize">Visualiser</a></td><td>—</td><td>Une carte stable des apps et de leurs destinations exactes, avec des chemins pondérés, des marqueurs de direction animés, le nombre de connexions et une liste équivalente.</td></tr>
         <tr><td><a href="#alerts">Alertes</a></td><td>⌘4</td><td>Tout ce qui a paru inhabituel, avec l’app, la destination et le chiffre qui a déclenché la règle.</td></tr>
         <tr><td><a href="#rules">Règles</a></td><td>⌘5</td><td>Chaque liste d’autorisation et chaque refus que vous avez posés, ce que chacun couvre, et ce qu’il a réellement arrêté.</td></tr>
         <tr><td><a href="#ask">Demander</a></td><td>⌘6</td><td>Des questions sur votre propre trafic en langage courant, auxquelles un modèle local ou hébergé répond à partir de l’historique enregistré.</td></tr>
@@ -110,6 +111,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         alt="L’écran En direct&nbsp;: une liste d’applications avec leurs débits d’envoi et de réception actuels et leur destination la plus active."></div>
         <figcaption class="caption">En direct, l’écran sur lequel Flowlight s’ouvre.</figcaption></figure>
       <p>Dans Rapports, survolez une barre pour voir quelles apps l’ont produite, cliquez pour zoomer, et double-cliquez n’importe quelle ligne pour y restreindre le rapport.</p>
+      <h2 id="visualize">Visualiser le trafic</h2>
+      <p>Visualiser affiche les apps et leurs destinations exactes sous forme de nœuds stables. La largeur représente les octets et les particules indiquent le sens. La liste contient les mêmes valeurs. Connexions signifie flux réseau, pas requêtes HTTP ; Observé n’est pas une décision d’autorisation.</p>
 
       <h2 id="agents">Règles pour les agents IA</h2>
       <p>Une app compte comme agent si Flowlight la connaît par son nom (16 à ce jour, dont Claude Code, Codex, Cursor, GitHub Copilot,

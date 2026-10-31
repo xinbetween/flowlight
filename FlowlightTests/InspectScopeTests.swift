@@ -13,13 +13,15 @@ final class InspectScopeTests: XCTestCase {
         try TrafficDatabase(url: FileManager.default.temporaryDirectory.appendingPathComponent("scope-\(UUID()).sqlite"))
     }
 
-    private func exchange(app: (String, String), host: String, body: String = "") -> HTTPExchange {
+    private func exchange(app: (String, String), host: String, body: String = "",
+                          agent: String? = nil, mcpServer: String? = nil,
+                          toolCalls: [ToolCall] = [], started: Date = Date()) -> HTTPExchange {
         HTTPExchange(
-            id: nil, started: Date(), duration: 0.1, scheme: "https", host: host, port: 443, method: "GET",
+            id: nil, started: started, duration: 0.1, scheme: "https", host: host, port: 443, method: "GET",
             path: "/", status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
             responseHeaders: [], responseBody: Data(body.utf8), responseSize: body.count, responseTruncated: false,
-            contentType: "text/html", pid: 1, bundleID: app.0, appName: app.1, agent: nil, agentName: nil,
-            mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
+            contentType: "text/html", pid: 1, bundleID: app.0, appName: app.1, agent: agent, agentName: agent,
+            mcpServer: mcpServer, toolCalls: toolCalls, toolResults: [], mcp: [], llm: nil, note: nil, mockRule: nil, guardrail: nil)
     }
 
     /// The exact shape of the bug: a page that merely mentions the app's name.
@@ -45,6 +47,13 @@ final class InspectScopeTests: XCTestCase {
 
         let scoped = try db.exchanges(since: Date().addingTimeInterval(-60), host: "github.com")
         XCTAssertEqual(Set(scoped.map(\.host)), ["github.com", "api.github.com"])
+
+        let exact = try db.exchanges(
+            since: Date().addingTimeInterval(-60),
+            host: "github.com",
+            hostIncludesSubdomains: false
+        )
+        XCTAssertEqual(exact.map(\.host), ["github.com"])
     }
 
     /// A scope and a search have to compose, or narrowing a scoped list would silently widen it.
@@ -56,6 +65,75 @@ final class InspectScopeTests: XCTestCase {
         let both = try db.exchanges(since: Date().addingTimeInterval(-60), search: "npmjs", app: "claude")
         XCTAssertEqual(both.count, 1)
         XCTAssertEqual(both.first?.host, "registry.npmjs.org")
+    }
+
+    func testInspectLinkQueryKeepsVisibleScopeAndAddsParentCalls() throws {
+        let db = try database()
+        let call = LLMToolCallReader.make(.anthropic, id: "call-1", name: "mcp__github__create_issue",
+                                          input: ["url": "https://api.github.com/repos/flowlight/issues"])
+        let now = Date()
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com",
+                                           agent: "claude", toolCalls: [call],
+                                           started: now.addingTimeInterval(-2)))
+        let childID = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                                     agent: "claude", mcpServer: "github", started: now))
+        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                           agent: "cursor", mcpServer: "github"))
+        _ = try db.insertExchange(exchange(app: ("node", "Node"), host: "api.github.com",
+                                           agent: "claude", mcpServer: "filesystem"))
+
+        let set = try InspectLinkQuery.load(
+            from: db,
+            since: Date().addingTimeInterval(-60),
+            focus: FocusScope(bundleIDs: ["claude"]),
+            app: "node",
+            host: "api.github.com",
+            includeAttributedChildren: false,
+            agentParent: "claude",
+            mcpServer: "github"
+        )
+
+        XCTAssertEqual(set.filter { $0.bundleID == "node" }.count, 1,
+                       "supporting rows must not widen the visible child scope")
+        XCTAssertEqual(ToolCallLinks.link(set)[childID]?.call.callID, "call-1",
+                       "the parent agent exchange carries the initiating tool call")
+
+        let rootSet = try InspectLinkQuery.load(
+            from: db,
+            since: Date().addingTimeInterval(-60),
+            focus: .none,
+            app: "claude",
+            host: nil,
+            includeAttributedChildren: true,
+            agentParent: nil,
+            mcpServer: nil
+        )
+        XCTAssertEqual(ToolCallLinks.link(rootSet)[childID]?.call.callID, "call-1",
+                       "an agent-root scope also keeps its root exchanges for child linking")
+    }
+
+    func testEmptySearchStillLoadsParentSupportForCausalLinks() {
+        XCTAssertTrue(InspectLinkQuery.needsSupportingRows(
+            search: "",
+            app: "node",
+            includeAttributedChildren: false,
+            agentParent: "claude",
+            mcpServer: "github"
+        ))
+        XCTAssertFalse(InspectLinkQuery.needsSupportingRows(
+            search: "",
+            app: "Safari",
+            includeAttributedChildren: false,
+            agentParent: nil,
+            mcpServer: nil
+        ))
+    }
+
+    func testScopeSummaryDisclosesBothAppAndHost() {
+        XCTAssertEqual(
+            InspectScopeSummary.text(appName: "Node", host: "api.github.com", potentialHarmOnly: false),
+            L("Showing only traffic from %@", "Node") + " · " + L("Showing only traffic to %@", "api.github.com")
+        )
     }
 
     func testNoScopeStillReturnsEverything() throws {

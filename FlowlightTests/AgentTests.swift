@@ -64,6 +64,32 @@ final class AgentTests: XCTestCase {
         XCTAssertFalse(IPOwnerLookup.isLocalNetwork("203.0.113.9"), "reserved ranges still count as leaving the Mac")
     }
 
+    func testFocusedAgentRowsRetainExactAttributedChildren() throws {
+        let db = try TrafficDatabase(
+            url: FileManager.default.temporaryDirectory.appendingPathComponent("focused-agent-\(UUID()).sqlite")
+        )
+        var child = key("node", domain: "api.github.com", ip: "203.0.113.9")
+        child.parentAgent = "claude"
+        child.parentAgentName = "Claude Code"
+        child.mcpServer = "github"
+        let now = Int64(Date().timeIntervalSince1970)
+        try db.insert([TrafficBatch(timestamp: now, records: [
+            TrafficRecord(key: child, counters: FlowCounters(bytesOut: 10, flows: 1))
+        ])])
+
+        let rows = try AgentsModel.rows(
+            from: db,
+            granularity: .second,
+            from: Date(timeIntervalSince1970: TimeInterval(now)),
+            to: Date(timeIntervalSince1970: TimeInterval(now + 1)),
+            focus: FocusScope(bundleIDs: ["claude"])
+        )
+
+        XCTAssertEqual(rows.map(\.bundleID), ["node"])
+        XCTAssertEqual(rows.first?.parentAgent, "claude")
+        XCTAssertEqual(rows.first?.mcpServer, "github")
+    }
+
     func testModelFoldsToolsAndMCPServersIntoTheirAgent() {
         func row(_ app: String, _ domain: String, out: Int64, parent: String = "", parentName: String = "", mcp: String = "") -> BreakdownRow {
             BreakdownRow(bundleID: app, appName: app, appPath: "", domain: domain, remoteIP: "203.0.113.\(out % 200)", ports: "443",
