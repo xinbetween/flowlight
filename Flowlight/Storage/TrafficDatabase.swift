@@ -325,7 +325,8 @@ final class TrafficDatabase: @unchecked Sendable {
         guard !realName.isEmpty else { return }
 
         let columns = "ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, " +
-                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel, attribution_exact"
+                      "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel, " +
+                      "attribution_exact, attribution_epoch"
         for (version, real) in realName {
             for table in Self.tables {
                 // Re-inserted rather than updated, because `bundle_id` is part of the unique key: renaming can
@@ -335,9 +336,9 @@ final class TrafficDatabase: @unchecked Sendable {
                     INSERT INTO \(table) (\(columns))
                     SELECT ts, pid, ?, ?, app_path, remote_ip, domain, port, transport, protocol,
                            bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, channel,
-                           attribution_exact
+                           attribution_exact, attribution_epoch
                     FROM \(table) WHERE bundle_id = ?
-                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact)
+                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch)
                     DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
                                   bytes_out = bytes_out + excluded.bytes_out,
                                   flows = flows + excluded.flows;
@@ -375,9 +376,16 @@ final class TrafficDatabase: @unchecked Sendable {
             }
             // `_key2` treated attribution as mutable metadata, so one row may already contain bytes from several
             // parents while retaining one arbitrary label. A prerelease `_key3` upgrade could not recover that
-            // provenance either. Preserve every field and counter, but trust only rows written under `_key4`.
+            // provenance either. Preserve every field and counter; the epoch below identifies corrected writes.
             if !columns.contains("attribution_exact") {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN attribution_exact INTEGER NOT NULL DEFAULT 0")
+            }
+            // The first provenance bit existed in prerelease builds that could promote already-merged `_key2`
+            // history. Keep every stored field and counter untouched, but require a second epoch bit that only the
+            // corrected schema writes. Existing `_key4` rows therefore remain queryable ordinary traffic without
+            // being accepted as lineage evidence.
+            if !columns.contains("attribution_epoch") {
+                try conn.execute("ALTER TABLE \(table) ADD COLUMN attribution_epoch INTEGER NOT NULL DEFAULT 0")
             }
             // v0.4.0: which way the bytes left the Mac. It joins the unique key rather than riding along as an
             // attribute — the same app on the same port over Wi-Fi and over AWDL is two different things, and
@@ -391,9 +399,10 @@ final class TrafficDatabase: @unchecked Sendable {
             DROP INDEX IF EXISTS \(table)_key;
             DROP INDEX IF EXISTS \(table)_key2;
             DROP INDEX IF EXISTS \(table)_key3;
-            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key4 ON \(table)(
+            DROP INDEX IF EXISTS \(table)_key4;
+            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key5 ON \(table)(
                 ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                agent_parent, agent_parent_name, mcp_server, attribution_exact
+                agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch
             );
             """)
         }
@@ -597,9 +606,10 @@ final class TrafficDatabase: @unchecked Sendable {
     func insert(_ batches: [TrafficBatch]) throws {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel,
+                              attribution_exact, attribution_epoch)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -629,9 +639,10 @@ final class TrafficDatabase: @unchecked Sendable {
         precondition(Self.tables.contains(table))
         let sql = """
         INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                              agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
+                              agent_parent, agent_parent_name, mcp_server, channel,
+                              attribution_exact, attribution_epoch)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows,
             agent_parent = CASE WHEN excluded.agent_parent != '' THEN excluded.agent_parent ELSE agent_parent END,
             agent_parent_name = CASE WHEN excluded.agent_parent_name != '' THEN excluded.agent_parent_name ELSE agent_parent_name END,
@@ -675,14 +686,15 @@ final class TrafficDatabase: @unchecked Sendable {
     private func fold(from source: String, into target: String, bucket: String, lower: Int64, upper: Int64) throws {
         try conn.run("""
         INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
-                               agent_parent, agent_parent_name, mcp_server, channel, attribution_exact)
+                               agent_parent, agent_parent_name, mcp_server, channel,
+                               attribution_exact, attribution_epoch)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
                SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server, channel,
-               attribution_exact
+               attribution_exact, attribution_epoch
         FROM \(source) WHERE ts >= ? AND ts < ?
         GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
-                 agent_parent, agent_parent_name, mcp_server, attribution_exact
-        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact) DO UPDATE SET
+                 agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch
+        ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server, attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """, [.int(lower), .int(upper)])
     }
@@ -738,17 +750,17 @@ final class TrafficDatabase: @unchecked Sendable {
         let includeChildren = includeAttributedChildren || filter.includeAttributedChildren
         if let v = filter.bundleID {
             clauses.append(includeChildren
-                ? "(bundle_id = ? OR (attribution_exact = 1 AND agent_parent = ?))"
+                ? "(bundle_id = ? OR (attribution_exact = 1 AND attribution_epoch = 1 AND agent_parent = ?))"
                 : "bundle_id = ?")
             values.append(.text(v))
             if includeChildren { values.append(.text(v)) }
         }
         if let v = filter.agentParent {
-            clauses.append("attribution_exact = 1 AND agent_parent = ?")
+            clauses.append("attribution_exact = 1 AND attribution_epoch = 1 AND agent_parent = ?")
             values.append(.text(v))
         }
         if let v = filter.mcpServer {
-            clauses.append("attribution_exact = 1 AND mcp_server = ?")
+            clauses.append("attribution_exact = 1 AND attribution_epoch = 1 AND mcp_server = ?")
             values.append(.text(v))
         }
         if let v = filter.domain { clauses.append("domain = ?"); values.append(.text(v)) }
@@ -780,7 +792,7 @@ final class TrafficDatabase: @unchecked Sendable {
         if !focus.bundleIDs.isEmpty {
             let placeholders = Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")
             parts.append(includeAttributedChildren
-                         ? "(\(bundleColumn) IN (\(placeholders)) OR (attribution_exact = 1 AND agent_parent IN (\(placeholders))))"
+                         ? "(\(bundleColumn) IN (\(placeholders)) OR (attribution_exact = 1 AND attribution_epoch = 1 AND agent_parent IN (\(placeholders))))"
                          : "\(bundleColumn) IN (\(placeholders))")
             values += focus.bundleIDs.map { .text($0) }
             if includeAttributedChildren { values += focus.bundleIDs.map { .text($0) } }
@@ -894,15 +906,15 @@ final class TrafficDatabase: @unchecked Sendable {
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
                        GROUP_CONCAT(DISTINCT port), GROUP_CONCAT(DISTINCT protocol),
                        SUM(bytes_in), SUM(bytes_out), SUM(flows),
-                       CASE WHEN attribution_exact = 1 THEN agent_parent ELSE '' END,
-                       CASE WHEN attribution_exact = 1 THEN agent_parent_name ELSE '' END,
-                       CASE WHEN attribution_exact = 1 THEN mcp_server ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
                        channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip, attribution_exact,
-                         CASE WHEN attribution_exact = 1 THEN agent_parent ELSE '' END,
-                         CASE WHEN attribution_exact = 1 THEN agent_parent_name ELSE '' END,
-                         CASE WHEN attribution_exact = 1 THEN mcp_server ELSE '' END,
+                GROUP BY bundle_id, domain, remote_ip, attribution_exact, attribution_epoch,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
+                         CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END,
                          channel
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
