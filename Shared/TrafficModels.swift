@@ -26,6 +26,16 @@ struct FlowKey: Hashable, Codable, Sendable {
     var parentAgentName: String? = nil
     /// The MCP server this process is, when it matches an agent's MCP configuration.
     var mcpServer: String? = nil
+    /// Capture-time proof of the terminal or supervisor that launched the agent responsible for this process.
+    /// These are separate from `parentAgent`: launcher lineage and agent ownership answer different questions.
+    var launcherBundleID: String? = nil
+    var launcherName: String? = nil
+    var launcherPath: String? = nil
+    /// An explicit local relay this counted connection traversed. Counters remain on this one record; graph route
+    /// evidence must never restore the hidden loopback leg and count it again.
+    var routeProxyBundleID: String? = nil
+    var routeProxyName: String? = nil
+    var routeProxyPath: String? = nil
 }
 
 struct FlowCounters: Codable, Sendable, Equatable {
@@ -117,5 +127,11 @@ extension FlowKey {
         parentAgent = try c.decodeIfPresent(String.self, forKey: .parentAgent)
         parentAgentName = try c.decodeIfPresent(String.self, forKey: .parentAgentName)
         mcpServer = try c.decodeIfPresent(String.self, forKey: .mcpServer)
+        launcherBundleID = try c.decodeIfPresent(String.self, forKey: .launcherBundleID)
+        launcherName = try c.decodeIfPresent(String.self, forKey: .launcherName)
+        launcherPath = try c.decodeIfPresent(String.self, forKey: .launcherPath)
+        routeProxyBundleID = try c.decodeIfPresent(String.self, forKey: .routeProxyBundleID)
+        routeProxyName = try c.decodeIfPresent(String.self, forKey: .routeProxyName)
+        routeProxyPath = try c.decodeIfPresent(String.self, forKey: .routeProxyPath)
     }
 }

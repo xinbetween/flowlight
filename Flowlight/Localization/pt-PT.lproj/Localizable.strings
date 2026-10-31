@@ -1701,6 +1701,23 @@
 "Remove this setting" = "Remove this setting";
 "Add Setting" = "Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ para %@, %lld tentativas bloqueadas";
+"A policy stopped this attempt before it became observed traffic." = "Uma política interrompeu esta tentativa antes de se tornar tráfego observado.";
+"Blocked" = "Bloqueado";
+"Blocked attempts" = "Tentativas bloqueadas";
+"Capture-time process ancestry proves this application started the agent." = "A ascendência de processos observada durante a captura comprova que esta aplicação iniciou o agente.";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "A atribuição de proxy observada durante a captura comprova que o tráfego desta aplicação utilizou esta rota.";
+"Inspected request evidence proves this invocation." = "O pedido inspecionado comprova esta invocação.";
+"Observed route" = "Rota observada";
+"Relationship evidence" = "Provas de relações";
+"Routed through" = "Encaminhado através de";
+"Started agent" = "Agente iniciado";
+"Managed pack: %@" = "Pacote gerido: %@";
+"Ordinary rule" = "Regra normal";
+"Telemetry" = "Telemetria";
+"Tracking" = "Rastreio";
+"Connections / attempts" = "Ligações / tentativas";
+"Loading visualization…" = "A carregar visualização…";
 "%lld medium or high local assessment%@ in this window." = "%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "%lld eligible request%@ did not receive a contextual verdict.";
@@ -1796,7 +1813,7 @@
 "Unknown destination" = "Destino desconhecido";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "Trabalha para %@";
+"Run by %@" = "Executado por %@";
 "MCP service for %@" = "Serviço MCP de %@";
 "LLM service" = "Serviço LLM";
 "AI activity" = "Atividade de IA";
@@ -1807,8 +1824,22 @@
 "No AI activity to visualize" = "Sem atividade de IA para visualizar";
 "Flowlight has not observed any proved AI agent activity in this period." = "O Flowlight não observou atividade comprovada de agentes de IA neste período.";
 "Exact destinations" = "Destinos exatos";
-"Works for" = "Trabalha para";
+"Runs" = "Executa";
 "Invoked" = "Invocado";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "A linhagem de processos guardada prova que esta ferramenta trabalha para o agente. Não prova uma invocação da ferramenta.";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "A linhagem de processos guardada prova que este agente executa a ferramenta. Não prova uma invocação da ferramenta.";
 "Block…" = "Bloquear…";
 "Direction and evidence" = "Direção e prova";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "Mapa de relações de tráfego";
+"Drag to pan, pinch to zoom, or use the map controls." = "Arraste para deslocar, junte ou afaste os dedos para ampliar, ou utilize os controlos do mapa.";
+"Zoom in" = "Ampliar";
+"Zoom out" = "Reduzir";
+"Fit" = "Ajustar";
+"Fit the map in the window" = "Ajustar o mapa à janela";
+"Reset" = "Repor";
+"Reset zoom and position" = "Repor ampliação e posição";
+"Select to inspect this connection" = "Selecione para inspecionar esta ligação";
+"%lld exact destinations" = "%lld destinos exatos";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@ para %@, recebeu %@, enviou %@, %lld ligações";
+"Show domain family in Reports" = "Mostrar família de domínios em Relatórios";

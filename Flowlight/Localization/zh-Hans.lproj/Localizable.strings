@@ -1701,6 +1701,23 @@
 "Remove this setting" = "待翻译：Remove this setting";
 "Add Setting" = "待翻译：Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ 到 %@，已阻止 %lld 次尝试";
+"A policy stopped this attempt before it became observed traffic." = "策略在此尝试成为已观察流量之前将其阻止。";
+"Blocked" = "已阻止";
+"Blocked attempts" = "已阻止的尝试";
+"Capture-time process ancestry proves this application started the agent." = "捕获时的进程层级证明此应用程序启动了该智能体。";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "捕获时的代理归属证明此应用程序的已观察流量使用了此路由。";
+"Inspected request evidence proves this invocation." = "已检查的请求证据证明了此次调用。";
+"Observed route" = "已观察路由";
+"Relationship evidence" = "关系证据";
+"Routed through" = "路由经过";
+"Started agent" = "已启动智能体";
+"Managed pack: %@" = "托管规则包：%@";
+"Ordinary rule" = "普通规则";
+"Telemetry" = "遥测";
+"Tracking" = "跟踪";
+"Connections / attempts" = "连接 / 尝试";
+"Loading visualization…" = "正在加载可视化…";
 "%lld medium or high local assessment%@ in this window." = "待翻译：%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "待翻译：No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "待翻译：%lld eligible request%@ did not receive a contextual verdict.";
@@ -1796,7 +1813,7 @@
 "Unknown destination" = "未知目标";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "为 %@ 工作";
+"Run by %@" = "由 %@ 运行";
 "MCP service for %@" = "%@ 的 MCP 服务";
 "LLM service" = "LLM 服务";
 "AI activity" = "AI 活动";
@@ -1807,8 +1824,22 @@
 "No AI activity to visualize" = "没有可视化的 AI 活动";
 "Flowlight has not observed any proved AI agent activity in this period." = "Flowlight 在此时间段内未观察到已证实的 AI 代理活动。";
 "Exact destinations" = "精确目标";
-"Works for" = "为其工作";
+"Runs" = "运行";
 "Invoked" = "已调用";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "存储的进程谱系证明此工具为该代理工作，但不能证明工具已被调用。";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "存储的进程谱系证明此代理运行该工具，但不能证明工具已被调用。";
 "Block…" = "阻止…";
 "Direction and evidence" = "方向和证据";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "流量关系图";
+"Drag to pan, pinch to zoom, or use the map controls." = "拖移以平移，双指开合以缩放，或使用地图控制按钮。";
+"Zoom in" = "放大";
+"Zoom out" = "缩小";
+"Fit" = "适应窗口";
+"Fit the map in the window" = "使地图适应窗口";
+"Reset" = "重置";
+"Reset zoom and position" = "重置缩放和位置";
+"Select to inspect this connection" = "选择以检查此连接";
+"%lld exact destinations" = "%lld 个精确目标";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@ 到 %@，接收 %@，发送 %@，%lld 个连接";
+"Show domain family in Reports" = "在报告中显示域名族";

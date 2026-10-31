@@ -205,6 +205,32 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(review.manifest.provenance.approvalFingerprint, review.approvalFingerprint)
     }
 
+    func testSignedPackageWithExplicitEmptyDeclarationsUsesReviewDefaultsBeforeSigning() throws {
+        var manifest = PluginManifest(id: "thirdparty.explicit-empty", name: "Explicit empty", version: "0.1.0",
+                                      kind: .traffic, source: .installed, publisher: .thirdParty,
+                                      guardrailProvider: .custom, description: "Signed plugin.",
+                                      privacySummary: "Uses metadata only.", capabilities: [], permissions: [],
+                                      privacy: PluginPrivacyDisclosure(categories: [], summary: ""))
+        manifest.script = "function evaluate(context) { return []; }"
+        let privateKey = P256.Signing.PrivateKey()
+        let signer = PluginTrustedSigner(keyID: "test-empty-v1", publisher: .thirdParty,
+                                         publisherName: "Test Empty", channel: .community,
+                                         publicKeyPEM: privateKey.publicKey.pemRepresentation)
+
+        let package = try PluginPackageVerifier.signedPackage(
+            manifest: manifest, keyID: signer.keyID, privateKey: privateKey
+        )
+        let review = try PluginPackageVerifier.review(
+            data: JSONEncoder().encode(package), trustedSigners: [signer]
+        )
+
+        XCTAssertEqual(review.signatureStatus, .verifiedCommunity)
+        XCTAssertEqual(review.manifest.capabilities, [.annotate])
+        XCTAssertEqual(review.manifest.permissions, PluginPermission.defaultMetadata)
+        XCTAssertEqual(review.manifest.privacy.categories, [.metadataOnly])
+        XCTAssertEqual(review.manifest.privacy.summary, "Uses metadata only.")
+    }
+
     func testSignedCommunityPackageAcceptsBase64DERPublicKey() throws {
         var manifest = PluginManifest(id: "thirdparty.der-key", name: "DER key", version: "0.1.0", kind: .traffic,
                                       source: .installed, publisher: .thirdParty, guardrailProvider: .custom,

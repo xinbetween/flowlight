@@ -42,18 +42,31 @@ final class VisualizeNavigationTests: XCTestCase {
         let filter = TrafficFilter(bundleID: "node", remoteIP: "203.0.113.9")
 
         XCTAssertFalse(VisualizeActionScope.canInspect(filter))
+        XCTAssertTrue(VisualizeActionScope.canBlock(filter))
         VisualizeActionScope.showInspect(nav, filter: filter)
         XCTAssertNil(nav.inspectRequest)
     }
 
+    func testDisplayOnlyDestinationDoesNotOfferDeadActions() {
+        let nav = AppNavigation()
+        for displayOnly in ["(unconnected)", "AirDrop and Handoff · nearby device"] {
+            let filter = TrafficFilter(bundleID: "sharingd", domain: displayOnly, remoteIP: displayOnly)
+            XCTAssertFalse(VisualizeActionScope.canInspect(filter))
+            XCTAssertFalse(VisualizeActionScope.canBlock(filter))
+            XCTAssertNil(VisualizeActionScope.blockRule(for: filter))
+            VisualizeActionScope.showInspect(nav, filter: filter)
+            XCTAssertNil(nav.inspectRequest)
+        }
+    }
+
     func testAttributedChildBlockDraftTargetsTheProvenAgent() {
-        let rule = VisualizeActionScope.blockRule(for: TrafficFilter(
+        let rule = try! XCTUnwrap(VisualizeActionScope.blockRule(for: TrafficFilter(
             bundleID: "node",
             agentParent: "claude",
             mcpServer: "github",
             domain: "api.github.com",
             remoteIP: "203.0.113.9"
-        ))
+        )))
 
         XCTAssertEqual(rule.app, "claude")
         XCTAssertEqual(rule.destination, "api.github.com")

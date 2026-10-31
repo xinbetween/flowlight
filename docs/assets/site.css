@@ -478,13 +478,13 @@
   .case p { color: var(--muted); font-size: 14.5px; }
   .case .view { font: 500 12px/1 var(--mono); color: var(--accent); }
 
-  /* The four views */
+  /* Product views */
   .views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .view-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 10px; align-content: start; }
   .view-card .glyph { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
   .view-card .glyph svg { width: 22px; height: 22px; }
   .glyph.live { background: var(--received); } .glyph.ai-agents { background: var(--accent); }
-  .glyph.reports { background: #1baf7a; } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.ask { background: #0aa3b5; } .glyph.devices { background: #8a6bd1; } .glyph.inspect { background: #7a4fd6; }
+  .glyph.reports { background: #1baf7a; } .glyph.visualize { background: var(--accent); } .glyph.alerts { background: var(--critical); } .glyph.rules { background: var(--warning); } .glyph.ask { background: #0aa3b5; } .glyph.devices { background: #8a6bd1; } .glyph.inspect { background: #7a4fd6; }
   .view-card p { color: var(--muted); font-size: 14.5px; }
   .view-card .keys { font: 12px var(--mono); color: var(--faint); }
 

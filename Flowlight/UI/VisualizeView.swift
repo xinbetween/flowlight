@@ -3,7 +3,12 @@ import SwiftUI
 @MainActor
 enum VisualizeActionScope {
     static func canInspect(_ filter: TrafficFilter) -> Bool {
-        filter.domain?.isEmpty == false
+        guard let domain = filter.domain else { return false }
+        return HostCanonicalizer.host(domain) != nil && HostCanonicalizer.address(domain) == nil
+    }
+
+    static func canBlock(_ filter: TrafficFilter) -> Bool {
+        exactDestination(filter) != nil
     }
 
     static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil) {
@@ -14,11 +19,23 @@ enum VisualizeActionScope {
                         agentParent: filter.agentParent, mcpServer: filter.mcpServer)
     }
 
-    static func blockRule(for filter: TrafficFilter) -> Rule {
-        var rule = RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "",
-                                   destination: filter.domain?.isEmpty == false ? filter.domain! : filter.remoteIP ?? "")
+    static func blockRule(for filter: TrafficFilter) -> Rule? {
+        guard let destination = exactDestination(filter) else { return nil }
+        var rule = RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "", destination: destination)
         rule.destinationMatch = .exact
         return rule
+    }
+
+    private static func exactDestination(_ filter: TrafficFilter) -> String? {
+        if let domain = filter.domain,
+           let canonical = HostCanonicalizer.host(domain) {
+            return canonical
+        }
+        if let remoteIP = filter.remoteIP,
+           let canonical = HostCanonicalizer.address(remoteIP) {
+            return canonical
+        }
+        return nil
     }
 }
 
@@ -45,6 +62,7 @@ struct VisualizeView: View {
     @AppStorage("visualize.granularity") private var granularity: Granularity = .minute
     @AppStorage("visualize.presentation") private var presentation: Presentation = .map
     @State private var rows: [BreakdownRow] = []
+    @State private var blockedAttempts: [BlockedAttemptRow] = []
     @State private var snapshot = TrafficGraphSnapshot.empty
     @State private var selectedNode: TrafficGraphNodeID?
     @State private var selectedEdge: TrafficGraphEdgeID?
@@ -66,7 +84,10 @@ struct VisualizeView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            if snapshot.edges.isEmpty, !loading {
+            if snapshot.edges.isEmpty, loading {
+                ProgressView(L("Loading visualization…"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if snapshot.edges.isEmpty {
                 emptyState
             } else if presentation == .map {
                 graphAndInspector
@@ -77,7 +98,9 @@ struct VisualizeView: View {
         .background(FL.ground)
         .navigationTitle(L("Visualize"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, or IP"))
-        .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope, version: monitor.dataVersion)) { await reload() }
+        .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope,
+                          trafficVersion: monitor.dataVersion, ruleVersion: monitor.rules.version,
+                          packVersion: monitor.rulePacks.version)) { await reload() }
         .task(id: granularity) {
             guard granularity == .second else { return }
             while !Task.isCancelled {
@@ -149,13 +172,9 @@ struct VisualizeView: View {
 
     private var graphAndInspector: some View {
         HSplitView {
-            ScrollView([.horizontal, .vertical]) {
-                TrafficGraphCanvas(snapshot: snapshot, selectedNode: $selectedNode, selectedEdge: $selectedEdge,
-                                   reduceMotion: reduceMotion)
-                    .frame(minWidth: 900, minHeight: 760)
-            }
-            .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-            .scrollIndicators(.automatic)
+            TrafficGraphCanvas(snapshot: snapshot, selectedNode: $selectedNode, selectedEdge: $selectedEdge,
+                               reduceMotion: reduceMotion)
+                .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
             TrafficGraphInspector(selection: selection, granularity: granularity)
                 .frame(minWidth: 260, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
                 .environmentObject(nav)
@@ -164,7 +183,8 @@ struct VisualizeView: View {
 
     private var listAndInspector: some View {
         HSplitView {
-            TrafficGraphList(snapshot: snapshot, selectedEdge: $selectedEdge, selectedNode: $selectedNode)
+            TrafficGraphList(snapshot: snapshot, mode: mode,
+                             selectedEdge: $selectedEdge, selectedNode: $selectedNode)
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
             TrafficGraphInspector(selection: selection, granularity: granularity)
                 .frame(minWidth: 260, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
@@ -191,8 +211,9 @@ struct VisualizeView: View {
 
     @MainActor
     private func reload() async {
+        let requestID = UUID()
+        loadID = requestID
         loading = true
-        defer { loading = false }
         let granularity = granularity
         let mode = mode
         let to = Date()
@@ -203,19 +224,26 @@ struct VisualizeView: View {
         }()
         do {
             let loaded = try await monitor.read { database in
+                let rows: [BreakdownRow]
                 switch mode {
                 case .traffic:
-                    return try database.appDestinationRows(granularity, from: from, to: to, filter: filter)
+                    rows = try database.appDestinationRows(granularity, from: from, to: to, filter: filter)
                 case .ai:
-                    return try database.aiVisualizationRows(granularity, from: from, to: to)
+                    rows = try database.aiVisualizationRows(granularity, from: from, to: to)
                 }
+                let attempts = mode == .traffic ? try database.blockedAttempts(from: from, to: to) : []
+                return (rows, attempts)
             }
-            guard !Task.isCancelled else { return }
-            rows = loaded
+            guard !Task.isCancelled, loadID == requestID else { return }
+            rows = loaded.0
+            blockedAttempts = loaded.1
+            loading = false
             loadID = UUID()
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, loadID == requestID else { return }
             rows = []
+            blockedAttempts = []
+            loading = false
             loadID = UUID()
             monitor.lastError = error.localizedDescription
         }
@@ -224,6 +252,7 @@ struct VisualizeView: View {
     @MainActor
     private func rebuild() async {
         let source = rows
+        let enforcement = blockedAttempts
         let mode = mode
         let focusScope = focus.scope
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -238,9 +267,25 @@ struct VisualizeView: View {
                     || row.parentAgentName.lowercased().contains(query)
                     || row.mcpServer.lowercased().contains(query)
             }
+            let focusedEnforcement = enforcement.filter { attempt in
+                focusScope.isEmpty || focusScope.matches(
+                    bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID,
+                    domain: HostCanonicalizer.host(attempt.destination) ?? "",
+                    remoteIP: HostCanonicalizer.address(attempt.destination) ?? ""
+                )
+            }
+            let searchedEnforcement = query.isEmpty ? focusedEnforcement : focusedEnforcement.filter { attempt in
+                attempt.appName.lowercased().contains(query)
+                    || attempt.bundleID.lowercased().contains(query)
+                    || attempt.agentName.lowercased().contains(query)
+                    || attempt.agentKey.lowercased().contains(query)
+                    || attempt.destination.lowercased().contains(query)
+                    || attempt.category.lowercased().contains(query)
+                    || attempt.source.lowercased().contains(query)
+            }
             switch mode {
             case .traffic:
-                return TrafficGraphBuilder.build(rows: searched)
+                return TrafficGraphBuilder.build(rows: searched, blockedAttempts: searchedEnforcement)
             case .ai:
                 let visible = searched.filter {
                     focusScope.isEmpty || focusScope.matches(bundleID: $0.bundleID,
@@ -259,7 +304,9 @@ struct VisualizeView: View {
         var mode: Mode
         var granularity: Granularity
         var focus: FocusScope
-        var version: Int
+        var trafficVersion: Int
+        var ruleVersion: Int
+        var packVersion: Int
     }
 
     private struct RebuildKey: Equatable {
@@ -281,70 +328,167 @@ private struct TrafficGraphCanvas: View {
     var reduceMotion: Bool
     @State private var hoveredNode: TrafficGraphNodeID?
     @State private var hoveredEdge: TrafficGraphEdgeID?
+    @State private var cachedLayout = TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+    @State private var viewport = TrafficGraphViewport()
+    @State private var panStart: TrafficGraphViewport?
+    @State private var zoomStart: TrafficGraphViewport?
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: CGRect(origin: .zero, size: geometry.size))
+            let graphSize = CGSize(width: max(900, geometry.size.width), height: max(760, geometry.size.height))
+            let graphBounds = CGRect(origin: .zero, size: graphSize)
+            let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: graphBounds,
+                                                    preserving: cachedLayout.nodeFrames.isEmpty ? nil : cachedLayout)
+            let layoutKey = LayoutKey(snapshot: snapshot, size: graphSize)
             ZStack(alignment: .topLeading) {
-                FL.surfaceDeep
-                edgeLayer(layout)
-                particleLayer(layout)
-                ForEach(snapshot.nodes) { node in
-                    if let frame = layout.nodeFrames[node.id] {
-                        TrafficGraphNodeView(node: node, selected: selectedNode == node.id, hovered: hoveredNode == node.id) {
-                            selectedNode = node.id
-                            selectedEdge = nil
-                        }
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
-                        .onHover { inside in hoveredNode = inside ? node.id : (hoveredNode == node.id ? nil : hoveredNode) }
-                    }
-                }
+                Color.clear
+                graphContent(layout, size: graphSize)
+                    .scaleEffect(viewport.scale, anchor: .topLeading)
+                    .offset(viewport.offset)
+                viewportControls(layout: layout, in: CGRect(origin: .zero, size: geometry.size))
             }
+            .clipped()
             .contentShape(Rectangle())
             .onContinuousHover { phase in
                 switch phase {
-                case .active(let point): hoveredEdge = layout.edge(at: point, tolerance: 12)
-                case .ended: hoveredEdge = nil
+                case .active(let point):
+                    hoveredEdge = layout.edge(at: viewport.graphPoint(for: point), tolerance: 12 / viewport.scale)
+                case .ended:
+                    hoveredEdge = nil
                 }
             }
             .onTapGesture { point in
-                if let edge = layout.edge(at: point, tolerance: 12) {
-                    selectedEdge = edge
-                    selectedNode = nil
-                } else if !layout.nodeFrames.values.contains(where: { $0.contains(point) }) {
+                let graphPoint = viewport.graphPoint(for: point)
+                if let edge = layout.edge(at: graphPoint, tolerance: 12 / viewport.scale) {
+                    select(edge)
+                } else if !layout.nodeFrames.values.contains(where: { $0.contains(graphPoint) }) {
                     selectedEdge = nil
                     selectedNode = nil
                 }
             }
+            .gesture(panGesture)
+            .simultaneousGesture(zoomGesture(in: geometry.size))
+            .task(id: layoutKey) {
+                cachedLayout = layout
+                viewport.fit(content: layout.contentBounds,
+                             in: CGRect(origin: .zero, size: geometry.size))
+            }
             .accessibilityElement(children: .contain)
+            .accessibilityLabel(L("Traffic relationship map"))
+            .accessibilityHint(L("Drag to pan, pinch to zoom, or use the map controls."))
         }
+    }
+
+    private func graphContent(_ layout: TrafficGraphLayoutSnapshot, size: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            edgeLayer(layout)
+            particleLayer(layout)
+            relationshipControls(layout)
+            ForEach(snapshot.nodes) { node in
+                if let frame = layout.nodeFrames[node.id] {
+                    TrafficGraphNodeView(
+                        node: node,
+                        selected: selectedNode == node.id,
+                        hovered: hoveredNode == node.id,
+                        dimmed: isNodeDimmed(node.id)
+                    ) {
+                        selectedNode = node.id
+                        selectedEdge = nil
+                    }
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX, y: frame.midY)
+                    .onHover { inside in
+                        hoveredNode = inside ? node.id : (hoveredNode == node.id ? nil : hoveredNode)
+                    }
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture(minimumDistance: 3)
+            .onChanged { value in
+                let start = panStart ?? viewport
+                if panStart == nil { panStart = start }
+                var next = start
+                next.pan(by: value.translation)
+                viewport = next
+            }
+            .onEnded { _ in panStart = nil }
+    }
+
+    private func zoomGesture(in size: CGSize) -> some Gesture {
+        MagnificationGesture()
+            .onChanged { factor in
+                let start = zoomStart ?? viewport
+                if zoomStart == nil { zoomStart = start }
+                var next = start
+                next.zoom(by: factor, around: CGPoint(x: size.width / 2, y: size.height / 2))
+                viewport = next
+            }
+            .onEnded { _ in zoomStart = nil }
+    }
+
+    private func viewportControls(layout: TrafficGraphLayoutSnapshot, in bounds: CGRect) -> some View {
+        HStack(spacing: 2) {
+            Button { viewport.zoom(by: 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY)) } label: {
+                Image(systemName: "plus")
+            }
+            .help(L("Zoom in"))
+            Button { viewport.zoom(by: 1 / 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY)) } label: {
+                Image(systemName: "minus")
+            }
+            .help(L("Zoom out"))
+            Divider().frame(height: 16)
+            Button(L("Fit")) { viewport.fit(content: layout.contentBounds, in: bounds) }
+                .help(L("Fit the map in the window"))
+            Button(L("Reset")) { viewport.reset() }
+                .help(L("Reset zoom and position"))
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .padding(6)
+        .background(FL.surface, in: RoundedRectangle(cornerRadius: Radius.chip))
+        .overlay(RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(FL.line))
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func edgeLayer(_ layout: TrafficGraphLayoutSnapshot) -> some View {
         Canvas { context, _ in
-            let maximum = max(1, snapshot.edges.map { $0.counters.total }.max() ?? 1)
             for edge in snapshot.edges {
                 guard let curve = layout.edgeCurves[edge.id] else { continue }
                 let emphasized = selectedEdge == edge.id || hoveredEdge == edge.id
-                if edge.relationship == .worksFor {
-                    context.stroke(path(curve), with: .color(FL.graphInvocation.opacity(emphasized ? 0.95 : 0.7)),
-                                   style: StrokeStyle(lineWidth: emphasized ? 3 : 2, lineCap: .round,
-                                                      dash: [7, 5]))
+                let related = isEdgeRelated(edge)
+                let baseOpacity = emphasized ? 0.92 : related ? 0.42 : 0.10
+                if edge.relationship != .observed {
+                    let color = edge.relationship == .blocked ? FL.critical
+                        : edge.relationship == .routedThrough ? FL.muted : FL.graphInvocation
+                    let dash: [CGFloat] = edge.relationship == .blocked ? [3, 4]
+                        : edge.relationship == .routedThrough ? [2, 4] : [6, 5]
+                    context.stroke(path(curve), with: .color(color.opacity(baseOpacity)),
+                                   style: StrokeStyle(lineWidth: emphasized ? 2.5 : 1.5, lineCap: .round,
+                                                      dash: dash))
                     continue
                 }
-                let totalWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.total, maximum: maximum)
-                let sentWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.bytesOut, maximum: maximum)
-                let receivedWidth = TrafficGraphLayout.edgeWidth(bytes: edge.counters.bytesIn, maximum: maximum)
-                context.stroke(path(curve), with: .color(FL.line.opacity(emphasized ? 0.62 : 0.35)),
-                               style: StrokeStyle(lineWidth: totalWidth + (emphasized ? 4 : 1), lineCap: .round))
-                if edge.counters.bytesOut > 0 {
-                    context.stroke(path(curve.offset(by: 2.5)), with: .color(FL.graphSent.opacity(emphasized ? 0.95 : 0.72)),
-                                   style: StrokeStyle(lineWidth: max(1.5, sentWidth * 0.58), lineCap: .round))
+
+                let width = layout.edgeWidths[edge.id] ?? 1
+                context.fill(ribbonPath(curve, width: width),
+                             with: .color(FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)))
+                guard emphasized, edge.counters.total > 0 else { continue }
+
+                let receivedWidth = width * CGFloat(edge.counters.bytesIn) / CGFloat(edge.counters.total)
+                let sentWidth = width - receivedWidth
+                if receivedWidth > 0 {
+                    let offset = -(width - receivedWidth) / 2
+                    context.fill(ribbonPath(curve, width: receivedWidth, offset: offset),
+                                 with: .color(FL.graphReceived.opacity(0.88)))
                 }
-                if edge.counters.bytesIn > 0 {
-                    context.stroke(path(curve.offset(by: -2.5)), with: .color(FL.graphReceived.opacity(emphasized ? 0.95 : 0.72)),
-                                   style: StrokeStyle(lineWidth: max(1.5, receivedWidth * 0.58), lineCap: .round))
+                if sentWidth > 0 {
+                    let offset = (width - sentWidth) / 2
+                    context.fill(ribbonPath(curve, width: sentWidth, offset: offset),
+                                 with: .color(FL.graphSent.opacity(0.88)))
                 }
             }
         }
@@ -354,17 +498,18 @@ private struct TrafficGraphCanvas: View {
     @ViewBuilder
     private func particleLayer(_ layout: TrafficGraphLayoutSnapshot) -> some View {
         if !reduceMotion {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+            TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
                 Canvas { context, _ in
-                    for edge in snapshot.edges {
+                    for edge in snapshot.edges where isEdgeRelated(edge) {
                         for particle in layout.particles(for: edge, at: timeline.date.timeIntervalSinceReferenceDate,
                                                          reduceMotion: reduceMotion) {
                             let rect = CGRect(x: particle.position.x - particle.radius, y: particle.position.y - particle.radius,
                                               width: particle.radius * 2, height: particle.radius * 2)
                             let color = particle.direction == .received ? FL.graphReceived
                                 : particle.direction == .sent ? FL.graphSent : FL.graphInvocation
-                            context.fill(Path(ellipseIn: rect), with: .color(color))
-                            context.stroke(Path(ellipseIn: rect.insetBy(dx: -1, dy: -1)), with: .color(FL.surface), lineWidth: 1)
+                            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.85)))
+                            context.stroke(Path(ellipseIn: rect.insetBy(dx: -1, dy: -1)),
+                                           with: .color(FL.ground), lineWidth: 1)
                         }
                     }
                 }
@@ -374,10 +519,83 @@ private struct TrafficGraphCanvas: View {
         }
     }
 
+    private func relationshipControls(_ layout: TrafficGraphLayoutSnapshot) -> some View {
+        ForEach(snapshot.edges) { edge in
+            if let curve = layout.edgeCurves[edge.id] {
+                Button { select(edge.id) } label: {
+                    Color.clear.frame(width: 24, height: 24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .position(curve.point(at: 0.5))
+                .accessibilityLabel(edgeAccessibilityLabel(edge))
+                .accessibilityHint(L("Select to inspect this connection"))
+            }
+        }
+    }
+
+    private func edgeAccessibilityLabel(_ edge: TrafficGraphEdge) -> String {
+        let source = snapshot.nodes.first { $0.id == edge.source }?.title ?? L("Source")
+        let target = snapshot.nodes.first { $0.id == edge.target }?.title ?? L("Destination")
+        if edge.relationship == .runs { return "\(source), \(L("Runs")), \(target)" }
+        if edge.relationship == .launched { return "\(source), \(L("Started")), \(target)" }
+        if edge.relationship == .routedThrough { return "\(source), \(L("Routed through")), \(target)" }
+        if edge.relationship == .blocked {
+            return L("%@ to %@, %lld blocked attempts", source, target, edge.enforcement?.count ?? 0)
+        }
+        if edge.relationship == .invoked { return "\(source), \(L("Invoked")), \(target)" }
+        return L("%@ to %@, received %@, sent %@, %lld connections", source, target,
+                 ByteFormat.string(edge.counters.bytesIn), ByteFormat.string(edge.counters.bytesOut),
+                 edge.counters.flows)
+    }
+
+    private func select(_ edge: TrafficGraphEdgeID) {
+        selectedEdge = edge
+        selectedNode = nil
+    }
+
+    private func isEdgeRelated(_ edge: TrafficGraphEdge) -> Bool {
+        if selectedEdge == nil, selectedNode == nil { return true }
+        return selectedEdge == edge.id || selectedNode == edge.source || selectedNode == edge.target
+    }
+
+    private func isNodeDimmed(_ id: TrafficGraphNodeID) -> Bool {
+        if selectedEdge == nil, selectedNode == nil { return false }
+        if selectedNode == id { return false }
+        return !snapshot.edges.contains { edge in
+            isEdgeRelated(edge) && (edge.source == id || edge.target == id)
+        }
+    }
+
     private func path(_ curve: TrafficGraphCurve) -> Path {
         Path { path in
             path.move(to: curve.start)
             path.addCurve(to: curve.end, control1: curve.control1, control2: curve.control2)
+        }
+    }
+
+    private func ribbonPath(_ curve: TrafficGraphCurve, width: CGFloat, offset: CGFloat = 0) -> Path {
+        let top = curve.offset(by: offset - width / 2)
+        let bottom = curve.offset(by: offset + width / 2)
+        return Path { path in
+            path.move(to: top.start)
+            path.addCurve(to: top.end, control1: top.control1, control2: top.control2)
+            path.addLine(to: bottom.end)
+            path.addCurve(to: bottom.start, control1: bottom.control2, control2: bottom.control1)
+            path.closeSubpath()
+        }
+    }
+
+    private struct LayoutKey: Equatable {
+        var nodeIDs: [TrafficGraphNodeID]
+        var edgeIDs: [TrafficGraphEdgeID]
+        var width: Int
+        var height: Int
+
+        init(snapshot: TrafficGraphSnapshot, size: CGSize) {
+            nodeIDs = snapshot.nodes.map(\.id)
+            edgeIDs = snapshot.edges.map(\.id)
+            width = Int(size.width.rounded())
+            height = Int(size.height.rounded())
         }
     }
 }
@@ -386,14 +604,17 @@ private struct TrafficGraphNodeView: View {
     var node: TrafficGraphNode
     var selected: Bool
     var hovered: Bool
+    var dimmed: Bool
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            if node.kind == .app || node.kind == .agent { appContent } else { destinationContent }
+            if node.kind == .app || node.kind == .agent || node.kind == .launcher { appContent }
+            else { destinationContent }
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .opacity(dimmed ? 0.28 : 1)
         .overlay {
             if selected || hovered {
                 RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.accent.opacity(selected ? 0.9 : 0.45), lineWidth: selected ? 2 : 1)
@@ -404,28 +625,28 @@ private struct TrafficGraphNodeView: View {
     }
 
     private var appContent: some View {
-        VStack(spacing: 5) {
-            AppIconView(path: node.appPath, size: 40)
-            Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(1)
-            Text(ByteFormat.string(node.counters.total)).font(.caption2.monospacedDigit()).foregroundStyle(FL.muted)
-            directionSummary
+        HStack(spacing: 9) {
+            AppIconView(path: node.appPath, size: 30)
+            Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(2)
+            Spacer(minLength: 0)
         }
         .padding(7)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(FL.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.line, lineWidth: 1))
     }
 
     private var destinationContent: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Image(systemName: nodeIcon).foregroundStyle(node.kind == .tool || node.kind == .mcp ? FL.tool : FL.accent)
-                    .accessibilityHidden(true)
-                Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(1)
+        HStack(spacing: 7) {
+            Image(systemName: nodeIcon).foregroundStyle(node.kind == .tool || node.kind == .mcp ? FL.tool : FL.accent)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(2)
+                if !node.detail.isEmpty { Text(node.detail).font(.caption2).foregroundStyle(FL.faint).lineLimit(1) }
             }
-            if !node.detail.isEmpty { Text(node.detail).font(.caption2).foregroundStyle(FL.faint).lineLimit(1) }
-            directionSummary
-            Text(L("%lld connections", node.counters.flows)).font(.caption2).foregroundStyle(FL.muted)
+            Spacer(minLength: 0)
         }
-        .padding(10)
+        .padding(9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(FL.surface, in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.line, lineWidth: 1))
@@ -438,17 +659,6 @@ private struct TrafficGraphNodeView: View {
         case .mcp: return "shippingbox"
         default: return "network"
         }
-    }
-
-    private var directionSummary: some View {
-        HStack(spacing: 7) {
-            Label(ByteFormat.compact(Double(node.counters.bytesIn)), systemImage: "arrow.down")
-                .foregroundStyle(FL.graphReceived)
-            Label(ByteFormat.compact(Double(node.counters.bytesOut)), systemImage: "arrow.up")
-                .foregroundStyle(FL.graphSent)
-        }
-        .font(.caption2.monospacedDigit())
-        .labelStyle(.titleAndIcon)
     }
 
     private var accessibilityLabel: String {
@@ -486,10 +696,30 @@ private struct TrafficGraphInspector: View {
         Group {
             Text(node.title).font(.title3.bold()).foregroundStyle(FL.ink)
             if !node.detail.isEmpty { Text(node.detail).font(.caption).foregroundStyle(FL.muted) }
-            FLPill(text: L("Observed"), systemImage: "eye", color: FL.muted)
-            metrics(node.counters)
+            if node.kind == .launcher {
+                FLPill(text: L("Started"), systemImage: "terminal", color: FL.graphInvocation)
+                Text(L("Capture-time process ancestry proves this application started the agent."))
+                    .font(.callout).foregroundStyle(FL.muted)
+            } else if node.kind == .proxy {
+                FLPill(text: L("Routed through"), systemImage: "arrow.triangle.branch", color: FL.graphInvocation)
+                Text(L("Capture-time proxy attribution proves this application's observed traffic used this route."))
+                    .font(.callout).foregroundStyle(FL.muted)
+                metrics(node.counters)
+            } else if node.counters.isEmpty {
+                FLPill(text: L("Relationship evidence"), systemImage: "line.diagonal", color: FL.graphInvocation)
+            } else {
+                FLPill(text: L("Observed"), systemImage: "eye", color: FL.muted)
+                metrics(node.counters)
+            }
             Divider()
-            if node.kind == .service, node.members.count > 1 {
+            if node.kind == .launcher || node.kind == .proxy || node.counters.isEmpty {
+                EmptyView()
+            } else if !node.members.isEmpty && (node.filter.domainSuffix != nil || node.members.count > 1) {
+                if node.filter.domainSuffix != nil {
+                    Button(L("Show domain family in Reports")) {
+                        nav.showReport(filter: node.filter, granularity: granularity)
+                    }
+                }
                 Text(L("Exact destinations")).font(.caption.bold()).foregroundStyle(FL.muted)
                 ScrollView {
                     LazyVStack(spacing: 6) {
@@ -524,11 +754,10 @@ private struct TrafficGraphInspector: View {
             Text(L("Connection")).font(.caption.bold()).foregroundStyle(FL.muted)
             Text("\(source?.title ?? L("App")) → \(target?.title ?? L("Destination"))")
                 .font(.title3.bold()).foregroundStyle(FL.ink)
-            FLPill(text: edge.relationship == .observed ? L("Observed")
-                   : edge.relationship == .worksFor ? L("Works for") : L("Invoked"),
-                   systemImage: edge.relationship == .observed ? "eye"
-                    : edge.relationship == .worksFor ? "point.topleft.down.to.point.bottomright.curvepath" : "bolt",
-                   color: edge.relationship == .observed ? FL.muted : FL.graphInvocation)
+            FLPill(text: relationshipLabel(edge.relationship),
+                   systemImage: relationshipIcon(edge.relationship),
+                   color: edge.relationship == .blocked ? FL.critical
+                    : edge.relationship == .observed ? FL.muted : FL.graphInvocation)
             if edge.relationship == .observed {
                 metrics(edge.counters)
                 Divider()
@@ -542,12 +771,81 @@ private struct TrafficGraphInspector: View {
                 } else {
                     exactActions(edge.filter, source: source)
                 }
+            } else if edge.relationship == .blocked, let enforcement = edge.enforcement {
+                metric(L("Blocked attempts"), enforcement.count.formatted(), FL.critical, "shield.slash")
+                Text(enforcementSources(enforcement.source)).font(.callout.bold()).foregroundStyle(FL.ink)
+                Text(enforcementCategories(enforcement.category)).font(.caption).foregroundStyle(FL.muted)
+                if !enforcement.detail.isEmpty {
+                    Text(enforcement.detail).font(.caption).foregroundStyle(FL.muted)
+                }
             } else {
-                Text(L("Stored process lineage proves this tool works for the agent. It does not prove a tool invocation."))
+                Text(relationshipExplanation(edge.relationship))
                     .font(.callout).foregroundStyle(FL.muted)
             }
             Spacer()
             legend
+        }
+    }
+
+    private func enforcementSources(_ value: String) -> String {
+        value.split(separator: ",").map { source in
+            let token = source.trimmingCharacters(in: .whitespaces)
+            if token == "ordinary-rule" { return L("Ordinary rule") }
+            if token.hasPrefix("managed-pack:") {
+                return L("Managed pack: %@", String(token.dropFirst("managed-pack:".count)))
+            }
+            return token
+        }.joined(separator: ", ")
+    }
+
+    private func enforcementCategories(_ value: String) -> String {
+        value.split(separator: ",").map { category in
+            switch category.trimmingCharacters(in: .whitespaces).lowercased() {
+            case "advertising": return L("Advertising")
+            case "tracking": return L("Tracking")
+            case "telemetry": return L("Telemetry")
+            case "rule": return L("Rule")
+            default: return String(category)
+            }
+        }.joined(separator: ", ")
+    }
+
+    private func relationshipLabel(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .observed: return L("Observed")
+        case .runs: return L("Runs")
+        case .launched: return L("Started")
+        case .routedThrough: return L("Routed through")
+        case .blocked: return L("Blocked")
+        case .invoked: return L("Invoked")
+        }
+    }
+
+    private func relationshipIcon(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .observed: return "eye"
+        case .runs: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .launched: return "terminal"
+        case .routedThrough: return "arrow.triangle.branch"
+        case .blocked: return "shield.slash"
+        case .invoked: return "bolt"
+        }
+    }
+
+    private func relationshipExplanation(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .runs:
+            return L("Stored process lineage proves this agent runs the tool. It does not prove a tool invocation.")
+        case .launched:
+            return L("Capture-time process ancestry proves this application started the agent.")
+        case .routedThrough:
+            return L("Capture-time proxy attribution proves this application's observed traffic used this route.")
+        case .invoked:
+            return L("Inspected request evidence proves this invocation.")
+        case .blocked:
+            return L("A policy stopped this attempt before it became observed traffic.")
+        case .observed:
+            return ""
         }
     }
 
@@ -564,6 +862,9 @@ private struct TrafficGraphInspector: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(member.title).font(.callout.bold()).foregroundStyle(FL.ink)
                     if !member.detail.isEmpty { Text(member.detail).font(.caption2).foregroundStyle(FL.muted) }
+                    if !member.protocols.isEmpty {
+                        Text(member.protocols).font(.caption2).foregroundStyle(FL.muted)
+                    }
                 }
                 Spacer()
                 Text(ByteFormat.string(member.counters.total)).font(.caption.monospacedDigit()).foregroundStyle(FL.muted)
@@ -584,8 +885,8 @@ private struct TrafficGraphInspector: View {
                 }
             }
             #endif
-            Button(L("Block…")) {
-                nav.writeRule(VisualizeActionScope.blockRule(for: filter))
+            if let rule = VisualizeActionScope.blockRule(for: filter) {
+                Button(L("Block…")) { nav.writeRule(rule) }
             }
         }
         .controlSize(.small)
@@ -612,7 +913,8 @@ private struct TrafficGraphInspector: View {
             Text(L("Direction and evidence")).font(.caption.bold()).foregroundStyle(FL.muted)
             Label(L("Received"), systemImage: "circle.fill").foregroundStyle(FL.graphReceived)
             Label(L("Sent"), systemImage: "circle.fill").foregroundStyle(FL.graphSent)
-            Label(L("Works for"), systemImage: "line.diagonal").foregroundStyle(FL.graphInvocation)
+            Label(L("Relationship evidence"), systemImage: "line.diagonal").foregroundStyle(FL.graphInvocation)
+            Label(L("Blocked attempts"), systemImage: "shield.slash").foregroundStyle(FL.critical)
         }.font(.caption)
     }
 
@@ -620,6 +922,7 @@ private struct TrafficGraphInspector: View {
 
 private struct TrafficGraphList: View {
     var snapshot: TrafficGraphSnapshot
+    var mode: VisualizeView.Mode
     @Binding var selectedEdge: TrafficGraphEdgeID?
     @Binding var selectedNode: TrafficGraphNodeID?
 
@@ -635,8 +938,8 @@ private struct TrafficGraphList: View {
     var body: some View {
         VStack(spacing: 0) {
             LazyVGrid(columns: columns, spacing: Spacing.s) {
-                header(L("App")); header(L("Destination")); header(L("Received")); header(L("Sent"))
-                header(L("Connections")); header(L("Status"))
+                header(mode == .traffic ? L("App") : L("Source")); header(L("Destination"))
+                header(L("Received")); header(L("Sent")); header(L("Connections / attempts")); header(L("Status"))
             }
             .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
             Divider()
@@ -671,11 +974,13 @@ private struct TrafficGraphList: View {
                 }
                 Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesIn) : "—").monospacedDigit()
                 Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesOut) : "—").monospacedDigit()
-                Text(edge.relationship == .observed ? edge.counters.flows.formatted() : "—").monospacedDigit()
-                FLPill(text: edge.relationship == .observed ? L("Observed")
-                       : edge.relationship == .worksFor ? L("Works for") : L("Invoked"),
-                       systemImage: edge.relationship == .observed ? "eye" : "point.topleft.down.to.point.bottomright.curvepath",
-                       color: edge.relationship == .observed ? FL.muted : FL.graphInvocation)
+                Text(edge.relationship == .observed ? edge.counters.flows.formatted()
+                     : edge.relationship == .blocked ? edge.enforcement?.count.formatted() ?? "0" : "—")
+                    .monospacedDigit()
+                FLPill(text: relationshipLabel(edge.relationship),
+                       systemImage: relationshipIcon(edge.relationship),
+                       color: edge.relationship == .blocked ? FL.critical
+                        : edge.relationship == .observed ? FL.muted : FL.graphInvocation)
             }
             .padding(.horizontal, Spacing.m).padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -694,11 +999,37 @@ private struct TrafficGraphList: View {
         selectedNode = nil
     }
 
+    private func relationshipLabel(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .observed: return L("Observed")
+        case .runs: return L("Runs")
+        case .launched: return L("Started")
+        case .routedThrough: return L("Routed through")
+        case .blocked: return L("Blocked")
+        case .invoked: return L("Invoked")
+        }
+    }
+
+    private func relationshipIcon(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .observed: return "eye"
+        case .runs: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .launched: return "terminal"
+        case .routedThrough: return "arrow.triangle.branch"
+        case .blocked: return "shield.slash"
+        case .invoked: return "bolt"
+        }
+    }
+
     private func rowAccessibilityLabel(_ edge: TrafficGraphEdge) -> String {
         let app = node(edge.source)?.title ?? L("App")
         let destination = node(edge.target)?.title ?? L("Destination")
-        if edge.relationship == .worksFor { return "\(app), \(L("Works for")), \(destination)" }
-        if edge.relationship == .invoked { return "\(app), \(L("Invoked")), \(destination)" }
+        if edge.relationship == .blocked {
+            return L("%@ to %@, %lld blocked attempts", app, destination, edge.enforcement?.count ?? 0)
+        }
+        if edge.relationship != .observed {
+            return "\(app), \(relationshipLabel(edge.relationship)), \(destination)"
+        }
         return "\(app), \(destination), \(L("Received")) \(ByteFormat.string(edge.counters.bytesIn)), "
             + "\(L("Sent")) \(ByteFormat.string(edge.counters.bytesOut)), \(L("%lld connections", edge.counters.flows))"
     }

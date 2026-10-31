@@ -34,6 +34,9 @@ final class DemoDataTests: XCTestCase {
         let day = try db.breakdown(.hour, from: Date().addingTimeInterval(-24 * 3600), to: Date())
         XCTAssertFalse(day.isEmpty, "the last day has no hourly rollups, so every view that reads history is empty")
         XCTAssertTrue(day.contains { !$0.bundleID.isEmpty }, "rollups exist but name no app")
+        let blocked = try db.blockedAttempts(from: Date().addingTimeInterval(-24 * 3600), to: Date())
+        XCTAssertTrue(blocked.contains { $0.destination == "www.google-analytics.com" })
+        XCTAssertTrue(blocked.contains { $0.destination == "www.googletagmanager.com" && $0.count == 18 })
     }
 
     func testPackReviewFixtureWritesStaleConsentWithoutEnablingThePack() throws {

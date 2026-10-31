@@ -157,9 +157,9 @@ extension FeatureGuide {
                     "For a grouped LLM service, choose an exact host and address before opening Reports, Inspect, or an unsaved blocking rule."],
             screen: .visualize,
             caveats: ["Connections are network flows, not HTTP request counts.",
-                      "Observed means traffic exists. Works for means stored process lineage; it is not a proved invocation.",
+                      "Observed means traffic exists. Runs means stored process lineage; it is not a proved invocation.",
                       "Browsers are never called agents only because someone opened an AI provider in them."],
-            keywords: ["visualize", "graph", "map", "topology", "nodes", "edges", "connections", "traffic universe", "AI activity", "works for", "provider"],
+            keywords: ["visualize", "graph", "map", "topology", "nodes", "edges", "connections", "traffic universe", "AI activity", "runs", "provider"],
         ),
 
         FeatureGuide(

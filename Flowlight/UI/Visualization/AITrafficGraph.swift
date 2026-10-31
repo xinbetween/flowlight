@@ -5,10 +5,13 @@ struct AITrafficGraphLimits: Equatable, Sendable {
     var maxTools: Int
     var maxDestinations: Int
     var maxObservedEdges: Int
+    var maxLaunchers: Int = 6
 
-    static let standard = AITrafficGraphLimits(maxAgents: 6, maxTools: 8, maxDestinations: 10, maxObservedEdges: 28)
+    static let standard = AITrafficGraphLimits(maxAgents: 6, maxTools: 8, maxDestinations: 10,
+                                                maxObservedEdges: 28, maxLaunchers: 6)
     static let unbounded = AITrafficGraphLimits(maxAgents: .max, maxTools: .max,
-                                                maxDestinations: .max, maxObservedEdges: .max)
+                                                maxDestinations: .max, maxObservedEdges: .max,
+                                                maxLaunchers: .max)
 }
 
 enum AITrafficGraphBuilder {
@@ -52,6 +55,17 @@ enum AITrafficGraphBuilder {
         var name: String
         var path: String
         var known: KnownAgent?
+        var weight: Int64
+    }
+
+    private struct LauncherIdentity: Hashable {
+        var agent: AgentIdentity
+        var bundleID: String
+    }
+
+    private struct LauncherMetadata {
+        var name: String
+        var path: String
         var weight: Int64
     }
 
@@ -134,11 +148,14 @@ enum AITrafficGraphBuilder {
                 }
 
                 let provider = AgentCatalog.provider(domain: row.domain, owner: row.owner) ?? ""
-                let destination = DestinationIdentity(provider: provider,
-                                                      domain: provider.isEmpty ? row.domain : "",
-                                                      remoteIP: provider.isEmpty ? row.remoteIP : "",
-                                                      owner: provider.isEmpty ? row.owner : "",
-                                                      asn: provider.isEmpty ? row.asn : 0)
+                let groupedDomain = row.domain.isEmpty ? "" : VisualizationDomainFamily.group(row.domain)
+                let destination = DestinationIdentity(
+                    provider: provider,
+                    domain: provider.isEmpty ? groupedDomain : "",
+                    remoteIP: provider.isEmpty && groupedDomain.isEmpty ? row.remoteIP : "",
+                    owner: provider.isEmpty && groupedDomain.isEmpty ? row.owner : "",
+                    asn: provider.isEmpty && groupedDomain.isEmpty ? row.asn : 0
+                )
                 let relationship = ObservedRelationship(source: sourceID, destination: destination)
                 observedCounters[relationship, default: FlowCounters()] += row.counters
                 let memberIdentity = ExactMemberIdentity(source: sourceID, bundleID: row.bundleID,
@@ -164,7 +181,7 @@ enum AITrafficGraphBuilder {
             allNodes[id] = TrafficGraphNode(
                 id: id, kind: tool.mcpServer.isEmpty ? .tool : .mcp,
                 title: tool.mcpServer.isEmpty ? metadata.name : "\(metadata.name) MCP",
-                detail: tool.mcpServer.isEmpty ? L("Works for %@", allNodes[agentID(tool.agent)]?.title ?? tool.agent.bundleID)
+                detail: tool.mcpServer.isEmpty ? L("Run by %@", allNodes[agentID(tool.agent)]?.title ?? tool.agent.bundleID)
                     : L("MCP service for %@", allNodes[agentID(tool.agent)]?.title ?? tool.agent.bundleID),
                 appPath: metadata.path,
                 filter: TrafficFilter(bundleID: tool.bundleID,
@@ -248,27 +265,79 @@ enum AITrafficGraphBuilder {
                 relationship: .observed, members: members
             )
         }
+        var launcherMetadata: [LauncherIdentity: LauncherMetadata] = [:]
+        for entry in included where visibleAgents.contains(agentID(entry.agent)) {
+            for row in entry.rows where !row.launcherBundleID.isEmpty {
+                let launcher = LauncherIdentity(agent: entry.agent, bundleID: row.launcherBundleID)
+                let candidate = LauncherMetadata(
+                    name: row.launcherName,
+                    path: row.launcherPath,
+                    weight: row.counters.total
+                )
+                let current = launcherMetadata[launcher]
+                if current == nil || prefersMetadata(candidate, over: current!) {
+                    launcherMetadata[launcher] = candidate
+                }
+            }
+        }
+        var nodeMetadata: [TrafficGraphNodeID: LauncherMetadata] = [:]
+        for (launcher, metadata) in launcherMetadata {
+            let nodeID = launcherID(bundleID: launcher.bundleID)
+            let current = nodeMetadata[nodeID]
+            if current == nil || prefersMetadata(metadata, over: current!) { nodeMetadata[nodeID] = metadata }
+        }
+        let rankedLaunchers = nodeMetadata.sorted {
+            if $0.value.weight != $1.value.weight { return $0.value.weight > $1.value.weight }
+            return $0.key < $1.key
+        }
+        let visibleLaunchers = Set(rankedLaunchers.prefix(max(0, limits.maxLaunchers)).map(\.key))
+        for (launcherNodeID, metadata) in nodeMetadata where visibleLaunchers.contains(launcherNodeID) {
+            allNodes[launcherNodeID] = TrafficGraphNode(
+                id: launcherNodeID, kind: .launcher,
+                title: metadata.name.isEmpty ? launcherNodeID.rawValue : metadata.name,
+                detail: L("Started agent"), appPath: metadata.path,
+                filter: .none, counters: FlowCounters()
+            )
+        }
+        let visibleLauncherEdges = launcherMetadata.keys.sorted {
+            let left = launcherID(bundleID: $0.bundleID)
+            let right = launcherID(bundleID: $1.bundleID)
+            if left != right { return left < right }
+            return agentID($0.agent) < agentID($1.agent)
+        }.filter { visibleLaunchers.contains(launcherID(bundleID: $0.bundleID)) }
+        for launcher in visibleLauncherEdges {
+            let launcherNodeID = launcherID(bundleID: launcher.bundleID)
+            let agentNodeID = agentID(launcher.agent)
+            edges.append(TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: launcherNodeID.rawValue + "→launched→" + agentNodeID.rawValue),
+                source: launcherNodeID, target: agentNodeID, counters: FlowCounters(),
+                filter: allNodes[agentNodeID]?.filter ?? .none, relationship: .launched
+            ))
+        }
         for toolNodeID in visibleTools.sorted() {
             guard let tool = toolMetadata.keys.first(where: { toolID($0) == toolNodeID }),
                   toolMetadata[tool]?.hasLineage == true
             else { continue }
             let agent = tool.agent
             edges.append(TrafficGraphEdge(
-                id: TrafficGraphEdgeID(rawValue: agentID(agent).rawValue + "→works-for→" + toolNodeID.rawValue),
-                source: toolNodeID, target: agentID(agent), counters: FlowCounters(),
-                filter: allNodes[toolNodeID]?.filter ?? .none, relationship: .worksFor
+                id: TrafficGraphEdgeID(rawValue: agentID(agent).rawValue + "→runs→" + toolNodeID.rawValue),
+                source: agentID(agent), target: toolNodeID, counters: FlowCounters(),
+                filter: allNodes[toolNodeID]?.filter ?? .none, relationship: .runs
             ))
         }
         edges.sort { $0.id < $1.id }
 
-        let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations)
+        let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations).union(visibleLaunchers)
         let nodes = visibleIDs.compactMap { allNodes[$0] }.sorted { $0.id < $1.id }
         let visibleTotal = selectedObserved.reduce(into: FlowCounters()) { $0 += $1.1 }
         let allDestinationCount = Set(observedCounters.keys.map(\.destination)).count
         let lineageCount = toolMetadata.values.filter(\.hasLineage).count
+        let allLauncherNodes = Set(launcherMetadata.keys.map { launcherID(bundleID: $0.bundleID) }).count
+        let allLauncherEdges = launcherMetadata.count
         let hidden = TrafficGraphHidden(
-            nodeCount: max(0, included.count + toolMetadata.count + allDestinationCount - nodes.count),
-            edgeCount: max(0, observedCounters.count + lineageCount - edges.count),
+            nodeCount: max(0, included.count + toolMetadata.count + allDestinationCount + allLauncherNodes
+                           - visibleIDs.count),
+            edgeCount: max(0, observedCounters.count + lineageCount + allLauncherEdges - edges.count),
             counters: subtract(total, visibleTotal)
         )
         return TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: hidden)
@@ -289,6 +358,18 @@ enum AITrafficGraphBuilder {
         if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
+    }
+
+    private static func prefersMetadata(_ candidate: LauncherMetadata, over current: LauncherMetadata) -> Bool {
+        if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
+        if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
+        if candidate.weight != current.weight { return candidate.weight > current.weight }
+        if candidate.name != current.name { return candidate.name < current.name }
+        return candidate.path < current.path
+    }
+
+    private static func launcherID(bundleID: String) -> TrafficGraphNodeID {
+        TrafficGraphNodeID(rawValue: "launcher:" + component(bundleID))
     }
 
     private static func agentID(_ agent: AgentIdentity) -> TrafficGraphNodeID {
@@ -330,10 +411,11 @@ enum AITrafficGraphBuilder {
 
     private static func destinationFilter(_ destination: DestinationIdentity,
                                           members: [TrafficGraphMember]) -> TrafficFilter {
-        if members.count == 1 { return members[0].filter }
-        guard !destination.isProvider else { return .none }
-        return TrafficFilter(domain: destination.domain.isEmpty ? nil : destination.domain,
-                             remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP)
+        guard !destination.isProvider else {
+            return members.count == 1 ? members[0].filter : .none
+        }
+        if !destination.domain.isEmpty { return TrafficFilter(domainSuffix: destination.domain) }
+        return TrafficFilter(remoteIP: destination.remoteIP.isEmpty ? nil : destination.remoteIP)
     }
 
     private static func makeMembers<S: Sequence>(_ values: S) -> [TrafficGraphMember]
@@ -352,6 +434,7 @@ enum AITrafficGraphBuilder {
                                       agentParent: value.identity.agentParent.isEmpty ? nil : value.identity.agentParent,
                                       mcpServer: value.identity.mcpServer.isEmpty ? nil : value.identity.mcpServer,
                                       domain: value.identity.domain, remoteIP: value.identity.remoteIP,
+                                      appProtocol: value.identity.protocols.isEmpty ? nil : value.identity.protocols,
                                       channel: value.identity.channel),
                 counters: value.counters, protocols: value.identity.protocols, channel: value.identity.channel
             )

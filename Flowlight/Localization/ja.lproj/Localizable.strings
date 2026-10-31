@@ -1702,6 +1702,23 @@
 "Remove this setting" = "Remove this setting";
 "Add Setting" = "Add Setting";
 "Installed" = "Installed";
+"%@ to %@, %lld blocked attempts" = "%@ から %@ へ、ブロックされた試行 %lld 件";
+"A policy stopped this attempt before it became observed traffic." = "ポリシーが、この試行を観測済みトラフィックになる前に停止しました。";
+"Blocked" = "ブロック済み";
+"Blocked attempts" = "ブロックされた試行";
+"Capture-time process ancestry proves this application started the agent." = "キャプチャ時のプロセス系統から、このアプリケーションがエージェントを起動したことが確認されています。";
+"Capture-time proxy attribution proves this application's observed traffic used this route." = "キャプチャ時のプロキシ帰属から、このアプリケーションの観測済みトラフィックがこの経路を使用したことが確認されています。";
+"Inspected request evidence proves this invocation." = "検査済みリクエストの証拠から、この呼び出しが確認されています。";
+"Observed route" = "観測された経路";
+"Relationship evidence" = "関係の証拠";
+"Routed through" = "経由";
+"Started agent" = "エージェントを起動";
+"Managed pack: %@" = "管理対象パック：%@";
+"Ordinary rule" = "通常のルール";
+"Telemetry" = "テレメトリ";
+"Tracking" = "トラッキング";
+"Connections / attempts" = "接続 / 試行";
+"Loading visualization…" = "ビジュアライゼーションを読み込み中…";
 "%lld medium or high local assessment%@ in this window." = "%lld medium or high local assessment%@ in this window.";
 "No medium or high local assessments in this window. Requests without an assessment are not being called safe." = "No medium or high local assessments in this window. Requests without an assessment are not being called safe.";
 "%lld eligible request%@ did not receive a contextual verdict." = "%lld eligible request%@ did not receive a contextual verdict.";
@@ -1797,7 +1814,7 @@
 "Unknown destination" = "不明な宛先";
 
 /* 0.16.0 AI visualization */
-"Works for %@" = "%@のために動作";
+"Run by %@" = "%@ が実行";
 "MCP service for %@" = "%@のMCPサービス";
 "LLM service" = "LLMサービス";
 "AI activity" = "AIアクティビティ";
@@ -1808,8 +1825,22 @@
 "No AI activity to visualize" = "可視化するAIアクティビティがありません";
 "Flowlight has not observed any proved AI agent activity in this period." = "この期間に確認済みAIエージェントのアクティビティは観測されませんでした。";
 "Exact destinations" = "正確な宛先";
-"Works for" = "動作元";
+"Runs" = "実行";
 "Invoked" = "呼び出し済み";
-"Stored process lineage proves this tool works for the agent. It does not prove a tool invocation." = "保存されたプロセス系統は、このツールがエージェントのために動作することを示します。ツールの呼び出しを示すものではありません。";
+"Stored process lineage proves this agent runs the tool. It does not prove a tool invocation." = "保存されたプロセス系統は、このエージェントがツールを実行することを示します。ツールの呼び出しを示すものではありません。";
 "Block…" = "ブロック…";
 "Direction and evidence" = "方向と証拠";
+
+/* 0.16.1 map controls */
+"Traffic relationship map" = "トラフィック関係マップ";
+"Drag to pan, pinch to zoom, or use the map controls." = "ドラッグで移動、ピンチで拡大縮小、またはマップ操作を使用します。";
+"Zoom in" = "拡大";
+"Zoom out" = "縮小";
+"Fit" = "全体表示";
+"Fit the map in the window" = "マップ全体をウインドウに表示";
+"Reset" = "リセット";
+"Reset zoom and position" = "拡大率と位置をリセット";
+"Select to inspect this connection" = "選択してこの接続を調べる";
+"%lld exact destinations" = "%lld件の正確な宛先";
+"%@ to %@, received %@, sent %@, %lld connections" = "%@から%@、受信%@、送信%@、%lld件の接続";
+"Show domain family in Reports" = "ドメインファミリーをレポートに表示";

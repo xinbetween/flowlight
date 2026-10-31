@@ -43,12 +43,7 @@ enum PluginPackageVerifier {
         guard package.packageVersion == 1 else { throw PluginPackageError.unsupportedPackage }
         var manifest = package.manifest
         try validateBase(manifest)
-        manifest.source = .installed
-        manifest.configuration = [:]
-        if manifest.capabilities.isEmpty { manifest.capabilities = [.annotate] }
-        manifest.permissions = normalizedPermissions(manifest)
-        if manifest.privacy.categories.isEmpty { manifest.privacy.categories = [.metadataOnly] }
-        if manifest.privacy.summary.isEmpty { manifest.privacy.summary = manifest.privacySummary }
+        normalizeForReview(&manifest)
 
         let scriptDigest = sha256Hex(Data(manifest.script.utf8))
         let packageDigest = digest(for: manifest)
@@ -86,7 +81,7 @@ enum PluginPackageVerifier {
                               signedAt: String = ISO8601DateFormatter().string(from: Date())) throws -> PluginPackage {
         var copy = manifest
         copy.enabled = true
-        copy.configuration = [:]
+        normalizeForReview(&copy)
         let digest = digest(for: copy)
         let signature = try privateKey.signature(for: signatureMessage(digest: digest, keyID: keyID))
         return PluginPackage(manifest: copy,
@@ -125,6 +120,15 @@ enum PluginPackageVerifier {
         }) else {
             throw PluginPackageError.unsafeScriptFormatting
         }
+    }
+
+    private static func normalizeForReview(_ manifest: inout PluginManifest) {
+        manifest.source = .installed
+        manifest.configuration = [:]
+        if manifest.capabilities.isEmpty { manifest.capabilities = [.annotate] }
+        manifest.permissions = normalizedPermissions(manifest)
+        if manifest.privacy.categories.isEmpty { manifest.privacy.categories = [.metadataOnly] }
+        if manifest.privacy.summary.isEmpty { manifest.privacy.summary = manifest.privacySummary }
     }
 
     private static func normalizedPermissions(_ manifest: PluginManifest) -> [PluginPermission] {
