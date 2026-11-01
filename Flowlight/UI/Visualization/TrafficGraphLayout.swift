@@ -510,18 +510,26 @@ enum TrafficGraphLayout {
     }
 
     private static func neighboringOrder(for lane: Lane, lanes: [Lane: [TrafficGraphNode]]) -> [TrafficGraphNode] {
+        let launcher = lanes[.launcher] ?? []
+        let source = lanes[.source] ?? []
+        let tool = lanes[.tool] ?? []
+        let gateway = lanes[.gateway] ?? []
+        let inspectionProxy = lanes[.inspectionProxy] ?? []
+        let destination = lanes[.destination] ?? []
+
         switch lane {
-        case .launcher: return lanes[.source] ?? []
-        case .source: return (lanes[.launcher] ?? []) + (lanes[.tool] ?? []) + (lanes[.gateway] ?? [])
-            + (lanes[.inspectionProxy] ?? []) + (lanes[.destination] ?? [])
-        case .tool: return (lanes[.source] ?? []) + (lanes[.gateway] ?? []) + (lanes[.inspectionProxy] ?? [])
-            + (lanes[.destination] ?? [])
-        case .gateway: return (lanes[.source] ?? []) + (lanes[.tool] ?? []) + (lanes[.inspectionProxy] ?? [])
-            + (lanes[.destination] ?? [])
-        case .inspectionProxy: return (lanes[.gateway] ?? []) + (lanes[.tool] ?? [])
-            + (lanes[.source] ?? []) + (lanes[.destination] ?? [])
-        case .destination: return (lanes[.inspectionProxy] ?? []) + (lanes[.gateway] ?? [])
-            + (lanes[.tool] ?? []) + (lanes[.source] ?? [])
+        case .launcher:
+            return source
+        case .source:
+            return [launcher, tool, gateway, inspectionProxy, destination].flatMap { $0 }
+        case .tool:
+            return [source, gateway, inspectionProxy, destination].flatMap { $0 }
+        case .gateway:
+            return [source, tool, inspectionProxy, destination].flatMap { $0 }
+        case .inspectionProxy:
+            return [gateway, tool, source, destination].flatMap { $0 }
+        case .destination:
+            return [inspectionProxy, gateway, tool, source].flatMap { $0 }
         }
     }
 
