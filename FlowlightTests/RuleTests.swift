@@ -463,6 +463,86 @@ final class RuleTests: XCTestCase {
     }
 
     @MainActor
+    func testDecisionBatchAcceptsMultipleEventsForTheSameRule() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-batch-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 3
+        store.save(allow)
+        _ = try db.sync { try $0.loadRules() }
+        let generation = store.ruleSet.generation
+        let committed = expectation(description: "decision batch committed")
+
+        store.record([
+            RuleEvent(at: 1_700_000_000, ruleID: allow.id, ruleSession: RuleStore.session,
+                      ruleGeneration: generation, action: .allow, engine: .flow,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "api.example.com", ip: "", port: 443),
+            RuleEvent(at: 1_700_000_001, ruleID: allow.id, ruleSession: RuleStore.session,
+                      ruleGeneration: generation, action: .allow, engine: .flow,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "cdn.example.com", ip: "", port: 443),
+        ]) { accepted in
+            XCTAssertTrue(accepted)
+            committed.fulfill()
+        }
+
+        await fulfillment(of: [committed], timeout: 2)
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 2)
+        XCTAssertEqual(try db.sync { try $0.ruleEvents(limit: 10).count }, 2)
+        XCTAssertEqual(
+            try db.sync { try $0.loadRules().first(where: { $0.id == allow.id })?.hits },
+            2
+        )
+    }
+
+    @MainActor
+    func testRuleResetWinsWhenItOvertakesAnAlreadyQueuedDecision() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-reset-race-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 3
+        store.save(allow)
+        _ = try db.sync { try $0.loadRules() }
+        let eventGeneration = store.ruleSet.generation
+        let blocked = DispatchSemaphore(value: 0)
+        let entered = DispatchSemaphore(value: 0)
+        db.queue.async {
+            entered.signal()
+            blocked.wait()
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
+
+        let committed = expectation(description: "decision committed")
+        store.record([
+            RuleEvent(at: 1_700_000_000, ruleID: allow.id, ruleSession: RuleStore.session,
+                      ruleGeneration: eventGeneration, action: .allow, engine: .flow,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "api.example.com", ip: "", port: 443),
+        ]) { accepted in
+            XCTAssertTrue(accepted)
+            committed.fulfill()
+        }
+        store.resetHits(allow)
+        blocked.signal()
+        await fulfillment(of: [committed], timeout: 2)
+        try await waitUntil {
+            (try? db.sync { try $0.ruleEvents(limit: 10).count }) == 1
+        }
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.hits, 0)
+        XCTAssertEqual(try db.sync { try $0.loadRules().first(where: { $0.id == allow.id })?.hits }, 0)
+    }
+
+    @MainActor
     func testRuleEventSurvivesAnUnrelatedRuleEdit() {
         var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
         allow.maxHits = 1

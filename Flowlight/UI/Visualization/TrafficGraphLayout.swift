@@ -213,7 +213,13 @@ struct TrafficGraphLayoutSnapshot: Sendable {
 }
 
 enum TrafficGraphLayout {
+    private struct ParallelEdgeKey: Hashable {
+        var source: TrafficGraphNodeID
+        var target: TrafficGraphNodeID
+    }
+
     private enum Lane: Int, CaseIterable {
+        case launcher
         case source
         case intermediary
         case destination
@@ -232,25 +238,24 @@ enum TrafficGraphLayout {
 
         let insetBounds = bounds.insetBy(dx: 24, dy: 22)
         let ordered = orderedNodes(snapshot: snapshot)
-        let columns: [Lane: CGFloat] = [
-            .source: insetBounds.minX + appSize.width / 2,
-            .intermediary: insetBounds.midX,
-            .destination: insetBounds.maxX - destinationSize.width / 2
-        ]
+        let activeLanes = Lane.allCases.filter { !(ordered[$0] ?? []).isEmpty }
+        let columns = columnPositions(for: activeLanes, in: insetBounds)
         var frames: [TrafficGraphNodeID: CGRect] = [:]
 
         if let previous {
             for node in snapshot.nodes {
                 guard var frame = previous.nodeFrames[node.id] else { continue }
                 let lane = lane(for: node)
-                frame.origin.x = columns[lane]! - frame.width / 2
-                guard insetBounds.contains(frame) else { continue }
+                guard let column = columns[lane] else { continue }
+                frame.origin.x = column - frame.width / 2
+                guard frame.minY >= insetBounds.minY, frame.maxY <= insetBounds.maxY else { continue }
                 frames[node.id] = frame
             }
         }
 
-        for lane in Lane.allCases {
+        for lane in activeLanes {
             let nodes = ordered[lane] ?? []
+            guard let column = columns[lane] else { continue }
             let size = size(for: lane)
             let availableHeight = insetBounds.height
             let stackHeight = CGFloat(nodes.count) * size.height + CGFloat(max(0, nodes.count - 1)) * nodeGap
@@ -261,9 +266,9 @@ enum TrafficGraphLayout {
 
             for (index, node) in nodes.enumerated() where frames[node.id] == nil {
                 let preferredY = startY + size.height / 2 + CGFloat(index) * step
-                let preferred = CGPoint(x: columns[lane]!, y: preferredY)
-                frames[node.id] = place(size: size, near: preferred, laneX: columns[lane]!,
-                                            within: insetBounds, avoiding: Array(frames.values))
+                let preferred = CGPoint(x: column, y: preferredY)
+                frames[node.id] = place(size: size, near: preferred, laneX: column,
+                                        within: insetBounds, avoiding: Array(frames.values))
             }
         }
 
@@ -299,6 +304,16 @@ enum TrafficGraphLayout {
         }
 
         let nodeLane = Dictionary(uniqueKeysWithValues: snapshot.nodes.map { ($0.id, lane(for: $0)) })
+        let parallelRelationships = Dictionary(grouping: snapshot.edges.filter { $0.relationship != .observed }) {
+            ParallelEdgeKey(source: $0.source, target: $0.target)
+        }.mapValues { $0.sorted { $0.id < $1.id } }
+        var parallelOffsets: [TrafficGraphEdgeID: CGFloat] = [:]
+        for edges in parallelRelationships.values where edges.count > 1 {
+            let midpoint = CGFloat(edges.count - 1) / 2
+            for (index, edge) in edges.enumerated() {
+                parallelOffsets[edge.id] = (CGFloat(index) - midpoint) * 16
+            }
+        }
         var curves: [TrafficGraphEdgeID: TrafficGraphCurve] = [:]
         for edge in snapshot.edges.sorted(by: { $0.id < $1.id }) {
             guard let source = frames[edge.source], let target = frames[edge.target] else { continue }
@@ -317,9 +332,16 @@ enum TrafficGraphLayout {
             } else {
                 widths[edge.id] = 1.5
                 let targetIsLeft = (nodeLane[edge.target]?.rawValue ?? 0) < (nodeLane[edge.source]?.rawValue ?? 0)
-                let start = CGPoint(x: targetIsLeft ? source.minX : source.maxX, y: source.midY)
-                let end = CGPoint(x: targetIsLeft ? target.maxX : target.minX, y: target.midY)
-                curves[edge.id] = sankeyCurve(start: start, end: end)
+                let offset = parallelOffsets[edge.id] ?? 0
+                let start = CGPoint(x: targetIsLeft ? source.minX : source.maxX, y: source.midY + offset)
+                let end = CGPoint(x: targetIsLeft ? target.maxX : target.minX, y: target.midY + offset)
+                let obstacles = nodeLane[edge.source] == .source && nodeLane[edge.target] == .destination
+                    ? snapshot.nodes.compactMap { node -> CGRect? in
+                        guard nodeLane[node.id] == .intermediary else { return nil }
+                        return frames[node.id]
+                    }
+                    : []
+                curves[edge.id] = sankeyCurve(start: start, end: end, avoiding: obstacles, width: 1.5)
             }
         }
         return TrafficGraphLayoutSnapshot(nodeFrames: frames, edgeCurves: curves, edgeWidths: widths)
@@ -432,7 +454,8 @@ enum TrafficGraphLayout {
 
     private static func neighboringOrder(for lane: Lane, lanes: [Lane: [TrafficGraphNode]]) -> [TrafficGraphNode] {
         switch lane {
-        case .source: return (lanes[.intermediary] ?? []) + (lanes[.destination] ?? [])
+        case .launcher: return lanes[.source] ?? []
+        case .source: return (lanes[.launcher] ?? []) + (lanes[.intermediary] ?? []) + (lanes[.destination] ?? [])
         case .intermediary: return (lanes[.source] ?? []) + (lanes[.destination] ?? [])
         case .destination: return (lanes[.intermediary] ?? []) + (lanes[.source] ?? [])
         }
@@ -449,7 +472,8 @@ enum TrafficGraphLayout {
 
     private static func lane(for node: TrafficGraphNode) -> Lane {
         switch node.kind {
-        case .app, .agent, .launcher: return .source
+        case .launcher: return .launcher
+        case .app, .agent: return .source
         case .tool, .mcp, .proxy: return .intermediary
         case .destination, .service: return .destination
         }
@@ -457,10 +481,28 @@ enum TrafficGraphLayout {
 
     private static func size(for lane: Lane) -> CGSize {
         switch lane {
-        case .source: return appSize
+        case .launcher, .source: return appSize
         case .intermediary: return intermediarySize
         case .destination: return destinationSize
         }
+    }
+
+    private static func columnPositions(for lanes: [Lane], in bounds: CGRect) -> [Lane: CGFloat] {
+        guard let first = lanes.first else { return [:] }
+        if lanes.count == 1 { return [first: bounds.midX] }
+        let minimumGap: CGFloat = 16
+        var minimum: [CGFloat] = [bounds.minX + size(for: first).width / 2]
+        for (left, right) in zip(lanes, lanes.dropFirst()) {
+            minimum.append(minimum.last! + size(for: left).width / 2
+                           + minimumGap + size(for: right).width / 2)
+        }
+        let last = lanes[lanes.count - 1]
+        let availableRight = bounds.maxX - size(for: last).width / 2
+        let extra = max(0, availableRight - minimum.last!)
+        return Dictionary(uniqueKeysWithValues: lanes.enumerated().map { index, lane in
+            let fraction = CGFloat(index) / CGFloat(lanes.count - 1)
+            return (lane, minimum[index] + extra * fraction)
+        })
     }
 
     private static func place(size: CGSize, near preferred: CGPoint, laneX: CGFloat,

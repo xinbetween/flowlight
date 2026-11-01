@@ -125,10 +125,12 @@ struct ReportsView: View {
     }
 
     /// What the screen actually queries: the filter chosen here, narrowed by Focus when it's on.
-    private var scoped: TrafficFilter {
-        var f = filter
-        f.focus = focus.scope
-        return f
+    private var scoped: TrafficFilter { Self.effectiveFilter(filter, focus: focus.scope) }
+
+    static func effectiveFilter(_ filter: TrafficFilter, focus: FocusScope) -> TrafficFilter {
+        var scoped = filter
+        scoped.focus = focus
+        return scoped
     }
 
     private struct ReloadKey: Equatable {
@@ -530,9 +532,9 @@ struct ReportsView: View {
         try? await Task.sleep(for: .milliseconds(60)) // skip buckets the pointer only passes over
         guard !Task.isCancelled else { return }
         let end = Calendar.current.date(byAdding: granularity.calendarComponent, value: 1, to: point.date) ?? point.date
-        let (g, f) = (granularity, filter)
+        let (g, f) = (granularity, scoped)
         if let apps = try? await monitor.read({ try $0.contributors(g, from: point.date, to: end, filter: f) }),
-           g == granularity, f == filter {
+           g == granularity, f == scoped {
             contributors[point.date] = apps
         }
     }

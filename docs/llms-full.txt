@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.3, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1671,8 +1671,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.2
+ 0.16.3
 October 31, 2026Latest
+
+ Read AI dependencies from left to right. Proved launcher, agent, tool or MCP, proxy, and destination stages now occupy stable ordered columns, keeping relationship paths collision-free without inventing invocation evidence.
+
+ Keep every refusal in the dependency story. Agent-allowlist refusals now persist structured child-process and destination evidence alongside ordinary rules and managed packs, so Map and List can show blocked agent-to-tool paths exactly once.
+
+ Keep evidence separate from traffic. Launcher, process-lineage, proxy-route, and blocked edges remain zero-byte relationships; only observed network edges carry volume, connection totals, ribbon width, and directional particles.
+
+ 0.16.2
+October 31, 2026
 
  Keep blocked history attached to the right app. Upgrades that had already repaired a version-number process identity now recover its ordinary-rule and managed-pack refusal history from the retained executable path, without guessing when evidence conflicts.
 

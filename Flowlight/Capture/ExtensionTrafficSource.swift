@@ -46,18 +46,20 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// extension is running — not that it is filtering anything, which is a different failure and looks identical.
     private var sawTraffic = false
     private var version = ""
+    private static let durableEventProtocol = 1
     /// Called when macOS has the extension running but isn't letting it filter — a state the user can only fix by
     /// switching source, so it needs to reach the UI as something more than a line of status text.
     var onFilterUnavailable: ((String) -> Void)?
-    /// Connections the filter refused, on their way to being recorded as alerts.
-    var onBlocked: (([BlockEvent]) -> Void)?
+    /// Connections the filter refused. The reply returns only after durable evidence and alerts commit, so the
+    /// extension can safely retain and retry the same stable event IDs if the connection drops.
+    var onBlocked: (([BlockEvent], @escaping @Sendable (Bool) -> Void) -> Void)?
     /// The enforcing allowlists, kept here so a reconnect re-sends them without the app being asked again. The
     /// extension never persists them: with no app to record a refusal, nothing should be refused.
     private var enforcement: [AgentPolicy] = []
     /// The rule list, kept for the same reason and re-sent on the same reconnect.
     private var ruleSet = RuleSet()
-    /// Connections a rule decided, refusals and relaxations alike.
-    var onRuleDecisions: (([RuleEvent]) -> Void)?
+    /// Connections a rule decided, refusals and relaxations alike. The reply is sent after durable commit.
+    var onRuleDecisions: (([RuleEvent], @escaping @Sendable (Bool) -> Void) -> Void)?
     /// Aggregated managed-pack decisions. These never enter the ordinary block-alert path.
     var onRulePackEvents: ((RulePackEventBatch, @escaping @Sendable (Bool) -> Void) -> Void)?
     var onRulePackStatus: ((RulePackApplyResult) -> Void)?
@@ -150,19 +152,41 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                     self.scheduleReconnect(L("Trying the filter extension again…"), from: connection)
                     return
                 }
-                self.recovery.succeeded()
-                self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
-                                             : L("Connected to filter extension %@ — no traffic from it yet", version))
-                self.startHeartbeat()
-                self.reportPackStatus(.init(status: .accepted, detail: "Synchronizing managed packs"))
-                // Initial synchronization is ordered: explicit user allows exist before AgentPolicy is enabled.
-                // Managed packs remain independently cleared until their own commit or clear acknowledges.
-                self.pushRules {
-                    self.pushEnforcement {
-                        self.pushRulePacks()
+                self.enableDurableEvents(on: connection) {
+                    self.recovery.succeeded()
+                    self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
+                                                 : L("Connected to filter extension %@ — no traffic from it yet", version))
+                    self.startHeartbeat()
+                    self.reportPackStatus(.init(status: .accepted, detail: "Synchronizing managed packs"))
+                    // Initial synchronization is ordered: explicit user allows exist before AgentPolicy is enabled.
+                    // Managed packs remain independently cleared until their own commit or clear acknowledges.
+                    self.pushRules {
+                        self.pushEnforcement {
+                            self.pushRulePacks()
+                        }
                     }
+                    self.checkFilterState(on: connection, version: version)
                 }
-                self.checkFilterState(on: connection, version: version)
+            }
+        }
+    }
+
+    private func enableDurableEvents(on connection: NSXPCConnection, completion: @escaping () -> Void) {
+        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self, weak connection] error in
+            self?.scheduleReconnect(L("Extension unreachable: %@", error.localizedDescription), from: connection)
+        } as? FlowlightProviderXPC
+        guard let proxy else {
+            scheduleReconnect(L("Extension unreachable: %@", "durable event negotiation"), from: connection)
+            return
+        }
+        proxy.enableDurableEvents(appProtocol: Self.durableEventProtocol) { [weak self, weak connection] accepted in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection else { return }
+                guard accepted else {
+                    self.scheduleReconnect(L("Extension refused registration"), from: connection)
+                    return
+                }
+                completion()
             }
         }
     }
@@ -542,14 +566,34 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
 
     func ruleDecisions(payload: Data, reply: @escaping () -> Void) {
         let events = BlockCoding.decode([RuleEvent].self, from: payload) ?? []
-        if !events.isEmpty { onRuleDecisions?(events) }
-        reply()
+        guard !events.isEmpty, let onRuleDecisions else { reply(); return }
+        onRuleDecisions(events) { _ in reply() }
     }
 
     func blocked(payload: Data, reply: @escaping () -> Void) {
         let events = BlockCoding.decode([BlockEvent].self, from: payload) ?? []
-        if !events.isEmpty { onBlocked?(events) }
-        reply()
+        guard !events.isEmpty, let onBlocked else { reply(); return }
+        onBlocked(events) { _ in reply() }
+    }
+
+    func ruleDecisionsDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void) {
+        guard let events = BlockCoding.decode([RuleEvent].self, from: payload) else {
+            reply(false)
+            return
+        }
+        guard !events.isEmpty else { reply(true); return }
+        guard let onRuleDecisions else { reply(false); return }
+        onRuleDecisions(events, reply)
+    }
+
+    func blockedDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void) {
+        guard let events = BlockCoding.decode([BlockEvent].self, from: payload) else {
+            reply(false)
+            return
+        }
+        guard !events.isEmpty else { reply(true); return }
+        guard let onBlocked else { reply(false); return }
+        onBlocked(events, reply)
     }
 
     func deliver(payload: Data, reply: @escaping () -> Void) {

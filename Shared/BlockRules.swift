@@ -25,6 +25,26 @@ enum FlowVerdict: Equatable, Sendable {
 
 /// Whether a flow is refused. Everything here errs towards letting traffic through: a monitor that breaks the
 /// machine it watches is worse than one that missed a connection, and a missed connection still raises an alert.
+struct EnforcementConnectionState {
+    private(set) var connected = false
+    private(set) var disconnectedAt: Date?
+
+    mutating func update(connected: Bool, now: Date = Date()) {
+        if self.connected && !connected {
+            disconnectedAt = now
+        }
+        self.connected = connected
+    }
+
+    func isInForce(now: Date = Date(), grace: TimeInterval = BlockRules.disconnectGrace) -> Bool {
+        BlockRules.inForce(
+            appConnected: connected,
+            sinceDisconnect: disconnectedAt.map { now.timeIntervalSince($0) },
+            grace: grace
+        )
+    }
+}
+
 enum BlockRules {
     /// Never refused whatever an allowlist says. Apple's own services carry the Mac's account, push and software
     /// update traffic, and many of them pin certificates, so a refusal there looks like a broken Mac rather than a
@@ -100,11 +120,18 @@ enum BlockRules {
 /// One refused connection, on its way to the app to be recorded. Blocking invisibly would be worse than not
 /// blocking at all, so this travels with the verdict rather than being a log line in the extension.
 struct BlockEvent: Codable, Sendable, Equatable {
+    /// Stable across XPC retries from older extensions. Current extensions use the compact session watermark below.
+    var id: UUID? = UUID()
+    var deliverySession: UUID? = nil
+    var deliverySequence: Int64? = nil
     var at: Int64
     var agentKey: String
     var agentName: String
     /// The process that opened the connection, which may be a tool the agent ran rather than the agent itself.
     var appName: String
+    /// Stable identity for that process. Optional so an app can still decode events sent by an older extension;
+    /// those conservatively fall back to the agent identity when projected.
+    var bundleID: String? = nil
     var host: String
     var ip: String
     var port: UInt16

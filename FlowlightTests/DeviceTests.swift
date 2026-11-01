@@ -181,6 +181,30 @@ final class CameraStoreTests: XCTestCase {
 }
 
 final class CameraTests: XCTestCase {
+    func testListenerDrivenSampleSchedulesRetryAfterEnumerationFailureThenRecovers() {
+        var scheduled = 0
+        var enumerations: [[Int]?] = [nil, [42]]
+        let enumerate = { enumerations.removeFirst() }
+
+        XCTAssertNil(CameraSampleEnumeration.resolve(prefetched: nil, enumerate: enumerate,
+                                                     failed: { scheduled += 1 }))
+        XCTAssertEqual(scheduled, 1, "a device-state listener must not leave the last camera state indefinitely")
+        XCTAssertEqual(CameraSampleEnumeration.resolve(prefetched: nil, enumerate: enumerate,
+                                                       failed: { scheduled += 1 }), [42])
+        XCTAssertEqual(scheduled, 1, "recovery returns the current devices without scheduling another retry")
+    }
+
+    func testEnumerationRetryBacksOffAndResetsAfterRecovery() {
+        var backoff = CameraEnumerationBackoff()
+        XCTAssertEqual(backoff.failed(), 1)
+        XCTAssertEqual(backoff.failed(), 2)
+        XCTAssertEqual(backoff.failed(), 5)
+        XCTAssertEqual(backoff.failed(), 10)
+        XCTAssertEqual(backoff.failed(), 10, "persistent failure retries at a bounded cadence")
+        backoff.recovered()
+        XCTAssertEqual(backoff.failed(), 1, "a later transient failure starts from the fast retry again")
+    }
+
     private func camera(_ id: String, _ state: CameraDevice.State, name: String? = nil) -> CameraDevice {
         CameraDevice(id: id, name: name ?? id, manufacturer: "Acme", state: state)
     }

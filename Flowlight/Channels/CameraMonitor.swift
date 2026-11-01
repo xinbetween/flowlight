@@ -1,6 +1,37 @@
 import CoreMediaIO
 import Foundation
 
+struct CameraEnumerationBackoff {
+    private(set) var failures = 0
+
+    mutating func failed() -> TimeInterval {
+        failures += 1
+        switch failures {
+        case 1: return 1
+        case 2: return 2
+        case 3: return 5
+        default: return 10
+        }
+    }
+
+    mutating func recovered() {
+        failures = 0
+    }
+}
+
+enum CameraSampleEnumeration {
+    static func resolve<ID>(prefetched: [ID]?, enumerate: () -> [ID]?,
+                            failed: () -> Void, recovered: () -> Void = {}) -> [ID]? {
+        if let prefetched { return prefetched }
+        guard let devices = enumerate() else {
+            failed()
+            return nil
+        }
+        recovered()
+        return devices
+    }
+}
+
 protocol CameraMonitoring: AnyObject {
     var onDevices: ([CameraDevice], UInt64) -> Void { get set }
     var onEvents: ([DeviceEvent], UInt64) -> Void { get set }
@@ -27,6 +58,8 @@ final class CameraMonitor: CameraMonitoring, @unchecked Sendable {
     private let queue = DispatchQueue(label: "flowlight.camera", qos: .utility)
     private var registrations: [Registration] = []
     private var fallbackTimer: DispatchSourceTimer?
+    private var enumerationRetry: DispatchSourceTimer?
+    private var enumerationBackoff = CameraEnumerationBackoff()
     private var known: [CameraDevice] = []
     private var sawAnything = false
     private var running = false
@@ -64,6 +97,9 @@ final class CameraMonitor: CameraMonitoring, @unchecked Sendable {
         registrations.removeAll()
         fallbackTimer?.cancel()
         fallbackTimer = nil
+        enumerationRetry?.cancel()
+        enumerationRetry = nil
+        enumerationBackoff.recovered()
         known = []
         sawAnything = false
     }
@@ -91,7 +127,13 @@ final class CameraMonitor: CameraMonitoring, @unchecked Sendable {
         if !registrations.contains(where: { $0.object == CMIOObjectID(kCMIOObjectSystemObject) }) {
             installDeviceListListener()
         }
-        guard let devices = Self.deviceIDs() else { return }
+        guard let devices = Self.deviceIDs() else {
+            scheduleEnumerationRetry()
+            return
+        }
+        enumerationRetry?.cancel()
+        enumerationRetry = nil
+        enumerationBackoff.recovered()
         let cameras = devices.filter(Self.hasInputStream)
         let systemListener = registrations.first { $0.object == CMIOObjectID(kCMIOObjectSystemObject) }
         var needsFallback = systemListener == nil
@@ -123,15 +165,34 @@ final class CameraMonitor: CameraMonitoring, @unchecked Sendable {
         sample(deviceIDs: cameras)
     }
 
+    private func scheduleEnumerationRetry() {
+        guard running, enumerationRetry == nil else { return }
+        let delay = enumerationBackoff.failed()
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + delay, leeway: .milliseconds(200))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.enumerationRetry?.cancel()
+            self.enumerationRetry = nil
+            self.rebuildDeviceListenersAndSample()
+        }
+        timer.resume()
+        enumerationRetry = timer
+    }
+
     private func sample(deviceIDs: [CMIOObjectID]? = nil) {
         guard running else { return }
-        let IDs: [CMIOObjectID]
-        if let deviceIDs {
-            IDs = deviceIDs
-        } else {
-            guard let devices = Self.deviceIDs() else { return }
-            IDs = devices.filter(Self.hasInputStream)
-        }
+        guard let enumerated = CameraSampleEnumeration.resolve(
+            prefetched: deviceIDs,
+            enumerate: Self.deviceIDs,
+            failed: scheduleEnumerationRetry,
+            recovered: {
+                enumerationRetry?.cancel()
+                enumerationRetry = nil
+                enumerationBackoff.recovered()
+            }
+        ) else { return }
+        let IDs = deviceIDs == nil ? enumerated.filter(Self.hasInputStream) : enumerated
         let cameras = IDs.map(Self.camera).sorted {
             ($0.state == .active ? 0 : 1, $0.name.lowercased())
                 < ($1.state == .active ? 0 : 1, $1.name.lowercased())

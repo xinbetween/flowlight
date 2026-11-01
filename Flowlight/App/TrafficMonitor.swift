@@ -494,9 +494,13 @@ final class TrafficMonitor: ObservableObject {
             extensionSource.onFilterUnavailable = { [weak self] message in
                 Task { @MainActor in self?.captureWarning = message }
             }
-            extensionSource.onBlocked = { [weak self] events in self?.recordBlocked(events) }
-            extensionSource.onRuleDecisions = { [weak self] events in
-                Task { @MainActor in self?.rules.record(events) }
+            extensionSource.onBlocked = { [weak self] events, reply in
+                guard let self else { reply(false); return }
+                self.recordBlocked(events, reply: reply)
+            }
+            extensionSource.onRuleDecisions = { [weak self] events, reply in
+                guard let self else { reply(false); return }
+                Task { @MainActor in self.rules.record(events, completion: reply) }
             }
             extensionSource.onRulePackEvents = { [weak self] batch, completion in
                 self?.recordRulePackEvents(batch, completion: completion) ?? completion(false)
@@ -680,26 +684,45 @@ final class TrafficMonitor: ObservableObject {
 
     /// Connections the filter refused. Each one becomes an alert naming the agent, where it was headed and the
     /// fact that it didn't get there — a refusal nobody can see would be worse than not refusing at all.
-    nonisolated func recordBlocked(_ events: [BlockEvent]) {
-        db.async { [weak self] db in
-            var alerts: [AlertRecord] = []
-            for event in events {
-                let who = event.appName.isEmpty || event.appName == event.agentName
-                    ? event.agentName : "\(event.agentName) › \(event.appName)"
-                let pattern = event.host.isEmpty ? event.ip : AnomalyEngine.registrableDomain(event.host)
-                let why = event.rule.isEmpty ? L("not on %@'s allowlist", event.agentName)
-                                             : L("the rule \"%@\"", event.rule)
-                alerts.append(try db.addAlert(kind: AnomalyEngine.Kind.blockedConnection.rawValue, bundleID: event.agentKey,
-                                              appName: event.agentName,
-                                              detail: L("Blocked %@ from connecting to %@:%lld — %@", who, event.destination, Int(event.port), why),
-                                              severity: 3, at: Date(timeIntervalSince1970: TimeInterval(event.at)),
-                                              allowPattern: pattern))
-            }
-            Notifier.post(alerts)
-            Task { @MainActor in
-                self?.exporter.record(alerts)
-                self?.refreshAlertCount()
-                self?.dataVersion += 1
+    nonisolated func recordBlocked(_ events: [BlockEvent], reply: @escaping @Sendable (Bool) -> Void = { _ in }) {
+        Task { [weak self] in
+            guard let self else { reply(false); return }
+            do {
+                let alerts = try await db.asyncResult { database in
+                    var alerts: [AlertRecord] = []
+                    try database.withTransaction {
+                        let acceptedEvents = try database.recordBlockEventsInTransaction(events)
+                        for event in acceptedEvents {
+                            let who = event.appName.isEmpty || event.appName == event.agentName
+                                ? event.agentName : "\(event.agentName) › \(event.appName)"
+                            let pattern = event.host.isEmpty ? event.ip : AnomalyEngine.registrableDomain(event.host)
+                            let why = event.rule.isEmpty ? L("not on %@'s allowlist", event.agentName)
+                                                         : L("the rule \"%@\"", event.rule)
+                            alerts.append(try database.addAlert(
+                                kind: AnomalyEngine.Kind.blockedConnection.rawValue,
+                                bundleID: event.agentKey,
+                                appName: event.agentName,
+                                detail: L("Blocked %@ from connecting to %@:%lld — %@", who, event.destination,
+                                          Int(event.port), why),
+                                severity: 3,
+                                at: Date(timeIntervalSince1970: TimeInterval(event.at)),
+                                allowPattern: pattern
+                            ))
+                        }
+                    }
+                    return alerts
+                }
+                // The extension's health tracks durable reporting, not UI delivery. A busy main actor must not turn a
+                // committed refusal into five seconds of apparent reporting failure and make enforcement fail open.
+                reply(true)
+                Notifier.post(alerts)
+                await MainActor.run {
+                    self.exporter.record(alerts)
+                    self.refreshAlertCount()
+                    self.dataVersion += 1
+                }
+            } catch {
+                reply(false)
             }
         }
     }

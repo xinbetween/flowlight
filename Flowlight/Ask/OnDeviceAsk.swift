@@ -82,7 +82,7 @@ struct HistoryTool: Tool {
 
     @Generable
     struct Arguments {
-        @Guide(description: "One of: trafficTotals, topApps, topDestinations, newDestinations, alerts, agents, overTime, deviceActivity.")
+        @Guide(description: "One of: trafficTotals, topApps, topDestinations, newDestinations, alerts, agents, overTime, deviceActivity, settings, howTo, rules, guardrails.")
         var query: String
         @Guide(description: "Start of the window: '24h', '7d', 'today', 'yesterday', or an ISO-8601 timestamp.")
         var from: String
@@ -96,6 +96,10 @@ struct HistoryTool: Tool {
         var granularity: String
         @Guide(description: "Device channel: camera, bluetooth, usb or volume. Leave empty for every channel.")
         var kind: String
+        @Guide(description: "Draw the result as line, bar, pie or none. Leave empty when no chart is needed.")
+        var chart: String
+        @Guide(description: "For howTo, the feature or task in the person's own words. Leave empty for other queries.")
+        var topic: String
     }
 
     func call(arguments: Arguments) async throws -> String {
@@ -103,11 +107,18 @@ struct HistoryTool: Tool {
             return "There is no query called '\(arguments.query)'. The ones that exist are: "
                 + AskQuery.allCases.map(\.rawValue).joined(separator: ", ") + "."
         }
-        var fields: [String: String] = ["from": arguments.from]
-        for (key, value) in [("to", arguments.to), ("app", arguments.app), ("limit", arguments.limit),
-                             ("granularity", arguments.granularity), ("kind", arguments.kind)]
+        var fields: [String: String] = [:]
+        for (key, value) in [("from", arguments.from), ("to", arguments.to), ("app", arguments.app),
+                             ("limit", arguments.limit), ("granularity", arguments.granularity),
+                             ("kind", arguments.kind), ("chart", arguments.chart), ("topic", arguments.topic)]
         where !value.trimmingCharacters(in: .whitespaces).isEmpty {
             fields[key] = value
+        }
+        let allowed = Set(query.parameters.map(\.name))
+        fields = fields.filter { allowed.contains($0.key) }
+        let missing = query.parameters.filter { $0.required && fields[$0.name] == nil }.map(\.name)
+        guard missing.isEmpty else {
+            return "The \(query.rawValue) query requires: \(missing.joined(separator: ", "))."
         }
         return await run(AskCall(query: query, arguments: fields))
     }

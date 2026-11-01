@@ -79,4 +79,58 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         XCTAssertFalse(allowed.first { $0.name == "Bash(git status)" }!.isSensitive)
         XCTAssertEqual(user.of(.permission).first { $0.name == "Read(./.env)" }?.detail, "deny")
     }
+
+    func testStaleResolvedBookmarkRenewsOnlyAfterSecurityScopeStarts() {
+        let old = Data("old".utf8)
+        let fresh = Data("fresh".utf8)
+        let root = home.appendingPathComponent("Documents/work")
+        var calls: [String] = []
+
+        let restored = WorkspaceBookmarkRestoration.restore(
+            [old],
+            resolve: { _ in (root, true) },
+            startAccessing: { _ in calls.append("access"); return true },
+            renew: { _ in calls.append("renew"); return fresh }
+        )
+
+        XCTAssertEqual(restored.roots, [root.standardizedFileURL])
+        XCTAssertEqual(restored.scopedRoots, restored.roots)
+        XCTAssertEqual(restored.bookmarks, [fresh])
+        XCTAssertTrue(restored.deferred.isEmpty)
+        XCTAssertEqual(calls, ["access", "renew"])
+    }
+
+    func testRemovedWorkspaceBookmarkCannotReappearAfterItResolvesLater() {
+        let old = Data("old".utf8)
+        let root = home.appendingPathComponent("Documents/work").standardizedFileURL
+
+        let restored = WorkspaceBookmarkRestoration.restore(
+            [old], excluding: [root.path],
+            resolve: { _ in (root, false) },
+            startAccessing: { _ in XCTFail("a removed root must not regain security scope"); return true },
+            renew: { _ in XCTFail("a removed root must not be renewed"); return nil }
+        )
+
+        XCTAssertTrue(restored.roots.isEmpty)
+        XCTAssertTrue(restored.bookmarks.isEmpty)
+        XCTAssertTrue(restored.deferred.isEmpty)
+    }
+
+    func testUnresolvedOrInaccessibleBookmarksRemainRetryableButNotVisible() {
+        let unresolved = Data("unresolved".utf8)
+        let inaccessible = Data("inaccessible".utf8)
+        let root = home.appendingPathComponent("Documents/work")
+
+        let restored = WorkspaceBookmarkRestoration.restore(
+            [unresolved, inaccessible],
+            resolve: { bookmark in bookmark == unresolved ? nil : (root, true) },
+            startAccessing: { _ in false },
+            renew: { _ in XCTFail("an inaccessible URL must not be renewed"); return nil }
+        )
+
+        XCTAssertTrue(restored.roots.isEmpty)
+        XCTAssertTrue(restored.scopedRoots.isEmpty)
+        XCTAssertEqual(restored.bookmarks, [unresolved, inaccessible])
+        XCTAssertEqual(restored.deferred, restored.bookmarks)
+    }
 }

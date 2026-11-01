@@ -38,7 +38,12 @@ enum AskProviderKind: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var needsKey: Bool { sendsOffDevice }
+    var needsKey: Bool {
+        switch self {
+        case .anthropic, .openAI, .gemini, .compatible: return true
+        case .onDevice, .localServer: return false
+        }
+    }
 
     var defaultEndpoint: String {
         switch self {
@@ -55,10 +60,18 @@ enum AskProviderKind: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .onDevice: return ""
         case .localServer: return "llama3.2"
-        case .anthropic: return "claude-sonnet-5"
+        case .anthropic: return "claude-opus-5-5"
         case .openAI: return "gpt-4o-mini"
         case .gemini: return "gemini-2.0-flash"
         case .compatible: return ""
+        }
+    }
+
+    static func owner(of endpoint: String) -> AskProviderKind? {
+        let normalized = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        return allCases.first {
+            !$0.defaultEndpoint.isEmpty
+                && normalized.caseInsensitiveCompare($0.defaultEndpoint) == .orderedSame
         }
     }
 }

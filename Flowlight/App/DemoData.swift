@@ -269,6 +269,10 @@ enum DemoData {
                           appName: "claude", agentKey: "claude", agentName: "Claude Code",
                           host: "telemetry.example", matchedHost: "telemetry.example", port: 443)
         ])
+        try db.recordBlockEvents([
+            BlockEvent(at: nowTs - 11 * 60, agentKey: "claude", agentName: "Claude Code",
+                       appName: "curl", bundleID: "curl", host: "uploads.paste.example", ip: "", port: 443)
+        ])
     }
 
     private static func seedAlerts(_ db: TrafficDatabase, now: Date) throws {

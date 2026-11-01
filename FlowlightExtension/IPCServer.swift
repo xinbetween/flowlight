@@ -7,16 +7,19 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
 
     private var listener: NSXPCListener?
     private var client: NSXPCConnection?
+    private var clientGeneration: UInt64 = 0
     private var pending: [(seq: UInt64, batch: TrafficBatch)] = []
     private var nextSeq: UInt64 = 0
     private var inFlight = false
     /// Refused connections waiting to be recorded by the app, on their own queue so they never wait behind an
-    /// hour of buffered traffic. Kept small: enforcement lapses when the app is away, so this can't pile up.
-    private var blocks: [BlockEvent] = []
-    private var blocksInFlight = false
+    /// hour of buffered traffic. Evidence is never evicted before durable acknowledgment; a persistent write failure
+    /// starts the normal fail-open grace so new refusals stop while the retained queue retries.
+    private var blocks = DurableEventQueue<BlockEvent>()
+    private let eventDeliverySession = UUID()
+    private var nextBlockSequence: Int64 = 0
     /// Connections a rule decided, on the same footing and for the same reason.
-    private var decisions: [RuleEvent] = []
-    private var decisionsInFlight = false
+    private var decisions = DurableEventQueue<RuleEvent>()
+    private var nextDecisionSequence: Int64 = 0
     /// Managed-pack hits are coalesced before IPC. Every immutable explanation field participates so a snapshot
     /// change cannot make an older decision appear to come from newer pack content or a different agent.
     private struct PackEventKey: Hashable {
@@ -59,10 +62,15 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var nextPackSequence: Int64 = 0
     private var packEventsInFlight = false
     private var packFlushScheduled = false
+    private enum DurableChannel: Hashable { case blocks, decisions, packs }
+    private var durableHealth = DurableDeliveryHealth<DurableChannel>()
+    private var durableEventsEnabled = false
+    private var enforcementSynchronized = false
+    private static let durableEventProtocol = 1
     private var droppedPackHits: Int64 = 0
     private var droppedPackKeys: Int64 = 0
     private var packTransfer = RulePackTransferBuffer()
-    private let maxPendingBlocks = 500
+    private let durableChunkSize = 500
     private let maxPackEventKeys = 4_096
     private let queue = DispatchQueue(label: "flowlight.ipc")
     /// Seconds of traffic held while no app is connected — the whole time the app is on the nettop sampler, or
@@ -104,11 +112,15 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self?.queue.async {
                 guard let self, self.client === connection else { return }
                 self.client = nil
+                self.clientGeneration &+= 1
                 self.inFlight = false
-                self.blocksInFlight = false
-                self.decisionsInFlight = false
+                self.blocks.resetDelivery()
+                self.decisions.resetDelivery()
                 self.packEventsInFlight = false
                 self.packTransfer.reset()
+                self.durableEventsEnabled = false
+                self.enforcementSynchronized = false
+                self.durableHealth.reset()
                 BlockEnforcer.shared.appConnectionChanged(connected: false)
             }
         }
@@ -126,11 +138,15 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         guard let connection = NSXPCConnection.current() else { reply(false, "no connection"); return }
         queue.async {
             self.client = connection
+            self.clientGeneration &+= 1
             self.inFlight = false
-            self.blocksInFlight = false
-            self.decisionsInFlight = false
+            self.blocks.resetDelivery()
+            self.decisions.resetDelivery()
             self.packEventsInFlight = false
             self.packTransfer.reset()
+            self.durableEventsEnabled = false
+            self.enforcementSynchronized = false
+            self.durableHealth.reset()
             // A reconnect begins fail-open. The app may have disabled or narrowed any of these while disconnected;
             // stale state must not become active during the policy/rule/pack synchronization that follows register.
             _ = BlockEnforcer.shared.apply([])
@@ -138,13 +154,29 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             _ = BlockEnforcer.shared.clearPacks()
             BlockEnforcer.shared.appConnectionChanged(connected: false)
             self.flushLocked()
-            self.flushBlocksLocked()
-            self.flushDecisionsLocked()
-            self.flushPackEventsLocked()
+            // Durable evidence waits for an exact-build app to opt in. Calling a new reply-block ABI before the
+            // registration version check would make a mixed-version upgrade lose its connection and possibly backlog.
             // Registration is the synchronization barrier: the app may publish rules only after this reset is done.
             let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
             let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
             reply(true, build.isEmpty ? shortVersion : "\(shortVersion)/\(build)")
+        }
+    }
+
+    func enableDurableEvents(appProtocol: Int, withReply reply: @escaping (Bool) -> Void) {
+        guard let connection = NSXPCConnection.current() else { reply(false); return }
+        queue.async {
+            guard self.client === connection,
+                  appProtocol == Self.durableEventProtocol else {
+                reply(false)
+                return
+            }
+            self.durableEventsEnabled = true
+            self.flushBlocksLocked()
+            self.flushDecisionsLocked()
+            self.flushPackEventsLocked()
+            self.updateEnforcementConnectionState()
+            reply(true)
         }
     }
 
@@ -156,7 +188,8 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             let count = BlockEnforcer.shared.apply(policies)
             // Rules are synchronized first. Once both ordinary policy sources are installed, enforcement can safely
             // run; managed packs remain independently cleared until their own commit or clear succeeds.
-            BlockEnforcer.shared.appConnectionChanged(connected: true)
+            self.enforcementSynchronized = true
+            self.updateEnforcementConnectionState()
             extensionLog.info("Enforcing \(count, privacy: .public) allowlists")
             reply(count)
         }
@@ -243,7 +276,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 }
                 do {
                     let result = try BlockEnforcer.shared.apply(snapshot)
-                    BlockEnforcer.shared.appConnectionChanged(connected: true)
+                    self.updateEnforcementConnectionState()
                     reply(BlockCoding.encode(result))
                 } catch {
                     reply(BlockCoding.encode(RulePackApplyResult(status: .invalid, detail: "\(error)")))
@@ -275,7 +308,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             }
             self.packTransfer.reset()
             let result = BlockEnforcer.shared.clearPacks()
-            BlockEnforcer.shared.appConnectionChanged(connected: true)
+            self.updateEnforcementConnectionState()
             reply(BlockCoding.encode(result))
         }
     }
@@ -295,6 +328,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
 
     func report(pack event: RulePackEvent) {
         queue.async {
+            self.durableDeliveryBegan(.packs)
             let key = PackEventKey(event)
             if var existing = self.packEvents[key] {
                 existing.count += event.count
@@ -319,10 +353,12 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// A connection the filter refused, on its way to being recorded as an alert.
     func report(_ event: BlockEvent) {
         queue.async {
+            var event = event
+            self.nextBlockSequence = self.saturatingAdd(self.nextBlockSequence, 1)
+            event.deliverySession = self.eventDeliverySession
+            event.deliverySequence = self.nextBlockSequence
+            self.durableDeliveryBegan(.blocks)
             self.blocks.append(event)
-            if self.blocks.count > self.maxPendingBlocks {
-                self.blocks.removeFirst(self.blocks.count - self.maxPendingBlocks)
-            }
             self.flushBlocksLocked()
         }
     }
@@ -330,16 +366,18 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// A connection a rule decided, refusal or relaxation, on its way to the violations feed.
     func report(decision event: RuleEvent) {
         queue.async {
+            var event = event
+            self.nextDecisionSequence = self.saturatingAdd(self.nextDecisionSequence, 1)
+            event.deliverySession = self.eventDeliverySession
+            event.deliverySequence = self.nextDecisionSequence
+            self.durableDeliveryBegan(.decisions)
             self.decisions.append(event)
-            if self.decisions.count > self.maxPendingBlocks {
-                self.decisions.removeFirst(self.decisions.count - self.maxPendingBlocks)
-            }
             self.flushDecisionsLocked()
         }
     }
 
     private func flushPackEventsLocked() {
-        guard !packEventsInFlight, let client else { return }
+        guard durableEventsEnabled, !packEventsInFlight, let client else { return }
         if packEventBatch == nil {
             guard !packEvents.isEmpty || droppedPackHits > 0 else { return }
             let keys = Array(packEvents.keys.prefix(300))
@@ -352,6 +390,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             droppedPackKeys = 0
         }
         guard let batch = packEventBatch else { return }
+        durableDeliveryBegan(.packs)
         let capturedClient = client
         let capturedClientID = ObjectIdentifier(capturedClient)
         let proxy = capturedClient.remoteObjectProxyWithErrorHandler { [weak self, weak capturedClient] error in
@@ -359,10 +398,12 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self?.queue.async {
                 guard let self, self.client === capturedClient, self.packEventBatch?.id == batch.id else { return }
                 self.packEventsInFlight = false
+                self.durableDeliveryFailed(.packs)
                 self.schedulePackRetryLocked()
             }
         } as? FlowlightAppXPC
         guard let proxy else {
+            durableDeliveryFailed(.packs)
             schedulePackRetryLocked()
             return
         }
@@ -375,7 +416,11 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 if accepted {
                     self.packEventBatch = nil
                     self.flushPackEventsLocked()
+                    if self.packEventBatch == nil {
+                        self.durableDeliverySucceeded(.packs)
+                    }
                 } else {
+                    self.durableDeliveryFailed(.packs)
                     self.schedulePackRetryLocked()
                 }
             }
@@ -386,47 +431,121 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.flushPackEventsLocked() }
     }
 
+    private func updateEnforcementConnectionState() {
+        BlockEnforcer.shared.appConnectionChanged(
+            connected: client != nil && durableEventsEnabled && enforcementSynchronized
+                && durableHealth.isHealthy
+        )
+    }
+
+    private func durableDeliveryBegan(_ channel: DurableChannel) {
+        durableHealth.begin(channel)
+        updateEnforcementConnectionState()
+    }
+
+    private func durableDeliveryFailed(_ channel: DurableChannel) {
+        durableHealth.failed(channel)
+        updateEnforcementConnectionState()
+    }
+
+    private func durableDeliverySucceeded(_ channel: DurableChannel) {
+        durableHealth.succeeded(channel)
+        updateEnforcementConnectionState()
+    }
+
     private func saturatingAdd(_ lhs: Int64, _ rhs: Int64) -> Int64 {
         let (sum, overflow) = lhs.addingReportingOverflow(rhs)
         return overflow ? Int64.max : sum
     }
 
     private func flushDecisionsLocked() {
-        guard !decisionsInFlight, let client, !decisions.isEmpty else { return }
-        let chunk = decisions
+        guard durableEventsEnabled, let client,
+              let delivery = decisions.begin(clientGeneration: clientGeneration, limit: durableChunkSize, id: \.id)
+        else { return }
+        durableDeliveryBegan(.decisions)
+        let generation = delivery.clientGeneration
+        let token = delivery.token
         let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
             extensionLog.error("ruleDecisions() failed: \(error.localizedDescription, privacy: .public)")
-            self?.queue.async { self?.decisionsInFlight = false }
-        } as? FlowlightAppXPC
-        guard let proxy else { return }
-        decisionsInFlight = true
-        proxy.ruleDecisions(payload: BlockCoding.encode(chunk)) { [weak self] in
             self?.queue.async {
-                guard let self else { return }
-                self.decisionsInFlight = false
-                self.decisions.removeFirst(min(chunk.count, self.decisions.count))
-                self.flushDecisionsLocked()
+                guard let self, self.clientGeneration == generation,
+                      self.decisions.complete(token: token, clientGeneration: generation,
+                                              committed: false, id: \.id) else { return }
+                self.durableDeliveryFailed(.decisions)
+                self.scheduleDecisionRetryLocked()
+            }
+        } as? FlowlightAppXPC
+        guard let proxy else {
+            _ = decisions.complete(token: token, clientGeneration: generation, committed: false, id: \.id)
+            durableDeliveryFailed(.decisions)
+            scheduleDecisionRetryLocked()
+            return
+        }
+        proxy.ruleDecisionsDurably(payload: BlockCoding.encode(delivery.events)) { [weak self] committed in
+            self?.queue.async {
+                guard let self, self.clientGeneration == generation,
+                      self.decisions.complete(token: token, clientGeneration: generation,
+                                              committed: committed, id: \.id) else { return }
+                if committed {
+                    self.flushDecisionsLocked()
+                    if self.decisions.isEmpty {
+                        self.durableDeliverySucceeded(.decisions)
+                    }
+                } else {
+                    self.durableDeliveryFailed(.decisions)
+                    self.scheduleDecisionRetryLocked()
+                }
             }
         }
     }
 
+    private func scheduleDecisionRetryLocked() {
+        queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.flushDecisionsLocked() }
+    }
+
     private func flushBlocksLocked() {
-        guard !blocksInFlight, let client, !blocks.isEmpty else { return }
-        let chunk = blocks
+        guard durableEventsEnabled, let client,
+              let delivery = blocks.begin(clientGeneration: clientGeneration, limit: durableChunkSize, id: \.id)
+        else { return }
+        durableDeliveryBegan(.blocks)
+        let generation = delivery.clientGeneration
+        let token = delivery.token
         let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
             extensionLog.error("blocked() failed: \(error.localizedDescription, privacy: .public)")
-            self?.queue.async { self?.blocksInFlight = false }
-        } as? FlowlightAppXPC
-        guard let proxy else { return }
-        blocksInFlight = true
-        proxy.blocked(payload: BlockCoding.encode(chunk)) { [weak self] in
             self?.queue.async {
-                guard let self else { return }
-                self.blocksInFlight = false
-                self.blocks.removeFirst(min(chunk.count, self.blocks.count))
-                self.flushBlocksLocked()
+                guard let self, self.clientGeneration == generation,
+                      self.blocks.complete(token: token, clientGeneration: generation,
+                                           committed: false, id: \.id) else { return }
+                self.durableDeliveryFailed(.blocks)
+                self.scheduleBlockRetryLocked()
+            }
+        } as? FlowlightAppXPC
+        guard let proxy else {
+            _ = blocks.complete(token: token, clientGeneration: generation, committed: false, id: \.id)
+            durableDeliveryFailed(.blocks)
+            scheduleBlockRetryLocked()
+            return
+        }
+        proxy.blockedDurably(payload: BlockCoding.encode(delivery.events)) { [weak self] committed in
+            self?.queue.async {
+                guard let self, self.clientGeneration == generation,
+                      self.blocks.complete(token: token, clientGeneration: generation,
+                                           committed: committed, id: \.id) else { return }
+                if committed {
+                    self.flushBlocksLocked()
+                    if self.blocks.isEmpty {
+                        self.durableDeliverySucceeded(.blocks)
+                    }
+                } else {
+                    self.durableDeliveryFailed(.blocks)
+                    self.scheduleBlockRetryLocked()
+                }
             }
         }
+    }
+
+    private func scheduleBlockRetryLocked() {
+        queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.flushBlocksLocked() }
     }
 
     /// Sends one chunk at a time; batches leave the queue only after the app acknowledges them.
