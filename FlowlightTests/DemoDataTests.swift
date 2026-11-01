@@ -28,15 +28,55 @@ final class DemoDataTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-\(UUID()).sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
         let db = try TrafficDatabase(url: url)
+        let now = Date()
 
-        try DemoData.seed(db)
+        try DemoData.seed(db, now: now)
 
-        let day = try db.breakdown(.hour, from: Date().addingTimeInterval(-24 * 3600), to: Date())
+        let day = try db.breakdown(.hour, from: now.addingTimeInterval(-24 * 3600), to: now)
         XCTAssertFalse(day.isEmpty, "the last day has no hourly rollups, so every view that reads history is empty")
         XCTAssertTrue(day.contains { !$0.bundleID.isEmpty }, "rollups exist but name no app")
-        let blocked = try db.blockedAttempts(from: Date().addingTimeInterval(-24 * 3600), to: Date())
+        let blocked = try db.blockedAttempts(from: now.addingTimeInterval(-24 * 3600), to: now)
         XCTAssertTrue(blocked.contains { $0.destination == "www.google-analytics.com" })
         XCTAssertTrue(blocked.contains { $0.destination == "www.googletagmanager.com" && $0.count == 18 })
+    }
+
+    func testAIVisualizationFixtureShowsConfiguredAndObservedProxyChain() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-proxy-\(UUID()).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+        let now = Date()
+        try DemoData.seed(db, now: now)
+
+        let rows = try db.aiVisualizationRows(.hour, from: now.addingTimeInterval(-24 * 3600), to: now)
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: rows,
+            gateways: DemoData.agentGateways,
+            resolveGateway: DemoData.gatewayIdentity,
+            limits: .unbounded
+        )
+
+        let configured = try XCTUnwrap(snapshot.edges.first { $0.relationship == .configuredGateway })
+        let route = try XCTUnwrap(snapshot.edges.first {
+            $0.relationship == .routedThrough && $0.source == configured.target
+        })
+        let observed = snapshot.edges.filter {
+            $0.relationship == .observed && $0.source == route.target
+        }
+        let claude = try XCTUnwrap(snapshot.nodes.first { $0.id == configured.source })
+        let magpie = try XCTUnwrap(snapshot.nodes.first { $0.id == configured.target })
+        let flowlight = try XCTUnwrap(snapshot.nodes.first { $0.id == route.target })
+
+        XCTAssertEqual(claude.title, "Claude Code")
+        XCTAssertEqual(magpie.title, "magpie")
+        XCTAssertEqual(flowlight.title, "Flowlight")
+        XCTAssertEqual(route.source, magpie.id)
+        XCTAssertFalse(observed.isEmpty)
+        XCTAssertTrue(observed.allSatisfy { $0.source == flowlight.id })
+        XCTAssertEqual(configured.counters.total, 0)
+        XCTAssertEqual(route.counters.total, 0)
+        XCTAssertGreaterThan(route.displayedCounters.total, 1_000_000_000)
+        XCTAssertEqual(route.displayedCounters,
+                       observed.reduce(into: FlowCounters()) { $0 += $1.counters })
     }
 
     func testPackReviewFixtureWritesStaleConsentWithoutEnablingThePack() throws {

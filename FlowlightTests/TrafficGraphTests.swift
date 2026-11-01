@@ -3,6 +3,48 @@ import XCTest
 @testable import Flowlight
 
 final class TrafficGraphTests: XCTestCase {
+    func testUnrelatedHoveredEdgeDoesNotOverrideNodeSelection() {
+        let selectedNode = TrafficGraphNodeID(rawValue: "agent:magpie")
+        let unrelatedEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "launcher:vscode→launched→agent:vscode"),
+            source: TrafficGraphNodeID(rawValue: "launcher:vscode"),
+            target: TrafficGraphNodeID(rawValue: "agent:vscode"),
+            counters: FlowCounters(),
+            filter: .none,
+            relationship: .launched
+        )
+
+        XCTAssertFalse(
+            TrafficGraphSelection.emphasizes(
+                unrelatedEdge,
+                selectedNode: selectedNode,
+                selectedEdge: nil,
+                hoveredEdge: unrelatedEdge.id
+            ),
+            "hover must not make an unrelated launcher edge look selected"
+        )
+    }
+
+    func testRelatedHoveredEdgeCanBeEmphasizedWithinNodeSelection() {
+        let selectedNode = TrafficGraphNodeID(rawValue: "agent:magpie")
+        let relatedEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "agent:magpie→observed→destination:example"),
+            source: selectedNode,
+            target: TrafficGraphNodeID(rawValue: "destination:example"),
+            counters: FlowCounters(bytesOut: 1),
+            filter: .none
+        )
+
+        XCTAssertTrue(
+            TrafficGraphSelection.emphasizes(
+                relatedEdge,
+                selectedNode: selectedNode,
+                selectedEdge: nil,
+                hoveredEdge: relatedEdge.id
+            )
+        )
+    }
+
     private func row(
         app: String,
         name: String? = nil,
@@ -557,6 +599,197 @@ final class TrafficGraphTests: XCTestCase {
         }
     }
 
+    func testAIBuilderKeepsConfiguredGatewayAndObservedProxyRouteAsSeparateEvidence() throws {
+        var routed = row(app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                         domain: "api.anthropic.com", ip: "160.79.104.10",
+                         bytesIn: 100, bytesOut: 50, flows: 2)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        routed.routeProxyPath = "/Applications/Flowlight.app"
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [routed],
+            gateways: [gateway],
+            resolveGateway: { $0 == gateway.endpoint ? identity : nil },
+            limits: .unbounded
+        )
+        let configured = try XCTUnwrap(snapshot.edges.first { $0.relationship == .configuredGateway })
+        let route = try XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
+        let observed = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        let agent = try XCTUnwrap(snapshot.nodes.first { $0.kind == .agent })
+        let magpie = try XCTUnwrap(snapshot.nodes.first { $0.title == "magpie" })
+        let flowlight = try XCTUnwrap(snapshot.nodes.first { $0.title == "Flowlight" })
+
+        XCTAssertEqual(configured.source, agent.id)
+        XCTAssertEqual(configured.target, magpie.id)
+        XCTAssertEqual(configured.counters, FlowCounters())
+        XCTAssertEqual(route.source, magpie.id)
+        XCTAssertEqual(route.target, flowlight.id)
+        XCTAssertEqual(route.counters, FlowCounters())
+        XCTAssertEqual(route.trafficVolume, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
+        XCTAssertEqual(observed.source, flowlight.id)
+        XCTAssertEqual(observed.counters, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
+        XCTAssertEqual(snapshot.total, observed.counters)
+        XCTAssertEqual(snapshot.visibleTotal, observed.counters)
+
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_100, height: 760))
+        XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[agent.id]).midX,
+                          try XCTUnwrap(layout.nodeFrames[magpie.id]).midX)
+        XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[magpie.id]).midX,
+                          try XCTUnwrap(layout.nodeFrames[flowlight.id]).midX)
+        XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[flowlight.id]).midX,
+                          try XCTUnwrap(layout.nodeFrames[observed.target]).midX)
+        XCTAssertTrue(layout.particles(for: configured, at: 1, reduceMotion: false).isEmpty)
+        XCTAssertTrue(layout.particles(for: route, at: 1, reduceMotion: false).isEmpty)
+    }
+
+    func testAIConfiguredGatewayUsesExistingApplicationAgentIdentity() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "cursor",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/Library/Application Support/Cursor/User/settings.json",
+            sourceKey: "http.proxy"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [row(app: "com.todesktop.230313mzl4w4u92", name: "Cursor", path: "/Applications/Cursor.app",
+                       domain: "api.openai.com", ip: "104.18.1.1", bytesOut: 20)],
+            gateways: [gateway], resolveGateway: { _ in identity }, limits: .unbounded
+        )
+
+        let agents = snapshot.nodes.filter { $0.kind == .agent }
+        XCTAssertEqual(agents.count, 1)
+        XCTAssertEqual(agents.first?.filter.bundleID, "com.todesktop.230313mzl4w4u92")
+        XCTAssertEqual(snapshot.edges.first { $0.relationship == .configuredGateway }?.source, agents.first?.id)
+    }
+
+    func testAIConfiguredGatewayDoesNotClaimObservedAgentTraffic() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                       ip: "160.79.104.10", bytesOut: 20)],
+            gateways: [gateway], resolveGateway: { _ in identity }, limits: .unbounded
+        )
+
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .configuredGateway }.count, 1)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 1)
+        XCTAssertEqual(snapshot.visibleTotal.bytesOut, 20,
+                       "configuration evidence must never duplicate or inherit observed counters")
+    }
+
+    func testAIConfiguredGatewaySurvivesWithoutLiveListener() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "https", host: "gateway.example", port: 443),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [], gateways: [gateway], resolveGateway: { _ in nil }, limits: .unbounded
+        )
+
+        let configured = try XCTUnwrap(snapshot.edges.first { $0.relationship == .configuredGateway })
+        XCTAssertEqual(snapshot.nodes.first { $0.id == configured.target }?.title, "https://gateway.example:443")
+        XCTAssertEqual(configured.configuration?.endpoint, "https://gateway.example:443")
+        XCTAssertEqual(configured.counters, FlowCounters())
+    }
+
+    func testAIGatewayProcessTrafficNeedsObservedRouteEvidence() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [row(app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                       domain: "updates.example", ip: "203.0.113.20", bytesIn: 100)],
+            gateways: [gateway], resolveGateway: { _ in identity }, limits: .unbounded
+        )
+
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .configuredGateway })
+        XCTAssertFalse(snapshot.edges.contains { $0.relationship == .routedThrough })
+        XCTAssertFalse(snapshot.edges.contains { $0.relationship == .observed })
+        XCTAssertEqual(snapshot.visibleTotal, FlowCounters(),
+                       "unrelated gateway-process traffic must not be attached to the configured agent")
+    }
+
+    func testAIGatewayRouteEvidenceDoesNotPromoteUnrelatedRowsFromSameProcess() throws {
+        var routed = row(app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                         domain: "api.anthropic.com", ip: "160.79.104.10", bytesIn: 100)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        routed.routeProxyPath = "/Applications/Flowlight.app"
+        let unrelated = row(app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                            domain: "updates.example", ip: "203.0.113.20", bytesIn: 900)
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [routed, unrelated], gateways: [gateway],
+            resolveGateway: { _ in identity }, limits: .unbounded
+        )
+
+        let route = try XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
+        XCTAssertEqual(route.displayedCounters.bytesIn, 100)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 1)
+        XCTAssertFalse(snapshot.edges.contains { edge in
+            edge.members.contains { $0.filter.domain == "updates.example" }
+        })
+        XCTAssertEqual(snapshot.visibleTotal.bytesIn, 100,
+                       "capture-time route evidence applies only to the row that carries it")
+        XCTAssertEqual(snapshot.total.bytesIn, 100)
+    }
+
+    func testAIDistinctGatewayDeclarationsRemainVisibleAndHiddenCountsStayExact() throws {
+        var routed = row(app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                         domain: "api.anthropic.com", ip: "160.79.104.10", bytesIn: 100)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                            path: "/Applications/magpie.app")
+        let gateways = [
+            AgentGatewayConfig(agent: "claude", endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+                               source: "~/.claude/settings.json", sourceKey: "env.HTTP_PROXY"),
+            AgentGatewayConfig(agent: "claude", endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3426),
+                               source: "~/.claude/settings.json", sourceKey: "env.HTTPS_PROXY"),
+        ]
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [routed], gateways: gateways, resolveGateway: { _ in identity }, limits: .unbounded
+        )
+
+        let configured = snapshot.edges.filter { $0.relationship == .configuredGateway }
+        XCTAssertEqual(configured.count, 2)
+        XCTAssertEqual(Set(configured.map(\.id)).count, 2)
+        XCTAssertEqual(snapshot.hidden.nodeCount, 0)
+        XCTAssertEqual(snapshot.hidden.edgeCount, 0)
+    }
+
     func testTrafficBuilderShowsExplicitProxyRouteWithoutDoubleCounting() {
         var routed = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
                          ip: "203.0.113.8", bytesIn: 100, bytesOut: 50, flows: 2)
@@ -572,6 +805,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.nodes.first { $0.id == route.target }?.kind, .proxy)
         XCTAssertEqual(observed.source, route.target)
         XCTAssertEqual(route.counters, FlowCounters())
+        XCTAssertEqual(route.trafficVolume, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
         XCTAssertEqual(observed.counters, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
         XCTAssertEqual(snapshot.total, observed.counters)
         XCTAssertEqual(snapshot.visibleTotal, observed.counters)
@@ -1245,6 +1479,23 @@ final class TrafficGraphTests: XCTestCase {
                                "parallel blocked edge \(edge.id.rawValue) crosses an intermediary card")
             }
         }
+    }
+
+    func testObservedRouteSegmentUsesTheSamePeriodTrafficWidthWithoutDoubleCounting() {
+        var routed = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                         ip: "203.0.113.8", bytesIn: 4_000_000_000, bytesOut: 300_000_000, flows: 2)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        let snapshot = TrafficGraphBuilder.build(rows: [routed], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 600))
+        let route = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
+        let observed = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+
+        XCTAssertEqual(route.displayedCounters.total, 4_300_000_000)
+        XCTAssertEqual(route.counters.total, 0, "route width metadata must not duplicate graph accounting")
+        XCTAssertEqual(layout.edgeWidths[route.id], layout.edgeWidths[observed.id])
+        XCTAssertEqual(snapshot.visibleTotal.total, 4_300_000_000)
     }
 
     func testSankeyRibbonsStayInsideNodePortsAndScaleWithTraffic() {

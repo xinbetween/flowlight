@@ -27,6 +27,32 @@ struct AgentWorkspace: Equatable, Sendable, Codable {
     var isProject: Bool
     var capabilities: [AgentCapability] = []
     var mcpServers: [MCPServerConfig] = []
+    /// Endpoints declared by this agent's documented proxy or LLM-gateway settings.
+    var gateways: [AgentGatewayConfig] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case agent, root, isProject, capabilities, mcpServers, gateways
+    }
+
+    init(agent: String, root: String, isProject: Bool, capabilities: [AgentCapability] = [],
+         mcpServers: [MCPServerConfig] = [], gateways: [AgentGatewayConfig] = []) {
+        self.agent = agent
+        self.root = root
+        self.isProject = isProject
+        self.capabilities = capabilities
+        self.mcpServers = mcpServers
+        self.gateways = gateways
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        agent = try values.decode(String.self, forKey: .agent)
+        root = try values.decode(String.self, forKey: .root)
+        isProject = try values.decode(Bool.self, forKey: .isProject)
+        capabilities = try values.decodeIfPresent([AgentCapability].self, forKey: .capabilities) ?? []
+        mcpServers = try values.decodeIfPresent([MCPServerConfig].self, forKey: .mcpServers) ?? []
+        gateways = try values.decodeIfPresent([AgentGatewayConfig].self, forKey: .gateways) ?? []
+    }
 
     func of(_ kind: AgentCapability.Kind) -> [AgentCapability] { capabilities.filter { $0.kind == kind } }
 }
@@ -80,8 +106,20 @@ enum AgentWorkspaceScanner {
                 }
             }
         }
+        // Some documented settings live outside an agent-named folder (Cursor and Windsurf under Library/Application
+        // Support). Read only those explicit files, then merge them into the matching user workspace without walking
+        // Library or any privacy-protected folder.
+        for gateway in AgentGatewayConfigReader.load(home: home, fm: fm) {
+            if let index = workspaces.firstIndex(where: { $0.agent == gateway.agent && !$0.isProject }) {
+                if !workspaces[index].gateways.contains(gateway) { workspaces[index].gateways.append(gateway) }
+            } else {
+                workspaces.append(AgentWorkspace(agent: gateway.agent, root: gateway.source,
+                                                 isProject: false, gateways: [gateway]))
+            }
+        }
         // Project files that sit next to a workspace rather than inside one.
-        return workspaces.filter { !$0.capabilities.isEmpty || !$0.mcpServers.isEmpty }
+        return workspaces.filter { !$0.capabilities.isEmpty || !$0.mcpServers.isEmpty || !$0.gateways.isEmpty }
+            .sorted { ($0.agent, $0.root) < ($1.agent, $1.root) }
     }
 
     /// Reads one configuration directory.
@@ -128,11 +166,46 @@ enum AgentWorkspaceScanner {
             if fm.fileExists(atPath: file.path) { add(.instructions, name, nil, file) }
         }
         workspace.mcpServers = mcpServers(in: root, client: agent, fm: fm)
+        workspace.gateways = gatewaySettings(in: root, agent: agent, home: home, fm: fm)
         return workspace
     }
 
     /// MCP servers configured beside this workspace: `mcp.json` or `settings.json` inside it, Codex's `config.toml`,
     /// and a project's `.mcp.json` next to it.
+    static func gatewaySettings(in root: URL, agent: String, home: URL,
+                                fm: FileManager) -> [AgentGatewayConfig] {
+        let keys: [AgentGatewayConfigReader.JSONKey]
+        switch agent {
+        case "claude":
+            keys = [
+                .nested(["env", "ANTHROPIC_BASE_URL"]),
+                .nested(["env", "HTTP_PROXY"]),
+                .nested(["env", "HTTPS_PROXY"]),
+            ]
+        case "gemini":
+            keys = [
+                .nested(["general", "proxy"]),
+                .nested(["env", "GOOGLE_GEMINI_BASE_URL"]),
+                .nested(["env", "GOOGLE_VERTEX_BASE_URL"]),
+                .nested(["env", "HTTP_PROXY"]),
+                .nested(["env", "HTTPS_PROXY"]),
+            ]
+        case "zed": keys = [.literal("proxy")]
+        default: return []
+        }
+        var effective: [String: AgentGatewayConfig] = [:]
+        for name in ["settings.json", "settings.local.json"] {
+            let file = root.appendingPathComponent(name)
+            guard let data = fm.contents(atPath: file.path) else { continue }
+            for gateway in AgentGatewayConfigReader.parseJSON(
+                data, agent: agent, source: display(file, home: home), keys: keys
+            ) {
+                effective[gateway.sourceKey] = gateway
+            }
+        }
+        return effective.values.sorted { $0.sourceKey < $1.sourceKey }
+    }
+
     static func mcpServers(in root: URL, client: String, fm: FileManager) -> [MCPServerConfig] {
         var servers: [MCPServerConfig] = []
         for name in ["mcp.json", "settings.json", "mcp_servers.json"] {
@@ -271,7 +344,10 @@ final class AgentWorkspaceStore: ObservableObject {
         static let roots = "agents.roots"
         static let rootBookmarks = "agents.rootBookmarks"
         static let removedRootPaths = "agents.removedRootPaths"
+        static let scanSchema = "agents.scanSchema"
     }
+
+    private static let currentScanSchema = 2
 
     @Published private(set) var workspaces: [AgentWorkspace] = []
     @Published private(set) var scanning = false
@@ -311,10 +387,13 @@ final class AgentWorkspaceStore: ObservableObject {
 
     var isStale: Bool {
         guard let scannedAt else { return true }
-        return Date().timeIntervalSince(scannedAt) > Self.staleAfter
+        return defaults.integer(forKey: Keys.scanSchema) < Self.currentScanSchema
+            || Date().timeIntervalSince(scannedAt) > Self.staleAfter
     }
 
-    var hasScanned: Bool { scannedAt != nil }
+    var hasScanned: Bool {
+        scannedAt != nil && defaults.integer(forKey: Keys.scanSchema) >= Self.currentScanSchema
+    }
 
     /// Scans in the background. Without `force` it only runs if nothing has been scanned yet, so opening AI Agents
     /// never kicks off disk work on its own.
@@ -375,6 +454,7 @@ final class AgentWorkspaceStore: ObservableObject {
         scannedAt = nil
         defaults.removeObject(forKey: Keys.workspaces)
         defaults.removeObject(forKey: Keys.scannedAt)
+        defaults.removeObject(forKey: Keys.scanSchema)
     }
 
     private func store(_ found: [AgentWorkspace]) {
@@ -383,6 +463,7 @@ final class AgentWorkspaceStore: ObservableObject {
         scanning = false
         defaults.set(try? JSONEncoder().encode(found), forKey: Keys.workspaces)
         defaults.set(scannedAt, forKey: Keys.scannedAt)
+        defaults.set(Self.currentScanSchema, forKey: Keys.scanSchema)
     }
 
     #if APP_STORE

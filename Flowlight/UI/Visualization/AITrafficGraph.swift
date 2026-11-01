@@ -39,6 +39,35 @@ enum AITrafficGraphBuilder {
     private struct ObservedRelationship: Hashable {
         var source: TrafficGraphNodeID
         var destination: DestinationIdentity
+        var relay: RelayIdentity?
+    }
+
+    private struct RelayIdentity: Hashable {
+        var bundleID: String
+    }
+
+    private struct RelayMetadata {
+        var name: String
+        var path: String
+        var weight: Int64
+    }
+
+    private struct ConfiguredGatewayRelationship: Hashable {
+        var agent: AgentIdentity
+        var gateway: RelayIdentity
+        var declaration: String
+    }
+
+    private struct ResolvedGateway {
+        var config: AgentGatewayConfig
+        var identity: AgentGatewayIdentity?
+        var agent: AgentIdentity
+        var relay: RelayIdentity
+    }
+
+    private struct ObservedRouteIdentity: Hashable {
+        var source: TrafficGraphNodeID
+        var relay: RelayIdentity
     }
 
     private struct BlockedRelationship: Hashable {
@@ -102,14 +131,25 @@ enum AITrafficGraphBuilder {
     static func build<Rows: Sequence>(rows sourceRows: Rows,
                                       visibleRows: [BreakdownRow]? = nil,
                                       blockedAttempts: [BlockedAttemptRow] = [],
+                                      gateways: [AgentGatewayConfig] = [],
+                                      resolveGateway: @Sendable (AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? = {
+                                          LocalGatewayResolver.resolve($0)
+                                      },
                                       limits: AITrafficGraphLimits = .standard) -> TrafficGraphSnapshot
     where Rows.Element == BreakdownRow {
         let sourceRows = sourceRows.filter { !$0.counters.isEmpty }
         let rows = (visibleRows ?? sourceRows).filter { !$0.counters.isEmpty }
-        let proofGroups = Dictionary(grouping: sourceRows) { row in
+        let gatewayConfigs = gateways.map { ($0, resolveGateway($0.endpoint)) }
+        let gatewayRelayBundleIDs = Set(gatewayConfigs.compactMap { $0.1?.bundleID })
+        let isObservedGatewayRow: (BreakdownRow) -> Bool = { row in
+            gatewayRelayBundleIDs.contains(row.bundleID) && !row.routeProxyBundleID.isEmpty
+        }
+        let proofRows = sourceRows.filter { !isObservedGatewayRow($0) }
+        let visibleProofRows = rows.filter { !isObservedGatewayRow($0) }
+        let proofGroups = Dictionary(grouping: proofRows) { row in
             AgentIdentity(bundleID: row.parentAgent.isEmpty ? row.bundleID : row.parentAgent)
         }
-        let grouped = Dictionary(grouping: rows) { row in
+        let grouped = Dictionary(grouping: visibleProofRows) { row in
             AgentIdentity(bundleID: row.parentAgent.isEmpty ? row.bundleID : row.parentAgent)
         }
 
@@ -123,7 +163,12 @@ enum AITrafficGraphBuilder {
                 refusalNames[agent] = attempt.agentKey
             }
         }
-        let candidateAgents = Set(grouped.keys).union(refusalNames.keys)
+        let existingCandidates = Set(grouped.keys).union(refusalNames.keys)
+        let configuredAgents = Set(gatewayConfigs.map { config, _ in
+            existingCandidates.first { gatewayMatches(config, candidate: $0, rows: proofGroups[$0] ?? []) }
+                ?? AgentIdentity(bundleID: config.agent)
+        })
+        let candidateAgents = existingCandidates.union(configuredAgents)
         for agent in candidateAgents {
             let agentRows = grouped[agent] ?? []
             let weight = agentRows.reduce(Int64(0)) { $0 + $1.counters.total }
@@ -135,11 +180,20 @@ enum AITrafficGraphBuilder {
                 let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: refusalName)
                 included.append((agent, agentRows, AgentMetadata(name: known?.name ?? refusalName, path: "",
                                                                  known: known, weight: 0)))
+            } else if configuredAgents.contains(agent) {
+                let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: agent.bundleID)
+                included.append((agent, agentRows, AgentMetadata(name: known?.name ?? agent.bundleID, path: "",
+                                                                 known: known, weight: 0)))
             }
         }
         included.sort {
             if $0.metadata.weight != $1.metadata.weight { return $0.metadata.weight > $1.metadata.weight }
             return agentID($0.agent) < agentID($1.agent)
+        }
+        let resolvedGateways = gatewayConfigs.compactMap { config, identity -> ResolvedGateway? in
+            guard let entry = included.first(where: { gatewayMatches(config, agent: $0) }) else { return nil }
+            let relay = RelayIdentity(bundleID: identity?.bundleID ?? "endpoint:\(config.endpoint.description)")
+            return ResolvedGateway(config: config, identity: identity, agent: entry.agent, relay: relay)
         }
 
         var allNodes: [TrafficGraphNodeID: TrafficGraphNode] = [:]
@@ -147,7 +201,39 @@ enum AITrafficGraphBuilder {
         var observedMembers: [ObservedRelationship: [ExactMemberIdentity: MemberValue]] = [:]
         var blocked: [BlockedRelationship: BlockedValue] = [:]
         var toolMetadata: [ToolIdentity: ToolMetadata] = [:]
+        var relayMetadata: [RelayIdentity: RelayMetadata] = [:]
+        var configuredGateways: [ConfiguredGatewayRelationship: AgentGatewayConfig] = [:]
         var total = FlowCounters()
+
+        for row in rows where isObservedGatewayRow(row) {
+            total += row.counters
+            let relay = row.routeProxyBundleID.isEmpty ? nil : RelayIdentity(bundleID: row.routeProxyBundleID)
+            if let relay {
+                let candidate = RelayMetadata(name: row.routeProxyName, path: row.routeProxyPath,
+                                              weight: row.counters.total)
+                let current = relayMetadata[relay]
+                if current == nil || prefersMetadata(candidate, over: current!) { relayMetadata[relay] = candidate }
+            }
+            let provider = AgentCatalog.provider(domain: row.domain, owner: row.owner) ?? ""
+            let groupedDomain = row.domain.isEmpty ? "" : VisualizationDomainFamily.group(row.domain)
+            let destination = DestinationIdentity(
+                provider: provider, domain: provider.isEmpty ? groupedDomain : "",
+                remoteIP: provider.isEmpty && groupedDomain.isEmpty ? row.remoteIP : "",
+                owner: provider.isEmpty && groupedDomain.isEmpty ? row.owner : "",
+                asn: provider.isEmpty && groupedDomain.isEmpty ? row.asn : 0
+            )
+            let sourceID = gatewayID(bundleID: row.bundleID)
+            let relationship = ObservedRelationship(source: sourceID, destination: destination, relay: relay)
+            observedCounters[relationship, default: FlowCounters()] += row.counters
+            let memberIdentity = ExactMemberIdentity(source: sourceID, bundleID: row.bundleID,
+                                                     agentParent: row.parentAgent, mcpServer: row.mcpServer,
+                                                     domain: row.domain, remoteIP: row.remoteIP,
+                                                     protocols: row.protocols, channel: row.channel)
+            var member = observedMembers[relationship]?[memberIdentity]
+                ?? MemberValue(identity: memberIdentity, owner: row.owner, asn: row.asn)
+            member.counters += row.counters
+            observedMembers[relationship, default: [:]][memberIdentity] = member
+        }
 
         for entry in included {
             let agentNodeID = agentID(entry.agent)
@@ -189,7 +275,16 @@ enum AITrafficGraphBuilder {
                     owner: provider.isEmpty && groupedDomain.isEmpty ? row.owner : "",
                     asn: provider.isEmpty && groupedDomain.isEmpty ? row.asn : 0
                 )
-                let relationship = ObservedRelationship(source: sourceID, destination: destination)
+                let relay = row.routeProxyBundleID.isEmpty ? nil : RelayIdentity(bundleID: row.routeProxyBundleID)
+                if let relay {
+                    let candidate = RelayMetadata(name: row.routeProxyName, path: row.routeProxyPath,
+                                                  weight: row.counters.total)
+                    let current = relayMetadata[relay]
+                    if current == nil || prefersMetadata(candidate, over: current!) {
+                        relayMetadata[relay] = candidate
+                    }
+                }
+                let relationship = ObservedRelationship(source: sourceID, destination: destination, relay: relay)
                 observedCounters[relationship, default: FlowCounters()] += row.counters
                 let memberIdentity = ExactMemberIdentity(source: sourceID, bundleID: row.bundleID,
                                                          agentParent: row.parentAgent, mcpServer: row.mcpServer,
@@ -252,6 +347,15 @@ enum AITrafficGraphBuilder {
                 counters: metadata.counters
             )
         }
+        for resolved in resolvedGateways {
+            let declaration = "\(resolved.config.endpoint.description)|\(resolved.config.source)|\(resolved.config.sourceKey)"
+            configuredGateways[ConfiguredGatewayRelationship(agent: resolved.agent, gateway: resolved.relay,
+                                                               declaration: declaration)] = resolved.config
+            let candidate = RelayMetadata(name: resolved.identity?.name ?? resolved.config.endpoint.description,
+                                          path: resolved.identity?.path ?? "", weight: 0)
+            let current = relayMetadata[resolved.relay]
+            if current == nil || prefersMetadata(candidate, over: current!) { relayMetadata[resolved.relay] = candidate }
+        }
 
         let rankedObserved = observedCounters.sorted { left, right in
             if left.value.total != right.value.total { return left.value.total > right.value.total }
@@ -294,9 +398,18 @@ enum AITrafficGraphBuilder {
         }
         var selectedObserved: [(ObservedRelationship, FlowCounters)] = []
         for (relationship, counters) in rankedObserved {
+            let destinationNodeID = destinationID(relationship.destination)
+            let sourceIsGateway = relationship.source.rawValue.hasPrefix("proxy:")
+            if sourceIsGateway {
+                guard (visibleDestinations.contains(destinationNodeID)
+                        || visibleDestinations.count < max(0, limits.maxDestinations)),
+                      selectedObserved.count < max(0, limits.maxObservedEdges) else { continue }
+                selectedObserved.append((relationship, counters))
+                visibleDestinations.insert(destinationNodeID)
+                continue
+            }
             let sourceAgent = owningAgent(of: relationship.source, included: included.map(\.agent))
             let agentNodeID = agentID(sourceAgent)
-            let destinationNodeID = destinationID(relationship.destination)
             let sourceIsTool = relationship.source != agentNodeID
             guard (visibleAgents.contains(agentNodeID) || visibleAgents.count < max(0, limits.maxAgents)),
                   (!sourceIsTool || visibleTools.contains(relationship.source)
@@ -308,6 +421,12 @@ enum AITrafficGraphBuilder {
             visibleAgents.insert(agentNodeID)
             if sourceIsTool { visibleTools.insert(relationship.source) }
             visibleDestinations.insert(destinationNodeID)
+        }
+        // Configuration is relationship evidence in its own right. Admit configured agents within the same agent cap;
+        // settings never manufacture counters or an observed route.
+        for relationship in configuredGateways.keys.sorted(by: { configuredGatewayID($0) < configuredGatewayID($1) })
+            where visibleAgents.count < max(0, limits.maxAgents) {
+            visibleAgents.insert(agentID(relationship.agent))
         }
         // The first refusal pass reserves capacity before observed traffic. Once observed traffic has admitted its
         // agents, use every remaining agent slot and blocked-edge slot rather than treating the reserve as a cap.
@@ -362,6 +481,35 @@ enum AITrafficGraphBuilder {
             )
         }
 
+        var visibleRelayCounters: [RelayIdentity: FlowCounters] = [:]
+        for (relationship, counters) in selectedObserved {
+            guard let relay = relationship.relay else { continue }
+            visibleRelayCounters[relay, default: FlowCounters()] += counters
+        }
+        for (relay, counters) in visibleRelayCounters {
+            let metadata = relayMetadata[relay] ?? RelayMetadata(name: relay.bundleID, path: "", weight: 0)
+            allNodes[relayID(relay)] = TrafficGraphNode(
+                id: relayID(relay), kind: .proxy,
+                title: metadata.name.isEmpty ? relay.bundleID : metadata.name,
+                detail: L("Observed route"), appPath: metadata.path,
+                filter: TrafficFilter(bundleID: relay.bundleID), counters: counters
+            )
+        }
+        let visibleGatewaySources = Set(selectedObserved.map(\.0.source)).filter { $0.rawValue.hasPrefix("proxy:") }
+        for gatewaySource in visibleGatewaySources where allNodes[gatewaySource] == nil {
+            guard let gateway = resolvedGateways.first(where: { relayID($0.relay) == gatewaySource }) else { continue }
+            let counters = selectedObserved.reduce(into: FlowCounters()) { result, entry in
+                if entry.0.source == gatewaySource { result += entry.1 }
+            }
+            allNodes[gatewaySource] = TrafficGraphNode(
+                id: gatewaySource, kind: .proxy,
+                title: gateway.identity?.name ?? gateway.config.endpoint.description,
+                detail: L("Configured gateway"), appPath: gateway.identity?.path ?? "",
+                filter: gateway.identity.map { TrafficFilter(bundleID: $0.bundleID) } ?? .none,
+                counters: counters
+            )
+        }
+
         var visibleSourceCounters: [TrafficGraphNodeID: FlowCounters] = [:]
         for (relationship, counters) in selectedObserved {
             visibleSourceCounters[relationship.source, default: FlowCounters()] += counters
@@ -383,11 +531,44 @@ enum AITrafficGraphBuilder {
             let values = Array(observedMembers[relationship]?.values ?? [:].values)
             let members = makeMembers(values)
             return TrafficGraphEdge(
-                id: observedID(relationship), source: relationship.source,
+                id: observedID(relationship), source: relationship.relay.map(relayID) ?? relationship.source,
                 target: destinationID(relationship.destination), counters: counters,
                 filter: members.count == 1 ? members[0].filter : sourceFilter(relationship.source, nodes: allNodes),
                 relationship: .observed, members: members
             )
+        }
+        let visibleObservedRoutes = Set(selectedObserved.compactMap { relationship, _ -> ObservedRouteIdentity? in
+            relationship.relay.map { ObservedRouteIdentity(source: relationship.source, relay: $0) }
+        })
+        for route in visibleObservedRoutes.sorted(by: { observedRouteID($0) < observedRouteID($1) }) {
+            let volume = selectedObserved.reduce(into: FlowCounters()) { result, entry in
+                if entry.0.source == route.source, entry.0.relay == route.relay { result += entry.1 }
+            }
+            edges.append(TrafficGraphEdge(
+                id: observedRouteID(route), source: route.source, target: relayID(route.relay),
+                counters: FlowCounters(), filter: sourceFilter(route.source, nodes: allNodes),
+                relationship: .routedThrough, trafficVolume: volume
+            ))
+        }
+        for (relationship, config) in configuredGateways where visibleAgents.contains(agentID(relationship.agent)) {
+            let metadata = relayMetadata[relationship.gateway]
+                ?? RelayMetadata(name: relationship.gateway.bundleID, path: "", weight: 0)
+            let nodeID = relayID(relationship.gateway)
+            if allNodes[nodeID] == nil {
+                allNodes[nodeID] = TrafficGraphNode(
+                    id: nodeID, kind: .proxy,
+                    title: metadata.name.isEmpty ? relationship.gateway.bundleID : metadata.name,
+                    detail: L("Configured gateway"), appPath: metadata.path,
+                    filter: TrafficFilter(bundleID: relationship.gateway.bundleID), counters: FlowCounters()
+                )
+            }
+            edges.append(TrafficGraphEdge(
+                id: configuredGatewayID(relationship), source: agentID(relationship.agent), target: nodeID,
+                counters: FlowCounters(), filter: allNodes[agentID(relationship.agent)]?.filter ?? .none,
+                relationship: .configuredGateway,
+                configuration: TrafficGraphConfiguration(endpoint: config.endpoint.description,
+                                                        source: config.source, sourceKey: config.sourceKey)
+            ))
         }
         for (relationship, value) in selectedBlocked {
             let destination = blockedDestination(relationship)
@@ -473,7 +654,13 @@ enum AITrafficGraphBuilder {
         }
         edges.sort { $0.id < $1.id }
 
-        let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations).union(visibleLaunchers)
+        let visibleRelays = Set(selectedObserved.compactMap { $0.0.relay.map(relayID) })
+            .union(selectedObserved.map(\.0.source).filter { $0.rawValue.hasPrefix("proxy:") })
+            .union(configuredGateways.keys.compactMap {
+                visibleAgents.contains(agentID($0.agent)) ? relayID($0.gateway) : nil
+            })
+        let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations)
+            .union(visibleLaunchers).union(visibleRelays)
         let nodes = visibleIDs.compactMap { allNodes[$0] }.sorted { $0.id < $1.id }
         let visibleTotal = selectedObserved.reduce(into: FlowCounters()) { $0 += $1.1 }
         let allDestinationCount = Set(observedCounters.keys.map { destinationID($0.destination) })
@@ -481,10 +668,21 @@ enum AITrafficGraphBuilder {
         let lineageCount = toolMetadata.values.filter(\.hasLineage).count
         let allLauncherNodes = Set(launcherMetadata.keys.map { launcherID(bundleID: $0.bundleID) }).count
         let allLauncherEdges = launcherMetadata.count
+        let allObservedGatewayNodeIDs = Set(observedCounters.keys.map(\.source).filter {
+            $0.rawValue.hasPrefix("proxy:")
+        })
+        let allRelayNodeIDs = Set(observedCounters.keys.compactMap { $0.relay.map(relayID) })
+            .union(allObservedGatewayNodeIDs)
+            .union(configuredGateways.keys.map { relayID($0.gateway) })
+        let allRelayNodes = allRelayNodeIDs.count
+        let allObservedRoutes = Set(observedCounters.keys.compactMap { relationship in
+            relationship.relay.map { ObservedRouteIdentity(source: relationship.source, relay: $0) }
+        }).count
         let hidden = TrafficGraphHidden(
-            nodeCount: max(0, included.count + toolMetadata.count + allDestinationCount + allLauncherNodes
+            nodeCount: max(0, included.count + toolMetadata.count + allDestinationCount + allLauncherNodes + allRelayNodes
                            - visibleIDs.count),
-            edgeCount: max(0, observedCounters.count + blocked.count + lineageCount + allLauncherEdges - edges.count),
+            edgeCount: max(0, observedCounters.count + blocked.count + lineageCount + allLauncherEdges
+                           + allObservedRoutes + configuredGateways.count - edges.count),
             counters: subtract(total, visibleTotal)
         )
         return TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: hidden)
@@ -513,6 +711,32 @@ enum AITrafficGraphBuilder {
         if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
+    }
+
+    private static func prefersMetadata(_ candidate: RelayMetadata, over current: RelayMetadata) -> Bool {
+        if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
+        if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
+        if candidate.weight != current.weight { return candidate.weight > current.weight }
+        if candidate.name != current.name { return candidate.name < current.name }
+        return candidate.path < current.path
+    }
+
+    private static func gatewayMatches(_ config: AgentGatewayConfig,
+                                       agent entry: (agent: AgentIdentity, rows: [BreakdownRow], metadata: AgentMetadata)) -> Bool {
+        gatewayMatches(config, candidate: entry.agent, rows: entry.rows)
+            || entry.metadata.name.lowercased() == config.agent.lowercased()
+            || entry.metadata.known?.processNames.contains(config.agent.lowercased()) == true
+            || entry.metadata.known?.bundleIDs.contains(config.agent) == true
+    }
+
+    private static func gatewayMatches(_ config: AgentGatewayConfig, candidate: AgentIdentity,
+                                       rows: [BreakdownRow]) -> Bool {
+        let key = config.agent.lowercased()
+        if candidate.bundleID.lowercased() == key { return true }
+        let names = rows.flatMap { [$0.appName, $0.parentAgentName] }.map { $0.lowercased() }
+        if names.contains(key) { return true }
+        return AgentCatalog.knownAgent(bundleID: candidate.bundleID, appName: names.first ?? candidate.bundleID)
+            .map { $0.processNames.contains(key) || $0.bundleIDs.contains(config.agent) } ?? false
     }
 
     private static func launcherID(bundleID: String) -> TrafficGraphNodeID {
@@ -563,9 +787,29 @@ enum AITrafficGraphBuilder {
                            + component(relationship.destination) + "→port→\(relationship.port)")
     }
 
+    private static func gatewayID(bundleID: String) -> TrafficGraphNodeID {
+        relayID(RelayIdentity(bundleID: bundleID))
+    }
+
+    private static func relayID(_ relay: RelayIdentity) -> TrafficGraphNodeID {
+        TrafficGraphNodeID(rawValue: "proxy:" + component(relay.bundleID))
+    }
+
+    private static func configuredGatewayID(_ relationship: ConfiguredGatewayRelationship) -> TrafficGraphEdgeID {
+        TrafficGraphEdgeID(rawValue: agentID(relationship.agent).rawValue + "→configured-gateway→"
+                           + relayID(relationship.gateway).rawValue + "→declaration→"
+                           + component(relationship.declaration))
+    }
+
+    private static func observedRouteID(_ route: ObservedRouteIdentity) -> TrafficGraphEdgeID {
+        TrafficGraphEdgeID(rawValue: route.source.rawValue + "→routed-through→" + relayID(route.relay).rawValue)
+    }
+
     private static func observedID(_ relationship: ObservedRelationship) -> TrafficGraphEdgeID {
-        TrafficGraphEdgeID(rawValue: relationship.source.rawValue + "→observed→"
-                           + destinationID(relationship.destination).rawValue)
+        let source = relationship.relay.map(relayID) ?? relationship.source
+        return TrafficGraphEdgeID(rawValue: source.rawValue + "→observed→"
+                                  + destinationID(relationship.destination).rawValue
+                                  + "→origin→" + relationship.source.rawValue)
     }
 
     private static func owningAgent(of source: TrafficGraphNodeID,

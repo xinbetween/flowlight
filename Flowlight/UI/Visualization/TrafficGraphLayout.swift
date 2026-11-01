@@ -221,7 +221,9 @@ enum TrafficGraphLayout {
     private enum Lane: Int, CaseIterable {
         case launcher
         case source
-        case intermediary
+        case tool
+        case gateway
+        case inspectionProxy
         case destination
     }
 
@@ -237,7 +239,8 @@ enum TrafficGraphLayout {
         }
 
         let insetBounds = bounds.insetBy(dx: 24, dy: 22)
-        let ordered = orderedNodes(snapshot: snapshot)
+        let nodeLanes = lanes(snapshot: snapshot)
+        let ordered = orderedNodes(snapshot: snapshot, nodeLanes: nodeLanes)
         let activeLanes = Lane.allCases.filter { !(ordered[$0] ?? []).isEmpty }
         let columns = columnPositions(for: activeLanes, in: insetBounds)
         var frames: [TrafficGraphNodeID: CGRect] = [:]
@@ -245,7 +248,7 @@ enum TrafficGraphLayout {
         if let previous {
             for node in snapshot.nodes {
                 guard var frame = previous.nodeFrames[node.id] else { continue }
-                let lane = lane(for: node)
+                guard let lane = nodeLanes[node.id] else { continue }
                 guard let column = columns[lane] else { continue }
                 frame.origin.x = column - frame.width / 2
                 guard frame.minY >= insetBounds.minY, frame.maxY <= insetBounds.maxY else { continue }
@@ -272,16 +275,16 @@ enum TrafficGraphLayout {
             }
         }
 
-        let observed = snapshot.edges.filter { $0.relationship == .observed }
-        let maximum = max(1, observed.map { $0.counters.total }.max() ?? 1)
-        var widths = Dictionary(uniqueKeysWithValues: observed.map {
-            ($0.id, ribbonWidth(bytes: $0.counters.total, maximum: maximum))
+        let trafficRibbons = snapshot.edges.filter(\.isTrafficRibbon)
+        let maximum = max(1, trafficRibbons.map { $0.displayedCounters.total }.max() ?? 1)
+        var widths = Dictionary(uniqueKeysWithValues: trafficRibbons.map {
+            ($0.id, ribbonWidth(bytes: $0.displayedCounters.total, maximum: maximum))
         })
-        let scale = ribbonScale(edges: observed, widths: widths, frames: frames)
+        let scale = ribbonScale(edges: trafficRibbons, widths: widths, frames: frames)
         widths = widths.mapValues { $0 * scale }
 
-        let outgoing = Dictionary(grouping: observed, by: \.source)
-        let incoming = Dictionary(grouping: observed, by: \.target)
+        let outgoing = Dictionary(grouping: trafficRibbons, by: \.source)
+        let incoming = Dictionary(grouping: trafficRibbons, by: \.target)
         var sourcePorts: [TrafficGraphEdgeID: CGPoint] = [:]
         var targetPorts: [TrafficGraphEdgeID: CGPoint] = [:]
         for (nodeID, edges) in outgoing {
@@ -303,8 +306,8 @@ enum TrafficGraphLayout {
             targetPorts.merge(portCenters(for: sorted, in: frame, edgeWidths: widths)) { current, _ in current }
         }
 
-        let nodeLane = Dictionary(uniqueKeysWithValues: snapshot.nodes.map { ($0.id, lane(for: $0)) })
-        let parallelRelationships = Dictionary(grouping: snapshot.edges.filter { $0.relationship != .observed }) {
+        let nodeLane = nodeLanes
+        let parallelRelationships = Dictionary(grouping: snapshot.edges.filter { !$0.isTrafficRibbon }) {
             ParallelEdgeKey(source: $0.source, target: $0.target)
         }.mapValues { $0.sorted { $0.id < $1.id } }
         var parallelOffsets: [TrafficGraphEdgeID: CGFloat] = [:]
@@ -317,13 +320,14 @@ enum TrafficGraphLayout {
         var curves: [TrafficGraphEdgeID: TrafficGraphCurve] = [:]
         for edge in snapshot.edges.sorted(by: { $0.id < $1.id }) {
             guard let source = frames[edge.source], let target = frames[edge.target] else { continue }
-            if edge.relationship == .observed {
+            if edge.isTrafficRibbon {
                 guard let sourcePort = sourcePorts[edge.id], let targetPort = targetPorts[edge.id] else { continue }
                 let start = CGPoint(x: source.maxX - 0.5, y: sourcePort.y)
                 let end = CGPoint(x: target.minX, y: targetPort.y)
                 let obstacles = nodeLane[edge.source] == .source && nodeLane[edge.target] == .destination
                     ? snapshot.nodes.compactMap { node -> CGRect? in
-                        guard nodeLane[node.id] == .intermediary else { return nil }
+                        guard let lane = nodeLane[node.id], [.tool, .gateway, .inspectionProxy].contains(lane)
+                        else { return nil }
                         return frames[node.id]
                     }
                     : []
@@ -341,7 +345,8 @@ enum TrafficGraphLayout {
                                   y: target.midY + attachmentOffset)
                 let obstacles = nodeLane[edge.source] == .source && nodeLane[edge.target] == .destination
                     ? snapshot.nodes.compactMap { node -> CGRect? in
-                        guard nodeLane[node.id] == .intermediary else { return nil }
+                        guard let lane = nodeLane[node.id], [.tool, .gateway, .inspectionProxy].contains(lane)
+                        else { return nil }
                         return frames[node.id]
                     }
                     : []
@@ -480,8 +485,9 @@ enum TrafficGraphLayout {
                                  control2: CGPoint(x: secondX, y: routeY), end: end)
     }
 
-    private static func orderedNodes(snapshot: TrafficGraphSnapshot) -> [Lane: [TrafficGraphNode]] {
-        var lanes = Dictionary(grouping: snapshot.nodes, by: lane(for:))
+    private static func orderedNodes(snapshot: TrafficGraphSnapshot,
+                                     nodeLanes: [TrafficGraphNodeID: Lane]) -> [Lane: [TrafficGraphNode]] {
+        var lanes = Dictionary(grouping: snapshot.nodes) { nodeLanes[$0.id] ?? .source }
         for lane in Lane.allCases { lanes[lane] = (lanes[lane] ?? []).sorted { $0.id < $1.id } }
 
         for _ in 0..<3 {
@@ -506,9 +512,16 @@ enum TrafficGraphLayout {
     private static func neighboringOrder(for lane: Lane, lanes: [Lane: [TrafficGraphNode]]) -> [TrafficGraphNode] {
         switch lane {
         case .launcher: return lanes[.source] ?? []
-        case .source: return (lanes[.launcher] ?? []) + (lanes[.intermediary] ?? []) + (lanes[.destination] ?? [])
-        case .intermediary: return (lanes[.source] ?? []) + (lanes[.destination] ?? [])
-        case .destination: return (lanes[.intermediary] ?? []) + (lanes[.source] ?? [])
+        case .source: return (lanes[.launcher] ?? []) + (lanes[.tool] ?? []) + (lanes[.gateway] ?? [])
+            + (lanes[.inspectionProxy] ?? []) + (lanes[.destination] ?? [])
+        case .tool: return (lanes[.source] ?? []) + (lanes[.gateway] ?? []) + (lanes[.inspectionProxy] ?? [])
+            + (lanes[.destination] ?? [])
+        case .gateway: return (lanes[.source] ?? []) + (lanes[.tool] ?? []) + (lanes[.inspectionProxy] ?? [])
+            + (lanes[.destination] ?? [])
+        case .inspectionProxy: return (lanes[.gateway] ?? []) + (lanes[.tool] ?? [])
+            + (lanes[.source] ?? []) + (lanes[.destination] ?? [])
+        case .destination: return (lanes[.inspectionProxy] ?? []) + (lanes[.gateway] ?? [])
+            + (lanes[.tool] ?? []) + (lanes[.source] ?? [])
         }
     }
 
@@ -521,19 +534,28 @@ enum TrafficGraphLayout {
         return sorted[sorted.count / 2]
     }
 
-    private static func lane(for node: TrafficGraphNode) -> Lane {
-        switch node.kind {
-        case .launcher: return .launcher
-        case .app, .agent: return .source
-        case .tool, .mcp, .proxy: return .intermediary
-        case .destination, .service: return .destination
-        }
+    private static func lanes(snapshot: TrafficGraphSnapshot) -> [TrafficGraphNodeID: Lane] {
+        let gatewayTargets = Set(snapshot.edges.filter { $0.relationship == .configuredGateway }.map(\.target))
+        let inspectionTargets = Set(snapshot.edges.filter { $0.relationship == .routedThrough }.map(\.target))
+        return Dictionary(uniqueKeysWithValues: snapshot.nodes.map { node in
+            let lane: Lane
+            switch node.kind {
+            case .launcher: lane = .launcher
+            case .app, .agent: lane = .source
+            case .tool, .mcp: lane = .tool
+            case .proxy:
+                lane = inspectionTargets.contains(node.id) ? .inspectionProxy
+                    : gatewayTargets.contains(node.id) ? .gateway : .inspectionProxy
+            case .destination, .service: lane = .destination
+            }
+            return (node.id, lane)
+        })
     }
 
     private static func size(for lane: Lane) -> CGSize {
         switch lane {
         case .launcher, .source: return appSize
-        case .intermediary: return intermediarySize
+        case .tool, .gateway, .inspectionProxy: return intermediarySize
         case .destination: return destinationSize
         }
     }

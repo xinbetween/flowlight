@@ -19,6 +19,23 @@ enum DemoData {
         return dir.appendingPathComponent("demo.sqlite")
     }
 
+    /// Synthetic configuration evidence used only by the disposable demo database. Demo mode never reads a
+    /// person's agent settings or live listener table, so screenshots remain deterministic and private.
+    static let agentGateways = [
+        AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "Demo · ~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+    ]
+
+    static func gatewayIdentity(_ endpoint: AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? {
+        guard endpoint == agentGateways.first?.endpoint else { return nil }
+        return AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie",
+                                    path: "/Applications/magpie.app")
+    }
+
     static func resetDatabase() {
         for suffix in ["", "-wal", "-shm"] {
             try? FileManager.default.removeItem(at: URL(fileURLWithPath: databaseURL.path + suffix))
@@ -94,8 +111,11 @@ enum DemoData {
             Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 700_000, outRate: 1_400_000),
             Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 300_000, outRate: 10_000),
             Flow(host: "github.com", ip: "198.51.100.11", port: 22, proto: "ssh", inRate: 50_000, outRate: 30_000),
-        ], launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"),
-           routedThroughFlowlight: true),
+        ], launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
+        App(bundleID: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app", weight: 0.9, flows: [
+            Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 4_000_000, outRate: 8_000_000),
+            Flow(host: "api.openai.com", ip: "198.51.100.90", port: 443, proto: "https", inRate: 2_000_000, outRate: 3_000_000),
+        ], routedThroughFlowlight: true),
         App(bundleID: "git", name: "git", path: "/usr/bin/git", weight: 0.5, flows: [
             Flow(host: "github.com", ip: "198.51.100.11", port: 443, proto: "https", inRate: 400_000, outRate: 60_000),
         ], parent: ("claude", "Claude Code", nil)),

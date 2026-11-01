@@ -40,36 +40,69 @@ SHOTS=(
   "visualize:visualize::1600x994"
 )
 
+exact_app_pids() {
+  local expected="$1" pid command
+  for pid in ${(f)"$(pgrep -x Flowlight 2>/dev/null || true)"}; do
+    command=$(ps -p "$pid" -o command=)
+    [[ "$command" == "$expected" || "$command" == "$expected "* ]] && print -r -- "$pid"
+  done
+}
+
+stop_exact_app() {
+  local pid="$1" expected="$2" command
+  command=$(ps -p "$pid" -o command=)
+  if [[ "$command" == "$expected" || "$command" == "$expected "* ]]; then
+    kill -TERM "$pid"
+  else
+    echo "    refusing to stop PID $pid: executable changed"
+    return 1
+  fi
+}
+
 capture() {
   local name="$1" screen="$2" tab="$3" size="${4:-$SIZE}"
   echo "  $name ($screen${tab:+ · $tab})"
   local w="${size%x*}" h="${size#*x}"
+  local executable
+  executable=$(realpath "$APP/Contents/MacOS/Flowlight")
+  [ -z "$(exact_app_pids "$executable")" ] || { echo "    exact candidate is already running"; return 1; }
   # The always-monitor shot asks for the representative "these agents are being monitored" banner, which real
   # inspection state (absent under the demo database) would otherwise never show.
-  local banner=()
+  local banner=() visualization=()
   [ "$name" = "always-monitor" ] && banner=(-FLDemoBanner YES)
+  [ "$name" = "visualize" ] && visualization=(-visualize.mode ai -visualize.presentation map -visualize.granularity hour)
   open -n "$APP" --args -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example "${banner[@]}"
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example "${banner[@]}" "${visualization[@]}"
+  local pid=""
+  for _ in {1..40}; do
+    pid=$(exact_app_pids "$executable" | head -1)
+    [ -n "$pid" ] && break
+    sleep 0.25
+  done
+  [ -n "$pid" ] || { echo "    couldn't find the candidate process"; return 1; }
   sleep "${FL_WAIT:-14}"   # seeding 90 days of synthetic history, then the rollups it reads
   # A window that isn't key draws its close/minimise/zoom buttons grey, which is how every published
-  # screenshot lost them. Bring it forward and let the redraw land before the shutter.
-  osascript -e 'tell application "Flowlight" to activate' >/dev/null 2>&1 || true
+  # screenshot lost them. Bring the exact candidate forward and let the redraw land before the shutter.
+  osascript - "$pid" <<'OSA' >/dev/null 2>&1 || true
+on run argv
+  tell application "System Events" to set frontmost of first application process whose unix id is (item 1 of argv as integer) to true
+end run
+OSA
   sleep 2
   local id
-  id=$(scripts/window-id.swift 2>/dev/null || true)
-  if [ -z "$id" ]; then echo "    couldn't find the window"; osascript -e 'quit app "Flowlight"'; return 1; fi
-  screencapture -x -o -l"$id" "$OUT/$name.png"
-  osascript -e 'quit app "Flowlight"' >/dev/null 2>&1 || true
+  id=$(scripts/window-id.swift "$pid" 2>/dev/null || true)
+  if [ -z "$id" ]; then
+    echo "    couldn't find the candidate window"
+    stop_exact_app "$pid" "$executable"
+    return 1
+  fi
+  if ! screencapture -x -o -l"$id" "$OUT/$name.png"; then
+    stop_exact_app "$pid" "$executable"
+    return 1
+  fi
+  stop_exact_app "$pid" "$executable"
   sleep 2
 }
-
-osascript -e 'quit app "Flowlight"' >/dev/null 2>&1 || true
-sleep 1
-
-# The demo database is seeded relative to the moment it is written, so one left over from another day has
-# nothing inside the windows these views ask about — which is how a run produced eight empty screens. It is
-# synthetic and rebuilt on launch, so throwing it away costs nothing.
-rm -f "$HOME/Library/Application Support/Flowlight/demo.sqlite"*
 
 for shot in "${SHOTS[@]}"; do
   IFS=":" read -r name screen tab size <<< "$shot"

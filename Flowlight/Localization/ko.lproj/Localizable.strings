@@ -1711,11 +1711,12 @@
 "Blocked" = "차단됨";
 "Blocked attempts" = "차단된 시도";
 "Capture-time process ancestry proves this application started the agent." = "캡처 시점의 프로세스 계보를 통해 이 애플리케이션이 에이전트를 시작했음이 확인됩니다.";
-"Capture-time proxy attribution proves this application's observed traffic used this route." = "캡처 시점의 프록시 귀속을 통해 이 애플리케이션의 관찰된 트래픽이 이 경로를 사용했음이 확인됩니다.";
+"Capture-time proxy attribution proves this observed route segment." = "캡처 시점의 프록시 귀속을 통해 이 관찰된 경로 구간이 확인됩니다.";
+"Configured gateway" = "구성된 게이트웨이";
+"The agent's documented settings declare this gateway. This does not prove a request used it." = "에이전트의 문서화된 설정에 이 게이트웨이가 선언되어 있습니다. 요청이 이를 사용했다는 증거는 아닙니다.";
 "Inspected request evidence proves this invocation." = "검사된 요청 증거를 통해 이 호출이 확인됩니다.";
 "Observed route" = "관찰된 경로";
 "Relationship evidence" = "관계 증거";
-"Routed through" = "다음을 통해 라우팅";
 "Started agent" = "에이전트 시작";
 "Managed pack: %@" = "관리형 팩: %@";
 "Ordinary rule" = "일반 규칙";
