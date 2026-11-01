@@ -1711,11 +1711,12 @@
 "Blocked" = "已阻擋";
 "Blocked attempts" = "已阻擋的嘗試";
 "Capture-time process ancestry proves this application started the agent." = "擷取時的程序層級證明此應用程式啟動了該代理程式。";
-"Capture-time proxy attribution proves this application's observed traffic used this route." = "擷取時的代理歸屬證明此應用程式的已觀察流量使用了此路由。";
+"Capture-time proxy attribution proves this observed route segment." = "擷取時的代理歸屬證明了此已觀察路由區段。";
+"Configured gateway" = "已設定閘道";
+"The agent's documented settings declare this gateway. This does not prove a request used it." = "代理程式的文件化設定宣告了此閘道。這並不能證明某個要求使用了它。";
 "Inspected request evidence proves this invocation." = "已檢查的要求證據證明了此次叫用。";
 "Observed route" = "已觀察路由";
 "Relationship evidence" = "關係證據";
-"Routed through" = "路由經過";
 "Started agent" = "已啟動代理程式";
 "Managed pack: %@" = "受管理規則包：%@";
 "Ordinary rule" = "一般規則";

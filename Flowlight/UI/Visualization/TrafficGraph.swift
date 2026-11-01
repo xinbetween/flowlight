@@ -38,6 +38,7 @@ enum TrafficGraphRelationship: String, Sendable {
     case observed
     case runs
     case launched
+    case configuredGateway
     case routedThrough
     case blocked
     case invoked
@@ -48,6 +49,12 @@ struct TrafficGraphEnforcement: Sendable, Equatable {
     var category: String
     var source: String
     var detail: String
+}
+
+struct TrafficGraphConfiguration: Sendable, Equatable {
+    var endpoint: String
+    var source: String
+    var sourceKey: String
 }
 
 struct TrafficGraphMember: Identifiable, Sendable, Equatable {
@@ -69,6 +76,13 @@ struct TrafficGraphEdge: Identifiable, Sendable {
     var relationship: TrafficGraphRelationship = .observed
     var members: [TrafficGraphMember] = []
     var enforcement: TrafficGraphEnforcement? = nil
+    var configuration: TrafficGraphConfiguration? = nil
+    /// Captured bytes represented by this route segment when `counters` must remain zero to avoid counting one flow
+    /// more than once in snapshot totals. Configured-only relationships never carry this value.
+    var trafficVolume: FlowCounters? = nil
+
+    var displayedCounters: FlowCounters { trafficVolume ?? counters }
+    var isTrafficRibbon: Bool { relationship == .observed || trafficVolume != nil }
 }
 
 struct TrafficGraphHidden: Equatable, Sendable {
@@ -89,6 +103,31 @@ struct TrafficGraphSnapshot: Sendable {
 
     var visibleTotal: FlowCounters {
         edges.reduce(into: FlowCounters()) { $0 += $1.counters }
+    }
+}
+
+enum TrafficGraphSelection {
+    static func isRelated(
+        _ edge: TrafficGraphEdge,
+        selectedNode: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?
+    ) -> Bool {
+        if selectedNode == nil, selectedEdge == nil { return true }
+        return selectedEdge == edge.id || selectedNode == edge.source || selectedNode == edge.target
+    }
+
+    static func emphasizes(
+        _ edge: TrafficGraphEdge,
+        selectedNode: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?,
+        hoveredEdge: TrafficGraphEdgeID?
+    ) -> Bool {
+        if selectedEdge == edge.id { return true }
+        return hoveredEdge == edge.id && isRelated(
+            edge,
+            selectedNode: selectedNode,
+            selectedEdge: selectedEdge
+        )
     }
 }
 
@@ -337,15 +376,17 @@ enum TrafficGraphBuilder {
                 members: members
             )
         }
-        let visibleRoutes = Set(selectedRelationships.compactMap { entry -> RouteIdentity? in
+        let visibleRoutes = Dictionary(grouping: selectedRelationships.compactMap { entry -> (RouteIdentity, FlowCounters)? in
             guard let relay = entry.key.relay else { return nil }
-            return RouteIdentity(app: entry.key.app, relay: relay)
-        })
-        for route in visibleRoutes {
+            return (RouteIdentity(app: entry.key.app, relay: relay), entry.value)
+        }, by: \.0).mapValues { values in
+            values.reduce(into: FlowCounters()) { $0 += $1.1 }
+        }
+        for (route, volume) in visibleRoutes {
             edges.append(TrafficGraphEdge(
                 id: routeID(route), source: appID(route.app), target: relayID(route.relay),
                 counters: FlowCounters(), filter: TrafficFilter(bundleID: route.app.bundleID),
-                relationship: .routedThrough
+                relationship: .routedThrough, trafficVolume: volume
             ))
         }
         for (identity, value) in selectedBlocked {

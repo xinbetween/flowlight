@@ -19,7 +19,8 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         {"permissions":{"allow":["Bash(git status)","WebFetch","Bash(curl:*)"],"deny":["Read(./.env)"],"ask":["Write"]},
          "hooks":{"Notification":[{"matcher":"","hooks":[{"type":"command","command":"curl -s -d hi https://ntfy.sh/mine"}]}],
                   "PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"~/.claude/hooks/audit.sh"}]}]},
-         "enabledPlugins":{"security-suite":true,"disabled-one":false}}
+         "enabledPlugins":{"security-suite":true,"disabled-one":false},
+         "env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:3425/anthropic"}}
         """)
         try write(".claude.json", #"{"mcpServers":{"ignored-here":{"command":"x"}}}"#)
         try write("Projects/app/.mcp.json", #"{"mcpServers":{"github":{"command":"npx","args":["-y","@modelcontextprotocol/server-github"]}}}"#)
@@ -30,6 +31,104 @@ final class AgentWorkspaceScannerTests: XCTestCase {
     }
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: home) }
+
+    func testReadsDocumentedGatewaySettingsWithoutKeepingSecretsOrPaths() throws {
+        let claude = try XCTUnwrap(AgentGatewayConfigReader.parseJSON(
+            Data(#"{"env":{"ANTHROPIC_BASE_URL":"http://user:secret@127.0.0.1:3425/anthropic?token=hidden"}}"#.utf8),
+            agent: "claude",
+            source: "~/.claude/settings.json",
+            keys: [.nested(["env", "ANTHROPIC_BASE_URL"])]
+        ).first)
+        XCTAssertEqual(claude.endpoint.scheme, "http")
+        XCTAssertEqual(claude.endpoint.host, "127.0.0.1")
+        XCTAssertEqual(claude.endpoint.port, 3425)
+        XCTAssertEqual(claude.sourceKey, "env.ANTHROPIC_BASE_URL")
+        XCTAssertFalse(claude.endpoint.description.contains("secret"))
+        XCTAssertFalse(claude.endpoint.description.contains("anthropic"))
+        XCTAssertFalse(claude.endpoint.description.contains("token"))
+
+        let editor = try XCTUnwrap(AgentGatewayConfigReader.parseJSON(
+            Data(#"{"http.proxy":"http://proxy.example:8080"}"#.utf8),
+            agent: "cursor",
+            source: "~/Library/Application Support/Cursor/User/settings.json",
+            keys: [.literal("http.proxy")]
+        ).first)
+        XCTAssertEqual(editor.endpoint.host, "proxy.example")
+        XCTAssertEqual(editor.endpoint.port, 8080)
+    }
+
+    func testReadsJSONWithCommentsAndFormatsIPv6Endpoint() throws {
+        let cursor = try XCTUnwrap(AgentGatewayConfigReader.parseJSON(
+            Data("""
+            {
+              // VS Code settings files permit comments and trailing commas.
+              "http.proxy": "http://[::1]:3425/private?token=hidden",
+            }
+            """.utf8),
+            agent: "cursor",
+            source: "~/Library/Application Support/Cursor/User/settings.json",
+            keys: [.literal("http.proxy")]
+        ).first)
+
+        XCTAssertEqual(cursor.endpoint.description, "http://[::1]:3425")
+    }
+
+    func testReadsOnlySelectedCodexProviderAndGeminiGateway() throws {
+        let gateways = AgentGatewayConfigReader.parseCodexTOML(
+            """
+            model_provider = "openai"
+            [model_providers.local]
+            base_url = "http://127.0.0.1:3425/v1"
+            [model_providers.openai]
+            base_url = "https://api.openai.com/v1"
+            """,
+            source: "~/.codex/config.toml"
+        )
+        let codex = try XCTUnwrap(gateways.first)
+        XCTAssertEqual(gateways.count, 1)
+        XCTAssertEqual(codex.agent, "codex")
+        XCTAssertEqual(codex.sourceKey, "model_providers.openai.base_url")
+        XCTAssertEqual(codex.endpoint.host, "api.openai.com")
+
+        let gemini = try XCTUnwrap(AgentGatewayConfigReader.parseJSON(
+            Data(#"{"general":{"proxy":"http://127.0.0.1:3425"}}"#.utf8),
+            agent: "gemini",
+            source: "~/.gemini/settings.json",
+            keys: [.nested(["general", "proxy"])]
+        ).first)
+        XCTAssertEqual(gemini.sourceKey, "general.proxy")
+        XCTAssertEqual(gemini.endpoint.host, "127.0.0.1")
+    }
+
+    func testWorkspaceScanRetainsConfiguredGatewayAsRelationshipEvidence() throws {
+        let workspaces = AgentWorkspaceScanner.scan(home: home)
+        let claude = try XCTUnwrap(workspaces.first { $0.agent == "claude" })
+        let gateway = try XCTUnwrap(claude.gateways.first)
+        XCTAssertEqual(gateway.agent, "claude")
+        XCTAssertEqual(gateway.endpoint.port, 3425)
+        XCTAssertEqual(gateway.source, "~/.claude/settings.json")
+    }
+
+    func testDecodesWorkspaceStoredBeforeGatewayDiscovery() throws {
+        let data = Data(#"{"agent":"claude","root":"~/.claude","isProject":false,"capabilities":[],"mcpServers":[]}"#.utf8)
+        let workspace = try JSONDecoder().decode(AgentWorkspace.self, from: data)
+
+        XCTAssertEqual(workspace.agent, "claude")
+        XCTAssertTrue(workspace.gateways.isEmpty)
+    }
+
+    func testScanReadsOnlyDocumentedGlobalGatewayFilesOutsideAgentFolders() throws {
+        let file = home.appendingPathComponent("Library/Application Support/Cursor/User/settings.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"{"http.proxy":"http://127.0.0.1:3425/private?token=hidden"}"#
+            .write(to: file, atomically: true, encoding: .utf8)
+
+        let cursor = try XCTUnwrap(AgentWorkspaceScanner.scan(home: home).first { $0.agent == "cursor" })
+        let gateway = try XCTUnwrap(cursor.gateways.first)
+        XCTAssertEqual(gateway.endpoint.description, "http://127.0.0.1:3425")
+        XCTAssertEqual(gateway.source, "~/Library/Application Support/Cursor/User/settings.json")
+        XCTAssertFalse(gateway.endpoint.description.contains("token"))
+    }
 
     func testScansHomeAgentFoldersOnly() {
         let workspaces = AgentWorkspaceScanner.scan(home: home)
@@ -53,6 +152,24 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(found.of(.instructions).map(\.name), ["AGENTS.md"])
         let names = workspaces.flatMap(\.capabilities).map(\.name)
         XCTAssertFalse(names.contains("sneaky"), "node_modules is skipped")
+    }
+
+    func testProjectLocalGatewayOverridesSharedSettings() throws {
+        let root = home.appendingPathComponent("Projects/app/.claude")
+        let shared = root.appendingPathComponent("settings.json")
+        let local = root.appendingPathComponent("settings.local.json")
+        try #"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:3000"}}"#
+            .write(to: shared, atomically: true, encoding: .utf8)
+        try #"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:3425"}}"#
+            .write(to: local, atomically: true, encoding: .utf8)
+
+        let gateways = AgentWorkspaceScanner.gatewaySettings(
+            in: root, agent: "claude", home: home, fm: .default
+        )
+
+        XCTAssertEqual(gateways.count, 1)
+        XCTAssertEqual(gateways.first?.endpoint.port, 3425)
+        XCTAssertEqual(gateways.first?.source, "~/Projects/app/.claude/settings.local.json")
     }
 
     func testNeverWalksIntoProtectedFolders() throws {
