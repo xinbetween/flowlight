@@ -3,23 +3,31 @@ import XCTest
 @testable import Flowlight
 
 final class CertificateAuthorityTests: XCTestCase {
-    func testCreatesCAAndLeafIdentity() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ca-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let ca = CertificateAuthority(directory: dir)
-        try ca.ensure()
-        XCTAssertTrue(ca.exists)
-        XCTAssertNotNil(ca.caCertificate(), "the certificate just written should parse back")
-        let bundle = try String(contentsOf: ca.bundleURL, encoding: .utf8)
-        XCTAssertTrue(bundle.contains(try String(contentsOf: ca.caCertificateURL, encoding: .utf8)))
+    func testCreatesCAAndLeafIdentity() async throws {
+        let result = try await Task.detached {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ca-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let ca = CertificateAuthority(directory: dir)
+            try ca.ensure()
+            let parsedCA = ca.caCertificate() != nil
+            let bundle = try String(contentsOf: ca.bundleURL, encoding: .utf8)
+            let containsCA = bundle.contains(try String(contentsOf: ca.caCertificateURL, encoding: .utf8))
 
-        let identity = try ca.identity(for: "api.example.com")
-        var cert: SecCertificate?
-        XCTAssertEqual(SecIdentityCopyCertificate(identity, &cert), errSecSuccess)
-        XCTAssertEqual(SecCertificateCopySubjectSummary(cert!) as String?, "api.example.com")
-        // Cached: the same identity object comes back.
-        XCTAssertTrue(try ca.identity(for: "API.example.com") === identity)
-        XCTAssertNoThrow(try ca.identity(for: "203.0.113.7"))
+            let identity = try ca.identity(for: "api.example.com")
+            var cert: SecCertificate?
+            let copyStatus = SecIdentityCopyCertificate(identity, &cert)
+            let subject = cert.map { SecCertificateCopySubjectSummary($0) as String? } ?? nil
+            let cached = try ca.identity(for: "API.example.com") === identity
+            _ = try ca.identity(for: "203.0.113.7")
+            return (ca.exists, parsedCA, containsCA, copyStatus, subject, cached)
+        }.value
+
+        XCTAssertTrue(result.0)
+        XCTAssertTrue(result.1, "the certificate just written should parse back")
+        XCTAssertTrue(result.2)
+        XCTAssertEqual(result.3, errSecSuccess)
+        XCTAssertEqual(result.4, "api.example.com")
+        XCTAssertTrue(result.5, "the same identity object should be cached")
     }
 
     func testConfigSafeStripsInjection() {

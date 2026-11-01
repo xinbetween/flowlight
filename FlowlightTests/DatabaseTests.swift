@@ -123,10 +123,67 @@ final class DatabaseTests: XCTestCase {
         let reopened = try TrafficDatabase(url: url)
 
         XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
-                                        map: { $0.int(0) }).first, 3)
+                                        map: { $0.int(0) }).first, 4)
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), ["claude"])
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_pack_event_rollups",
                                         map: { $0.text(0) }), ["claude"])
+    }
+
+    func testVersionedNameRepairUpdatesChildProcessAgentEvidenceAndMergesPackCollisions() throws {
+        let url = db.url
+        let version = "2.1.260"
+        var agent = key(version, "api.example.com")
+        agent.appName = version
+        agent.appPath = "/Users/test/.local/share/claude/versions/\(version)"
+        try db.insert([TrafficBatch(timestamp: 1_700_000_000, records: [
+            TrafficRecord(key: agent, counters: FlowCounters(bytesIn: 1, flows: 1))
+        ])])
+        _ = try db.insertExchange(HTTPExchange(
+            id: nil, started: Date(timeIntervalSince1970: 1_700_000_001), duration: 0.1,
+            scheme: "https", host: "api.example", port: 443, method: "GET", path: "/", status: 200,
+            requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+            responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+            contentType: "application/json", pid: 10, bundleID: "curl", appName: "curl",
+            agent: version, agentName: version, mcpServer: nil, toolCalls: [], note: nil,
+            mockRule: nil, guardrail: nil
+        ))
+        try db.recordRuleEvents([
+            RuleEvent(at: 1_700_000_001, ruleID: UUID(), action: .block, engine: .flow,
+                      agentKey: version, agentName: version, appName: "curl", bundleID: "curl",
+                      host: "telemetry.example", ip: "", port: 443)
+        ])
+        let collision = { (agentKey: String, agentName: String) in
+            RulePackEvent(bucket: 1_700_000_000, packID: "official.telemetry", packVersion: "1",
+                          entryID: 1, category: .telemetry, action: .block, count: 2,
+                          firstAt: 1_700_000_001, lastAt: 1_700_000_002, bundleID: "curl",
+                          appName: "curl", agentKey: agentKey, agentName: agentName,
+                          host: "metrics.example", matchedHost: "metrics.example", port: 443)
+        }
+        try db.recordRulePackEvents([collision(version, version), collision("claude", "Claude Code")])
+        db = nil
+        let shipped = try SQLiteConnection(path: url.path)
+        try shipped.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 3)")
+
+        let reopened = try TrafficDatabase(url: url)
+
+        XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
+                                        map: { $0.int(0) }).first, 4)
+        for table in ["http_exchanges", "rule_events", "rule_pack_event_rollups"] {
+            XCTAssertEqual(try reopened.raw("SELECT DISTINCT agent, agent_name FROM \(table)",
+                                            map: { ($0.text(0), $0.text(1)) }).map(\.0), ["claude"],
+                           "\(table) must attach child-process evidence to the repaired agent")
+        }
+        let packRows = try reopened.raw(
+            "SELECT count, first_at, last_at FROM rule_pack_event_rollups",
+            map: { ($0.int(0), $0.int(1), $0.int(2)) }
+        )
+        XCTAssertEqual(packRows.count, 1)
+        XCTAssertEqual(packRows.first?.0, 4, "rewriting the agent key must merge colliding rollups")
+        let attempts = try reopened.blockedAttempts(
+            from: Date(timeIntervalSince1970: 1_700_000_000),
+            to: Date(timeIntervalSince1970: 1_700_000_060)
+        )
+        XCTAssertTrue(attempts.allSatisfy { $0.agentKey == "claude" && $0.agentName == "Claude Code" })
     }
 
     func testVersionedNameRepairDoesNotGuessAcrossConflictingRetainedPaths() throws {
@@ -157,7 +214,7 @@ final class DatabaseTests: XCTestCase {
         let reopened = try TrafficDatabase(url: url)
 
         XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
-                                        map: { $0.int(0) }).first, 3)
+                                        map: { $0.int(0) }).first, 4)
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM flows_1s", map: { $0.text(0) }), ["claude"])
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), [version])
     }
@@ -188,14 +245,153 @@ final class DatabaseTests: XCTestCase {
                           appName: "Browser", agentKey: "", agentName: "", host: "analytics.google.com",
                           matchedHost: "analytics.google.com", port: 443)
         ])
+        let blockSession = UUID()
+        var replayed = BlockEvent(at: 1_700_000_030, agentKey: "claude", agentName: "Claude Code",
+                                  appName: "curl", bundleID: "curl", host: "uploads.example", ip: "", port: 443)
+        replayed.deliverySession = blockSession
+        replayed.deliverySequence = 1
+        var ordinaryBlock = BlockEvent(at: 1_700_000_031, agentKey: "claude", agentName: "Claude Code",
+                                       appName: "curl", bundleID: "curl", host: "duplicate.example", ip: "", port: 443,
+                                       rule: "Block duplicate")
+        ordinaryBlock.deliverySession = blockSession
+        ordinaryBlock.deliverySequence = 2
+        XCTAssertEqual(try db.recordBlockEvents([replayed, ordinaryBlock]), [replayed, ordinaryBlock])
+        XCTAssertTrue(try db.recordBlockEvents([replayed]).isEmpty,
+                      "an XPC redelivery after a lost reply must not duplicate evidence or alerts")
+        var ruleReplay = BlockEvent(at: 1_700_000_032, agentKey: "claude", agentName: "Claude Code",
+                                    appName: "curl", bundleID: "curl", host: "rule.example", ip: "", port: 443,
+                                    rule: "Block rule")
+        ruleReplay.deliverySession = blockSession
+        ruleReplay.deliverySequence = 3
+        XCTAssertEqual(try db.recordBlockEvents([ruleReplay]), [ruleReplay])
+        XCTAssertTrue(try db.recordBlockEvents([ruleReplay]).isEmpty,
+                      "ordinary-rule block alerts share the same replay receipt")
 
         let attempts = try db.blockedAttempts(from: from, to: from.addingTimeInterval(60))
 
-        XCTAssertEqual(attempts.reduce(Int64(0)) { $0 + $1.count }, 4)
-        XCTAssertEqual(Set(attempts.map(\.destination)), ["www.google-analytics.com", "telemetry.example"])
+        XCTAssertEqual(attempts.reduce(Int64(0)) { $0 + $1.count }, 5)
+        XCTAssertEqual(Set(attempts.map(\.destination)),
+                       ["www.google-analytics.com", "telemetry.example", "uploads.example"])
         XCTAssertFalse(attempts.contains { $0.destination == "analytics.google.com" })
         XCTAssertFalse(attempts.contains { $0.destination == "outside.example" })
+        XCTAssertFalse(attempts.contains { $0.destination == "duplicate.example" })
         XCTAssertTrue(attempts.contains { $0.source == "managed-pack:official.privacy" && $0.count == 3 })
+        XCTAssertTrue(attempts.contains {
+            $0.source == "agent-allowlist" && $0.bundleID == "curl" && $0.agentKey == "claude"
+                && $0.destination == "uploads.example" && $0.count == 1
+        })
+
+        try db.pruneRuleEvents(before: Date(timeIntervalSince1970: 2))
+        XCTAssertEqual(try db.raw("SELECT COUNT(*) FROM block_event_receipts", map: { $0.int(0) }).first, 0)
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM durable_event_watermarks WHERE channel = 'blocks'",
+                       map: { $0.int(0) }).first,
+            1,
+            "current refusal traffic keeps one session watermark regardless of event volume"
+        )
+        XCTAssertTrue(try db.recordBlockEvents([replayed, ruleReplay]).isEmpty)
+    }
+
+    func testBlockEvidenceCanCommitInsideTheAlertTransaction() throws {
+        let session = UUID()
+        var event = BlockEvent(at: 1_700_000_030, agentKey: "claude", agentName: "Claude Code",
+                               appName: "curl", bundleID: "curl", host: "uploads.example", ip: "", port: 443)
+        event.deliverySession = session
+        event.deliverySequence = 1
+
+        try db.withTransaction {
+            let accepted = try db.recordBlockEventsInTransaction([event])
+            XCTAssertEqual(accepted, [event])
+            _ = try db.addAlert(kind: AnomalyEngine.Kind.blockedConnection.rawValue,
+                                bundleID: event.agentKey, appName: event.agentName,
+                                detail: "Blocked curl", severity: 3,
+                                at: Date(timeIntervalSince1970: TimeInterval(event.at)),
+                                allowPattern: event.host)
+        }
+
+        XCTAssertEqual(try db.alerts().count, 1)
+        XCTAssertEqual(try db.blockedAttempts(
+            from: Date(timeIntervalSince1970: TimeInterval(event.at - 1)),
+            to: Date(timeIntervalSince1970: TimeInterval(event.at + 1))
+        ).map(\.destination), [event.host])
+        XCTAssertTrue(try db.recordBlockEvents([event]).isEmpty,
+                      "the atomic commit advances the replay watermark")
+    }
+
+    func testRuleDecisionReplayIsIdempotentAcrossHistoryPruning() throws {
+        var rule = Rule(action: .allow, app: "com.browser", destination: "analytics.example")
+        rule.maxHits = 3
+        try db.saveRule(rule)
+        let session = UUID()
+        var event = RuleEvent(at: 1_700_000_010, ruleID: rule.id, action: .allow, engine: .flow,
+                              agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
+                              host: "analytics.example", ip: "", port: 443)
+        event.deliverySession = session
+        event.deliverySequence = 1
+        XCTAssertEqual(try db.recordRuleEvents([event], durableReplay: true), [event])
+        XCTAssertTrue(try db.recordRuleEvents([event], durableReplay: true).isEmpty)
+        XCTAssertEqual(try XCTUnwrap(db.loadRules().first { $0.id == rule.id }).hits, 1,
+                       "a retry must not spend the same rule decision twice")
+
+        try db.pruneRuleEvents(before: Date(timeIntervalSince1970: 1_700_000_011))
+        XCTAssertTrue(try db.recordRuleEvents([event], durableReplay: true).isEmpty,
+                      "a redelivery after visible history expires must not recreate the decision")
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM durable_event_watermarks WHERE channel = 'rules'",
+                       map: { $0.int(0) }).first,
+            1,
+            "current retries use one compact session watermark rather than one receipt per event"
+        )
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM rule_event_receipts", map: { $0.int(0) }).first,
+            0
+        )
+        XCTAssertEqual(try XCTUnwrap(db.loadRules().first { $0.id == rule.id }).hits, 1)
+    }
+
+    func testOrdinaryRuleEditPreservesNewerDurableActivity() throws {
+        var stored = Rule(action: .allow, app: "com.browser", destination: "analytics.example")
+        stored.maxHits = 1
+        stored.hits = 1
+        stored.lastHit = Date(timeIntervalSince1970: 1_700_000_010)
+        try db.saveRule(stored)
+
+        var edited = stored
+        edited.name = "Edited"
+        edited.hits = 0
+        edited.lastHit = Date(timeIntervalSince1970: 1_700_000_000)
+        try db.saveRule(edited, preservingActivity: true)
+
+        let loaded = try XCTUnwrap(db.loadRules().first { $0.id == stored.id })
+        XCTAssertEqual(loaded.name, "Edited")
+        XCTAssertEqual(loaded.hits, 1)
+        XCTAssertEqual(loaded.lastHit, stored.lastHit)
+    }
+
+    func testDurableEventWatermarksStayBoundedAcrossExtensionSessions() throws {
+        let rule = Rule(action: .allow, app: "com.browser", destination: "analytics.example")
+        try db.saveRule(rule)
+        var latest: RuleEvent?
+        for sequence in 1...100 {
+            var event = RuleEvent(at: Int64(sequence), ruleID: rule.id, action: .allow, engine: .flow,
+                                  agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
+                                  host: "analytics.example", ip: "", port: 443)
+            event.deliverySession = UUID()
+            event.deliverySequence = 1
+            _ = try db.recordRuleEvents([event], durableReplay: true)
+            latest = event
+        }
+        XCTAssertTrue(try db.recordRuleEvents([XCTUnwrap(latest)], durableReplay: true).isEmpty,
+                      "the most recently committed session must survive same-second retention pruning")
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM durable_event_watermarks WHERE channel = 'rules'",
+                       map: { $0.int(0) }).first,
+            64
+        )
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM rule_event_receipts", map: { $0.int(0) }).first,
+            0
+        )
     }
 
     func testRollupsAndQueries() throws {
@@ -661,6 +857,16 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(apps[0].topDestination, "upload.example.com")
         XCTAssertEqual(apps[1].topDestination, "Cloudflare, Inc. · 104.18.0.1")
         XCTAssertTrue(try db.contributors(.second, from: Date(timeIntervalSince1970: TimeInterval(t0 + 5)), to: Date(timeIntervalSince1970: TimeInterval(t0 + 6))).top.isEmpty)
+    }
+
+    func testReportsContributorFilterIncludesFocusScope() {
+        let filter = TrafficFilter(bundleID: "com.visible")
+        let focus = FocusScope(hosts: ["example.com"])
+
+        let scoped = ReportsView.effectiveFilter(filter, focus: focus)
+
+        XCTAssertEqual(scoped.bundleID, "com.visible")
+        XCTAssertEqual(scoped.focus, focus, "hover contributors must use the same Focus scope as the visible chart")
     }
 
     func testTrimLeadingEmptyBuckets() {

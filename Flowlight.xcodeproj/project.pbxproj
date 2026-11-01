@@ -51,6 +51,7 @@
 		1ADF39B07A56B2AFFC721C1B /* ExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E01AEB9AB4F8723FFFA4BFB /* ExportTests.swift */; };
 		1C699CA261A1C0963BF36120 /* BoundedHTTPDataTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D5C4691F1B4DFDDCC1A705 /* BoundedHTTPDataTransport.swift */; };
 		1C837EBCE2110C53FB85C886 /* AnomalySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61F7D8D3D08054C7697792D /* AnomalySettings.swift */; };
+		1C84600D9B2365A7905656B2 /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
 		1D11256FDE7183EBBED5D308 /* BoundedHTTPDataTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D5C4691F1B4DFDDCC1A705 /* BoundedHTTPDataTransport.swift */; };
 		1D997A2137B9445F4D423737 /* ProcessNaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F3F458498856491A40E88C /* ProcessNaming.swift */; };
 		1E0AB61964E7FD024B5B4E71 /* AgentPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF99FCE4EBE61D20FFC1E2F1 /* AgentPolicy.swift */; };
@@ -88,6 +89,7 @@
 		2D89FAAC905437BEC596808B /* ProxyJanitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18286421CD591157CF1E1FD /* ProxyJanitor.swift */; };
 		2DADC58723CCECF67EAC1613 /* ExtensionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218F146542CC01A417469F9 /* ExtensionRecovery.swift */; };
 		2E110029B0BE1C39A967E0CA /* CertificateAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6652559787FD52622A19834A /* CertificateAuthority.swift */; };
+		2E690A1F45355F154A2EB37E /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
 		2F2E867F1E599C48EC6DE525 /* RulePackTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AC102A5B36107D8B6B31F /* RulePackTransfer.swift */; };
 		2F805A324684FF8CB7E0297B /* HostCanonicalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA83082A5085897BE34D963 /* HostCanonicalizer.swift */; };
 		2F80C3268E914A2041232706 /* TLSSNIParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5C4444B7A84352BE3672C41 /* TLSSNIParser.swift */; };
@@ -172,6 +174,7 @@
 		5AA48BB88F9E0F6F858DC553 /* BluetoothMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B6A48D086EF16CF6E438FF /* BluetoothMonitor.swift */; };
 		5B0715A36BAB76BC06AE4052 /* FlowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8267406A5D7DA536B7A713 /* FlowTracker.swift */; };
 		5D637AB4C3D308EAC8CC9448 /* RulePackDeliveryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B24C254E2C17056730C06B /* RulePackDeliveryStats.swift */; };
+		5D6F528946645297E0F1520A /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
 		5E22345FC07C19F4A32C5002 /* RuleEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08643257F8D11784563BD6CC /* RuleEditor.swift */; };
 		5EC8847DF0E49875B602B9AA /* ExtensionRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2747CAE7AD41663488F0E2B9 /* ExtensionRecoveryTests.swift */; };
 		6034C069D97EE923799AC9B2 /* FlowlightStoreExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9341EDA5AB3454E82FECD53A /* FlowlightStoreExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -417,6 +420,7 @@
 		DE472CC9E3475EF582BB706E /* DemoDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83A96A61DE59D2731045A8C /* DemoDataTests.swift */; };
 		DED507EF1A36E9B66FE4512E /* HTTPStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8974956FEBD82934CA1EB5 /* HTTPStream.swift */; };
 		DEDCFC43A3BBD2E91277302F /* PluginScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E593C4ED11E1BCADD22099E6 /* PluginScriptRunner.swift */; };
+		DF5288407A8E3BE4290DC2D0 /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
 		DF8776D774DE087DBBFB257F /* TrafficDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94538A9E26BCD8960123C7E4 /* TrafficDatabase.swift */; };
 		DFC721C64B216FEB81C55917 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9C36E21D6DB161C80DF3F6 /* UpdateChecker.swift */; };
 		E00C03B4955BFBA626340B5C /* InspectMenuItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406DB466CD32DA8223AE61A6 /* InspectMenuItems.swift */; };
@@ -637,6 +641,7 @@
 		4017B3BE9E7FC6895D23FB6C /* Flowlight-AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Flowlight-AppStore.entitlements"; sourceTree = "<group>"; };
 		406DB466CD32DA8223AE61A6 /* InspectMenuItems.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectMenuItems.swift; sourceTree = "<group>"; };
 		415931FB0EB29261A56B90C7 /* AskQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskQuery.swift; sourceTree = "<group>"; };
+		4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurableEventQueue.swift; sourceTree = "<group>"; };
 		41AE1A6CC673544FCEC9E7F4 /* AskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskView.swift; sourceTree = "<group>"; };
 		41B98E13F994F7E684F57C07 /* AgentAttributor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAttributor.swift; sourceTree = "<group>"; };
 		440DB80190A1847AC834210D /* AgentLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLauncher.swift; sourceTree = "<group>"; };
@@ -1184,6 +1189,7 @@
 				D16976C5552006B1F9975A62 /* AppleSystemApps.swift */,
 				80BC5E16F824FC642C12C8B0 /* BlockRules.swift */,
 				38E49720B1B25DC9EBB2ABA0 /* Constants.swift */,
+				4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */,
 				0872CE92A9A3D5A785ECC816 /* GlobMatch.swift */,
 				11A65C830B699BC4477CA879 /* Guardrail.swift */,
 				3EA83082A5085897BE34D963 /* HostCanonicalizer.swift */,
@@ -1613,6 +1619,7 @@
 				9D9CC413EDA13E69B872454F /* BlockRules.swift in Sources */,
 				B13CAA0E1DA5A274F3F4D849 /* Constants.swift in Sources */,
 				7212BA0F348AC67423887CF5 /* DNSParser.swift in Sources */,
+				5D6F528946645297E0F1520A /* DurableEventQueue.swift in Sources */,
 				B8AF34F3100E3ABF6190BE68 /* FilterDataProvider.swift in Sources */,
 				5B0715A36BAB76BC06AE4052 /* FlowTracker.swift in Sources */,
 				EF0EBBEAC6177681CBD4F0D7 /* GlobMatch.swift in Sources */,
@@ -1761,6 +1768,7 @@
 				274EE87B6A63D7F18C0D0E1E /* DeviceModels.swift in Sources */,
 				CF8EE120DA5241445ECD1797 /* DeviceStore.swift in Sources */,
 				F782A1187A8564DA1C37EDC1 /* DevicesView.swift in Sources */,
+				2E690A1F45355F154A2EB37E /* DurableEventQueue.swift in Sources */,
 				65F6E16AC002847C032ECC48 /* ExportController.swift in Sources */,
 				3F90E760FD34949F451FBDF4 /* ExportDisclosure.swift in Sources */,
 				4BAEC22536747CFB9525934A /* ExportDisclosureSheet.swift in Sources */,
@@ -1897,6 +1905,7 @@
 				37BAEA33191AFCF7EED18540 /* BlockRules.swift in Sources */,
 				56AE97B7A55B1A70250CAA57 /* Constants.swift in Sources */,
 				18F94A8B0CE6DD3B1714C5DC /* DNSParser.swift in Sources */,
+				DF5288407A8E3BE4290DC2D0 /* DurableEventQueue.swift in Sources */,
 				8D0ECCF27AEAA38CE6E939B0 /* FilterDataProvider.swift in Sources */,
 				C030AD2D9C98160C80D356AD /* FlowTracker.swift in Sources */,
 				0BB12E96D54D92C8D24619B5 /* GlobMatch.swift in Sources */,
@@ -1973,6 +1982,7 @@
 				10776A2B276E82BD07243E07 /* DeviceModels.swift in Sources */,
 				315C5531C14F1DDE99043A18 /* DeviceStore.swift in Sources */,
 				70CD0A27AAF526B9BB07BBAE /* DevicesView.swift in Sources */,
+				1C84600D9B2365A7905656B2 /* DurableEventQueue.swift in Sources */,
 				9DA5CB6639FF673FC53D033A /* ExportController.swift in Sources */,
 				0567566CCFA1B23855C3C0F1 /* ExportDisclosure.swift in Sources */,
 				C49DD542101E64D0EEBD05E4 /* ExportDisclosureSheet.swift in Sources */,
@@ -2236,7 +2246,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2251,7 +2261,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.2;
+				MARKETING_VERSION = 0.16.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2297,7 +2307,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 38RJUJHKZS;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2312,7 +2322,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.2;
+				MARKETING_VERSION = 0.16.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2377,7 +2387,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2398,7 +2408,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.2;
+				MARKETING_VERSION = 0.16.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

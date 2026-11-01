@@ -20,12 +20,12 @@
 	     content filter at a time and holds superseded copies until a restart, so changing the extension's version
 	     on every app release forced a reboot each time. Kept fixed, an app-only update ships the version macOS
 	     already runs and replaces nothing. Bump these two ONLY when the FlowlightExtension binary itself changes
-	     (and expect one replacement when you do). Build 27 adds exact-host ordinary rules and reports the full
-	     version/build identity before the app publishes those rules. -->
+	     (and expect one replacement when you do). Build 28 adds the refusing process identity to structured
+	     allowlist evidence so dependency paths remain truthful in the app. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.15.4</string>
+	<string>0.16.3</string>
 	<key>CFBundleVersion</key>
-	<string>27</string>
+	<string>28</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>FLAppGroupIdentifier</key>

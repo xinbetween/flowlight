@@ -124,6 +124,7 @@
 
 /* Ask/AskController.swift */
 "Set the endpoint of the model server you're running." = "Legen Sie den Endpunkt des Modellservers fest, den Sie betreiben.";
+"Local server must use localhost or a loopback address. Choose OpenAI-compatible endpoint for another machine." = "Lokaler Server muss localhost oder eine Loopback-Adresse verwenden. Wählen Sie für einen anderen Rechner den OpenAI-kompatiblen Endpunkt.";
 "%@ needs an API key. It goes to your login Keychain, not to Flowlight's preferences." = "%@ benötigt einen API-Schlüssel. Er wird im Anmeldeschlüsselbund gespeichert, nicht in den Einstellungen von Flowlight.";
 "Asking %@…" = "%@ wird gefragt…";
 "running…" = "läuft…";
@@ -189,6 +190,10 @@
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@ benötigt einen API-Schlüssel. Fügen Sie in den Einstellungen einen hinzu – er wird im Anmeldeschlüsselbund gespeichert.";
 "The on-device model isn't reached over HTTP." = "Das Modell auf dem Gerät wird nicht über HTTP erreicht.";
 "I ran out of steps before I could answer that. Try asking something narrower." = "Die Schritte waren aufgebraucht, bevor eine Antwort möglich war. Fragen Sie etwas Engeres.";
+"The provider reached its output limit before finishing the answer. Try asking something narrower." = "Der Anbieter hat sein Ausgabelimit erreicht, bevor die Antwort fertig war. Fragen Sie etwas Engeres.";
+"The provider's safety filter stopped the answer before it finished." = "Der Sicherheitsfilter des Anbieters hat die Antwort vorzeitig gestoppt.";
+"The provider stopped before finishing the answer (%@)." = "Der Anbieter hat vor Abschluss der Antwort angehalten (%@).";
+"The provider declined to answer that question." = "Der Anbieter hat die Beantwortung dieser Frage abgelehnt.";
 
 /* Capture/ExtensionManager.swift */
 "Unknown" = "Unbekannt";

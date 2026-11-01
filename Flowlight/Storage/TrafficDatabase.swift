@@ -383,6 +383,25 @@ final class TrafficDatabase: @unchecked Sendable {
                                   flows = flows + excluded.flows;
                     """, [.text(real.id), .text(real.name), .text(version)])
                 try conn.run("DELETE FROM \(table) WHERE bundle_id = ?", [.text(version)])
+
+                // A child process can have an ordinary identity of its own while its parent agent is the version.
+                // Re-key that attribution independently, with the same collision-safe counter merge.
+                try conn.run("""
+                    INSERT INTO \(table) (\(columns))
+                    SELECT ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol,
+                           bytes_in, bytes_out, flows, ?, ?, mcp_server,
+                           launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name,
+                           route_proxy_path, channel, attribution_exact, attribution_epoch
+                    FROM \(table) WHERE agent_parent = ?
+                    ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
+                                agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name,
+                                launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                                attribution_exact, attribution_epoch)
+                    DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
+                                  bytes_out = bytes_out + excluded.bytes_out,
+                                  flows = flows + excluded.flows;
+                    """, [.text(real.id), .text(real.name), .text(version)])
+                try conn.run("DELETE FROM \(table) WHERE agent_parent = ?", [.text(version)])
             }
             // Merge keyed support tables explicitly. `UPDATE OR IGNORE` leaves the obsolete identity behind when
             // the corrected key already exists, splitting first-seen state, baselines and agent policy forever.
@@ -440,19 +459,30 @@ final class TrafficDatabase: @unchecked Sendable {
                          [.text(real.id), .text(real.name), .text(version)])
             try conn.run("UPDATE rule_events SET bundle_id = ?, app_name = ? WHERE bundle_id = ?",
                          [.text(real.id), .text(real.name), .text(version)])
+            for table in ["http_exchanges", "rule_events", "allowlist_events"] {
+                try conn.run("UPDATE \(table) SET agent = ?, agent_name = ? WHERE agent = ?",
+                             [.text(real.id), .text(real.name), .text(version)])
+            }
             try conn.run("""
                 INSERT INTO rule_pack_event_rollups
                     (bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
                      bundle_id, app_name, agent, agent_name, host, matched_host, port)
                 SELECT bucket, pack_id, pack_version, entry_id, category, match, action, count, first_at, last_at,
-                       ?, ?, agent, agent_name, host, matched_host, port
-                FROM rule_pack_event_rollups WHERE bundle_id = ?
+                       CASE WHEN bundle_id = ? THEN ? ELSE bundle_id END,
+                       CASE WHEN bundle_id = ? THEN ? ELSE app_name END,
+                       CASE WHEN agent = ? THEN ? ELSE agent END,
+                       CASE WHEN agent = ? THEN ? ELSE agent_name END,
+                       host, matched_host, port
+                FROM rule_pack_event_rollups WHERE bundle_id = ? OR agent = ?
                 ON CONFLICT(\(Self.rulePackEventKeySQL)) DO UPDATE SET
                     count = count + excluded.count,
                     first_at = MIN(first_at, excluded.first_at),
                     last_at = MAX(last_at, excluded.last_at)
-                """, [.text(real.id), .text(real.name), .text(version)])
-            try conn.run("DELETE FROM rule_pack_event_rollups WHERE bundle_id = ?", [.text(version)])
+                """, [.text(version), .text(real.id), .text(version), .text(real.name),
+                       .text(version), .text(real.id), .text(version), .text(real.name),
+                       .text(version), .text(version)])
+            try conn.run("DELETE FROM rule_pack_event_rollups WHERE bundle_id = ? OR agent = ?",
+                         [.text(version), .text(version)])
         }
     }
 
@@ -618,6 +648,24 @@ final class TrafficDatabase: @unchecked Sendable {
             ip TEXT NOT NULL, port INTEGER NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS rule_events_ts ON rule_events(ts);
         CREATE INDEX IF NOT EXISTS rule_events_rule ON rule_events(rule_id, ts);
+        -- Agent allowlist refusals have no RuleEvent or managed-pack hit. Keep their structured process and
+        -- destination evidence independently so alerts can stay localized presentation rather than storage.
+        -- Stable-ID receipts deliberately outlive visible history and "Delete everything". The extension process can
+        -- retain an unacknowledged event indefinitely, so pruning by age would let a late replay recreate evidence.
+        CREATE TABLE IF NOT EXISTS block_event_receipts (
+            event_id TEXT PRIMARY KEY, received INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS rule_event_receipts (
+            event_id TEXT PRIMARY KEY, received INTEGER NOT NULL);
+        -- Current extension deliveries use one monotonic watermark per process session and channel. This keeps
+        -- lost-ack replay idempotent without retaining one receipt row for every connection forever.
+        CREATE TABLE IF NOT EXISTS durable_event_watermarks (
+            channel TEXT NOT NULL, delivery_session TEXT NOT NULL, highest_sequence INTEGER NOT NULL,
+            updated INTEGER NOT NULL, PRIMARY KEY(channel, delivery_session));
+        CREATE TABLE IF NOT EXISTS allowlist_events (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id TEXT NOT NULL UNIQUE, ts INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
+            agent TEXT NOT NULL, agent_name TEXT NOT NULL, host TEXT NOT NULL, ip TEXT NOT NULL,
+            port INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS allowlist_events_ts ON allowlist_events(ts);
         -- Managed packs keep only user state here. The verified entry lists remain in the signed app bundle.
         CREATE TABLE IF NOT EXISTS rule_packs (
             pack_id TEXT PRIMARY KEY, configuration TEXT NOT NULL, updated INTEGER NOT NULL);
@@ -693,15 +741,15 @@ final class TrafficDatabase: @unchecked Sendable {
             }
         }
 
-        // Version 3 recovers enforcement history after the shipped version-2 repair had already advanced its
-        // watermark without finding the version-keyed traffic rows removed by version 1.
-        let repairVersion: Int64 = 3
+        // Version 3 recovered version-keyed processes. Version 4 also repairs version-shaped parent-agent
+        // attribution on child-process traffic and enforcement evidence used by the dependency graph.
+        let repairVersion: Int64 = 4
         let repaired = try conn.query("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
                                       map: { $0.int(0) }).first ?? 0
         if repaired < repairVersion {
             try conn.transaction {
                 try repairVersionedNames()
-                try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 3)")
+                try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 4)")
             }
         }
     }
@@ -1273,7 +1321,22 @@ final class TrafficDatabase: @unchecked Sendable {
         return rows.compactMap { try? JSONDecoder().decode(Rule.self, from: Data($0.utf8)) }
     }
 
-    func saveRule(_ rule: Rule) throws {
+    func saveRule(_ rule: Rule, preservingActivity: Bool = false) throws {
+        var rule = rule
+        if preservingActivity,
+           let storedJSON = try conn.query(
+               "SELECT rule FROM rules WHERE id = ?",
+               [.text(rule.id.uuidString)],
+               map: { $0.text(0) }
+           ).first,
+           let stored = try? JSONDecoder().decode(Rule.self, from: Data(storedJSON.utf8)) {
+            let mergedHits = max(rule.hits, stored.hits)
+            rule.hits = rule.maxHits > 0 ? min(rule.maxHits, mergedHits) : mergedHits
+            if let storedHit = stored.lastHit,
+               rule.lastHit == nil || rule.lastHit! < storedHit {
+                rule.lastHit = storedHit
+            }
+        }
         let json = String(decoding: try JSONEncoder().encode(rule), as: UTF8.self)
         try conn.run("""
             INSERT INTO rules (id, rule, updated) VALUES (?,?,?)
@@ -1285,8 +1348,97 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("DELETE FROM rules WHERE id = ?", [.text(id.uuidString)])
     }
 
-    func recordRuleEvents(_ events: [RuleEvent]) throws {
-        try writeRuleEvents(events)
+    @discardableResult
+    func recordRuleEvents(_ events: [RuleEvent], durableReplay: Bool = false) throws -> [RuleEvent] {
+        let receiptSQL = "INSERT OR IGNORE INTO rule_event_receipts (event_id, received) VALUES (?,?)"
+        var accepted: [RuleEvent] = []
+        try conn.transaction {
+            let current = try durableWatermarks(channel: "rules", events: events.map {
+                ($0.deliverySession, $0.deliverySequence)
+            })
+            for event in events {
+                if let session = event.deliverySession, let sequence = event.deliverySequence {
+                    if sequence > (current[session] ?? 0) { accepted.append(event) }
+                } else if durableReplay, let eventID = event.id?.uuidString {
+                    try conn.run(receiptSQL, [.text(eventID), .int(Int64(Date().timeIntervalSince1970))])
+                    if conn.changes > 0 { accepted.append(event) }
+                } else {
+                    accepted.append(event)
+                }
+            }
+            try advanceDurableWatermarks(channel: "rules", events: events.map {
+                ($0.deliverySession, $0.deliverySequence)
+            })
+            try writeRuleEvents(accepted)
+            var stored = Dictionary(uniqueKeysWithValues: try loadRules().map { ($0.id, $0) })
+            for event in accepted {
+                guard var rule = stored[event.ruleID] else { continue }
+                rule.hits = rule.maxHits > 0 ? min(rule.maxHits, rule.hits + 1) : rule.hits + 1
+                let hit = Date(timeIntervalSince1970: TimeInterval(event.at))
+                if rule.lastHit == nil || rule.lastHit! < hit { rule.lastHit = hit }
+                stored[rule.id] = rule
+            }
+            for rule in stored.values where accepted.contains(where: { $0.ruleID == rule.id }) {
+                try saveRule(rule)
+            }
+        }
+        return accepted
+    }
+
+    private func durableWatermarks(
+        channel: String,
+        events: [(UUID?, Int64?)]
+    ) throws -> [UUID: Int64] {
+        var result: [UUID: Int64] = [:]
+        for session in Set(events.compactMap(\.0)) {
+            let highest = try conn.query(
+                "SELECT highest_sequence FROM durable_event_watermarks WHERE channel = ? AND delivery_session = ?",
+                [.text(channel), .text(session.uuidString)],
+                map: { $0.int(0) }
+            ).first ?? 0
+            result[session] = highest
+        }
+        return result
+    }
+
+    private func advanceDurableWatermarks(
+        channel: String,
+        events: [(UUID?, Int64?)]
+    ) throws {
+        var highest: [UUID: Int64] = [:]
+        for (session, sequence) in events {
+            guard let session, let sequence else { continue }
+            highest[session] = max(highest[session] ?? 0, sequence)
+        }
+        let now = Int64(Date().timeIntervalSince1970)
+        for (session, sequence) in highest {
+            try conn.run("""
+                INSERT INTO durable_event_watermarks (channel, delivery_session, highest_sequence, updated)
+                VALUES (?,?,?,?)
+                ON CONFLICT(channel, delivery_session) DO UPDATE SET
+                    highest_sequence = MAX(highest_sequence, excluded.highest_sequence),
+                    updated = excluded.updated
+                """, [.text(channel), .text(session.uuidString), .int(sequence), .int(now)])
+        }
+        // Keep enough completed extension launches for delayed callbacks while bounding bookkeeping independently of
+        // connection volume. Every session in the committing batch is retained even when many updates share a second.
+        let currentSessions = Set(highest.keys.map(\.uuidString))
+        let retainedOlder = try conn.query("""
+            SELECT delivery_session FROM durable_event_watermarks
+            WHERE channel = ? ORDER BY updated DESC, delivery_session DESC
+            """, [.text(channel)], map: { $0.text(0) })
+            .filter { !currentSessions.contains($0) }
+            .prefix(max(0, 64 - currentSessions.count))
+        let retained = currentSessions.union(retainedOlder)
+        if retained.isEmpty {
+            try conn.run("DELETE FROM durable_event_watermarks WHERE channel = ?", [.text(channel)])
+        } else {
+            let placeholders = Array(repeating: "?", count: retained.count).joined(separator: ",")
+            try conn.run(
+                "DELETE FROM durable_event_watermarks WHERE channel = ? AND delivery_session NOT IN (\(placeholders))",
+                [.text(channel)] + retained.sorted().map(SQLValue.text)
+            )
+        }
     }
 
     /// A bounded proxy decision is not carried out until both its spent count and visible explanation commit. Keeping
@@ -1309,6 +1461,54 @@ final class TrafficDatabase: @unchecked Sendable {
                                .text(event.agentKey), .text(event.agentName), .text(event.host), .text(event.ip),
                                .int(Int64(event.port)), .text(event.path), .text(event.method)])
         }
+    }
+
+    /// Accepts each block delivery once. Ordinary rule refusals already have exact `RuleEvent` evidence, while
+    /// allowlist refusals also need their own structured graph row; both share the receipt because both create alerts.
+    @discardableResult
+    func recordBlockEvents(_ events: [BlockEvent]) throws -> [BlockEvent] {
+        var accepted: [BlockEvent] = []
+        try conn.transaction { accepted = try recordBlockEventsInTransaction(events) }
+        return accepted
+    }
+
+    /// Transaction-neutral form for callers that atomically add visible alerts before acknowledging the delivery.
+    @discardableResult
+    func recordBlockEventsInTransaction(_ events: [BlockEvent]) throws -> [BlockEvent] {
+        let receiptSQL = "INSERT OR IGNORE INTO block_event_receipts (event_id, received) VALUES (?,?)"
+        let allowlistSQL = """
+        INSERT INTO allowlist_events
+            (event_id, ts, bundle_id, app_name, agent, agent_name, host, ip, port)
+        VALUES (?,?,?,?,?,?,?,?,?)
+        """
+        var accepted: [BlockEvent] = []
+        let current = try durableWatermarks(channel: "blocks", events: events.map {
+            ($0.deliverySession, $0.deliverySequence)
+        })
+        for event in events {
+            let eventID: String
+            if let session = event.deliverySession, let sequence = event.deliverySequence {
+                guard sequence > (current[session] ?? 0) else { continue }
+                eventID = "\(session.uuidString):\(sequence)"
+            } else {
+                // Legacy extension payloads retain UUID receipts. Payloads older than stable IDs remain visible.
+                eventID = event.id?.uuidString ?? "legacy:\(UUID().uuidString)"
+                if event.id != nil {
+                    try conn.run(receiptSQL, [.text(eventID), .int(Int64(Date().timeIntervalSince1970))])
+                    guard conn.changes > 0 else { continue }
+                }
+            }
+            accepted.append(event)
+            guard event.rule.isEmpty else { continue }
+            let bundleID = event.bundleID.flatMap { $0.isEmpty ? nil : $0 } ?? event.agentKey
+            try conn.run(allowlistSQL, [.text(eventID), .int(event.at), .text(bundleID), .text(event.appName),
+                                       .text(event.agentKey), .text(event.agentName), .text(event.host), .text(event.ip),
+                                       .int(Int64(event.port))])
+        }
+        try advanceDurableWatermarks(channel: "blocks", events: events.map {
+            ($0.deliverySession, $0.deliverySequence)
+        })
+        return accepted
     }
 
     /// The violations feed: every decision, newest first, optionally narrowed to one rule.
@@ -1334,8 +1534,8 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
-    /// Blocked enforcement evidence for a graph window. Ordinary decisions are exact; managed-pack rows are
-    /// minute rollups, so overlap uses first/last evidence and keeps their indivisible count intact.
+    /// Blocked enforcement evidence for a graph window. Ordinary and allowlist decisions are exact; managed-pack
+    /// rows are minute rollups, so overlap uses first/last evidence and keeps their indivisible count intact.
     func blockedAttempts(from: Date, to: Date) throws -> [BlockedAttemptRow] {
         let lower = Int64(from.timeIntervalSince1970)
         let upper = Int64(to.timeIntervalSince1970)
@@ -1351,6 +1551,19 @@ final class TrafficDatabase: @unchecked Sendable {
                     bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
                     destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
                     category: "rule", source: "ordinary-rule", detail: "\(row.text(8)) · \(row.text(7))"
+                )
+            }
+        attempts += try conn.query("""
+            SELECT bundle_id, app_name, agent, agent_name,
+                   CASE WHEN host <> '' THEN host ELSE ip END, port, COUNT(*)
+            FROM allowlist_events
+            WHERE ts >= ? AND ts < ?
+            GROUP BY bundle_id, app_name, agent, agent_name, host, ip, port
+            """, [.int(lower), .int(upper)]) { row in
+                BlockedAttemptRow(
+                    bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
+                    destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
+                    category: "allowlist", source: "agent-allowlist", detail: row.text(3)
                 )
             }
         attempts += try conn.query("""
@@ -1377,7 +1590,11 @@ final class TrafficDatabase: @unchecked Sendable {
 
     /// Keeps the feed from growing without bound. Called with the same retention sweep as everything else.
     func pruneRuleEvents(before date: Date) throws {
-        try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(Int64(date.timeIntervalSince1970))])
+        let cutoff = Int64(date.timeIntervalSince1970)
+        try conn.transaction {
+            try conn.run("DELETE FROM rule_events WHERE ts < ?", [.int(cutoff)])
+            try conn.run("DELETE FROM allowlist_events WHERE ts < ?", [.int(cutoff)])
+        }
     }
 
     // MARK: Managed rule packs
@@ -2535,7 +2752,7 @@ final class TrafficDatabase: @unchecked Sendable {
 
     func clearAll() throws {
         try conn.transaction {
-            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "device_events", "rule_events", "rule_pack_event_rollups"] {
+            for t in Self.tables + ["rollup_state", "seen_destinations", "seen_ports", "apps", "baselines", "alerts", "http_exchanges", "local_risk_assessments", "plugin_findings", "device_events", "rule_events", "allowlist_events", "rule_pack_event_rollups"] {
                 try conn.run("DELETE FROM \(t)")
             }
             // Keep event batch IDs so an acknowledgment lost before "Delete everything" cannot resurrect activity.
@@ -2546,6 +2763,10 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Serialized access helpers
 
     func sync<T>(_ body: (TrafficDatabase) throws -> T) rethrows -> T { try queue.sync { try body(self) } }
+
+    func withTransaction(_ body: () throws -> Void) throws {
+        try conn.transaction(body)
+    }
 
     func async(_ body: @escaping (TrafficDatabase) throws -> Void) {
         queue.async {

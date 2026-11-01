@@ -396,6 +396,10 @@ extension Rule {
 /// One connection a rule decided, on its way to be recorded. Both halves matter: a refusal nobody can see is
 /// worse than no refusal, and a relaxation nobody can see is how "why is this getting through?" becomes unanswerable.
 struct RuleEvent: Codable, Sendable, Equatable {
+    /// Stable across XPC retries from older extensions. Current extensions use the compact session watermark below.
+    var id: UUID? = UUID()
+    var deliverySession: UUID? = nil
+    var deliverySequence: Int64? = nil
     var at: Int64
     var ruleID: UUID
     /// Present for generation-bound flow decisions. Buffered older/request events remain decodable without it.

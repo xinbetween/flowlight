@@ -86,5 +86,23 @@ final class ExtensionSourceTests: XCTestCase {
         let registerRemaining = source[registerStart.lowerBound...]
         let registerEnd = registerRemaining.dropFirst().range(of: "\n    func ")?.lowerBound ?? registerRemaining.endIndex
         XCTAssertTrue(registerRemaining[..<registerEnd].contains("self.packTransfer.reset()"))
+        for channel in [".blocks", ".decisions", ".packs"] {
+            XCTAssertTrue(source.contains("durableDeliveryBegan(\(channel))"),
+                          "\(channel) must fail open while its durable acknowledgment is pending")
+            XCTAssertTrue(source.contains("durableDeliveryFailed(\(channel))"),
+                          "\(channel) persistence failures must start the fail-open grace")
+            XCTAssertTrue(source.contains("durableDeliverySucceeded(\(channel))"),
+                          "\(channel) recovery must restore enforcement only after durable commit")
+        }
+        XCTAssertTrue(source.contains("guard durableEventsEnabled"),
+                      "queued evidence must wait until an exact-build app opts into the new selectors")
+        XCTAssertTrue(source.contains("durableEventsEnabled && enforcementSynchronized"),
+                      "durable negotiation must not enable enforcement before policy synchronization")
+        XCTAssertFalse(registerRemaining[..<registerEnd].contains("flushBlocksLocked()"),
+                       "registration must not call a new app selector before version validation")
+        XCTAssertTrue(registerRemaining[..<registerEnd].contains("self.enforcementSynchronized = false"),
+                      "every registration must reset synchronization even before the old client invalidates")
+        XCTAssertTrue(source.contains("clientGeneration == generation"),
+                      "durable replies must be bound to the exact registered client generation")
     }
 }

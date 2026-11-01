@@ -217,6 +217,45 @@ enum AgentWorkspaceScanner {
     }
 }
 
+struct WorkspaceBookmarkRestoration {
+    /// Keep every original bookmark until a resolved URL has successfully renewed it. An OS update can make a
+    /// bookmark temporarily unresolvable; dropping its bytes here would turn that transient failure into permanent
+    /// loss of a folder the person explicitly selected.
+    static func restore(
+        _ bookmarks: [Data],
+        excluding removedPaths: Set<String> = [],
+        resolve: (Data) -> (url: URL, stale: Bool)?,
+        startAccessing: (URL) -> Bool,
+        renew: (URL) -> Data?
+    ) -> (roots: [URL], scopedRoots: [URL], bookmarks: [Data], deferred: [Data]) {
+        var roots: [URL] = []
+        var scopedRoots: [URL] = []
+        var stored: [Data] = []
+        var deferred: [Data] = []
+        var seen = Set<String>()
+
+        for bookmark in bookmarks {
+            guard let resolved = resolve(bookmark) else {
+                stored.append(bookmark)
+                deferred.append(bookmark)
+                continue
+            }
+            let url = resolved.url.standardizedFileURL
+            guard !removedPaths.contains(url.path) else { continue }
+            guard seen.insert(url.path).inserted else { continue }
+            guard startAccessing(url) else {
+                stored.append(bookmark)
+                deferred.append(bookmark)
+                continue
+            }
+            roots.append(url)
+            scopedRoots.append(url)
+            stored.append(resolved.stale ? renew(url) ?? bookmark : bookmark)
+        }
+        return (roots, scopedRoots, stored, deferred)
+    }
+}
+
 /// Keeps what the last scan found, so Flowlight doesn't walk the disk again on every launch.
 ///
 /// By default it looks only at the agent folders in the home folder itself (`~/.claude`, `~/.codex`, …), which macOS
@@ -231,6 +270,7 @@ final class AgentWorkspaceStore: ObservableObject {
         static let scannedAt = "agents.scannedAt"
         static let roots = "agents.roots"
         static let rootBookmarks = "agents.rootBookmarks"
+        static let removedRootPaths = "agents.removedRootPaths"
     }
 
     @Published private(set) var workspaces: [AgentWorkspace] = []
@@ -245,13 +285,20 @@ final class AgentWorkspaceStore: ObservableObject {
     private let defaults: UserDefaults
     #if APP_STORE
     private var securityScopedRoots: [URL] = []
+    private var deferredBookmarks: [Data] = []
     #endif
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         #if APP_STORE
-        roots = Self.restoreBookmarks(defaults.data(forKey: Keys.rootBookmarks))
-        securityScopedRoots = roots.filter { $0.startAccessingSecurityScopedResource() }
+        let removedPaths = Set(defaults.stringArray(forKey: Keys.removedRootPaths) ?? [])
+        let restored = Self.restoreBookmarks(defaults.data(forKey: Keys.rootBookmarks), excluding: removedPaths)
+        roots = restored.roots
+        securityScopedRoots = restored.scopedRoots
+        deferredBookmarks = restored.deferred
+        if let data = try? PropertyListEncoder().encode(restored.bookmarks) {
+            defaults.set(data, forKey: Keys.rootBookmarks)
+        }
         #else
         roots = (defaults.array(forKey: Keys.roots) as? [String] ?? []).map { URL(fileURLWithPath: $0) }
         #endif
@@ -292,6 +339,9 @@ final class AgentWorkspaceStore: ObservableObject {
         #if APP_STORE
         guard let bookmark = try? root.bookmarkData(options: .withSecurityScope) else { return }
         guard root.startAccessingSecurityScopedResource() else { return }
+        var removedPaths = Set(defaults.stringArray(forKey: Keys.removedRootPaths) ?? [])
+        removedPaths.remove(root.path)
+        defaults.set(removedPaths.sorted(), forKey: Keys.removedRootPaths)
         securityScopedRoots.append(root)
         roots.append(root)
         saveBookmarks(adding: bookmark)
@@ -304,9 +354,13 @@ final class AgentWorkspaceStore: ObservableObject {
 
     func removeRoot(_ url: URL) {
         #if APP_STORE
-        securityScopedRoots.filter { $0 == url }.forEach { $0.stopAccessingSecurityScopedResource() }
-        securityScopedRoots.removeAll { $0 == url }
-        roots.removeAll { $0 == url }
+        let root = url.standardizedFileURL
+        var removedPaths = Set(defaults.stringArray(forKey: Keys.removedRootPaths) ?? [])
+        removedPaths.insert(root.path)
+        defaults.set(removedPaths.sorted(), forKey: Keys.removedRootPaths)
+        securityScopedRoots.filter { $0 == root }.forEach { $0.stopAccessingSecurityScopedResource() }
+        securityScopedRoots.removeAll { $0 == root }
+        roots.removeAll { $0 == root }
         saveBookmarks()
         #else
         roots.removeAll { $0 == url }
@@ -332,27 +386,37 @@ final class AgentWorkspaceStore: ObservableObject {
     }
 
     #if APP_STORE
-    private static func restoreBookmarks(_ data: Data?) -> [URL] {
+    private static func restoreBookmarks(_ data: Data?, excluding removedPaths: Set<String> = [])
+        -> (roots: [URL], scopedRoots: [URL], bookmarks: [Data], deferred: [Data]) {
         guard let data,
-              let bookmarks = try? PropertyListDecoder().decode([Data].self, from: data) else { return [] }
-        var seen = Set<String>()
-        return bookmarks.compactMap { bookmark in
-            var stale = false
-            guard let url = try? URL(
-                resolvingBookmarkData: bookmark,
-                options: [.withSecurityScope, .withoutUI],
-                relativeTo: nil,
-                bookmarkDataIsStale: &stale
-            ), !stale, seen.insert(url.standardizedFileURL.path).inserted else { return nil }
-            return url.standardizedFileURL
+              let bookmarks = try? PropertyListDecoder().decode([Data].self, from: data) else {
+            return ([], [], [], [])
         }
+        return WorkspaceBookmarkRestoration.restore(
+            bookmarks,
+            excluding: removedPaths,
+            resolve: { bookmark in
+                var stale = false
+                guard let url = try? URL(
+                    resolvingBookmarkData: bookmark,
+                    options: [.withSecurityScope, .withoutUI],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &stale
+                ) else { return nil }
+                return (url, stale)
+            },
+            startAccessing: { $0.startAccessingSecurityScopedResource() },
+            renew: { try? $0.bookmarkData(options: .withSecurityScope) }
+        )
     }
 
     private func saveBookmarks(adding bookmark: Data? = nil) {
-        var bookmarks = roots.compactMap {
+        let persistedRoots = bookmark == nil ? roots : Array(roots.dropLast())
+        var bookmarks = persistedRoots.compactMap {
             try? $0.bookmarkData(options: .withSecurityScope)
         }
-        if let bookmark, bookmarks.isEmpty { bookmarks = [bookmark] }
+        if let bookmark { bookmarks.append(bookmark) }
+        bookmarks.append(contentsOf: deferredBookmarks)
         defaults.set(try? PropertyListEncoder().encode(bookmarks), forKey: Keys.rootBookmarks)
         defaults.removeObject(forKey: Keys.roots)
     }

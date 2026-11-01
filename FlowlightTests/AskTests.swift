@@ -68,7 +68,11 @@ final class AskTests: XCTestCase {
         XCTAssertEqual(Set(allowed), Set(AskQuery.allCases.map(\.rawValue)))
         XCTAssertEqual((properties["kind"] as? [String: String])?["type"], "string")
         XCTAssertTrue((properties["kind"] as? [String: String])?["description"]?.contains("camera") == true)
-        XCTAssertEqual(RemoteProvider.schema["required"] as? [String], ["query", "from"])
+        let canonical = Set(AskQuery.allCases.flatMap(\.parameters).map(\.name))
+        XCTAssertEqual(Set(properties.keys), canonical.union(["query"]))
+        XCTAssertEqual((properties["chart"] as? [String: String])?["type"], "string")
+        XCTAssertEqual((properties["topic"] as? [String: String])?["type"], "string")
+        XCTAssertEqual(RemoteProvider.schema["required"] as? [String], ["query"])
     }
 
     // MARK: Windows
@@ -372,6 +376,349 @@ final class AskTests: XCTestCase {
             XCTAssertTrue(kind.sendsOffDevice, "\(kind.rawValue) sends a question off the Mac and must say so")
             XCTAssertTrue(kind.needsKey || kind == .compatible)
         }
+    }
+
+    @MainActor
+    func testProviderSettingsDoNotLeakAcrossProviderSwitches() {
+        let suite = "flowlight-ask-provider-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let controller = AskController(defaults: defaults)
+
+        controller.provider = .anthropic
+        controller.endpoint = "https://gateway.example/v1/messages"
+        controller.model = "hosted-model"
+        controller.provider = .localServer
+
+        XCTAssertEqual(controller.endpoint, AskProviderKind.localServer.defaultEndpoint)
+        XCTAssertEqual(controller.model, AskProviderKind.localServer.defaultModel)
+        XCTAssertFalse(controller.sendsOffDevice)
+        XCTAssertNil(controller.blockedReason)
+
+        controller.endpoint = "https://gateway.example/v1/chat/completions"
+        XCTAssertTrue(controller.sendsOffDevice)
+        XCTAssertNotNil(controller.blockedReason, "a remote URL must never be labelled Local server")
+
+        controller.provider = .anthropic
+        XCTAssertEqual(controller.endpoint, "https://gateway.example/v1/messages")
+        XCTAssertEqual(controller.model, "hosted-model")
+
+        controller.provider = .compatible
+        controller.endpoint = "https://gateway.example/v1/chat/completions"
+        XCTAssertNotNil(controller.blockedReason, "Compatible requires the API key enforced by RemoteProvider")
+    }
+
+    @MainActor
+    func testLegacyModelWithoutExplicitEndpointMigratesToSelectedProvider() {
+        let suite = "flowlight-ask-model-migration-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(AskProviderKind.localServer.rawValue, forKey: AskController.Keys.provider)
+        defaults.set("custom-local-model", forKey: AskController.Keys.legacyModel)
+
+        let controller = AskController(defaults: defaults)
+
+        XCTAssertEqual(controller.model, "custom-local-model")
+        XCTAssertNil(defaults.object(forKey: AskController.Keys.legacyModel))
+    }
+
+    @MainActor
+    func testLegacyGlobalSettingsMigrateToTheirEndpointOwner() {
+        let suite = "flowlight-ask-migration-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(AskProviderKind.localServer.rawValue, forKey: AskController.Keys.provider)
+        defaults.set(AskProviderKind.anthropic.defaultEndpoint, forKey: AskController.Keys.legacyEndpoint)
+        defaults.set("legacy-claude", forKey: AskController.Keys.legacyModel)
+
+        let controller = AskController(defaults: defaults)
+        XCTAssertEqual(controller.endpoint, AskProviderKind.localServer.defaultEndpoint)
+        controller.provider = .anthropic
+        XCTAssertEqual(controller.endpoint, AskProviderKind.anthropic.defaultEndpoint)
+        XCTAssertEqual(controller.model, "legacy-claude")
+        XCTAssertNil(defaults.object(forKey: AskController.Keys.legacyEndpoint))
+        XCTAssertNil(defaults.object(forKey: AskController.Keys.legacyModel))
+    }
+
+    func testEndpointLocalityReflectsWhereTheQuestionActuallyGoes() {
+        XCTAssertTrue(RemoteProvider.isOnMac(URL(string: "http://127.0.0.1:11434/v1")))
+        XCTAssertTrue(RemoteProvider.isOnMac(URL(string: "https://localhost:8443/v1")))
+        XCTAssertFalse(RemoteProvider.isOnMac(URL(string: "http://127.attacker.example/v1")),
+                       "a DNS name that starts like loopback is not on this Mac")
+        XCTAssertFalse(RemoteProvider.isOnMac(URL(string: "http://192.168.1.20:11434/v1")),
+                       "another machine on the LAN is still off this Mac")
+        XCTAssertFalse(RemoteProvider.isOnMac(URL(string: "https://gateway.example/v1")))
+    }
+
+    func testPlainHTTPEndpointRequiresALiteralPrivateAddressOrLocalName() {
+        XCTAssertTrue(RemoteProvider.isSafeEndpoint(URL(string: "http://10.0.0.2/v1")!))
+        XCTAssertTrue(RemoteProvider.isSafeEndpoint(URL(string: "http://172.16.0.2/v1")!))
+        XCTAssertTrue(RemoteProvider.isSafeEndpoint(URL(string: "http://192.168.1.20/v1")!))
+        XCTAssertFalse(RemoteProvider.isSafeEndpoint(URL(string: "http://10.attacker.example/v1")!))
+        XCTAssertFalse(RemoteProvider.isSafeEndpoint(URL(string: "http://172.16.attacker.example/v1")!))
+        XCTAssertFalse(RemoteProvider.isSafeEndpoint(URL(string: "http://192.168.attacker.example/v1")!))
+        XCTAssertFalse(RemoteProvider.isSafeEndpoint(URL(string: "http://127.attacker.example/v1")!))
+    }
+
+    func testAnthropicEndTurnUsesCurrentOutputBudgetAndReturnsText() async throws {
+        let fixture = AskTransportFixture(responses: [[
+            "stop_reason": "end_turn",
+            "content": [["type": "text", "text": "Nothing unusual was recorded."]],
+        ]])
+        let answer = try await anthropicProvider(fixture).answer(
+            askRequest,
+            run: { _ in XCTFail("an end turn must not run a query"); return "" },
+            sending: { _ in }
+        )
+
+        XCTAssertEqual(answer, "Nothing unusual was recorded.")
+        let captured = await fixture.request(at: 0)
+        let body = try XCTUnwrap(captured)
+        XCTAssertEqual(body["model"] as? String, AskProviderKind.anthropic.defaultModel)
+        XCTAssertEqual(body["max_tokens"] as? Int, 16_000)
+    }
+
+    func testAnthropicRunsEveryToolUseThenReturnsTheFinalTurn() async throws {
+        let fixture = AskTransportFixture(responses: [
+            [
+                "stop_reason": "tool_use",
+                "content": [
+                    ["type": "tool_use", "id": "toolu_settings", "name": "runQuery",
+                     "input": ["query": "settings"]],
+                    ["type": "tool_use", "id": "toolu_rules", "name": "runQuery",
+                     "input": ["query": "rules"]],
+                ],
+            ],
+            [
+                "stop_reason": "end_turn",
+                "content": [["type": "text", "text": "Blocking is on."]],
+            ],
+        ])
+        let calls = AskCallCapture()
+        let answer = try await anthropicProvider(fixture).answer(
+            askRequest,
+            run: { call in await calls.record(call); return "result for \(call.query.rawValue)" },
+            sending: { _ in }
+        )
+
+        XCTAssertEqual(answer, "Blocking is on.")
+        let queries = await calls.queries()
+        XCTAssertEqual(queries, [.settings, .rules])
+        let captured = await fixture.request(at: 1)
+        let secondBody = try XCTUnwrap(captured)
+        let messages = try XCTUnwrap(secondBody["messages"] as? [[String: Any]])
+        let resultBlocks = try XCTUnwrap(messages.last?["content"] as? [[String: Any]])
+        XCTAssertEqual(Set(resultBlocks.compactMap { $0["tool_use_id"] as? String }),
+                       ["toolu_settings", "toolu_rules"])
+    }
+
+    func testAnthropicMaxTokensNeverRunsOrPresentsPartialOutput() async {
+        let fixture = AskTransportFixture(responses: [[
+            "stop_reason": "max_tokens",
+            "content": [
+                ["type": "text", "text": "The largest app was"],
+                ["type": "tool_use", "id": "toolu_partial", "name": "runQuery",
+                 "input": ["query": "settings"]],
+            ],
+        ]])
+        let calls = AskCallCapture()
+
+        do {
+            _ = try await anthropicProvider(fixture).answer(
+                askRequest,
+                run: { call in await calls.record(call); return "must not run" },
+                sending: { _ in }
+            )
+            XCTFail("a truncated response must fail")
+        } catch {
+            XCTAssertTrue("\(error)".contains("output limit"))
+        }
+        let queries = await calls.queries()
+        XCTAssertTrue(queries.isEmpty)
+    }
+
+    func testAnthropicRefusalUsesStopDetailsAndNeverRunsTools() async {
+        let fixture = AskTransportFixture(responses: [[
+            "stop_reason": "refusal",
+            "stop_details": ["category": "cyber", "explanation": "That request is not available."],
+            "content": [["type": "tool_use", "id": "toolu_cut_off", "name": "runQuery",
+                         "input": ["query": "settings"]]],
+        ]])
+        let calls = AskCallCapture()
+
+        do {
+            _ = try await anthropicProvider(fixture).answer(
+                askRequest,
+                run: { call in await calls.record(call); return "must not run" },
+                sending: { _ in }
+            )
+            XCTFail("a refusal must fail")
+        } catch {
+            XCTAssertTrue("\(error)".contains("That request is not available."))
+        }
+        let queries = await calls.queries()
+        XCTAssertTrue(queries.isEmpty)
+    }
+
+    func testOpenAILengthAndContentFilterStopsAreNotPresentedAsAnswers() async {
+        for (reason, expected) in [("length", "output limit"), ("content_filter", "safety filter")] {
+            let fixture = AskTransportFixture(responses: [[
+                "choices": [[
+                    "finish_reason": reason,
+                    "message": [
+                        "content": "A partial answer",
+                        "tool_calls": [["id": "partial", "function": [
+                            "name": "runQuery", "arguments": "{\"query\":\"settings\"}",
+                        ]]],
+                    ],
+                ]],
+            ]])
+            let calls = AskCallCapture()
+            do {
+                _ = try await openAIProvider(fixture).answer(
+                    askRequest,
+                    run: { call in await calls.record(call); return "must not run" },
+                    sending: { _ in }
+                )
+                XCTFail("\(reason) must fail")
+            } catch {
+                XCTAssertTrue("\(error)".contains(expected))
+            }
+            let queries = await calls.queries()
+            XCTAssertTrue(queries.isEmpty)
+        }
+    }
+
+    func testOpenAIToolCallsRequireValidIdentity() async {
+        let fixture = AskTransportFixture(responses: [[
+            "choices": [[
+                "finish_reason": "tool_calls",
+                "message": ["tool_calls": [["id": "", "function": [
+                    "name": "runQuery", "arguments": "{\"query\":\"settings\"}",
+                ]]]],
+            ]],
+        ]])
+        let calls = AskCallCapture()
+        do {
+            _ = try await openAIProvider(fixture).answer(
+                askRequest,
+                run: { call in await calls.record(call); return "must not run" },
+                sending: { _ in }
+            )
+            XCTFail("a tool call without an ID must fail")
+        } catch {
+            XCTAssertTrue("\(error)".contains("shape"))
+        }
+        let queries = await calls.queries()
+        XCTAssertTrue(queries.isEmpty)
+    }
+
+    func testGeminiTokenAndSafetyStopsAreNotPresentedAsAnswers() async {
+        for (reason, expected) in [("MAX_TOKENS", "output limit"), ("SAFETY", "safety filter")] {
+            let fixture = AskTransportFixture(responses: [[
+                "candidates": [[
+                    "finishReason": reason,
+                    "content": ["role": "model", "parts": [
+                        ["text": "A partial answer"],
+                        ["functionCall": ["name": "runQuery", "args": ["query": "settings"]]],
+                    ]],
+                ]],
+            ]])
+            let calls = AskCallCapture()
+            do {
+                _ = try await geminiProvider(fixture).answer(
+                    askRequest,
+                    run: { call in await calls.record(call); return "must not run" },
+                    sending: { _ in }
+                )
+                XCTFail("\(reason) must fail")
+            } catch {
+                XCTAssertTrue("\(error)".contains(expected))
+            }
+            let queries = await calls.queries()
+            XCTAssertTrue(queries.isEmpty)
+        }
+    }
+
+    func testAnthropicMalformedToolIdentityNeverRunsAQuery() async {
+        let fixture = AskTransportFixture(responses: [[
+            "stop_reason": "tool_use",
+            "content": [["type": "tool_use", "id": "", "name": "runQuery",
+                         "input": ["query": "settings"]]],
+        ]])
+        let calls = AskCallCapture()
+
+        do {
+            _ = try await anthropicProvider(fixture).answer(
+                askRequest,
+                run: { call in await calls.record(call); return "must not run" },
+                sending: { _ in }
+            )
+            XCTFail("a tool call without an ID must fail")
+        } catch {
+            XCTAssertTrue("\(error)".contains("shape"))
+        }
+        let queries = await calls.queries()
+        XCTAssertTrue(queries.isEmpty)
+    }
+
+    private var askRequest: AskRequest {
+        AskRequest(question: "Is blocking on?", instructions: "Use Flowlight's query.", queries: [.settings, .rules])
+    }
+
+    private func anthropicProvider(_ fixture: AskTransportFixture) -> RemoteProvider {
+        RemoteProvider(kind: .anthropic, endpoint: AskProviderKind.anthropic.defaultEndpoint,
+                       model: AskProviderKind.anthropic.defaultModel, apiKey: "test-key",
+                       transport: { request in try await fixture.send(request) })
+    }
+
+    private func openAIProvider(_ fixture: AskTransportFixture) -> RemoteProvider {
+        RemoteProvider(kind: .openAI, endpoint: AskProviderKind.openAI.defaultEndpoint,
+                       model: AskProviderKind.openAI.defaultModel, apiKey: "test-key",
+                       transport: { request in try await fixture.send(request) })
+    }
+
+    private func geminiProvider(_ fixture: AskTransportFixture) -> RemoteProvider {
+        RemoteProvider(kind: .gemini, endpoint: AskProviderKind.gemini.defaultEndpoint,
+                       model: AskProviderKind.gemini.defaultModel, apiKey: "test-key",
+                       transport: { request in try await fixture.send(request) })
+    }
+}
+
+private actor AskTransportFixture {
+    private var responses: [[String: Any]]
+    private var requests: [[String: Any]] = []
+
+    init(responses: [[String: Any]]) {
+        self.responses = responses
+    }
+
+    func send(_ request: URLRequest) throws -> (Data, URLResponse) {
+        guard let body = request.httpBody,
+              let json = try JSONSerialization.jsonObject(with: body) as? [String: Any],
+              !responses.isEmpty,
+              let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                             headerFields: ["Content-Type": "application/json"]) else {
+            throw URLError(.badServerResponse)
+        }
+        requests.append(json)
+        return (try JSONSerialization.data(withJSONObject: responses.removeFirst()), response)
+    }
+
+    func request(at index: Int) -> [String: Any]? {
+        requests.indices.contains(index) ? requests[index] : nil
+    }
+}
+
+private actor AskCallCapture {
+    private var calls: [AskCall] = []
+
+    func record(_ call: AskCall) {
+        calls.append(call)
+    }
+
+    func queries() -> [AskQuery] {
+        calls.map(\.query)
     }
 }
 

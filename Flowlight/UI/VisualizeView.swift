@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum VisualizeSelectionPolicy {
+    static func shouldClear(previousQuery: String, newQuery: String) -> Bool {
+        previousQuery != newQuery
+    }
+}
+
 @MainActor
 enum VisualizeActionScope {
     static func canInspect(_ filter: TrafficFilter) -> Bool {
@@ -116,6 +122,11 @@ struct VisualizeView: View {
             selectedEdge = nil
             loadID = UUID()
         }
+        .onChange(of: query) { previous, current in
+            guard VisualizeSelectionPolicy.shouldClear(previousQuery: previous, newQuery: current) else { return }
+            selectedNode = nil
+            selectedEdge = nil
+        }
         .onChange(of: snapshot.edges.map(\.id)) { _, ids in
             if let selectedEdge, !ids.contains(selectedEdge) { self.selectedEdge = nil }
             if let selectedNode, !snapshot.nodes.map(\.id).contains(selectedNode) { self.selectedNode = nil }
@@ -231,7 +242,7 @@ struct VisualizeView: View {
                 case .ai:
                     rows = try database.aiVisualizationRows(granularity, from: from, to: to)
                 }
-                let attempts = mode == .traffic ? try database.blockedAttempts(from: from, to: to) : []
+                let attempts = try database.blockedAttempts(from: from, to: to)
                 return (rows, attempts)
             }
             guard !Task.isCancelled, loadID == requestID else { return }
@@ -272,7 +283,7 @@ struct VisualizeView: View {
                     bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID,
                     domain: HostCanonicalizer.host(attempt.destination) ?? "",
                     remoteIP: HostCanonicalizer.address(attempt.destination) ?? ""
-                )
+                ) || (!attempt.agentKey.isEmpty && focusScope.bundleIDs.contains(attempt.agentKey))
             }
             let searchedEnforcement = query.isEmpty ? focusedEnforcement : focusedEnforcement.filter { attempt in
                 attempt.appName.lowercased().contains(query)
@@ -293,7 +304,8 @@ struct VisualizeView: View {
                                                               remoteIP: $0.remoteIP)
                         || (!$0.parentAgent.isEmpty && focusScope.bundleIDs.contains($0.parentAgent))
                 }
-                return AITrafficGraphBuilder.build(rows: source, visibleRows: visible)
+                return AITrafficGraphBuilder.build(rows: source, visibleRows: visible,
+                                                   blockedAttempts: searchedEnforcement)
             }
         }.value
         guard !Task.isCancelled else { return }

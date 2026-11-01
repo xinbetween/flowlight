@@ -124,6 +124,7 @@
 
 /* Ask/AskController.swift */
 "Set the endpoint of the model server you're running." = "請設定你自己執行的模型伺服器端點。";
+"Local server must use localhost or a loopback address. Choose OpenAI-compatible endpoint for another machine." = "本機伺服器必須使用 localhost 或迴路位址。如需連接另一部電腦，請選擇 OpenAI 相容端點。";
 "%@ needs an API key. It goes to your login Keychain, not to Flowlight's preferences." = "%@ 需要 API 金鑰。金鑰會存入你的登入鑰匙串，而不是 Flowlight 的偏好設定。";
 "Asking %@…" = "正在詢問 %@…";
 "running…" = "執行中…";
@@ -189,6 +190,10 @@
 "%@ needs an API key. Add one in Settings — it goes to your login Keychain." = "%@ 需要 API 金鑰。請在「設定」中加入 — 金鑰會存入你的登入鑰匙串。";
 "The on-device model isn't reached over HTTP." = "裝置端模型不是透過 HTTP 連線的。";
 "I ran out of steps before I could answer that. Try asking something narrower." = "我在能回答之前就用完了可執行的步驟。試著問得更具體一些。";
+"The provider reached its output limit before finishing the answer. Try asking something narrower." = "供應商在完成回答前已達到輸出上限。請把問題問得更具體一些。";
+"The provider's safety filter stopped the answer before it finished." = "供應商的安全篩選器在回答完成前將其停止。";
+"The provider stopped before finishing the answer (%@)." = "供應商在完成回答前停止了（%@）。";
+"The provider declined to answer that question." = "供應商拒絕回答該問題。";
 
 /* Capture/ExtensionManager.swift */
 "Unknown" = "未知";

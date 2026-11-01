@@ -8,8 +8,11 @@ import Foundation
 final class AskController: ObservableObject {
     enum Keys {
         static let provider = "ask.provider"
-        static let endpoint = "ask.endpoint"
-        static let model = "ask.model"
+        static let legacyEndpoint = "ask.endpoint"
+        static let legacyModel = "ask.model"
+
+        static func endpoint(_ provider: AskProviderKind) -> String { "ask.\(provider.rawValue).endpoint" }
+        static func model(_ provider: AskProviderKind) -> String { "ask.\(provider.rawValue).model" }
     }
 
     @Published private(set) var turns: [AskTurn] = []
@@ -18,14 +21,32 @@ final class AskController: ObservableObject {
     @Published private(set) var status = ""
 
     private weak var db: TrafficDatabase?
+    private let defaults: UserDefaults
     /// A snapshot of how Flowlight is set up, taken on the main actor when a question starts. Set by
     /// `TrafficMonitor`, which is the only thing that can see all of it at once.
     var environment: () -> AskEnvironment = { .empty }
 
-    init() {
-        UserDefaults.standard.register(defaults: [
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        defaults.register(defaults: [
             Keys.provider: (OnDeviceAsk.isReady ? AskProviderKind.onDevice : .localServer).rawValue,
         ])
+        migrateLegacyProviderSettings()
+    }
+
+    private func migrateLegacyProviderSettings() {
+        let endpoint = defaults.string(forKey: Keys.legacyEndpoint).flatMap { $0.isEmpty ? nil : $0 }
+        let model = defaults.string(forKey: Keys.legacyModel).flatMap { $0.isEmpty ? nil : $0 }
+        guard endpoint != nil || model != nil else { return }
+        let owner = endpoint.flatMap(AskProviderKind.owner(of:)) ?? provider
+        if let endpoint, defaults.string(forKey: Keys.endpoint(owner)) == nil {
+            defaults.set(endpoint, forKey: Keys.endpoint(owner))
+        }
+        if let model, defaults.string(forKey: Keys.model(owner)) == nil {
+            defaults.set(model, forKey: Keys.model(owner))
+        }
+        defaults.removeObject(forKey: Keys.legacyEndpoint)
+        defaults.removeObject(forKey: Keys.legacyModel)
     }
 
     func attach(db: TrafficDatabase) {
@@ -36,18 +57,18 @@ final class AskController: ObservableObject {
     // MARK: Settings
 
     var provider: AskProviderKind {
-        get { AskProviderKind(rawValue: UserDefaults.standard.string(forKey: Keys.provider) ?? "") ?? .onDevice }
+        get { AskProviderKind(rawValue: defaults.string(forKey: Keys.provider) ?? "") ?? .onDevice }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: Keys.provider)
+            defaults.set(newValue.rawValue, forKey: Keys.provider)
             objectWillChange.send()
             publishPort()
         }
     }
 
     var endpoint: String {
-        get { UserDefaults.standard.string(forKey: Keys.endpoint).flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultEndpoint }
+        get { defaults.string(forKey: Keys.endpoint(provider)).flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultEndpoint }
         set {
-            UserDefaults.standard.set(newValue, forKey: Keys.endpoint)
+            defaults.set(newValue, forKey: Keys.endpoint(provider))
             objectWillChange.send()
             publishPort()
         }
@@ -67,8 +88,8 @@ final class AskController: ObservableObject {
     }
 
     var model: String {
-        get { UserDefaults.standard.string(forKey: Keys.model).flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultModel }
-        set { UserDefaults.standard.set(newValue, forKey: Keys.model); objectWillChange.send() }
+        get { defaults.string(forKey: Keys.model(provider)).flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultModel }
+        set { defaults.set(newValue, forKey: Keys.model(provider)); objectWillChange.send() }
     }
 
     var apiKey: String {
@@ -80,8 +101,13 @@ final class AskController: ObservableObject {
     var blockedReason: String? {
         switch provider {
         case .onDevice: return OnDeviceAsk.readiness.explanation
-        case .localServer, .compatible:
-            return endpoint.isEmpty ? L("Set the endpoint of the model server you're running.") : nil
+        case .localServer:
+            guard !endpoint.isEmpty else { return L("Set the endpoint of the model server you're running.") }
+            return RemoteProvider.isOnMac(URL(string: endpoint))
+                ? nil : L("Local server must use localhost or a loopback address. Choose OpenAI-compatible endpoint for another machine.")
+        case .compatible:
+            if endpoint.isEmpty { return L("Set the endpoint of the model server you're running.") }
+            fallthrough
         case .anthropic, .openAI, .gemini:
             return apiKey.isEmpty
                 ? L("%@ needs an API key. It goes to your login Keychain, not to Flowlight's preferences.", provider.title)
@@ -91,7 +117,9 @@ final class AskController: ObservableObject {
 
     /// Whether answering this question would send anything off the Mac. The screen says so before the question is
     /// asked, not after.
-    var sendsOffDevice: Bool { provider.sendsOffDevice }
+    var sendsOffDevice: Bool {
+        provider == .onDevice ? false : !RemoteProvider.isOnMac(URL(string: endpoint))
+    }
 
     func clear() { turns = [] }
 

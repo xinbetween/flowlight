@@ -134,6 +134,179 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(reversed.hidden, snapshot.hidden, "row order must not change graph accounting")
     }
 
+    func testAIBuilderProjectsAllowlistRefusalAsAgentToolAndBlockedPath() {
+        let rows = [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
+                bytesOut: 25)
+        ]
+        let blocked = [
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "uploads.example", port: 443, count: 2,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, blockedAttempts: blocked, limits: .unbounded)
+        let agent = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .agent })
+        let tool = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .tool })
+        let runs = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .runs })
+        let refusal = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(runs.source, agent.id)
+        XCTAssertEqual(runs.target, tool.id)
+        XCTAssertEqual(refusal.source, tool.id)
+        XCTAssertEqual(snapshot.nodes.first { $0.id == refusal.target }?.title, "uploads.example")
+        XCTAssertEqual(refusal.enforcement?.count, 2)
+        XCTAssertEqual(runs.counters, FlowCounters())
+        XCTAssertEqual(refusal.counters, FlowCounters())
+        XCTAssertEqual(snapshot.total.bytesOut, 25)
+        XCTAssertEqual(snapshot.visibleTotal.bytesOut, 25)
+        XCTAssertFalse(snapshot.edges.contains { $0.relationship == .invoked })
+    }
+
+    func testAIBuilderProjectsRefusalOnlyAgentWithoutInventingTraffic() {
+        let blocked = [
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "uploads.example", port: 443, count: 2,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: [], blockedAttempts: blocked, limits: .unbounded)
+        let agent = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .agent })
+        let tool = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .tool })
+        let runs = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .runs })
+        let refusal = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(agent.title, "Claude Code")
+        XCTAssertEqual(runs.source, agent.id)
+        XCTAssertEqual(runs.target, tool.id)
+        XCTAssertEqual(refusal.source, tool.id)
+        XCTAssertEqual(agent.counters, FlowCounters())
+        XCTAssertEqual(tool.counters, FlowCounters())
+        XCTAssertEqual(refusal.counters, FlowCounters())
+        XCTAssertEqual(snapshot.total, FlowCounters(), "refusal evidence must never invent observed traffic")
+        XCTAssertEqual(snapshot.visibleTotal, FlowCounters())
+    }
+
+    func testAIBuilderDoesNotTreatGenericRuleOrPackRefusalAsAgentProof() {
+        for source in ["ordinary-rule", "managed-pack:advertising"] {
+            let blocked = [
+                BlockedAttemptRow(bundleID: "com.apple.Safari", appName: "Safari",
+                                  agentKey: "com.apple.Safari", agentName: "Safari",
+                                  destination: "tracker.example", port: 443, count: 1,
+                                  category: "rule", source: source, detail: "")
+            ]
+
+            let snapshot = AITrafficGraphBuilder.build(rows: [], blockedAttempts: blocked, limits: .unbounded)
+
+            XCTAssertTrue(snapshot.nodes.isEmpty, "\(source) is refusal evidence, not proof Safari is an AI agent")
+            XCTAssertTrue(snapshot.edges.isEmpty)
+            XCTAssertEqual(snapshot.total, FlowCounters())
+            XCTAssertEqual(snapshot.visibleTotal, FlowCounters())
+        }
+    }
+
+    func testAIBuilderKeepsBlockedOnlySearchMatchWithProofOutsideVisibleRows() {
+        let allRows = [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
+                bytesOut: 25, launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"))
+        ]
+        let blocked = [
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "uploads.example", port: 443, count: 2,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: allRows, visibleRows: [],
+                                                   blockedAttempts: blocked, limits: .unbounded)
+
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .agent && $0.filter.bundleID == "claude" })
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .tool && $0.filter.bundleID == "curl" })
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .launcher && $0.title == "Ghostty" })
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .launched })
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .blocked })
+        XCTAssertEqual(snapshot.total, FlowCounters(), "hidden observed rows must not leak into searched totals")
+    }
+
+    func testVisualizationSelectionClearsWhenSearchContextChanges() {
+        XCTAssertTrue(VisualizeSelectionPolicy.shouldClear(previousQuery: "", newQuery: "uploads.example"))
+        XCTAssertFalse(VisualizeSelectionPolicy.shouldClear(previousQuery: "uploads.example",
+                                                             newQuery: "uploads.example"))
+    }
+
+    func testAIBuilderReservesToolAndDestinationCapacityForRefusalEvidence() {
+        let rows = [
+            row(app: "git", name: "git", domain: "github.com", ip: "203.0.113.10", bytesOut: 100,
+                parent: "claude", parentName: "Claude Code"),
+            row(app: "npm", name: "npm", domain: "npmjs.org", ip: "203.0.113.11", bytesOut: 90,
+                parent: "claude", parentName: "Claude Code"),
+        ]
+        let blocked = [
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "uploads.example", port: 443, count: 10_000,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        ]
+        let limits = AITrafficGraphLimits(maxAgents: 1, maxTools: 1, maxDestinations: 1,
+                                          maxObservedEdges: 2, maxLaunchers: 0, maxBlockedEdges: 1)
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, blockedAttempts: blocked, limits: limits)
+
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .tool && $0.filter.bundleID == "curl" })
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .destination && $0.title == "uploads.example" })
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .blocked && $0.enforcement?.count == 10_000 },
+                      "refusal evidence must reserve scarce tool and destination capacity before observed traffic")
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .tool }.count, limits.maxTools)
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .destination || $0.kind == .service }.count,
+                                 limits.maxDestinations)
+    }
+
+    func testAIBuilderReservesAgentCapacityForRefusalHeavyEvidence() {
+        let agents = ["claude", "codex", "aider", "goose", "gemini", "opencode", "ollama"]
+        let rows = (0..<7).map { index in
+            row(app: agents[index], domain: "host\(index).example", ip: "203.0.113.\(index + 1)",
+                bytesOut: Int64(100 - index))
+        }
+        let blocked = [
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "first.example", port: 443, count: 20_000,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code"),
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "claude", agentName: "Claude Code",
+                              destination: "second.example", port: 443, count: 15_000,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code"),
+            BlockedAttemptRow(bundleID: "curl", appName: "curl", agentKey: "ollama", agentName: "Ollama",
+                              destination: "uploads.example", port: 443, count: 10_000,
+                              category: "allowlist", source: "agent-allowlist", detail: "Ollama")
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, blockedAttempts: blocked)
+
+        XCTAssertTrue(snapshot.nodes.contains { $0.kind == .agent && $0.filter.bundleID == "ollama" })
+        XCTAssertTrue(snapshot.edges.contains { $0.relationship == .blocked && $0.enforcement?.count == 10_000 })
+        XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .agent }.count,
+                                 AITrafficGraphLimits.standard.maxAgents)
+    }
+
+    func testAIBlockedAndObservedProviderShareOneDestinationNode() {
+        let rows = [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
+                bytesOut: 25)
+        ]
+        let blocked = [
+            BlockedAttemptRow(bundleID: "claude", appName: "Claude Code", agentKey: "claude",
+                              agentName: "Claude Code", destination: "api.anthropic.com", port: 443, count: 2,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, blockedAttempts: blocked, limits: .unbounded)
+        let observed = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        let refusal = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(observed.target, refusal.target)
+        XCTAssertEqual(snapshot.nodes.first { $0.id == observed.target }?.kind, .service)
+        XCTAssertEqual(snapshot.nodes.first { $0.id == observed.target }?.title, "Anthropic")
+        XCTAssertEqual(snapshot.hidden.nodeCount, 0,
+                       "metadata differences must not invent a second hidden destination node")
+    }
+
     func testAIRunsRelationshipReadsAgentToTool() {
         let snapshot = AITrafficGraphBuilder.build(rows: [
             row(app: "curl", name: "curl", domain: "example.com", ip: "203.0.113.10", bytesOut: 25,
@@ -159,6 +332,34 @@ final class TrafficGraphTests: XCTestCase {
                 bytesOut: 25)
         ], limits: .unbounded)
         XCTAssertFalse(unknown.edges.contains { $0.relationship == .launched })
+    }
+
+    func testDependencyLayoutOrdersLauncherAgentToolAndDestinationWithoutOverlap() {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "curl", name: "curl", domain: "uploads.example", ip: "203.0.113.10", bytesOut: 25,
+                parent: "claude", parentName: "Claude Code",
+                launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"))
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 1_100, height: 760))
+        let launcher = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher })
+        let agent = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .agent })
+        let tool = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .tool })
+        let destination = try! XCTUnwrap(snapshot.nodes.first { $0.kind == .destination })
+        let launcherFrame = try! XCTUnwrap(layout.nodeFrames[launcher.id])
+        let agentFrame = try! XCTUnwrap(layout.nodeFrames[agent.id])
+        let toolFrame = try! XCTUnwrap(layout.nodeFrames[tool.id])
+        let destinationFrame = try! XCTUnwrap(layout.nodeFrames[destination.id])
+
+        XCTAssertLessThan(launcherFrame.maxX, agentFrame.minX)
+        XCTAssertLessThan(agentFrame.maxX, toolFrame.minX)
+        XCTAssertLessThan(toolFrame.maxX, destinationFrame.minX)
+        let frames = Array(layout.nodeFrames.values)
+        for left in frames.indices {
+            for right in frames.indices where right > left {
+                XCTAssertFalse(frames[left].insetBy(dx: -8, dy: -8).intersects(frames[right]))
+            }
+        }
     }
 
     func testAIBuilderPreservesMultiplePersistedLaunchersDeterministically() {
@@ -492,6 +693,28 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertGreaterThan(snapshot.hidden.edgeCount, 0)
     }
 
+    func testBlockedSelectionExpandsToAgentsAdmittedByObservedTraffic() {
+        let agents = ["claude", "codex", "aider"]
+        let observed = (0..<3).map { index in
+            row(app: agents[index], name: agents[index], domain: "api-\(index).example",
+                ip: "203.0.113.\(index + 1)", bytesIn: Int64(1_000 - index))
+        }
+        let blocked = (0..<3).map { index in
+            BlockedAttemptRow(bundleID: agents[index], appName: agents[index], agentKey: agents[index],
+                              agentName: agents[index], destination: "blocked-\(index).example", port: 443,
+                              count: Int64(30 - index),
+                              category: "tracking", source: "managed-pack:official.privacy", detail: "")
+        }
+        let limits = AITrafficGraphLimits(maxAgents: 6, maxTools: 8, maxDestinations: 10,
+                                          maxObservedEdges: 28, maxBlockedEdges: 12)
+
+        let snapshot = AITrafficGraphBuilder.build(rows: observed, blockedAttempts: blocked, limits: limits)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .agent }.count, 3)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .blocked }.count, 3,
+                       "every visible agent's refusal should use the available blocked budget")
+    }
+
     func testBlockedOnlyAppsCannotStarveBusyObservedTraffic() {
         let observed = row(app: "busy.app", name: "Busy", domain: "api.example.com",
                            ip: "203.0.113.8", bytesIn: 1_000_000)
@@ -769,6 +992,39 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertGreaterThan(trafficWidths[2], trafficWidths[1])
     }
 
+    func testParallelBlockedPortsHaveDistinctAndIndependentlyHittableCurves() {
+        let blocked = (0..<12).map { index in
+            let port = UInt16(8_000 + index)
+            return BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                                     destination: "example.com", port: port, count: Int64(index + 1),
+                                     category: "rule", source: "ordinary-rule", detail: "port \(port)")
+        }
+        let snapshot = TrafficGraphBuilder.build(rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded)
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }.sorted { $0.id < $1.id }
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 800, height: 500))
+        let curves = edges.map { edge in
+            try! XCTUnwrap(layout.edgeCurves[edge.id], "missing curve for \(edge.id.rawValue)")
+        }
+
+        XCTAssertEqual(curves.count, blocked.count)
+        for (edge, curve) in zip(edges, curves) {
+            let source = try! XCTUnwrap(layout.nodeFrames[edge.source])
+            let target = try! XCTUnwrap(layout.nodeFrames[edge.target])
+            XCTAssertEqual(curve.start.x, source.maxX, accuracy: 0.001)
+            XCTAssertTrue((source.minY...source.maxY).contains(curve.start.y),
+                          "blocked edge must remain attached to its source card")
+            XCTAssertEqual(curve.end.x, target.minX, accuracy: 0.001)
+            XCTAssertTrue((target.minY...target.maxY).contains(curve.end.y),
+                          "blocked edge must remain attached to its destination card")
+            XCTAssertEqual(layout.edge(at: curve.point(at: 0.5), tolerance: 5), edge.id)
+        }
+        let midpointYs = curves.map { $0.point(at: 0.5).y }.sorted()
+        for pair in zip(midpointYs, midpointYs.dropFirst()) {
+            XCTAssertGreaterThan(pair.1 - pair.0, 12)
+        }
+    }
+
     func testEdgeHitTestingCoversLongCurvesAtMaximumZoom() {
         let edgeID = TrafficGraphEdgeID(rawValue: "long")
         let curve = TrafficGraphCurve(
@@ -832,6 +1088,35 @@ final class TrafficGraphTests: XCTestCase {
         }
     }
 
+    func testAddingLauncherToPreservedNarrowLayoutDoesNotOverlapSurvivingStages() {
+        let rows = [
+            row(app: "curl", name: "curl", domain: "uploads.example", ip: "203.0.113.10", bytesOut: 25,
+                parent: "claude", parentName: "Claude Code")
+        ]
+        let expandedRows = [
+            row(app: "curl", name: "curl", domain: "uploads.example", ip: "203.0.113.10", bytesOut: 25,
+                parent: "claude", parentName: "Claude Code",
+                launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app"))
+        ]
+        let bounds = CGRect(x: 0, y: 0, width: 600, height: 760)
+        let initial = TrafficGraphLayout.layout(
+            snapshot: AITrafficGraphBuilder.build(rows: rows, limits: .unbounded), in: bounds
+        )
+        let expanded = TrafficGraphLayout.layout(
+            snapshot: AITrafficGraphBuilder.build(rows: expandedRows, limits: .unbounded),
+            in: bounds,
+            preserving: initial
+        )
+        let frames = Array(expanded.nodeFrames.values)
+
+        for left in frames.indices {
+            for right in frames.indices where right > left {
+                XCTAssertFalse(frames[left].insetBy(dx: -8, dy: -8).intersects(frames[right]),
+                               "preserved frames must move apart when a dependency stage is added")
+            }
+        }
+    }
+
     func testResizeMovesSurvivingNodesToNewSemanticColumns() {
         let snapshot = AITrafficGraphBuilder.build(rows: [
             row(app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 10,
@@ -846,15 +1131,20 @@ final class TrafficGraphTests: XCTestCase {
             let wideFrame = try! XCTUnwrap(wide.nodeFrames[node.id])
             let narrowFrame = try! XCTUnwrap(narrow.nodeFrames[node.id])
             XCTAssertEqual(narrowFrame.midY, wideFrame.midY, accuracy: 0.001)
+            let sourceX = 24 + TrafficGraphLayout.appSize.width / 2
+            let destinationX = 900 - 24 - TrafficGraphLayout.destinationSize.width / 2
             switch node.kind {
-            case .app, .agent, .launcher:
-                XCTAssertEqual(narrowFrame.midX, 24 + TrafficGraphLayout.appSize.width / 2, accuracy: 0.001)
+            case .app, .agent:
+                XCTAssertEqual(narrowFrame.midX, sourceX, accuracy: 0.001)
+            case .launcher:
+                XCTFail("this topology has no launcher evidence")
             case .tool, .mcp, .proxy:
-                XCTAssertEqual(narrowFrame.midX, 450, accuracy: 0.001)
+                XCTAssertGreaterThan(narrowFrame.minX, sourceX + TrafficGraphLayout.appSize.width / 2 + 15)
+                XCTAssertLessThan(narrowFrame.maxX,
+                                  destinationX - TrafficGraphLayout.destinationSize.width / 2 - 15)
                 XCTAssertNotEqual(narrowFrame.midX, wideFrame.midX)
             case .destination, .service:
-                XCTAssertEqual(narrowFrame.midX, 900 - 24 - TrafficGraphLayout.destinationSize.width / 2,
-                               accuracy: 0.001)
+                XCTAssertEqual(narrowFrame.midX, destinationX, accuracy: 0.001)
                 XCTAssertNotEqual(narrowFrame.midX, wideFrame.midX)
             }
         }
@@ -904,6 +1194,56 @@ final class TrafficGraphTests: XCTestCase {
         for step in 1..<100 {
             let point = curve.point(at: CGFloat(step) / 100)
             XCTAssertFalse(intermediaries.contains { $0.insetBy(dx: -5, dy: -5).contains(point) })
+        }
+    }
+
+    func testDirectBlockedAIEdgeAvoidsIntermediaryCards() {
+        let blocked = (0..<12).map { index in
+            BlockedAttemptRow(bundleID: "claude", appName: "Claude Code", agentKey: "claude",
+                              agentName: "Claude Code", destination: "uploads.example",
+                              port: UInt16(8_000 + index), count: 1,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        }
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 50,
+                parent: "claude", parentName: "Claude Code")
+        ], blockedAttempts: blocked, limits: .unbounded)
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 600)
+        let direct = snapshot.edges.filter { edge in
+            edge.relationship == .blocked
+                && snapshot.nodes.first { $0.id == edge.source }?.kind == .agent
+        }
+        var previous = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
+        let sourceIDs = Set(direct.map(\.source))
+        let targetIDs = Set(direct.map(\.target))
+        for node in snapshot.nodes {
+            guard var frame = previous.nodeFrames[node.id] else { continue }
+            switch node.kind {
+            case .agent where sourceIDs.contains(node.id): frame.origin.y = 154
+            case .tool, .mcp: frame.origin.y = 274
+            case .destination where targetIDs.contains(node.id): frame.origin.y = 394
+            default: continue
+            }
+            previous.nodeFrames[node.id] = frame
+        }
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds, preserving: previous)
+        let intermediaries = snapshot.nodes.filter { $0.kind == .tool || $0.kind == .mcp }
+            .compactMap { layout.nodeFrames[$0.id] }
+
+        XCTAssertEqual(direct.count, blocked.count)
+        XCTAssertFalse(intermediaries.isEmpty)
+        for edge in direct {
+            let curve = try! XCTUnwrap(layout.edgeCurves[edge.id])
+            let source = try! XCTUnwrap(layout.nodeFrames[edge.source])
+            let target = try! XCTUnwrap(layout.nodeFrames[edge.target])
+            XCTAssertTrue((source.minY...source.maxY).contains(curve.start.y))
+            XCTAssertTrue((target.minY...target.maxY).contains(curve.end.y))
+            XCTAssertEqual(layout.edge(at: curve.point(at: 0.5), tolerance: 5), edge.id)
+            for step in 1..<100 {
+                let point = curve.point(at: CGFloat(step) / 100)
+                XCTAssertFalse(intermediaries.contains { $0.insetBy(dx: -5, dy: -5).contains(point) },
+                               "parallel blocked edge \(edge.id.rawValue) crosses an intermediary card")
+            }
         }
     }
 

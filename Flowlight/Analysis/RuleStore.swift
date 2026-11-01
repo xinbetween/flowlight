@@ -24,9 +24,13 @@ final class RuleStore: ObservableObject {
     private weak var db: TrafficDatabase?
     private var pendingHitResets: Set<UUID> = []
     private var pendingRuleInvalidations: Set<UUID> = []
+    /// Logic-only stores have no durable receipt table; still keep stable retry IDs idempotent for this process.
+    private var volatileEventReceipts: Set<UUID> = []
     /// The first whole-list generation that describes each rule's current definition. Delayed decisions from an
     /// older definition are ignored, while an unrelated rule edit does not erase a valid spend.
     private var ruleInvalidatedAt: [UUID: UInt64] = [:]
+    /// Unlike an ordinary edit, an explicit reset intentionally wins over an already queued decision.
+    private var hitResetAt: [UUID: UInt64] = [:]
     private var publicationGeneration: UInt64 = 0
     private var pauseTimer: Timer?
     /// The same rules, readable from the proxy's queue. The store itself is main-actor — it is a published model —
@@ -72,19 +76,26 @@ final class RuleStore: ObservableObject {
         let enteredWildcard = rule.destination.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("*.")
         rule.destination = Self.cleaned(rule.destination)
         if enteredWildcard { rule.destinationMatch = .suffix }
+        let resetsHits = pendingHitResets.contains(rule.id)
         if let index = rules.firstIndex(where: { $0.id == rule.id }) {
+            if !resetsHits {
+                let current = rules[index]
+                rule.hits = rule.maxHits > 0 ? min(rule.maxHits, current.hits) : current.hits
+                rule.lastHit = current.lastHit
+            }
             rules[index] = rule
         } else {
             rules.append(rule)
         }
         pendingRuleInvalidations.insert(rule.id)
-        db?.async { try $0.saveRule(rule) }
+        db?.async { try $0.saveRule(rule, preservingActivity: !resetsHits) }
         publish()
     }
 
     func delete(_ rule: Rule) {
         rules.removeAll { $0.id == rule.id }
         pendingRuleInvalidations.insert(rule.id)
+        hitResetAt.removeValue(forKey: rule.id)
         db?.async { try $0.deleteRule(rule.id) }
         publish()
     }
@@ -127,39 +138,70 @@ final class RuleStore: ObservableObject {
 
     // MARK: What the rules did
 
-    /// Decisions from the filter: recorded, counted, and shown. Both refusals and relaxations arrive here.
-    func record(_ incoming: [RuleEvent]) {
-        guard !incoming.isEmpty else { return }
-        var accepted: [RuleEvent] = []
-        for event in incoming {
-            if let eventSession = event.ruleSession,
-               let eventGeneration = event.ruleGeneration,
-               !acceptsDecision(
-                   ruleID: event.ruleID,
-                   session: eventSession,
-                   generation: eventGeneration
-               ) {
-                continue
-            }
-            accepted.append(event)
-            guard let index = rules.firstIndex(where: { $0.id == event.ruleID }) else { continue }
-            rules[index].hits = rules[index].maxHits > 0
-                ? min(rules[index].maxHits, rules[index].hits + 1)
-                : rules[index].hits + 1
-            rules[index].lastHit = Date(timeIntervalSince1970: TimeInterval(event.at))
-            let rule = rules[index]
-            db?.async { try $0.saveRule(rule) }
+    /// Decisions from the filter: recorded, counted, and shown. Both refusals and relaxations arrive here. The
+    /// completion becomes true only after newly accepted IDs, decision rows, and durable hit counters commit together.
+    func record(_ incoming: [RuleEvent], completion: @escaping @Sendable (Bool) -> Void = { _ in }) {
+        guard !incoming.isEmpty else { completion(true); return }
+        let candidates = incoming.filter { event in
+            guard let eventSession = event.ruleSession, let eventGeneration = event.ruleGeneration else { return true }
+            return acceptsDecision(ruleID: event.ruleID, session: eventSession, generation: eventGeneration)
         }
-        guard !accepted.isEmpty else { return }
-        db?.async { [weak self] db in
-            try db.recordRuleEvents(accepted)
-            let events = (try? db.ruleEvents(limit: 300)) ?? []
-            Task { @MainActor in
-                self?.events = events
-                self?.version += 1
+        guard !candidates.isEmpty else { completion(true); return }
+        guard let db else {
+            let accepted = candidates.filter { event in
+                guard let id = event.id else { return true }
+                return volatileEventReceipts.insert(id).inserted
+            }
+            for event in accepted {
+                guard let index = rules.firstIndex(where: { $0.id == event.ruleID }) else { continue }
+                rules[index].hits = rules[index].maxHits > 0
+                    ? min(rules[index].maxHits, rules[index].hits + 1)
+                    : rules[index].hits + 1
+                rules[index].lastHit = Date(timeIntervalSince1970: TimeInterval(event.at))
+            }
+            if !accepted.isEmpty { publish(advancingGeneration: false) }
+            completion(false)
+            return
+        }
+        let acceptedResetGeneration = Dictionary(
+            uniqueKeysWithValues: Set(candidates.map(\.ruleID)).map { ruleID in
+                (ruleID, hitResetAt[ruleID] ?? 0)
+            }
+        )
+        db.queue.async { [weak self, weak db] in
+            guard let db else { completion(false); return }
+            do {
+                let accepted = try db.recordRuleEvents(
+                    candidates,
+                    durableReplay: candidates.contains { $0.deliverySession != nil }
+                )
+                let events = try db.ruleEvents(limit: 300)
+                // Acknowledge the database commit before publishing it to the UI. Extension health must not depend on
+                // main-actor availability after the durable receipt, event, and counters already succeeded.
+                completion(true)
+                Task { @MainActor in
+                    guard let self else { return }
+                    for event in accepted {
+                        guard (self.hitResetAt[event.ruleID] ?? 0) == acceptedResetGeneration[event.ruleID],
+                              let index = self.rules.firstIndex(where: { $0.id == event.ruleID }) else { continue }
+                        self.rules[index].hits = self.rules[index].maxHits > 0
+                            ? min(self.rules[index].maxHits, self.rules[index].hits + 1)
+                            : self.rules[index].hits + 1
+                        let hit = Date(timeIntervalSince1970: TimeInterval(event.at))
+                        if self.rules[index].lastHit == nil || self.rules[index].lastHit! < hit {
+                            self.rules[index].lastHit = hit
+                        }
+                    }
+                    self.events = events
+                    if !accepted.isEmpty {
+                        self.version += 1
+                        self.publish(advancingGeneration: false)
+                    }
+                }
+            } catch {
+                completion(false)
             }
         }
-        publish(advancingGeneration: false)
     }
 
     /// Clears the published feed after its durable rows were deleted by the caller.
@@ -298,6 +340,9 @@ final class RuleStore: ObservableObject {
             publicationGeneration &+= 1
             for ruleID in pendingRuleInvalidations {
                 ruleInvalidatedAt[ruleID] = publicationGeneration
+            }
+            for ruleID in pendingHitResets {
+                hitResetAt[ruleID] = publicationGeneration
             }
         }
         live.replace(
@@ -455,6 +500,11 @@ final class LiveRules: @unchecked Sendable {
 
     /// The rules that would answer a request right now. Timing is judged here, at the moment the request arrives,
     /// rather than when the list was last published — a window that closed a minute ago has closed.
+    var currentGeneration: UInt64 {
+        lock.lock(); defer { lock.unlock() }
+        return generation
+    }
+
     func requestRules(now: Date = Date()) -> [Rule] {
         lock.lock(); defer { lock.unlock() }
         if let pausedUntil, now < pausedUntil { return [] }

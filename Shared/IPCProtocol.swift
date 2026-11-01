@@ -10,6 +10,10 @@ import Foundation
     /// time, and when another product holds that slot ours is launched and then never asked to filter anything.
     func filterState(withReply reply: @escaping (Bool, String) -> Void)
 
+    /// Enables the stable-ID refusal delivery selectors after the app has verified the extension's exact build.
+    /// Registration itself deliberately does not send this backlog: an older app exports only the legacy selectors.
+    func enableDurableEvents(appProtocol: Int, withReply reply: @escaping (Bool) -> Void)
+
     /// Replaces the allowlists the filter enforces. `payload` is `BlockCoding.encode([AgentPolicy])`, holding only
     /// the policies the user has switched to blocking; an empty list turns enforcement off entirely. The app sends
     /// this on every connection and on every change, so the extension never has to read the database itself.
@@ -42,14 +46,15 @@ import Foundation
     /// are accepted; the extension keeps them queued until then.
     func deliver(payload: Data, reply: @escaping () -> Void)
 
-    /// Connections the filter refused. `payload` is `BlockCoding.encode([BlockEvent])`. These come up on their own
-    /// call rather than riding with the traffic batches: they are rare, and they must not wait behind a backlog.
+    /// Legacy delivery selectors retained unchanged for mixed-version upgrades. Current extensions wait for
+    /// `enableDurableEvents` and then use the durable selectors below.
     func blocked(payload: Data, reply: @escaping () -> Void)
-
-    /// Connections a rule decided, refusals and relaxations alike. `payload` is `BlockCoding.encode([RuleEvent])`.
-    /// Both halves come back: a refusal has to be visible, and so does an exception that let something through,
-    /// because "why is this getting through?" is the question a rule list exists to answer.
     func ruleDecisions(payload: Data, reply: @escaping () -> Void)
+
+    /// Stable-ID refusal and decision delivery. True is returned only after the rows commit durably; retries reuse
+    /// the same event IDs. New selectors avoid changing an existing Objective-C reply-block ABI in place.
+    func blockedDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void)
+    func ruleDecisionsDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void)
 
     /// Bounded minute rollups from managed packs. True is returned only after the batch is durably committed.
     func rulePackEvents(payload: Data, reply: @escaping @Sendable (Bool) -> Void)

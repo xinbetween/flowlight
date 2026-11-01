@@ -16,8 +16,7 @@ final class BlockEnforcer: @unchecked Sendable {
 
     private let lock = NSLock()
     private var policies: [String: AgentPolicy] = [:]
-    private var appConnected = false
-    private var disconnectedAt: Date?
+    private var connectionState = EnforcementConnectionState()
     private var cache: [Int32: (agent: Agent?, at: Date)] = [:]
     /// The rule list, which is asked before any allowlist: a rule is something someone wrote down about this
     /// exact connection, and it should not be second-guessed by a policy written about a whole agent.
@@ -111,16 +110,14 @@ final class BlockEnforcer: @unchecked Sendable {
                                  activeGeneration: packGeneration, activeDigest: packDigest)
     }
 
-    func appConnectionChanged(connected: Bool) {
+    func appConnectionChanged(connected: Bool, now: Date = Date()) {
         lock.lock(); defer { lock.unlock() }
-        appConnected = connected
-        if !connected { disconnectedAt = Date() }
+        connectionState.update(connected: connected, now: now)
     }
 
     private func inForce() -> Bool {
         lock.lock(); defer { lock.unlock() }
-        return BlockRules.inForce(appConnected: appConnected,
-                                  sinceDisconnect: disconnectedAt.map { Date().timeIntervalSince($0) })
+        return connectionState.isInForce()
     }
 
     /// The filter's one question. True means refuse this flow — by then the refusal has already been reported.
@@ -184,7 +181,8 @@ final class BlockEnforcer: @unchecked Sendable {
         case .block:
             state.judged = true
             let event = BlockEvent(at: Int64(Date().timeIntervalSince1970), agentKey: agent.key, agentName: agent.name,
-                                   appName: state.process.name, host: facts.host, ip: facts.ip, port: facts.port)
+                                   appName: state.process.name, bundleID: facts.bundleID,
+                                   host: facts.host, ip: facts.ip, port: facts.port)
             extensionLog.info("Refused a connection for \(agent.key, privacy: .public)")
             report(event)
             return true
@@ -231,7 +229,8 @@ final class BlockEnforcer: @unchecked Sendable {
         reportDecision(event)
         if rule.action == .block {
             report(BlockEvent(at: event.at, agentKey: facts.agentKey, agentName: agent?.name ?? process.name,
-                              appName: process.name, host: facts.host, ip: facts.ip, port: facts.port,
+                              appName: process.name, bundleID: facts.bundleID,
+                              host: facts.host, ip: facts.ip, port: facts.port,
                               rule: rule.title))
         }
         return decision
