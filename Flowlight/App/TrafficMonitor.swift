@@ -227,6 +227,7 @@ final class TrafficMonitor: ObservableObject {
         }
         // The proxy reads one lock-backed publication for rules and one for the extension-committed pack generation.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
+        inspection.requestRuleGeneration = { [live = rules.live] in live.currentGeneration }
         inspection.flowRuleDecision = { [live = rules.live] facts in
             live.flowDecision(facts)
         }

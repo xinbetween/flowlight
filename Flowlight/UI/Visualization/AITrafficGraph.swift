@@ -115,7 +115,7 @@ enum AITrafficGraphBuilder {
 
         var included: [(agent: AgentIdentity, rows: [BreakdownRow], metadata: AgentMetadata)] = []
         var refusalNames: [AgentIdentity: String] = [:]
-        for attempt in blockedAttempts where !attempt.agentKey.isEmpty {
+        for attempt in blockedAttempts where refusalProvesAgent(attempt) {
             let agent = AgentIdentity(bundleID: attempt.agentKey)
             if refusalNames[agent]?.isEmpty != false, !attempt.agentName.isEmpty {
                 refusalNames[agent] = attempt.agentName
@@ -517,6 +517,12 @@ enum AITrafficGraphBuilder {
 
     private static func launcherID(bundleID: String) -> TrafficGraphNodeID {
         TrafficGraphNodeID(rawValue: "launcher:" + component(bundleID))
+    }
+
+    private static func refusalProvesAgent(_ attempt: BlockedAttemptRow) -> Bool {
+        guard !attempt.agentKey.isEmpty else { return false }
+        if attempt.source == "agent-allowlist" || attempt.agentKey != attempt.bundleID { return true }
+        return AgentCatalog.knownAgent(bundleID: attempt.agentKey, appName: attempt.agentName) != nil
     }
 
     private static func agentID(_ agent: AgentIdentity) -> TrafficGraphNodeID {

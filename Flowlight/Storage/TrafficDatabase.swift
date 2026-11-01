@@ -1321,7 +1321,22 @@ final class TrafficDatabase: @unchecked Sendable {
         return rows.compactMap { try? JSONDecoder().decode(Rule.self, from: Data($0.utf8)) }
     }
 
-    func saveRule(_ rule: Rule) throws {
+    func saveRule(_ rule: Rule, preservingActivity: Bool = false) throws {
+        var rule = rule
+        if preservingActivity,
+           let storedJSON = try conn.query(
+               "SELECT rule FROM rules WHERE id = ?",
+               [.text(rule.id.uuidString)],
+               map: { $0.text(0) }
+           ).first,
+           let stored = try? JSONDecoder().decode(Rule.self, from: Data(storedJSON.utf8)) {
+            let mergedHits = max(rule.hits, stored.hits)
+            rule.hits = rule.maxHits > 0 ? min(rule.maxHits, mergedHits) : mergedHits
+            if let storedHit = stored.lastHit,
+               rule.lastHit == nil || rule.lastHit! < storedHit {
+                rule.lastHit = storedHit
+            }
+        }
         let json = String(decoding: try JSONEncoder().encode(rule), as: UTF8.self)
         try conn.run("""
             INSERT INTO rules (id, rule, updated) VALUES (?,?,?)

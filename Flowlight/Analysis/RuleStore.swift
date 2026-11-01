@@ -29,6 +29,8 @@ final class RuleStore: ObservableObject {
     /// The first whole-list generation that describes each rule's current definition. Delayed decisions from an
     /// older definition are ignored, while an unrelated rule edit does not erase a valid spend.
     private var ruleInvalidatedAt: [UUID: UInt64] = [:]
+    /// Unlike an ordinary edit, an explicit reset intentionally wins over an already queued decision.
+    private var hitResetAt: [UUID: UInt64] = [:]
     private var publicationGeneration: UInt64 = 0
     private var pauseTimer: Timer?
     /// The same rules, readable from the proxy's queue. The store itself is main-actor — it is a published model —
@@ -74,19 +76,30 @@ final class RuleStore: ObservableObject {
         let enteredWildcard = rule.destination.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("*.")
         rule.destination = Self.cleaned(rule.destination)
         if enteredWildcard { rule.destinationMatch = .suffix }
+        let resetsHits = pendingHitResets.contains(rule.id)
         if let index = rules.firstIndex(where: { $0.id == rule.id }) {
+            if !resetsHits {
+                let current = rules[index]
+                let mergedHits = max(rule.hits, current.hits)
+                rule.hits = rule.maxHits > 0 ? min(rule.maxHits, mergedHits) : mergedHits
+                if let currentHit = current.lastHit,
+                   rule.lastHit == nil || rule.lastHit! < currentHit {
+                    rule.lastHit = currentHit
+                }
+            }
             rules[index] = rule
         } else {
             rules.append(rule)
         }
         pendingRuleInvalidations.insert(rule.id)
-        db?.async { try $0.saveRule(rule) }
+        db?.async { try $0.saveRule(rule, preservingActivity: !resetsHits) }
         publish()
     }
 
     func delete(_ rule: Rule) {
         rules.removeAll { $0.id == rule.id }
         pendingRuleInvalidations.insert(rule.id)
+        hitResetAt.removeValue(forKey: rule.id)
         db?.async { try $0.deleteRule(rule.id) }
         publish()
     }
@@ -154,9 +167,9 @@ final class RuleStore: ObservableObject {
             completion(false)
             return
         }
-        let acceptedAtGeneration = Dictionary(
+        let acceptedResetGeneration = Dictionary(
             uniqueKeysWithValues: Set(candidates.map(\.ruleID)).map { ruleID in
-                (ruleID, ruleInvalidatedAt[ruleID] ?? 0)
+                (ruleID, hitResetAt[ruleID] ?? 0)
             }
         )
         db.queue.async { [weak self, weak db] in
@@ -173,7 +186,7 @@ final class RuleStore: ObservableObject {
                 Task { @MainActor in
                     guard let self else { return }
                     for event in accepted {
-                        guard (self.ruleInvalidatedAt[event.ruleID] ?? 0) == acceptedAtGeneration[event.ruleID],
+                        guard (self.hitResetAt[event.ruleID] ?? 0) == acceptedResetGeneration[event.ruleID],
                               let index = self.rules.firstIndex(where: { $0.id == event.ruleID }) else { continue }
                         self.rules[index].hits = self.rules[index].maxHits > 0
                             ? min(self.rules[index].maxHits, self.rules[index].hits + 1)
@@ -332,6 +345,9 @@ final class RuleStore: ObservableObject {
             for ruleID in pendingRuleInvalidations {
                 ruleInvalidatedAt[ruleID] = publicationGeneration
             }
+            for ruleID in pendingHitResets {
+                hitResetAt[ruleID] = publicationGeneration
+            }
         }
         live.replace(
             rules,
@@ -488,6 +504,11 @@ final class LiveRules: @unchecked Sendable {
 
     /// The rules that would answer a request right now. Timing is judged here, at the moment the request arrives,
     /// rather than when the list was last published — a window that closed a minute ago has closed.
+    var currentGeneration: UInt64 {
+        lock.lock(); defer { lock.unlock() }
+        return generation
+    }
+
     func requestRules(now: Date = Date()) -> [Rule] {
         lock.lock(); defer { lock.unlock() }
         if let pausedUntil, now < pausedUntil { return [] }

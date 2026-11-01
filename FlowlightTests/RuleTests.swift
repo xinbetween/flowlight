@@ -543,6 +543,127 @@ final class RuleTests: XCTestCase {
     }
 
     @MainActor
+    func testRuleEventSurvivesAnEditThatOvertakesItsQueuedCommit() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-edit-race-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 3
+        allow.hits = 2
+        store.save(allow)
+        _ = try db.sync { try $0.loadRules() }
+        let eventGeneration = store.ruleSet.generation
+        let blocked = DispatchSemaphore(value: 0)
+        let entered = DispatchSemaphore(value: 0)
+        db.queue.async {
+            entered.signal()
+            blocked.wait()
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
+
+        let committed = expectation(description: "decision committed before edit save")
+        store.record([
+            RuleEvent(at: 1_700_000_000, ruleID: allow.id, ruleSession: RuleStore.session,
+                      ruleGeneration: eventGeneration, action: .allow, engine: .flow,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "api.example.com", ip: "", port: 443),
+        ]) { accepted in
+            XCTAssertTrue(accepted)
+            committed.fulfill()
+        }
+        allow.name = "Edited while decision was queued"
+        allow.maxHits = 1
+        allow.hits = 1
+        store.save(allow)
+        blocked.signal()
+        await fulfillment(of: [committed], timeout: 2)
+        try await waitUntil {
+            store.rules.first(where: { $0.id == allow.id })?.hits == 1
+                && (try? db.sync { try $0.loadRules().first(where: { $0.id == allow.id })?.hits }) == 1
+        }
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == allow.id })?.name, allow.name)
+        let loaded = try XCTUnwrap(db.sync { try $0.loadRules().first(where: { $0.id == allow.id }) })
+        XCTAssertEqual(loaded.name, allow.name)
+        XCTAssertEqual(loaded.hits, 1)
+        XCTAssertEqual(try db.sync { try $0.ruleEvents(ruleID: allow.id).count }, 1)
+    }
+
+    @MainActor
+    func testRuleActivitySurvivesSavingAStaleEditorSnapshot() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-stale-editor-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 3
+        store.save(allow)
+        _ = try db.sync { try $0.loadRules() }
+        let staleEditorSnapshot = allow
+        let committed = expectation(description: "decision committed before stale editor save")
+
+        store.record([
+            RuleEvent(at: 1_700_000_000, ruleID: allow.id, ruleSession: RuleStore.session,
+                      ruleGeneration: store.ruleSet.generation, action: .allow, engine: .flow,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "api.example.com", ip: "", port: 443),
+        ]) { accepted in
+            XCTAssertTrue(accepted)
+            committed.fulfill()
+        }
+        await fulfillment(of: [committed], timeout: 2)
+        try await waitUntil { store.rules.first(where: { $0.id == allow.id })?.hits == 1 }
+
+        var edited = staleEditorSnapshot
+        edited.name = "Saved after the decision committed"
+        store.save(edited)
+        _ = try db.sync { try $0.loadRules() }
+
+        let current = try XCTUnwrap(store.rules.first(where: { $0.id == allow.id }))
+        XCTAssertEqual(current.name, edited.name)
+        XCTAssertEqual(current.hits, 1)
+        XCTAssertEqual(current.lastHit, Date(timeIntervalSince1970: 1_700_000_000))
+        let loaded = try XCTUnwrap(db.sync { try $0.loadRules().first(where: { $0.id == allow.id }) })
+        XCTAssertEqual(loaded.name, edited.name)
+        XCTAssertEqual(loaded.hits, 1)
+        XCTAssertEqual(loaded.lastHit, current.lastHit)
+    }
+
+    @MainActor
+    func testStaleRequestRuleEventIsRejectedAfterDefinitionEdit() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-request-rule-stale-event-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var rule = Rule(action: .block, app: "com.example.app", destination: "api.example.com")
+        rule.path = "/old/*"
+        store.save(rule)
+        _ = try db.sync { try $0.loadRules() }
+        let staleGeneration = store.ruleSet.generation
+
+        rule.path = "/new/*"
+        store.save(rule)
+        store.record([
+            RuleEvent(at: 1_700_000_000, ruleID: rule.id, ruleSession: RuleStore.session,
+                      ruleGeneration: staleGeneration, action: .block, engine: .request,
+                      agentKey: "com.example.app", agentName: "Example", appName: "Example",
+                      bundleID: "com.example.app", host: "api.example.com", ip: "", port: 443,
+                      path: "/old/items", method: "GET"),
+        ])
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(store.rules.first(where: { $0.id == rule.id })?.hits, 0)
+        XCTAssertTrue(try db.sync { try $0.ruleEvents(ruleID: rule.id).isEmpty })
+    }
+
+    @MainActor
     func testRuleEventSurvivesAnUnrelatedRuleEdit() {
         var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
         allow.maxHits = 1

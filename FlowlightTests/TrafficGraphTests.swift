@@ -187,6 +187,24 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.visibleTotal, FlowCounters())
     }
 
+    func testAIBuilderDoesNotTreatGenericRuleOrPackRefusalAsAgentProof() {
+        for source in ["ordinary-rule", "managed-pack:advertising"] {
+            let blocked = [
+                BlockedAttemptRow(bundleID: "com.apple.Safari", appName: "Safari",
+                                  agentKey: "com.apple.Safari", agentName: "Safari",
+                                  destination: "tracker.example", port: 443, count: 1,
+                                  category: "rule", source: source, detail: "")
+            ]
+
+            let snapshot = AITrafficGraphBuilder.build(rows: [], blockedAttempts: blocked, limits: .unbounded)
+
+            XCTAssertTrue(snapshot.nodes.isEmpty, "\(source) is refusal evidence, not proof Safari is an AI agent")
+            XCTAssertTrue(snapshot.edges.isEmpty)
+            XCTAssertEqual(snapshot.total, FlowCounters())
+            XCTAssertEqual(snapshot.visibleTotal, FlowCounters())
+        }
+    }
+
     func testAIBuilderKeepsBlockedOnlySearchMatchWithProofOutsideVisibleRows() {
         let allRows = [
             row(app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
@@ -975,27 +993,36 @@ final class TrafficGraphTests: XCTestCase {
     }
 
     func testParallelBlockedPortsHaveDistinctAndIndependentlyHittableCurves() {
-        let blocked = [
-            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
-                              destination: "example.com", port: 22, count: 2,
-                              category: "rule", source: "ordinary-rule", detail: "ssh"),
-            BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
-                              destination: "example.com", port: 443, count: 3,
-                              category: "rule", source: "ordinary-rule", detail: "https"),
-        ]
+        let blocked = (0..<12).map { index in
+            let port = UInt16(8_000 + index)
+            return BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                                     destination: "example.com", port: port, count: Int64(index + 1),
+                                     category: "rule", source: "ordinary-rule", detail: "port \(port)")
+        }
         let snapshot = TrafficGraphBuilder.build(rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded)
         let edges = snapshot.edges.filter { $0.relationship == .blocked }.sorted { $0.id < $1.id }
         let layout = TrafficGraphLayout.layout(snapshot: snapshot,
                                                 in: CGRect(x: 0, y: 0, width: 800, height: 500))
-        let first = try! XCTUnwrap(layout.edgeCurves[edges[0].id])
-        let second = try! XCTUnwrap(layout.edgeCurves[edges[1].id])
+        let curves = edges.map { edge in
+            try! XCTUnwrap(layout.edgeCurves[edge.id], "missing curve for \(edge.id.rawValue)")
+        }
 
-        XCTAssertNotEqual(first, second)
-        let firstMidpoint = first.point(at: 0.5)
-        let secondMidpoint = second.point(at: 0.5)
-        XCTAssertGreaterThan(hypot(firstMidpoint.x - secondMidpoint.x, firstMidpoint.y - secondMidpoint.y), 12)
-        XCTAssertEqual(layout.edge(at: first.point(at: 0.5), tolerance: 5), edges[0].id)
-        XCTAssertEqual(layout.edge(at: second.point(at: 0.5), tolerance: 5), edges[1].id)
+        XCTAssertEqual(curves.count, blocked.count)
+        for (edge, curve) in zip(edges, curves) {
+            let source = try! XCTUnwrap(layout.nodeFrames[edge.source])
+            let target = try! XCTUnwrap(layout.nodeFrames[edge.target])
+            XCTAssertEqual(curve.start.x, source.maxX, accuracy: 0.001)
+            XCTAssertTrue((source.minY...source.maxY).contains(curve.start.y),
+                          "blocked edge must remain attached to its source card")
+            XCTAssertEqual(curve.end.x, target.minX, accuracy: 0.001)
+            XCTAssertTrue((target.minY...target.maxY).contains(curve.end.y),
+                          "blocked edge must remain attached to its destination card")
+            XCTAssertEqual(layout.edge(at: curve.point(at: 0.5), tolerance: 5), edge.id)
+        }
+        let midpointYs = curves.map { $0.point(at: 0.5).y }.sorted()
+        for pair in zip(midpointYs, midpointYs.dropFirst()) {
+            XCTAssertGreaterThan(pair.1 - pair.0, 12)
+        }
     }
 
     func testEdgeHitTestingCoversLongCurvesAtMaximumZoom() {
@@ -1171,27 +1198,52 @@ final class TrafficGraphTests: XCTestCase {
     }
 
     func testDirectBlockedAIEdgeAvoidsIntermediaryCards() {
+        let blocked = (0..<12).map { index in
+            BlockedAttemptRow(bundleID: "claude", appName: "Claude Code", agentKey: "claude",
+                              agentName: "Claude Code", destination: "uploads.example",
+                              port: UInt16(8_000 + index), count: 1,
+                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
+        }
         let snapshot = AITrafficGraphBuilder.build(rows: [
             row(app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8", bytesOut: 50,
                 parent: "claude", parentName: "Claude Code")
-        ], blockedAttempts: [
-            BlockedAttemptRow(bundleID: "claude", appName: "Claude Code", agentKey: "claude",
-                              agentName: "Claude Code", destination: "uploads.example", port: 443, count: 1,
-                              category: "allowlist", source: "agent-allowlist", detail: "Claude Code")
-        ], limits: .unbounded)
-        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
-                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 600))
-        let direct = try! XCTUnwrap(snapshot.edges.first { edge in
+        ], blockedAttempts: blocked, limits: .unbounded)
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 600)
+        let direct = snapshot.edges.filter { edge in
             edge.relationship == .blocked
                 && snapshot.nodes.first { $0.id == edge.source }?.kind == .agent
-        })
-        let curve = try! XCTUnwrap(layout.edgeCurves[direct.id])
+        }
+        var previous = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
+        let sourceIDs = Set(direct.map(\.source))
+        let targetIDs = Set(direct.map(\.target))
+        for node in snapshot.nodes {
+            guard var frame = previous.nodeFrames[node.id] else { continue }
+            switch node.kind {
+            case .agent where sourceIDs.contains(node.id): frame.origin.y = 154
+            case .tool, .mcp: frame.origin.y = 274
+            case .destination where targetIDs.contains(node.id): frame.origin.y = 394
+            default: continue
+            }
+            previous.nodeFrames[node.id] = frame
+        }
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds, preserving: previous)
         let intermediaries = snapshot.nodes.filter { $0.kind == .tool || $0.kind == .mcp }
             .compactMap { layout.nodeFrames[$0.id] }
 
-        for step in 1..<100 {
-            let point = curve.point(at: CGFloat(step) / 100)
-            XCTAssertFalse(intermediaries.contains { $0.insetBy(dx: -5, dy: -5).contains(point) })
+        XCTAssertEqual(direct.count, blocked.count)
+        XCTAssertFalse(intermediaries.isEmpty)
+        for edge in direct {
+            let curve = try! XCTUnwrap(layout.edgeCurves[edge.id])
+            let source = try! XCTUnwrap(layout.nodeFrames[edge.source])
+            let target = try! XCTUnwrap(layout.nodeFrames[edge.target])
+            XCTAssertTrue((source.minY...source.maxY).contains(curve.start.y))
+            XCTAssertTrue((target.minY...target.maxY).contains(curve.end.y))
+            XCTAssertEqual(layout.edge(at: curve.point(at: 0.5), tolerance: 5), edge.id)
+            for step in 1..<100 {
+                let point = curve.point(at: CGFloat(step) / 100)
+                XCTAssertFalse(intermediaries.contains { $0.insetBy(dx: -5, dy: -5).contains(point) },
+                               "parallel blocked edge \(edge.id.rawValue) crosses an intermediary card")
+            }
         }
     }
 

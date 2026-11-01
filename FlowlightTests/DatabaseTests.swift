@@ -349,6 +349,25 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(db.loadRules().first { $0.id == rule.id }).hits, 1)
     }
 
+    func testOrdinaryRuleEditPreservesNewerDurableActivity() throws {
+        var stored = Rule(action: .allow, app: "com.browser", destination: "analytics.example")
+        stored.maxHits = 1
+        stored.hits = 1
+        stored.lastHit = Date(timeIntervalSince1970: 1_700_000_010)
+        try db.saveRule(stored)
+
+        var edited = stored
+        edited.name = "Edited"
+        edited.hits = 0
+        edited.lastHit = Date(timeIntervalSince1970: 1_700_000_000)
+        try db.saveRule(edited, preservingActivity: true)
+
+        let loaded = try XCTUnwrap(db.loadRules().first { $0.id == stored.id })
+        XCTAssertEqual(loaded.name, "Edited")
+        XCTAssertEqual(loaded.hits, 1)
+        XCTAssertEqual(loaded.lastHit, stored.lastHit)
+    }
+
     func testDurableEventWatermarksStayBoundedAcrossExtensionSessions() throws {
         let rule = Rule(action: .allow, app: "com.browser", destination: "analytics.example")
         try db.saveRule(rule)

@@ -66,6 +66,10 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     /// changes only what the answer calls itself — the same machinery gives it, but "Flowlight blocked this" and
     /// "Flowlight pretended to be the server" are not the same thing to read in a log.
     var blocked = false
+    /// Request refusals carry the publication that made the decision, so an answer already in flight cannot credit
+    /// activity to a later definition of the same rule. Ordinary saved mocks leave both values empty.
+    var ruleSession: String?
+    var ruleGeneration: UInt64?
 
     /// Methods offered in the editor. `ANY` is the empty method.
     static let methods = ["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
@@ -88,10 +92,12 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
 
     init(id: UUID = UUID(), enabled: Bool = true, name: String = "", host: String = "", path: String = "*",
          method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "",
-         bodyEncoding: MockBodyEncoding = .text, delay: Double = 0, blocked: Bool = false) {
+         bodyEncoding: MockBodyEncoding = .text, delay: Double = 0, blocked: Bool = false,
+         ruleSession: String? = nil, ruleGeneration: UInt64? = nil) {
         self.id = id; self.enabled = enabled; self.name = name; self.host = host; self.path = path
         self.method = method; self.status = status; self.headers = headers; self.body = body
         self.bodyEncoding = bodyEncoding; self.delay = delay; self.blocked = blocked
+        self.ruleSession = ruleSession; self.ruleGeneration = ruleGeneration
     }
 }
 
@@ -112,6 +118,8 @@ extension MockRule {
         bodyEncoding = try c.decodeIfPresent(MockBodyEncoding.self, forKey: .bodyEncoding) ?? .text
         delay = try c.decodeIfPresent(Double.self, forKey: .delay) ?? 0
         blocked = try c.decodeIfPresent(Bool.self, forKey: .blocked) ?? false
+        ruleSession = try c.decodeIfPresent(String.self, forKey: .ruleSession)
+        ruleGeneration = try c.decodeIfPresent(UInt64.self, forKey: .ruleGeneration)
     }
 }
 
@@ -271,10 +279,12 @@ extension Rule {
     /// reason the proxy is worth having in the rule story at all.
     /// `host` stands in for a rule that names no destination of its own — one written about an app, which
     /// refuses that app's requests wherever they are headed.
-    func asRefusal(host: String = "") -> MockRule {
+    func asRefusal(host: String = "", ruleSession: String? = nil,
+                   ruleGeneration: UInt64? = nil) -> MockRule {
         let body = #"{"error": "blocked by Flowlight", "rule": "\#(MockRule.headerSafe(title).replacingOccurrences(of: "\"", with: "'"))"}"#
         return MockRule(id: id, enabled: enabled, name: title, host: destination.isEmpty ? host : destination,
                         path: path.isEmpty ? "*" : path,
-                        method: method, status: status, headers: [], body: body, delay: 0, blocked: true)
+                        method: method, status: status, headers: [], body: body, delay: 0, blocked: true,
+                        ruleSession: ruleSession, ruleGeneration: ruleGeneration)
     }
 }

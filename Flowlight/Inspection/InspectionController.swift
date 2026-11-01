@@ -114,6 +114,9 @@ final class InspectionController: ObservableObject {
     /// which only the proxy can see. Read fresh on every connection, so a rule written now applies to the next
     /// request rather than the next launch.
     nonisolated(unsafe) var requestRules: @Sendable () -> [Rule] = { [] }
+    /// Read before requestRules. If a publication lands between the reads, a new rule paired with an older generation
+    /// is conservatively ignored rather than crediting an obsolete request decision to a replacement definition.
+    nonisolated(unsafe) var requestRuleGeneration: @Sendable () -> UInt64 = { 0 }
     /// Called with every request or proxied connection a rule refused, ready for the violations feed.
     nonisolated(unsafe) var onRuleRefusal: @Sendable (RuleEvent) -> Void = { _ in }
     /// One atomic flow-level rule answer, including whether the global escape hatch is active.
@@ -187,6 +190,7 @@ final class InspectionController: ObservableObject {
         // it goes first: a block someone wrote has to outrank a mock they left switched on.
         let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
             let destination = Self.proxyDestination(host)
+            let generation = self?.requestRuleGeneration() ?? 0
             var refusals = (self?.requestRules() ?? []).filter {
                 $0.action == .block && ($0.destination.isEmpty
                     || $0.destinationMatches(host: destination.host, ip: destination.ip))
@@ -200,7 +204,9 @@ final class InspectionController: ObservableObject {
                         || Rule.appMatches($0.app, bundleID: owner.appName, agentKey: owner.agentName ?? "")
                 }
             }
-            return refusals.map { $0.asRefusal(host: host) } + MockRules.mocks(mockRules(), host: host)
+            return refusals.map {
+                $0.asRefusal(host: host, ruleSession: RuleStore.session, ruleGeneration: generation)
+            } + MockRules.mocks(mockRules(), host: host)
         }
         proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
         proxy.authorizeConnection = { [weak self, recorder, proxy] host, port, clientPort, answer in
@@ -279,8 +285,9 @@ final class InspectionController: ObservableObject {
             guard rule.blocked, let refused = (self?.requestRules() ?? []).first(where: { $0.id == rule.id }) else { return }
             let owner = recorder.owner(clientPort: flow.clientPort, proxyPort: proxy.port)
             let path = head?.target.split(separator: "?").first.map(String.init) ?? refused.path
-            self?.onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: refused.id, action: .block,
-                                          engine: .request, agentKey: owner.agent ?? owner.bundleID,
+            self?.onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: refused.id,
+                                          ruleSession: rule.ruleSession, ruleGeneration: rule.ruleGeneration,
+                                          action: .block, engine: .request, agentKey: owner.agent ?? owner.bundleID,
                                           agentName: owner.agentName ?? owner.appName, appName: owner.appName,
                                           bundleID: owner.bundleID, host: flow.host, ip: "",
                                           port: UInt16(clamping: flow.port), path: path,
