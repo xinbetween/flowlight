@@ -331,16 +331,30 @@ final class TrafficDatabase: @unchecked Sendable {
     /// Internal rather than private so a test can run it against a database it has filled: the repair happens
     /// once, at first open, which leaves no way to exercise it afterwards through the public surface.
     func repairVersionedNames() throws {
-        // What each version belongs to, learned from the rows that did keep a path.
-        var realName: [String: (id: String, name: String)] = [:]
+        // What each version belongs to, learned from the rows that did keep a path. Earlier repairs already renamed
+        // and deleted the version-keyed traffic rows before enforcement history joined this migration. Those
+        // corrected rows still carry the original executable path, so its version-shaped filename preserves every
+        // candidate identity — including paths that disagree with the identity an earlier repair chose. Only accept
+        // one unambiguous identity per version.
+        var candidates: [String: Set<String>] = [:]
         for table in Self.tables {
             for (bundleID, path) in try conn.query(
-                "SELECT DISTINCT bundle_id, app_path FROM \(table) WHERE app_path <> ''", map: { ($0.text(0), $0.text(1)) }) {
-                guard ProcessNaming.isVersion(bundleID) else { continue }
+                "SELECT DISTINCT bundle_id, app_path FROM \(table) WHERE app_path <> ''",
+                map: { ($0.text(0), $0.text(1)) }) {
                 let derived = ProcessNaming.displayName(path: path)
                 guard !derived.isEmpty, !ProcessNaming.isVersion(derived) else { continue }
-                realName[bundleID] = (derived, ProcessNaming.friendlyName(executable: derived))
+                let filename = URL(fileURLWithPath: path).lastPathComponent
+                if ProcessNaming.isVersion(bundleID) {
+                    candidates[bundleID, default: []].insert(derived)
+                } else if ProcessNaming.isVersion(filename) {
+                    candidates[filename, default: []].insert(derived)
+                }
             }
+        }
+        var realName: [String: (id: String, name: String)] = [:]
+        for (version, choices) in candidates where choices.count == 1 {
+            guard let identity = choices.first else { continue }
+            realName[version] = (identity, ProcessNaming.friendlyName(executable: identity))
         }
         guard !realName.isEmpty else { return }
 
@@ -679,15 +693,15 @@ final class TrafficDatabase: @unchecked Sendable {
             }
         }
 
-        // Version 2 also merges colliding support/enforcement rows. Existing installations already carry the v1
-        // watermark, so comparing the version is required for the corrected repair to run on upgrade.
-        let repairVersion: Int64 = 2
+        // Version 3 recovers enforcement history after the shipped version-2 repair had already advanced its
+        // watermark without finding the version-keyed traffic rows removed by version 1.
+        let repairVersion: Int64 = 3
         let repaired = try conn.query("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
                                       map: { $0.int(0) }).first ?? 0
         if repaired < repairVersion {
             try conn.transaction {
                 try repairVersionedNames()
-                try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 2)")
+                try conn.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 3)")
             }
         }
     }

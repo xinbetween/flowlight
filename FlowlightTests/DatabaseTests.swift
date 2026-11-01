@@ -87,11 +87,11 @@ final class DatabaseTests: XCTestCase {
         XCTAssertNotNil(try db.loadPolicies()["claude"])
     }
 
-    func testVersionedNameRepairRunsAgainForLegacyWatermarkAndUpdatesEnforcementHistory() throws {
+    func testVersionedNameRepairRunsAfterShippedWatermarkAndUpdatesEnforcementHistory() throws {
         let url = db.url
         var versioned = key("2.1.260", "api.example.com")
         versioned.appName = "2.1.260"
-        versioned.appPath = "/usr/local/bin/claude"
+        versioned.appPath = "/Users/test/.local/share/claude/versions/2.1.260"
         try db.insert([TrafficBatch(timestamp: 1_700_000_000, records: [
             TrafficRecord(key: versioned, counters: FlowCounters(bytesIn: 1, flows: 1))
         ])])
@@ -107,17 +107,59 @@ final class DatabaseTests: XCTestCase {
                           appName: "2.1.260", agentKey: "", agentName: "", host: "metrics.example",
                           matchedHost: "metrics.example", port: 443)
         ])
+
+        // Reproduce the state left by the shipped version-1 migration, not merely its marker: traffic was renamed
+        // and kept the original path, while enforcement history stayed under the version-shaped identity.
+        _ = try db.raw("UPDATE flows_1s SET bundle_id = 'claude', app_name = 'Claude Code' WHERE bundle_id = '2.1.260'",
+                       map: { _ in () })
+        XCTAssertEqual(try db.raw("SELECT DISTINCT bundle_id FROM flows_1s", map: { $0.text(0) }), ["claude"])
+        XCTAssertEqual(try db.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), ["2.1.260"])
+        XCTAssertEqual(try db.raw("SELECT DISTINCT bundle_id FROM rule_pack_event_rollups",
+                                  map: { $0.text(0) }), ["2.1.260"])
         db = nil
         let legacy = try SQLiteConnection(path: url.path)
-        try legacy.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 1)")
+        try legacy.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 2)")
 
         let reopened = try TrafficDatabase(url: url)
 
         XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
-                                        map: { $0.int(0) }).first, 2)
+                                        map: { $0.int(0) }).first, 3)
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), ["claude"])
         XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_pack_event_rollups",
                                         map: { $0.text(0) }), ["claude"])
+    }
+
+    func testVersionedNameRepairDoesNotGuessAcrossConflictingRetainedPaths() throws {
+        let url = db.url
+        let version = "2.1.260"
+        var claude = key("claude", "api.example.com")
+        claude.appName = "Claude Code"
+        claude.appPath = "/Users/test/.local/share/claude/versions/\(version)"
+        var conflicting = key("claude", "other.example.com", ip: "2.3.4.5")
+        conflicting.appName = "Claude Code"
+        conflicting.appPath = "/Users/test/.local/share/another-agent/versions/\(version)"
+        try db.insert([TrafficBatch(timestamp: 1_700_000_000, records: [
+            TrafficRecord(key: claude, counters: FlowCounters(bytesIn: 1, flows: 1)),
+            TrafficRecord(key: conflicting, counters: FlowCounters(bytesIn: 1, flows: 1))
+        ])])
+        try db.recordRuleEvents([
+            RuleEvent(at: 1_700_000_001, ruleID: UUID(), action: .block, engine: .flow,
+                      agentKey: "", agentName: "", appName: version, bundleID: version,
+                      host: "telemetry.example", ip: "", port: 443)
+        ])
+
+        // Version 1 collapsed every version-keyed traffic row to one chosen identity while retaining each original
+        // path. Version 3 must treat the disagreeing retained path as conflicting evidence rather than ignore it.
+        db = nil
+        let shipped = try SQLiteConnection(path: url.path)
+        try shipped.execute("INSERT OR REPLACE INTO rollup_state (tier, watermark) VALUES ('repair.versionedNames', 2)")
+
+        let reopened = try TrafficDatabase(url: url)
+
+        XCTAssertEqual(try reopened.raw("SELECT watermark FROM rollup_state WHERE tier = 'repair.versionedNames'",
+                                        map: { $0.int(0) }).first, 3)
+        XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM flows_1s", map: { $0.text(0) }), ["claude"])
+        XCTAssertEqual(try reopened.raw("SELECT DISTINCT bundle_id FROM rule_events", map: { $0.text(0) }), [version])
     }
 
     func testBlockedAttemptProjectionIsWindowedAndExcludesAllows() throws {
