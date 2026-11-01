@@ -80,12 +80,8 @@ final class RuleStore: ObservableObject {
         if let index = rules.firstIndex(where: { $0.id == rule.id }) {
             if !resetsHits {
                 let current = rules[index]
-                let mergedHits = max(rule.hits, current.hits)
-                rule.hits = rule.maxHits > 0 ? min(rule.maxHits, mergedHits) : mergedHits
-                if let currentHit = current.lastHit,
-                   rule.lastHit == nil || rule.lastHit! < currentHit {
-                    rule.lastHit = currentHit
-                }
+                rule.hits = rule.maxHits > 0 ? min(rule.maxHits, current.hits) : current.hits
+                rule.lastHit = current.lastHit
             }
             rules[index] = rule
         } else {

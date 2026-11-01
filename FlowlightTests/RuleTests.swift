@@ -635,6 +635,39 @@ final class RuleTests: XCTestCase {
     }
 
     @MainActor
+    func testSavingAPreResetEditorSnapshotDoesNotRestoreClearedActivity() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-stale-reset-editor-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        allow.hits = 1
+        allow.lastHit = Date(timeIntervalSince1970: 1_700_000_000)
+        store.save(allow)
+        _ = try db.sync { try $0.loadRules() }
+        let staleEditorSnapshot = allow
+
+        store.resetHits(allow)
+        _ = try db.sync { try $0.loadRules() }
+        var edited = staleEditorSnapshot
+        edited.name = "Saved after activity reset"
+        store.save(edited)
+        _ = try db.sync { try $0.loadRules() }
+
+        let current = try XCTUnwrap(store.rules.first(where: { $0.id == allow.id }))
+        XCTAssertEqual(current.name, edited.name)
+        XCTAssertEqual(current.hits, 0)
+        XCTAssertNil(current.lastHit)
+        let loaded = try XCTUnwrap(db.sync { try $0.loadRules().first(where: { $0.id == allow.id }) })
+        XCTAssertEqual(loaded.name, edited.name)
+        XCTAssertEqual(loaded.hits, 0)
+        XCTAssertNil(loaded.lastHit)
+    }
+
+    @MainActor
     func testStaleRequestRuleEventIsRejectedAfterDefinitionEdit() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("flowlight-request-rule-stale-event-\(UUID().uuidString).sqlite")
