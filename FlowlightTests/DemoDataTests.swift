@@ -51,7 +51,7 @@ final class DemoDataTests: XCTestCase {
         let snapshot = AITrafficGraphBuilder.build(
             rows: rows,
             gateways: DemoData.agentGateways,
-            resolveGateway: DemoData.gatewayIdentity,
+            resolveGateway: { endpoint in DemoData.gatewayIdentity(endpoint) },
             limits: .unbounded
         )
 
