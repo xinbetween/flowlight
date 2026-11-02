@@ -3079,7 +3079,7 @@ final class TrafficGraphTests: XCTestCase {
             TrafficGraphLayout.layout(
                 snapshot: snapshot,
                 in: bounds,
-                placementObserver: gate.observePlacement
+                placementObserver: { gate.observePlacement() }
             )
         }
 
