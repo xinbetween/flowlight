@@ -1803,8 +1803,13 @@
 "Traffic map" = "Traffic map";
 "All applications" = "All applications";
 "Observed connections during %@" = "Observed connections during %@";
-"%lld quieter connections hidden" = "%lld quieter connections hidden";
-"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "The map stays readable by showing the busiest relationships. The list uses the same bounded selection.";
+"%lld relationships omitted from Map" = "%lld relationships omitted from Map";
+"The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope." = "The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope.";
+"%lld nodes and %lld relationships omitted from Map" = "%lld nodes and %lld relationships omitted from Map";
+"Showing %lld of %lld relationships" = "Showing %lld of %lld relationships";
+"Show %lld more relationships" = "Show %lld more relationships";
+"Loads the next page without changing the Map" = "Loads the next page without changing the Map";
+"Select a relationship for an exact Reports scope." = "Select a relationship for an exact Reports scope.";
 "Period" = "Period";
 "No traffic to visualize" = "No traffic to visualize";
 "Flowlight has not observed any connections in this period." = "Flowlight has not observed any connections in this period.";

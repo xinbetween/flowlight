@@ -1803,8 +1803,13 @@
 "Traffic map" = "트래픽 지도";
 "All applications" = "모든 애플리케이션";
 "Observed connections during %@" = "%@ 동안 관찰된 연결";
-"%lld quieter connections hidden" = "활동이 적은 연결 %lld개 숨김";
-"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "가장 활발한 관계를 표시하여 지도를 읽기 쉽게 유지합니다. 목록도 동일한 제한된 선택을 사용합니다.";
+"%lld relationships omitted from Map" = "지도에서 관계 %lld개 생략";
+"The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope." = "지도는 제한된 투영으로 읽기 쉽게 유지됩니다. 목록에는 이 검색 및 포커스 범위의 모든 관계가 유지됩니다.";
+"%lld nodes and %lld relationships omitted from Map" = "지도에서 노드 %lld개와 관계 %lld개 생략";
+"Showing %lld of %lld relationships" = "관계 %2$lld개 중 %1$lld개 표시";
+"Show %lld more relationships" = "관계 %lld개 더 표시";
+"Loads the next page without changing the Map" = "지도를 변경하지 않고 다음 페이지를 불러옵니다";
+"Select a relationship for an exact Reports scope." = "정확한 보고서 범위를 보려면 관계를 선택하십시오.";
 "Period" = "기간";
 "No traffic to visualize" = "시각화할 트래픽 없음";
 "Flowlight has not observed any connections in this period." = "이 기간에 Flowlight가 관찰한 연결이 없습니다.";

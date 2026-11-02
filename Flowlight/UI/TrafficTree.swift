@@ -328,6 +328,52 @@ struct TrafficNode: Identifiable, Hashable {
     }
 }
 
+struct TrafficTreePage {
+    var limits: [String: Int]
+    var displayed: [TrafficNode]
+}
+
+enum TrafficTreePaging {
+    static func project(
+        _ nodes: [TrafficNode],
+        query: String,
+        comparators: [KeyPathComparator<TrafficNode>],
+        limits: [String: Int],
+        levels: [TreeLevel]
+    ) -> TrafficTreePage {
+        let sorted = TrafficNode.filter(nodes, query: query)
+            .sorted(using: comparators)
+            .map { $0.sorted(using: comparators) }
+        return TrafficTreePage(
+            limits: limits,
+            displayed: TrafficNode.capped(
+                sorted,
+                parentID: TrafficNode.rootID,
+                parent: nil,
+                limits: limits,
+                levels: levels
+            )
+        )
+    }
+
+    static func showMore(
+        _ nodes: [TrafficNode],
+        query: String,
+        comparators: [KeyPathComparator<TrafficNode>],
+        limits: [String: Int],
+        after moreRowID: String,
+        levels: [TreeLevel]
+    ) -> TrafficTreePage {
+        project(
+            nodes,
+            query: query,
+            comparators: comparators,
+            limits: TrafficNode.showingMore(limits, after: moreRowID),
+            levels: levels
+        )
+    }
+}
+
 extension TreeLevel: Equatable {}
 
 enum CSVExport {

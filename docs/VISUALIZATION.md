@@ -12,8 +12,8 @@ Traffic mode answers: **which applications moved traffic, and where did it go?**
 - Moving particles represent sent and received direction; Reduce Motion removes them.
 - Values are bytes and network connections (`FlowCounters.flows`), never mislabeled as HTTP requests.
 - Ordinary traffic is **Observed**, not “Allowed.” A status badge appears only when a store provides matching structured evidence.
-- The map is bounded for readability and reports hidden node, edge, byte, and connection totals. Applications are admitted by their full selected-period traffic, matching Reports; each visible application card keeps that full total even when only its busiest relationships are drawn. The list presents the same bounded relationships.
-- Proxy cards report traffic routed through that proxy, which remains distinct from traffic owned by the proxy application itself.
+- The semantic graph retains every relationship in the selected search and Focus scope. The map derives a bounded projection for readability and reports exact omitted node, relationship, byte, and connection totals. The independently paged list reveals the complete graph 25 relationships at a time; paging never changes Map IDs or layout.
+- Each application has one semantic card. Application-owned traffic, observed proxy routing, configured-gateway, launcher, agent, and tool roles remain distinct relationship evidence on that card, while observed traffic is counted exactly once.
 - Selecting an app, destination, or relationship can open Reports, Inspect, or an unsaved rule editor with the exact app and host/address filter. Bare IPv4 and IPv6 destinations retain exact address identity and use `remoteIP` scope rather than a fabricated domain family.
 
 The first slice reads the uncapped `TrafficDatabase.appDestinationRows` projection and builds a pure `TrafficGraphSnapshot`. Layout depends on stable topology IDs and viewport size, not counter values, so refreshes do not make nodes jump.
@@ -82,8 +82,8 @@ A later status overlay must expose completeness/retention and join only structur
 - Existing positions survive counter refreshes and mode-local filtering where topology permits.
 - Layout recomputes only for material topology or viewport changes.
 - Node frames include icon, labels, telemetry, and status footprint before collision resolution.
-- Separate caps apply to agents, tools/MCP nodes, services/destinations, and relationships.
-- Hidden/Other summaries preserve byte and connection totals and name what was folded.
+- Separate caps apply only to the Map projection: agents, tools/MCP nodes, services/destinations, and relationships remain complete in List.
+- Map omission summaries are the exact ID-set difference from the complete semantic graph and include only omitted observed traffic in byte and connection totals.
 
 ### Acceptance tests
 
@@ -92,8 +92,8 @@ A later status overlay must expose completeness/retention and join only structur
 3. Provider grouping preserves exact host/IP members and exact navigation filters.
 4. Lineage never appears as a measured invocation without inspected invocation evidence.
 5. Duplicate rows aggregate without losing received, sent, or connection totals.
-6. Caps are deterministic and visible plus hidden totals equal the full source totals.
-7. Node positions remain unchanged when only counters change.
+6. Complete semantics retain every relationship; deterministic Map IDs are a subset, and visible plus omitted observed totals equal the full source totals.
+7. List paging and counter-only refreshes leave Map IDs, node positions, and curves unchanged.
 8. No feasible full-frame overlaps; hover and selection never mutate geometry.
 9. Reduce Motion removes traveling particles; the list and accessibility labels retain direction and values.
 10. Status overlays never classify ordinary observed traffic as an allow decision.

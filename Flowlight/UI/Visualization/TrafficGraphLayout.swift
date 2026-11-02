@@ -135,6 +135,20 @@ struct TrafficGraphParticle: Equatable, Sendable {
     var radius: CGFloat
 }
 
+struct TrafficGraphLayoutKey: Equatable, Sendable {
+    var nodeIDs: [TrafficGraphNodeID]
+    var edgeIDs: [TrafficGraphEdgeID]
+    var width: Int
+    var height: Int
+
+    init(snapshot: TrafficGraphSnapshot, size: CGSize) {
+        nodeIDs = snapshot.nodes.map(\.id)
+        edgeIDs = snapshot.edges.map(\.id)
+        width = Int(size.width.rounded())
+        height = Int(size.height.rounded())
+    }
+}
+
 struct TrafficGraphLayoutSnapshot: Sendable {
     var nodeFrames: [TrafficGraphNodeID: CGRect]
     var edgeCurves: [TrafficGraphEdgeID: TrafficGraphCurve]

@@ -1804,8 +1804,13 @@
 "Traffic map" = "Carte du trafic";
 "All applications" = "Toutes les applications";
 "Observed connections during %@" = "Connexions observées pendant %@";
-"%lld quieter connections hidden" = "%lld connexions moins actives masquées";
-"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "La carte reste lisible en affichant les relations les plus actives. La liste utilise la même sélection limitée.";
+"%lld relationships omitted from Map" = "%lld relations omises de la carte";
+"The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope." = "La carte reste lisible grâce à une projection limitée. La liste conserve toutes les relations de cette recherche et de cette portée Focus.";
+"%lld nodes and %lld relationships omitted from Map" = "%lld nœuds et %lld relations omis de la carte";
+"Showing %lld of %lld relationships" = "Affichage de %lld relations sur %lld";
+"Show %lld more relationships" = "Afficher %lld relations de plus";
+"Loads the next page without changing the Map" = "Charge la page suivante sans modifier la carte";
+"Select a relationship for an exact Reports scope." = "Sélectionnez une relation pour obtenir une portée exacte dans Rapports.";
 "Period" = "Période";
 "No traffic to visualize" = "Aucun trafic à visualiser";
 "Flowlight has not observed any connections in this period." = "Flowlight n’a observé aucune connexion pendant cette période.";

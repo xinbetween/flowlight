@@ -39,6 +39,7 @@ struct TrafficGraphNode: Identifiable, Sendable {
     var counters: FlowCounters
     var members: [TrafficGraphMember] = []
     var roleEvidence: [TrafficGraphRoleEvidence] = []
+    var isFilterExact = true
 }
 
 enum TrafficGraphRelationship: String, Sendable, Hashable {
@@ -92,12 +93,23 @@ struct TrafficGraphEdge: Identifiable, Sendable {
     var isTrafficRibbon: Bool { relationship == .observed || trafficVolume != nil }
 }
 
+extension FlowCounters {
+    func subtractingFloorZero(_ other: FlowCounters) -> FlowCounters {
+        FlowCounters(
+            bytesIn: max(0, bytesIn - other.bytesIn),
+            bytesOut: max(0, bytesOut - other.bytesOut),
+            flows: max(0, flows - other.flows)
+        )
+    }
+}
+
 struct TrafficGraphHidden: Equatable, Sendable {
     var nodeCount = 0
     var edgeCount = 0
     var counters = FlowCounters()
 
     static let none = TrafficGraphHidden()
+    var hasOmissions: Bool { nodeCount > 0 || edgeCount > 0 }
 }
 
 struct TrafficGraphSnapshot: Sendable {
@@ -109,7 +121,470 @@ struct TrafficGraphSnapshot: Sendable {
     static let empty = TrafficGraphSnapshot(nodes: [], edges: [], total: FlowCounters(), hidden: .none)
 
     var visibleTotal: FlowCounters {
-        edges.reduce(into: FlowCounters()) { $0 += $1.counters }
+        edges.lazy.filter { $0.relationship == .observed }
+            .reduce(into: FlowCounters()) { $0 += $1.counters }
+    }
+}
+
+struct TrafficGraphBuild: Sendable {
+    var complete: TrafficGraphSnapshot
+    var map: TrafficGraphSnapshot
+}
+
+struct TrafficGraphRoleListItem: Identifiable, Sendable {
+    var node: TrafficGraphNode
+    var evidence: TrafficGraphRoleEvidence
+    var index: Int
+
+    var id: String {
+        node.id.rawValue + "|role|" + evidence.relationship.rawValue + "|\(index)"
+    }
+}
+
+struct TrafficGraphListPage: Sendable {
+    var edges: [TrafficGraphEdge]
+    var roleItems: [TrafficGraphRoleListItem]
+    var shownCount: Int
+    var totalCount: Int
+    var remainingCount: Int
+
+    var hasMore: Bool { remainingCount > 0 }
+}
+
+enum TrafficGraphListPager {
+    static let pageSize = 25
+
+    private static func roleItems(in complete: TrafficGraphSnapshot) -> [TrafficGraphRoleListItem] {
+        complete.nodes.flatMap { node in
+            node.roleEvidence.enumerated().compactMap { index, evidence -> TrafficGraphRoleListItem? in
+                let survivesAsEdge = complete.edges.contains { edge in
+                    edge.relationship == evidence.relationship
+                        && (edge.source == node.id || edge.target == node.id)
+                        && edge.configuration == evidence.configuration
+                }
+                guard !survivesAsEdge else { return nil }
+                return TrafficGraphRoleListItem(node: node, evidence: evidence, index: index)
+            }
+        }
+    }
+
+    static func totalCount(in complete: TrafficGraphSnapshot) -> Int {
+        complete.edges.count + roleItems(in: complete).count
+    }
+
+    static func clampedVisibleCount(current: Int, in complete: TrafficGraphSnapshot) -> Int {
+        min(max(pageSize, current), totalCount(in: complete))
+    }
+
+    static func page(in complete: TrafficGraphSnapshot, visibleCount: Int) -> TrafficGraphListPage {
+        let roleItems = roleItems(in: complete)
+        let total = complete.edges.count + roleItems.count
+        let shown = min(max(0, visibleCount), total)
+        let shownEdgeCount = min(shown, complete.edges.count)
+        let shownRoleCount = max(0, shown - shownEdgeCount)
+        return TrafficGraphListPage(
+            edges: Array(complete.edges.prefix(shownEdgeCount)),
+            roleItems: Array(roleItems.prefix(shownRoleCount)),
+            shownCount: shown,
+            totalCount: total,
+            remainingCount: total - shown
+        )
+    }
+
+    static func nextVisibleCount(current: Int, total: Int) -> Int {
+        min(max(0, total), max(0, current) + pageSize)
+    }
+}
+
+extension TrafficGraphHidden {
+    static func exactDifference(
+        complete: TrafficGraphSnapshot,
+        projected: TrafficGraphSnapshot
+    ) -> TrafficGraphHidden {
+        let projectedNodeIDs = Set(projected.nodes.map(\.id))
+        let projectedEdgeIDs = Set(projected.edges.map(\.id))
+        let omittedObserved = complete.edges.lazy.filter {
+            $0.relationship == .observed && !projectedEdgeIDs.contains($0.id)
+        }
+        return TrafficGraphHidden(
+            nodeCount: complete.nodes.lazy.filter { !projectedNodeIDs.contains($0.id) }.count,
+            edgeCount: complete.edges.lazy.filter { !projectedEdgeIDs.contains($0.id) }.count,
+            counters: omittedObserved.reduce(into: FlowCounters()) { $0 += $1.counters }
+        )
+    }
+}
+
+enum TrafficGraphMapProjector {
+    private struct Limits {
+        var roots: Int
+        var tools: Int
+        var destinations: Int
+        var observedEdges: Int
+        var blockedEdges: Int
+        var launchers: Int
+        var relays: Int
+        var recalculateSourceCounters: Bool
+        var blockedRootReserve: Int
+        var blockedDestinationReserve: Int?
+    }
+
+    static func project(
+        _ complete: TrafficGraphSnapshot,
+        limits: TrafficGraphLimits
+    ) -> TrafficGraphSnapshot {
+        project(
+            complete,
+            limits: Limits(
+                roots: limits.maxApps,
+                tools: 0,
+                destinations: limits.maxDestinations,
+                observedEdges: limits.maxEdges,
+                blockedEdges: limits.maxBlockedEdges,
+                launchers: 0,
+                relays: limits.maxRelays,
+                recalculateSourceCounters: false,
+                blockedRootReserve: 0,
+                blockedDestinationReserve: min(
+                    5,
+                    max(0, limits.maxBlockedEdges),
+                    max(0, limits.maxDestinations) / 2
+                )
+            )
+        )
+    }
+
+    static func project(
+        _ complete: TrafficGraphSnapshot,
+        limits: AITrafficGraphLimits
+    ) -> TrafficGraphSnapshot {
+        project(
+            complete,
+            limits: Limits(
+                roots: limits.maxAgents,
+                tools: limits.maxTools,
+                destinations: limits.maxDestinations,
+                observedEdges: limits.maxObservedEdges,
+                blockedEdges: limits.maxBlockedEdges,
+                launchers: limits.maxLaunchers,
+                relays: .max,
+                recalculateSourceCounters: true,
+                blockedRootReserve: min(
+                    max(0, limits.maxAgents),
+                    max(1, max(0, limits.maxAgents) / 3)
+                ),
+                blockedDestinationReserve: nil
+            )
+        )
+    }
+
+    private static func project(
+        _ complete: TrafficGraphSnapshot,
+        limits: Limits
+    ) -> TrafficGraphSnapshot {
+        let nodesByID = Dictionary(uniqueKeysWithValues: complete.nodes.map { ($0.id, $0) })
+        let supportEdges = complete.edges.filter {
+            $0.relationship != .observed && $0.relationship != .blocked
+        }
+        let incomingSupport = Dictionary(grouping: supportEdges, by: \.target)
+
+        func rootIDs(for nodeID: TrafficGraphNodeID) -> Set<TrafficGraphNodeID> {
+            guard let node = nodesByID[nodeID] else { return [] }
+            switch node.kind {
+            case .app, .agent:
+                return [nodeID]
+            case .tool, .mcp:
+                let roots = (incomingSupport[nodeID] ?? [])
+                    .filter { $0.relationship == .runs || $0.relationship == .invoked }
+                    .flatMap { rootIDs(for: $0.source) }
+                return roots.isEmpty ? [nodeID] : Set(roots)
+            case .proxy:
+                let roots = (incomingSupport[nodeID] ?? [])
+                    .filter {
+                        $0.relationship == .routedThrough
+                            || $0.relationship == .configuredGateway
+                    }
+                    .flatMap { rootIDs(for: $0.source) }
+                return roots.isEmpty ? [nodeID] : Set(roots)
+            case .launcher, .destination, .service:
+                return []
+            }
+        }
+
+        let rootNodesByBundleID: [String: Set<TrafficGraphNodeID>] = complete.nodes.reduce(into: [:]) {
+            result, node in
+            guard node.kind == .app || node.kind == .agent else { return }
+            let bundleIDs = Set(node.filter.bundleIDs)
+                .union(node.filter.bundleID.map { [$0] } ?? [])
+            for bundleID in bundleIDs where !bundleID.isEmpty {
+                result[bundleID.lowercased(), default: []].insert(node.id)
+            }
+        }
+
+        func roots(for edge: TrafficGraphEdge) -> Set<TrafficGraphNodeID> {
+            if edge.relationship == .observed {
+                let memberRoots = edge.members.reduce(into: Set<TrafficGraphNodeID>()) { result, member in
+                    let identity = member.filter.agentParent ?? member.filter.bundleID
+                    guard let identity else { return }
+                    result.formUnion(rootNodesByBundleID[identity.lowercased()] ?? [])
+                }
+                if !memberRoots.isEmpty { return memberRoots }
+            }
+            let sourceRoots = rootIDs(for: edge.source)
+            return sourceRoots.isEmpty ? rootIDs(for: edge.target) : sourceRoots
+        }
+
+        var selectedNodeIDs: Set<TrafficGraphNodeID> = []
+        var selectedEdgeIDs: Set<TrafficGraphEdgeID> = []
+        var selectedRoots: Set<TrafficGraphNodeID> = []
+        var selectedTools: Set<TrafficGraphNodeID> = []
+        var selectedDestinations: Set<TrafficGraphNodeID> = []
+        var selectedRelays: Set<TrafficGraphNodeID> = []
+
+        func classified(_ ids: Set<TrafficGraphNodeID>) -> (
+            roots: Set<TrafficGraphNodeID>,
+            tools: Set<TrafficGraphNodeID>,
+            destinations: Set<TrafficGraphNodeID>,
+            relays: Set<TrafficGraphNodeID>
+        ) {
+            var roots: Set<TrafficGraphNodeID> = []
+            var tools: Set<TrafficGraphNodeID> = []
+            var destinations: Set<TrafficGraphNodeID> = []
+            var relays: Set<TrafficGraphNodeID> = []
+            for id in ids {
+                guard let node = nodesByID[id] else { continue }
+                switch node.kind {
+                case .app, .agent: roots.insert(id)
+                case .tool, .mcp: tools.insert(id)
+                case .destination, .service: destinations.insert(id)
+                case .proxy: relays.insert(id)
+                case .launcher: break
+                }
+            }
+            return (roots, tools, destinations, relays)
+        }
+
+        func relayIDs(
+            for edge: TrafficGraphEdge,
+            endpointKinds: (
+                roots: Set<TrafficGraphNodeID>,
+                tools: Set<TrafficGraphNodeID>,
+                destinations: Set<TrafficGraphNodeID>,
+                relays: Set<TrafficGraphNodeID>
+            )
+        ) -> Set<TrafficGraphNodeID> {
+            var relays = endpointKinds.relays
+            let endpoints: Set<TrafficGraphNodeID> = [edge.source, edge.target]
+            let roleEndpoints = endpoints.filter { id in
+                nodesByID[id]?.roleEvidence.contains(where: {
+                    $0.relationship == .routedThrough || $0.relationship == .configuredGateway
+                }) == true
+            }
+            if edge.relationship == .routedThrough || edge.relationship == .configuredGateway {
+                relays.formUnion(roleEndpoints)
+            } else if edge.relationship == .observed,
+                      !roots(for: edge).isSubset(of: endpointKinds.roots) {
+                relays.formUnion(roleEndpoints)
+            }
+            return relays
+        }
+
+        func rootsToAdmit(
+            for edge: TrafficGraphEdge,
+            limit: Int
+        ) -> Set<TrafficGraphNodeID> {
+            let kinds = classified([edge.source, edge.target])
+            let semanticRoots = roots(for: edge).union(kinds.roots)
+            let existing = semanticRoots.intersection(selectedRoots)
+            var available = max(0, max(0, limit) - selectedRoots.count)
+            let required = kinds.roots.subtracting(selectedRoots).sorted()
+            let admittedRequired = Set(required.prefix(available))
+            available -= admittedRequired.count
+            let optional = semanticRoots
+                .subtracting(selectedRoots)
+                .subtracting(admittedRequired)
+                .sorted()
+            return existing.union(admittedRequired).union(optional.prefix(available))
+        }
+
+        func canSelect(
+            _ edge: TrafficGraphEdge,
+            rootLimit: Int? = nil,
+            destinationLimit: Int? = nil
+        ) -> Bool {
+            let endpoints: Set<TrafficGraphNodeID> = [edge.source, edge.target]
+            let kinds = classified(endpoints)
+            let semanticRoots = roots(for: edge).union(kinds.roots)
+            let admittedRoots = rootsToAdmit(
+                for: edge,
+                limit: rootLimit ?? limits.roots
+            )
+            let rootsAfterSelection = selectedRoots.union(admittedRoots)
+            return (semanticRoots.isEmpty || !admittedRoots.isEmpty)
+                && (kinds.roots.isEmpty || semanticRoots.isSubset(of: rootsAfterSelection))
+                && selectedTools.union(kinds.tools).count <= max(0, limits.tools)
+                && selectedDestinations.union(kinds.destinations).count
+                    <= max(0, destinationLimit ?? limits.destinations)
+                && selectedRelays.union(relayIDs(for: edge, endpointKinds: kinds)).count
+                    <= max(0, limits.relays)
+        }
+
+        func select(_ edge: TrafficGraphEdge, rootLimit: Int? = nil) {
+            selectedEdgeIDs.insert(edge.id)
+            selectedNodeIDs.insert(edge.source)
+            selectedNodeIDs.insert(edge.target)
+            let kinds = classified([edge.source, edge.target])
+            selectedRoots.formUnion(rootsToAdmit(for: edge, limit: rootLimit ?? limits.roots))
+            selectedTools.formUnion(kinds.tools)
+            selectedDestinations.formUnion(kinds.destinations)
+            selectedRelays.formUnion(relayIDs(for: edge, endpointKinds: kinds))
+        }
+
+        let rankedBlocked = complete.edges
+            .filter { $0.relationship == .blocked }
+            .sorted {
+                let left = $0.enforcement?.count ?? 0
+                let right = $1.enforcement?.count ?? 0
+                return left == right ? $0.id < $1.id : left > right
+            }
+        let blockedReserve = limits.blockedDestinationReserve ?? limits.destinations
+        var blockedCount = 0
+        for edge in rankedBlocked
+        where blockedCount < max(0, limits.blockedEdges) {
+            guard canSelect(
+                edge,
+                rootLimit: limits.blockedRootReserve,
+                destinationLimit: blockedReserve
+            ) else { continue }
+            select(edge, rootLimit: limits.blockedRootReserve)
+            blockedCount += 1
+        }
+
+        let rankedObserved = complete.edges
+            .filter { $0.relationship == .observed }
+            .sorted {
+                if $0.counters.total != $1.counters.total {
+                    return $0.counters.total > $1.counters.total
+                }
+                return $0.id < $1.id
+            }
+        var representedRoots = selectedRoots
+        var observedCount = 0
+        for edge in rankedObserved {
+            let edgeRoots = roots(for: edge)
+            guard !edgeRoots.isSubset(of: representedRoots),
+                  observedCount < max(0, limits.observedEdges),
+                  canSelect(edge) else { continue }
+            select(edge)
+            representedRoots.formUnion(selectedRoots)
+            observedCount += 1
+        }
+        for edge in rankedObserved
+        where observedCount < max(0, limits.observedEdges) {
+            guard !selectedEdgeIDs.contains(edge.id), canSelect(edge) else { continue }
+            select(edge)
+            observedCount += 1
+        }
+
+        for edge in rankedBlocked
+        where blockedCount < max(0, limits.blockedEdges) {
+            guard !selectedEdgeIDs.contains(edge.id), canSelect(edge) else { continue }
+            select(edge)
+            blockedCount += 1
+        }
+
+        for edge in supportEdges
+        where edge.relationship == .configuredGateway
+            && !selectedEdgeIDs.contains(edge.id) {
+            guard canSelect(edge) else { continue }
+            select(edge)
+        }
+        for node in complete.nodes
+        where !node.roleEvidence.isEmpty && !selectedNodeIDs.contains(node.id) {
+            let roots = rootIDs(for: node.id)
+            let available = max(0, max(0, limits.roots) - selectedRoots.count)
+            let admitted = roots.intersection(selectedRoots).union(
+                roots.subtracting(selectedRoots).sorted().prefix(available)
+            )
+            guard roots.isEmpty || !admitted.isEmpty else { continue }
+            selectedNodeIDs.insert(node.id)
+            selectedRoots.formUnion(admitted)
+        }
+
+        var selectedLaunchers: Set<TrafficGraphNodeID> = []
+        var changed = true
+        while changed {
+            changed = false
+            for edge in supportEdges where !selectedEdgeIDs.contains(edge.id) {
+                let required: Bool
+                switch edge.relationship {
+                case .runs, .routedThrough:
+                    required = selectedNodeIDs.contains(edge.target)
+                case .configuredGateway:
+                    required = selectedNodeIDs.contains(edge.source)
+                        || selectedNodeIDs.contains(edge.target)
+                case .launched:
+                    required = selectedNodeIDs.contains(edge.target)
+                case .invoked:
+                    required = selectedNodeIDs.contains(edge.source)
+                        && selectedNodeIDs.contains(edge.target)
+                case .observed, .blocked:
+                    required = false
+                }
+                guard required else { continue }
+                if edge.relationship == .launched {
+                    guard selectedLaunchers.contains(edge.source)
+                        || selectedLaunchers.count < max(0, limits.launchers)
+                    else { continue }
+                }
+                guard canSelect(edge) else { continue }
+                select(edge)
+                if edge.relationship == .launched { selectedLaunchers.insert(edge.source) }
+                changed = true
+            }
+        }
+
+        let projectedEdges = complete.edges.filter { selectedEdgeIDs.contains($0.id) }
+        var sourceCounters: [TrafficGraphNodeID: FlowCounters] = [:]
+        var destinationCounters: [TrafficGraphNodeID: FlowCounters] = [:]
+        var destinationMembers: [TrafficGraphNodeID: [String: TrafficGraphMember]] = [:]
+        for edge in projectedEdges where edge.relationship == .observed {
+            sourceCounters[edge.source, default: FlowCounters()] += edge.counters
+            destinationCounters[edge.target, default: FlowCounters()] += edge.counters
+            for member in edge.members {
+                let identity = member.filter.agentParent ?? member.filter.bundleID
+                if let identity {
+                    for rootID in rootNodesByBundleID[identity.lowercased()] ?? []
+                    where selectedRoots.contains(rootID) && rootID != edge.source {
+                        sourceCounters[rootID, default: FlowCounters()] += member.counters
+                    }
+                }
+                if var existing = destinationMembers[edge.target]?[member.id] {
+                    existing.counters += member.counters
+                    destinationMembers[edge.target]?[member.id] = existing
+                } else {
+                    destinationMembers[edge.target, default: [:]][member.id] = member
+                }
+            }
+        }
+        let projectedNodes = complete.nodes.filter { selectedNodeIDs.contains($0.id) }.map { node in
+            var projectedNode = node
+            if node.kind == .destination || node.kind == .service {
+                projectedNode.counters = destinationCounters[node.id] ?? FlowCounters()
+                projectedNode.members = (destinationMembers[node.id] ?? [:]).values.sorted { $0.id < $1.id }
+            } else if limits.recalculateSourceCounters,
+                      node.kind != .launcher {
+                projectedNode.counters = sourceCounters[node.id] ?? FlowCounters()
+            }
+            return projectedNode
+        }
+        var projected = TrafficGraphSnapshot(
+            nodes: projectedNodes,
+            edges: projectedEdges,
+            total: complete.total,
+            hidden: .none
+        )
+        projected.hidden = .exactDifference(complete: complete, projected: projected)
+        return projected
     }
 }
 
@@ -510,7 +985,7 @@ enum TrafficGraphBuilder {
             nodes.append(TrafficGraphNode(
                 id: id, kind: .proxy, title: metadata.name.isEmpty ? relay.bundleID : metadata.name,
                 detail: L("Observed route"), appPath: metadata.path,
-                filter: TrafficFilter(), counters: counters
+                filter: TrafficFilter(bundleID: relay.bundleID), counters: counters
             ))
         }
         for destination in visibleDestinations.sorted(by: { destinationID($0) < destinationID($1) }) {
@@ -543,9 +1018,32 @@ enum TrafficGraphBuilder {
                 0,
                 relationships.count + blocked.count - selectedRelationships.count - selectedBlocked.count
             ),
-            counters: subtract(total, visibleTotal)
+            counters: total.subtractingFloorZero(visibleTotal)
         )
-        return TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: hidden)
+        let coalesced = TrafficGraphApplicationCoalescer.coalesce(nodes: nodes, edges: edges)
+        return TrafficGraphSnapshot(
+            nodes: coalesced.nodes,
+            edges: coalesced.edges,
+            total: total,
+            hidden: hidden
+        )
+    }
+
+    static func buildForPresentation<Rows: Sequence>(
+        rows sourceRows: Rows,
+        blockedAttempts: [BlockedAttemptRow] = [],
+        mapLimits: TrafficGraphLimits = .standard
+    ) -> TrafficGraphBuild where Rows.Element == BreakdownRow {
+        let rows = Array(sourceRows)
+        var complete = build(rows: rows, blockedAttempts: blockedAttempts, limits: .unbounded)
+        complete.hidden = .none
+        guard mapLimits != .unbounded else {
+            return TrafficGraphBuild(complete: complete, map: complete)
+        }
+        return TrafficGraphBuild(
+            complete: complete,
+            map: TrafficGraphMapProjector.project(complete, limits: mapLimits)
+        )
     }
 
     private struct RepresentativeResource: Hashable {
@@ -740,13 +1238,5 @@ enum TrafficGraphBuilder {
         }
         if !destination.owner.isEmpty, destination.asn > 0 { return "AS\(destination.asn) · \(destination.remoteIP)" }
         return ""
-    }
-
-    private static func subtract(_ lhs: FlowCounters, _ rhs: FlowCounters) -> FlowCounters {
-        FlowCounters(
-            bytesIn: max(0, lhs.bytesIn - rhs.bytesIn),
-            bytesOut: max(0, lhs.bytesOut - rhs.bytesOut),
-            flows: max(0, lhs.flows - rhs.flows)
-        )
     }
 }

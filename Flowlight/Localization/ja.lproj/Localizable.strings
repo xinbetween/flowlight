@@ -1804,8 +1804,13 @@
 "Traffic map" = "トラフィックマップ";
 "All applications" = "すべてのアプリ";
 "Observed connections during %@" = "%@に観測された接続";
-"%lld quieter connections hidden" = "%lld件の低活動接続を非表示";
-"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "最も活発な関係を表示してマップを読みやすくしています。リストも同じ制限された選択を使用します。";
+"%lld relationships omitted from Map" = "マップから%lld件の関係を省略";
+"The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope." = "マップは制限された投影で読みやすさを保ちます。リストには、この検索とフォーカス範囲のすべての関係が保持されます。";
+"%lld nodes and %lld relationships omitted from Map" = "マップから%lld個のノードと%lld件の関係を省略";
+"Showing %lld of %lld relationships" = "%2$lld件中%1$lld件の関係を表示";
+"Show %lld more relationships" = "さらに%lld件の関係を表示";
+"Loads the next page without changing the Map" = "マップを変更せずに次のページを読み込みます";
+"Select a relationship for an exact Reports scope." = "正確なレポート範囲を表示するには関係を選択してください。";
 "Period" = "期間";
 "No traffic to visualize" = "可視化するトラフィックがありません";
 "Flowlight has not observed any connections in this period." = "この期間にFlowlightが観測した接続はありません。";

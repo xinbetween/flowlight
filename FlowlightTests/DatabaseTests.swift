@@ -676,6 +676,33 @@ final class DatabaseTests: XCTestCase {
                        "a child visible through its focused parent must remain visible after Reports drill-down")
     }
 
+    func testAIVisualizationRowsRetainsEveryRelationshipBeyondMapCaps() throws {
+        let timestamp: Int64 = 1_700_100_000
+        let records = (0..<35).map { index -> TrafficRecord in
+            var identity = key(
+                "claude",
+                "host\(index).example",
+                ip: "203.0.113.\(index)"
+            )
+            identity.appName = "Claude Code"
+            return TrafficRecord(
+                key: identity,
+                counters: FlowCounters(bytesIn: Int64(index + 1), flows: 1)
+            )
+        }
+        try db.insert([TrafficBatch(timestamp: timestamp, records: records)])
+
+        let rows = try db.aiVisualizationRows(
+            .second,
+            from: Date(timeIntervalSince1970: TimeInterval(timestamp)),
+            to: Date(timeIntervalSince1970: TimeInterval(timestamp + 1))
+        )
+
+        XCTAssertEqual(rows.count, 35)
+        XCTAssertEqual(Set(rows.map(\.domain)).count, 35)
+        XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.flows }, 35)
+    }
+
     func testAIRollupsKeepDistinctParentAndMCPAttribution() throws {
         let utc = TimeZone(identifier: "UTC")!
         let t0: Int64 = 1_700_000_000 - (1_700_000_000 % 86400)
