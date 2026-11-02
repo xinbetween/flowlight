@@ -1129,7 +1129,8 @@
 "Copy IP Address" = "IP アドレスをコピー";
 "Copy Destination" = "接続先をコピー";
 "Copy Hostname" = "ホスト名をコピー";
-"Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail." = "アプリ × 接続先 × IP の組み合わせのうち、上位 %@ 件を表示しています。合計と構成比はすべてのトラフィックを含みます。すべての詳細を見るには、絞り込むか期間を短くしてください。";
+"Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail." = "アプリ × 接続先 × IP の組み合わせのうち、上位 %@ 件を表示しています。アプリの合計と構成比はすべてのトラフィックを含みます。関係の全詳細を見るには、絞り込むか期間を短くしてください。";
+"Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window." = "アプリ × 接続先 × IP の組み合わせのうち、上位 %@ 件を表示しています。接続先と IP のグループ化にはこの限定された詳細が使われます。アプリの完全な合計を見るには「アプリ」に切り替えるか、絞り込むか期間を短くしてください。";
 "Per-second data is kept for a few hours." = "秒単位のデータは数時間だけ保持されます。";
 "Rollups run once a minute, so new data appears shortly." = "集計は 1 分ごとに実行されるため、新しいデータはまもなく表示されます。";
 "No hostname was seen for this traffic. %@ operates these addresses." = "このトラフィックにはホスト名が見つかりませんでした。これらのアドレスは %@ が運用しています。";

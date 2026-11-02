@@ -462,6 +462,166 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.total }, 30)
     }
 
+    func testReportsBreakdownKeepsApplicationsPastRelationshipDisplayLimit() throws {
+        let t0: Int64 = 1_700_000_000
+        let records = (0...TrafficDatabase.breakdownLimit).map { index in
+            TrafficRecord(
+                key: key(
+                    index == TrafficDatabase.breakdownLimit ? "late-app" : "busy-app",
+                    "host-\(index).example",
+                    ip: "203.0.\(index / 256).\(index % 256)"
+                ),
+                counters: FlowCounters(bytesIn: 1, flows: 1)
+            )
+        }
+        try db.insert([TrafficBatch(timestamp: t0, records: records)])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let limited = try db.breakdown(.second, from: from, to: to)
+        let reports = try db.reportsBreakdown(.second, from: from, to: to)
+
+        XCTAssertEqual(limited.count, TrafficDatabase.breakdownLimit)
+        XCTAssertEqual(reports.rows.count, TrafficDatabase.breakdownLimit)
+        XCTAssertTrue(reports.isTruncated)
+        XCTAssertEqual(Set(reports.appTotals.map(\.bundleID)), ["busy-app", "late-app"])
+        XCTAssertEqual(
+            reports.appTotals.reduce(Int64(0)) { $0 + $1.counters.bytesIn },
+            Int64(records.count)
+        )
+        let base = TrafficFilter(channel: .tunnel, focus: FocusScope(bundleIDs: ["late-app"]))
+        let tree = TrafficNode.tree(from: reports.rows, appTotals: reports.appTotals, base: base)
+        XCTAssertEqual(Set(tree.compactMap(\.bundleID)), ["busy-app", "late-app"])
+        XCTAssertEqual(tree.reduce(Int64(0)) { $0 + $1.counters.bytesIn }, Int64(records.count))
+        let late = try XCTUnwrap(tree.first { $0.bundleID == "late-app" })
+        XCTAssertEqual(late.filter.channel, .tunnel)
+        XCTAssertEqual(late.filter.focus, base.focus)
+        XCTAssertEqual(late.filter.bundleID, "late-app")
+
+        let destinations = TrafficNode.tree(
+            from: reports.rows,
+            appTotals: [],
+            grouping: .destination,
+            base: base
+        )
+        XCTAssertFalse(destinations.contains { $0.bundleID == "late-app" },
+                       "bounded destination detail must not synthesize an app-only aggregate")
+    }
+
+    func testAppTreeDrillDownReplacesMergedAliasScope() throws {
+        let base = TrafficFilter(
+            bundleIDs: ["claude", "claude-code"],
+            includeAttributedChildren: true
+        )
+        let rows = [
+            BreakdownRow(
+                bundleID: "claude", appName: "Claude Code", appPath: "", domain: "api.anthropic.com",
+                remoteIP: "203.0.113.10", ports: "443", protocols: "https",
+                counters: FlowCounters(bytesOut: 10, flows: 1)
+            ),
+            BreakdownRow(
+                bundleID: "claude-code", appName: "Claude Code", appPath: "", domain: "api.anthropic.com",
+                remoteIP: "203.0.113.11", ports: "443", protocols: "https",
+                counters: FlowCounters(bytesOut: 20, flows: 1)
+            )
+        ]
+
+        let tree = TrafficNode.tree(from: rows, grouping: .app, base: base)
+        let claude = try XCTUnwrap(tree.first { $0.bundleID == "claude" })
+
+        XCTAssertEqual(claude.filter.bundleID, "claude")
+        XCTAssertTrue(claude.filter.bundleIDs.isEmpty,
+                      "choosing one app row must replace the parent card's merged alias scope")
+        XCTAssertFalse(claude.filter.includeAttributedChildren,
+                       "an exact app row must not inherit its parent card's child-inclusive scope")
+    }
+
+    func testReportsAppTotalsKeepNameAndPathFromOneMetadataRow() throws {
+        let t0: Int64 = 1_700_000_000
+        var loud = key("app", "loud.example")
+        loud.appName = "Alpha"
+        loud.appPath = "/Applications/Zulu.app"
+        var quiet = key("app", "quiet.example")
+        quiet.appName = "Zulu"
+        quiet.appPath = "/Applications/Alpha.app"
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: loud, counters: FlowCounters(bytesOut: 100, flows: 1)),
+            TrafficRecord(key: quiet, counters: FlowCounters(bytesOut: 1, flows: 1))
+        ])])
+
+        let total = try XCTUnwrap(db.reportsBreakdown(
+            .second,
+            from: Date(timeIntervalSince1970: TimeInterval(t0)),
+            to: Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        ).appTotals.first)
+
+        XCTAssertEqual(total.counters.bytesOut, 101)
+        XCTAssertEqual(total.appName, "Alpha")
+        XCTAssertEqual(total.appPath, "/Applications/Zulu.app",
+                       "app metadata must come from one real row, not independent maxima")
+    }
+
+    func testReportsProjectionUsesOneReadSnapshot() throws {
+        let t0: Int64 = 1_700_000_000
+        let writer = try TrafficDatabase(url: db.url)
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: key("claude", "api.anthropic.com"),
+                          counters: FlowCounters(bytesOut: 10, flows: 1))
+        ])])
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+
+        let projection = try db.readSnapshot { () -> (Int64, Int64) in
+            let seriesTotal = try db.series(.second, from: from, to: to)
+                .reduce(0) { $0 + $1.bytesOut }
+            try writer.insert([TrafficBatch(timestamp: t0, records: [
+                TrafficRecord(key: key("claude", "api.anthropic.com"),
+                              counters: FlowCounters(bytesOut: 20, flows: 1))
+            ])])
+            let appTotal = try db.reportsBreakdown(.second, from: from, to: to)
+                .appTotals.reduce(0) { $0 + $1.counters.bytesOut }
+            return (seriesTotal, appTotal)
+        }
+
+        XCTAssertEqual(projection.0, 10)
+        XCTAssertEqual(projection.1, 10,
+                       "series and exact app totals must share one committed WAL snapshot")
+        XCTAssertEqual(try db.series(.second, from: from, to: to)
+            .reduce(0) { $0 + $1.bytesOut }, 30,
+                       "the concurrent capture commit becomes visible after the read snapshot ends")
+    }
+
+    func testReportsAndTrafficVisualizationAgreeOnPerAppTotals() throws {
+        let t0: Int64 = 1_700_000_000
+        var routed = key("claude", "api.anthropic.com", ip: "203.0.113.8")
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        var quic = routed
+        quic.appProtocol = "quic"
+        quic.transport = .udp
+        var launched = key("codex", "api.openai.com", ip: "203.0.113.9")
+        launched.launcherBundleID = "com.mitchellh.ghostty"
+        launched.launcherName = "Ghostty"
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: routed, counters: FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1)),
+            TrafficRecord(key: quic, counters: FlowCounters(bytesIn: 5, bytesOut: 5, flows: 1)),
+            TrafficRecord(key: launched, counters: FlowCounters(bytesIn: 99, bytesOut: 1, flows: 2))
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let reports = try db.breakdown(.second, from: from, to: to, limit: .max)
+        let visualization = try db.appDestinationRows(.second, from: from, to: to)
+        let reportTotals = Dictionary(grouping: reports, by: \.bundleID).mapValues {
+            $0.reduce(into: FlowCounters()) { $0 += $1.counters }
+        }
+        let visualizationTotals = Dictionary(grouping: visualization, by: \.bundleID).mapValues {
+            $0.reduce(into: FlowCounters()) { $0 += $1.counters }
+        }
+
+        XCTAssertEqual(visualizationTotals, reportTotals)
+    }
+
     func testAIVisualizationProjectionPreservesAttributionAndScope() throws {
         let t0: Int64 = 1_700_000_000
         var attributed = key("node", "api.github.com", ip: "203.0.113.9")
@@ -859,6 +1019,39 @@ final class DatabaseTests: XCTestCase {
         XCTAssertTrue(try db.contributors(.second, from: Date(timeIntervalSince1970: TimeInterval(t0 + 5)), to: Date(timeIntervalSince1970: TimeInterval(t0 + 6))).top.isEmpty)
     }
 
+    func testExactApplicationScopeCanMatchGlobalFocusThroughParentAttribution() throws {
+        let t0: Int64 = 1_700_000_000
+        var first = key("node", "one.example")
+        first.parentAgent = "agent.one"
+        first.parentAgentName = "Agent One"
+        var second = key("node", "two.example")
+        second.parentAgent = "agent.two"
+        second.parentAgentName = "Agent Two"
+        var unrelated = key("node", "unrelated.example")
+        unrelated.parentAgent = "agent.three"
+        unrelated.parentAgentName = "Agent Three"
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: first, counters: FlowCounters(bytesOut: 40, flows: 1)),
+            TrafficRecord(key: second, counters: FlowCounters(bytesOut: 60, flows: 1)),
+            TrafficRecord(key: unrelated, counters: FlowCounters(bytesOut: 100, flows: 1))
+        ])])
+        let filter = TrafficFilter(
+            bundleID: "node",
+            focusIncludesAttributedParents: true,
+            focus: FocusScope(bundleIDs: ["agent.one", "agent.two"])
+        )
+
+        let total = try db.series(
+            .second,
+            from: Date(timeIntervalSince1970: TimeInterval(t0 - 1)),
+            to: Date(timeIntervalSince1970: TimeInterval(t0 + 1)),
+            filter: filter
+        ).reduce(0) { $0 + $1.bytesOut }
+
+        XCTAssertEqual(total, 100,
+                       "parent-aware Focus must intersect the exact executable without widening to other children")
+    }
+
     func testReportsContributorFilterIncludesFocusScope() {
         let filter = TrafficFilter(bundleID: "com.visible")
         let focus = FocusScope(hosts: ["example.com"])
@@ -867,6 +1060,36 @@ final class DatabaseTests: XCTestCase {
 
         XCTAssertEqual(scoped.bundleID, "com.visible")
         XCTAssertEqual(scoped.focus, focus, "hover contributors must use the same Focus scope as the visible chart")
+    }
+
+    func testMergedApplicationAliasesComposeWithGlobalFocus() throws {
+        let t0: Int64 = 1_700_000_000
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: key("claude", "api.anthropic.com"),
+                          counters: FlowCounters(bytesIn: 0, bytesOut: 8, flows: 1)),
+            TrafficRecord(key: key("claude-code", "api.anthropic.com"),
+                          counters: FlowCounters(bytesIn: 0, bytesOut: 12, flows: 1)),
+            TrafficRecord(key: key("other", "api.anthropic.com"),
+                          counters: FlowCounters(bytesIn: 0, bytesOut: 100, flows: 1)),
+            TrafficRecord(key: key("claude", "other.example"),
+                          counters: FlowCounters(bytesIn: 0, bytesOut: 50, flows: 1))
+        ])])
+        let from = Date(timeIntervalSince1970: TimeInterval(t0 - 1))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let aliases = TrafficFilter(bundleIDs: ["claude", "claude-code"])
+
+        XCTAssertEqual(try db.series(.second, from: from, to: to, filter: aliases)
+            .reduce(0) { $0 + $1.bytesOut }, 70)
+
+        let focused = ReportsView.effectiveFilter(
+            aliases,
+            focus: FocusScope(hosts: ["api.anthropic.com"])
+        )
+        XCTAssertEqual(focused.bundleIDs, ["claude", "claude-code"])
+        XCTAssertEqual(focused.focus.hosts, ["api.anthropic.com"])
+        XCTAssertEqual(try db.series(.second, from: from, to: to, filter: focused)
+            .reduce(0) { $0 + $1.bytesOut }, 20,
+                       "global Focus must narrow the intrinsic alias set without replacing it")
     }
 
     func testTrimLeadingEmptyBuckets() {

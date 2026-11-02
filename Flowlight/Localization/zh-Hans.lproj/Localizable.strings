@@ -1152,7 +1152,8 @@
 "Copy IP Address" = "拷贝 IP 地址";
 "Copy Destination" = "拷贝目标";
 "Copy Hostname" = "拷贝主机名";
-"Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail." = "显示最大的 %@ 个“应用 × 目标 × IP”组合。合计与占比包含所有流量；若要完整细节，请筛选或缩短时间窗口。";
+"Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail." = "显示最大的 %@ 个“应用 × 目标 × IP”组合。应用合计与占比包含所有流量；若要查看完整关系细节，请筛选或缩短时间窗口。";
+"Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window." = "显示最大的 %@ 个“应用 × 目标 × IP”组合。目标和 IP 分组使用此有限明细；请切换到“应用”查看完整应用合计，或筛选或缩短时间窗口。";
 "Per-second data is kept for a few hours." = "每秒数据只保留几个小时。";
 "Rollups run once a minute, so new data appears shortly." = "汇总每分钟运行一次，因此新数据稍后就会出现。";
 "No hostname was seen for this traffic. %@ operates these addresses." = "此流量未发现主机名。这些地址由 %@ 运营。";

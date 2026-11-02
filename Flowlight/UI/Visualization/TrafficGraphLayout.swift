@@ -232,6 +232,15 @@ enum TrafficGraphLayout {
     private static let intermediarySize = CGSize(width: 144, height: 52)
     private static let nodeGap: CGFloat = 10
 
+    static func minimumCanvasHeight(for snapshot: TrafficGraphSnapshot) -> CGFloat {
+        let nodeLanes = lanes(snapshot: snapshot)
+        let largestLane = Dictionary(grouping: snapshot.nodes, by: { nodeLanes[$0.id] }).values
+            .map(\.count).max() ?? 0
+        let stackHeight = CGFloat(largestLane) * appSize.height
+            + CGFloat(max(0, largestLane - 1)) * nodeGap
+        return max(760, stackHeight + 44)
+    }
+
     static func layout(snapshot: TrafficGraphSnapshot, in bounds: CGRect,
                        preserving previous: TrafficGraphLayoutSnapshot? = nil) -> TrafficGraphLayoutSnapshot {
         guard !snapshot.nodes.isEmpty, bounds.width > 0, bounds.height > 0 else {
@@ -256,23 +265,22 @@ enum TrafficGraphLayout {
             }
         }
 
-        for lane in activeLanes {
-            let nodes = ordered[lane] ?? []
-            guard let column = columns[lane] else { continue }
-            let size = size(for: lane)
-            let availableHeight = insetBounds.height
-            let stackHeight = CGFloat(nodes.count) * size.height + CGFloat(max(0, nodes.count - 1)) * nodeGap
-            let startY = insetBounds.midY - min(stackHeight, availableHeight) / 2
-            let step = nodes.count > 1 && stackHeight > availableHeight
-                ? max(1, (availableHeight - size.height) / CGFloat(nodes.count - 1))
-                : size.height + nodeGap
-
-            for (index, node) in nodes.enumerated() where frames[node.id] == nil {
-                let preferredY = startY + size.height / 2 + CGFloat(index) * step
-                let preferred = CGPoint(x: column, y: preferredY)
-                frames[node.id] = place(size: size, near: preferred, laneX: column,
-                                        within: insetBounds, avoiding: Array(frames.values))
-            }
+        placeMissingNodes(
+            ordered: ordered,
+            activeLanes: activeLanes,
+            columns: columns,
+            insetBounds: insetBounds,
+            frames: &frames
+        )
+        if hasOverlaps(frames.values) {
+            frames = [:]
+            placeMissingNodes(
+                ordered: ordered,
+                activeLanes: activeLanes,
+                columns: columns,
+                insetBounds: insetBounds,
+                frames: &frames
+            )
         }
 
         let trafficRibbons = snapshot.edges.filter(\.isTrafficRibbon)
@@ -584,6 +592,52 @@ enum TrafficGraphLayout {
             let fraction = CGFloat(index) / CGFloat(lanes.count - 1)
             return (lane, minimum[index] + extra * fraction)
         })
+    }
+
+    private static func placeMissingNodes(
+        ordered: [Lane: [TrafficGraphNode]],
+        activeLanes: [Lane],
+        columns: [Lane: CGFloat],
+        insetBounds: CGRect,
+        frames: inout [TrafficGraphNodeID: CGRect]
+    ) {
+        for lane in activeLanes {
+            let nodes = ordered[lane] ?? []
+            guard let column = columns[lane] else { continue }
+            let size = size(for: lane)
+            let availableHeight = insetBounds.height
+            let stackHeight = CGFloat(nodes.count) * size.height
+                + CGFloat(max(0, nodes.count - 1)) * nodeGap
+            let startY = insetBounds.midY - min(stackHeight, availableHeight) / 2
+            let step = nodes.count > 1 && stackHeight > availableHeight
+                ? max(1, (availableHeight - size.height) / CGFloat(nodes.count - 1))
+                : size.height + nodeGap
+
+            for (index, node) in nodes.enumerated() where frames[node.id] == nil {
+                let preferredY = startY + size.height / 2 + CGFloat(index) * step
+                let preferred = CGPoint(x: column, y: preferredY)
+                frames[node.id] = place(
+                    size: size,
+                    near: preferred,
+                    laneX: column,
+                    within: insetBounds,
+                    avoiding: Array(frames.values)
+                )
+            }
+        }
+    }
+
+    private static func hasOverlaps<S: Sequence>(_ frames: S) -> Bool where S.Element == CGRect {
+        let frames = Array(frames)
+        for left in frames.indices {
+            for right in frames.indices where right > left {
+                if frames[left].insetBy(dx: -nodeGap / 2, dy: -nodeGap / 2)
+                    .intersects(frames[right]) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     private static func place(size: CGSize, near preferred: CGPoint, laneX: CGFloat,

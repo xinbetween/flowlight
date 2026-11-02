@@ -59,6 +59,7 @@ final class TrafficGraphTests: XCTestCase {
         parentName: String = "",
         mcp: String = "",
         launcher: (id: String, name: String, path: String)? = nil,
+        relay: (id: String, name: String, path: String)? = nil,
         protocol appProtocol: String = "https",
         channel: NetworkChannel = .ip
     ) -> BreakdownRow {
@@ -78,6 +79,9 @@ final class TrafficGraphTests: XCTestCase {
             launcherBundleID: launcher?.id ?? "",
             launcherName: launcher?.name ?? "",
             launcherPath: launcher?.path ?? "",
+            routeProxyBundleID: relay?.id ?? "",
+            routeProxyName: relay?.name ?? "",
+            routeProxyPath: relay?.path ?? "",
             channel: channel
         )
     }
@@ -358,6 +362,170 @@ final class TrafficGraphTests: XCTestCase {
         let lineage = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .runs })
         XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.source }?.kind, .agent)
         XCTAssertEqual(snapshot.nodes.first { $0.id == lineage.target }?.kind, .tool)
+    }
+
+    func testAIBuilderRendersOneNodePerApplicationAcrossRoles() throws {
+        let rows = [
+            row(
+                app: "claude", name: "Claude Code", path: "/opt/homebrew/bin/claude",
+                domain: "api.anthropic.com", ip: "203.0.113.10", bytesOut: 25,
+                launcher: ("claude", "Claude Code", "/opt/homebrew/bin/claude")
+            ),
+            row(
+                app: "com.microsoft.VSCode", name: "Visual Studio Code",
+                path: "/Applications/Visual Studio Code.app",
+                domain: "api.openai.com", ip: "203.0.113.11", bytesOut: 20,
+                launcher: (
+                    "com.microsoft.VSCode",
+                    "Visual Studio Code",
+                    "/Applications/Visual Studio Code.app/Contents/MacOS/Electron"
+                )
+            ),
+            row(
+                app: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app",
+                domain: "api.openai.com", ip: "203.0.113.12", bytesOut: 15,
+                relay: ("com.yetone.magpie", "magpie", "/Applications/magpie.app")
+            ),
+            row(
+                app: "com.flowlight.app", name: "Flowlight", path: "/Applications/Flowlight.app",
+                domain: "api.anthropic.com", ip: "203.0.113.13", bytesOut: 10,
+                relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app")
+            )
+        ]
+        let gateway = AgentGatewayConfig(
+            agent: "com.yetone.magpie",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.magpie/settings.json",
+            sourceKey: "gateway"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "com.yetone.magpie",
+            name: "magpie",
+            path: "/Applications/magpie.app"
+        )
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: rows,
+            gateways: [gateway],
+            resolveGateway: { _ in identity },
+            limits: .unbounded
+        )
+
+        for bundleID in ["claude", "com.microsoft.VSCode", "com.yetone.magpie", "com.flowlight.app"] {
+            XCTAssertEqual(
+                snapshot.nodes.filter {
+                    $0.filter.bundleID == bundleID
+                        && [.agent, .tool, .launcher, .proxy].contains($0.kind)
+                }.count,
+                1,
+                "\(bundleID) should render once regardless of role"
+            )
+        }
+        XCTAssertFalse(snapshot.edges.contains { $0.source == $0.target })
+        XCTAssertEqual(Set(snapshot.nodes.map(\.id)).count, snapshot.nodes.count)
+        XCTAssertEqual(snapshot.hidden.nodeCount, 0)
+        XCTAssertEqual(snapshot.hidden.edgeCount, 0)
+
+        let magpie = try XCTUnwrap(snapshot.nodes.first { $0.filter.bundleID == "com.yetone.magpie" })
+        XCTAssertTrue(magpie.roleEvidence.contains { evidence in
+            evidence.relationship == .configuredGateway
+                && evidence.configuration?.endpoint == "http://127.0.0.1:3425"
+                && evidence.configuration?.sourceKey == "gateway"
+        })
+        XCTAssertTrue(magpie.roleEvidence.contains { $0.relationship == .routedThrough })
+
+        let flowlight = try XCTUnwrap(snapshot.nodes.first { $0.filter.bundleID == "com.flowlight.app" })
+        XCTAssertTrue(flowlight.roleEvidence.contains { $0.relationship == .routedThrough })
+    }
+
+    func testAIMergedAgentCardKeepsAttributedChildTraffic() throws {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                ip: "203.0.113.10", bytesOut: 10,
+                launcher: ("claude", "Claude Code", "/usr/local/bin/claude")),
+            row(app: "node", name: "node", domain: "api.github.com",
+                ip: "203.0.113.11", bytesOut: 20,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+
+        let claude = try XCTUnwrap(snapshot.nodes.first {
+            $0.filter.bundleID == "claude"
+                && [.agent, .tool, .launcher, .proxy].contains($0.kind)
+        })
+        XCTAssertEqual(claude.counters.bytesOut, 30,
+                       "the semantic agent card must retain proved child traffic after role collapse")
+        XCTAssertTrue(claude.filter.includeAttributedChildren)
+        XCTAssertFalse(snapshot.edges.contains { $0.source == $0.target })
+    }
+
+    func testAIMergedToolAcrossAgentsUsesApplicationWideScope() throws {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "node", domain: "shared.example",
+                ip: "203.0.113.10", bytesOut: 40,
+                parent: "agent.one", parentName: "Agent One"),
+            row(app: "node", name: "node", domain: "shared.example",
+                ip: "203.0.113.11", bytesOut: 60,
+                parent: "agent.two", parentName: "Agent Two")
+        ], limits: .unbounded)
+
+        let node = try XCTUnwrap(snapshot.nodes.first {
+            $0.filter.bundleID == "node" && $0.kind == .tool
+        })
+        XCTAssertEqual(node.counters.bytesOut, 100)
+        XCTAssertNil(node.filter.agentParent,
+                     "a merged application card must not retain one role-specific parent scope")
+        XCTAssertNil(node.filter.mcpServer)
+        XCTAssertFalse(node.filter.includeAttributedChildren)
+        XCTAssertTrue(node.filter.focusIncludesAttributedParents,
+                      "global Focus must still match the merged executable through either proved parent")
+        let edge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        XCTAssertEqual(edge.counters.bytesOut, 100)
+        XCTAssertEqual(edge.filter.bundleID, "node")
+        XCTAssertNil(edge.filter.agentParent,
+                     "an aggregate edge must not retain one arbitrary member's parent scope")
+        XCTAssertNil(edge.filter.domain)
+        XCTAssertNil(edge.filter.remoteIP)
+        XCTAssertNil(edge.filter.appProtocol)
+    }
+
+    func testAIMergedAliasesPreserveExactStoredBundleIDCasing() throws {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "CLAUDE", name: "claude", domain: "api.anthropic.com",
+                ip: "203.0.113.10", bytesOut: 8),
+            row(app: "claude-code", name: "claude", domain: "api.anthropic.com",
+                ip: "203.0.113.11", bytesOut: 12)
+        ], limits: .unbounded)
+
+        let claude = try XCTUnwrap(snapshot.nodes.first {
+            Set($0.filter.bundleIDs) == ["CLAUDE", "claude-code"]
+        })
+        XCTAssertEqual(claude.counters.bytesOut, 20)
+        XCTAssertTrue(claude.filter.bundleIDs.contains("CLAUDE"),
+                      "case-sensitive database identities must not be normalized in the query scope")
+        let edge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        XCTAssertEqual(Set(edge.filter.bundleIDs), ["CLAUDE", "claude-code"])
+    }
+
+    func testAIMergedLauncherKeepsExternalLaunchEvidenceOnSurvivingCard() throws {
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "com.microsoft.VSCode", name: "Visual Studio Code",
+                domain: "api.openai.com", ip: "203.0.113.9", bytesOut: 15),
+            row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                ip: "203.0.113.10", bytesOut: 25,
+                launcher: ("com.microsoft.VSCode", "Visual Studio Code", "/Applications/Visual Studio Code.app"))
+        ], limits: .unbounded)
+
+        let vscode = try XCTUnwrap(snapshot.nodes.first {
+            $0.filter.bundleID == "com.microsoft.VSCode"
+                && [.agent, .tool, .launcher, .proxy].contains($0.kind)
+        })
+        XCTAssertTrue(
+            vscode.roleEvidence.contains { $0.relationship == .launched },
+            "role evidence: \(vscode.roleEvidence)"
+        )
+        let launched = try XCTUnwrap(snapshot.edges.first { $0.relationship == .launched })
+        XCTAssertEqual(launched.source, vscode.id)
+        XCTAssertNotEqual(launched.source, launched.target)
     }
 
     func testAIBuilderShowsPersistedLauncherEvidenceOnly() {
@@ -711,6 +879,171 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(configured.counters, FlowCounters())
     }
 
+    func testConfiguredGatewayScopeKeepsMatchingEvidenceOnly() {
+        let claude = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "https", host: "gateway.example", port: 443),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let codex = AgentGatewayConfig(
+            agent: "codex",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 4000),
+            source: "~/.codex/config.toml",
+            sourceKey: "model_providers.local.base_url"
+        )
+
+        XCTAssertTrue(VisualizeGatewayScope.includes(claude, query: "claude", focus: .none))
+        XCTAssertFalse(VisualizeGatewayScope.includes(codex, query: "claude", focus: .none))
+        XCTAssertTrue(VisualizeGatewayScope.includes(codex, query: "4000", focus: .none))
+        XCTAssertTrue(VisualizeGatewayScope.includes(
+            claude,
+            query: "",
+            focus: FocusScope(bundleIDs: ["claude"])
+        ))
+        XCTAssertFalse(VisualizeGatewayScope.includes(
+            codex,
+            query: "",
+            focus: FocusScope(bundleIDs: ["claude"])
+        ))
+        XCTAssertTrue(VisualizeGatewayScope.includes(
+            claude,
+            query: "",
+            focus: FocusScope(bundleIDs: ["claude-code"])
+        ))
+        let magpie = AgentGatewayIdentity(
+            bundleID: "com.yetone.magpie",
+            name: "magpie",
+            path: "/Applications/magpie.app"
+        )
+        XCTAssertTrue(VisualizeGatewayScope.includes(
+            claude,
+            identity: magpie,
+            query: "magpie",
+            focus: .none
+        ))
+        XCTAssertTrue(VisualizeGatewayScope.includes(
+            claude,
+            identity: magpie,
+            query: "",
+            focus: FocusScope(bundleIDs: ["com.yetone.magpie"])
+        ))
+    }
+
+    func testAIConfiguredOnlyGatewayRespectsNarrowedScope() {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "https", host: "gateway.example", port: 443),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+
+        let unfiltered = AITrafficGraphBuilder.build(
+            rows: [], gateways: [gateway], resolveGateway: { _ in nil }, limits: .unbounded
+        )
+        let narrowed = AITrafficGraphBuilder.build(
+            rows: [], gateways: [gateway], resolveGateway: { _ in nil },
+            includeConfiguredOnlyAgents: false, limits: .unbounded
+        )
+
+        XCTAssertTrue(unfiltered.edges.contains { $0.relationship == .configuredGateway })
+        XCTAssertFalse(narrowed.edges.contains { $0.relationship == .configuredGateway })
+        XCTAssertFalse(narrowed.nodes.contains { $0.kind == .agent })
+    }
+
+    func testAISemanticAliasesDoNotConsumeAnotherApplicationSlot() {
+        let limits = AITrafficGraphLimits(
+            maxAgents: 2,
+            maxTools: 8,
+            maxDestinations: 10,
+            maxObservedEdges: 28
+        )
+        let snapshot = AITrafficGraphBuilder.build(rows: [
+            row(app: "claude", name: "Claude Code", domain: "one.example",
+                ip: "203.0.113.1", bytesOut: 100),
+            row(app: "claude-code", name: "Claude Code", domain: "two.example",
+                ip: "203.0.113.2", bytesOut: 90),
+            row(app: "codex", name: "Codex", domain: "three.example",
+                ip: "203.0.113.3", bytesOut: 80)
+        ], limits: limits)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .agent }.count, 2)
+        XCTAssertTrue(snapshot.nodes.contains { $0.filter.bundleID == "codex" },
+                      "historical aliases must not hide another semantic application")
+        XCTAssertTrue(snapshot.nodes.contains { Set($0.filter.bundleIDs) == ["claude", "claude-code"] })
+    }
+
+    func testAICollapsedConfiguredGatewayKeepsEvidenceAndResolvedMetadata() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "localhost", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "claude",
+            name: "Claude Code",
+            path: "/Applications/Claude Code.app"
+        )
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [],
+            gateways: [gateway],
+            resolveGateway: { _ in identity },
+            limits: .unbounded
+        )
+
+        let node = try XCTUnwrap(snapshot.nodes.first)
+        XCTAssertTrue(snapshot.edges.isEmpty,
+                      "a role-collapse self-loop is not a real dependency edge")
+        XCTAssertEqual(node.appPath, identity.path,
+                       "the surviving configured agent inherits resolved application metadata")
+        XCTAssertEqual(node.title, identity.name)
+        XCTAssertTrue(node.roleEvidence.contains { $0.relationship == .configuredGateway })
+    }
+
+    func testAIGatewayAliasChoiceIsDeterministic() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "https", host: "gateway.example", port: 443),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let rows = [
+            row(app: "claude-code", name: "claude", domain: "api.anthropic.com",
+                ip: "203.0.113.1", bytesOut: 10),
+            row(app: "claude", name: "claude", domain: "api.anthropic.com",
+                ip: "203.0.113.2", bytesOut: 10)
+        ]
+
+        let snapshots = (0..<20).map { index in
+            AITrafficGraphBuilder.build(
+                rows: index.isMultiple(of: 2) ? rows : rows.reversed(),
+                gateways: [gateway], resolveGateway: { _ in nil }, limits: .unbounded
+            )
+        }
+        let sources = try snapshots.map { snapshot in
+            try XCTUnwrap(snapshot.edges.first { $0.relationship == .configuredGateway }?.source)
+        }
+
+        XCTAssertEqual(Set(sources).count, 1)
+        XCTAssertEqual(sources.first?.rawValue, "agent:6:claude")
+        let claude = try XCTUnwrap(snapshots[0].nodes.first { $0.id.rawValue == "agent:6:claude" })
+        XCTAssertEqual(claude.counters.bytesOut, 20,
+                       "distinct historical aliases contribute their disjoint traffic to the surviving card")
+        XCTAssertNil(claude.filter.bundleID)
+        XCTAssertEqual(Set(claude.filter.bundleIDs), ["claude", "claude-code"])
+        XCTAssertTrue(claude.filter.focus.isEmpty,
+                      "historical aliases are intrinsic to the card, not stored in global Focus")
+        let observed = snapshots[0].edges.filter { $0.relationship == .observed }
+        XCTAssertEqual(observed.count, 1)
+        XCTAssertEqual(observed[0].counters.bytesOut, 20)
+        XCTAssertEqual(observed[0].members.count, 2)
+        XCTAssertNil(observed[0].filter.bundleID)
+        XCTAssertEqual(Set(observed[0].filter.bundleIDs), ["claude", "claude-code"])
+        XCTAssertTrue(observed[0].filter.focus.isEmpty)
+    }
+
     func testAIGatewayProcessTrafficNeedsObservedRouteEvidence() throws {
         let gateway = AgentGatewayConfig(
             agent: "claude",
@@ -764,6 +1097,26 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.visibleTotal.bytesIn, 100,
                        "capture-time route evidence applies only to the row that carries it")
         XCTAssertEqual(snapshot.total.bytesIn, 100)
+    }
+
+    func testAIGatewayEdgeIDsPreserveConfigurationTupleBoundaries() {
+        let endpoint = AgentGatewayConfig.Endpoint(scheme: "https", host: "gateway.example", port: 443)
+        let gateways = [
+            AgentGatewayConfig(agent: "claude", endpoint: endpoint, source: "ab", sourceKey: "c"),
+            AgentGatewayConfig(agent: "claude", endpoint: endpoint, source: "a", sourceKey: "bc")
+        ]
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                       ip: "203.0.113.10", bytesOut: 10)],
+            gateways: gateways,
+            resolveGateway: { _ in nil },
+            limits: .unbounded
+        )
+
+        let configured = snapshot.edges.filter { $0.relationship == .configuredGateway }
+        XCTAssertEqual(configured.count, 2)
+        XCTAssertEqual(Set(configured.map(\.id)).count, 2,
+                       "distinct configuration tuples must never concatenate into the same edge ID")
     }
 
     func testAIDistinctGatewayDeclarationsRemainVisibleAndHiddenCountsStayExact() throws {
@@ -888,6 +1241,227 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 1)
     }
 
+    func testBlockedIPDestinationsKeepExactAddressIdentityAndScope() throws {
+        let addresses = ["203.0.113.8", "2001:db8::8"]
+        let blocked = addresses.map { address in
+            BlockedAttemptRow(
+                bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                destination: address, port: 443, count: 1,
+                category: "Rule", source: "Ordinary rule", detail: address
+            )
+        }
+
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded
+        )
+        let destinations = snapshot.nodes.filter { $0.kind == .destination }
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }
+
+        XCTAssertEqual(Set(destinations.map(\.title)), Set(addresses))
+        XCTAssertEqual(Set(destinations.compactMap(\.filter.remoteIP)), Set(addresses))
+        XCTAssertTrue(destinations.allSatisfy { $0.filter.domain == nil && $0.filter.domainSuffix == nil })
+        XCTAssertEqual(Set(edges.compactMap(\.filter.remoteIP)), Set(addresses))
+        XCTAssertTrue(edges.allSatisfy { $0.filter.domain == nil && $0.filter.domainSuffix == nil })
+    }
+
+    func testAIBlockedIPDestinationsKeepExactAddressIdentityAndScope() {
+        let addresses = ["203.0.113.8", "2001:db8::8"]
+        let blocked = addresses.map { address in
+            BlockedAttemptRow(
+                bundleID: "claude", appName: "Claude Code", agentKey: "claude", agentName: "Claude Code",
+                destination: address, port: 443, count: 1,
+                category: "Rule", source: "Ordinary rule", detail: address
+            )
+        }
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded
+        )
+        let destinations = snapshot.nodes.filter { $0.kind == .destination }
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }
+
+        XCTAssertEqual(Set(destinations.map(\.title)), Set(addresses))
+        XCTAssertEqual(Set(destinations.compactMap(\.filter.remoteIP)), Set(addresses))
+        XCTAssertTrue(destinations.allSatisfy { $0.filter.domain == nil && $0.filter.domainSuffix == nil })
+        XCTAssertEqual(Set(edges.compactMap(\.filter.remoteIP)), Set(addresses))
+        XCTAssertTrue(edges.allSatisfy { $0.filter.domain == nil && $0.filter.domainSuffix == nil })
+    }
+
+    func testObservedAndBlockedBareIPShareOneTrafficDestination() throws {
+        let observed = row(app: "com.browser", name: "Browser", domain: "", ip: "203.0.113.8",
+                           bytesIn: 100)
+        let blocked = BlockedAttemptRow(
+            bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+            destination: "203.0.113.8", port: 443, count: 2,
+            category: "Rule", source: "Ordinary rule", detail: "203.0.113.8"
+        )
+
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [observed], blockedAttempts: [blocked], limits: .unbounded
+        )
+        let observedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        let blockedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+        let destination = try XCTUnwrap(snapshot.nodes.first { $0.id == observedEdge.target })
+
+        XCTAssertEqual(observedEdge.target, blockedEdge.target)
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .destination }.count, 1)
+        XCTAssertEqual(destination.title, "203.0.113.8")
+        XCTAssertEqual(destination.filter.remoteIP, "203.0.113.8")
+        XCTAssertNil(destination.filter.domainSuffix)
+        XCTAssertEqual(blockedEdge.filter.remoteIP, "203.0.113.8")
+        XCTAssertNil(blockedEdge.filter.domain)
+        XCTAssertEqual(snapshot.total.bytesIn, 100)
+        XCTAssertEqual(blockedEdge.enforcement?.count, 2)
+    }
+
+    func testObservedAndBlockedBareIPWithOwnerMetadataShareOneTrafficDestination() throws {
+        let observed = row(
+            app: "com.browser", name: "Browser", domain: "", ip: "203.0.113.8",
+            owner: "Example Network", bytesIn: 100
+        )
+        let blocked = BlockedAttemptRow(
+            bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+            destination: "203.0.113.8", port: 443, count: 2,
+            category: "Rule", source: "Ordinary rule", detail: "203.0.113.8"
+        )
+
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [observed], blockedAttempts: [blocked], limits: .unbounded
+        )
+        let observedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        let blockedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+        let destinations = snapshot.nodes.filter { $0.kind == .destination }
+
+        XCTAssertEqual(observedEdge.target, blockedEdge.target)
+        XCTAssertEqual(destinations.count, 1)
+        XCTAssertEqual(destinations[0].title, "203.0.113.8")
+        XCTAssertEqual(destinations[0].members.first?.title, "Example Network")
+        XCTAssertNoThrow(
+            TrafficGraphLayout.layout(
+                snapshot: snapshot,
+                in: CGRect(x: 0, y: 0, width: 900, height: 760)
+            )
+        )
+    }
+
+    func testObservedAndBlockedBareIPShareOneAIDestination() throws {
+        let observed = row(app: "claude", name: "Claude Code", domain: "", ip: "203.0.113.8",
+                           bytesIn: 100)
+        let blocked = BlockedAttemptRow(
+            bundleID: "claude", appName: "Claude Code", agentKey: "claude", agentName: "Claude Code",
+            destination: "203.0.113.8", port: 443, count: 2,
+            category: "Rule", source: "Ordinary rule", detail: "203.0.113.8"
+        )
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [observed], blockedAttempts: [blocked], limits: .unbounded
+        )
+        let observedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        let blockedEdge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+        let destination = try XCTUnwrap(snapshot.nodes.first { $0.id == observedEdge.target })
+
+        XCTAssertEqual(observedEdge.target, blockedEdge.target)
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .destination }.count, 1)
+        XCTAssertEqual(destination.title, "203.0.113.8")
+        XCTAssertEqual(destination.filter.remoteIP, "203.0.113.8")
+        XCTAssertNil(destination.filter.domainSuffix)
+        XCTAssertEqual(blockedEdge.filter.remoteIP, "203.0.113.8")
+        XCTAssertNil(blockedEdge.filter.domain)
+        XCTAssertEqual(snapshot.total.bytesIn, 100)
+        XCTAssertEqual(blockedEdge.enforcement?.count, 2)
+    }
+
+    func testTrafficBlockedAttemptsMergeCanonicalDestinationSpellings() throws {
+        let blocked = [
+            BlockedAttemptRow(
+                bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                destination: "2001:0db8:0:0:0:0:0:1", port: 443, count: 2,
+                category: "rule", source: "ordinary-rule", detail: "expanded"
+            ),
+            BlockedAttemptRow(
+                bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                destination: "2001:db8::1", port: 443, count: 3,
+                category: "rule", source: "ordinary-rule", detail: "compressed"
+            ),
+            BlockedAttemptRow(
+                bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                destination: "Example.COM.", port: 443, count: 5,
+                category: "rule", source: "ordinary-rule", detail: "trailing dot"
+            ),
+            BlockedAttemptRow(
+                bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+                destination: "example.com", port: 443, count: 7,
+                category: "rule", source: "ordinary-rule", detail: "canonical"
+            )
+        ]
+
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded
+        )
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }
+
+        XCTAssertEqual(edges.count, 2)
+        XCTAssertEqual(Set(edges.compactMap { $0.enforcement?.count }), [5, 12])
+        XCTAssertEqual(Set(edges.compactMap(\.filter.remoteIP)), ["2001:db8::1"])
+        XCTAssertEqual(Set(edges.compactMap(\.filter.domain)), ["example.com"])
+    }
+
+    func testBlockedAttemptWithNoncanonicalHostnameRemainsVisible() throws {
+        let attempt = BlockedAttemptRow(
+            bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
+            destination: "Legacy_Host.Example", port: 443, count: 4,
+            category: "rule", source: "ordinary-rule", detail: "historical"
+        )
+
+        let traffic = TrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: [attempt], limits: .unbounded
+        )
+        let edge = try XCTUnwrap(traffic.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(edge.enforcement?.count, 4)
+        XCTAssertEqual(edge.filter.domain, "legacy_host.example")
+    }
+
+    func testAIBlockedAttemptsMergeCanonicalDestinationSpellings() {
+        let blocked = [
+            BlockedAttemptRow(
+                bundleID: "claude", appName: "Claude Code", agentKey: "claude", agentName: "Claude Code",
+                destination: "2001:0db8:0:0:0:0:0:1", port: 443, count: 2,
+                category: "rule", source: "ordinary-rule", detail: "expanded"
+            ),
+            BlockedAttemptRow(
+                bundleID: "claude", appName: "Claude Code", agentKey: "claude", agentName: "Claude Code",
+                destination: "2001:db8::1", port: 443, count: 3,
+                category: "rule", source: "ordinary-rule", detail: "compressed"
+            )
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: blocked, limits: .unbounded
+        )
+        let edges = snapshot.edges.filter { $0.relationship == .blocked }
+
+        XCTAssertEqual(edges.count, 1)
+        XCTAssertEqual(edges.first?.enforcement?.count, 5)
+        XCTAssertEqual(edges.first?.filter.remoteIP, "2001:db8::1")
+    }
+
+    func testAIBlockedAttemptWithNoncanonicalHostnameRemainsVisible() throws {
+        let attempt = BlockedAttemptRow(
+            bundleID: "claude", appName: "Claude Code", agentKey: "claude", agentName: "Claude Code",
+            destination: "Legacy_Host.Example", port: 443, count: 4,
+            category: "rule", source: "ordinary-rule", detail: "historical"
+        )
+
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [BreakdownRow](), blockedAttempts: [attempt], limits: .unbounded
+        )
+        let edge = try XCTUnwrap(snapshot.edges.first { $0.relationship == .blocked })
+
+        XCTAssertEqual(edge.enforcement?.count, 4)
+        XCTAssertEqual(edge.filter.domain, "legacy_host.example")
+    }
+
     func testBlockedAttemptsKeepPortsDistinct() {
         let blocked = [
             BlockedAttemptRow(bundleID: "com.browser", appName: "Browser", agentKey: "", agentName: "",
@@ -925,6 +1499,24 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertLessThanOrEqual(snapshot.nodes.filter { $0.kind == .destination }.count, limits.maxDestinations)
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .blocked }.count, 5)
         XCTAssertGreaterThan(snapshot.hidden.edgeCount, 0)
+    }
+
+    func testBlockedReserveStillLeavesOneRelationshipForEveryTopTrafficApp() {
+        let observed = (0..<8).map { index in
+            row(app: "app.\(index)", domain: "observed-\(index).example", ip: "203.0.113.\(index + 1)",
+                bytesIn: Int64(1_000 - index))
+        }
+        let blocked = (0..<6).map { index in
+            BlockedAttemptRow(bundleID: "app.\(index)", appName: "App \(index)", agentKey: "", agentName: "",
+                              destination: "blocked-\(index).example", port: 443, count: Int64(20 - index),
+                              category: "tracking", source: "managed-pack:official.privacy", detail: "")
+        }
+
+        let snapshot = TrafficGraphBuilder.build(rows: observed, blockedAttempts: blocked)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .app }.count, 8)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 8)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .blocked }.count, 5)
     }
 
     func testBlockedSelectionExpandsToAgentsAdmittedByObservedTraffic() {
@@ -1127,6 +1719,141 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.edges[0].counters.bytesIn, 50)
     }
 
+    func testTrafficAppCapRanksByWholeAppTotal() throws {
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [
+                row(app: "fragmented", domain: "one.example", ip: "203.0.113.1", bytesIn: 60),
+                row(app: "fragmented", domain: "two.example", ip: "203.0.113.2", bytesIn: 60),
+                row(app: "single", domain: "three.example", ip: "203.0.113.3", bytesIn: 100)
+            ],
+            limits: TrafficGraphLimits(maxApps: 1, maxDestinations: 2, maxEdges: 2)
+        )
+
+        let app = try XCTUnwrap(snapshot.nodes.first { $0.kind == .app })
+        XCTAssertEqual(app.filter.bundleID, "fragmented")
+        XCTAssertEqual(app.counters.bytesIn, 120)
+    }
+
+    func testTrafficAppNodeReportsWholePeriodTotalWhenRelationshipsAreHidden() throws {
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [
+                row(app: "app", domain: "one.example", ip: "203.0.113.1", bytesIn: 60),
+                row(app: "app", domain: "two.example", ip: "203.0.113.2", bytesIn: 40)
+            ],
+            limits: TrafficGraphLimits(maxApps: 1, maxDestinations: 1, maxEdges: 1)
+        )
+
+        let app = try XCTUnwrap(snapshot.nodes.first { $0.kind == .app })
+        let observed = try XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
+        XCTAssertEqual(app.counters.bytesIn, 100)
+        XCTAssertEqual(observed.counters.bytesIn, 60)
+        XCTAssertEqual(snapshot.hidden.counters.bytesIn, 40)
+    }
+
+    func testTopTrafficAppsReceiveRepresentativeRelationshipsBeforeSpareEdges() {
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [
+                row(app: "fragmented", domain: "one.example", ip: "203.0.113.1", bytesIn: 60),
+                row(app: "fragmented", domain: "two.example", ip: "203.0.113.2", bytesIn: 60),
+                row(app: "single", domain: "three.example", ip: "203.0.113.3", bytesIn: 100),
+                row(app: "lower", domain: "four.example", ip: "203.0.113.4", bytesIn: 90)
+            ],
+            limits: TrafficGraphLimits(maxApps: 2, maxDestinations: 2, maxEdges: 2)
+        )
+
+        let apps = Set(snapshot.nodes.filter { $0.kind == .app }.compactMap(\.filter.bundleID))
+        XCTAssertEqual(apps, ["fragmented", "single"])
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 2)
+    }
+
+    func testRepresentativeSelectionReconsidersBusyEdgeToShareDestinationCapacity() {
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [
+                row(app: "a", domain: "one.example", ip: "203.0.113.1", bytesIn: 100),
+                row(app: "a", domain: "shared.example", ip: "203.0.113.2", bytesIn: 90),
+                row(app: "b", domain: "shared.example", ip: "203.0.113.2", bytesIn: 95)
+            ],
+            limits: TrafficGraphLimits(
+                maxApps: 2, maxDestinations: 1, maxEdges: 2,
+                maxBlockedEdges: 0, maxRelays: 0
+            )
+        )
+
+        let apps = Set(snapshot.nodes.filter { $0.kind == .app }.compactMap(\.filter.bundleID))
+        let observed = snapshot.edges.filter { $0.relationship == .observed }
+        XCTAssertEqual(apps, ["a", "b"])
+        XCTAssertEqual(observed.count, 2)
+        XCTAssertEqual(Set(observed.map(\.target)).count, 1)
+    }
+
+    func testRepresentativeSelectionReconsidersBusyEdgeToShareRelayCapacity() {
+        var first = row(app: "a", domain: "one.example", ip: "203.0.113.1", bytesIn: 100)
+        first.routeProxyBundleID = "proxy.one"
+        var sharedA = row(app: "a", domain: "two.example", ip: "203.0.113.2", bytesIn: 90)
+        sharedA.routeProxyBundleID = "proxy.shared"
+        var sharedB = row(app: "b", domain: "three.example", ip: "203.0.113.3", bytesIn: 95)
+        sharedB.routeProxyBundleID = "proxy.shared"
+
+        let snapshot = TrafficGraphBuilder.build(
+            rows: [first, sharedA, sharedB],
+            limits: TrafficGraphLimits(
+                maxApps: 2, maxDestinations: 3, maxEdges: 2,
+                maxBlockedEdges: 0, maxRelays: 1
+            )
+        )
+
+        let apps = Set(snapshot.nodes.filter { $0.kind == .app }.compactMap(\.filter.bundleID))
+        let relays = snapshot.nodes.filter { $0.kind == .proxy }
+        XCTAssertEqual(apps, ["a", "b"])
+        XCTAssertEqual(relays.count, 1)
+        XCTAssertEqual(relays[0].id.rawValue, "proxy:12:proxy.shared")
+    }
+
+    func testStandardTrafficCapKeepsEveryTopAppBehindDistinctRelays() {
+        let rows = (0..<8).map { index -> BreakdownRow in
+            var result = row(
+                app: "app.\(index)", domain: "host-\(index).example", ip: "203.0.113.\(index + 1)",
+                bytesIn: Int64(1_000 - index)
+            )
+            result.routeProxyBundleID = "proxy.\(index)"
+            result.routeProxyName = "Proxy \(index)"
+            return result
+        }
+
+        let snapshot = TrafficGraphBuilder.build(rows: rows)
+
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .app }.count, 8)
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .proxy }.count, 8)
+        XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 8)
+    }
+
+    func testFlowlightApplicationAndRouteRelayRemainDistinct() throws {
+        let own = row(app: "com.flowlight.app", name: "Flowlight", domain: "updates.example",
+                      ip: "203.0.113.10", bytesIn: 25)
+        var routed = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
+                         ip: "203.0.113.11", bytesOut: 75)
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+
+        let snapshot = TrafficGraphBuilder.build(rows: [own, routed], limits: .unbounded)
+        let app = try XCTUnwrap(snapshot.nodes.first {
+            $0.kind == .app && $0.filter.bundleID == "com.flowlight.app"
+        })
+        let relay = try XCTUnwrap(snapshot.nodes.first { $0.kind == .proxy && $0.title == "Flowlight" })
+        let route = try XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
+        let routedTraffic = try XCTUnwrap(snapshot.edges.first {
+            $0.relationship == .observed && $0.source == relay.id
+        })
+
+        XCTAssertNotEqual(app.id, relay.id)
+        XCTAssertEqual(app.counters.bytesIn, 25)
+        XCTAssertEqual(relay.counters.bytesOut, 75)
+        XCTAssertEqual(route.displayedCounters.bytesOut, 75)
+        XCTAssertEqual(routedTraffic.counters.bytesOut, 75)
+        XCTAssertEqual(snapshot.total.total, 100)
+        XCTAssertEqual(snapshot.visibleTotal.total, 100)
+    }
+
     func testCapsAreDeterministicAndAccountForEverythingHidden() {
         let rows = (0..<12).map { index in
             row(app: "app.\(index)", domain: "host\(index).example", ip: "203.0.113.\(index)",
@@ -1194,20 +1921,66 @@ final class TrafficGraphTests: XCTestCase {
     }
 
     func testStandardCapFitsTheMinimumScrollableCanvasWithoutOverlaps() {
-        let rows = (0..<80).map { index in
-            row(app: "app.\(index % 8)", domain: "host\(index % 10).example", ip: "203.0.113.\(index % 10)",
+        let rows = (0..<104).map { index in
+            row(app: "app.\(index % 8)", domain: "host\(index % 13).example", ip: "203.0.113.\(index % 13)",
                 bytesIn: Int64(index + 1) * 100, flows: 1)
         }
         let snapshot = TrafficGraphBuilder.build(rows: rows)
-        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: CGRect(x: 0, y: 0, width: 900, height: 760))
+        let canvasHeight = TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 900, height: canvasHeight)
+        )
         let frames = Array(layout.nodeFrames.values)
 
         XCTAssertEqual(snapshot.nodes.filter { $0.kind == .app }.count, 8)
-        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .destination }.count, 10)
+        XCTAssertEqual(snapshot.nodes.filter { $0.kind == .destination }.count, 13)
         for left in frames.indices {
             for right in frames.indices where right > left {
                 XCTAssertFalse(frames[left].insetBy(dx: -8, dy: -8).intersects(frames[right]),
                                "node frames \(frames[left]) and \(frames[right]) overlap")
+            }
+        }
+    }
+
+    func testCachedLayoutIsRecomputedWhenTopologyExpands() {
+        let initial = TrafficGraphBuilder.build(
+            rows: (0..<8).map { index in
+                row(
+                    app: "app.\(index % 2)", domain: "host\(index).example",
+                    ip: "203.0.113.\(index)", bytesIn: 100
+                )
+            },
+            limits: .unbounded
+        )
+        let expanded = TrafficGraphBuilder.build(
+            rows: (0..<13).map { index in
+                row(
+                    app: "app.\(index % 2)", domain: "host\(index).example",
+                    ip: "203.0.113.\(index)", bytesIn: 100
+                )
+            },
+            limits: .unbounded
+        )
+        let initialLayout = TrafficGraphLayout.layout(
+            snapshot: initial,
+            in: CGRect(x: 0, y: 0, width: 900, height: 760)
+        )
+        let expandedHeight = TrafficGraphLayout.minimumCanvasHeight(for: expanded)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: expanded,
+            in: CGRect(x: 0, y: 0, width: 900, height: expandedHeight),
+            preserving: initialLayout
+        )
+        let frames = Array(layout.nodeFrames.values)
+
+        XCTAssertEqual(layout.nodeFrames.count, expanded.nodes.count)
+        for left in frames.indices {
+            for right in frames.indices where right > left {
+                XCTAssertFalse(
+                    frames[left].insetBy(dx: -8, dy: -8).intersects(frames[right]),
+                    "node frames \(frames[left]) and \(frames[right]) overlap"
+                )
             }
         }
     }

@@ -3,6 +3,32 @@ import XCTest
 
 @MainActor
 final class VisualizeNavigationTests: XCTestCase {
+    func testForgettingAgentConfigurationDisablesAutomaticDiscoveryUntilManualRefresh() {
+        let suite = "visualize-workspace-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AgentWorkspaceStore(defaults: defaults)
+
+        store.refresh(gatewaysOnly: true)
+        let staleGeneration = store.discoveryGeneration
+        XCTAssertTrue(store.scanning)
+
+        store.forget()
+        store.storeDiscovery(
+            [AgentWorkspace(agent: "claude", root: "~/.claude", isProject: false)],
+            generation: staleGeneration,
+            gatewaysOnly: true
+        )
+        XCTAssertTrue(store.workspaces.isEmpty,
+                      "an in-flight scan must not repopulate configuration after Forget")
+        XCTAssertFalse(store.scanning)
+        XCTAssertTrue(defaults.bool(forKey: AgentWorkspaceStore.Keys.discoveryDisabled))
+
+        store.refresh(gatewaysOnly: true)
+        XCTAssertFalse(store.scanning,
+                       "opening Visualize must not undo the explicit Forget privacy choice")
+    }
+
     func testVisualizeIsReachableFromTrafficWithoutStealingExistingShortcuts() {
         XCTAssertTrue(SidebarItem.availableCases.contains(.visualize))
         XCTAssertEqual(SidebarItem.visualize.section, .traffic)
@@ -57,6 +83,34 @@ final class VisualizeNavigationTests: XCTestCase {
             VisualizeActionScope.showInspect(nav, filter: filter)
             XCTAssertNil(nav.inspectRequest)
         }
+    }
+
+    func testMergedAliasScopeDoesNotOfferAmbiguousInspectOrBlockActions() {
+        let nav = AppNavigation()
+        let filter = TrafficFilter(
+            bundleIDs: ["claude", "claude-code"],
+            domain: "api.anthropic.com"
+        )
+
+        VisualizeActionScope.showInspect(nav, filter: filter, sourceTitle: "Claude Code")
+
+        XCTAssertNil(nav.inspectRequest?.appID)
+        XCTAssertEqual(nav.inspectRequest?.host, "api.anthropic.com")
+        XCTAssertNil(VisualizeActionScope.blockRule(for: filter))
+    }
+
+    func testGlobalFocusDoesNotMakeAnExactAppActionAmbiguous() {
+        let nav = AppNavigation()
+        let filter = TrafficFilter(
+            bundleID: "claude",
+            domain: "api.anthropic.com",
+            focus: FocusScope(bundleIDs: ["claude", "claude-code"])
+        )
+
+        VisualizeActionScope.showInspect(nav, filter: filter, sourceTitle: "Claude Code")
+
+        XCTAssertEqual(nav.inspectRequest?.appID, "claude")
+        XCTAssertEqual(VisualizeActionScope.blockRule(for: filter)?.app, "claude")
     }
 
     func testAttributedChildBlockDraftTargetsTheProvenAgent() {

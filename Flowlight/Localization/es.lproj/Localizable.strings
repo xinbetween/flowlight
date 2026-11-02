@@ -1129,7 +1129,8 @@
 "Copy IP Address" = "Copiar la dirección IP";
 "Copy Destination" = "Copiar el destino";
 "Copy Hostname" = "Copiar el nombre de host";
-"Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail." = "Se muestran las %@ combinaciones app × destino × IP mayores. Los totales y los repartos incluyen todo el tráfico; filtra o acorta el periodo para ver todo el detalle.";
+"Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail." = "Se muestran las %@ combinaciones app × destino × IP mayores. Los totales y repartos por aplicación incluyen todo el tráfico; filtra o acorta el periodo para ver todas las relaciones.";
+"Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window." = "Se muestran las %@ combinaciones app × destino × IP mayores. Las agrupaciones por destino e IP usan este detalle limitado; cambia a App para ver totales completos por aplicación, o filtra o acorta el periodo.";
 "Per-second data is kept for a few hours." = "Los datos por segundo se conservan unas horas.";
 "Rollups run once a minute, so new data appears shortly." = "Los agregados se calculan una vez por minuto, así que los datos nuevos aparecen en breve.";
 "No hostname was seen for this traffic. %@ operates these addresses." = "No se vio ningún nombre de host para este tráfico. %@ opera estas direcciones.";

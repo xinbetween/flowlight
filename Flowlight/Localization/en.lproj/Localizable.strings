@@ -1078,7 +1078,8 @@
 "Copy IP Address" = "Copy IP Address";
 "Copy Destination" = "Copy Destination";
 "Copy Hostname" = "Copy Hostname";
-"Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail." = "Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail.";
+"Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail." = "Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail.";
+"Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window." = "Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window.";
 "Per-second data is kept for a few hours." = "Per-second data is kept for a few hours.";
 "Rollups run once a minute, so new data appears shortly." = "Rollups run once a minute, so new data appears shortly.";
 "No hostname was seen for this traffic. %@ operates these addresses." = "No hostname was seen for this traffic. %@ operates these addresses.";

@@ -13,7 +13,18 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.16.4</h2><time datetime="2026-11-01">November 1, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.16.5</h2><time datetime="2026-11-01">November 1, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Make the graph agree with Reports.</strong> Traffic mode now chooses applications by their full selected-period received plus sent bytes, guarantees each selected application a representative relationship, and keeps the application card total complete when quieter relationships are hidden.</li>
+          <li><strong>Render each application once.</strong> Agent, tool, launcher, configured-gateway, and observed-route evidence now converges on one semantic application card, with relationships remapped to that card, no synthetic self-loops, and the merged role evidence retained for inspection.</li>
+          <li><strong>Keep totals exact when detail is bounded.</strong> Reports keeps relationship detail responsive while loading complete selected-period application totals separately, so applications and shares beyond the 10,000-row detail cap remain visible and correct.</li>
+          <li><strong>Keep routing evidence and accounting distinct.</strong> A shared Flowlight or gateway card can carry application, configuration, and observed-route roles while traffic remains counted exactly once; configuration alone never claims observed bytes.</li>
+          <li><strong>Keep destination and gateway identity exact.</strong> Observed and blocked IPv4, IPv6, and hostname spellings now converge canonically without discarding historical evidence, while refreshed documented gateway settings respect Search and Focus and resolve local listeners within the correct address family.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.16.4</h2><time datetime="2026-11-01">November 1, 2026</time></header>
         <ul>
           <li><strong>See the real proxy chain.</strong> AI activity now combines each agent’s documented gateway setting with captured socket and inspection evidence, showing configured agent → gateway, observed gateway → Flowlight, and Flowlight → destination stages without claiming configuration is observed traffic.</li>
           <li><strong>Recognize local gateways by the process that owns them.</strong> Flowlight reads documented Claude Code, Codex, Gemini CLI, Cursor, Windsurf, and Zed settings, stores only a sanitized scheme, host, and port, and resolves localhost listeners to the actual application icon and identity instead of assuming a product or port.</li>

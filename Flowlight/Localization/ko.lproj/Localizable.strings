@@ -1152,7 +1152,8 @@
 "Copy IP Address" = "IP 주소 복사";
 "Copy Destination" = "목적지 복사";
 "Copy Hostname" = "호스트 이름 복사";
-"Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail." = "앱 × 목적지 × IP 조합 중 가장 큰 %@개를 표시합니다. 합계와 비중은 전체 트래픽을 반영하며, 전체 내역을 보려면 필터를 걸거나 기간을 좁히세요.";
+"Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail." = "앱 × 목적지 × IP 조합 중 가장 큰 %@개를 표시합니다. 앱 합계와 비중은 전체 트래픽을 반영하며, 전체 관계 내역을 보려면 필터를 걸거나 기간을 좁히세요.";
+"Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window." = "앱 × 목적지 × IP 조합 중 가장 큰 %@개를 표시합니다. 목적지 및 IP 그룹은 이 제한된 내역을 사용합니다. 전체 앱 합계를 보려면 앱으로 전환하거나 필터를 걸거나 기간을 좁히세요.";
 "Per-second data is kept for a few hours." = "초 단위 데이터는 몇 시간만 보관합니다.";
 "Rollups run once a minute, so new data appears shortly." = "집계는 1분에 한 번 수행되므로 새 데이터는 잠시 뒤에 나타납니다.";
 "No hostname was seen for this traffic. %@ operates these addresses." = "이 트래픽에서는 호스트 이름이 확인되지 않았습니다. 이 주소는 %@에서 운영합니다.";
