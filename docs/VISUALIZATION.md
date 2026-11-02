@@ -12,8 +12,9 @@ Traffic mode answers: **which applications moved traffic, and where did it go?**
 - Moving particles represent sent and received direction; Reduce Motion removes them.
 - Values are bytes and network connections (`FlowCounters.flows`), never mislabeled as HTTP requests.
 - Ordinary traffic is **Observed**, not “Allowed.” A status badge appears only when a store provides matching structured evidence.
-- The map is bounded for readability and reports hidden node, edge, byte, and connection totals. The list presents the same bounded selection.
-- Selecting an app, destination, or relationship can open Reports, Inspect, or an unsaved rule editor with the exact app and host/address filter.
+- The map is bounded for readability and reports hidden node, edge, byte, and connection totals. Applications are admitted by their full selected-period traffic, matching Reports; each visible application card keeps that full total even when only its busiest relationships are drawn. The list presents the same bounded relationships.
+- Proxy cards report traffic routed through that proxy, which remains distinct from traffic owned by the proxy application itself.
+- Selecting an app, destination, or relationship can open Reports, Inspect, or an unsaved rule editor with the exact app and host/address filter. Bare IPv4 and IPv6 destinations retain exact address identity and use `remoteIP` scope rather than a fabricated domain family.
 
 The first slice reads the uncapped `TrafficDatabase.appDestinationRows` projection and builds a pure `TrafficGraphSnapshot`. Layout depends on stable topology IDs and viewport size, not counter values, so refreshes do not make nodes jump.
 

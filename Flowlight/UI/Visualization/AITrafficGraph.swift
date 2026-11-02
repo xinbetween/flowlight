@@ -571,6 +571,7 @@ enum AITrafficGraphBuilder {
             ))
         }
         for (relationship, value) in selectedBlocked {
+            let exactDestination = VisualizationDestinationCanonicalizer.parse(relationship.destination)
             let destination = blockedDestination(relationship)
             edges.append(TrafficGraphEdge(
                 id: blockedID(relationship), source: relationship.source, target: destinationID(destination),
@@ -580,8 +581,8 @@ enum AITrafficGraphBuilder {
                         ? relationship.agent.bundleID : allNodes[relationship.source]?.filter.bundleID,
                     agentParent: relationship.source == agentID(relationship.agent)
                         ? nil : relationship.agent.bundleID,
-                    domain: HostCanonicalizer.host(relationship.destination),
-                    remoteIP: HostCanonicalizer.address(relationship.destination)
+                    domain: exactDestination.domain,
+                    remoteIP: exactDestination.address
                 ),
                 relationship: .blocked,
                 enforcement: TrafficGraphEnforcement(
@@ -771,12 +772,12 @@ enum AITrafficGraphBuilder {
     }
 
     private static func blockedDestination(_ relationship: BlockedRelationship) -> DestinationIdentity {
-        let host = HostCanonicalizer.host(relationship.destination) ?? ""
-        let provider = AgentCatalog.provider(domain: host, owner: "") ?? ""
+        let exact = VisualizationDestinationCanonicalizer.parse(relationship.destination)
+        let provider = exact.domain.flatMap { AgentCatalog.provider(domain: $0, owner: "") } ?? ""
         return DestinationIdentity(
             provider: provider,
-            domain: provider.isEmpty ? VisualizationDomainFamily.group(host) : "",
-            remoteIP: provider.isEmpty ? HostCanonicalizer.address(relationship.destination) ?? "" : "",
+            domain: provider.isEmpty ? exact.domain.map(VisualizationDomainFamily.group) ?? "" : "",
+            remoteIP: provider.isEmpty ? exact.address ?? "" : "",
             owner: "",
             asn: 0
         )

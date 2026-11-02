@@ -462,6 +462,37 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.total }, 30)
     }
 
+    func testReportsAndTrafficVisualizationAgreeOnPerAppTotals() throws {
+        let t0: Int64 = 1_700_000_000
+        var routed = key("claude", "api.anthropic.com", ip: "203.0.113.8")
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        var quic = routed
+        quic.appProtocol = "quic"
+        quic.transport = .udp
+        var launched = key("codex", "api.openai.com", ip: "203.0.113.9")
+        launched.launcherBundleID = "com.mitchellh.ghostty"
+        launched.launcherName = "Ghostty"
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: routed, counters: FlowCounters(bytesIn: 20, bytesOut: 10, flows: 1)),
+            TrafficRecord(key: quic, counters: FlowCounters(bytesIn: 5, bytesOut: 5, flows: 1)),
+            TrafficRecord(key: launched, counters: FlowCounters(bytesIn: 99, bytesOut: 1, flows: 2))
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let reports = try db.breakdown(.second, from: from, to: to, limit: .max)
+        let visualization = try db.appDestinationRows(.second, from: from, to: to)
+        let reportTotals = Dictionary(grouping: reports, by: \.bundleID).mapValues {
+            $0.reduce(into: FlowCounters()) { $0 += $1.counters }
+        }
+        let visualizationTotals = Dictionary(grouping: visualization, by: \.bundleID).mapValues {
+            $0.reduce(into: FlowCounters()) { $0 += $1.counters }
+        }
+
+        XCTAssertEqual(visualizationTotals, reportTotals)
+    }
+
     func testAIVisualizationProjectionPreservesAttributionAndScope() throws {
         let t0: Int64 = 1_700_000_000
         var attributed = key("node", "api.github.com", ip: "203.0.113.9")

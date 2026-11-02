@@ -365,7 +365,10 @@ private struct TrafficGraphCanvas: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let graphSize = CGSize(width: max(900, geometry.size.width), height: max(760, geometry.size.height))
+            let graphSize = CGSize(
+                width: max(900, geometry.size.width),
+                height: max(TrafficGraphLayout.minimumCanvasHeight(for: snapshot), geometry.size.height)
+            )
             let graphBounds = CGRect(origin: .zero, size: graphSize)
             let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: graphBounds,
                                                     preserving: cachedLayout.nodeFrames.isEmpty ? nil : cachedLayout)

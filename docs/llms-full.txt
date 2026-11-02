@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.5, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1671,8 +1671,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.4
+ 0.16.5
 November 1, 2026Latest
+
+ Make the graph agree with Reports. Traffic mode now chooses applications by their full selected-period received plus sent bytes, guarantees each selected application a representative relationship, and keeps the application card total complete when quieter relationships are hidden.
+
+ Keep routed and owned traffic distinct. Flowlight’s application card reports traffic owned by Flowlight, while the separate Flowlight proxy card reports traffic routed through inspection; relationship ribbons still count every byte exactly once.
+
+ Keep bare addresses exact. Blocked IPv4 and IPv6 destinations now converge with observed traffic on one destination node and carry exact address-scoped Reports and rule actions instead of fabricated domain families.
+
+ 0.16.4
+November 1, 2026
 
  See the real proxy chain. AI activity now combines each agent’s documented gateway setting with captured socket and inspection evidence, showing configured agent → gateway, observed gateway → Flowlight, and Flowlight → destination stages without claiming configuration is observed traffic.
 
