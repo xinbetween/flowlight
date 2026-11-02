@@ -135,6 +135,7 @@ enum AITrafficGraphBuilder {
                                       resolveGateway: @Sendable (AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? = {
                                           LocalGatewayResolver.resolve($0)
                                       },
+                                      includeConfiguredOnlyAgents: Bool = true,
                                       limits: AITrafficGraphLimits = .standard) -> TrafficGraphSnapshot
     where Rows.Element == BreakdownRow {
         let sourceRows = sourceRows.filter { !$0.counters.isEmpty }
@@ -164,10 +165,17 @@ enum AITrafficGraphBuilder {
             }
         }
         let existingCandidates = Set(grouped.keys).union(refusalNames.keys)
-        let configuredAgents = Set(gatewayConfigs.map { config, _ in
-            existingCandidates.first { gatewayMatches(config, candidate: $0, rows: proofGroups[$0] ?? []) }
-                ?? AgentIdentity(bundleID: config.agent)
-        })
+        let configuredGatewayAgents = gatewayConfigs.map { config, identity in
+            let agent = existingCandidates.sorted { left, right in
+                let leftExact = left.bundleID.caseInsensitiveCompare(config.agent) == .orderedSame
+                let rightExact = right.bundleID.caseInsensitiveCompare(config.agent) == .orderedSame
+                if leftExact != rightExact { return leftExact }
+                return agentID(left) < agentID(right)
+            }.first { gatewayMatches(config, candidate: $0, rows: proofGroups[$0] ?? []) }
+                ?? (includeConfiguredOnlyAgents ? AgentIdentity(bundleID: config.agent) : nil)
+            return (config: config, identity: identity, agent: agent)
+        }
+        let configuredAgents = Set(configuredGatewayAgents.compactMap(\.agent))
         let candidateAgents = existingCandidates.union(configuredAgents)
         for agent in candidateAgents {
             let agentRows = grouped[agent] ?? []
@@ -190,10 +198,27 @@ enum AITrafficGraphBuilder {
             if $0.metadata.weight != $1.metadata.weight { return $0.metadata.weight > $1.metadata.weight }
             return agentID($0.agent) < agentID($1.agent)
         }
-        let resolvedGateways = gatewayConfigs.compactMap { config, identity -> ResolvedGateway? in
-            guard let entry = included.first(where: { gatewayMatches(config, agent: $0) }) else { return nil }
-            let relay = RelayIdentity(bundleID: identity?.bundleID ?? "endpoint:\(config.endpoint.description)")
-            return ResolvedGateway(config: config, identity: identity, agent: entry.agent, relay: relay)
+        let semanticAgentIdentity: [TrafficGraphNodeID: String] = Dictionary(
+            uniqueKeysWithValues: included.map {
+                (
+                    agentID($0.agent),
+                    canonicalApplicationIdentity(bundleID: $0.agent.bundleID, title: $0.metadata.name)
+                )
+            }
+        )
+        let resolvedGateways = configuredGatewayAgents.compactMap { configured -> ResolvedGateway? in
+            guard let agent = configured.agent,
+                  included.contains(where: { $0.agent == agent }) else { return nil }
+            let relay = RelayIdentity(
+                bundleID: configured.identity?.bundleID
+                    ?? "endpoint:\(configured.config.endpoint.description)"
+            )
+            return ResolvedGateway(
+                config: configured.config,
+                identity: configured.identity,
+                agent: agent,
+                relay: relay
+            )
         }
 
         var allNodes: [TrafficGraphNodeID: TrafficGraphNode] = [:]
@@ -323,8 +348,9 @@ enum AITrafficGraphBuilder {
             } else {
                 sourceID = agentID(agent)
             }
+            guard let destination = VisualizationDestinationCanonicalizer.identity(attempt.destination) else { continue }
             let relationship = BlockedRelationship(source: sourceID, agent: agent,
-                                                   destination: attempt.destination.lowercased(), port: attempt.port)
+                                                   destination: destination, port: attempt.port)
             var value = blocked[relationship] ?? BlockedValue()
             value.count += attempt.count
             if !attempt.category.isEmpty { value.categories.insert(attempt.category) }
@@ -376,7 +402,20 @@ enum AITrafficGraphBuilder {
             if $0.value != $1.value { return $0.value > $1.value }
             return agentID($0.key) < agentID($1.key)
         }
-        var visibleAgents = Set(rankedBlockedAgents.prefix(blockedAgentReserve).map { agentID($0.key) })
+        var visibleAgents: Set<TrafficGraphNodeID> = []
+        func semanticAgentKey(_ id: TrafficGraphNodeID) -> String {
+            semanticAgentIdentity[id] ?? id.rawValue
+        }
+        func canAdmitAgent(_ id: TrafficGraphNodeID) -> Bool {
+            let visibleSemanticAgents = Set(visibleAgents.map(semanticAgentKey))
+            return visibleAgents.contains(id)
+                || visibleSemanticAgents.contains(semanticAgentKey(id))
+                || visibleSemanticAgents.count < max(0, limits.maxAgents)
+        }
+        for (agent, _) in rankedBlockedAgents.prefix(blockedAgentReserve) {
+            let id = agentID(agent)
+            if canAdmitAgent(id) { visibleAgents.insert(id) }
+        }
         var visibleTools: Set<TrafficGraphNodeID> = []
         var visibleDestinations: Set<TrafficGraphNodeID> = []
         // Refusals reserve scarce tool and destination slots before normal traffic. Otherwise a handful of low-value
@@ -411,7 +450,7 @@ enum AITrafficGraphBuilder {
             let sourceAgent = owningAgent(of: relationship.source, included: included.map(\.agent))
             let agentNodeID = agentID(sourceAgent)
             let sourceIsTool = relationship.source != agentNodeID
-            guard (visibleAgents.contains(agentNodeID) || visibleAgents.count < max(0, limits.maxAgents)),
+            guard canAdmitAgent(agentNodeID),
                   (!sourceIsTool || visibleTools.contains(relationship.source)
                     || visibleTools.count < max(0, limits.maxTools)),
                   (visibleDestinations.contains(destinationNodeID)
@@ -424,14 +463,15 @@ enum AITrafficGraphBuilder {
         }
         // Configuration is relationship evidence in its own right. Admit configured agents within the same agent cap;
         // settings never manufacture counters or an observed route.
-        for relationship in configuredGateways.keys.sorted(by: { configuredGatewayID($0) < configuredGatewayID($1) })
-            where visibleAgents.count < max(0, limits.maxAgents) {
-            visibleAgents.insert(agentID(relationship.agent))
+        for relationship in configuredGateways.keys.sorted(by: { configuredGatewayID($0) < configuredGatewayID($1) }) {
+            let id = agentID(relationship.agent)
+            if canAdmitAgent(id) { visibleAgents.insert(id) }
         }
         // The first refusal pass reserves capacity before observed traffic. Once observed traffic has admitted its
         // agents, use every remaining agent slot and blocked-edge slot rather than treating the reserve as a cap.
-        for (agent, _) in rankedBlockedAgents where visibleAgents.count < max(0, limits.maxAgents) {
-            visibleAgents.insert(agentID(agent))
+        for (agent, _) in rankedBlockedAgents {
+            let id = agentID(agent)
+            if canAdmitAgent(id) { visibleAgents.insert(id) }
         }
         let alreadySelected = Set(selectedBlocked.map(\.0))
         for (relationship, value) in rankedBlocked where !alreadySelected.contains(relationship) {
@@ -624,7 +664,12 @@ enum AITrafficGraphBuilder {
                 id: launcherNodeID, kind: .launcher,
                 title: metadata.name.isEmpty ? launcherNodeID.rawValue : metadata.name,
                 detail: L("Started agent"), appPath: metadata.path,
-                filter: .none, counters: FlowCounters()
+                filter: TrafficFilter(
+                    bundleID: launcherMetadata.keys.first {
+                        launcherID(bundleID: $0.bundleID) == launcherNodeID
+                    }?.bundleID
+                ),
+                counters: FlowCounters()
             )
         }
         let visibleLauncherEdges = launcherMetadata.keys.sorted {
@@ -663,6 +708,7 @@ enum AITrafficGraphBuilder {
         let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations)
             .union(visibleLaunchers).union(visibleRelays)
         let nodes = visibleIDs.compactMap { allNodes[$0] }.sorted { $0.id < $1.id }
+        let coalesced = coalesceApplicationNodes(nodes: nodes, edges: edges)
         let visibleTotal = selectedObserved.reduce(into: FlowCounters()) { $0 += $1.1 }
         let allDestinationCount = Set(observedCounters.keys.map { destinationID($0.destination) })
             .union(blocked.keys.map { destinationID(blockedDestination($0)) }).count
@@ -686,7 +732,7 @@ enum AITrafficGraphBuilder {
                            + allObservedRoutes + configuredGateways.count - edges.count),
             counters: subtract(total, visibleTotal)
         )
-        return TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: hidden)
+        return TrafficGraphSnapshot(nodes: coalesced.nodes, edges: coalesced.edges, total: total, hidden: hidden)
     }
 
     private static func toolIdentity(_ row: BreakdownRow, agent: AgentIdentity) -> ToolIdentity? {
@@ -722,12 +768,230 @@ enum AITrafficGraphBuilder {
         return candidate.path < current.path
     }
 
-    private static func gatewayMatches(_ config: AgentGatewayConfig,
-                                       agent entry: (agent: AgentIdentity, rows: [BreakdownRow], metadata: AgentMetadata)) -> Bool {
-        gatewayMatches(config, candidate: entry.agent, rows: entry.rows)
-            || entry.metadata.name.lowercased() == config.agent.lowercased()
-            || entry.metadata.known?.processNames.contains(config.agent.lowercased()) == true
-            || entry.metadata.known?.bundleIDs.contains(config.agent) == true
+    private static func coalesceApplicationNodes(
+        nodes: [TrafficGraphNode],
+        edges: [TrafficGraphEdge]
+    ) -> (nodes: [TrafficGraphNode], edges: [TrafficGraphEdge]) {
+        let candidates = nodes.filter { node in
+            switch node.kind {
+            case .agent, .tool, .launcher, .proxy: return node.filter.bundleID?.isEmpty == false
+            default: return false
+            }
+        }
+        let grouped = Dictionary(grouping: candidates) {
+            canonicalApplicationIdentity(bundleID: $0.filter.bundleID ?? "", title: $0.title)
+        }
+        var replacements: [TrafficGraphNodeID: TrafficGraphNodeID] = [:]
+        var mergedNodes: [TrafficGraphNodeID: TrafficGraphNode] = Dictionary(
+            uniqueKeysWithValues: nodes.map { ($0.id, $0) }
+        )
+        let configuredAgentIDs = Set(
+            edges.lazy
+                .filter { $0.relationship == .configuredGateway }
+                .map(\.source)
+        )
+
+        for duplicates in grouped.values where duplicates.count > 1 {
+            let survivor = duplicates.sorted {
+                prefersApplicationNode(
+                    $0,
+                    over: $1,
+                    configuredAgentIDs: configuredAgentIDs
+                )
+            }.first!
+            var merged = survivor
+            if let metadata = duplicates.sorted(by: prefersDisplayMetadata).first {
+                if merged.appPath.isEmpty, !metadata.appPath.isEmpty {
+                    merged.appPath = metadata.appPath
+                    if !metadata.title.isEmpty { merged.title = metadata.title }
+                    if !metadata.detail.isEmpty { merged.detail = metadata.detail }
+                } else {
+                    if merged.title.isEmpty { merged.title = metadata.title }
+                    if merged.detail.isEmpty { merged.detail = metadata.detail }
+                }
+            }
+            let exactBundleIDs = Set(duplicates.compactMap { $0.filter.bundleID })
+            let normalizedBundleIDs = Set(exactBundleIDs.map { $0.lowercased() })
+            let includeAttributedChildren = duplicates.contains { $0.filter.includeAttributedChildren }
+            let focusIncludesAttributedParents = duplicates.contains {
+                $0.filter.agentParent != nil || $0.filter.focusIncludesAttributedParents
+            }
+            var exactMembers: [String: TrafficGraphMember] = [:]
+            for edge in edges where edge.relationship == .observed {
+                for member in edge.members {
+                    let matchesApplication = normalizedBundleIDs.contains(
+                        member.filter.bundleID?.lowercased() ?? ""
+                    )
+                    let matchesAttributedChild = includeAttributedChildren && normalizedBundleIDs.contains(
+                        member.filter.agentParent?.lowercased() ?? ""
+                    )
+                    guard matchesApplication || matchesAttributedChild else { continue }
+                    if var current = exactMembers[member.id] {
+                        current.counters += member.counters
+                        exactMembers[member.id] = current
+                    } else {
+                        exactMembers[member.id] = member
+                    }
+                }
+            }
+            merged.counters = exactMembers.values.reduce(into: FlowCounters()) { $0 += $1.counters }
+            merged.filter = exactBundleIDs.count == 1
+                ? TrafficFilter(
+                    bundleID: exactBundleIDs.first,
+                    includeAttributedChildren: includeAttributedChildren,
+                    focusIncludesAttributedParents: focusIncludesAttributedParents
+                )
+                : TrafficFilter(
+                    bundleIDs: exactBundleIDs.sorted(),
+                    includeAttributedChildren: includeAttributedChildren,
+                    focusIncludesAttributedParents: focusIncludesAttributedParents
+                )
+            let removedIDs = Set(duplicates.filter { $0.id != survivor.id }.map(\.id))
+            let collapsedEvidence = edges.compactMap { edge -> TrafficGraphRoleEvidence? in
+                guard removedIDs.contains(edge.source) || removedIDs.contains(edge.target),
+                      edge.relationship != .observed,
+                      edge.relationship != .blocked,
+                      edge.relationship != .invoked else { return nil }
+                return TrafficGraphRoleEvidence(
+                    relationship: edge.relationship,
+                    detail: roleEvidenceDetail(edge.relationship),
+                    configuration: edge.configuration
+                )
+            }
+            merged.roleEvidence = (duplicates.flatMap(\.roleEvidence) + collapsedEvidence)
+                .reduce(into: [TrafficGraphRoleEvidence]()) { result, evidence in
+                    guard !result.contains(evidence) else { return }
+                    result.append(evidence)
+                }
+            for node in duplicates where node.id != survivor.id {
+                replacements[node.id] = survivor.id
+                mergedNodes.removeValue(forKey: node.id)
+            }
+            mergedNodes[survivor.id] = merged
+        }
+
+        struct EdgeKey: Hashable {
+            var source: TrafficGraphNodeID
+            var relationship: TrafficGraphRelationship
+            var target: TrafficGraphNodeID
+            var configuration: TrafficGraphConfiguration?
+            var enforcementCategory: String?
+            var enforcementSource: String?
+            var enforcementDetail: String?
+        }
+        var remappedEdges: [EdgeKey: TrafficGraphEdge] = [:]
+        for original in edges {
+            var edge = original
+            edge.source = replacements[edge.source] ?? edge.source
+            edge.target = replacements[edge.target] ?? edge.target
+            guard edge.source != edge.target else { continue }
+            let key = EdgeKey(
+                source: edge.source,
+                relationship: edge.relationship,
+                target: edge.target,
+                configuration: edge.configuration,
+                enforcementCategory: edge.enforcement?.category,
+                enforcementSource: edge.enforcement?.source,
+                enforcementDetail: edge.enforcement?.detail
+            )
+            if var current = remappedEdges[key] {
+                current.counters += edge.counters
+                if let count = edge.enforcement?.count { current.enforcement?.count += count }
+                if let volume = edge.trafficVolume {
+                    var combined = current.trafficVolume ?? FlowCounters()
+                    combined += volume
+                    current.trafficVolume = combined
+                }
+                current.members = (current.members + edge.members)
+                    .reduce(into: [TrafficGraphMember]()) { result, member in
+                        if let index = result.firstIndex(where: { $0.id == member.id }) {
+                            result[index].counters += member.counters
+                        } else {
+                            result.append(member)
+                        }
+                    }
+                    .sorted { $0.id < $1.id }
+                remappedEdges[key] = current
+            } else {
+                var rawID = edge.source.rawValue + "→" + edge.relationship.rawValue + "→" + edge.target.rawValue
+                if let configuration = edge.configuration {
+                    rawID += "→configuration→" + component(configuration.endpoint)
+                        + component(configuration.source)
+                        + component(configuration.sourceKey)
+                }
+                if let enforcement = edge.enforcement {
+                    rawID += "→enforcement→" + component(enforcement.source)
+                        + component(enforcement.category)
+                        + component(enforcement.detail)
+                }
+                edge.id = TrafficGraphEdgeID(rawValue: rawID)
+                remappedEdges[key] = edge
+            }
+        }
+        let normalizedEdges = remappedEdges.values.map { value in
+            var edge = value
+            guard edge.relationship == .observed, edge.members.count > 1 else { return edge }
+            let bundleIDs = Set(edge.members.compactMap { $0.filter.bundleID })
+            edge.filter = bundleIDs.count == 1
+                ? TrafficFilter(bundleID: bundleIDs.first)
+                : TrafficFilter(bundleIDs: bundleIDs.sorted())
+            return edge
+        }
+        return (
+            mergedNodes.values.sorted { $0.id < $1.id },
+            normalizedEdges.sorted { $0.id < $1.id }
+        )
+    }
+
+    private static func roleEvidenceDetail(_ relationship: TrafficGraphRelationship) -> String {
+        switch relationship {
+        case .runs: return L("Runs")
+        case .launched: return L("Started")
+        case .configuredGateway: return L("Configured gateway")
+        case .routedThrough: return L("Observed route")
+        case .observed: return L("Observed")
+        case .blocked: return L("Blocked")
+        case .invoked: return L("Invoked")
+        }
+    }
+
+    private static func canonicalApplicationIdentity(bundleID: String, title: String) -> String {
+        if let known = AgentCatalog.knownAgent(bundleID: bundleID, appName: title) {
+            return "known:" + known.name.lowercased()
+        }
+        return "app:" + bundleID.lowercased()
+    }
+
+    private static func prefersDisplayMetadata(_ left: TrafficGraphNode, _ right: TrafficGraphNode) -> Bool {
+        if left.appPath.isEmpty != right.appPath.isEmpty { return !left.appPath.isEmpty }
+        if left.title.isEmpty != right.title.isEmpty { return !left.title.isEmpty }
+        if left.detail.isEmpty != right.detail.isEmpty { return !left.detail.isEmpty }
+        if left.counters.total != right.counters.total { return left.counters.total > right.counters.total }
+        return left.id < right.id
+    }
+
+    private static func prefersApplicationNode(
+        _ left: TrafficGraphNode,
+        over right: TrafficGraphNode,
+        configuredAgentIDs: Set<TrafficGraphNodeID>
+    ) -> Bool {
+        func priority(_ kind: TrafficGraphNode.Kind) -> Int {
+            switch kind {
+            case .agent: return 0
+            case .tool: return 1
+            case .proxy: return 2
+            case .launcher: return 3
+            default: return 4
+            }
+        }
+        let leftIsConfigured = configuredAgentIDs.contains(left.id)
+        let rightIsConfigured = configuredAgentIDs.contains(right.id)
+        if leftIsConfigured != rightIsConfigured { return leftIsConfigured }
+        let leftPriority = priority(left.kind)
+        let rightPriority = priority(right.kind)
+        if leftPriority != rightPriority { return leftPriority < rightPriority }
+        if left.counters.total != right.counters.total { return left.counters.total > right.counters.total }
+        return left.id < right.id
     }
 
     private static func gatewayMatches(_ config: AgentGatewayConfig, candidate: AgentIdentity,

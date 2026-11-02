@@ -40,7 +40,7 @@ enum InsightDimension: String, CaseIterable, Identifiable, Sendable {
     /// IPs only become interesting once a destination is chosen.
     static func available(for filter: TrafficFilter) -> [InsightDimension] {
         var dims: [InsightDimension] = []
-        if filter.bundleID == nil { dims.append(.app) }
+        if filter.bundleID == nil && filter.bundleIDs.isEmpty { dims.append(.app) }
         if !filter.pinsDestination { dims.append(.destination) }
         if filter.pinsDestination && filter.remoteIP == nil { dims.append(.ip) }
         if filter.appProtocol == nil { dims.append(.appProtocol) }
@@ -105,7 +105,9 @@ struct InsightEntity: Hashable, Sendable, Identifiable {
     func narrowing(_ filter: TrafficFilter) -> TrafficFilter? {
         var f = filter
         switch kind {
-        case .app: f.bundleID = key
+        case .app:
+            f.bundleID = key
+            f.bundleIDs = []
         case .domain: f.domainSuffix = label; f.domain = nil; f.owner = nil
         case .owner: f.owner = label; f.domain = ""; f.domainSuffix = nil
         case .ip: f.remoteIP = key

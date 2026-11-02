@@ -100,6 +100,71 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(gemini.endpoint.host, "127.0.0.1")
     }
 
+    func testCodexProviderSelectionAllowsQuotedProviderKey() throws {
+        let gateways = AgentGatewayConfigReader.parseCodexTOML(
+            """
+            model_provider = "my-provider"
+            [model_providers."my-provider"]
+            base_url = "http://localhost:4000/v1"
+            """,
+            source: "~/.codex/config.toml"
+        )
+
+        let gateway = try XCTUnwrap(gateways.first)
+        XCTAssertEqual(gateways.count, 1)
+        XCTAssertEqual(gateway.sourceKey, "model_providers.my-provider.base_url")
+        XCTAssertEqual(gateway.endpoint.host, "localhost")
+    }
+
+    func testCodexProviderSelectionAllowsClosingBracketInsideQuotedKey() throws {
+        let gateways = AgentGatewayConfigReader.parseCodexTOML(
+            """
+            model_provider = "selected"
+            [model_providers.selected]
+            base_url = "http://localhost:4000/v1"
+            [model_providers."dev]local"]
+            base_url = "http://localhost:5000/v1"
+            """,
+            source: "~/.codex/config.toml"
+        )
+
+        XCTAssertEqual(gateways.count, 1)
+        XCTAssertEqual(gateways.first?.endpoint.port, 4000,
+                       "a quoted closing bracket must not leak values into the previous provider section")
+    }
+
+    func testCodexProviderSelectionAllowsInlineComments() throws {
+        let gateways = AgentGatewayConfigReader.parseCodexTOML(
+            """
+            model_provider = "local" # use the corporate gateway
+            [model_providers.local] # corporate gateway
+            base_url = "http://localhost:4000/v1" # no secrets are retained
+            """,
+            source: "~/.codex/config.toml"
+        )
+
+        let gateway = try XCTUnwrap(gateways.first)
+        XCTAssertEqual(gateways.count, 1)
+        XCTAssertEqual(gateway.endpoint.host, "localhost")
+        XCTAssertEqual(gateway.endpoint.port, 4000)
+    }
+
+    func testLocalGatewayAddressMatchingAcceptsLocalhostAndWildcardListeners() {
+        XCTAssertTrue(AgentGatewayConfig.Endpoint(
+            scheme: "http",
+            host: "0:0:0:0:0:0:0:1",
+            port: 4000
+        ).isLocal)
+        XCTAssertTrue(LocalGatewayResolver.address("127.0.0.1", accepts: "localhost"))
+        XCTAssertTrue(LocalGatewayResolver.address("::1", accepts: "localhost"))
+        XCTAssertTrue(LocalGatewayResolver.address("::1", accepts: "0:0:0:0:0:0:0:1"))
+        XCTAssertTrue(LocalGatewayResolver.address("0.0.0.0", accepts: "127.0.0.1"))
+        XCTAssertTrue(LocalGatewayResolver.address("::", accepts: "::1"))
+        XCTAssertFalse(LocalGatewayResolver.address("0.0.0.0", accepts: "::1"))
+        XCTAssertFalse(LocalGatewayResolver.address("::", accepts: "127.0.0.1"))
+        XCTAssertFalse(LocalGatewayResolver.address("192.0.2.1", accepts: "127.0.0.1"))
+    }
+
     func testWorkspaceScanRetainsConfiguredGatewayAsRelationshipEvidence() throws {
         let workspaces = AgentWorkspaceScanner.scan(home: home)
         let claude = try XCTUnwrap(workspaces.first { $0.agent == "claude" })
@@ -152,6 +217,27 @@ final class AgentWorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(found.of(.instructions).map(\.name), ["AGENTS.md"])
         let names = workspaces.flatMap(\.capabilities).map(\.name)
         XCTAssertFalse(names.contains("sneaky"), "node_modules is skipped")
+    }
+
+    func testProjectCodexGatewayIsDiscoveredDuringGatewayRefresh() throws {
+        let project = home.appendingPathComponent("Projects/new-app")
+        let root = project.appendingPathComponent(".codex")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try """
+        model_provider = "local"
+        [model_providers.local]
+        base_url = "http://localhost:4555/v1"
+        """.write(to: root.appendingPathComponent("config.toml"), atomically: true, encoding: .utf8)
+
+        let workspaces = AgentWorkspaceScanner.scanGatewaySettings(
+            home: home,
+            extraRoots: [project],
+            fm: .default
+        )
+
+        let codex = try XCTUnwrap(workspaces.first { $0.agent == "codex" && $0.isProject })
+        XCTAssertEqual(codex.gateways.first?.endpoint.port, 4555)
+        XCTAssertEqual(codex.root, "~/Projects/new-app/.codex")
     }
 
     func testProjectLocalGatewayOverridesSharedSettings() throws {

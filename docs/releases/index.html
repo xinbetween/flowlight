@@ -64,8 +64,10 @@
         <header><h2>0.16.5</h2><time datetime="2026-11-01">November 1, 2026</time><span class="tag">Latest</span></header>
         <ul>
           <li><strong>Make the graph agree with Reports.</strong> Traffic mode now chooses applications by their full selected-period received plus sent bytes, guarantees each selected application a representative relationship, and keeps the application card total complete when quieter relationships are hidden.</li>
-          <li><strong>Keep routed and owned traffic distinct.</strong> Flowlight’s application card reports traffic owned by Flowlight, while the separate Flowlight proxy card reports traffic routed through inspection; relationship ribbons still count every byte exactly once.</li>
-          <li><strong>Keep bare addresses exact.</strong> Blocked IPv4 and IPv6 destinations now converge with observed traffic on one destination node and carry exact address-scoped Reports and rule actions instead of fabricated domain families.</li>
+          <li><strong>Render each application once.</strong> Agent, tool, launcher, configured-gateway, and observed-route evidence now converges on one semantic application card, with relationships remapped to that card, no synthetic self-loops, and the merged role evidence retained for inspection.</li>
+          <li><strong>Keep totals exact when detail is bounded.</strong> Reports keeps relationship detail responsive while loading complete selected-period application totals separately, so applications and shares beyond the 10,000-row detail cap remain visible and correct.</li>
+          <li><strong>Keep routing evidence and accounting distinct.</strong> A shared Flowlight or gateway card can carry application, configuration, and observed-route roles while traffic remains counted exactly once; configuration alone never claims observed bytes.</li>
+          <li><strong>Keep destination and gateway identity exact.</strong> Observed and blocked IPv4, IPv6, and hostname spellings now converge canonically without discarding historical evidence, while refreshed documented gateway settings respect Search and Focus and resolve local listeners within the correct address family.</li>
         </ul>
       </section>
 

@@ -72,8 +72,13 @@ enum Granularity: String, CaseIterable, Identifiable, Sendable {
 
 struct TrafficFilter: Equatable, Sendable {
     var bundleID: String?
-    /// Include rows attributed to `bundleID` as children of that agent root.
+    /// Exact application identities that make up one semantic application (for example, historical aliases).
+    /// This intrinsic scope is independent of global Focus, which is applied as an additional constraint.
+    var bundleIDs: [String] = []
+    /// Include rows attributed to `bundleID` or `bundleIDs` as children of those agent roots.
     var includeAttributedChildren = false
+    /// Let global Focus match this exact application scope through stored parent attribution without adding child rows.
+    var focusIncludesAttributedParents = false
     /// Exact stored process-lineage parent. Unlike `includeAttributedChildren`, this never matches the root process.
     var agentParent: String?
     /// Exact stored MCP attribution.
@@ -94,8 +99,8 @@ struct TrafficFilter: Equatable, Sendable {
     /// Focus isn't part of this: it's applied to every query rather than chosen on a screen, so a view that asks
     /// "did the user narrow anything?" should get the same answer whether or not Focus happens to be on.
     var isEmpty: Bool {
-        bundleID == nil && agentParent == nil && mcpServer == nil && domain == nil && remoteIP == nil
-            && owner == nil && domainSuffix == nil && appProtocol == nil && channel == nil
+        bundleID == nil && bundleIDs.isEmpty && agentParent == nil && mcpServer == nil && domain == nil
+            && remoteIP == nil && owner == nil && domainSuffix == nil && appProtocol == nil && channel == nil
     }
     /// True when the filter pins a destination (hostname, domain, owner or IP).
     var pinsDestination: Bool { domain != nil || domainSuffix != nil || owner != nil || remoteIP != nil }
@@ -108,6 +113,12 @@ struct SeriesPoint: Identifiable, Sendable, Equatable {
     var flows: Int64
     var id: Date { date }
     var total: Int64 { bytesIn + bytesOut }
+}
+
+struct ReportsBreakdown: Sendable {
+    var rows: [BreakdownRow]
+    var appTotals: [BreakdownRow]
+    var isTruncated: Bool
 }
 
 struct BreakdownRow: Sendable {
@@ -917,6 +928,11 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: Queries
 
+    /// Execute a related projection against one committed WAL snapshot while capture continues writing.
+    func readSnapshot<T>(_ body: () throws -> T) throws -> T {
+        try conn.readTransaction(body)
+    }
+
     private func whereClause(from: Date, to: Date, filter: TrafficFilter,
                              includeAttributedChildren: Bool = false) -> (String, [SQLValue]) {
         var clauses = ["ts >= ?", "ts < ?"]
@@ -928,6 +944,14 @@ final class TrafficDatabase: @unchecked Sendable {
                 : "bundle_id = ?")
             values.append(.text(v))
             if includeChildren { values.append(.text(v)) }
+        }
+        if !filter.bundleIDs.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.bundleIDs.count).joined(separator: ",")
+            clauses.append(includeChildren
+                ? "(bundle_id IN (\(placeholders)) OR (attribution_exact = 1 AND attribution_epoch = 1 AND agent_parent IN (\(placeholders))))"
+                : "bundle_id IN (\(placeholders))")
+            values += filter.bundleIDs.map { .text($0) }
+            if includeChildren { values += filter.bundleIDs.map { .text($0) } }
         }
         if let v = filter.agentParent {
             clauses.append("attribution_exact = 1 AND attribution_epoch = 1 AND agent_parent = ?")
@@ -948,7 +972,8 @@ final class TrafficDatabase: @unchecked Sendable {
         if let v = filter.channel { clauses.append("channel = ?"); values.append(.text(v.rawValue)) }
         if let (clause, focusValues) = Self.focusClause(
             filter.focus,
-            includeAttributedChildren: includeChildren || filter.agentParent != nil || filter.mcpServer != nil
+            includeAttributedChildren: includeChildren || filter.focusIncludesAttributedParents
+                || filter.agentParent != nil || filter.mcpServer != nil
         ) {
             clauses.append(clause)
             values += focusValues
@@ -1042,6 +1067,48 @@ final class TrafficDatabase: @unchecked Sendable {
                          parentAgent: row.text(10), parentAgentName: row.text(11), mcpServer: row.text(12),
                          channel: NetworkChannel(rawValue: row.text(13)) ?? .ip)
         }
+    }
+
+    /// Reports bounds relationship detail but obtains exact application totals separately. This keeps every app and
+    /// its selected-period total truthful without materializing an unbounded app × destination × IP result set.
+    func reportsBreakdown(_ granularity: Granularity, from: Date, to: Date,
+                          filter: TrafficFilter = .none) throws -> ReportsBreakdown {
+        let candidates = try breakdown(
+            granularity,
+            from: from,
+            to: to,
+            filter: filter,
+            limit: Self.breakdownLimit + 1
+        )
+        let isTruncated = candidates.count > Self.breakdownLimit
+        let rows = Array(candidates.prefix(Self.breakdownLimit))
+        let (clause, values) = whereClause(from: from, to: to, filter: filter)
+        let appTotals = try conn.query("""
+            SELECT bundle_id, app_name, app_path, total_in, total_out, total_flows
+            FROM (
+                SELECT bundle_id, app_name, app_path,
+                       SUM(bytes_in) OVER (PARTITION BY bundle_id) AS total_in,
+                       SUM(bytes_out) OVER (PARTITION BY bundle_id) AS total_out,
+                       SUM(flows) OVER (PARTITION BY bundle_id) AS total_flows,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY bundle_id
+                           ORDER BY bytes_in + bytes_out DESC, app_name, app_path
+                       ) AS metadata_rank
+                FROM \(granularity.table) WHERE \(clause)
+            ) WHERE metadata_rank = 1
+            ORDER BY total_in + total_out DESC
+            """, values) { row in
+            BreakdownRow(
+                bundleID: row.text(0), appName: row.text(1), appPath: row.text(2),
+                domain: "", remoteIP: "", ports: "", protocols: "",
+                counters: FlowCounters(bytesIn: row.int(3), bytesOut: row.int(4), flows: row.int(5))
+            )
+        }
+        return ReportsBreakdown(
+            rows: rows,
+            appTotals: appTotals,
+            isTruncated: isTruncated
+        )
     }
 
     /// What an external collector may receive. Ordinary traffic remains exportable, but historical attribution
@@ -2396,14 +2463,26 @@ final class TrafficDatabase: @unchecked Sendable {
     func localRiskCounts(since: Date, to: Date? = nil, filter: TrafficFilter = .none,
                          visibleOnly: Bool = true) throws -> RiskAssessmentCounts {
         guard !visibleOnly || LocalRiskSettings.isActive else { return .init() }
+        // Inspected exchanges do not retain address ownership, traffic protocol, or network channel. Returning an
+        // unscoped count for those dimensions would make Potential harm disagree with every traffic projection.
+        guard filter.owner == nil, filter.remoteIP == nil,
+              filter.appProtocol == nil, filter.channel == nil else { return .init() }
         var clause = "e.ts >= ?"
         var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
-        if let to { clause += " AND e.ts <= ?"; values.append(.double(to.timeIntervalSince1970)) }
+        if let to { clause += " AND e.ts < ?"; values.append(.double(to.timeIntervalSince1970)) }
         if let app = filter.bundleID, !app.isEmpty {
             clause += filter.includeAttributedChildren
                 ? " AND (e.bundle_id = ? OR e.agent = ?)" : " AND e.bundle_id = ?"
             values.append(.text(app))
             if filter.includeAttributedChildren { values.append(.text(app)) }
+        }
+        if !filter.bundleIDs.isEmpty {
+            let marks = Array(repeating: "?", count: filter.bundleIDs.count).joined(separator: ",")
+            clause += filter.includeAttributedChildren
+                ? " AND (e.bundle_id IN (\(marks)) OR e.agent IN (\(marks)))"
+                : " AND e.bundle_id IN (\(marks))"
+            values += filter.bundleIDs.map { .text($0) }
+            if filter.includeAttributedChildren { values += filter.bundleIDs.map { .text($0) } }
         }
         if let parent = filter.agentParent, !parent.isEmpty {
             clause += " AND e.agent = ?"
@@ -2416,10 +2495,6 @@ final class TrafficDatabase: @unchecked Sendable {
         if let host = filter.domain, !host.isEmpty {
             clause += " AND e.host = ?"
             values.append(.text(host))
-        } else if filter.remoteIP != nil {
-            // Inspected exchanges retain hostnames, not destination addresses. An IP-only traffic scope has no
-            // corresponding request rows and must not silently widen the Potential harm card.
-            clause += " AND 0"
         }
         if let suffix = filter.domainSuffix, !suffix.isEmpty {
             clause += " AND (e.host = ? OR e.host LIKE ?)"
@@ -2429,7 +2504,8 @@ final class TrafficDatabase: @unchecked Sendable {
             var focusParts: [String] = []
             if !filter.focus.bundleIDs.isEmpty {
                 let marks = Array(repeating: "?", count: filter.focus.bundleIDs.count).joined(separator: ",")
-                let matchesParent = filter.includeAttributedChildren || filter.agentParent != nil || filter.mcpServer != nil
+                let matchesParent = filter.includeAttributedChildren || filter.focusIncludesAttributedParents
+                    || filter.agentParent != nil || filter.mcpServer != nil
                 focusParts.append(matchesParent
                     ? "(e.bundle_id IN (\(marks)) OR e.agent IN (\(marks)))"
                     : "e.bundle_id IN (\(marks))")

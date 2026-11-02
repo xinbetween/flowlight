@@ -14,7 +14,9 @@ struct AgentGatewayConfig: Equatable, Sendable, Codable {
             return "\(scheme)://\(displayHost):\(port)"
         }
         var isLocal: Bool {
-            host == "localhost" || host == "127.0.0.1" || host == "::1"
+            guard host != "localhost" else { return true }
+            guard let address = HostCanonicalizer.address(host) else { return false }
+            return address == "127.0.0.1" || address == "::1"
         }
     }
 
@@ -103,14 +105,19 @@ enum AgentGatewayConfigReader {
         var values: [(section: String, key: String, value: String)] = []
         for raw in text.components(separatedBy: .newlines) {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("["), line.hasSuffix("]") {
-                section = String(line.dropFirst().dropLast()).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if line.hasPrefix("[") {
+                section = ""
+                guard let close = tomlTableClose(in: line) else { continue }
+                let suffix = line[line.index(after: close)...].trimmingCharacters(in: .whitespaces)
+                guard suffix.isEmpty || suffix.hasPrefix("#") else { continue }
+                section = tomlSection(
+                    String(line[line.index(after: line.startIndex)..<close])
+                )
                 continue
             }
             guard let equals = line.firstIndex(of: "=") else { continue }
             let key = line[..<equals].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            let value = tomlValue(String(line[line.index(after: equals)...]))
             if section.isEmpty, key == "model_provider" { selectedProvider = value }
             if key == "openai_base_url" || key == "base_url" || key == "http_proxy" || key == "https_proxy" {
                 values.append((section, key, value))
@@ -127,11 +134,90 @@ enum AgentGatewayConfigReader {
         }
     }
 
+    private static func tomlTableClose(in line: String) -> String.Index? {
+        var quote: Character?
+        var escaped = false
+        for index in line.indices.dropFirst() {
+            let character = line[index]
+            if escaped {
+                escaped = false
+                continue
+            }
+            if character == "\\", quote == "\"" {
+                escaped = true
+                continue
+            }
+            if character == "\"" || character == "'" {
+                quote = quote == character ? nil : quote ?? character
+                continue
+            }
+            if character == "]", quote == nil { return index }
+        }
+        return nil
+    }
+
+    private static func tomlSection(_ raw: String) -> String {
+        var parts: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaped = false
+        for character in raw.trimmingCharacters(in: .whitespaces) {
+            if escaped {
+                current.append(character)
+                escaped = false
+                continue
+            }
+            if character == "\\", quote == "\"" {
+                escaped = true
+                continue
+            }
+            if character == "\"" || character == "'" {
+                quote = quote == character ? nil : quote ?? character
+                continue
+            }
+            if character == ".", quote == nil {
+                parts.append(current.trimmingCharacters(in: .whitespaces))
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        parts.append(current.trimmingCharacters(in: .whitespaces))
+        return parts.joined(separator: ".")
+    }
+
+    private static func tomlValue(_ raw: String) -> String {
+        var quote: Character?
+        var escaped = false
+        for index in raw.indices {
+            let character = raw[index]
+            if escaped {
+                escaped = false
+                continue
+            }
+            if character == "\\", quote == "\"" {
+                escaped = true
+                continue
+            }
+            if character == "\"" || character == "'" {
+                quote = quote == character ? nil : quote ?? character
+                continue
+            }
+            if character == "#", quote == nil {
+                return raw[..<index].trimmingCharacters(in: .whitespaces)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            }
+        }
+        return raw.trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+    }
+
     static func endpoint(_ raw: String) -> AgentGatewayConfig.Endpoint? {
         guard var parts = URLComponents(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               let scheme = parts.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let rawHost = parts.host?.lowercased(), !rawHost.isEmpty else { return nil }
-        let host = rawHost.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let unbracketed = rawHost.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let host = HostCanonicalizer.address(unbracketed) ?? unbracketed
         let port = parts.port ?? (scheme == "https" ? 443 : 80)
         guard let port = UInt16(exactly: port) else { return nil }
         // Deliberately discard credentials, path, query, and fragment before anything is persisted or displayed.
@@ -186,7 +272,12 @@ enum LocalGatewayResolver {
         guard count > 0 else { return nil }
         var pids = [Int32](repeating: 0, count: Int(count) + 64)
         let filled = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<Int32>.size))
-        return pids.prefix(Int(max(0, filled))).first { $0 > 1 && listens(pid: $0, endpoint: endpoint) }
+        let matches = pids.prefix(Int(max(0, filled))).filter {
+            $0 > 1 && listens(pid: $0, endpoint: endpoint)
+        }
+        // `localhost` can resolve to either address family. If different processes own IPv4 and IPv6 listeners,
+        // process enumeration order is not truthful routing evidence, so keep the configured endpoint synthetic.
+        return matches.count == 1 ? matches[0] : nil
     }
 
     private static func listens(pid: Int32, endpoint: AgentGatewayConfig.Endpoint) -> Bool {
@@ -206,9 +297,24 @@ enum LocalGatewayResolver {
             let localPort = UInt16(bigEndian: UInt16(truncatingIfNeeded: socket.insi_lport))
             if tcp.tcpsi_state == TSI_S_LISTEN,
                localPort == endpoint.port,
-               localAddress(socket) == endpoint.host { return true }
+               address(localAddress(socket), accepts: endpoint.host) { return true }
         }
         return false
+    }
+
+    static func address(_ listener: String?, accepts configured: String) -> Bool {
+        guard let listener else { return false }
+        let configuredAddress = HostCanonicalizer.address(configured)
+        if listener == "0.0.0.0" {
+            return configured == "localhost" || configuredAddress?.contains(":") == false
+        }
+        if listener == "::" {
+            return configured == "localhost" || configuredAddress?.contains(":") == true
+        }
+        if configured == "localhost" {
+            return listener == "127.0.0.1" || listener == "::1"
+        }
+        return listener == configuredAddress
     }
 
     private static func localAddress(_ socket: in_sockinfo) -> String? {

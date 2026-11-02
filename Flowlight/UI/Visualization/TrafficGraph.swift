@@ -12,6 +12,12 @@ struct TrafficGraphEdgeID: Hashable, Sendable, Comparable {
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
+struct TrafficGraphRoleEvidence: Sendable, Equatable {
+    var relationship: TrafficGraphRelationship
+    var detail: String
+    var configuration: TrafficGraphConfiguration? = nil
+}
+
 struct TrafficGraphNode: Identifiable, Sendable {
     enum Kind: String, Sendable {
         case app
@@ -32,9 +38,10 @@ struct TrafficGraphNode: Identifiable, Sendable {
     var filter: TrafficFilter
     var counters: FlowCounters
     var members: [TrafficGraphMember] = []
+    var roleEvidence: [TrafficGraphRoleEvidence] = []
 }
 
-enum TrafficGraphRelationship: String, Sendable {
+enum TrafficGraphRelationship: String, Sendable, Hashable {
     case observed
     case runs
     case launched
@@ -44,14 +51,14 @@ enum TrafficGraphRelationship: String, Sendable {
     case invoked
 }
 
-struct TrafficGraphEnforcement: Sendable, Equatable {
+struct TrafficGraphEnforcement: Sendable, Hashable {
     var count: Int64
     var category: String
     var source: String
     var detail: String
 }
 
-struct TrafficGraphConfiguration: Sendable, Equatable {
+struct TrafficGraphConfiguration: Sendable, Hashable {
     var endpoint: String
     var source: String
     var sourceKey: String
@@ -172,12 +179,20 @@ struct CanonicalVisualizationDestination {
 enum VisualizationDestinationCanonicalizer {
     static func parse(_ value: String) -> CanonicalVisualizationDestination {
         guard let canonical = HostCanonicalizer.host(value) else {
-            return CanonicalVisualizationDestination()
+            let fallback = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return fallback.isEmpty
+                ? CanonicalVisualizationDestination()
+                : CanonicalVisualizationDestination(domain: fallback)
         }
         if let address = HostCanonicalizer.address(canonical) {
             return CanonicalVisualizationDestination(address: address)
         }
         return CanonicalVisualizationDestination(domain: canonical)
+    }
+
+    static func identity(_ value: String) -> String? {
+        let exact = parse(value)
+        return exact.address ?? exact.domain
     }
 }
 
@@ -300,7 +315,8 @@ enum TrafficGraphBuilder {
         for attempt in blockedAttempts where attempt.count > 0 && !attempt.destination.isEmpty {
             let app = AppIdentity(bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID)
             guard !app.bundleID.isEmpty else { continue }
-            let identity = BlockedIdentity(app: app, destination: attempt.destination.lowercased(), port: attempt.port)
+            guard let destination = VisualizationDestinationCanonicalizer.identity(attempt.destination) else { continue }
+            let identity = BlockedIdentity(app: app, destination: destination, port: attempt.port)
             var value = blocked[identity] ?? BlockedValue(appName: attempt.appName)
             value.count += attempt.count
             if !attempt.category.isEmpty { value.categories.insert(attempt.category) }

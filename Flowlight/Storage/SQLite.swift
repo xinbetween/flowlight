@@ -127,5 +127,18 @@ final class SQLiteConnection {
         }
     }
 
+    /// A deferred transaction pins one WAL snapshot after its first read without blocking concurrent capture writes.
+    func readTransaction<T>(_ body: () throws -> T) throws -> T {
+        try execute("BEGIN")
+        do {
+            let result = try body()
+            try execute("COMMIT")
+            return result
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
     var changes: Int { Int(sqlite3_changes(db)) }
 }

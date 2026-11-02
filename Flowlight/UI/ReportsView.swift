@@ -32,6 +32,7 @@ struct ReportsView: View {
     @State private var sortOrder = [KeyPathComparator(\TrafficNode.total, order: .reverse)]
     @State private var selection: TrafficNode.ID?
     @State private var loading = false
+    @State private var reloadID = UUID()
     @State private var hovered: SeriesPoint?
     /// Top apps per bucket, fetched on hover and cached until the next reload.
     @State private var contributors: [Date: BucketContributors] = [:]
@@ -43,6 +44,7 @@ struct ReportsView: View {
     @AppStorage("reports.grouping") private var grouping: BreakdownGrouping = .app
     /// Raw breakdown rows; the tree is rebuilt from these when the grouping changes (no re-query).
     @State private var breakdownRows: [BreakdownRow] = []
+    @State private var breakdownAppTotals: [BreakdownRow] = []
     @AppStorage("reports.insightMetric") private var metric: InsightMetric = .total
     @State private var insights = InsightsSnapshot.empty
     @State private var registries: [InsightDimension: ColorRegistry] = [:]
@@ -280,7 +282,12 @@ struct ReportsView: View {
         .onChange(of: grouping) {
             childLimits = [:]
             selection = nil
-            nodes = TrafficNode.tree(from: breakdownRows, grouping: grouping, base: filter)
+            nodes = TrafficNode.tree(
+                from: breakdownRows,
+                appTotals: grouping == .app ? breakdownAppTotals : [],
+                grouping: grouping,
+                base: scoped
+            )
         }
     }
 
@@ -292,9 +299,12 @@ struct ReportsView: View {
 
     /// What the charts are scoped to, for their titles ("Destinations · claude").
     private var scopeName: String? {
-        [filter.bundleID.map(appName(for:)), filter.agentParent.map(appName(for:)), filter.mcpServer,
-         filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
-         filter.remoteIP, filter.appProtocol, filter.channel.map(\.localizedTitle)].compactMap { $0 }.first
+        let applications = filter.bundleIDs.isEmpty
+            ? filter.bundleID.map(appName(for:))
+            : filter.bundleIDs.map(appName(for:)).joined(separator: ", ")
+        return [applications, filter.agentParent.map(appName(for:)), filter.mcpServer,
+                filter.domainSuffix, filter.owner, filter.domain.flatMap { $0.isEmpty ? nil : $0 },
+                filter.remoteIP, filter.appProtocol, filter.channel.map(\.localizedTitle)].compactMap { $0 }.first
     }
 
     private func narrow(to entity: InsightEntity) {
@@ -339,6 +349,12 @@ struct ReportsView: View {
             if let app = filter.bundleID {
                 chip(L("App: %@", appName(for: app))) {
                     filter.bundleID = nil
+                    filter.includeAttributedChildren = false
+                }
+            }
+            if !filter.bundleIDs.isEmpty {
+                chip("\(L("Apps")): \(filter.bundleIDs.map(appName(for:)).joined(separator: ", "))") {
+                    filter.bundleIDs = []
                     filter.includeAttributedChildren = false
                 }
             }
@@ -611,7 +627,12 @@ struct ReportsView: View {
             if let id = ids.first, let node = find(id), node.kind != .more {
                 Button(L("Show Only This")) { applyFilter(node) }
                 if node.kind != .app, let bundleID = node.bundleID {
-                    Button(L("Show Only %@", node.appName ?? bundleID)) { var f = filter; f.bundleID = bundleID; filter = f }
+                    Button(L("Show Only %@", node.appName ?? bundleID)) {
+                        var f = filter
+                        f.bundleID = bundleID
+                        f.bundleIDs = []
+                        filter = f
+                    }
                 }
                 Divider()
                 InspectMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
@@ -632,8 +653,9 @@ struct ReportsView: View {
         .onChange(of: childLimits) { recompute() }
         .safeAreaInset(edge: .top, spacing: 0) {
             if breakdownTruncated {
-                Label(L("Showing the %@ largest app × destination × IP combinations. Totals and shares include all traffic; filter or shorten the window for full detail.",
-                        TrafficDatabase.breakdownLimit.formatted()),
+                Label(grouping == .app
+                      ? L("Showing the %@ largest app × destination × IP combinations. Application totals and shares include all traffic; filter or shorten the window for full relationship detail.", TrafficDatabase.breakdownLimit.formatted())
+                      : L("Showing the %@ largest app × destination × IP combinations. Destination and IP groupings use this bounded detail; switch to App for complete application totals, or filter or shorten the window.", TrafficDatabase.breakdownLimit.formatted()),
                       systemImage: "info.circle")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -774,23 +796,42 @@ struct ReportsView: View {
 
     private func reload() async {
         if followNow { endDate = Date() }
+        let requestID = UUID()
+        reloadID = requestID
         loading = true
-        defer { loading = false }
-        let (g, from, to, f, m) = (granularity, startDate, endDate, scoped, metric)
-        let wantsCharts = lowerMode == .charts
+        defer {
+            if reloadID == requestID { loading = false }
+        }
+        let (g, from, to, f, m, requestedMode) = (granularity, startDate, endDate, scoped, metric, lowerMode)
+        let wantsCharts = requestedMode == .charts
         do {
-            let wantsBehaviour = lowerMode == .behaviour
-            let result = try await monitor.read { db -> ([SeriesPoint], [BreakdownRow], InsightsSnapshot?, [BreakdownRow], RiskAssessmentCounts) in
-                let series = try db.series(g, from: from, to: to, filter: f)
-                let breakdown = try db.breakdown(g, from: from, to: to, filter: f)
-                let behaviourRows = wantsBehaviour ? try db.appDestinationRows(g, from: from, to: to, filter: f) : []
-                let risk = try db.localRiskCounts(since: from, to: to, filter: f)
-                guard wantsCharts else { return (series, breakdown, nil, behaviourRows, risk) }
-                let snapshot = try InsightsBuilder.load(db: db, dimensions: InsightDimension.available(for: f), series: series,
-                                                        metric: m, granularity: g, from: from, to: to, filter: f)
-                return (series, breakdown, snapshot, behaviourRows, risk)
+            let wantsBehaviour = requestedMode == .behaviour
+            let result = try await monitor.read { db -> ([SeriesPoint], ReportsBreakdown, InsightsSnapshot?, [BreakdownRow], RiskAssessmentCounts) in
+                try db.readSnapshot {
+                    let series = try db.series(g, from: from, to: to, filter: f)
+                    let breakdown = try db.reportsBreakdown(g, from: from, to: to, filter: f)
+                    let behaviourRows = wantsBehaviour
+                        ? try db.appDestinationRows(g, from: from, to: to, filter: f)
+                        : []
+                    let risk = try db.localRiskCounts(since: from, to: to, filter: f)
+                    guard wantsCharts else { return (series, breakdown, nil, behaviourRows, risk) }
+                    let snapshot = try InsightsBuilder.load(
+                        db: db,
+                        dimensions: InsightDimension.available(for: f),
+                        series: series,
+                        metric: m,
+                        granularity: g,
+                        from: from,
+                        to: to,
+                        filter: f
+                    )
+                    return (series, breakdown, snapshot, behaviourRows, risk)
+                }
             }
-            guard g == granularity, f == scoped, m == metric else { return } // a newer request superseded this one
+            guard !Task.isCancelled, reloadID == requestID,
+                  g == granularity, from == startDate, to == endDate,
+                  f == scoped, m == metric, requestedMode == lowerMode
+            else { return } // a newer request superseded this one
             if let snapshot = result.2 {
                 for insight in snapshot.dimensions {
                     registries[insight.dimension, default: ColorRegistry()]
@@ -801,15 +842,24 @@ struct ReportsView: View {
             series = Self.trimLeadingEmpty(result.0)
             flagged = SeriesAnomalies.flagged(result.0, sigma: sigma)
             contributors = [:]
-            breakdownTruncated = result.1.count >= TrafficDatabase.breakdownLimit
-            breakdownRows = result.1
-            // Not result.1: those rows stop at breakdownLimit, and an app past the cap would silently never be
-            // considered. This asks for every app's destinations on their own, which is a much smaller result.
+            breakdownTruncated = result.1.isTruncated
+            breakdownRows = result.1.rows
+            breakdownAppTotals = result.1.appTotals
+            // This projection preserves attribution and route evidence that Reports does not need.
             behaviour = DestinationProfile.analyse(result.3)
             localRiskCounts = result.4
-            nodes = TrafficNode.tree(from: result.1, grouping: grouping, base: f)
+            nodes = TrafficNode.tree(
+                from: result.1.rows,
+                appTotals: grouping == .app ? result.1.appTotals : [],
+                grouping: grouping,
+                base: f
+            )
             if hovered != nil { hovered = series.first { $0.date == hovered?.date } }
         } catch {
+            guard !Task.isCancelled, reloadID == requestID,
+                  g == granularity, from == startDate, to == endDate,
+                  f == scoped, m == metric, requestedMode == lowerMode
+            else { return }
             monitor.lastError = L("Query failed: %@", "\(error)")
         }
     }

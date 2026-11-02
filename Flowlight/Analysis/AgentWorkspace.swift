@@ -122,6 +122,61 @@ enum AgentWorkspaceScanner {
             .sorted { ($0.agent, $0.root) < ($1.agent, $1.root) }
     }
 
+    static func scanGatewaySettings(
+        home rawHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+        existing: [AgentWorkspace] = [],
+        extraRoots: [URL] = [],
+        fm: FileManager = .default
+    ) -> [AgentWorkspace] {
+        let home = rawHome.standardizedFileURL
+        var workspaces: [AgentWorkspace] = []
+        for gateway in AgentGatewayConfigReader.load(home: home, fm: fm) {
+            if let index = workspaces.firstIndex(where: { $0.agent == gateway.agent && !$0.isProject }) {
+                workspaces[index].gateways.append(gateway)
+            } else {
+                workspaces.append(AgentWorkspace(
+                    agent: gateway.agent,
+                    root: gateway.source,
+                    isProject: false,
+                    gateways: [gateway]
+                ))
+            }
+        }
+        var projects = existing.filter(\.isProject).map {
+            (
+                root: URL(fileURLWithPath: $0.root.replacingOccurrences(of: "~/", with: home.path + "/")),
+                agent: $0.agent
+            )
+        }
+        for project in extraRoots.map(\.standardizedFileURL) {
+            for (directory, agent) in directories.sorted(by: { $0.key < $1.key }) {
+                let root = project.appendingPathComponent(directory)
+                guard fm.fileExists(atPath: root.path),
+                      !projects.contains(where: { $0.root.standardizedFileURL == root.standardizedFileURL }) else {
+                    continue
+                }
+                projects.append((root, agent))
+            }
+        }
+        for project in projects {
+            let gateways = gatewaySettings(
+                in: project.root,
+                agent: project.agent,
+                home: home,
+                fm: fm
+            )
+            if !gateways.isEmpty {
+                workspaces.append(AgentWorkspace(
+                    agent: project.agent,
+                    root: display(project.root, home: home),
+                    isProject: true,
+                    gateways: gateways
+                ))
+            }
+        }
+        return workspaces.sorted { ($0.agent, $0.root) < ($1.agent, $1.root) }
+    }
+
     /// Reads one configuration directory.
     static func read(root: URL, agent: String, isProject: Bool, home: URL, fm: FileManager = .default) -> AgentWorkspace {
         var workspace = AgentWorkspace(agent: agent, root: display(root, home: home), isProject: isProject)
@@ -174,6 +229,14 @@ enum AgentWorkspaceScanner {
     /// and a project's `.mcp.json` next to it.
     static func gatewaySettings(in root: URL, agent: String, home: URL,
                                 fm: FileManager) -> [AgentGatewayConfig] {
+        if agent == "codex" {
+            let file = root.appendingPathComponent("config.toml")
+            guard let data = fm.contents(atPath: file.path) else { return [] }
+            return AgentGatewayConfigReader.parseCodexTOML(
+                String(decoding: data, as: UTF8.self),
+                source: display(file, home: home)
+            )
+        }
         let keys: [AgentGatewayConfigReader.JSONKey]
         switch agent {
         case "claude":
@@ -345,6 +408,7 @@ final class AgentWorkspaceStore: ObservableObject {
         static let rootBookmarks = "agents.rootBookmarks"
         static let removedRootPaths = "agents.removedRootPaths"
         static let scanSchema = "agents.scanSchema"
+        static let discoveryDisabled = "agents.discoveryDisabled"
     }
 
     private static let currentScanSchema = 2
@@ -359,6 +423,7 @@ final class AgentWorkspaceStore: ObservableObject {
     static let staleAfter: TimeInterval = 14 * 86400
 
     private let defaults: UserDefaults
+    private(set) var discoveryGeneration = 0
     #if APP_STORE
     private var securityScopedRoots: [URL] = []
     private var deferredBookmarks: [Data] = []
@@ -397,18 +462,41 @@ final class AgentWorkspaceStore: ObservableObject {
 
     /// Scans in the background. Without `force` it only runs if nothing has been scanned yet, so opening AI Agents
     /// never kicks off disk work on its own.
-    func refresh(force: Bool = false) {
+    func refresh(force: Bool = false, gatewaysOnly: Bool = false) {
         guard !scanning, !DemoData.isEnabled else { return }
-        guard force || !hasScanned else { return }
+        guard force || !defaults.bool(forKey: Keys.discoveryDisabled) else { return }
+        guard force || gatewaysOnly || !hasScanned else { return }
+        if force { defaults.set(false, forKey: Keys.discoveryDisabled) }
         scanning = true
+        discoveryGeneration += 1
+        let generation = discoveryGeneration
         let extraRoots = roots
+        let existing = workspaces
         Task.detached(priority: .utility) {
-            #if APP_STORE
-            let found = AgentWorkspaceScanner.scan(home: FileManager.default.temporaryDirectory, extraRoots: extraRoots)
-            #else
-            let found = AgentWorkspaceScanner.scan(extraRoots: extraRoots)
-            #endif
-            await MainActor.run { self.store(found) }
+            let found: [AgentWorkspace]
+            if gatewaysOnly {
+                #if APP_STORE
+                found = AgentWorkspaceScanner.scanGatewaySettings(
+                    home: FileManager.default.temporaryDirectory,
+                    existing: existing,
+                    extraRoots: extraRoots
+                )
+                #else
+                found = AgentWorkspaceScanner.scanGatewaySettings(existing: existing, extraRoots: extraRoots)
+                #endif
+            } else {
+                #if APP_STORE
+                found = AgentWorkspaceScanner.scan(
+                    home: FileManager.default.temporaryDirectory,
+                    extraRoots: extraRoots
+                )
+                #else
+                found = AgentWorkspaceScanner.scan(extraRoots: extraRoots)
+                #endif
+            }
+            await MainActor.run {
+                self.storeDiscovery(found, generation: generation, gatewaysOnly: gatewaysOnly)
+            }
         }
     }
 
@@ -450,11 +538,22 @@ final class AgentWorkspaceStore: ObservableObject {
 
     /// Forgets everything found on disk, for someone who would rather Flowlight didn't look at all.
     func forget() {
+        discoveryGeneration += 1
+        scanning = false
         workspaces = []
         scannedAt = nil
         defaults.removeObject(forKey: Keys.workspaces)
         defaults.removeObject(forKey: Keys.scannedAt)
         defaults.removeObject(forKey: Keys.scanSchema)
+        defaults.set(true, forKey: Keys.discoveryDisabled)
+    }
+
+    func storeDiscovery(_ found: [AgentWorkspace], generation: Int, gatewaysOnly: Bool) {
+        guard discoveryGeneration == generation,
+              !defaults.bool(forKey: Keys.discoveryDisabled) else {
+            return
+        }
+        gatewaysOnly ? storeGatewaySettings(found) : store(found)
     }
 
     private func store(_ found: [AgentWorkspace]) {
@@ -464,6 +563,28 @@ final class AgentWorkspaceStore: ObservableObject {
         defaults.set(try? JSONEncoder().encode(found), forKey: Keys.workspaces)
         defaults.set(scannedAt, forKey: Keys.scannedAt)
         defaults.set(Self.currentScanSchema, forKey: Keys.scanSchema)
+    }
+
+    private func storeGatewaySettings(_ found: [AgentWorkspace]) {
+        workspaces = workspaces.map { workspace in
+            var workspace = workspace
+            workspace.gateways = found.first {
+                $0.agent == workspace.agent
+                    && $0.isProject == workspace.isProject
+                    && (!workspace.isProject || $0.root == workspace.root)
+            }?.gateways ?? []
+            return workspace
+        }
+        for workspace in found where !workspaces.contains(where: {
+            $0.agent == workspace.agent
+                && $0.isProject == workspace.isProject
+                && (!$0.isProject || $0.root == workspace.root)
+        }) {
+            workspaces.append(workspace)
+        }
+        workspaces.sort { ($0.agent, $0.root) < ($1.agent, $1.root) }
+        scanning = false
+        defaults.set(try? JSONEncoder().encode(workspaces), forKey: Keys.workspaces)
     }
 
     #if APP_STORE

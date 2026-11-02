@@ -6,6 +6,47 @@ enum VisualizeSelectionPolicy {
     }
 }
 
+enum VisualizeGatewayScope {
+    static func includes(
+        _ gateway: AgentGatewayConfig,
+        identity: AgentGatewayIdentity? = nil,
+        query: String,
+        focus: FocusScope
+    ) -> Bool {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let known = AgentCatalog.knownAgent(
+            bundleID: gateway.agent,
+            appName: gateway.agent
+        )
+        let aliases = Set(
+            [
+                gateway.agent.lowercased(),
+                known?.name.lowercased() ?? "",
+                identity?.bundleID.lowercased() ?? "",
+                identity?.name.lowercased() ?? "",
+                identity?.path.lowercased() ?? "",
+            ]
+                + (known?.processNames.map { $0.lowercased() } ?? [])
+                + (known?.bundleIDs.map { $0.lowercased() } ?? [])
+        ).filter { !$0.isEmpty }
+        let matchesQuery = query.isEmpty
+            || aliases.contains(where: { $0.contains(query) })
+            || gateway.endpoint.description.lowercased().contains(query)
+            || gateway.sourceKey.lowercased().contains(query)
+        let matchesFocus = focus.isEmpty
+            || !Set(focus.bundleIDs.map { $0.lowercased() }).isDisjoint(with: aliases)
+            || focus.matches(
+                bundleID: gateway.agent,
+                domain: HostCanonicalizer.host(gateway.endpoint.host) ?? "",
+                remoteIP: HostCanonicalizer.address(gateway.endpoint.host) ?? ""
+            )
+            || identity.map {
+                focus.matches(bundleID: $0.bundleID, domain: "", remoteIP: "")
+            } == true
+        return matchesQuery && matchesFocus
+    }
+}
+
 @MainActor
 enum VisualizeActionScope {
     static func canInspect(_ filter: TrafficFilter) -> Bool {
@@ -19,15 +60,21 @@ enum VisualizeActionScope {
 
     static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil) {
         guard canInspect(filter), let host = filter.domain else { return }
-        let app = filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
+        let app = filter.bundleIDs.isEmpty
+            ? filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
+            : nil
         nav.showInspect(app: app, host: host, hostIncludesSubdomains: false,
                         includeAttributedChildren: filter.includeAttributedChildren,
                         agentParent: filter.agentParent, mcpServer: filter.mcpServer)
     }
 
     static func blockRule(for filter: TrafficFilter) -> Rule? {
-        guard let destination = exactDestination(filter) else { return nil }
-        var rule = RuleStore.block(app: filter.agentParent ?? filter.bundleID ?? "", destination: destination)
+        guard filter.bundleIDs.isEmpty,
+              let destination = exactDestination(filter) else { return nil }
+        var rule = RuleStore.block(
+            app: filter.agentParent ?? filter.bundleID ?? "",
+            destination: destination
+        )
         rule.destinationMatch = .exact
         return rule
     }
@@ -99,10 +146,10 @@ struct VisualizeView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            if snapshot.edges.isEmpty, loading {
+            if snapshot.nodes.isEmpty, loading {
                 ProgressView(L("Loading visualization…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if snapshot.edges.isEmpty {
+            } else if snapshot.nodes.isEmpty {
                 emptyState
             } else if presentation == .map {
                 graphAndInspector
@@ -113,6 +160,7 @@ struct VisualizeView: View {
         .background(FL.ground)
         .navigationTitle(L("Visualize"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, or IP"))
+        .task { workspaceStore.refresh(gatewaysOnly: true) }
         .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope,
                           trafficVersion: monitor.dataVersion, ruleVersion: monitor.rules.version,
                           packVersion: monitor.rulePacks.version)) { await reload() }
@@ -316,13 +364,30 @@ struct VisualizeView: View {
                                                               remoteIP: $0.remoteIP)
                         || (!$0.parentAgent.isEmpty && focusScope.bundleIDs.contains($0.parentAgent))
                 }
-                return AITrafficGraphBuilder.build(rows: source, visibleRows: visible,
-                                                   blockedAttempts: searchedEnforcement,
-                                                   gateways: gateways,
-                                                   resolveGateway: { endpoint in
-                                                       demo ? DemoData.gatewayIdentity(endpoint)
-                                                           : LocalGatewayResolver.resolve(endpoint)
-                                                   })
+                let resolvedGateways = gateways.map { gateway in
+                    (
+                        gateway,
+                        demo ? DemoData.gatewayIdentity(gateway.endpoint)
+                            : LocalGatewayResolver.resolve(gateway.endpoint)
+                    )
+                }
+                let scopedGateways = resolvedGateways.filter { gateway, identity in
+                    VisualizeGatewayScope.includes(
+                        gateway,
+                        identity: identity,
+                        query: query,
+                        focus: focusScope
+                    )
+                }
+                return AITrafficGraphBuilder.build(
+                    rows: source,
+                    visibleRows: visible,
+                    blockedAttempts: searchedEnforcement,
+                    gateways: scopedGateways.map(\.0),
+                    resolveGateway: { endpoint in
+                        scopedGateways.first { $0.0.endpoint == endpoint }?.1
+                    }
+                )
             }
         }.value
         guard !Task.isCancelled else { return }
@@ -706,12 +771,18 @@ private struct TrafficGraphNodeView: View {
     }
 
     private var roleLabel: String? {
+        var labels = node.roleEvidence.map(\.detail)
         switch node.kind {
-        case .launcher: return L("Started agent")
-        case .agent: return L("Agent")
-        case .proxy: return node.detail
-        default: return nil
+        case .launcher: labels.insert(L("Started agent"), at: 0)
+        case .agent: labels.insert(L("Agent"), at: 0)
+        case .proxy: labels.insert(node.detail, at: 0)
+        default: break
         }
+        let unique = labels.reduce(into: [String]()) { result, label in
+            guard !label.isEmpty, !result.contains(label) else { return }
+            result.append(label)
+        }
+        return unique.isEmpty ? nil : unique.joined(separator: " · ")
     }
 
     private var nodeIcon: String {
@@ -759,6 +830,14 @@ private struct TrafficGraphInspector: View {
         Group {
             Text(node.title).font(.title3.bold()).foregroundStyle(FL.ink)
             if !node.detail.isEmpty { Text(node.detail).font(.caption).foregroundStyle(FL.muted) }
+            ForEach(Array(node.roleEvidence.enumerated()), id: \.offset) { _, evidence in
+                FLPill(text: evidence.detail, systemImage: "arrow.triangle.branch", color: FL.graphInvocation)
+                if let configuration = evidence.configuration {
+                    Text("\(configuration.endpoint) · \(configuration.sourceKey)")
+                        .font(.caption).foregroundStyle(FL.muted)
+                    Text(configuration.source).font(.caption2).foregroundStyle(FL.faint)
+                }
+            }
             if node.kind == .launcher {
                 FLPill(text: L("Started"), systemImage: "terminal", color: FL.graphInvocation)
                 Text(L("Capture-time process ancestry proves this application started the agent."))
@@ -800,9 +879,9 @@ private struct TrafficGraphInspector: View {
                             VisualizeActionScope.showInspect(nav, filter: node.filter)
                         }
                     }
-                } else {
+                } else if let bundleID = node.filter.bundleID {
                     Button(L("Inspect")) {
-                        nav.showInspect(app: (node.filter.bundleID ?? "", node.title),
+                        nav.showInspect(app: (bundleID, node.title),
                                         includeAttributedChildren: node.filter.includeAttributedChildren,
                                         agentParent: node.filter.agentParent, mcpServer: node.filter.mcpServer)
                     }

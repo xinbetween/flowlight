@@ -22,8 +22,9 @@ final class LocalRiskAnalysisTests: XCTestCase {
 
     private func exchange(host: String = "127.0.0.1", path: String = "/admin/config", requestBytes: Int = 600_000,
                           responseBytes: Int = 1_000, tools: [ToolCall] = [], bundleID: String = "agent",
-                          agent: String? = "agent", mcpServer: String? = nil) -> HTTPExchange {
-        HTTPExchange(id: nil, started: Date(), duration: 0.1, scheme: "https", host: host, port: 443, method: "POST", path: path,
+                          agent: String? = "agent", mcpServer: String? = nil,
+                          started: Date = Date()) -> HTTPExchange {
+        HTTPExchange(id: nil, started: started, duration: 0.1, scheme: "https", host: host, port: 443, method: "POST", path: path,
                      status: 200,
                      requestHeaders: [HTTPHeader(name: "Authorization", value: "Bearer very-secret-token"),
                                       HTTPHeader(name: "Cookie", value: "session=secret"), HTTPHeader(name: "Content-Type", value: "application/json")],
@@ -134,6 +135,70 @@ final class LocalRiskAnalysisTests: XCTestCase {
             visibleOnly: false
         )
         XCTAssertEqual(focused.unassessed, 1, "Focus on the parent agent must retain the visible attributed child")
+    }
+
+    func testRiskCountsHonorIntrinsicAliasScopeAndGlobalFocus() throws {
+        let db = try database()
+        let tool = ToolCall(source: .anthropic, callID: "risk", name: "Bash", mcpServer: nil,
+                            input: "", summary: nil)
+        for exchange in [
+            exchange(host: "api.anthropic.com", tools: [tool], bundleID: "claude", agent: "claude"),
+            exchange(host: "api.anthropic.com", tools: [tool], bundleID: "claude-code", agent: "claude-code"),
+            exchange(host: "other.example", tools: [tool], bundleID: "claude", agent: "claude"),
+            exchange(host: "api.anthropic.com", tools: [tool], bundleID: "other", agent: "other")
+        ] {
+            _ = try db.insertExchange(exchange, enqueueLocalRisk: true)
+        }
+
+        let counts = try db.localRiskCounts(
+            since: Date().addingTimeInterval(-60),
+            filter: TrafficFilter(
+                bundleIDs: ["claude", "claude-code"],
+                focus: FocusScope(hosts: ["api.anthropic.com"])
+            ),
+            visibleOnly: false
+        )
+
+        XCTAssertEqual(counts.unassessed, 2,
+                       "risk counts must intersect the alias card with global Focus")
+    }
+
+    func testRiskCountsRefuseUnsupportedTrafficDimensionsAndUseHalfOpenWindow() throws {
+        let db = try database()
+        let tool = ToolCall(source: .anthropic, callID: "risk", name: "Bash", mcpServer: nil,
+                            input: "", summary: nil)
+        let start = Date()
+        _ = try db.insertExchange(
+            exchange(host: "api.github.com", tools: [tool], started: start),
+            enqueueLocalRisk: true
+        )
+        _ = try db.insertExchange(
+            exchange(host: "api.github.com", tools: [tool], started: start.addingTimeInterval(10)),
+            enqueueLocalRisk: true
+        )
+
+        let unsupported = [
+            TrafficFilter(owner: "Example Network"),
+            TrafficFilter(appProtocol: "quic"),
+            TrafficFilter(channel: .tunnel),
+            TrafficFilter(remoteIP: "203.0.113.9"),
+            TrafficFilter(domain: "api.github.com", remoteIP: "203.0.113.9")
+        ]
+        for filter in unsupported {
+            XCTAssertEqual(
+                try db.localRiskCounts(since: start.addingTimeInterval(-1), filter: filter, visibleOnly: false),
+                RiskAssessmentCounts(),
+                "unsupported exchange dimensions must not silently widen Potential harm"
+            )
+        }
+
+        let bounded = try db.localRiskCounts(
+            since: start.addingTimeInterval(-1),
+            to: start.addingTimeInterval(10),
+            visibleOnly: false
+        )
+        XCTAssertEqual(bounded.unassessed, 1,
+                       "the report window is half-open and excludes an exchange exactly at endDate")
     }
 
     func testRiskCountsKeepExactHostSeparateFromSubdomains() throws {

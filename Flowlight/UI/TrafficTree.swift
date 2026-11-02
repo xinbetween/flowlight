@@ -71,6 +71,8 @@ enum TreeLevel {
                 : row.mcpServer.isEmpty ? L("via %@", row.parentAgentName) : "\(row.mcpServer) MCP · \(row.parentAgentName)"
             return Key(id: "a:" + row.bundleID, title: row.appName.isEmpty ? row.bundleID : row.appName, detail: detail, kind: .app) {
                 $0.bundleID = row.bundleID
+                $0.bundleIDs = []
+                $0.includeAttributedChildren = false
             }
         case .hostname:
             if !row.domain.isEmpty {
@@ -142,8 +144,39 @@ struct TrafficNode: Identifiable, Hashable {
 
     // MARK: Building
 
-    static func tree(from rows: [BreakdownRow], grouping: BreakdownGrouping = .app, base: TrafficFilter = .none) -> [TrafficNode] {
-        build(backfilled(rows), levels: grouping.levels[...], parentID: "", filter: base, app: nil)
+    static func tree(from rows: [BreakdownRow], appTotals: [BreakdownRow] = [],
+                     grouping: BreakdownGrouping = .app, base: TrafficFilter = .none) -> [TrafficNode] {
+        let built = build(backfilled(rows), levels: grouping.levels[...], parentID: "", filter: base, app: nil)
+        guard grouping == .app, !appTotals.isEmpty else { return built }
+
+        let byBundleID = Dictionary(uniqueKeysWithValues: built.compactMap { node in
+            node.bundleID.map { ($0, node) }
+        })
+        return appTotals.map { total in
+            if var node = byBundleID[total.bundleID] {
+                node.counters = total.counters
+                return node
+            }
+            return TrafficNode(
+                id: "a:" + total.bundleID,
+                kind: .app,
+                title: total.appName.isEmpty ? total.bundleID : total.appName,
+                bundleID: total.bundleID,
+                appName: total.appName,
+                appPath: total.appPath,
+                filter: appFilter(total.bundleID, base: base),
+                counters: total.counters,
+                children: []
+            )
+        }
+    }
+
+    private static func appFilter(_ bundleID: String, base: TrafficFilter) -> TrafficFilter {
+        var filter = base
+        filter.bundleID = bundleID
+        filter.bundleIDs = []
+        filter.includeAttributedChildren = false
+        return filter
     }
 
     /// Rows whose hostname was unknown when recorded (reverse DNS resolves a moment after a
