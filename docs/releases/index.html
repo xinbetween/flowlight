@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=0baf855f">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/releases/#webpage", "url": "https://flowlight.xinbetween.com/releases/", "name": "Flowlight releases", "description": "Release notes for every version of Flowlight.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-10-31"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight releases", "item": "https://flowlight.xinbetween.com/releases/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/releases/#webpage", "url": "https://flowlight.xinbetween.com/releases/", "name": "Flowlight releases", "description": "Release notes for every version of Flowlight.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-11-01"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight releases", "item": "https://flowlight.xinbetween.com/releases/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -61,7 +61,17 @@
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.16.3</h2><time datetime="2026-10-31">October 31, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.16.4</h2><time datetime="2026-11-01">November 1, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>See the real proxy chain.</strong> AI activity now combines each agent’s documented gateway setting with captured socket and inspection evidence, showing configured agent → gateway, observed gateway → Flowlight, and Flowlight → destination stages without claiming configuration is observed traffic.</li>
+          <li><strong>Recognize local gateways by the process that owns them.</strong> Flowlight reads documented Claude Code, Codex, Gemini CLI, Cursor, Windsurf, and Zed settings, stores only a sanitized scheme, host, and port, and resolves localhost listeners to the actual application icon and identity instead of assuming a product or port.</li>
+          <li><strong>Read volume from every observed route segment.</strong> Ribbon width reflects total received plus sent bytes in the selected period—including GB-scale traffic—while counters remain attached exactly once; configured-only relationships stay thin and carry no particles.</li>
+          <li><strong>Keep selection and roles unambiguous.</strong> Hover can no longer make an unrelated edge look selected, launcher, agent, and proxy cards expose their roles, and application-backed proxies use their own icon across Map, List, inspector, keyboard, and VoiceOver paths.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.16.3</h2><time datetime="2026-10-31">October 31, 2026</time></header>
         <ul>
           <li><strong>Read AI dependencies from left to right.</strong> Proved launcher, agent, tool or MCP, proxy, and destination stages now occupy stable ordered columns, keeping relationship paths collision-free without inventing invocation evidence.</li>
           <li><strong>Keep every refusal in the dependency story.</strong> Agent-allowlist refusals now persist structured child-process and destination evidence alongside ordinary rules and managed packs, so Map and List can show blocked agent-to-tool paths exactly once.</li>
@@ -1466,7 +1476,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.16.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.16.4 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

@@ -35,6 +35,7 @@
 		0D37699776684FD04F8D9D07 /* ProtocolClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C533BB77B419198656C6284 /* ProtocolClassifier.swift */; };
 		0D622C67AB136A6F14708CA6 /* IPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8A0C2D83843716604FD3F0 /* IPCServer.swift */; };
 		0D7D15BD7081161D53ED1578 /* InspectionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15E51941A085C6B16AF395BB /* InspectionController.swift */; };
+		0E804FB918AC012315F3A903 /* AgentGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */; };
 		10776A2B276E82BD07243E07 /* DeviceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD774DADE526BE4F507BE06C /* DeviceModels.swift */; };
 		118B4F7C72898BC0091B8F6A /* GlobMatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0872CE92A9A3D5A785ECC816 /* GlobMatch.swift */; };
 		1203A91F64B3D15431700D4F /* GuardrailEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15456E37F11CE5E19A124753 /* GuardrailEngine.swift */; };
@@ -172,6 +173,7 @@
 		5A3B1EB5936B67AD426A5967 /* NetworkChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD9D2D024F76347C8414BD5 /* NetworkChannelTests.swift */; };
 		5A58E6A00FD4F35DA506B390 /* RuleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97943E847A22CF491FA82084 /* RuleStore.swift */; };
 		5AA48BB88F9E0F6F858DC553 /* BluetoothMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B6A48D086EF16CF6E438FF /* BluetoothMonitor.swift */; };
+		5AD8431BC3E97C3DE167CF9F /* AgentGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */; };
 		5B0715A36BAB76BC06AE4052 /* FlowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8267406A5D7DA536B7A713 /* FlowTracker.swift */; };
 		5D637AB4C3D308EAC8CC9448 /* RulePackDeliveryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B24C254E2C17056730C06B /* RulePackDeliveryStats.swift */; };
 		5D6F528946645297E0F1520A /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
@@ -653,6 +655,7 @@
 		4D2C6211A645D4DDF8526DF2 /* ExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportController.swift; sourceTree = "<group>"; };
 		4D73C529EED550F2BD81CB72 /* AppLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLifecycleTests.swift; sourceTree = "<group>"; };
 		4D9926D17DD57B7F97E895C9 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
+		4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentGateway.swift; sourceTree = "<group>"; };
 		4EEDBAB278885D747B420AD3 /* OnDeviceAsk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceAsk.swift; sourceTree = "<group>"; };
 		4F2FBA5700CA1489D6740FC8 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
 		4F383DF6343F2DB3052413C9 /* NetworkScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkScope.swift; sourceTree = "<group>"; };
@@ -1026,6 +1029,7 @@
 			children = (
 				E872723F2D92AA78F7941259 /* ActivityMonitor.swift */,
 				41B98E13F994F7E684F57C07 /* AgentAttributor.swift */,
+				4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */,
 				09E79F3A686C0EC5D7B28E8C /* AgentWorkspace.swift */,
 				21A2E14BFE5E66664D0A604B /* AnomalyEngine.swift */,
 				F61F7D8D3D08054C7697792D /* AnomalySettings.swift */,
@@ -1725,6 +1729,7 @@
 				89E518A6DD4F49D012E47AFE /* ActivityMonitor.swift in Sources */,
 				B1E5CA21DA13E924DD50CB51 /* AgentAttributor.swift in Sources */,
 				2D10E8EE0B452C5746D2AF73 /* AgentCatalog.swift in Sources */,
+				5AD8431BC3E97C3DE167CF9F /* AgentGateway.swift in Sources */,
 				07B78C868D02BC6FB6FC561C /* AgentLauncher.swift in Sources */,
 				9162E455E37916AAD651349B /* AgentPolicy.swift in Sources */,
 				585CA811DBF12784CBF086EA /* AgentWorkspace.swift in Sources */,
@@ -1939,6 +1944,7 @@
 				D30F3B5A02E089EEADBDE98B /* ActivityMonitor.swift in Sources */,
 				C35F10A4B87D29525A740DD5 /* AgentAttributor.swift in Sources */,
 				DDE2B0B0A807C428B9F78120 /* AgentCatalog.swift in Sources */,
+				0E804FB918AC012315F3A903 /* AgentGateway.swift in Sources */,
 				63CBA5AACC00FC44C982ADAF /* AgentLauncher.swift in Sources */,
 				9767A4CE180F4083B693CC19 /* AgentPolicy.swift in Sources */,
 				120C7E644032F70B351DB87E /* AgentWorkspace.swift in Sources */,
@@ -2246,7 +2252,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 66;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2261,7 +2267,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.3;
+				MARKETING_VERSION = 0.16.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2307,7 +2313,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 66;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 38RJUJHKZS;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2322,7 +2328,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.3;
+				MARKETING_VERSION = 0.16.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2387,7 +2393,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 66;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2408,7 +2414,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.16.3;
+				MARKETING_VERSION = 0.16.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

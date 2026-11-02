@@ -1712,11 +1712,12 @@
 "Blocked" = "Bloccato";
 "Blocked attempts" = "Tentativi bloccati";
 "Capture-time process ancestry proves this application started the agent." = "La discendenza dei processi osservata durante l'acquisizione dimostra che questa applicazione ha avviato l'agente.";
-"Capture-time proxy attribution proves this application's observed traffic used this route." = "L'attribuzione del proxy osservata durante l'acquisizione dimostra che il traffico di questa applicazione ha usato questo percorso.";
+"Capture-time proxy attribution proves this observed route segment." = "L'attribuzione del proxy osservata durante l'acquisizione dimostra questo segmento di percorso osservato.";
+"Configured gateway" = "Gateway configurato";
+"The agent's documented settings declare this gateway. This does not prove a request used it." = "Le impostazioni documentate dell'agente dichiarano questo gateway. Ciò non dimostra che una richiesta lo abbia utilizzato.";
 "Inspected request evidence proves this invocation." = "La richiesta ispezionata dimostra questa invocazione.";
 "Observed route" = "Percorso osservato";
 "Relationship evidence" = "Prove delle relazioni";
-"Routed through" = "Instradato tramite";
 "Started agent" = "Agente avviato";
 "Managed pack: %@" = "Pacchetto gestito: %@";
 "Ordinary rule" = "Regola ordinaria";

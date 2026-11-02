@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.4, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -957,7 +957,7 @@ Understand your AI agents.
  Cursorapi2.cursor.sh · POST /v1/chat503
  ✎ answered by Flowlight, never sent upstream
 
- Visualize traffic as a Sankey map: agents and their attributed tools flow into domain families and LLM services, with ribbon width showing volume and exact destinations one click away. Shown with demo data.
+ See the real AI route: agents, attributed tools, configured gateways, Flowlight's observed proxy stage, and exact destinations. Ribbon width shows total received plus sent traffic for the selected period. Shown with demo data.
 
  The AI Agents view: each agent's model provider, and everything else it talked to. Shown with demo data.
 
@@ -1671,8 +1671,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.16.4
+November 1, 2026Latest
+
+ See the real proxy chain. AI activity now combines each agent’s documented gateway setting with captured socket and inspection evidence, showing configured agent → gateway, observed gateway → Flowlight, and Flowlight → destination stages without claiming configuration is observed traffic.
+
+ Recognize local gateways by the process that owns them. Flowlight reads documented Claude Code, Codex, Gemini CLI, Cursor, Windsurf, and Zed settings, stores only a sanitized scheme, host, and port, and resolves localhost listeners to the actual application icon and identity instead of assuming a product or port.
+
+ Read volume from every observed route segment. Ribbon width reflects total received plus sent bytes in the selected period—including GB-scale traffic—while counters remain attached exactly once; configured-only relationships stay thin and carry no particles.
+
+ Keep selection and roles unambiguous. Hover can no longer make an unrelated edge look selected, launcher, agent, and proxy cards expose their roles, and application-backed proxies use their own icon across Map, List, inspector, keyboard, and VoiceOver paths.
+
  0.16.3
-October 31, 2026Latest
+October 31, 2026
 
  Read AI dependencies from left to right. Proved launcher, agent, tool or MCP, proxy, and destination stages now occupy stable ordered columns, keeping relationship paths collision-free without inventing invocation evidence.
 

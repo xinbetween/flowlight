@@ -1712,11 +1712,12 @@
 "Blocked" = "ブロック済み";
 "Blocked attempts" = "ブロックされた試行";
 "Capture-time process ancestry proves this application started the agent." = "キャプチャ時のプロセス系統から、このアプリケーションがエージェントを起動したことが確認されています。";
-"Capture-time proxy attribution proves this application's observed traffic used this route." = "キャプチャ時のプロキシ帰属から、このアプリケーションの観測済みトラフィックがこの経路を使用したことが確認されています。";
+"Capture-time proxy attribution proves this observed route segment." = "キャプチャ時のプロキシ帰属から、この観測済み経路区間が確認されています。";
+"Configured gateway" = "設定済みゲートウェイ";
+"The agent's documented settings declare this gateway. This does not prove a request used it." = "エージェントの文書化された設定でこのゲートウェイが指定されています。リクエストが使用したことを示す証拠ではありません。";
 "Inspected request evidence proves this invocation." = "検査済みリクエストの証拠から、この呼び出しが確認されています。";
 "Observed route" = "観測された経路";
 "Relationship evidence" = "関係の証拠";
-"Routed through" = "経由";
 "Started agent" = "エージェントを起動";
 "Managed pack: %@" = "管理対象パック：%@";
 "Ordinary rule" = "通常のルール";

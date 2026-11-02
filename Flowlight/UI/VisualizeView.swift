@@ -63,6 +63,7 @@ struct VisualizeView: View {
     @EnvironmentObject private var monitor: TrafficMonitor
     @EnvironmentObject private var nav: AppNavigation
     @EnvironmentObject private var focus: FocusStore
+    @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("visualize.mode") private var mode: Mode = .traffic
     @AppStorage("visualize.granularity") private var granularity: Granularity = .minute
@@ -78,6 +79,14 @@ struct VisualizeView: View {
 
     private var endDate: Date { Date() }
     private var startDate: Date { endDate.addingTimeInterval(-granularity.defaultWindow) }
+    private var agentGateways: [AgentGatewayConfig] {
+        DemoData.isEnabled ? DemoData.agentGateways : workspaceStore.workspaces.flatMap(\.gateways)
+    }
+    private var gatewayVersion: String {
+        agentGateways.map {
+            "\($0.agent)|\($0.endpoint.description)|\($0.source)|\($0.sourceKey)"
+        }.sorted().joined(separator: "\n")
+    }
     private var selection: GraphSelection? {
         if let selectedEdge, let edge = snapshot.edges.first(where: { $0.id == selectedEdge }) {
             return .edge(edge, source: node(edge.source), target: node(edge.target))
@@ -114,7 +123,8 @@ struct VisualizeView: View {
                 if !Task.isCancelled { await reload() }
             }
         }
-        .task(id: RebuildKey(loadID: loadID, query: query, mode: mode)) { await rebuild() }
+        .task(id: RebuildKey(loadID: loadID, query: query, mode: mode,
+                             gatewayVersion: gatewayVersion)) { await rebuild() }
         .onChange(of: mode) { _, _ in
             rows = []
             snapshot = .empty
@@ -264,6 +274,8 @@ struct VisualizeView: View {
     private func rebuild() async {
         let source = rows
         let enforcement = blockedAttempts
+        let gateways = agentGateways
+        let demo = DemoData.isEnabled
         let mode = mode
         let focusScope = focus.scope
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -305,7 +317,12 @@ struct VisualizeView: View {
                         || (!$0.parentAgent.isEmpty && focusScope.bundleIDs.contains($0.parentAgent))
                 }
                 return AITrafficGraphBuilder.build(rows: source, visibleRows: visible,
-                                                   blockedAttempts: searchedEnforcement)
+                                                   blockedAttempts: searchedEnforcement,
+                                                   gateways: gateways,
+                                                   resolveGateway: { endpoint in
+                                                       demo ? DemoData.gatewayIdentity(endpoint)
+                                                           : LocalGatewayResolver.resolve(endpoint)
+                                                   })
             }
         }.value
         guard !Task.isCancelled else { return }
@@ -325,6 +342,7 @@ struct VisualizeView: View {
         var loadID: UUID
         var query: String
         var mode: Mode
+        var gatewayVersion: String
     }
 }
 
@@ -471,26 +489,30 @@ private struct TrafficGraphCanvas: View {
         Canvas { context, _ in
             for edge in snapshot.edges {
                 guard let curve = layout.edgeCurves[edge.id] else { continue }
-                let emphasized = selectedEdge == edge.id || hoveredEdge == edge.id
+                let emphasized = TrafficGraphSelection.emphasizes(
+                    edge,
+                    selectedNode: selectedNode,
+                    selectedEdge: selectedEdge,
+                    hoveredEdge: hoveredEdge
+                )
                 let related = isEdgeRelated(edge)
                 let baseOpacity = emphasized ? 0.92 : related ? 0.42 : 0.10
-                if edge.relationship != .observed {
-                    let color = edge.relationship == .blocked ? FL.critical
-                        : edge.relationship == .routedThrough ? FL.muted : FL.graphInvocation
-                    let dash: [CGFloat] = edge.relationship == .blocked ? [3, 4]
-                        : edge.relationship == .routedThrough ? [2, 4] : [6, 5]
+                if !edge.isTrafficRibbon {
+                    let color = edge.relationship == .blocked ? FL.critical : FL.graphInvocation
+                    let dash: [CGFloat] = edge.relationship == .blocked ? [3, 4] : [6, 5]
                     context.stroke(path(curve), with: .color(color.opacity(baseOpacity)),
                                    style: StrokeStyle(lineWidth: emphasized ? 2.5 : 1.5, lineCap: .round,
                                                       dash: dash))
                     continue
                 }
 
+                let counters = edge.displayedCounters
                 let width = layout.edgeWidths[edge.id] ?? 1
                 context.fill(ribbonPath(curve, width: width),
                              with: .color(FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)))
-                guard emphasized, edge.counters.total > 0 else { continue }
+                guard emphasized, counters.total > 0 else { continue }
 
-                let receivedWidth = width * CGFloat(edge.counters.bytesIn) / CGFloat(edge.counters.total)
+                let receivedWidth = width * CGFloat(counters.bytesIn) / CGFloat(counters.total)
                 let sentWidth = width - receivedWidth
                 if receivedWidth > 0 {
                     let offset = -(width - receivedWidth) / 2
@@ -550,7 +572,12 @@ private struct TrafficGraphCanvas: View {
         let target = snapshot.nodes.first { $0.id == edge.target }?.title ?? L("Destination")
         if edge.relationship == .runs { return "\(source), \(L("Runs")), \(target)" }
         if edge.relationship == .launched { return "\(source), \(L("Started")), \(target)" }
-        if edge.relationship == .routedThrough { return "\(source), \(L("Routed through")), \(target)" }
+        if edge.relationship == .routedThrough {
+            let counters = edge.displayedCounters
+            return "\(source), \(L("Observed route")), \(target), \(L("Received")) "
+                + "\(ByteFormat.string(counters.bytesIn)), \(L("Sent")) \(ByteFormat.string(counters.bytesOut))"
+        }
+        if edge.relationship == .configuredGateway { return "\(source), \(L("Configured gateway")), \(target)" }
         if edge.relationship == .blocked {
             return L("%@ to %@, %lld blocked attempts", source, target, edge.enforcement?.count ?? 0)
         }
@@ -566,8 +593,11 @@ private struct TrafficGraphCanvas: View {
     }
 
     private func isEdgeRelated(_ edge: TrafficGraphEdge) -> Bool {
-        if selectedEdge == nil, selectedNode == nil { return true }
-        return selectedEdge == edge.id || selectedNode == edge.source || selectedNode == edge.target
+        TrafficGraphSelection.isRelated(
+            edge,
+            selectedNode: selectedNode,
+            selectedEdge: selectedEdge
+        )
     }
 
     private func isNodeDimmed(_ id: TrafficGraphNodeID) -> Bool {
@@ -621,8 +651,11 @@ private struct TrafficGraphNodeView: View {
 
     var body: some View {
         Button(action: action) {
-            if node.kind == .app || node.kind == .agent || node.kind == .launcher { appContent }
-            else { destinationContent }
+            if node.kind == .app || node.kind == .agent || node.kind == .launcher || node.kind == .proxy {
+                appContent
+            } else {
+                destinationContent
+            }
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
@@ -639,7 +672,12 @@ private struct TrafficGraphNodeView: View {
     private var appContent: some View {
         HStack(spacing: 9) {
             AppIconView(path: node.appPath, size: 30)
-            Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(2)
+                if let role = roleLabel {
+                    Text(role).font(.caption2).foregroundStyle(FL.faint).lineLimit(1)
+                }
+            }
             Spacer(minLength: 0)
         }
         .padding(7)
@@ -664,6 +702,15 @@ private struct TrafficGraphNodeView: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.line, lineWidth: 1))
     }
 
+    private var roleLabel: String? {
+        switch node.kind {
+        case .launcher: return L("Started agent")
+        case .agent: return L("Agent")
+        case .proxy: return node.detail
+        default: return nil
+        }
+    }
+
     private var nodeIcon: String {
         switch node.kind {
         case .service: return "sparkles"
@@ -674,8 +721,9 @@ private struct TrafficGraphNodeView: View {
     }
 
     private var accessibilityLabel: String {
-        L("%@, received %@, sent %@, %lld connections", node.title, ByteFormat.string(node.counters.bytesIn),
-          ByteFormat.string(node.counters.bytesOut), node.counters.flows)
+        let title = roleLabel.map { "\(node.title), \($0)" } ?? node.title
+        return L("%@, received %@, sent %@, %lld connections", title, ByteFormat.string(node.counters.bytesIn),
+                 ByteFormat.string(node.counters.bytesOut), node.counters.flows)
     }
 }
 
@@ -713,10 +761,12 @@ private struct TrafficGraphInspector: View {
                 Text(L("Capture-time process ancestry proves this application started the agent."))
                     .font(.callout).foregroundStyle(FL.muted)
             } else if node.kind == .proxy {
-                FLPill(text: L("Routed through"), systemImage: "arrow.triangle.branch", color: FL.graphInvocation)
-                Text(L("Capture-time proxy attribution proves this application's observed traffic used this route."))
+                FLPill(text: node.detail, systemImage: "arrow.triangle.branch", color: FL.graphInvocation)
+                Text(node.detail == L("Configured gateway")
+                     ? L("The agent's documented settings declare this gateway. This does not prove a request used it.")
+                     : L("Capture-time proxy attribution proves this observed route segment."))
                     .font(.callout).foregroundStyle(FL.muted)
-                metrics(node.counters)
+                if !node.counters.isEmpty { metrics(node.counters) }
             } else if node.counters.isEmpty {
                 FLPill(text: L("Relationship evidence"), systemImage: "line.diagonal", color: FL.graphInvocation)
             } else {
@@ -770,18 +820,23 @@ private struct TrafficGraphInspector: View {
                    systemImage: relationshipIcon(edge.relationship),
                    color: edge.relationship == .blocked ? FL.critical
                     : edge.relationship == .observed ? FL.muted : FL.graphInvocation)
-            if edge.relationship == .observed {
-                metrics(edge.counters)
-                Divider()
-                if edge.members.count > 1 {
-                    Text(L("Exact destinations")).font(.caption.bold()).foregroundStyle(FL.muted)
-                    ScrollView {
-                        LazyVStack(spacing: 6) {
-                            ForEach(edge.members) { member in exactMember(member, source: source) }
+            if edge.isTrafficRibbon {
+                metrics(edge.displayedCounters)
+                if edge.relationship == .observed {
+                    Divider()
+                    if edge.members.count > 1 {
+                        Text(L("Exact destinations")).font(.caption.bold()).foregroundStyle(FL.muted)
+                        ScrollView {
+                            LazyVStack(spacing: 6) {
+                                ForEach(edge.members) { member in exactMember(member, source: source) }
+                            }
                         }
+                    } else {
+                        exactActions(edge.filter, source: source)
                     }
                 } else {
-                    exactActions(edge.filter, source: source)
+                    Text(relationshipExplanation(edge.relationship))
+                        .font(.callout).foregroundStyle(FL.muted)
                 }
             } else if edge.relationship == .blocked, let enforcement = edge.enforcement {
                 metric(L("Blocked attempts"), enforcement.count.formatted(), FL.critical, "shield.slash")
@@ -790,6 +845,12 @@ private struct TrafficGraphInspector: View {
                 if !enforcement.detail.isEmpty {
                     Text(enforcement.detail).font(.caption).foregroundStyle(FL.muted)
                 }
+            } else if edge.relationship == .configuredGateway, let configuration = edge.configuration {
+                Text(relationshipExplanation(edge.relationship)).font(.callout).foregroundStyle(FL.muted)
+                Divider()
+                Text(configuration.endpoint).font(.callout.monospaced()).foregroundStyle(FL.ink)
+                Text(L("Configured: %@", configuration.sourceKey)).font(.caption).foregroundStyle(FL.muted)
+                Text(configuration.source).font(.caption2.monospaced()).foregroundStyle(FL.faint)
             } else {
                 Text(relationshipExplanation(edge.relationship))
                     .font(.callout).foregroundStyle(FL.muted)
@@ -827,7 +888,8 @@ private struct TrafficGraphInspector: View {
         case .observed: return L("Observed")
         case .runs: return L("Runs")
         case .launched: return L("Started")
-        case .routedThrough: return L("Routed through")
+        case .configuredGateway: return L("Configured gateway")
+        case .routedThrough: return L("Observed route")
         case .blocked: return L("Blocked")
         case .invoked: return L("Invoked")
         }
@@ -838,6 +900,7 @@ private struct TrafficGraphInspector: View {
         case .observed: return "eye"
         case .runs: return "point.topleft.down.to.point.bottomright.curvepath"
         case .launched: return "terminal"
+        case .configuredGateway: return "gearshape.2"
         case .routedThrough: return "arrow.triangle.branch"
         case .blocked: return "shield.slash"
         case .invoked: return "bolt"
@@ -850,8 +913,10 @@ private struct TrafficGraphInspector: View {
             return L("Stored process lineage proves this agent runs the tool. It does not prove a tool invocation.")
         case .launched:
             return L("Capture-time process ancestry proves this application started the agent.")
+        case .configuredGateway:
+            return L("The agent's documented settings declare this gateway. This does not prove a request used it.")
         case .routedThrough:
-            return L("Capture-time proxy attribution proves this application's observed traffic used this route.")
+            return L("Capture-time proxy attribution proves this observed route segment.")
         case .invoked:
             return L("Inspected request evidence proves this invocation.")
         case .blocked:
@@ -984,9 +1049,9 @@ private struct TrafficGraphList: View {
                         Text(detail).font(.caption2).foregroundStyle(FL.muted)
                     }
                 }
-                Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesIn) : "—").monospacedDigit()
-                Text(edge.relationship == .observed ? ByteFormat.string(edge.counters.bytesOut) : "—").monospacedDigit()
-                Text(edge.relationship == .observed ? edge.counters.flows.formatted()
+                Text(edge.isTrafficRibbon ? ByteFormat.string(edge.displayedCounters.bytesIn) : "—").monospacedDigit()
+                Text(edge.isTrafficRibbon ? ByteFormat.string(edge.displayedCounters.bytesOut) : "—").monospacedDigit()
+                Text(edge.isTrafficRibbon ? edge.displayedCounters.flows.formatted()
                      : edge.relationship == .blocked ? edge.enforcement?.count.formatted() ?? "0" : "—")
                     .monospacedDigit()
                 FLPill(text: relationshipLabel(edge.relationship),
@@ -1016,7 +1081,8 @@ private struct TrafficGraphList: View {
         case .observed: return L("Observed")
         case .runs: return L("Runs")
         case .launched: return L("Started")
-        case .routedThrough: return L("Routed through")
+        case .configuredGateway: return L("Configured gateway")
+        case .routedThrough: return L("Observed route")
         case .blocked: return L("Blocked")
         case .invoked: return L("Invoked")
         }
@@ -1027,6 +1093,7 @@ private struct TrafficGraphList: View {
         case .observed: return "eye"
         case .runs: return "point.topleft.down.to.point.bottomright.curvepath"
         case .launched: return "terminal"
+        case .configuredGateway: return "gearshape.2"
         case .routedThrough: return "arrow.triangle.branch"
         case .blocked: return "shield.slash"
         case .invoked: return "bolt"
@@ -1039,10 +1106,12 @@ private struct TrafficGraphList: View {
         if edge.relationship == .blocked {
             return L("%@ to %@, %lld blocked attempts", app, destination, edge.enforcement?.count ?? 0)
         }
-        if edge.relationship != .observed {
+        if !edge.isTrafficRibbon {
             return "\(app), \(relationshipLabel(edge.relationship)), \(destination)"
         }
-        return "\(app), \(destination), \(L("Received")) \(ByteFormat.string(edge.counters.bytesIn)), "
-            + "\(L("Sent")) \(ByteFormat.string(edge.counters.bytesOut)), \(L("%lld connections", edge.counters.flows))"
+        let counters = edge.displayedCounters
+        return "\(app), \(destination), \(relationshipLabel(edge.relationship)), "
+            + "\(L("Received")) \(ByteFormat.string(counters.bytesIn)), "
+            + "\(L("Sent")) \(ByteFormat.string(counters.bytesOut)), \(L("%lld connections", counters.flows))"
     }
 }
