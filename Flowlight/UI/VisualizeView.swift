@@ -18,17 +18,18 @@ enum VisualizeGatewayScope {
             bundleID: gateway.agent,
             appName: gateway.agent
         )
-        let aliases = Set(
-            [
-                gateway.agent.lowercased(),
-                known?.name.lowercased() ?? "",
-                identity?.bundleID.lowercased() ?? "",
-                identity?.name.lowercased() ?? "",
-                identity?.path.lowercased() ?? "",
-            ]
-                + (known?.processNames.map { $0.lowercased() } ?? [])
-                + (known?.bundleIDs.map { $0.lowercased() } ?? [])
-        ).filter { !$0.isEmpty }
+        var aliases: Set<String> = [gateway.agent.lowercased()]
+        if let known {
+            aliases.insert(known.name.lowercased())
+            aliases.formUnion(known.processNames.map { $0.lowercased() })
+            aliases.formUnion(known.bundleIDs.map { $0.lowercased() })
+        }
+        if let identity {
+            aliases.insert(identity.bundleID.lowercased())
+            aliases.insert(identity.name.lowercased())
+            aliases.insert(identity.path.lowercased())
+        }
+        aliases.remove("")
         let matchesQuery = query.isEmpty
             || aliases.contains(where: { $0.contains(query) })
             || gateway.endpoint.description.lowercased().contains(query)
