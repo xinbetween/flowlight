@@ -54,6 +54,23 @@ struct TrafficGraphViewport: Equatable, Sendable {
         CGPoint(x: (screenPoint.x - offset.width) / scale,
                 y: (screenPoint.y - offset.height) / scale)
     }
+
+    func visibleGraphRect(in screenBounds: CGRect) -> CGRect {
+        let topLeft = graphPoint(for: CGPoint(x: screenBounds.minX, y: screenBounds.minY))
+        let bottomRight = graphPoint(for: CGPoint(x: screenBounds.maxX, y: screenBounds.maxY))
+        return CGRect(
+            x: min(topLeft.x, bottomRight.x),
+            y: min(topLeft.y, bottomRight.y),
+            width: abs(bottomRight.x - topLeft.x),
+            height: abs(bottomRight.y - topLeft.y)
+        )
+    }
+}
+
+enum TrafficGraphViewportPolicy {
+    static func shouldAutoFit(isUserControlled: Bool) -> Bool {
+        !isUserControlled
+    }
 }
 
 struct TrafficGraphCurve: Equatable, Sendable {
@@ -149,20 +166,53 @@ struct TrafficGraphLayoutKey: Equatable, Sendable {
     }
 }
 
+struct TrafficGraphVisibleRegion: Equatable, Sendable {
+    var nodeIDs: Set<TrafficGraphNodeID>
+    var edgeIDs: Set<TrafficGraphEdgeID>
+}
+
 struct TrafficGraphLayoutSnapshot: Sendable {
     var nodeFrames: [TrafficGraphNodeID: CGRect]
     var edgeCurves: [TrafficGraphEdgeID: TrafficGraphCurve]
     var edgeWidths: [TrafficGraphEdgeID: CGFloat] = [:]
+    var edgeWidthCaps: [TrafficGraphEdgeID: CGFloat] = [:]
+    var edgeBounds: [TrafficGraphEdgeID: CGRect] = [:]
 
     var contentBounds: CGRect {
         let nodes = nodeFrames.values.reduce(CGRect.null) { $0.union($1) }
-        return edgeCurves.reduce(nodes) { bounds, entry in
-            let width = edgeWidths[entry.key] ?? 1
-            return entry.value.points.reduce(bounds) { partial, point in
+        return resolvedEdgeBounds.reduce(nodes) { $0.union($1.value) }
+    }
+
+    func updatingTrafficWidths(for snapshot: TrafficGraphSnapshot) -> TrafficGraphLayoutSnapshot {
+        var updated = self
+        updated.edgeWidths = TrafficGraphLayout.trafficWidths(
+            for: snapshot,
+            caps: edgeWidthCaps
+        )
+        return updated
+    }
+
+    func visibleRegion(in graphRect: CGRect, margin: CGFloat = 80) -> TrafficGraphVisibleRegion {
+        let expanded = graphRect.insetBy(dx: -max(0, margin), dy: -max(0, margin))
+        let nodes = Set(nodeFrames.compactMap { id, frame in
+            frame.intersects(expanded) ? id : nil
+        })
+        let edges = Set(resolvedEdgeBounds.compactMap { id, bounds in
+            bounds.intersects(expanded) ? id : nil
+        })
+        return TrafficGraphVisibleRegion(nodeIDs: nodes, edgeIDs: edges)
+    }
+
+    private var resolvedEdgeBounds: [TrafficGraphEdgeID: CGRect] {
+        guard edgeBounds.count != edgeCurves.count else { return edgeBounds }
+        return Dictionary(uniqueKeysWithValues: edgeCurves.map { id, curve in
+            let width = max(1, edgeWidthCaps[id] ?? edgeWidths[id] ?? 1)
+            let bounds = curve.points.reduce(CGRect.null) { partial, point in
                 partial.union(CGRect(x: point.x - width / 2, y: point.y - width / 2,
                                      width: width, height: width))
             }
-        }
+            return (id, bounds)
+        })
     }
 
     func edge(at point: CGPoint, tolerance: CGFloat = 12) -> TrafficGraphEdgeID? {
@@ -244,20 +294,37 @@ enum TrafficGraphLayout {
     static let appSize = CGSize(width: 132, height: 52)
     static let destinationSize = CGSize(width: 150, height: 52)
     private static let intermediarySize = CGSize(width: 144, height: 52)
-    private static let nodeGap: CGFloat = 10
+    private static let baseNodeGap: CGFloat = 10
+    private static let maximumRibbonWidth: CGFloat = 24
+
+    static func minimumCanvasWidth(for snapshot: TrafficGraphSnapshot) -> CGFloat {
+        let nodeLanes = lanes(snapshot: snapshot)
+        let activeLanes = Lane.allCases.filter { lane in
+            snapshot.nodes.contains { nodeLanes[$0.id] == lane }
+        }
+        let cards = activeLanes.reduce(CGFloat(0)) { $0 + size(for: $1).width }
+        let gaps = CGFloat(max(0, activeLanes.count - 1)) * columnGap(for: snapshot)
+        return max(900, cards + gaps + 48)
+    }
 
     static func minimumCanvasHeight(for snapshot: TrafficGraphSnapshot) -> CGFloat {
         let nodeLanes = lanes(snapshot: snapshot)
         let largestLane = Dictionary(grouping: snapshot.nodes, by: { nodeLanes[$0.id] }).values
             .map(\.count).max() ?? 0
+        let gap = nodeGap(for: snapshot)
         let stackHeight = CGFloat(largestLane) * appSize.height
-            + CGFloat(max(0, largestLane - 1)) * nodeGap
+            + CGFloat(max(0, largestLane - 1)) * gap
         return max(760, stackHeight + 44)
     }
 
-    static func layout(snapshot: TrafficGraphSnapshot, in bounds: CGRect,
-                       preserving previous: TrafficGraphLayoutSnapshot? = nil) -> TrafficGraphLayoutSnapshot {
-        guard !snapshot.nodes.isEmpty, bounds.width > 0, bounds.height > 0 else {
+    static func layout(
+        snapshot: TrafficGraphSnapshot,
+        in bounds: CGRect,
+        preserving previous: TrafficGraphLayoutSnapshot? = nil,
+        placementObserver: (@Sendable () -> Void)? = nil
+    ) -> TrafficGraphLayoutSnapshot {
+        guard !snapshot.nodes.isEmpty, bounds.width > 0, bounds.height > 0,
+              !Task<Never, Never>.isCancelled else {
             return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
         }
 
@@ -265,11 +332,19 @@ enum TrafficGraphLayout {
         let nodeLanes = lanes(snapshot: snapshot)
         let ordered = orderedNodes(snapshot: snapshot, nodeLanes: nodeLanes)
         let activeLanes = Lane.allCases.filter { !(ordered[$0] ?? []).isEmpty }
-        let columns = columnPositions(for: activeLanes, in: insetBounds)
+        let columns = columnPositions(
+            for: activeLanes,
+            in: insetBounds,
+            minimumGap: columnGap(for: snapshot)
+        )
+        let verticalGap = nodeGap(for: snapshot)
         var frames: [TrafficGraphNodeID: CGRect] = [:]
 
         if let previous {
             for node in snapshot.nodes {
+                if Task<Never, Never>.isCancelled {
+                    return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+                }
                 guard var frame = previous.nodeFrames[node.id] else { continue }
                 guard let lane = nodeLanes[node.id] else { continue }
                 guard let column = columns[lane] else { continue }
@@ -279,31 +354,41 @@ enum TrafficGraphLayout {
             }
         }
 
-        placeMissingNodes(
+        guard placeMissingNodes(
             ordered: ordered,
             activeLanes: activeLanes,
             columns: columns,
             insetBounds: insetBounds,
-            frames: &frames
-        )
-        if hasOverlaps(frames.values) {
+            gap: verticalGap,
+            frames: &frames,
+            placementObserver: placementObserver
+        ) else {
+            return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+        }
+        if hasOverlaps(frames.values, gap: verticalGap) {
+            guard !Task<Never, Never>.isCancelled else {
+                return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+            }
             frames = [:]
-            placeMissingNodes(
+            guard placeMissingNodes(
                 ordered: ordered,
                 activeLanes: activeLanes,
                 columns: columns,
                 insetBounds: insetBounds,
-                frames: &frames
-            )
+                gap: verticalGap,
+                frames: &frames,
+                placementObserver: placementObserver
+            ) else {
+                return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+            }
+        }
+        guard !Task<Never, Never>.isCancelled else {
+            return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
         }
 
         let trafficRibbons = snapshot.edges.filter(\.isTrafficRibbon)
-        let maximum = max(1, trafficRibbons.map { $0.displayedCounters.total }.max() ?? 1)
-        var widths = Dictionary(uniqueKeysWithValues: trafficRibbons.map {
-            ($0.id, ribbonWidth(bytes: $0.displayedCounters.total, maximum: maximum))
-        })
-        let scale = ribbonScale(edges: trafficRibbons, widths: widths, frames: frames)
-        widths = widths.mapValues { $0 * scale }
+        let capacityWidths = ribbonCapacities(edges: trafficRibbons, frames: frames)
+        var widths = trafficWidths(for: snapshot, caps: capacityWidths)
 
         let outgoing = Dictionary(grouping: trafficRibbons, by: \.source)
         let incoming = Dictionary(grouping: trafficRibbons, by: \.target)
@@ -316,7 +401,7 @@ enum TrafficGraphLayout {
                 let rightY = frames[$1.target]?.midY ?? 0
                 return leftY == rightY ? $0.id < $1.id : leftY < rightY
             }
-            sourcePorts.merge(portCenters(for: sorted, in: frame, edgeWidths: widths)) { current, _ in current }
+            sourcePorts.merge(portCenters(for: sorted, in: frame, edgeWidths: capacityWidths)) { current, _ in current }
         }
         for (nodeID, edges) in incoming {
             guard let frame = frames[nodeID] else { continue }
@@ -325,7 +410,7 @@ enum TrafficGraphLayout {
                 let rightY = frames[$1.source]?.midY ?? 0
                 return leftY == rightY ? $0.id < $1.id : leftY < rightY
             }
-            targetPorts.merge(portCenters(for: sorted, in: frame, edgeWidths: widths)) { current, _ in current }
+            targetPorts.merge(portCenters(for: sorted, in: frame, edgeWidths: capacityWidths)) { current, _ in current }
         }
 
         let nodeLane = nodeLanes
@@ -341,6 +426,9 @@ enum TrafficGraphLayout {
         }
         var curves: [TrafficGraphEdgeID: TrafficGraphCurve] = [:]
         for edge in snapshot.edges.sorted(by: { $0.id < $1.id }) {
+            if Task<Never, Never>.isCancelled {
+                return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
+            }
             guard let source = frames[edge.source], let target = frames[edge.target] else { continue }
             if edge.isTrafficRibbon {
                 guard let sourcePort = sourcePorts[edge.id], let targetPort = targetPorts[edge.id] else { continue }
@@ -354,7 +442,7 @@ enum TrafficGraphLayout {
                     }
                     : []
                 curves[edge.id] = sankeyCurve(start: start, end: end, avoiding: obstacles,
-                                              width: widths[edge.id] ?? 0)
+                                              width: capacityWidths[edge.id] ?? 0)
             } else {
                 widths[edge.id] = 1.5
                 let targetIsLeft = (nodeLane[edge.target]?.rawValue ?? 0) < (nodeLane[edge.source]?.rawValue ?? 0)
@@ -378,7 +466,40 @@ enum TrafficGraphLayout {
                                                 avoiding: obstacles, width: 1.5)
             }
         }
-        return TrafficGraphLayoutSnapshot(nodeFrames: frames, edgeCurves: curves, edgeWidths: widths)
+        var widthCaps = capacityWidths
+        for edge in snapshot.edges where !edge.isTrafficRibbon { widthCaps[edge.id] = 1.5 }
+        let boundsByEdge = edgeBounds(curves: curves, widths: widthCaps)
+        return TrafficGraphLayoutSnapshot(
+            nodeFrames: frames,
+            edgeCurves: curves,
+            edgeWidths: widths,
+            edgeWidthCaps: widthCaps,
+            edgeBounds: boundsByEdge
+        )
+    }
+
+    static func crossingCount(
+        snapshot: TrafficGraphSnapshot,
+        layout: TrafficGraphLayoutSnapshot
+    ) -> Int {
+        let positioned = snapshot.edges.compactMap { edge -> (CGRect, CGRect)? in
+            guard let source = layout.nodeFrames[edge.source],
+                  let target = layout.nodeFrames[edge.target] else { return nil }
+            return (source, target)
+        }
+        var crossings = 0
+        for left in positioned.indices {
+            for right in positioned.indices where right > left {
+                let first = positioned[left]
+                let second = positioned[right]
+                guard abs(first.0.midX - second.0.midX) < 0.5,
+                      abs(first.1.midX - second.1.midX) < 0.5 else { continue }
+                let sourceDelta = first.0.midY - second.0.midY
+                let targetDelta = first.1.midY - second.1.midY
+                if sourceDelta * targetDelta < 0 { crossings += 1 }
+            }
+        }
+        return crossings
     }
 
     static func edgeWidth(bytes: Int64, maximum: Int64) -> CGFloat {
@@ -399,21 +520,50 @@ enum TrafficGraphLayout {
         return 3 + CGFloat(normalized) * 21
     }
 
-    private static func ribbonScale(
+    static func trafficWidths(
+        for snapshot: TrafficGraphSnapshot,
+        caps: [TrafficGraphEdgeID: CGFloat]
+    ) -> [TrafficGraphEdgeID: CGFloat] {
+        let ribbons = snapshot.edges.filter(\.isTrafficRibbon)
+        let maximum = max(1, ribbons.map { $0.displayedCounters.total }.max() ?? 1)
+        return Dictionary(uniqueKeysWithValues: snapshot.edges.map { edge in
+            guard edge.isTrafficRibbon else { return (edge.id, 1.5) }
+            let width = ribbonWidth(bytes: edge.displayedCounters.total, maximum: maximum)
+            let scale = min(1, (caps[edge.id] ?? maximumRibbonWidth) / maximumRibbonWidth)
+            return (edge.id, width * scale)
+        })
+    }
+
+    private static func ribbonCapacities(
         edges: [TrafficGraphEdge],
-        widths: [TrafficGraphEdgeID: CGFloat],
         frames: [TrafficGraphNodeID: CGRect]
-    ) -> CGFloat {
+    ) -> [TrafficGraphEdgeID: CGFloat] {
         let bySource = Dictionary(grouping: edges, by: \.source)
         let byTarget = Dictionary(grouping: edges, by: \.target)
         let groups = Array(bySource) + Array(byTarget)
-        return groups.reduce(CGFloat(1)) { scale, group in
-            guard let height = frames[group.key]?.height else { return scale }
-            let total = group.value.reduce(CGFloat(0)) { $0 + (widths[$1.id] ?? 0) }
-            guard total > 0 else { return scale }
-            let available = max(1, height - 12 - CGFloat(max(0, group.value.count - 1)) * 2)
-            return min(scale, available / total)
+        let scale = groups.reduce(CGFloat(1)) { current, group in
+            guard let height = frames[group.key]?.height else { return current }
+            let gaps = CGFloat(max(0, group.value.count - 1)) * 2
+            let available = max(1, height - 12 - gaps)
+            let maximumTotal = CGFloat(group.value.count) * maximumRibbonWidth
+            return min(current, available / maximumTotal)
         }
+        let capacity = maximumRibbonWidth * min(1, scale)
+        return Dictionary(uniqueKeysWithValues: edges.map { ($0.id, capacity) })
+    }
+
+    private static func edgeBounds(
+        curves: [TrafficGraphEdgeID: TrafficGraphCurve],
+        widths: [TrafficGraphEdgeID: CGFloat]
+    ) -> [TrafficGraphEdgeID: CGRect] {
+        Dictionary(uniqueKeysWithValues: curves.map { id, curve in
+            let width = max(1, widths[id] ?? 1)
+            let bounds = curve.points.reduce(CGRect.null) { partial, point in
+                partial.union(CGRect(x: point.x - width / 2, y: point.y - width / 2,
+                                     width: width, height: width))
+            }
+            return (id, bounds)
+        })
     }
 
     private static func portCenters(
@@ -511,48 +661,37 @@ enum TrafficGraphLayout {
                                      nodeLanes: [TrafficGraphNodeID: Lane]) -> [Lane: [TrafficGraphNode]] {
         var lanes = Dictionary(grouping: snapshot.nodes) { nodeLanes[$0.id] ?? .source }
         for lane in Lane.allCases { lanes[lane] = (lanes[lane] ?? []).sorted { $0.id < $1.id } }
+        let neighbors = Dictionary(grouping: snapshot.edges.flatMap { edge in
+            [(edge.source, edge.target), (edge.target, edge.source)]
+        }, by: \.0)
 
-        for _ in 0..<3 {
-            for lane in Lane.allCases {
-                let neighbors = neighboringOrder(for: lane, lanes: lanes)
-                guard !neighbors.isEmpty else { continue }
-                let positions = Dictionary(uniqueKeysWithValues: neighbors.enumerated().map { ($1.id, CGFloat($0)) })
-                let edgesByNode = Dictionary(grouping: snapshot.edges.flatMap { edge in
-                    [(edge.source, edge.target), (edge.target, edge.source)]
-                }, by: \.0)
-                lanes[lane]?.sort { left, right in
-                    let leftScore = median((edgesByNode[left.id] ?? []).compactMap { positions[$0.1] })
-                    let rightScore = median((edgesByNode[right.id] ?? []).compactMap { positions[$0.1] })
-                    if leftScore == rightScore { return left.id < right.id }
-                    return leftScore < rightScore
+        func normalizedPositions(_ current: [Lane: [TrafficGraphNode]]) -> [TrafficGraphNodeID: CGFloat] {
+            Dictionary(uniqueKeysWithValues: current.values.flatMap { nodes in
+                nodes.enumerated().map { index, node in
+                    let denominator = CGFloat(max(1, nodes.count - 1))
+                    return (node.id, CGFloat(index) / denominator)
                 }
+            })
+        }
+
+        func reorder(_ lane: Lane) {
+            guard var nodes = lanes[lane], nodes.count > 1 else { return }
+            let positions = normalizedPositions(lanes)
+            nodes.sort { left, right in
+                let leftScore = median((neighbors[left.id] ?? []).compactMap { positions[$0.1] })
+                let rightScore = median((neighbors[right.id] ?? []).compactMap { positions[$0.1] })
+                if leftScore == rightScore { return left.id < right.id }
+                return leftScore < rightScore
             }
+            lanes[lane] = nodes
+        }
+
+        for _ in 0..<6 {
+            if Task<Never, Never>.isCancelled { return lanes }
+            for lane in Lane.allCases { reorder(lane) }
+            for lane in Lane.allCases.reversed() { reorder(lane) }
         }
         return lanes
-    }
-
-    private static func neighboringOrder(for lane: Lane, lanes: [Lane: [TrafficGraphNode]]) -> [TrafficGraphNode] {
-        let launcher = lanes[.launcher] ?? []
-        let source = lanes[.source] ?? []
-        let tool = lanes[.tool] ?? []
-        let gateway = lanes[.gateway] ?? []
-        let inspectionProxy = lanes[.inspectionProxy] ?? []
-        let destination = lanes[.destination] ?? []
-
-        switch lane {
-        case .launcher:
-            return source
-        case .source:
-            return [launcher, tool, gateway, inspectionProxy, destination].flatMap { $0 }
-        case .tool:
-            return [source, gateway, inspectionProxy, destination].flatMap { $0 }
-        case .gateway:
-            return [source, tool, inspectionProxy, destination].flatMap { $0 }
-        case .inspectionProxy:
-            return [gateway, tool, source, destination].flatMap { $0 }
-        case .destination:
-            return [inspectionProxy, gateway, tool, source].flatMap { $0 }
-        }
     }
 
     private static func median(_ values: [CGFloat]) -> CGFloat {
@@ -590,10 +729,25 @@ enum TrafficGraphLayout {
         }
     }
 
-    private static func columnPositions(for lanes: [Lane], in bounds: CGRect) -> [Lane: CGFloat] {
+    private static func columnGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
+        guard !snapshot.nodes.isEmpty else { return 18 }
+        let density = CGFloat(snapshot.edges.count) / CGFloat(snapshot.nodes.count)
+        return 18 + min(30, density * 6)
+    }
+
+    private static func nodeGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
+        guard !snapshot.nodes.isEmpty else { return baseNodeGap }
+        let density = CGFloat(snapshot.edges.count) / CGFloat(snapshot.nodes.count)
+        return baseNodeGap + min(18, density * 3)
+    }
+
+    private static func columnPositions(
+        for lanes: [Lane],
+        in bounds: CGRect,
+        minimumGap: CGFloat
+    ) -> [Lane: CGFloat] {
         guard let first = lanes.first else { return [:] }
         if lanes.count == 1 { return [first: bounds.midX] }
-        let minimumGap: CGFloat = 16
         var minimum: [CGFloat] = [bounds.minX + size(for: first).width / 2]
         for (left, right) in zip(lanes, lanes.dropFirst()) {
             minimum.append(minimum.last! + size(for: left).width / 2
@@ -613,21 +767,25 @@ enum TrafficGraphLayout {
         activeLanes: [Lane],
         columns: [Lane: CGFloat],
         insetBounds: CGRect,
-        frames: inout [TrafficGraphNodeID: CGRect]
-    ) {
+        gap: CGFloat,
+        frames: inout [TrafficGraphNodeID: CGRect],
+        placementObserver: (@Sendable () -> Void)?
+    ) -> Bool {
         for lane in activeLanes {
+            if Task<Never, Never>.isCancelled { return false }
             let nodes = ordered[lane] ?? []
             guard let column = columns[lane] else { continue }
             let size = size(for: lane)
             let availableHeight = insetBounds.height
             let stackHeight = CGFloat(nodes.count) * size.height
-                + CGFloat(max(0, nodes.count - 1)) * nodeGap
+                + CGFloat(max(0, nodes.count - 1)) * gap
             let startY = insetBounds.midY - min(stackHeight, availableHeight) / 2
             let step = nodes.count > 1 && stackHeight > availableHeight
                 ? max(1, (availableHeight - size.height) / CGFloat(nodes.count - 1))
-                : size.height + nodeGap
+                : size.height + gap
 
             for (index, node) in nodes.enumerated() where frames[node.id] == nil {
+                if Task<Never, Never>.isCancelled { return false }
                 let preferredY = startY + size.height / 2 + CGFloat(index) * step
                 let preferred = CGPoint(x: column, y: preferredY)
                 frames[node.id] = place(
@@ -635,17 +793,25 @@ enum TrafficGraphLayout {
                     near: preferred,
                     laneX: column,
                     within: insetBounds,
-                    avoiding: Array(frames.values)
+                    avoiding: Array(frames.values),
+                    gap: gap
                 )
+                placementObserver?()
             }
         }
+        return true
     }
 
-    private static func hasOverlaps<S: Sequence>(_ frames: S) -> Bool where S.Element == CGRect {
+    private static func hasOverlaps<S: Sequence>(
+        _ frames: S,
+        gap: CGFloat
+    ) -> Bool where S.Element == CGRect {
         let frames = Array(frames)
         for left in frames.indices {
+            if Task<Never, Never>.isCancelled { return false }
             for right in frames.indices where right > left {
-                if frames[left].insetBy(dx: -nodeGap / 2, dy: -nodeGap / 2)
+                if Task<Never, Never>.isCancelled { return false }
+                if frames[left].insetBy(dx: -gap / 2, dy: -gap / 2)
                     .intersects(frames[right]) {
                     return true
                 }
@@ -654,8 +820,14 @@ enum TrafficGraphLayout {
         return false
     }
 
-    private static func place(size: CGSize, near preferred: CGPoint, laneX: CGFloat,
-                              within bounds: CGRect, avoiding placed: [CGRect]) -> CGRect {
+    private static func place(
+        size: CGSize,
+        near preferred: CGPoint,
+        laneX: CGFloat,
+        within bounds: CGRect,
+        avoiding placed: [CGRect],
+        gap: CGFloat
+    ) -> CGRect {
         func frame(y: CGFloat) -> CGRect {
             CGRect(x: laneX - size.width / 2, y: y - size.height / 2,
                    width: size.width, height: size.height)
@@ -666,12 +838,17 @@ enum TrafficGraphLayout {
             return result
         }
         func clear(_ candidate: CGRect) -> Bool {
-            !placed.contains { $0.insetBy(dx: -nodeGap / 2, dy: -nodeGap / 2).intersects(candidate) }
+            for existing in placed {
+                if Task<Never, Never>.isCancelled { return false }
+                if existing.insetBy(dx: -gap / 2, dy: -gap / 2).intersects(candidate) { return false }
+            }
+            return true
         }
 
         let initial = clamped(frame(y: preferred.y))
         if clear(initial) { return initial }
-        for distance in stride(from: nodeGap + size.height, through: bounds.height, by: nodeGap + size.height) {
+        for distance in stride(from: gap + size.height, through: bounds.height, by: gap + size.height) {
+            if Task<Never, Never>.isCancelled { return initial }
             for direction: CGFloat in [-1, 1] {
                 let candidate = clamped(frame(y: preferred.y + distance * direction))
                 if clear(candidate) { return candidate }

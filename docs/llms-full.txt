@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.6, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.7, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.6macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.7macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1671,8 +1671,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.6
+ 0.16.7
 November 2, 2026Latest
+
+ Keep large maps calm. Stable barycentric sweeps reduce avoidable relationship crossings, while topology-aware horizontal and vertical spacing keeps every semantic stage and card inside the canvas.
+
+ Update traffic without moving the map. Node frames, ports, and curves are cached by stable topology and viewport size; changing byte and connection totals refreshes ribbon widths without recomputing geometry.
+
+ Draw only what is on screen. Zooming and panning derive an exact graph-space viewport and skip offscreen ribbons and particles while keeping every card and relationship control available to keyboard and VoiceOver.
+
+ Scale with measured evidence. A 600-relationship benchmark guards layout cost alongside collision, route-avoidance, hit-testing, Fit, zoom, Reduce Motion, and accessibility regressions.
+
+ 0.16.6
+November 2, 2026
 
  See every relationship. Map stays readable with a bounded projection, while List retains the complete semantic graph and reveals it 25 relationships at a time without changing Map layout.
 

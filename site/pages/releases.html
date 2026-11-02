@@ -13,7 +13,17 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.16.6</h2><time datetime="2026-11-02">November 2, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.16.7</h2><time datetime="2026-11-02">November 2, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Keep large maps calm.</strong> Stable barycentric sweeps reduce avoidable relationship crossings, while topology-aware horizontal and vertical spacing keeps every semantic stage and card inside the canvas.</li>
+          <li><strong>Update traffic without moving the map.</strong> Node frames, ports, and curves are cached by stable topology and viewport size; changing byte and connection totals refreshes ribbon widths without recomputing geometry.</li>
+          <li><strong>Draw only what is on screen.</strong> Zooming and panning derive an exact graph-space viewport and skip offscreen ribbons and particles while keeping every card and relationship control available to keyboard and VoiceOver.</li>
+          <li><strong>Scale with measured evidence.</strong> A 600-relationship benchmark guards layout cost alongside collision, route-avoidance, hit-testing, Fit, zoom, Reduce Motion, and accessibility regressions.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.16.6</h2><time datetime="2026-11-02">November 2, 2026</time></header>
         <ul>
           <li><strong>See every relationship.</strong> Map stays readable with a bounded projection, while List retains the complete semantic graph and reveals it 25 relationships at a time without changing Map layout.</li>
           <li><strong>Render each application once.</strong> Flowlight and other application-backed agent, tool, launcher, gateway, and proxy roles converge on one card while exact role evidence, members, and traffic accounting remain intact.</li>
