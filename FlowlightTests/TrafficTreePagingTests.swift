@@ -57,6 +57,31 @@ final class TrafficTreePagingTests: XCTestCase {
         XCTAssertEqual(TrafficNode.showingMore(["app": 25], after: "app|github.com"), ["app": 25])
     }
 
+    func testProductionShowMoreActionUpdatesLimitsAndProjectionTogether() throws {
+        let source = [parent.withChildren(nodes(91))]
+        let initial = TrafficTreePaging.project(
+            source,
+            query: "",
+            comparators: [KeyPathComparator(\TrafficNode.total, order: .reverse)],
+            limits: [:],
+            levels: BreakdownGrouping.app.levels
+        )
+        let more = try XCTUnwrap(initial.displayed.first?.children?.last)
+
+        let expanded = TrafficTreePaging.showMore(
+            source,
+            query: "",
+            comparators: [KeyPathComparator(\TrafficNode.total, order: .reverse)],
+            limits: initial.limits,
+            after: more.id,
+            levels: BreakdownGrouping.app.levels
+        )
+
+        XCTAssertEqual(expanded.limits["app"], 50)
+        XCTAssertEqual(expanded.displayed.first?.children?.count, 51)
+        XCTAssertEqual(expanded.displayed.first?.children?.last?.moreCount, 41)
+    }
+
     // MARK: -
 
     private let parent = TrafficNode(id: "app", kind: .app, title: "Codex", filter: .none)

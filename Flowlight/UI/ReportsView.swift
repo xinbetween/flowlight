@@ -650,7 +650,6 @@ struct ReportsView: View {
             guard let id = ids.first, let node = find(id) else { return }
             if node.moreCount > 0 { showMore(node) } else { applyFilter(node) }
         }
-        .onChange(of: childLimits) { recompute() }
         .safeAreaInset(edge: .top, spacing: 0) {
             if breakdownTruncated {
                 Label(grouping == .app
@@ -785,13 +784,27 @@ struct ReportsView: View {
     }
 
     private func showMore(_ node: TrafficNode) {
-        childLimits = TrafficNode.showingMore(childLimits, after: node.id)
+        let page = TrafficTreePaging.showMore(
+            nodes,
+            query: query,
+            comparators: sortOrder,
+            limits: childLimits,
+            after: node.id,
+            levels: grouping.levels
+        )
+        childLimits = page.limits
+        displayed = page.displayed
         selection = nil
     }
 
     private func recompute() {
-        let sorted = TrafficNode.filter(nodes, query: query).sorted(using: sortOrder).map { $0.sorted(using: sortOrder) }
-        displayed = TrafficNode.capped(sorted, parentID: TrafficNode.rootID, parent: nil, limits: childLimits, levels: grouping.levels)
+        displayed = TrafficTreePaging.project(
+            nodes,
+            query: query,
+            comparators: sortOrder,
+            limits: childLimits,
+            levels: grouping.levels
+        ).displayed
     }
 
     private func reload() async {

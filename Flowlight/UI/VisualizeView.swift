@@ -4,6 +4,93 @@ enum VisualizeSelectionPolicy {
     static func shouldClear(previousQuery: String, newQuery: String) -> Bool {
         previousQuery != newQuery
     }
+
+    static func mapOmitsSelection(
+        selectedNode: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?,
+        map: TrafficGraphSnapshot
+    ) -> Bool {
+        if let selectedEdge, !map.edges.contains(where: { $0.id == selectedEdge }) { return true }
+        if let selectedNode, !map.nodes.contains(where: { $0.id == selectedNode }) { return true }
+        return false
+    }
+}
+
+enum VisualizeOmissionLabel {
+    static func text(for hidden: TrafficGraphHidden) -> String {
+        if hidden.nodeCount > 0 {
+            return L("%lld nodes and %lld relationships omitted from Map", hidden.nodeCount, hidden.edgeCount)
+        }
+        return L("%lld relationships omitted from Map", hidden.edgeCount)
+    }
+}
+
+enum VisualizeEvidenceScope {
+    static func rows(
+        _ rows: [BreakdownRow],
+        query: String,
+        focus: FocusScope
+    ) -> [BreakdownRow] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return rows.filter { row in
+            let matchesQuery = query.isEmpty || [
+                row.appName,
+                row.bundleID,
+                row.appPath,
+                row.domain,
+                row.remoteIP,
+                row.owner,
+                row.parentAgent,
+                row.parentAgentName,
+                row.mcpServer,
+                row.launcherBundleID,
+                row.launcherName,
+                row.launcherPath,
+                row.routeProxyBundleID,
+                row.routeProxyName,
+                row.routeProxyPath
+            ].contains { $0.lowercased().contains(query) }
+            let matchesFocus = focus.isEmpty
+                || focus.matches(
+                    bundleID: row.bundleID,
+                    domain: row.domain,
+                    remoteIP: row.remoteIP
+                )
+                || focus.matches(bundleID: row.parentAgent, domain: "", remoteIP: "")
+                || focus.matches(bundleID: row.launcherBundleID, domain: "", remoteIP: "")
+                || focus.matches(bundleID: row.routeProxyBundleID, domain: "", remoteIP: "")
+            return matchesQuery && matchesFocus
+        }
+    }
+
+    static func blockedAttempts(
+        _ attempts: [BlockedAttemptRow],
+        query: String,
+        focus: FocusScope
+    ) -> [BlockedAttemptRow] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return attempts.filter { attempt in
+            let exactDestination = VisualizationDestinationCanonicalizer.parse(attempt.destination)
+            let matchesFocus = focus.isEmpty
+                || focus.matches(
+                    bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID,
+                    domain: exactDestination.domain ?? "",
+                    remoteIP: exactDestination.address ?? ""
+                )
+                || focus.matches(bundleID: attempt.agentKey, domain: "", remoteIP: "")
+            let matchesQuery = query.isEmpty || [
+                attempt.appName,
+                attempt.bundleID,
+                attempt.agentName,
+                attempt.agentKey,
+                attempt.destination,
+                attempt.category,
+                attempt.source,
+                attempt.detail
+            ].contains { $0.lowercased().contains(query) }
+            return matchesFocus && matchesQuery
+        }
+    }
 }
 
 enum VisualizeGatewayScope {
@@ -118,7 +205,9 @@ struct VisualizeView: View {
     @AppStorage("visualize.presentation") private var presentation: Presentation = .map
     @State private var rows: [BreakdownRow] = []
     @State private var blockedAttempts: [BlockedAttemptRow] = []
-    @State private var snapshot = TrafficGraphSnapshot.empty
+    @State private var completeSnapshot = TrafficGraphSnapshot.empty
+    @State private var mapSnapshot = TrafficGraphSnapshot.empty
+    @State private var listVisibleCount = TrafficGraphListPager.pageSize
     @State private var selectedNode: TrafficGraphNodeID?
     @State private var selectedEdge: TrafficGraphEdgeID?
     @State private var query = ""
@@ -136,7 +225,7 @@ struct VisualizeView: View {
         }.sorted().joined(separator: "\n")
     }
     private var selection: GraphSelection? {
-        if let selectedEdge, let edge = snapshot.edges.first(where: { $0.id == selectedEdge }) {
+        if let selectedEdge, let edge = completeSnapshot.edges.first(where: { $0.id == selectedEdge }) {
             return .edge(edge, source: node(edge.source), target: node(edge.target))
         }
         if let selectedNode, let node = node(selectedNode) { return .node(node) }
@@ -147,10 +236,10 @@ struct VisualizeView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            if snapshot.nodes.isEmpty, loading {
+            if completeSnapshot.nodes.isEmpty, loading {
                 ProgressView(L("Loading visualization…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if snapshot.nodes.isEmpty {
+            } else if completeSnapshot.nodes.isEmpty {
                 emptyState
             } else if presentation == .map {
                 graphAndInspector
@@ -173,22 +262,40 @@ struct VisualizeView: View {
             }
         }
         .task(id: RebuildKey(loadID: loadID, query: query, mode: mode,
-                             gatewayVersion: gatewayVersion)) { await rebuild() }
+                             focus: focus.scope, gatewayVersion: gatewayVersion)) { await rebuild() }
         .onChange(of: mode) { _, _ in
             rows = []
-            snapshot = .empty
+            completeSnapshot = .empty
+            mapSnapshot = .empty
+            listVisibleCount = TrafficGraphListPager.pageSize
             selectedNode = nil
             selectedEdge = nil
             loadID = UUID()
         }
+        .onChange(of: granularity) { _, _ in
+            listVisibleCount = TrafficGraphListPager.pageSize
+        }
+        .onChange(of: focus.scope) { _, _ in
+            listVisibleCount = TrafficGraphListPager.pageSize
+            selectedNode = nil
+            selectedEdge = nil
+        }
         .onChange(of: query) { previous, current in
+            listVisibleCount = TrafficGraphListPager.pageSize
             guard VisualizeSelectionPolicy.shouldClear(previousQuery: previous, newQuery: current) else { return }
             selectedNode = nil
             selectedEdge = nil
         }
-        .onChange(of: snapshot.edges.map(\.id)) { _, ids in
-            if let selectedEdge, !ids.contains(selectedEdge) { self.selectedEdge = nil }
-            if let selectedNode, !snapshot.nodes.map(\.id).contains(selectedNode) { self.selectedNode = nil }
+        .onChange(of: presentation) { _, current in
+            guard current == .map,
+                  VisualizeSelectionPolicy.mapOmitsSelection(
+                    selectedNode: selectedNode,
+                    selectedEdge: selectedEdge,
+                    map: mapSnapshot
+                  )
+            else { return }
+            selectedNode = nil
+            selectedEdge = nil
         }
     }
 
@@ -207,9 +314,10 @@ struct VisualizeView: View {
                     .font(.caption).foregroundStyle(FL.muted)
             }
             Spacer()
-            if snapshot.hidden.edgeCount > 0 {
-                Label(L("%lld quieter connections hidden", snapshot.hidden.edgeCount), systemImage: "ellipsis.circle")
+            if presentation == .map, mapSnapshot.hidden.hasOmissions {
+                Label(VisualizeOmissionLabel.text(for: mapSnapshot.hidden), systemImage: "ellipsis.circle")
                     .font(.caption).foregroundStyle(FL.muted)
+                    .accessibilityLabel(hiddenSummary)
                     .help(hiddenSummary)
             }
             Picker(L("Mode"), selection: $mode) {
@@ -233,16 +341,18 @@ struct VisualizeView: View {
     }
 
     private var hiddenSummary: String {
-        let explanation = L("The map stays readable by showing the busiest relationships. The list uses the same bounded selection.")
-        let totals = "\(L("Received")): \(ByteFormat.string(snapshot.hidden.counters.bytesIn)) · "
-            + "\(L("Sent")): \(ByteFormat.string(snapshot.hidden.counters.bytesOut)) · "
-            + L("%lld connections", snapshot.hidden.counters.flows)
-        return explanation + "\n" + totals
+        let explanation = L("The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope.")
+        let counts = L("%lld nodes and %lld relationships omitted from Map", mapSnapshot.hidden.nodeCount,
+                       mapSnapshot.hidden.edgeCount)
+        let totals = "\(L("Received")): \(ByteFormat.string(mapSnapshot.hidden.counters.bytesIn)) · "
+            + "\(L("Sent")): \(ByteFormat.string(mapSnapshot.hidden.counters.bytesOut)) · "
+            + L("%lld connections", mapSnapshot.hidden.counters.flows)
+        return explanation + "\n" + counts + "\n" + totals
     }
 
     private var graphAndInspector: some View {
         HSplitView {
-            TrafficGraphCanvas(snapshot: snapshot, selectedNode: $selectedNode, selectedEdge: $selectedEdge,
+            TrafficGraphCanvas(snapshot: mapSnapshot, selectedNode: $selectedNode, selectedEdge: $selectedEdge,
                                reduceMotion: reduceMotion)
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
             TrafficGraphInspector(selection: selection, granularity: granularity)
@@ -253,7 +363,7 @@ struct VisualizeView: View {
 
     private var listAndInspector: some View {
         HSplitView {
-            TrafficGraphList(snapshot: snapshot, mode: mode,
+            TrafficGraphList(snapshot: completeSnapshot, mode: mode, visibleCount: $listVisibleCount,
                              selectedEdge: $selectedEdge, selectedNode: $selectedNode)
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
             TrafficGraphInspector(selection: selection, granularity: granularity)
@@ -276,7 +386,7 @@ struct VisualizeView: View {
     }
 
     private func node(_ id: TrafficGraphNodeID) -> TrafficGraphNode? {
-        snapshot.nodes.first { $0.id == id }
+        completeSnapshot.nodes.first { $0.id == id }
     }
 
     @MainActor
@@ -288,16 +398,12 @@ struct VisualizeView: View {
         let mode = mode
         let to = Date()
         let from = to.addingTimeInterval(-granularity.defaultWindow)
-        let filter: TrafficFilter = {
-            guard mode == .traffic else { return .none }
-            return TrafficFilter(focus: focus.scope)
-        }()
         do {
             let loaded = try await monitor.read { database in
                 let rows: [BreakdownRow]
                 switch mode {
                 case .traffic:
-                    rows = try database.appDestinationRows(granularity, from: from, to: to, filter: filter)
+                    rows = try database.appDestinationRows(granularity, from: from, to: to, filter: .none)
                 case .ai:
                     rows = try database.aiVisualizationRows(granularity, from: from, to: to)
                 }
@@ -329,42 +435,23 @@ struct VisualizeView: View {
         let focusScope = focus.scope
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let built = await Task.detached(priority: .userInitiated) {
-            let searched = query.isEmpty ? source : source.filter { row in
-                row.appName.lowercased().contains(query)
-                    || row.bundleID.lowercased().contains(query)
-                    || row.domain.lowercased().contains(query)
-                    || row.remoteIP.lowercased().contains(query)
-                    || row.owner.lowercased().contains(query)
-                    || row.parentAgent.lowercased().contains(query)
-                    || row.parentAgentName.lowercased().contains(query)
-                    || row.mcpServer.lowercased().contains(query)
-            }
-            let focusedEnforcement = enforcement.filter { attempt in
-                focusScope.isEmpty || focusScope.matches(
-                    bundleID: attempt.bundleID.isEmpty ? attempt.agentKey : attempt.bundleID,
-                    domain: HostCanonicalizer.host(attempt.destination) ?? "",
-                    remoteIP: HostCanonicalizer.address(attempt.destination) ?? ""
-                ) || (!attempt.agentKey.isEmpty && focusScope.bundleIDs.contains(attempt.agentKey))
-            }
-            let searchedEnforcement = query.isEmpty ? focusedEnforcement : focusedEnforcement.filter { attempt in
-                attempt.appName.lowercased().contains(query)
-                    || attempt.bundleID.lowercased().contains(query)
-                    || attempt.agentName.lowercased().contains(query)
-                    || attempt.agentKey.lowercased().contains(query)
-                    || attempt.destination.lowercased().contains(query)
-                    || attempt.category.lowercased().contains(query)
-                    || attempt.source.lowercased().contains(query)
-            }
+            let visibleRows = VisualizeEvidenceScope.rows(
+                source,
+                query: query,
+                focus: focusScope
+            )
+            let visibleEnforcement = VisualizeEvidenceScope.blockedAttempts(
+                enforcement,
+                query: query,
+                focus: focusScope
+            )
             switch mode {
             case .traffic:
-                return TrafficGraphBuilder.build(rows: searched, blockedAttempts: searchedEnforcement)
+                return TrafficGraphBuilder.buildForPresentation(
+                    rows: visibleRows,
+                    blockedAttempts: visibleEnforcement
+                )
             case .ai:
-                let visible = searched.filter {
-                    focusScope.isEmpty || focusScope.matches(bundleID: $0.bundleID,
-                                                              domain: $0.domain,
-                                                              remoteIP: $0.remoteIP)
-                        || (!$0.parentAgent.isEmpty && focusScope.bundleIDs.contains($0.parentAgent))
-                }
                 let resolvedGateways = gateways.map { gateway in
                     (
                         gateway,
@@ -380,10 +467,10 @@ struct VisualizeView: View {
                         focus: focusScope
                     )
                 }
-                return AITrafficGraphBuilder.build(
+                return AITrafficGraphBuilder.buildForPresentation(
                     rows: source,
-                    visibleRows: visible,
-                    blockedAttempts: searchedEnforcement,
+                    visibleRows: visibleRows,
+                    blockedAttempts: visibleEnforcement,
                     gateways: scopedGateways.map(\.0),
                     resolveGateway: { endpoint in
                         scopedGateways.first { $0.0.endpoint == endpoint }?.1
@@ -392,7 +479,17 @@ struct VisualizeView: View {
             }
         }.value
         guard !Task.isCancelled else { return }
-        snapshot = built
+        completeSnapshot = built.complete
+        mapSnapshot = built.map
+        let selectionSnapshot = presentation == .map ? built.map : built.complete
+        let visibleEdgeIDs = Set(selectionSnapshot.edges.map(\.id))
+        let visibleNodeIDs = Set(selectionSnapshot.nodes.map(\.id))
+        if let selectedEdge, !visibleEdgeIDs.contains(selectedEdge) { self.selectedEdge = nil }
+        if let selectedNode, !visibleNodeIDs.contains(selectedNode) { self.selectedNode = nil }
+        listVisibleCount = TrafficGraphListPager.clampedVisibleCount(
+            current: listVisibleCount,
+            in: built.complete
+        )
     }
 
     private struct LoadKey: Equatable {
@@ -408,6 +505,7 @@ struct VisualizeView: View {
         var loadID: UUID
         var query: String
         var mode: Mode
+        var focus: FocusScope
         var gatewayVersion: String
     }
 }
@@ -438,7 +536,7 @@ private struct TrafficGraphCanvas: View {
             let graphBounds = CGRect(origin: .zero, size: graphSize)
             let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: graphBounds,
                                                     preserving: cachedLayout.nodeFrames.isEmpty ? nil : cachedLayout)
-            let layoutKey = LayoutKey(snapshot: snapshot, size: graphSize)
+            let layoutKey = TrafficGraphLayoutKey(snapshot: snapshot, size: graphSize)
             ZStack(alignment: .topLeading) {
                 Color.clear
                 graphContent(layout, size: graphSize)
@@ -695,20 +793,6 @@ private struct TrafficGraphCanvas: View {
             path.closeSubpath()
         }
     }
-
-    private struct LayoutKey: Equatable {
-        var nodeIDs: [TrafficGraphNodeID]
-        var edgeIDs: [TrafficGraphEdgeID]
-        var width: Int
-        var height: Int
-
-        init(snapshot: TrafficGraphSnapshot, size: CGSize) {
-            nodeIDs = snapshot.nodes.map(\.id)
-            edgeIDs = snapshot.edges.map(\.id)
-            width = Int(size.width.rounded())
-            height = Int(size.height.rounded())
-        }
-    }
 }
 
 private struct TrafficGraphNodeView: View {
@@ -857,7 +941,11 @@ private struct TrafficGraphInspector: View {
                 metrics(node.counters)
             }
             Divider()
-            if node.kind == .launcher || node.kind == .proxy || node.counters.isEmpty {
+            if !node.isFilterExact {
+                Text(L("Select a relationship for an exact Reports scope."))
+                    .font(.callout)
+                    .foregroundStyle(FL.muted)
+            } else if node.kind == .launcher || node.kind == .proxy || node.counters.isEmpty {
                 EmptyView()
             } else if !node.members.isEmpty && (node.filter.domainSuffix != nil || node.members.count > 1) {
                 if node.filter.domainSuffix != nil {
@@ -1083,6 +1171,7 @@ private struct TrafficGraphInspector: View {
 private struct TrafficGraphList: View {
     var snapshot: TrafficGraphSnapshot
     var mode: VisualizeView.Mode
+    @Binding var visibleCount: Int
     @Binding var selectedEdge: TrafficGraphEdgeID?
     @Binding var selectedNode: TrafficGraphNodeID?
 
@@ -1095,6 +1184,10 @@ private struct TrafficGraphList: View {
         GridItem(.flexible(minimum: 105), alignment: .leading)
     ]
 
+    private var page: TrafficGraphListPage {
+        TrafficGraphListPager.page(in: snapshot, visibleCount: visibleCount)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             LazyVGrid(columns: columns, spacing: Spacing.s) {
@@ -1105,8 +1198,28 @@ private struct TrafficGraphList: View {
             Divider()
             ScrollView {
                 LazyVStack(spacing: 3) {
-                    ForEach(snapshot.edges) { edge in
+                    ForEach(page.edges) { edge in
                         row(edge)
+                    }
+                    ForEach(page.roleItems) { item in
+                        roleRow(item)
+                    }
+                    if page.hasMore {
+                        VStack(spacing: Spacing.s) {
+                            Text(L("Showing %lld of %lld relationships", page.shownCount, page.totalCount))
+                                .font(.caption)
+                                .foregroundStyle(FL.muted)
+                            Button(L("Show %lld more relationships", min(TrafficGraphListPager.pageSize,
+                                                                         page.remainingCount))) {
+                                visibleCount = TrafficGraphListPager.nextVisibleCount(
+                                    current: page.shownCount,
+                                    total: page.totalCount
+                                )
+                            }
+                            .buttonStyle(.link)
+                            .accessibilityHint(L("Loads the next page without changing the Map"))
+                        }
+                        .padding(.vertical, Spacing.m)
                     }
                 }
                 .padding(.vertical, 3)
@@ -1118,6 +1231,39 @@ private struct TrafficGraphList: View {
 
     private func header(_ title: String) -> some View {
         Text(title).font(.caption.bold()).foregroundStyle(FL.muted)
+    }
+
+    private func roleRow(_ item: TrafficGraphRoleListItem) -> some View {
+        Button {
+            selectedNode = item.node.id
+            selectedEdge = nil
+        } label: {
+            LazyVGrid(columns: columns, spacing: Spacing.s) {
+                Text(item.node.title)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.evidence.detail)
+                    if let endpoint = item.evidence.configuration?.endpoint, !endpoint.isEmpty {
+                        Text(endpoint).font(.caption2).foregroundStyle(FL.muted)
+                    }
+                }
+                Text("—")
+                Text("—")
+                Text("—")
+                Text(L("Relationship evidence"))
+                    .foregroundStyle(FL.muted)
+            }
+            .font(.caption)
+            .foregroundStyle(FL.ink)
+            .padding(.horizontal, Spacing.m)
+            .padding(.vertical, Spacing.s)
+            .background(
+                selectedNode == item.node.id ? FL.accent.opacity(0.12) : FL.surfaceDeep,
+                in: RoundedRectangle(cornerRadius: Radius.chip)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(item.node.title), \(item.evidence.detail), \(L("Relationship evidence"))")
     }
 
     private func row(_ edge: TrafficGraphEdge) -> some View {

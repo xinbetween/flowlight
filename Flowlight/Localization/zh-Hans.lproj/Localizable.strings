@@ -1803,8 +1803,13 @@
 "Traffic map" = "流量地图";
 "All applications" = "所有应用";
 "Observed connections during %@" = "%@期间观察到的连接";
-"%lld quieter connections hidden" = "已隐藏 %lld 个活动较少的连接";
-"The map stays readable by showing the busiest relationships. The list uses the same bounded selection." = "地图仅显示最活跃的关系以保持清晰。列表使用相同的有界选择。";
+"%lld relationships omitted from Map" = "地图中省略了 %lld 个关系";
+"The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope." = "地图通过显示有界投影保持清晰。列表会保留此搜索和专注范围内的每个关系。";
+"%lld nodes and %lld relationships omitted from Map" = "地图中省略了 %lld 个节点和 %lld 个关系";
+"Showing %lld of %lld relationships" = "正在显示 %2$lld 个关系中的 %1$lld 个";
+"Show %lld more relationships" = "再显示 %lld 个关系";
+"Loads the next page without changing the Map" = "加载下一页而不更改地图";
+"Select a relationship for an exact Reports scope." = "请选择一个关系以获得精确的报告范围。";
 "Period" = "时间段";
 "No traffic to visualize" = "没有可视化的流量";
 "Flowlight has not observed any connections in this period." = "Flowlight 在此时间段内未观察到任何连接。";

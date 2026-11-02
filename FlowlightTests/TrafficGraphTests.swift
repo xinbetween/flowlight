@@ -1827,31 +1827,518 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 8)
     }
 
-    func testFlowlightApplicationAndRouteRelayRemainDistinct() throws {
+    func testFlowlightApplicationAndObservedRouteCoalesceWithoutLosingEvidence() throws {
         let own = row(app: "com.flowlight.app", name: "Flowlight", domain: "updates.example",
                       ip: "203.0.113.10", bytesIn: 25)
         var routed = row(app: "claude", name: "Claude Code", domain: "api.anthropic.com",
                          ip: "203.0.113.11", bytesOut: 75)
         routed.routeProxyBundleID = "com.flowlight.app"
         routed.routeProxyName = "Flowlight"
+        let direct = row(app: "claude", name: "Claude Code", domain: "direct.example",
+                         ip: "203.0.113.12", bytesOut: 1_000)
 
-        let snapshot = TrafficGraphBuilder.build(rows: [own, routed], limits: .unbounded)
-        let app = try XCTUnwrap(snapshot.nodes.first {
-            $0.kind == .app && $0.filter.bundleID == "com.flowlight.app"
+        let snapshot = TrafficGraphBuilder.build(rows: [own, routed, direct], limits: .unbounded)
+        let flowlightNodes = snapshot.nodes.filter {
+            [.app, .proxy].contains($0.kind)
+                && ($0.filter.bundleID == "com.flowlight.app"
+                    || $0.filter.bundleIDs.contains("com.flowlight.app"))
+        }
+        let flowlight = try XCTUnwrap(flowlightNodes.first)
+        let route = try XCTUnwrap(snapshot.edges.first {
+            $0.relationship == .routedThrough && $0.target == flowlight.id
         })
-        let relay = try XCTUnwrap(snapshot.nodes.first { $0.kind == .proxy && $0.title == "Flowlight" })
-        let route = try XCTUnwrap(snapshot.edges.first { $0.relationship == .routedThrough })
-        let routedTraffic = try XCTUnwrap(snapshot.edges.first {
-            $0.relationship == .observed && $0.source == relay.id
-        })
+        let observed = snapshot.edges.filter {
+            $0.relationship == .observed && $0.source == flowlight.id
+        }
+        let page = TrafficGraphListPager.page(in: snapshot, visibleCount: 25)
 
-        XCTAssertNotEqual(app.id, relay.id)
-        XCTAssertEqual(app.counters.bytesIn, 25)
-        XCTAssertEqual(relay.counters.bytesOut, 75)
+        XCTAssertEqual(flowlightNodes.count, 1)
+        XCTAssertEqual(flowlight.kind, .app)
+        XCTAssertEqual(flowlight.counters.bytesIn, 25)
+        XCTAssertEqual(flowlight.counters.bytesOut, 75)
+        XCTAssertEqual(flowlight.filter.bundleID, "com.flowlight.app")
+        XCTAssertFalse(flowlight.isFilterExact)
+        XCTAssertTrue(flowlight.roleEvidence.contains { $0.relationship == .routedThrough })
+        XCTAssertFalse(page.roleItems.contains { $0.evidence.relationship == .routedThrough })
+        XCTAssertEqual(page.edges.filter { $0.relationship == .routedThrough }.count, 1)
+        XCTAssertEqual(route.counters.total, 0)
         XCTAssertEqual(route.displayedCounters.bytesOut, 75)
-        XCTAssertEqual(routedTraffic.counters.bytesOut, 75)
-        XCTAssertEqual(snapshot.total.total, 100)
-        XCTAssertEqual(snapshot.visibleTotal.total, 100)
+        XCTAssertEqual(observed.count, 2)
+        XCTAssertEqual(Set(observed.flatMap(\.members).compactMap(\.filter.bundleID)),
+                       ["com.flowlight.app", "claude"])
+        XCTAssertFalse(snapshot.edges.contains { $0.source == $0.target })
+        XCTAssertEqual(Set(snapshot.nodes.map(\.id)).count, snapshot.nodes.count)
+        XCTAssertEqual(snapshot.total.total, 1_100)
+        XCTAssertEqual(snapshot.visibleTotal.total, 1_100)
+    }
+
+    func testAIPresentationBuildRetainsDomainsBeyondMapCaps() {
+        let rows = (0..<35).map { index in
+            row(
+                app: "claude",
+                name: "Claude Code",
+                domain: "quiet\(index).example",
+                ip: "192.0.2.\(index)",
+                bytesOut: Int64(35 - index),
+                flows: 1
+            )
+        }
+
+        let build = AITrafficGraphBuilder.buildForPresentation(rows: rows)
+        let completeNodeIDs = Set(build.complete.nodes.map(\.id))
+        let completeEdgeIDs = Set(build.complete.edges.map(\.id))
+
+        XCTAssertEqual(build.complete.edges.filter { $0.relationship == .observed }.count, 35)
+        XCTAssertEqual(build.complete.nodes.filter { $0.kind == .destination }.count, 35)
+        XCTAssertEqual(build.complete.hidden, .none)
+        XCTAssertEqual(build.map.nodes.filter { $0.kind == .destination }.count,
+                       AITrafficGraphLimits.standard.maxDestinations)
+        XCTAssertEqual(build.map.nodes.first { $0.kind == .agent }?.counters.total,
+                       build.map.visibleTotal.total)
+        XCTAssertTrue(Set(build.map.nodes.map(\.id)).isSubset(of: completeNodeIDs))
+        XCTAssertTrue(Set(build.map.edges.map(\.id)).isSubset(of: completeEdgeIDs))
+        XCTAssertEqual(build.map.hidden.nodeCount, build.complete.nodes.count - build.map.nodes.count)
+        XCTAssertEqual(build.map.hidden.edgeCount, build.complete.edges.count - build.map.edges.count)
+        XCTAssertEqual(build.map.visibleTotal.total + build.map.hidden.counters.total, build.complete.total.total)
+    }
+
+    func testAISearchFindsQuietDomainOmittedFromMap() {
+        let rows = (0..<11).map { index in
+            row(
+                app: "claude",
+                name: "Claude Code",
+                domain: "quiet\(index).example",
+                ip: "192.0.2.\(index)",
+                bytesOut: Int64(11 - index),
+                flows: 1
+            )
+        }
+        let full = AITrafficGraphBuilder.buildForPresentation(rows: rows)
+        let quietRows = VisualizeEvidenceScope.rows(
+            rows,
+            query: "quiet10.example",
+            focus: .none
+        )
+        let searched = AITrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            visibleRows: quietRows
+        )
+
+        XCTAssertEqual(full.complete.edges.filter { $0.relationship == .observed }.count, 11)
+        XCTAssertEqual(full.map.edges.filter { $0.relationship == .observed }.count, 10)
+        XCTAssertEqual(quietRows.count, 1)
+        XCTAssertEqual(searched.complete.edges.filter { $0.relationship == .observed }.count, 1)
+        XCTAssertTrue(searched.complete.nodes.contains { $0.title == "quiet10.example" })
+    }
+
+    func testAIListRetainsTwentyNinthRelationshipAndFocusCanIsolateIt() {
+        let rows = (0..<29).map { index in
+            row(
+                app: "claude",
+                name: "Claude Code",
+                domain: "focus\(index).example",
+                ip: "198.51.100.\(index)",
+                bytesIn: Int64(29 - index),
+                flows: 1
+            )
+        }
+        let limits = AITrafficGraphLimits(
+            maxAgents: 1,
+            maxTools: 0,
+            maxDestinations: 29,
+            maxObservedEdges: 28,
+            maxLaunchers: 0,
+            maxBlockedEdges: 0
+        )
+        let full = AITrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: limits)
+        let page = TrafficGraphListPager.page(in: full.complete, visibleCount: 50)
+        let focusedRows = VisualizeEvidenceScope.rows(
+            rows,
+            query: "",
+            focus: FocusScope(hosts: ["focus28.example"])
+        )
+        let focused = AITrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            visibleRows: focusedRows,
+            mapLimits: limits
+        )
+
+        XCTAssertEqual(full.complete.edges.filter { $0.relationship == .observed }.count, 29)
+        XCTAssertEqual(page.edges.filter { $0.relationship == .observed }.count, 29)
+        XCTAssertEqual(full.map.edges.filter { $0.relationship == .observed }.count, 28)
+        XCTAssertEqual(full.map.hidden.edgeCount, 1)
+        XCTAssertEqual(full.map.hidden.counters.bytesIn, 1)
+        XCTAssertEqual(focusedRows.count, 1)
+        XCTAssertEqual(focused.complete.edges.filter { $0.relationship == .observed }.count, 1)
+        XCTAssertTrue(focused.complete.nodes.contains { $0.title == "focus28.example" })
+    }
+
+    func testRouteProxyFocusRetainsTrafficOwnedByAnotherApplication() {
+        let routed = row(
+            app: "claude",
+            name: "Claude Code",
+            domain: "api.anthropic.com",
+            ip: "192.0.2.1",
+            bytesOut: 10,
+            flows: 1,
+            relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app")
+        )
+
+        let focused = VisualizeEvidenceScope.rows(
+            [routed],
+            query: "",
+            focus: FocusScope(bundleIDs: ["com.flowlight.app"])
+        )
+
+        XCTAssertEqual(focused.count, 1)
+        XCTAssertEqual(focused.first?.bundleID, "claude")
+        XCTAssertEqual(focused.first?.routeProxyBundleID, "com.flowlight.app")
+    }
+
+    func testConfiguredOnlyCoalescedGatewayRemainsInMapAndList() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "localhost", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "claude",
+            name: "Claude Code",
+            path: "/Applications/Claude Code.app"
+        )
+
+        let build = AITrafficGraphBuilder.buildForPresentation(
+            rows: [],
+            gateways: [gateway],
+            resolveGateway: { _ in identity }
+        )
+        let node = try XCTUnwrap(build.complete.nodes.first)
+        let page = TrafficGraphListPager.page(in: build.complete, visibleCount: 25)
+
+        XCTAssertTrue(build.complete.edges.isEmpty)
+        XCTAssertTrue(node.roleEvidence.contains { $0.relationship == .configuredGateway })
+        XCTAssertEqual(build.map.nodes.map(\.id), [node.id])
+        XCTAssertEqual(page.roleItems.count, 1)
+        XCTAssertEqual(page.roleItems.first?.evidence.relationship, .configuredGateway)
+        XCTAssertEqual(page.totalCount, 1)
+        XCTAssertEqual(TrafficGraphListPager.totalCount(in: build.complete), 1)
+        XCTAssertEqual(
+            TrafficGraphListPager.clampedVisibleCount(current: 25, in: build.complete),
+            1,
+            "role-only relationships must be visible on the initial List page"
+        )
+    }
+
+    func testCoalescedRouteRespectsApplicationAndRelayCaps() {
+        let own = row(
+            app: "com.flowlight.app",
+            name: "Flowlight",
+            domain: "updates.example",
+            ip: "192.0.2.10",
+            bytesIn: 25,
+            flows: 1
+        )
+        let routed = row(
+            app: "claude",
+            name: "Claude Code",
+            domain: "api.anthropic.com",
+            ip: "192.0.2.11",
+            bytesOut: 75,
+            flows: 1,
+            relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app")
+        )
+        let limits = TrafficGraphLimits(
+            maxApps: 1,
+            maxDestinations: 2,
+            maxEdges: 2,
+            maxBlockedEdges: 0,
+            maxRelays: 0
+        )
+
+        let build = TrafficGraphBuilder.buildForPresentation(rows: [own, routed], mapLimits: limits)
+
+        XCTAssertEqual(build.map.nodes.filter { $0.kind == .app }.count, 1)
+        XCTAssertEqual(build.map.edges.filter { $0.relationship == .observed }.count, 1)
+        XCTAssertFalse(build.map.edges.contains { edge in
+            edge.members.contains { $0.filter.bundleID == "claude" }
+        })
+    }
+
+    func testNodeOnlyMapOmissionRemainsDisclosed() {
+        let gateways = (0..<7).map { index in
+            AgentGatewayConfig(
+                agent: "configured.\(index)",
+                endpoint: .init(scheme: "http", host: "localhost", port: UInt16(3_400 + index)),
+                source: "settings.\(index)",
+                sourceKey: "gateway"
+            )
+        }
+        let build = AITrafficGraphBuilder.buildForPresentation(
+            rows: [],
+            gateways: gateways,
+            resolveGateway: { endpoint in
+                guard let index = gateways.firstIndex(where: { $0.endpoint == endpoint }) else { return nil }
+                return AgentGatewayIdentity(
+                    bundleID: "configured.\(index)",
+                    name: "Configured \(index)",
+                    path: ""
+                )
+            }
+        )
+
+        XCTAssertEqual(build.complete.nodes.count, 7)
+        XCTAssertEqual(build.map.nodes.count, 6)
+        XCTAssertEqual(build.map.hidden.nodeCount, 1)
+        XCTAssertEqual(build.map.hidden.edgeCount, 0)
+        XCTAssertTrue(build.map.hidden.hasOmissions)
+        XCTAssertEqual(
+            VisualizeOmissionLabel.text(for: build.map.hidden),
+            L("%lld nodes and %lld relationships omitted from Map", 1, 0)
+        )
+    }
+
+    func testMapDestinationCountersAndMembersExcludeOmittedRelationships() throws {
+        let rows = (0..<20).map { index in
+            row(
+                app: "app.\(index)",
+                domain: "shared.example",
+                ip: "203.0.113.10",
+                bytesIn: 1,
+                flows: 1
+            )
+        }
+        let limits = TrafficGraphLimits(
+            maxApps: 8,
+            maxDestinations: 1,
+            maxEdges: 20,
+            maxBlockedEdges: 0,
+            maxRelays: 0
+        )
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: limits)
+        let destination = try XCTUnwrap(build.map.nodes.first { $0.kind == .destination })
+
+        XCTAssertEqual(build.map.visibleTotal.bytesIn, 8)
+        XCTAssertEqual(destination.counters.bytesIn, build.map.visibleTotal.bytesIn)
+        XCTAssertEqual(destination.members.count, 8)
+        XCTAssertEqual(build.map.hidden.counters.bytesIn, 12)
+    }
+
+    func testSharedToolTrafficSurvivesMoreParentsThanAgentCap() {
+        let toolID = TrafficGraphNodeID(rawValue: "tool:shared")
+        let destinationID = TrafficGraphNodeID(rawValue: "destination:shared")
+        let agentIDs = (0..<7).map { TrafficGraphNodeID(rawValue: "agent:\($0)") }
+        let agents = agentIDs.enumerated().map { index, id in
+            TrafficGraphNode(
+                id: id,
+                kind: .agent,
+                title: "Agent \(index)",
+                detail: "agent.\(index)",
+                appPath: "",
+                filter: TrafficFilter(bundleID: "agent.\(index)"),
+                counters: FlowCounters(bytesOut: 1, flows: 1)
+            )
+        }
+        let tool = TrafficGraphNode(
+            id: toolID,
+            kind: .tool,
+            title: "Shared tool",
+            detail: "",
+            appPath: "",
+            filter: TrafficFilter(bundleID: "tool.shared"),
+            counters: FlowCounters(bytesOut: 7, flows: 7)
+        )
+        let destination = TrafficGraphNode(
+            id: destinationID,
+            kind: .destination,
+            title: "shared.example",
+            detail: "",
+            appPath: "",
+            filter: TrafficFilter(domain: "shared.example"),
+            counters: FlowCounters(bytesOut: 7, flows: 7)
+        )
+        let members = agentIDs.enumerated().map { index, _ in
+            TrafficGraphMember(
+                id: "member.\(index)",
+                title: "shared.example",
+                detail: "",
+                filter: TrafficFilter(bundleID: "tool.shared", agentParent: "agent.\(index)"),
+                counters: FlowCounters(bytesOut: 1, flows: 1),
+                protocols: "https",
+                channel: .ip
+            )
+        }
+        let observed = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "tool→observed→destination"),
+            source: toolID,
+            target: destinationID,
+            counters: FlowCounters(bytesOut: 7, flows: 7),
+            filter: .none,
+            members: members
+        )
+        let runs = agentIDs.map { agentID in
+            TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: agentID.rawValue + "→runs→tool"),
+                source: agentID,
+                target: toolID,
+                counters: FlowCounters(),
+                filter: .none,
+                relationship: .runs
+            )
+        }
+        let complete = TrafficGraphSnapshot(
+            nodes: agents + [tool, destination],
+            edges: [observed] + runs,
+            total: observed.counters,
+            hidden: .none
+        )
+        let limits = AITrafficGraphLimits(
+            maxAgents: 6,
+            maxTools: 1,
+            maxDestinations: 1,
+            maxObservedEdges: 1,
+            maxLaunchers: 0,
+            maxBlockedEdges: 0
+        )
+
+        let map = TrafficGraphMapProjector.project(complete, limits: limits)
+
+        XCTAssertTrue(map.edges.contains { $0.id == observed.id })
+        XCTAssertEqual(map.edges.filter { $0.relationship == .runs }.count, 6)
+        XCTAssertEqual(map.nodes.filter { $0.kind == .agent }.count, 6)
+    }
+
+    func testMapPresentationClearsListOnlySelection() {
+        let visibleEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "visible"),
+            source: TrafficGraphNodeID(rawValue: "source"),
+            target: TrafficGraphNodeID(rawValue: "target"),
+            counters: FlowCounters(),
+            filter: .none
+        )
+        let map = TrafficGraphSnapshot(nodes: [], edges: [visibleEdge], total: FlowCounters(), hidden: .none)
+
+        XCTAssertTrue(VisualizeSelectionPolicy.mapOmitsSelection(
+            selectedNode: nil,
+            selectedEdge: TrafficGraphEdgeID(rawValue: "list-only"),
+            map: map
+        ))
+        XCTAssertFalse(VisualizeSelectionPolicy.mapOmitsSelection(
+            selectedNode: nil,
+            selectedEdge: visibleEdge.id,
+            map: map
+        ))
+    }
+
+    func testPresentationBuildKeepsEveryRelationshipBesideBoundedMap() {
+        let rows = (0..<35).map { index in
+            row(
+                app: "app.complete",
+                name: "Complete",
+                domain: "host\(index).example",
+                ip: "203.0.113.\(index)",
+                bytesIn: Int64(index + 1),
+                flows: 1
+            )
+        }
+        let limits = TrafficGraphLimits(
+            maxApps: 1,
+            maxDestinations: 10,
+            maxEdges: 28,
+            maxBlockedEdges: 0,
+            maxRelays: 0
+        )
+
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: limits)
+        let completeNodeIDs = Set(build.complete.nodes.map(\.id))
+        let completeEdgeIDs = Set(build.complete.edges.map(\.id))
+
+        XCTAssertEqual(build.complete.edges.filter { $0.relationship == .observed }.count, 35)
+        XCTAssertEqual(build.complete.hidden, .none)
+        XCTAssertEqual(build.map.edges.filter { $0.relationship == .observed }.count, 10)
+        XCTAssertTrue(Set(build.map.nodes.map(\.id)).isSubset(of: completeNodeIDs))
+        XCTAssertTrue(Set(build.map.edges.map(\.id)).isSubset(of: completeEdgeIDs))
+        XCTAssertEqual(build.map.hidden.nodeCount, build.complete.nodes.count - build.map.nodes.count)
+        XCTAssertEqual(build.map.hidden.edgeCount, build.complete.edges.count - build.map.edges.count)
+        XCTAssertEqual(build.map.visibleTotal.total + build.map.hidden.counters.total, build.complete.total.total)
+    }
+
+    func testListPagerRevealsCompleteRelationshipsTwentyFiveAtATime() {
+        let rows = (0..<61).map { index in
+            row(
+                app: "app.complete",
+                domain: "host\(index).example",
+                ip: "198.51.100.\(index)",
+                bytesOut: Int64(index + 1),
+                flows: 1
+            )
+        }
+        let complete = TrafficGraphBuilder.buildForPresentation(rows: rows).complete
+
+        let first = TrafficGraphListPager.page(in: complete, visibleCount: 25)
+        let second = TrafficGraphListPager.page(
+            in: complete,
+            visibleCount: TrafficGraphListPager.nextVisibleCount(
+                current: first.shownCount,
+                total: first.totalCount
+            )
+        )
+        let final = TrafficGraphListPager.page(
+            in: complete,
+            visibleCount: TrafficGraphListPager.nextVisibleCount(
+                current: second.shownCount,
+                total: second.totalCount
+            )
+        )
+
+        XCTAssertEqual(first.shownCount, 25)
+        XCTAssertEqual(first.remainingCount, 36)
+        XCTAssertEqual(second.shownCount, 50)
+        XCTAssertEqual(second.remainingCount, 11)
+        XCTAssertEqual(final.shownCount, 61)
+        XCTAssertEqual(final.remainingCount, 0)
+        XCTAssertEqual(Set(final.edges.map(\.id)).count, 61)
+        XCTAssertEqual(final.edges.map(\.id), complete.edges.map(\.id))
+    }
+
+    func testListExpansionDoesNotChangeMapIdentityOrGeometry() {
+        let rows = (0..<61).map { index in
+            row(
+                app: "app.complete",
+                domain: "stable\(index).example",
+                ip: "203.0.113.\(index)",
+                bytesOut: Int64(index + 1),
+                flows: 1
+            )
+        }
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows)
+        let size = CGSize(width: 1_200, height: 900)
+        let firstPage = TrafficGraphListPager.page(in: build.complete, visibleCount: 25)
+        let beforeKey = TrafficGraphLayoutKey(snapshot: build.map, size: size)
+        let beforeLayout = TrafficGraphLayout.layout(
+            snapshot: build.map,
+            in: CGRect(origin: .zero, size: size)
+        )
+        let secondPage = TrafficGraphListPager.page(
+            in: build.complete,
+            visibleCount: TrafficGraphListPager.nextVisibleCount(
+                current: firstPage.shownCount,
+                total: firstPage.totalCount
+            )
+        )
+        let afterKey = TrafficGraphLayoutKey(snapshot: build.map, size: size)
+        let afterLayout = TrafficGraphLayout.layout(
+            snapshot: build.map,
+            in: CGRect(origin: .zero, size: size)
+        )
+
+        XCTAssertEqual(firstPage.shownCount, 25)
+        XCTAssertEqual(secondPage.shownCount, 50)
+        XCTAssertEqual(beforeKey, afterKey)
+        XCTAssertEqual(build.map.nodes.map(\.id), beforeKey.nodeIDs)
+        XCTAssertEqual(build.map.edges.map(\.id), beforeKey.edgeIDs)
+        XCTAssertEqual(beforeLayout.nodeFrames, afterLayout.nodeFrames)
+        XCTAssertEqual(beforeLayout.edgeCurves, afterLayout.edgeCurves)
     }
 
     func testCapsAreDeterministicAndAccountForEverythingHidden() {

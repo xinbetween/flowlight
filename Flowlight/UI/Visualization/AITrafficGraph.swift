@@ -202,7 +202,10 @@ enum AITrafficGraphBuilder {
             uniqueKeysWithValues: included.map {
                 (
                     agentID($0.agent),
-                    canonicalApplicationIdentity(bundleID: $0.agent.bundleID, title: $0.metadata.name)
+                    TrafficGraphApplicationCoalescer.canonicalApplicationIdentity(
+                        bundleID: $0.agent.bundleID,
+                        title: $0.metadata.name
+                    )
                 )
             }
         )
@@ -708,7 +711,7 @@ enum AITrafficGraphBuilder {
         let visibleIDs = visibleAgents.union(visibleTools).union(visibleDestinations)
             .union(visibleLaunchers).union(visibleRelays)
         let nodes = visibleIDs.compactMap { allNodes[$0] }.sorted { $0.id < $1.id }
-        let coalesced = coalesceApplicationNodes(nodes: nodes, edges: edges)
+        let coalesced = TrafficGraphApplicationCoalescer.coalesce(nodes: nodes, edges: edges)
         let visibleTotal = selectedObserved.reduce(into: FlowCounters()) { $0 += $1.1 }
         let allDestinationCount = Set(observedCounters.keys.map { destinationID($0.destination) })
             .union(blocked.keys.map { destinationID(blockedDestination($0)) }).count
@@ -730,9 +733,40 @@ enum AITrafficGraphBuilder {
                            - visibleIDs.count),
             edgeCount: max(0, observedCounters.count + blocked.count + lineageCount + allLauncherEdges
                            + allObservedRoutes + configuredGateways.count - edges.count),
-            counters: subtract(total, visibleTotal)
+            counters: total.subtractingFloorZero(visibleTotal)
         )
         return TrafficGraphSnapshot(nodes: coalesced.nodes, edges: coalesced.edges, total: total, hidden: hidden)
+    }
+
+    static func buildForPresentation<Rows: Sequence>(
+        rows sourceRows: Rows,
+        visibleRows: [BreakdownRow]? = nil,
+        blockedAttempts: [BlockedAttemptRow] = [],
+        gateways: [AgentGatewayConfig] = [],
+        resolveGateway: @Sendable (AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? = {
+            LocalGatewayResolver.resolve($0)
+        },
+        includeConfiguredOnlyAgents: Bool = true,
+        mapLimits: AITrafficGraphLimits = .standard
+    ) -> TrafficGraphBuild where Rows.Element == BreakdownRow {
+        let rows = Array(sourceRows)
+        var complete = build(
+            rows: rows,
+            visibleRows: visibleRows,
+            blockedAttempts: blockedAttempts,
+            gateways: gateways,
+            resolveGateway: resolveGateway,
+            includeConfiguredOnlyAgents: includeConfiguredOnlyAgents,
+            limits: .unbounded
+        )
+        complete.hidden = .none
+        guard mapLimits != .unbounded else {
+            return TrafficGraphBuild(complete: complete, map: complete)
+        }
+        return TrafficGraphBuild(
+            complete: complete,
+            map: TrafficGraphMapProjector.project(complete, limits: mapLimits)
+        )
     }
 
     private static func toolIdentity(_ row: BreakdownRow, agent: AgentIdentity) -> ToolIdentity? {
@@ -768,13 +802,16 @@ enum AITrafficGraphBuilder {
         return candidate.path < current.path
     }
 
-    private static func coalesceApplicationNodes(
+}
+
+enum TrafficGraphApplicationCoalescer {
+    static func coalesce(
         nodes: [TrafficGraphNode],
         edges: [TrafficGraphEdge]
     ) -> (nodes: [TrafficGraphNode], edges: [TrafficGraphEdge]) {
         let candidates = nodes.filter { node in
             switch node.kind {
-            case .agent, .tool, .launcher, .proxy: return node.filter.bundleID?.isEmpty == false
+            case .app, .agent, .tool, .launcher, .proxy: return node.filter.bundleID?.isEmpty == false
             default: return false
             }
         }
@@ -816,7 +853,10 @@ enum AITrafficGraphBuilder {
             let focusIncludesAttributedParents = duplicates.contains {
                 $0.filter.agentParent != nil || $0.filter.focusIncludesAttributedParents
             }
+            let duplicateRoleIDs = Set(duplicates.map(\.id))
+            let mergesAppAndRole = duplicates.contains { $0.kind == .app }
             var exactMembers: [String: TrafficGraphMember] = [:]
+            var applicationVisible = FlowCounters()
             for edge in edges where edge.relationship == .observed {
                 for member in edge.members {
                     let matchesApplication = normalizedBundleIDs.contains(
@@ -825,7 +865,11 @@ enum AITrafficGraphBuilder {
                     let matchesAttributedChild = includeAttributedChildren && normalizedBundleIDs.contains(
                         member.filter.agentParent?.lowercased() ?? ""
                     )
-                    guard matchesApplication || matchesAttributedChild else { continue }
+                    let belongsToMergedRole = mergesAppAndRole && duplicateRoleIDs.contains(edge.source)
+                    guard matchesApplication || matchesAttributedChild || belongsToMergedRole else { continue }
+                    if matchesApplication || matchesAttributedChild {
+                        applicationVisible += member.counters
+                    }
                     if var current = exactMembers[member.id] {
                         current.counters += member.counters
                         exactMembers[member.id] = current
@@ -834,7 +878,13 @@ enum AITrafficGraphBuilder {
                     }
                 }
             }
-            merged.counters = exactMembers.values.reduce(into: FlowCounters()) { $0 += $1.counters }
+            var mergedCounters = exactMembers.values.reduce(into: FlowCounters()) { $0 += $1.counters }
+            if survivor.kind == .app {
+                mergedCounters += survivor.counters.subtractingFloorZero(applicationVisible)
+            }
+            merged.counters = mergedCounters
+            let routedBundleIDs = Set(exactMembers.values.compactMap { $0.filter.bundleID })
+            merged.isFilterExact = !mergesAppAndRole || routedBundleIDs.isSubset(of: exactBundleIDs)
             merged.filter = exactBundleIDs.count == 1
                 ? TrafficFilter(
                     bundleID: exactBundleIDs.first,
@@ -868,6 +918,10 @@ enum AITrafficGraphBuilder {
                 mergedNodes.removeValue(forKey: node.id)
             }
             mergedNodes[survivor.id] = merged
+        }
+
+        guard !replacements.isEmpty else {
+            return (nodes.sorted { $0.id < $1.id }, edges.sorted { $0.id < $1.id })
         }
 
         struct EdgeKey: Hashable {
@@ -955,7 +1009,7 @@ enum AITrafficGraphBuilder {
         }
     }
 
-    private static func canonicalApplicationIdentity(bundleID: String, title: String) -> String {
+    static func canonicalApplicationIdentity(bundleID: String, title: String) -> String {
         if let known = AgentCatalog.knownAgent(bundleID: bundleID, appName: title) {
             return "known:" + known.name.lowercased()
         }
@@ -977,11 +1031,12 @@ enum AITrafficGraphBuilder {
     ) -> Bool {
         func priority(_ kind: TrafficGraphNode.Kind) -> Int {
             switch kind {
-            case .agent: return 0
-            case .tool: return 1
-            case .proxy: return 2
-            case .launcher: return 3
-            default: return 4
+            case .app: return 0
+            case .agent: return 1
+            case .tool: return 2
+            case .proxy: return 3
+            case .launcher: return 4
+            default: return 5
             }
         }
         let leftIsConfigured = configuredAgentIDs.contains(left.id)
@@ -994,6 +1049,12 @@ enum AITrafficGraphBuilder {
         return left.id < right.id
     }
 
+    private static func component(_ value: String) -> String {
+        "\(value.utf8.count):\(value)"
+    }
+}
+
+extension AITrafficGraphBuilder {
     private static func gatewayMatches(_ config: AgentGatewayConfig, candidate: AgentIdentity,
                                        rows: [BreakdownRow]) -> Bool {
         let key = config.agent.lowercased()
@@ -1135,10 +1196,4 @@ enum AITrafficGraphBuilder {
     }
 
     private static func component(_ value: String) -> String { "\(value.utf8.count):\(value)" }
-
-    private static func subtract(_ lhs: FlowCounters, _ rhs: FlowCounters) -> FlowCounters {
-        FlowCounters(bytesIn: max(0, lhs.bytesIn - rhs.bytesIn),
-                     bytesOut: max(0, lhs.bytesOut - rhs.bytesOut),
-                     flows: max(0, lhs.flows - rhs.flows))
-    }
 }
