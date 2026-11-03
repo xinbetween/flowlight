@@ -70,9 +70,7 @@ enum TreeLevel {
             let detail = row.parentAgentName.isEmpty ? ""
                 : row.mcpServer.isEmpty ? L("via %@", row.parentAgentName) : "\(row.mcpServer) MCP · \(row.parentAgentName)"
             return Key(id: "a:" + row.bundleID, title: row.appName.isEmpty ? row.bundleID : row.appName, detail: detail, kind: .app) {
-                $0.bundleID = row.bundleID
-                $0.bundleIDs = []
-                $0.includeAttributedChildren = false
+                $0.narrowToApp(row.bundleID)
             }
         case .hostname:
             if !row.domain.isEmpty {
@@ -173,9 +171,7 @@ struct TrafficNode: Identifiable, Hashable {
 
     private static func appFilter(_ bundleID: String, base: TrafficFilter) -> TrafficFilter {
         var filter = base
-        filter.bundleID = bundleID
-        filter.bundleIDs = []
-        filter.includeAttributedChildren = false
+        filter.narrowToApp(bundleID)
         return filter
     }
 

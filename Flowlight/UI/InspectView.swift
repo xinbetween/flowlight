@@ -10,30 +10,46 @@ struct InspectView: View {
 }
 
 enum InspectLinkQuery {
-    static func needsSupportingRows(search: String, app: String?, includeAttributedChildren: Bool,
+    static func needsSupportingRows(search: String, app: String?, apps: [String] = [],
+                                    includeAttributedChildren: Bool,
                                     agentParent: String?, mcpServer: String?) -> Bool {
         if !search.isEmpty { return true }
         if agentParent?.isEmpty == false { return true }
-        return app?.isEmpty == false && (includeAttributedChildren || mcpServer?.isEmpty == false)
+        return (app?.isEmpty == false || !apps.isEmpty)
+            && (includeAttributedChildren || mcpServer?.isEmpty == false)
     }
 
     static func load(from database: TrafficDatabase, since: Date, focus: FocusScope,
-                     app: String?, host: String?, hostIncludesSubdomains: Bool = true,
+                     app: String?, apps: [String] = [], host: String?, hostIncludesSubdomains: Bool = true,
                      includeAttributedChildren: Bool, agentParent: String?,
                      mcpServer: String?) throws -> [HTTPExchange] {
         let visible = try database.exchanges(
-            since: since, focus: focus, app: app, host: host,
+            since: since, focus: focus, app: app, apps: apps, host: host,
             hostIncludesSubdomains: hostIncludesSubdomains,
             includeAttributedChildren: includeAttributedChildren,
             agentParent: agentParent, mcpServer: mcpServer
         )
-        guard let root = agentParent ?? ((includeAttributedChildren || mcpServer != nil) ? app : nil),
-              !root.isEmpty else { return visible }
-        // A child request's initiating tool call is recorded on the root agent's LLM exchange, which naturally has
+        let roots: [String]
+        if let agentParent, !agentParent.isEmpty {
+            roots = [agentParent]
+        } else if includeAttributedChildren || mcpServer != nil {
+            roots = ([app].compactMap { $0 } + apps).filter { !$0.isEmpty }
+        } else {
+            roots = []
+        }
+        guard !roots.isEmpty else { return visible }
+
+        // A child request's initiating tool call is recorded on a root agent's LLM exchange, which naturally has
         // a different app, host and MCP scope. These rows support linking only; `exchanges` remains the visible list.
-        let supporting = try database.exchanges(since: since, app: root)
-        let visibleIDs = Set(visible.compactMap(\.id))
-        return visible + supporting.filter { $0.id.map { !visibleIDs.contains($0) } ?? true }
+        var linked = visible
+        var includedIDs = Set(visible.compactMap(\.id))
+        for root in Set(roots).sorted() {
+            for exchange in try database.exchanges(since: since, app: root) {
+                if let id = exchange.id, !includedIDs.insert(id).inserted { continue }
+                linked.append(exchange)
+            }
+        }
+        return linked
     }
 }
 
@@ -61,6 +77,8 @@ private struct InspectContent: View {
     /// Scoped to one app or one destination, arrived at from a row elsewhere. Shown as a chip beside the list so
     /// it is as visible and as removable as a search term, which is what the search field was chosen for.
     @State private var scopeApp: (id: String, name: String)?
+    @State private var scopeAppIDs: [String] = []
+    @State private var scopeAppName: String?
     @State private var scopeHost: String?
     @State private var scopeHostIncludesSubdomains = true
     @State private var scopeIncludesChildren = false
@@ -138,6 +156,8 @@ private struct InspectContent: View {
             guard let request = nav.inspectRequest else { return }
             search = request.search
             scopeApp = request.appID.map { (id: $0, name: request.appName ?? $0) }
+            scopeAppIDs = request.appIDs
+            scopeAppName = request.appName ?? (request.appIDs.isEmpty ? nil : request.appIDs.joined(separator: ", "))
             scopeHost = request.host
             scopeHostIncludesSubdomains = request.hostIncludesSubdomains
             scopeIncludesChildren = request.includeAttributedChildren
@@ -168,8 +188,8 @@ private struct InspectContent: View {
         }
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
                           search: search, window: window, enabled: inspection.enabled,
-                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id, host: scopeHost,
-                          hostIncludesSubdomains: scopeHostIncludesSubdomains,
+                          potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id,
+                          apps: scopeAppIDs, host: scopeHost, hostIncludesSubdomains: scopeHostIncludesSubdomains,
                           includeChildren: scopeIncludesChildren, parent: scopeAgentParent, mcp: scopeMCPServer)) {
             // Coalesce bursts of new exchanges.
             try? await Task.sleep(for: .milliseconds(300))
@@ -179,7 +199,7 @@ private struct InspectContent: View {
 
     private struct LoadKey: Equatable {
         var version: Int; var localRiskVersion: Int; var pluginVersion: Int; var search: String; var window: AgentWindow; var enabled: Bool
-        var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var host: String?
+        var potentialHarmOnly: Bool; var focus: FocusScope; var app: String?; var apps: [String]; var host: String?
         var hostIncludesSubdomains: Bool; var includeChildren: Bool; var parent: String?; var mcp: String?
     }
 
@@ -258,11 +278,12 @@ private struct InspectContent: View {
 
     private func load() async {
         let since = Date().addingTimeInterval(-window.interval), term = search, scope = focus.scope
-        let app = scopeApp?.id, host = scopeHost, hostIncludesSubdomains = scopeHostIncludesSubdomains
+        let app = scopeApp?.id, apps = scopeAppIDs
+        let host = scopeHost, hostIncludesSubdomains = scopeHostIncludesSubdomains
         let includeChildren = scopeIncludesChildren
         let parent = scopeAgentParent, mcp = scopeMCPServer
         let loaded = (try? await monitor.read {
-            try $0.exchanges(since: since, search: term, focus: scope, app: app, host: host,
+            try $0.exchanges(since: since, search: term, focus: scope, app: app, apps: apps, host: host,
                              hostIncludesSubdomains: hostIncludesSubdomains,
                              includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp)
         }) ?? []
@@ -284,11 +305,11 @@ private struct InspectContent: View {
         // Drop only the text term for causal linking. Exact visible rows stay on screen, while an attributed child
         // also receives its root agent's private supporting exchanges even when navigation supplied no search text.
         let needsSupport = InspectLinkQuery.needsSupportingRows(
-            search: term, app: app, includeAttributedChildren: includeChildren,
+            search: term, app: app, apps: apps, includeAttributedChildren: includeChildren,
             agentParent: parent, mcpServer: mcp
         )
         let all = needsSupport ? ((try? await monitor.read {
-            try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, host: host,
+            try InspectLinkQuery.load(from: $0, since: since, focus: scope, app: app, apps: apps, host: host,
                                       hostIncludesSubdomains: hostIncludesSubdomains,
                                       includeAttributedChildren: includeChildren,
                                       agentParent: parent, mcpServer: mcp)
@@ -347,17 +368,19 @@ private struct InspectContent: View {
     /// The scope arrived at from another screen, shown so it can be seen and dropped. Without it a filtered list
     /// is indistinguishable from a quiet one, which is the way this feature first went wrong.
     @ViewBuilder private var scopeChip: some View {
-        if scopeApp != nil || scopeHost != nil || potentialHarmOnly {
+        if scopeApp != nil || !scopeAppIDs.isEmpty || scopeHost != nil || potentialHarmOnly {
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal.decrease.circle.fill").foregroundStyle(.tint)
                 Text(InspectScopeSummary.text(
-                    appName: scopeApp?.name,
+                    appName: scopeApp?.name ?? scopeAppName,
                     host: scopeHost,
                     potentialHarmOnly: potentialHarmOnly
                 ))
                 .font(.callout)
                 Button {
                     scopeApp = nil
+                    scopeAppIDs = []
+                    scopeAppName = nil
                     scopeHost = nil
                     scopeHostIncludesSubdomains = true
                     scopeIncludesChildren = false

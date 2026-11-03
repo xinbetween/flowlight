@@ -106,8 +106,7 @@ struct InsightEntity: Hashable, Sendable, Identifiable {
         var f = filter
         switch kind {
         case .app:
-            f.bundleID = key
-            f.bundleIDs = []
+            f.narrowToApp(key)
         case .domain: f.domainSuffix = label; f.domain = nil; f.owner = nil
         case .owner: f.owner = label; f.domain = ""; f.domainSuffix = nil
         case .ip: f.remoteIP = key

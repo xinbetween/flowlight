@@ -88,6 +88,12 @@ camera_description=$(/usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription
   fail "Store app has no camera activity usage description"
 [ -n "$camera_description" ] || fail "Store app has an empty camera activity usage description"
 
+# Flowlight uses Apple's TLS APIs and does not ship custom cryptography. Declaring that in the built product keeps
+# export-compliance handling deterministic instead of leaving each upload to an avoidable App Store Connect prompt.
+uses_non_exempt_encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' \
+  "$contents/Info.plist" 2>/dev/null) || fail "Store app does not declare export-compliance encryption usage"
+[ "$uses_non_exempt_encryption" = false ] || fail "Store app declares non-exempt encryption"
+
 ruby -ryaml -e '
   project = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
   expected = {

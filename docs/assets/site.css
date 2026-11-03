@@ -223,6 +223,10 @@
   .hero h1 .flow { color: var(--accent); }
   .hero .lede { margin-top: 20px; }
   .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
+  /* Official Apple artwork stays unmodified at its 40 px minimum screen height. The block margin supplies the
+     required quarter-height clear space without turning the badge into a restyled Flowlight button. */
+  .app-store-badge { display: inline-flex; flex: none; margin-block: 10px; }
+  .app-store-badge img { display: block; width: auto; height: 40px; }
   .cta-note { font-size: 13px; color: var(--faint); width: 100%; }
 
   .log { background: var(--log-bg); color: var(--log-ink); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden;
@@ -394,7 +398,8 @@
     .hero h1 { font-size: clamp(32px, 9vw, 46px); }
     .lede { font-size: 16.5px; }
     .cta { gap: 10px; margin-top: 24px; }
-    .cta .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+    .cta .app-store-badge { flex-basis: 100%; margin-bottom: 0; }
+    .cta .btn { flex: 1 1 100%; justify-content: center; min-height: 44px; }
     .brew { width: 100%; }
     /* A table this wide can only scroll; say so rather than letting it look cut off. */
     .table-wrap { position: relative; }

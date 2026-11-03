@@ -143,10 +143,49 @@ final class InsightsTests: XCTestCase {
         let domain = InsightEntity(key: "d:google.com", label: "google.com", kind: .domain)
         XCTAssertEqual(domain.narrowing(TrafficFilter(bundleID: "x"))?.domainSuffix, "google.com")
         XCTAssertEqual(domain.narrowing(TrafficFilter(bundleID: "x"))?.bundleID, "x")
+        let app = InsightEntity(key: "node", label: "Node", kind: .app).narrowing(
+            TrafficFilter(bundleID: "claude", includeAttributedChildren: true)
+        )
+        XCTAssertEqual(app?.bundleID, "node")
+        XCTAssertFalse(app?.includeAttributedChildren ?? true,
+                       "narrowing to one app must not keep the previous agent's child-process scope")
         let owner = InsightEntity(key: "o:Cloudflare", label: "Cloudflare", kind: .owner).narrowing(.none)
         XCTAssertEqual(owner?.owner, "Cloudflare")
         XCTAssertEqual(owner?.domain, "", "owners describe hostname-less traffic")
         XCTAssertNil(InsightEntity.other.narrowing(.none))
+    }
+
+    func testReportChartKeyboardSelectionMovesAcrossBuckets() {
+        let dates = [10.0, 20.0, 30.0].map(Date.init(timeIntervalSince1970:))
+
+        XCTAssertEqual(ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: dates), dates[0])
+        XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[0], direction: .right, dates: dates), dates[1])
+        XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[1], direction: .left, dates: dates), dates[0])
+        XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[0], direction: .left, dates: dates), dates[0])
+        XCTAssertNil(ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: []))
+    }
+
+    func testReportNavigationHistoryRestoresTheCompleteFilter() {
+        let filter = TrafficFilter(
+            bundleIDs: ["claude", "claude-code"],
+            includeAttributedChildren: true,
+            agentParent: "claude",
+            mcpServer: "github",
+            domain: "api.github.com",
+            remoteIP: "203.0.113.9"
+        )
+        let state = ReportNavigationState(
+            granularity: .hour,
+            endDate: Date(timeIntervalSince1970: 42),
+            followNow: false,
+            filter: filter
+        )
+        var history = ReportNavigationHistory()
+
+        history.push(state)
+
+        XCTAssertEqual(history.pop(), state)
+        XCTAssertTrue(history.isEmpty)
     }
 
     func testSuffixAndProtocolFiltersInSQL() throws {

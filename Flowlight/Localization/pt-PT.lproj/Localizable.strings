@@ -1106,7 +1106,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domínio › IP, Destino › App › IP ou IP › App";
 "Choose a longer window or clear filters." = "Escolha um período mais longo ou limpe os filtros.";
 "Back" = "Voltar";
-"Return to the previous zoom level" = "Voltar ao nível de ampliação anterior";
+"Return to the previous report scope" = "Voltar ao âmbito anterior do relatório";
 "Granularity" = "Granularidade";
 "Earlier (⌘[)" = "Recuar (⌘[)";
 "Earlier" = "Recuar";
@@ -1136,6 +1136,8 @@
 "Bytes" = "Bytes";
 "Filtered traffic" = "Tráfego filtrado";
 "Click a bar to zoom in" = "Clique numa barra para ampliar";
+"Use the Left and Right Arrow keys to inspect time buckets." = "Use as teclas de seta esquerda e direita para explorar os intervalos de tempo.";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Use as teclas de seta esquerda e direita para explorar os intervalos de tempo e prima Return para ampliar.";
 "1 new flow" = "1 novo fluxo";
 "%@ new flows" = "%@ novos fluxos";
 "+ %@ more app · %@" = "+ %@ app adicional · %@";
@@ -1818,7 +1820,7 @@
 "%lld connections" = "%lld ligações";
 "%@, received %@, sent %@, %lld connections" = "%@, recebeu %@, enviou %@, %lld ligações";
 "Select a node or connection" = "Selecione um nó ou uma ligação";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "O mapa mantém-se estável enquanto os valores são atualizados. As partículas mostram a direção; utilize Lista para ver os mesmos valores sem movimento.";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "O mapa mantém-se estável enquanto os valores são atualizados. Os traços em movimento mostram a direção e correspondem ao tráfego recebido e enviado; utilize Lista para ver todas as relações sem movimento.";
 "Observed" = "Observado";
 "Connections" = "Ligações";
 "Traffic connections" = "Ligações de tráfego";

@@ -140,16 +140,63 @@ struct TrafficGraphCurve: Equatable, Sendable {
     }
 }
 
-struct TrafficGraphParticle: Equatable, Sendable {
-    enum Direction: Sendable {
-        case received
-        case sent
-        case invocation
+enum TrafficGraphFlowDirection: Equatable, Sendable {
+    case received
+    case sent
+    case invocation
+}
+
+struct TrafficGraphFlowDashLane: Equatable, Sendable {
+    var width: CGFloat
+    var offset: CGFloat
+}
+
+struct TrafficGraphFlowDashLanes: Equatable, Sendable {
+    var received: TrafficGraphFlowDashLane
+    var sent: TrafficGraphFlowDashLane
+}
+
+enum TrafficGraphFlowDash {
+    static let pattern: [CGFloat] = [8, 26]
+    static let strokeWidth: CGFloat = 1.8
+    static let frameInterval: TimeInterval = 1 / 30
+    private static let pointsPerSecond: CGFloat = 32
+
+    static func animates(_ edge: TrafficGraphEdge) -> Bool {
+        edge.relationship == .observed && edge.counters.total > 0
     }
 
-    var position: CGPoint
-    var direction: Direction
-    var radius: CGFloat
+    static func phase(at time: TimeInterval, direction: TrafficGraphFlowDirection) -> CGFloat {
+        let cycle = pattern.reduce(CGFloat(0), +)
+        let distance = (CGFloat(time) * pointsPerSecond).truncatingRemainder(dividingBy: cycle)
+        return direction == .received ? distance : -distance
+    }
+
+    static func borderOffset(totalWidth: CGFloat, direction: TrafficGraphFlowDirection) -> CGFloat {
+        let width = max(0, totalWidth)
+        let inset = min(strokeWidth / 2, width / 2)
+        switch direction {
+        case .received: return -width / 2 + inset
+        case .sent: return width / 2 - inset
+        case .invocation: return 0
+        }
+    }
+
+    static func lanes(counters: FlowCounters, totalWidth: CGFloat) -> TrafficGraphFlowDashLanes {
+        let width = max(0, totalWidth)
+        let totalBytes = max(0, counters.bytesIn) + max(0, counters.bytesOut)
+        guard totalBytes > 0 else {
+            let empty = TrafficGraphFlowDashLane(width: 0, offset: 0)
+            return TrafficGraphFlowDashLanes(received: empty, sent: empty)
+        }
+
+        let receivedWidth = width * CGFloat(max(0, counters.bytesIn)) / CGFloat(totalBytes)
+        let sentWidth = width - receivedWidth
+        return TrafficGraphFlowDashLanes(
+            received: TrafficGraphFlowDashLane(width: receivedWidth, offset: -sentWidth / 2),
+            sent: TrafficGraphFlowDashLane(width: sentWidth, offset: receivedWidth / 2)
+        )
+    }
 }
 
 struct TrafficGraphLayoutKey: Equatable, Sendable {
@@ -243,37 +290,6 @@ struct TrafficGraphLayoutSnapshot: Sendable {
         let t = min(1, max(0, projection))
         return point.distance(to: CGPoint(x: start.x + dx * t, y: start.y + dy * t))
     }
-
-    func particles(for edge: TrafficGraphEdge, at time: TimeInterval, reduceMotion: Bool) -> [TrafficGraphParticle] {
-        guard !reduceMotion, edge.relationship == .observed,
-              let curve = edgeCurves[edge.id] else { return [] }
-        var result: [TrafficGraphParticle] = []
-        appendParticles(direction: .sent, bytes: edge.counters.bytesOut, curve: curve.offset(by: 2), reverse: false,
-                        edgeID: edge.id, time: time, into: &result)
-        appendParticles(direction: .received, bytes: edge.counters.bytesIn, curve: curve.offset(by: -2), reverse: true,
-                        edgeID: edge.id, time: time, into: &result)
-        return result
-    }
-
-    private func appendParticles(direction: TrafficGraphParticle.Direction, bytes: Int64, curve: TrafficGraphCurve,
-                                 reverse: Bool, edgeID: TrafficGraphEdgeID, time: TimeInterval,
-                                 into result: inout [TrafficGraphParticle]) {
-        guard bytes > 0 else { return }
-        let count = max(1, min(2, Int(log10(Double(bytes) / 25_000_000 + 1).rounded(.up))))
-        let duration = max(28, 36 - log10(Double(bytes) / 1_000_000 + 1) * 0.8)
-        let seed = Double(Self.stableHash(edgeID.rawValue) % 997) / 997
-        for index in 0..<count {
-            var progress = (time / duration + Double(index) / Double(count) + seed).truncatingRemainder(dividingBy: 1)
-            if progress < 0 { progress += 1 }
-            if reverse { progress = 1 - progress }
-            result.append(TrafficGraphParticle(position: curve.point(at: CGFloat(progress)),
-                                                direction: direction, radius: 2.4))
-        }
-    }
-
-    private static func stableHash(_ value: String) -> UInt64 {
-        value.utf8.reduce(14_695_981_039_346_656_037) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
-    }
 }
 
 enum TrafficGraphLayout {
@@ -314,7 +330,7 @@ enum TrafficGraphLayout {
         let gap = nodeGap(for: snapshot)
         let stackHeight = CGFloat(largestLane) * appSize.height
             + CGFloat(max(0, largestLane - 1)) * gap
-        return max(760, stackHeight + 44)
+        return max(760, stackHeight + 104)
     }
 
     static func layout(
@@ -328,7 +344,7 @@ enum TrafficGraphLayout {
             return TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
         }
 
-        let insetBounds = bounds.insetBy(dx: 24, dy: 22)
+        let insetBounds = bounds.insetBy(dx: 24, dy: 52)
         let nodeLanes = lanes(snapshot: snapshot)
         let ordered = orderedNodes(snapshot: snapshot, nodeLanes: nodeLanes)
         let activeLanes = Lane.allCases.filter { !(ordered[$0] ?? []).isEmpty }
@@ -434,15 +450,14 @@ enum TrafficGraphLayout {
                 guard let sourcePort = sourcePorts[edge.id], let targetPort = targetPorts[edge.id] else { continue }
                 let start = CGPoint(x: source.maxX - 0.5, y: sourcePort.y)
                 let end = CGPoint(x: target.minX, y: targetPort.y)
-                let obstacles = nodeLane[edge.source] == .source && nodeLane[edge.target] == .destination
-                    ? snapshot.nodes.compactMap { node -> CGRect? in
-                        guard let lane = nodeLane[node.id], [.tool, .gateway, .inspectionProxy].contains(lane)
-                        else { return nil }
-                        return frames[node.id]
-                    }
-                    : []
-                curves[edge.id] = sankeyCurve(start: start, end: end, avoiding: obstacles,
-                                              width: capacityWidths[edge.id] ?? 0)
+                let obstacles = unrelatedObstacles(for: edge, from: frames, between: start, and: end)
+                curves[edge.id] = sankeyCurve(
+                    start: start,
+                    end: end,
+                    avoiding: obstacles,
+                    width: capacityWidths[edge.id] ?? 0,
+                    within: bounds
+                )
             } else {
                 widths[edge.id] = 1.5
                 let targetIsLeft = (nodeLane[edge.target]?.rawValue ?? 0) < (nodeLane[edge.source]?.rawValue ?? 0)
@@ -453,17 +468,16 @@ enum TrafficGraphLayout {
                                     y: source.midY + attachmentOffset)
                 let end = CGPoint(x: targetIsLeft ? target.maxX : target.minX,
                                   y: target.midY + attachmentOffset)
-                let obstacles = nodeLane[edge.source] == .source && nodeLane[edge.target] == .destination
-                    ? snapshot.nodes.compactMap { node -> CGRect? in
-                        guard let lane = nodeLane[node.id], [.tool, .gateway, .inspectionProxy].contains(lane)
-                        else { return nil }
-                        return frames[node.id]
-                    }
-                    : []
-                curves[edge.id] = parallelCurve(start: start, end: end,
-                                                fanout: fanoutOffset - attachmentOffset,
-                                                routeOffset: fanoutOffset,
-                                                avoiding: obstacles, width: 1.5)
+                let obstacles = unrelatedObstacles(for: edge, from: frames, between: start, and: end)
+                curves[edge.id] = parallelCurve(
+                    start: start,
+                    end: end,
+                    fanout: fanoutOffset - attachmentOffset,
+                    routeOffset: fanoutOffset,
+                    avoiding: obstacles,
+                    width: 1.5,
+                    within: bounds
+                )
             }
         }
         var widthCaps = capacityWidths
@@ -584,9 +598,33 @@ enum TrafficGraphLayout {
         return result
     }
 
-    private static func parallelCurve(start: CGPoint, end: CGPoint, fanout: CGFloat,
-                                      routeOffset: CGFloat, avoiding obstacles: [CGRect],
-                                      width: CGFloat) -> TrafficGraphCurve {
+    private static func unrelatedObstacles(
+        for edge: TrafficGraphEdge,
+        from frames: [TrafficGraphNodeID: CGRect],
+        between start: CGPoint,
+        and end: CGPoint
+    ) -> [CGRect] {
+        let horizontalRange = min(start.x, end.x)...max(start.x, end.x)
+        return frames.compactMap { id, frame in
+            // Sibling cards in the endpoint columns cannot be treated as obstacles: every route has to leave and
+            // enter those columns inside their padded horizontal span. Only cards wholly between the attachment
+            // points can block the route; those are the cards a cable can otherwise visibly pass through.
+            guard id != edge.source, id != edge.target,
+                  frame.minX > horizontalRange.lowerBound,
+                  frame.maxX < horizontalRange.upperBound else { return nil }
+            return frame
+        }
+    }
+
+    private static func parallelCurve(
+        start: CGPoint,
+        end: CGPoint,
+        fanout: CGFloat,
+        routeOffset: CGFloat,
+        avoiding obstacles: [CGRect],
+        width: CGFloat,
+        within bounds: CGRect
+    ) -> TrafficGraphCurve {
         let controlOffset = max(24, abs(end.x - start.x) * 0.42)
         let direction: CGFloat = end.x >= start.x ? 1 : -1
         // Both cubic controls contribute 75% of their shared shift at t = 0.5. Compensate so the midpoint keeps the
@@ -598,26 +636,23 @@ enum TrafficGraphLayout {
             control2: CGPoint(x: end.x - controlOffset * direction, y: end.y + controlFanout),
             end: end
         )
-        let padded = obstacles.map { $0.insetBy(dx: -(width / 2 + 6), dy: -(width / 2 + 6)) }
+        let padded = obstacles.map { $0.insetBy(dx: -(width / 2 + 10), dy: -(width / 2 + 10)) }
         guard intersects(direct, obstacles: padded) else { return direct }
 
-        let top = padded.map(\.minY).min() ?? min(start.y, end.y)
-        let bottom = padded.map(\.maxY).max() ?? max(start.y, end.y)
-        let above = top - 16
-        let below = bottom + 16
-        let routesAbove = routeOffset < 0 || (routeOffset == 0
+        let above = (padded.map(\.minY).min() ?? min(start.y, end.y)) - 16 + min(0, routeOffset)
+        let below = (padded.map(\.maxY).max() ?? max(start.y, end.y)) + 16 + max(0, routeOffset)
+        let preferAbove = routeOffset < 0 || (routeOffset == 0
             && abs(start.y - above) + abs(end.y - above) <= abs(start.y - below) + abs(end.y - below))
-        var routeY = routesAbove ? above + min(0, routeOffset) : below + max(0, routeOffset)
-        let firstX = start.x + (end.x - start.x) * 0.38
-        let secondX = start.x + (end.x - start.x) * 0.62
-        var routed = TrafficGraphCurve(start: start, control1: CGPoint(x: firstX, y: routeY),
-                                       control2: CGPoint(x: secondX, y: routeY), end: end)
-        while intersects(routed, obstacles: padded) {
-            routeY += routesAbove ? -16 : 16
-            routed.control1.y = routeY
-            routed.control2.y = routeY
-        }
-        return routed
+        return routedCurve(
+            start: start,
+            end: end,
+            obstacles: padded,
+            above: above,
+            below: below,
+            preferAbove: preferAbove,
+            width: width,
+            within: bounds
+        ) ?? direct
     }
 
     private static func intersects(_ curve: TrafficGraphCurve, obstacles: [CGRect]) -> Bool {
@@ -628,8 +663,13 @@ enum TrafficGraphLayout {
         }
     }
 
-    private static func sankeyCurve(start: CGPoint, end: CGPoint, avoiding obstacles: [CGRect] = [],
-                                    width: CGFloat = 0) -> TrafficGraphCurve {
+    private static func sankeyCurve(
+        start: CGPoint,
+        end: CGPoint,
+        avoiding obstacles: [CGRect] = [],
+        width: CGFloat = 0,
+        within bounds: CGRect
+    ) -> TrafficGraphCurve {
         let controlOffset = max(24, abs(end.x - start.x) * 0.42)
         let direction: CGFloat = end.x >= start.x ? 1 : -1
         let direct = TrafficGraphCurve(
@@ -638,23 +678,67 @@ enum TrafficGraphLayout {
             control2: CGPoint(x: end.x - controlOffset * direction, y: end.y),
             end: end
         )
-        let padded = obstacles.map { $0.insetBy(dx: -(width / 2 + 6), dy: -(width / 2 + 6)) }
-        guard padded.contains(where: { obstacle in
-            (1..<80).contains(where: { step in
-                obstacle.contains(direct.point(at: CGFloat(step) / 80))
-            })
-        }) else { return direct }
+        let padded = obstacles.map { $0.insetBy(dx: -(width / 2 + 10), dy: -(width / 2 + 10)) }
+        guard intersects(direct, obstacles: padded) else { return direct }
 
-        let top = padded.map(\.minY).min() ?? min(start.y, end.y)
-        let bottom = padded.map(\.maxY).max() ?? max(start.y, end.y)
-        let above = top - 16
-        let below = bottom + 16
-        let routeY = abs(start.y - above) + abs(end.y - above) <= abs(start.y - below) + abs(end.y - below)
-            ? above : below
-        let firstX = start.x + (end.x - start.x) * 0.38
-        let secondX = start.x + (end.x - start.x) * 0.62
-        return TrafficGraphCurve(start: start, control1: CGPoint(x: firstX, y: routeY),
-                                 control2: CGPoint(x: secondX, y: routeY), end: end)
+        let above = (padded.map(\.minY).min() ?? min(start.y, end.y)) - 16
+        let below = (padded.map(\.maxY).max() ?? max(start.y, end.y)) + 16
+        let preferAbove = abs(start.y - above) + abs(end.y - above)
+            <= abs(start.y - below) + abs(end.y - below)
+        return routedCurve(
+            start: start,
+            end: end,
+            obstacles: padded,
+            above: above,
+            below: below,
+            preferAbove: preferAbove,
+            width: width,
+            within: bounds
+        ) ?? direct
+    }
+
+    private static func routedCurve(
+        start: CGPoint,
+        end: CGPoint,
+        obstacles: [CGRect],
+        above: CGFloat,
+        below: CGFloat,
+        preferAbove: Bool,
+        width: CGFloat,
+        within bounds: CGRect
+    ) -> TrafficGraphCurve? {
+        let halfWidth = max(0.5, width / 2)
+        let minimumY = bounds.minY + halfWidth + 2
+        let maximumY = bounds.maxY - halfWidth - 2
+        let direction: CGFloat = end.x >= start.x ? 1 : -1
+        let shoulder = min(48, max(20, abs(end.x - start.x) * 0.08))
+
+        func curve(at routeY: CGFloat) -> TrafficGraphCurve {
+            TrafficGraphCurve(
+                start: start,
+                control1: CGPoint(x: start.x + shoulder * direction, y: routeY),
+                control2: CGPoint(x: end.x - shoulder * direction, y: routeY),
+                end: end
+            )
+        }
+
+        func candidates(from origin: CGFloat, toward limit: CGFloat, step: CGFloat) -> [CGFloat] {
+            var values: [CGFloat] = []
+            var value = min(maximumY, max(minimumY, origin))
+            while step < 0 ? value >= limit : value <= limit {
+                values.append(value)
+                value += step
+            }
+            if values.last != limit { values.append(limit) }
+            return values
+        }
+
+        let aboveCandidates = candidates(from: above, toward: minimumY, step: -16)
+        let belowCandidates = candidates(from: below, toward: maximumY, step: 16)
+        let ordered = preferAbove
+            ? aboveCandidates + belowCandidates
+            : belowCandidates + aboveCandidates
+        return ordered.lazy.map(curve).first { !intersects($0, obstacles: obstacles) }
     }
 
     private static func orderedNodes(snapshot: TrafficGraphSnapshot,

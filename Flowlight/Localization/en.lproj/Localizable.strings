@@ -1032,7 +1032,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP, Destination › App › IP, or IP › App";
 "Choose a longer window or clear filters." = "Choose a longer window or clear filters.";
 "Back" = "Back";
-"Return to the previous zoom level" = "Return to the previous zoom level";
+"Return to the previous report scope" = "Return to the previous report scope";
 "Granularity" = "Granularity";
 "Earlier (⌘[)" = "Earlier (⌘[)";
 "Earlier" = "Earlier";
@@ -1062,6 +1062,8 @@
 "Bytes" = "Bytes";
 "Filtered traffic" = "Filtered traffic";
 "Click a bar to zoom in" = "Click a bar to zoom in";
+"Use the Left and Right Arrow keys to inspect time buckets." = "Use the Left and Right Arrow keys to inspect time buckets.";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in.";
 "1 new flow" = "1 new flow";
 "%@ new flows" = "%@ new flows";
 "+ %@ more app · %@" = "+ %@ more app · %@";
@@ -1818,7 +1820,7 @@
 "%lld connections" = "%lld connections";
 "%@, received %@, sent %@, %lld connections" = "%@, received %@, sent %@, %lld connections";
 "Select a node or connection" = "Select a node or connection";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion.";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion.";
 "Observed" = "Observed";
 "Connections" = "Connections";
 "Traffic connections" = "Traffic connections";

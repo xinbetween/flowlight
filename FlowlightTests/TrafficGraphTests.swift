@@ -858,8 +858,9 @@ final class TrafficGraphTests: XCTestCase {
                           try XCTUnwrap(layout.nodeFrames[flowlight.id]).midX)
         XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[flowlight.id]).midX,
                           try XCTUnwrap(layout.nodeFrames[observed.target]).midX)
-        XCTAssertTrue(layout.particles(for: configured, at: 1, reduceMotion: false).isEmpty)
-        XCTAssertTrue(layout.particles(for: route, at: 1, reduceMotion: false).isEmpty)
+        XCTAssertFalse(TrafficGraphFlowDash.animates(configured))
+        XCTAssertFalse(TrafficGraphFlowDash.animates(route))
+        XCTAssertTrue(TrafficGraphFlowDash.animates(observed))
     }
 
     func testAIConfiguredGatewayUsesExistingApplicationAgentIdentity() throws {
@@ -2272,6 +2273,86 @@ final class TrafficGraphTests: XCTestCase {
         ))
     }
 
+    func testMapSelectionResolvesProjectedNodeInsteadOfCompleteNode() throws {
+        let rows = (0..<20).map { index in
+            row(
+                app: "app.\(index)",
+                domain: "shared.example",
+                ip: "203.0.113.10",
+                bytesIn: 1,
+                flows: 1
+            )
+        }
+        let limits = TrafficGraphLimits(
+            maxApps: 8,
+            maxDestinations: 1,
+            maxEdges: 20,
+            maxBlockedEdges: 0,
+            maxRelays: 0
+        )
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: limits)
+        let selectedID = try XCTUnwrap(build.map.nodes.first { $0.kind == .destination }?.id)
+
+        let mapNode = try XCTUnwrap(VisualizeSelectionPolicy.selectedNode(selectedID, in: build.map))
+        let listNode = try XCTUnwrap(VisualizeSelectionPolicy.selectedNode(selectedID, in: build.complete))
+
+        XCTAssertEqual(mapNode.counters.bytesIn, 8)
+        XCTAssertEqual(mapNode.members.count, 8)
+        XCTAssertEqual(listNode.counters.bytesIn, 20)
+        XCTAssertEqual(listNode.members.count, 20)
+    }
+
+    func testListPresentationClearsOrdinaryNodeSelectionButKeepsVisibleRows() {
+        let ordinary = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "destination:ordinary"),
+            kind: .destination,
+            title: "ordinary.example",
+            detail: "",
+            appPath: "",
+            filter: TrafficFilter(domain: "ordinary.example"),
+            counters: FlowCounters()
+        )
+        let evidenced = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "agent:evidenced"),
+            kind: .agent,
+            title: "Evidenced",
+            detail: "agent.evidenced",
+            appPath: "",
+            filter: TrafficFilter(bundleID: "agent.evidenced"),
+            counters: FlowCounters(),
+            roleEvidence: [TrafficGraphRoleEvidence(relationship: .runs, detail: "Observed agent")]
+        )
+        let visibleEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "visible"),
+            source: ordinary.id,
+            target: evidenced.id,
+            counters: FlowCounters(),
+            filter: .none
+        )
+        let complete = TrafficGraphSnapshot(
+            nodes: [ordinary, evidenced],
+            edges: [visibleEdge],
+            total: FlowCounters(),
+            hidden: .none
+        )
+
+        XCTAssertTrue(VisualizeSelectionPolicy.listOmitsSelection(
+            selectedNode: ordinary.id,
+            selectedEdge: nil,
+            complete: complete
+        ))
+        XCTAssertFalse(VisualizeSelectionPolicy.listOmitsSelection(
+            selectedNode: evidenced.id,
+            selectedEdge: nil,
+            complete: complete
+        ))
+        XCTAssertFalse(VisualizeSelectionPolicy.listOmitsSelection(
+            selectedNode: nil,
+            selectedEdge: visibleEdge.id,
+            complete: complete
+        ))
+    }
+
     func testPresentationBuildKeepsEveryRelationshipBesideBoundedMap() {
         let rows = (0..<35).map { index in
             row(
@@ -2590,18 +2671,32 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertNil(layout.edge(at: CGPoint(x: 20, y: 20), tolerance: 5))
     }
 
-    func testParticlesAreDeterministicAndReducedMotionRemovesThem() {
-        let snapshot = TrafficGraphBuilder.build(rows: [
-            row(app: "a", domain: "example.com", ip: "203.0.113.8", bytesIn: 1_000_000, bytesOut: 500_000)
-        ], limits: .unbounded)
-        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: CGRect(x: 0, y: 0, width: 800, height: 500))
-        let edge = snapshot.edges[0]
-        let first = layout.particles(for: edge, at: 123.45, reduceMotion: false)
-        let second = layout.particles(for: edge, at: 123.45, reduceMotion: false)
+    func testFlowDashPhaseIsSparseDeterministicAndDirectional() {
+        XCTAssertEqual(TrafficGraphFlowDash.pattern, [8, 26])
+        XCTAssertEqual(TrafficGraphFlowDash.strokeWidth, 1.8)
+        XCTAssertEqual(TrafficGraphFlowDash.frameInterval, 1 / 30)
+        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .sent), -8)
+        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .received), 8)
+        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .invocation), -8)
+        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .sent),
+                       TrafficGraphFlowDash.phase(at: 0.25, direction: .sent))
 
-        XCTAssertEqual(first, second)
-        XCTAssertFalse(first.isEmpty)
-        XCTAssertTrue(layout.particles(for: edge, at: 123.45, reduceMotion: true).isEmpty)
+        let lanes = TrafficGraphFlowDash.lanes(
+            counters: FlowCounters(bytesIn: 75, bytesOut: 25),
+            totalWidth: 20
+        )
+        XCTAssertEqual(lanes.received.width, 15)
+        XCTAssertEqual(lanes.received.offset, -2.5)
+        XCTAssertEqual(lanes.sent.width, 5)
+        XCTAssertEqual(lanes.sent.offset, 7.5)
+        XCTAssertEqual(
+            TrafficGraphFlowDash.borderOffset(totalWidth: 20, direction: .received),
+            -9.1
+        )
+        XCTAssertEqual(
+            TrafficGraphFlowDash.borderOffset(totalWidth: 20, direction: .sent),
+            9.1
+        )
     }
 
     func testLayoutPreservesSurvivingNodeFramesWhenTopologyChanges() {
@@ -2699,14 +2794,74 @@ final class TrafficGraphTests: XCTestCase {
         let layout = TrafficGraphLayout.layout(snapshot: snapshot,
                                                 in: CGRect(x: 0, y: 0, width: 1_200, height: 760))
 
+        XCTAssertLessThan(layout.contentBounds.height, 2_000,
+                          "obstacle routing must not push a dense graph into an unreadable auto-fit thumbnail")
         for edge in snapshot.edges {
             let curve = try! XCTUnwrap(layout.edgeCurves[edge.id])
             let obstacles = layout.nodeFrames.filter { id, _ in id != edge.source && id != edge.target }
             for step in 1..<100 {
                 let point = curve.point(at: CGFloat(step) / 100)
-                XCTAssertFalse(obstacles.values.contains { $0.insetBy(dx: -5, dy: -5).contains(point) },
-                               "route \(edge.id.rawValue) enters an unrelated card near \(point)")
+                XCTAssertFalse(obstacles.values.contains { $0.insetBy(dx: -18, dy: -18).contains(point) },
+                               "route \(edge.id.rawValue) brings its ribbon or animated dash over an unrelated card near \(point)")
             }
+        }
+    }
+
+    func testDemoAIMapKeepsObstacleRoutesWithinReadableFitBounds() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("demo-graph-\(UUID().uuidString).sqlite")
+        let database = try TrafficDatabase(url: url)
+        try DemoData.seed(database, now: now)
+        let from = now.addingTimeInterval(-Granularity.week.defaultWindow)
+        let rows = try database.aiVisualizationRows(.week, from: from, to: now)
+        let attempts = try database.blockedAttempts(from: from, to: now)
+        let build = AITrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            blockedAttempts: attempts,
+            gateways: DemoData.agentGateways,
+            resolveGateway: { DemoData.gatewayIdentity($0) }
+        )
+        let size = CGSize(width: max(1_280, TrafficGraphLayout.minimumCanvasWidth(for: build.map)),
+                          height: max(800, TrafficGraphLayout.minimumCanvasHeight(for: build.map)))
+        let layout = TrafficGraphLayout.layout(snapshot: build.map, in: CGRect(origin: .zero, size: size))
+
+        XCTAssertGreaterThan(build.map.nodes.count, 10)
+        XCTAssertLessThan(layout.contentBounds.height, size.height * 2,
+                          "demo AI map must remain readable after automatic Fit")
+        XCTAssertTrue(
+            CGRect(origin: .zero, size: size).contains(layout.contentBounds),
+            "every routed ribbon must stay inside the canvas so Fit cannot reveal pre-transform clipping: \(layout.contentBounds) in \(size)"
+        )
+    }
+
+    func testRelationshipEdgesRouteAroundUnrelatedLaneCards() {
+        let launcher = TrafficGraphNodeID(rawValue: "launcher:terminal")
+        let agent = TrafficGraphNodeID(rawValue: "agent:claude")
+        let tool = TrafficGraphNodeID(rawValue: "tool:node")
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [
+                TrafficGraphNode(id: launcher, kind: .launcher, title: "Terminal", detail: "", appPath: "",
+                                 filter: .none, counters: FlowCounters()),
+                TrafficGraphNode(id: agent, kind: .agent, title: "Claude Code", detail: "", appPath: "",
+                                 filter: .none, counters: FlowCounters()),
+                TrafficGraphNode(id: tool, kind: .tool, title: "Node", detail: "", appPath: "",
+                                 filter: .none, counters: FlowCounters())
+            ],
+            edges: [TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "terminal-runs-node"),
+                                     source: launcher, target: tool, counters: FlowCounters(),
+                                     filter: .none, relationship: .runs)],
+            total: FlowCounters(),
+            hidden: .none
+        )
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
+                                                in: CGRect(x: 0, y: 0, width: 900, height: 500))
+        let curve = try! XCTUnwrap(layout.edgeCurves[snapshot.edges[0].id])
+        let obstacle = try! XCTUnwrap(layout.nodeFrames[agent]).insetBy(dx: -8, dy: -8)
+
+        for step in 1..<100 {
+            XCTAssertFalse(obstacle.contains(curve.point(at: CGFloat(step) / 100)),
+                           "relationship edge crosses an unrelated agent card")
         }
     }
 
@@ -2846,20 +3001,6 @@ final class TrafficGraphTests: XCTestCase {
         for edge in snapshot.edges where edge.relationship == .runs {
             XCTAssertEqual(layout.edgeWidths[edge.id], 1.5)
         }
-    }
-
-    func testRepresentativeParticleMovesCalmly() {
-        let snapshot = TrafficGraphBuilder.build(rows: [
-            row(app: "a", domain: "example.com", ip: "203.0.113.8", bytesOut: 1_000_000)
-        ], limits: .unbounded)
-        let layout = TrafficGraphLayout.layout(snapshot: snapshot,
-                                                in: CGRect(x: 0, y: 0, width: 1_000, height: 500))
-        let edge = snapshot.edges[0]
-        let first = try! XCTUnwrap(layout.particles(for: edge, at: 120, reduceMotion: false).first)
-        let second = try! XCTUnwrap(layout.particles(for: edge, at: 121, reduceMotion: false).first)
-
-        XCTAssertLessThan(hypot(first.position.x - second.position.x, first.position.y - second.position.y), 55,
-                          "one second should communicate activity without racing across the map")
     }
 
     func testViewportClampsScaleAndRoundTripsCoordinates() {
