@@ -202,8 +202,8 @@ final class TrafficGraphTests: XCTestCase {
 
         XCTAssertEqual(snapshot.nodes.filter { $0.kind == .tool }.count, 1,
                        "mutable display metadata must not create separate tool identities")
-        XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.title, "node",
-                       "the heaviest row supplies display metadata deterministically")
+        XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.title, "Node",
+                       "stable lexical metadata must not change when counters change")
         XCTAssertEqual(snapshot.nodes.first { $0.kind == .tool }?.counters.bytesOut, 30)
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .runs }.count, 1)
 
@@ -220,6 +220,18 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(reversed.edges.map(\.counters), snapshot.edges.map(\.counters))
         XCTAssertEqual(reversed.total, snapshot.total)
         XCTAssertEqual(reversed.hidden, snapshot.hidden, "row order must not change graph accounting")
+
+        let counterRefresh = AITrafficGraphBuilder.build(rows: [
+            row(app: "node", name: "Node", domain: "one.example", ip: "203.0.113.20", bytesOut: 100,
+                parent: "claude", parentName: "Claude Code"),
+            row(app: "node", name: "node", domain: "two.example", ip: "203.0.113.21", bytesOut: 1,
+                parent: "claude", parentName: "Claude Code")
+        ], limits: .unbounded)
+        XCTAssertEqual(
+            counterRefresh.nodes.first { $0.kind == .tool }?.title,
+            snapshot.nodes.first { $0.kind == .tool }?.title,
+            "counter-only refreshes must not rename a stable tool identity"
+        )
     }
 
     func testAIBuilderProjectsAllowlistRefusalAsAgentToolAndBlockedPath() {
@@ -1223,7 +1235,7 @@ final class TrafficGraphTests: XCTestCase {
 
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .routedThrough }.count, 1)
         XCTAssertEqual(snapshot.nodes.filter { $0.kind == .proxy }.count, 1)
-        XCTAssertEqual(snapshot.nodes.first { $0.kind == .proxy }?.title, "Flowlight renamed")
+        XCTAssertEqual(snapshot.nodes.first { $0.kind == .proxy }?.title, "Flowlight")
         XCTAssertEqual(snapshot.edges.filter { $0.relationship == .observed }.count, 2)
         XCTAssertEqual(snapshot.total.total, 125)
         XCTAssertEqual(snapshot.visibleTotal.total, 125)
@@ -1915,7 +1927,36 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(snapshot.visibleTotal.total, 1_100)
     }
 
-    func testAIPresentationBuildRetainsDomainsBeyondMapCaps() {
+    func testAIMapDoesNotDiscardCompleteRelationshipsBeforeLayout() {
+        let rows = (0..<35).map { index in
+            row(
+                app: "claude",
+                name: "Claude Code",
+                domain: "quiet\(index).example",
+                ip: "192.0.2.\(index)",
+                bytesIn: Int64(index + 1),
+                bytesOut: Int64(35 - index),
+                flows: 1
+            )
+        }
+
+        let build = AITrafficGraphBuilder.buildForPresentation(rows: rows)
+        let reportTotal = rows.reduce(into: FlowCounters()) { $0 += $1.counters }
+
+        XCTAssertEqual(
+            build.map.representedNodeIDs,
+            Set(build.complete.nodes.map(\.id))
+        )
+        XCTAssertEqual(
+            build.map.representedEdgeIDs,
+            Set(build.complete.edges.map(\.id))
+        )
+        XCTAssertEqual(build.map.hidden, .none)
+        XCTAssertEqual(build.map.visibleTotal, reportTotal)
+        XCTAssertEqual(build.map.visibleTotal, build.complete.visibleTotal)
+    }
+
+    func testAIPresentationBuildRepresentsEveryDomainInCollapsedMapGroups() {
         let rows = (0..<35).map { index in
             row(
                 app: "claude",
@@ -1934,18 +1975,16 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(build.complete.edges.filter { $0.relationship == .observed }.count, 35)
         XCTAssertEqual(build.complete.nodes.filter { $0.kind == .destination }.count, 35)
         XCTAssertEqual(build.complete.hidden, .none)
-        XCTAssertEqual(build.map.nodes.filter { $0.kind == .destination }.count,
-                       AITrafficGraphLimits.standard.maxDestinations)
+        XCTAssertLessThan(build.map.nodes.filter { $0.kind == .destination }.count, 35)
         XCTAssertEqual(build.map.nodes.first { $0.kind == .agent }?.counters.total,
                        build.map.visibleTotal.total)
-        XCTAssertTrue(Set(build.map.nodes.map(\.id)).isSubset(of: completeNodeIDs))
-        XCTAssertTrue(Set(build.map.edges.map(\.id)).isSubset(of: completeEdgeIDs))
-        XCTAssertEqual(build.map.hidden.nodeCount, build.complete.nodes.count - build.map.nodes.count)
-        XCTAssertEqual(build.map.hidden.edgeCount, build.complete.edges.count - build.map.edges.count)
-        XCTAssertEqual(build.map.visibleTotal.total + build.map.hidden.counters.total, build.complete.total.total)
+        XCTAssertEqual(build.map.representedNodeIDs, completeNodeIDs)
+        XCTAssertEqual(build.map.representedEdgeIDs, completeEdgeIDs)
+        XCTAssertEqual(build.map.hidden, .none)
+        XCTAssertEqual(build.map.visibleTotal, build.complete.visibleTotal)
     }
 
-    func testAISearchFindsQuietDomainOmittedFromMap() {
+    func testAISearchRevealsExactQuietDomainOnMap() {
         let rows = (0..<11).map { index in
             row(
                 app: "claude",
@@ -1968,10 +2007,15 @@ final class TrafficGraphTests: XCTestCase {
         )
 
         XCTAssertEqual(full.complete.edges.filter { $0.relationship == .observed }.count, 11)
-        XCTAssertEqual(full.map.edges.filter { $0.relationship == .observed }.count, 10)
+        XCTAssertEqual(full.map.representedEdgeIDs, Set(full.complete.edges.map(\.id)))
         XCTAssertEqual(quietRows.count, 1)
         XCTAssertEqual(searched.complete.edges.filter { $0.relationship == .observed }.count, 1)
         XCTAssertTrue(searched.complete.nodes.contains { $0.title == "quiet10.example" })
+        XCTAssertTrue(searched.map.nodes.contains {
+            $0.title == "quiet10.example" && !$0.isCollapsedGroup
+        })
+        XCTAssertEqual(searched.map.representedNodeIDs, Set(searched.complete.nodes.map(\.id)))
+        XCTAssertEqual(searched.map.representedEdgeIDs, Set(searched.complete.edges.map(\.id)))
     }
 
     func testAIListRetainsTwentyNinthRelationshipAndFocusCanIsolateIt() {
@@ -2108,7 +2152,7 @@ final class TrafficGraphTests: XCTestCase {
         })
     }
 
-    func testNodeOnlyMapOmissionRemainsDisclosed() {
+    func testConfiguredOnlyNodesRemainExactWithoutMapOmissions() {
         let gateways = (0..<7).map { index in
             AgentGatewayConfig(
                 agent: "configured.\(index)",
@@ -2131,14 +2175,9 @@ final class TrafficGraphTests: XCTestCase {
         )
 
         XCTAssertEqual(build.complete.nodes.count, 7)
-        XCTAssertEqual(build.map.nodes.count, 6)
-        XCTAssertEqual(build.map.hidden.nodeCount, 1)
-        XCTAssertEqual(build.map.hidden.edgeCount, 0)
-        XCTAssertTrue(build.map.hidden.hasOmissions)
-        XCTAssertEqual(
-            VisualizeOmissionLabel.text(for: build.map.hidden),
-            L("%lld nodes and %lld relationships omitted from Map", 1, 0)
-        )
+        XCTAssertEqual(build.map.nodes.count, 7)
+        XCTAssertEqual(build.map.representedNodeIDs, Set(build.complete.nodes.map(\.id)))
+        XCTAssertEqual(build.map.hidden, .none)
     }
 
     func testMapDestinationCountersAndMembersExcludeOmittedRelationships() throws {
@@ -2351,6 +2390,258 @@ final class TrafficGraphTests: XCTestCase {
             selectedEdge: visibleEdge.id,
             complete: complete
         ))
+    }
+
+    func testAllApplicationsMapReconcilesWithCompleteReportTotals() {
+        let rows = (0..<35).map { index in
+            row(
+                app: "app.complete",
+                name: "Complete",
+                domain: "host\(index).example",
+                ip: "203.0.113.\(index)",
+                bytesIn: Int64(index + 1),
+                bytesOut: Int64(35 - index),
+                flows: 1
+            )
+        }
+
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows)
+        let reportTotal = rows.reduce(into: FlowCounters()) { $0 += $1.counters }
+
+        XCTAssertEqual(
+            build.map.representedNodeIDs,
+            Set(build.complete.nodes.map(\.id))
+        )
+        XCTAssertEqual(
+            build.map.representedEdgeIDs,
+            Set(build.complete.edges.map(\.id))
+        )
+        XCTAssertEqual(build.map.hidden, .none)
+        XCTAssertEqual(build.map.visibleTotal, reportTotal)
+        XCTAssertEqual(build.map.visibleTotal, build.complete.visibleTotal)
+    }
+
+    func testMapGroupingPartitionsEveryExactItemAndExpansionPreservesTotals() throws {
+        let rows = (0..<35).map { index in
+            row(
+                app: "app.complete",
+                name: "Complete",
+                domain: "host\(index).example",
+                ip: "203.0.113.\(index)",
+                bytesIn: Int64(index + 1),
+                bytesOut: Int64(35 - index),
+                flows: 1
+            )
+        }
+        let complete = TrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            mapLimits: .unbounded
+        ).complete
+        let collapsed = TrafficGraphMapGrouping.project(complete)
+        let group = try XCTUnwrap(collapsed.nodes.first {
+            $0.kind == .destination && $0.isCollapsedGroup
+        })
+        let expanded = TrafficGraphMapGrouping.project(
+            complete,
+            expandedGroupIDs: [group.id]
+        )
+
+        XCTAssertEqual(collapsed.representedNodeIDs, Set(complete.nodes.map(\.id)))
+        XCTAssertEqual(collapsed.representedEdgeIDs, Set(complete.edges.map(\.id)))
+        XCTAssertEqual(expanded.representedNodeIDs, Set(complete.nodes.map(\.id)))
+        XCTAssertEqual(expanded.representedEdgeIDs, Set(complete.edges.map(\.id)))
+        XCTAssertEqual(collapsed.visibleTotal, complete.visibleTotal)
+        XCTAssertEqual(expanded.visibleTotal, complete.visibleTotal)
+        XCTAssertTrue(group.collapsedNodeIDs.allSatisfy { id in
+            expanded.nodes.contains { $0.id == id && !$0.isCollapsedGroup }
+        })
+        XCTAssertFalse(expanded.nodes.contains { $0.id == group.id })
+    }
+
+    func testMapGroupingPreservesTheExactFilterForOneCollapsedRelationship() throws {
+        let apps = (0..<13).map { index in
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: "app:\(index)"),
+                kind: .app,
+                title: "Alpha \(index)",
+                detail: "app.\(index)",
+                appPath: "",
+                filter: TrafficFilter(bundleID: "app.\(index)"),
+                counters: FlowCounters(bytesIn: 1, flows: 1)
+            )
+        }
+        let destination = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "destination:one.example"),
+            kind: .destination,
+            title: "one.example",
+            detail: "",
+            appPath: "",
+            filter: TrafficFilter(domain: "one.example"),
+            counters: FlowCounters(bytesIn: 1, flows: 1)
+        )
+        let exactFilter = TrafficFilter(bundleID: "app.0", domain: "one.example")
+        let exactEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "app.0→one.example"),
+            source: apps[0].id,
+            target: destination.id,
+            counters: FlowCounters(bytesIn: 1, flows: 1),
+            filter: exactFilter
+        )
+        let projected = TrafficGraphMapGrouping.project(TrafficGraphSnapshot(
+            nodes: apps + [destination],
+            edges: [exactEdge],
+            total: exactEdge.counters,
+            hidden: .none
+        ))
+        let collapsed = try XCTUnwrap(projected.edges.first)
+
+        XCTAssertTrue(collapsed.isCollapsedGroup)
+        XCTAssertEqual(collapsed.collapsedEdgeIDs, [exactEdge.id])
+        XCTAssertEqual(collapsed.filter, exactFilter)
+    }
+
+    func testMapGroupingBoundsEdgeDenseMapsWithStableExactMembership() throws {
+        let source = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "app:browser"),
+            kind: .app,
+            title: "Browser",
+            detail: "com.browser",
+            appPath: "",
+            filter: TrafficFilter(bundleID: "com.browser"),
+            counters: FlowCounters()
+        )
+        let target = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "destination:example.com"),
+            kind: .destination,
+            title: "example.com",
+            detail: "",
+            appPath: "",
+            filter: TrafficFilter(domain: "example.com"),
+            counters: FlowCounters()
+        )
+        func snapshot(detailSuffix: String) -> TrafficGraphSnapshot {
+            let edges = (0..<128).map { index in
+                TrafficGraphEdge(
+                    id: TrafficGraphEdgeID(rawValue: "blocked:\(index)"),
+                    source: source.id,
+                    target: target.id,
+                    counters: FlowCounters(),
+                    filter: TrafficFilter(bundleID: "com.browser", domain: "example.com"),
+                    relationship: .blocked,
+                    enforcement: TrafficGraphEnforcement(
+                        count: 1,
+                        category: "rule-\(detailSuffix)",
+                        source: "ordinary-rule",
+                        detail: "Port \(8_000 + index), \(detailSuffix)"
+                    )
+                )
+            }
+            return TrafficGraphSnapshot(nodes: [source, target], edges: edges,
+                                        total: FlowCounters(), hidden: .none)
+        }
+        let first = TrafficGraphMapGrouping.project(snapshot(detailSuffix: "first"))
+        let refreshed = TrafficGraphMapGrouping.project(snapshot(detailSuffix: "updated"))
+        let grouped = try XCTUnwrap(first.edges.first)
+
+        XCTAssertEqual(first.edges.count, 1)
+        XCTAssertEqual(grouped.collapsedEdgeIDs.count, 128)
+        XCTAssertEqual(grouped.representedEdgeIDs, Set((0..<128).map {
+            TrafficGraphEdgeID(rawValue: "blocked:\($0)")
+        }))
+        XCTAssertEqual(refreshed.edges.map(\.id), first.edges.map(\.id),
+                       "mutable enforcement descriptions must not change aggregate identity")
+
+        let expanded = TrafficGraphMapGrouping.project(
+            snapshot(detailSuffix: "first"),
+            expandedEdgeGroupIDs: [grouped.id]
+        )
+        XCTAssertEqual(expanded.edges.count, 128)
+        XCTAssertEqual(Set(expanded.edges.map(\.id)), grouped.representedEdgeIDs)
+        XCTAssertTrue(expanded.edges.allSatisfy { !$0.isCollapsedGroup })
+        XCTAssertEqual(expanded.representedEdgeIDs, grouped.representedEdgeIDs)
+    }
+
+    func testMapGroupingFoldsAccentedLatinTitlesIntoAlphabetBuckets() {
+        let nodes = (0..<13).map { index in
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: "app:\(index)"),
+                kind: .app,
+                title: index.isMultiple(of: 2) ? "Éditeur \(index)" : "Ångström \(index)",
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: FlowCounters()
+            )
+        }
+        let projected = TrafficGraphMapGrouping.project(TrafficGraphSnapshot(
+            nodes: nodes,
+            edges: [],
+            total: FlowCounters(),
+            hidden: .none
+        ))
+        let titles = Set(projected.nodes.map(\.title))
+
+        XCTAssertTrue(titles.contains("Applications A–D"))
+        XCTAssertTrue(titles.contains("Applications E–H"))
+        XCTAssertFalse(titles.contains("Applications #"))
+    }
+
+    func testMapGroupingIDsStayStableAcrossInputOrderCountersAndUnrelatedExpansion() throws {
+        let rows: [BreakdownRow] = (0..<28).map { index -> BreakdownRow in
+            let prefix = index < 14 ? "alpha" : "zulu"
+            return row(
+                app: "app.complete",
+                name: "Complete",
+                domain: "\(prefix)\(index).example",
+                ip: "203.0.113.\(index)",
+                bytesIn: Int64(index + 1),
+                bytesOut: Int64(28 - index),
+                flows: 1
+            )
+        }
+        let louderRows = rows.map { value -> BreakdownRow in
+            var value = value
+            value.counters.bytesIn *= 10
+            value.counters.bytesOut *= 10
+            value.counters.flows *= 10
+            return value
+        }
+        let complete = TrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            mapLimits: .unbounded
+        ).complete
+        let reversed = TrafficGraphBuilder.buildForPresentation(
+            rows: rows.reversed(),
+            mapLimits: .unbounded
+        ).complete
+        let louder = TrafficGraphBuilder.buildForPresentation(
+            rows: louderRows,
+            mapLimits: .unbounded
+        ).complete
+        let first = TrafficGraphMapGrouping.project(complete)
+        let reordered = TrafficGraphMapGrouping.project(reversed)
+        let refreshed = TrafficGraphMapGrouping.project(louder)
+        let groups = first.nodes.filter { $0.kind == .destination && $0.isCollapsedGroup }
+            .sorted { $0.id < $1.id }
+        let expandedID = try XCTUnwrap(groups.first?.id)
+        let unchanged = try XCTUnwrap(groups.last)
+        let expanded = TrafficGraphMapGrouping.project(
+            complete,
+            expandedGroupIDs: [expandedID]
+        )
+
+        XCTAssertEqual(first.nodes.map(\.id), reordered.nodes.map(\.id))
+        XCTAssertEqual(first.edges.map(\.id), reordered.edges.map(\.id))
+        XCTAssertEqual(first.nodes.map(\.id), refreshed.nodes.map(\.id))
+        XCTAssertEqual(first.edges.map(\.id), refreshed.edges.map(\.id))
+        XCTAssertEqual(first.representedNodeIDs, Set(complete.nodes.map(\.id)))
+        XCTAssertEqual(first.representedEdgeIDs, Set(complete.edges.map(\.id)))
+        XCTAssertTrue(expanded.nodes.contains {
+            $0.id == unchanged.id && $0.collapsedNodeIDs == unchanged.collapsedNodeIDs
+        })
+        XCTAssertEqual(expanded.representedNodeIDs, first.representedNodeIDs)
+        XCTAssertEqual(expanded.representedEdgeIDs, first.representedEdgeIDs)
+        XCTAssertEqual(refreshed.visibleTotal, louder.visibleTotal)
     }
 
     func testPresentationBuildKeepsEveryRelationshipBesideBoundedMap() {
@@ -2675,11 +2966,38 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(TrafficGraphFlowDash.pattern, [8, 26])
         XCTAssertEqual(TrafficGraphFlowDash.strokeWidth, 1.8)
         XCTAssertEqual(TrafficGraphFlowDash.frameInterval, 1 / 30)
-        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .sent), -8)
-        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .received), 8)
-        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .invocation), -8)
-        XCTAssertEqual(TrafficGraphFlowDash.phase(at: 0.25, direction: .sent),
-                       TrafficGraphFlowDash.phase(at: 0.25, direction: .sent))
+        let first = TrafficGraphEdgeID(rawValue: "observed|app.a|one.example")
+        let second = TrafficGraphEdgeID(rawValue: "observed|app.b|two.example")
+        let firstSpeed = TrafficGraphFlowDash.speed(for: first)
+        let secondSpeed = TrafficGraphFlowDash.speed(for: second)
+        XCTAssertTrue((22.4...41.6).contains(firstSpeed))
+        XCTAssertTrue((22.4...41.6).contains(secondSpeed))
+        XCTAssertNotEqual(firstSpeed, secondSpeed)
+        let sampleIDs = (0..<64).map { TrafficGraphEdgeID(rawValue: "edge-\($0)") }
+        let sampleSpeeds = TrafficGraphFlowDash.speeds(for: sampleIDs)
+        XCTAssertEqual(sampleSpeeds.count, sampleIDs.count)
+        XCTAssertEqual(Set(sampleSpeeds.values).count, sampleIDs.count)
+        XCTAssertGreaterThan(
+            (sampleSpeeds.values.max() ?? 0) - (sampleSpeeds.values.min() ?? 0),
+            15
+        )
+        XCTAssertEqual(sampleSpeeds, TrafficGraphFlowDash.speeds(for: Array(sampleIDs.reversed())))
+        let expandedSpeeds = TrafficGraphFlowDash.speeds(for: sampleIDs + [
+            TrafficGraphEdgeID(rawValue: "unrelated-new-edge")
+        ])
+        for edgeID in sampleIDs {
+            XCTAssertEqual(expandedSpeeds[edgeID], sampleSpeeds[edgeID],
+                           "an unchanged edge must keep its speed when topology changes")
+        }
+        XCTAssertEqual(firstSpeed, TrafficGraphFlowDash.speed(for: first))
+        XCTAssertEqual(
+            TrafficGraphFlowDash.phase(at: 0.25, edgeID: first, direction: .sent),
+            -TrafficGraphFlowDash.phase(at: 0.25, edgeID: first, direction: .received)
+        )
+        XCTAssertEqual(
+            TrafficGraphFlowDash.phase(at: 0.25, edgeID: first, direction: .sent),
+            TrafficGraphFlowDash.phase(at: 0.25, edgeID: first, direction: .invocation)
+        )
 
         let lanes = TrafficGraphFlowDash.lanes(
             counters: FlowCounters(bytesIn: 75, bytesOut: 25),
@@ -2833,6 +3151,40 @@ final class TrafficGraphTests: XCTestCase {
             CGRect(origin: .zero, size: size).contains(layout.contentBounds),
             "every routed ribbon must stay inside the canvas so Fit cannot reveal pre-transform clipping: \(layout.contentBounds) in \(size)"
         )
+        for edge in build.map.edges {
+            let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+            let obstacles = layout.nodeFrames.filter { id, _ in
+                id != edge.source && id != edge.target
+            }
+            for step in 1..<100 {
+                let point = curve.point(at: CGFloat(step) / 100)
+                XCTAssertFalse(
+                    obstacles.values.contains { $0.insetBy(dx: -10, dy: -10).contains(point) },
+                    "demo route \(edge.id.rawValue) crosses an unrelated card near \(point)"
+                )
+            }
+        }
+        for leftIndex in build.map.edges.indices {
+            for rightIndex in build.map.edges.indices where rightIndex > leftIndex {
+                let left = build.map.edges[leftIndex]
+                let right = build.map.edges[rightIndex]
+                guard let leftCurve = layout.edgeCurves[left.id],
+                      let rightCurve = layout.edgeCurves[right.id] else { continue }
+                let sharedEndpoint = left.source == right.source || left.source == right.target
+                    || left.target == right.source || left.target == right.target
+                let closeSamples = (15..<85).filter { step in
+                    let t = CGFloat(step) / 100
+                    let leftPoint = leftCurve.point(at: t)
+                    let rightPoint = rightCurve.point(at: t)
+                    return hypot(leftPoint.x - rightPoint.x, leftPoint.y - rightPoint.y) < 4
+                }.count
+                XCTAssertLessThan(
+                    closeSamples,
+                    sharedEndpoint ? 18 : 8,
+                    "routes \(left.id.rawValue) and \(right.id.rawValue) share one corridor"
+                )
+            }
+        }
     }
 
     func testRelationshipEdgesRouteAroundUnrelatedLaneCards() {
@@ -3000,6 +3352,200 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertTrue(observed.allSatisfy { (layout.edgeWidths[$0.id] ?? 0) > 1.5 })
         for edge in snapshot.edges where edge.relationship == .runs {
             XCTAssertEqual(layout.edgeWidths[edge.id], 1.5)
+        }
+    }
+
+    func testMixedRelationshipPortsStayInsideTheirCards() throws {
+        let source = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "app:source"),
+            kind: .app,
+            title: "Source",
+            detail: "",
+            appPath: "",
+            filter: .none,
+            counters: FlowCounters(bytesIn: 3_000, flows: 3)
+        )
+        let targets = (0..<9).map { index in
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: "destination:\(index)"),
+                kind: .destination,
+                title: "target\(index).example",
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: FlowCounters(bytesIn: 1_000, flows: 1)
+            )
+        }
+        let edges = targets.enumerated().map { index, target in
+            TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: "edge:\(index)"),
+                source: source.id,
+                target: target.id,
+                counters: index < 3 ? FlowCounters(bytesIn: 1_000, flows: 1) : FlowCounters(),
+                filter: .none,
+                relationship: index < 3 ? .observed : .blocked
+            )
+        }
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [source] + targets,
+            edges: edges,
+            total: FlowCounters(bytesIn: 3_000, flows: 3),
+            hidden: .none
+        )
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 1_000, height: 800)
+        )
+        let sourceFrame = try XCTUnwrap(layout.nodeFrames[source.id])
+
+        for edge in edges {
+            let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+            let width = try XCTUnwrap(layout.edgeWidthCaps[edge.id])
+            XCTAssertGreaterThanOrEqual(curve.start.y - width / 2, sourceFrame.minY)
+            XCTAssertLessThanOrEqual(curve.start.y + width / 2, sourceFrame.maxY)
+        }
+    }
+
+    func testDenseSemanticPortsCompressTheirGapsInsideTheCard() throws {
+        let source = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "app:source"), kind: .app, title: "Source", detail: "",
+            appPath: "", filter: .none, counters: FlowCounters()
+        )
+        let targets = (0..<24).map { index in
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: "destination:\(index)"), kind: .destination,
+                title: "target\(index).example", detail: "", appPath: "", filter: .none,
+                counters: FlowCounters()
+            )
+        }
+        let edges = targets.enumerated().map { index, target in
+            TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: "blocked:\(index)"),
+                source: source.id,
+                target: target.id,
+                counters: FlowCounters(),
+                filter: .none,
+                relationship: .blocked
+            )
+        }
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [source] + targets,
+            edges: edges,
+            total: FlowCounters(),
+            hidden: .none
+        )
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 1_000, height: 1_600)
+        )
+        let sourceFrame = try XCTUnwrap(layout.nodeFrames[source.id])
+
+        for edge in edges {
+            let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+            let width = try XCTUnwrap(layout.edgeWidths[edge.id])
+            XCTAssertGreaterThanOrEqual(curve.start.y - width / 2, sourceFrame.minY)
+            XCTAssertLessThanOrEqual(curve.start.y + width / 2, sourceFrame.maxY)
+        }
+    }
+
+    func testSameLaneRelationshipCurvesAroundInterveningCard() throws {
+        func node(_ id: String, title: String) -> TrafficGraphNode {
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: id),
+                kind: .app,
+                title: title,
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: FlowCounters()
+            )
+        }
+        let source = node("app:a", title: "A")
+        let middle = node("app:b", title: "B")
+        let target = node("app:c", title: "C")
+        let edge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "a-launches-c"),
+            source: source.id,
+            target: target.id,
+            counters: FlowCounters(),
+            filter: .none,
+            relationship: .launched
+        )
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [source, middle, target],
+            edges: [edge],
+            total: FlowCounters(),
+            hidden: .none
+        )
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 800, height: 600)
+        )
+        let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+        let obstacle = try XCTUnwrap(layout.nodeFrames[middle.id]).insetBy(dx: -10.75, dy: -10.75)
+
+        XCTAssertGreaterThan(abs(curve.point(at: 0.5).x - curve.start.x), 20)
+        for step in 1..<200 {
+            XCTAssertFalse(obstacle.contains(curve.point(at: CGFloat(step) / 200)))
+        }
+    }
+
+    func testSameLaneRelationshipTriesTheClearOppositeSide() {
+        let obstacle = CGRect(x: 170, y: 0, width: 360, height: 400)
+        let curve = TrafficGraphLayout.sameLaneCurve(
+            start: CGPoint(x: 150, y: 50),
+            end: CGPoint(x: 150, y: 350),
+            side: .right,
+            avoiding: [obstacle],
+            width: 1.5,
+            within: CGRect(x: 0, y: 0, width: 600, height: 400)
+        )
+        let padded = obstacle.insetBy(dx: -10.75, dy: -10.75)
+
+        XCTAssertLessThan(curve.point(at: 0.5).x, 150)
+        for step in 1..<200 {
+            XCTAssertFalse(padded.contains(curve.point(at: CGFloat(step) / 200)))
+        }
+    }
+
+    func testWideRibbonClearanceIncludesHalfItsRenderedWidth() throws {
+        let source = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "app:source"), kind: .app, title: "Source", detail: "",
+            appPath: "", filter: .none, counters: FlowCounters(bytesIn: 1_000_000, flows: 1)
+        )
+        let obstacle = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "tool:middle"), kind: .tool, title: "Middle", detail: "",
+            appPath: "", filter: .none, counters: FlowCounters()
+        )
+        let target = TrafficGraphNode(
+            id: TrafficGraphNodeID(rawValue: "destination:target"), kind: .destination,
+            title: "target.example", detail: "", appPath: "", filter: .none,
+            counters: FlowCounters(bytesIn: 1_000_000, flows: 1)
+        )
+        let edge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "source→target"),
+            source: source.id,
+            target: target.id,
+            counters: FlowCounters(bytesIn: 1_000_000, flows: 1),
+            filter: .none
+        )
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [source, obstacle, target],
+            edges: [edge],
+            total: edge.counters,
+            hidden: .none
+        )
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 1_000, height: 500)
+        )
+        let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+        let width = try XCTUnwrap(layout.edgeWidths[edge.id])
+        let clearance = try XCTUnwrap(layout.nodeFrames[obstacle.id])
+            .insetBy(dx: -(10 + width / 2), dy: -(10 + width / 2))
+
+        for step in 1..<200 {
+            XCTAssertFalse(clearance.contains(curve.point(at: CGFloat(step) / 200)))
         }
     }
 

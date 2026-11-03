@@ -112,7 +112,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <figcaption class="caption">In diretta, la schermata con cui Flowlight si apre.</figcaption></figure>
       <p>In Rapporti, passa il puntatore su una barra per vedere quali app l'hanno generata, fai clic per ingrandire e doppio clic su una riga per limitare il rapporto a essa.</p>
       <h2 id="visualize">Visualizzare il traffico</h2>
-      <p>Visualizza mostra app e destinazioni esatte come nodi stabili. La larghezza rappresenta i byte e le particelle indicano la direzione. L’elenco contiene gli stessi valori. Connessioni significa flussi di rete, non richieste HTTP; Osservato non è una decisione di autorizzazione.</p>
+      <p><strong>Visualizza</strong> mostra ogni app, destinazione esatta e relazione osservata nell’intervallo, nella ricerca e nel focus correnti. La larghezza rappresenta i byte. Trattini rosa e blu sparsi scorrono in direzioni opposte per invio e ricezione; ogni arco ha la propria velocità stabile e Riduci movimento mantiene gli stessi percorsi statici.</p>
+      <p>Se la mappa esatta sarebbe troppo densa, Flowlight mostra gruppi deterministici con il numero visibile di elementi esatti. Seleziona un gruppo per rivelarne nodi e relazioni; <strong>Comprimi gruppi</strong> ripristina la panoramica. Ricerca e Focus mostrano direttamente le corrispondenze, anche a basso volume. Il raggruppamento cambia solo la presentazione: identità, byte ricevuti e inviati, connessioni e appartenenza coincidono con Rapporti per lo stesso ambito.</p>
+      <p>Seleziona un nodo o una connessione per i valori esatti, quindi apri Rapporti, Ispeziona o una regola non salvata con la stessa app e destinazione. <strong>Elenco</strong> offre lo stesso grafo completo per tastiera e VoiceOver. Connessioni significa flussi di rete, non richieste HTTP; Osservato non è una decisione di autorizzazione.</p>
 
       <h2 id="agents">Regole per gli agenti IA</h2>
       <p>Un'app conta come agente se Flowlight la conosce per nome (oggi 16, tra cui Claude Code, Codex, Cursor, GitHub Copilot,

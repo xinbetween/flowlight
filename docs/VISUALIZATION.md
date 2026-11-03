@@ -9,10 +9,10 @@ Traffic mode answers: **which applications moved traffic, and where did it go?**
 - Every observed application is an app node with its native icon and name.
 - Every exact `(hostname, IP address)` is a destination node. Hostname-less traffic keeps its owner/address identity.
 - Curved path width represents total bytes.
-- Moving particles represent sent and received direction; Reduce Motion removes them.
+- Sparse moving dashes represent sent and received direction. Every edge has a distinct deterministic speed, both directions on one edge share its magnitude and move oppositely, and Reduce Motion removes animation.
 - Values are bytes and network connections (`FlowCounters.flows`), never mislabeled as HTTP requests.
 - Ordinary traffic is **Observed**, not “Allowed.” A status badge appears only when a store provides matching structured evidence.
-- The semantic graph retains every relationship in the selected search and Focus scope. The map derives a bounded projection for readability and reports exact omitted node, relationship, byte, and connection totals. The independently paged list reveals the complete graph 25 relationships at a time; paging never changes Map IDs or layout.
+- The semantic graph retains every relationship in the selected search and Focus scope. When an exact Map would be too dense, deterministic visible groups retain every member node and relationship ID; selecting a group reveals its exact chart items without changing totals. Search and Focus build an exact scoped Map, including low-volume applications and destinations. The independently paged List reveals the same complete graph 25 relationships at a time.
 - Each application has one semantic card. Application-owned traffic, observed proxy routing, configured-gateway, launcher, agent, and tool roles remain distinct relationship evidence on that card, while observed traffic is counted exactly once.
 - Selecting an app, destination, or relationship can open Reports, Inspect, or an unsaved rule editor with the exact app and host/address filter. Bare IPv4 and IPv6 destinations retain exact address identity and use `remoteIP` scope rather than a fabricated domain family.
 
@@ -82,8 +82,8 @@ A later status overlay must expose completeness/retention and join only structur
 - Existing positions survive counter refreshes and mode-local filtering where topology permits.
 - Layout recomputes only for material topology or viewport changes.
 - Node frames include icon, labels, telemetry, and status footprint before collision resolution.
-- Separate caps apply only to the Map projection: agents, tools/MCP nodes, services/destinations, and relationships remain complete in List.
-- Map omission summaries are the exact ID-set difference from the complete semantic graph and include only omitted observed traffic in byte and connection totals.
+- Map grouping is deterministic and presentation-only: a collapsed node or relationship stores the exact IDs it represents, while complete accounting remains unchanged.
+- Expanding and collapsing groups may change geometry only. Exact membership, received bytes, sent bytes, and connection totals must remain identical to Reports for the same range, search, and Focus scope.
 
 ## 0.16.7 — scalable map geometry
 
@@ -97,6 +97,14 @@ Map geometry is now a stable product of semantic IDs and viewport size. Counter 
 - Fit still includes every card and relationship. After a person pans, zooms, or resets, asynchronous topology refreshes preserve that viewport until they choose Fit again. Anchored zoom round-trips between graph and screen coordinates, and Reduce Motion continues to remove moving dashes.
 - A 600-relationship benchmark guards layout cost in addition to deterministic geometry, collision, route-avoidance, crossing, hit-testing, Fit, and accessibility coverage.
 
+## 0.16.9 — complete expandable maps
+
+Traffic and AI Maps no longer discard exact evidence behind a fixed top-N boundary. Dense stages collapse into deterministic alphabetical groups that state how many exact items they contain. Selecting a group expands its exact nodes and relationships; **Collapse groups** restores the stable overview. Search and Focus reveal exact matching chart items directly, even when their traffic volume is low.
+
+Reports and Visualize now share an explicit parity contract for the same half-open time range and scope: raw application identity, exact destination identity, canonical observed relationships, received bytes, sent bytes, and connection counts must reconcile exactly. Collapsing or expanding groups cannot alter any of those values.
+
+Every relationship uses the same smooth cubic curve family. Direction is drawn with sparse border-aligned dashes whose speed is unique per edge but stable across refreshes and launches; received and sent motion on one edge has equal magnitude and opposite direction. Swift's randomized `Hasher` is deliberately not part of the identity or animation contract.
+
 ### Acceptance tests
 
 1. Known agents, attributed parents, and non-browser provider callers are included; browsers are not auto-discovered.
@@ -104,8 +112,8 @@ Map geometry is now a stable product of semantic IDs and viewport size. Counter 
 3. Provider grouping preserves exact host/IP members and exact navigation filters.
 4. Lineage never appears as a measured invocation without inspected invocation evidence.
 5. Duplicate rows aggregate without losing received, sent, or connection totals.
-6. Complete semantics retain every relationship; deterministic Map IDs are a subset, and visible plus omitted observed totals equal the full source totals.
-7. List paging and counter-only refreshes leave Map IDs, node positions, and curves unchanged.
+6. Complete semantics retain every relationship; deterministic collapsed groups retain exact member node and relationship IDs, and expansion leaves source totals unchanged.
+7. List paging, counter-only refreshes, and unrelated group expansion leave surviving Map IDs and membership stable.
 8. No feasible full-frame overlaps; hover and selection never mutate geometry.
 9. Reduce Motion removes moving dashes; the list and accessibility labels retain direction and values.
 10. Status overlays never classify ordinary observed traffic as an allow decision.

@@ -36,15 +36,6 @@ enum VisualizeSelectionPolicy {
     }
 }
 
-enum VisualizeOmissionLabel {
-    static func text(for hidden: TrafficGraphHidden) -> String {
-        if hidden.nodeCount > 0 {
-            return L("%lld nodes and %lld relationships omitted from Map", hidden.nodeCount, hidden.edgeCount)
-        }
-        return L("%lld relationships omitted from Map", hidden.edgeCount)
-    }
-}
-
 enum VisualizeEvidenceScope {
     static func rows(
         _ rows: [BreakdownRow],
@@ -220,6 +211,8 @@ struct VisualizeView: View {
     @State private var blockedAttempts: [BlockedAttemptRow] = []
     @State private var completeSnapshot = TrafficGraphSnapshot.empty
     @State private var mapSnapshot = TrafficGraphSnapshot.empty
+    @State private var expandedGroupIDs: Set<TrafficGraphNodeID> = []
+    @State private var expandedEdgeGroupIDs: Set<TrafficGraphEdgeID> = []
     @State private var listVisibleCount = TrafficGraphListPager.pageSize
     @State private var selectedNode: TrafficGraphNodeID?
     @State private var selectedEdge: TrafficGraphEdgeID?
@@ -286,11 +279,15 @@ struct VisualizeView: View {
             }
         }
         .task(id: RebuildKey(loadID: loadID, query: query, mode: mode,
-                             focus: focus.scope, gatewayVersion: gatewayVersion)) { await rebuild() }
+                             focus: focus.scope, gatewayVersion: gatewayVersion,
+                             expandedGroupIDs: expandedGroupIDs,
+                             expandedEdgeGroupIDs: expandedEdgeGroupIDs)) { await rebuild() }
         .onChange(of: mode) { _, _ in
             rows = []
             completeSnapshot = .empty
             mapSnapshot = .empty
+            expandedGroupIDs = []
+            expandedEdgeGroupIDs = []
             listVisibleCount = TrafficGraphListPager.pageSize
             selectedNode = nil
             selectedEdge = nil
@@ -301,11 +298,15 @@ struct VisualizeView: View {
         }
         .onChange(of: focus.scope) { _, _ in
             listVisibleCount = TrafficGraphListPager.pageSize
+            expandedGroupIDs = []
+            expandedEdgeGroupIDs = []
             selectedNode = nil
             selectedEdge = nil
         }
         .onChange(of: query) { previous, current in
             listVisibleCount = TrafficGraphListPager.pageSize
+            expandedGroupIDs = []
+            expandedEdgeGroupIDs = []
             guard VisualizeSelectionPolicy.shouldClear(previousQuery: previous, newQuery: current) else { return }
             selectedNode = nil
             selectedEdge = nil
@@ -346,11 +347,23 @@ struct VisualizeView: View {
                     .font(.caption).foregroundStyle(FL.muted)
             }
             Spacer()
-            if presentation == .map, mapSnapshot.hidden.hasOmissions {
-                Label(VisualizeOmissionLabel.text(for: mapSnapshot.hidden), systemImage: "ellipsis.circle")
-                    .font(.caption).foregroundStyle(FL.muted)
-                    .accessibilityLabel(hiddenSummary)
-                    .help(hiddenSummary)
+            if presentation == .map, collapsedExactItemCount > 0 {
+                Label(
+                    L("%lld exact items collapsed into %lld groups",
+                      Int64(collapsedExactItemCount), Int64(collapsedGroupCount)),
+                    systemImage: "square.grid.2x2"
+                )
+                .font(.caption).foregroundStyle(FL.muted)
+                .help(L("Select a group to reveal its exact chart items."))
+            }
+            if presentation == .map, !expandedGroupIDs.isEmpty || !expandedEdgeGroupIDs.isEmpty {
+                Button(L("Collapse groups")) {
+                    expandedGroupIDs = []
+                    expandedEdgeGroupIDs = []
+                    selectedNode = nil
+                    selectedEdge = nil
+                }
+                .buttonStyle(.borderless)
             }
             Picker(L("Mode"), selection: $mode) {
                 ForEach(Mode.allCases) { Label($0.title, systemImage: $0.icon).tag($0) }
@@ -372,22 +385,33 @@ struct VisualizeView: View {
         .background(FL.surface)
     }
 
-    private var hiddenSummary: String {
-        let explanation = L("The map stays readable by showing a bounded projection. List retains every relationship in this search and Focus scope.")
-        let counts = L("%lld nodes and %lld relationships omitted from Map", mapSnapshot.hidden.nodeCount,
-                       mapSnapshot.hidden.edgeCount)
-        let totals = "\(L("Received")): \(ByteFormat.string(mapSnapshot.hidden.counters.bytesIn)) · "
-            + "\(L("Sent")): \(ByteFormat.string(mapSnapshot.hidden.counters.bytesOut)) · "
-            + L("%lld connections", mapSnapshot.hidden.counters.flows)
-        return explanation + "\n" + counts + "\n" + totals
+    private var collapsedGroupCount: Int {
+        mapSnapshot.nodes.lazy.filter(\.isCollapsedGroup).count
+            + mapSnapshot.edges.lazy.filter(\.isCollapsedGroup).count
+    }
+
+    private var collapsedExactItemCount: Int {
+        mapSnapshot.nodes.lazy.filter(\.isCollapsedGroup)
+            .reduce(0) { $0 + $1.collapsedNodeIDs.count }
+            + mapSnapshot.edges.lazy.filter(\.isCollapsedGroup)
+                .reduce(0) { $0 + $1.collapsedEdgeIDs.count }
     }
 
     private var graphAndInspector: some View {
         HSplitView {
-            TrafficGraphCanvas(snapshot: mapSnapshot, selectedNode: $selectedNode, selectedEdge: $selectedEdge,
-                               reduceMotion: reduceMotion)
+            TrafficGraphCanvas(
+                snapshot: mapSnapshot,
+                selectedNode: $selectedNode,
+                selectedEdge: $selectedEdge,
+                reduceMotion: reduceMotion,
+                onToggleGroup: expandGroup
+            )
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-            TrafficGraphInspector(selection: selection, granularity: granularity)
+            TrafficGraphInspector(
+                selection: selection,
+                granularity: granularity,
+                onExpandEdgeGroup: expandEdgeGroup
+            )
                 .frame(minWidth: 260, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
                 .environmentObject(nav)
         }
@@ -461,6 +485,8 @@ struct VisualizeView: View {
         let demo = DemoData.isEnabled
         let mode = mode
         let focusScope = focus.scope
+        let expandedGroupIDs = expandedGroupIDs
+        let expandedEdgeGroupIDs = expandedEdgeGroupIDs
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let built = await Task.detached(priority: .userInitiated) {
             let visibleRows = VisualizeEvidenceScope.rows(
@@ -477,7 +503,9 @@ struct VisualizeView: View {
             case .traffic:
                 return TrafficGraphBuilder.buildForPresentation(
                     rows: visibleRows,
-                    blockedAttempts: visibleEnforcement
+                    blockedAttempts: visibleEnforcement,
+                    expandedGroupIDs: expandedGroupIDs,
+                    expandedEdgeGroupIDs: expandedEdgeGroupIDs
                 )
             case .ai:
                 let resolvedGateways = gateways.map { gateway in
@@ -502,7 +530,9 @@ struct VisualizeView: View {
                     gateways: scopedGateways.map(\.0),
                     resolveGateway: { endpoint in
                         scopedGateways.first { $0.0.endpoint == endpoint }?.1
-                    }
+                    },
+                    expandedGroupIDs: expandedGroupIDs,
+                    expandedEdgeGroupIDs: expandedEdgeGroupIDs
                 )
             }
         }.value
@@ -520,6 +550,18 @@ struct VisualizeView: View {
         )
     }
 
+    private func expandGroup(_ id: TrafficGraphNodeID) {
+        expandedGroupIDs.insert(id)
+        selectedNode = nil
+        selectedEdge = nil
+    }
+
+    private func expandEdgeGroup(_ id: TrafficGraphEdgeID) {
+        expandedEdgeGroupIDs.insert(id)
+        selectedNode = nil
+        selectedEdge = nil
+    }
+
     private struct LoadKey: Equatable {
         var mode: Mode
         var granularity: Granularity
@@ -535,6 +577,8 @@ struct VisualizeView: View {
         var mode: Mode
         var focus: FocusScope
         var gatewayVersion: String
+        var expandedGroupIDs: Set<TrafficGraphNodeID>
+        var expandedEdgeGroupIDs: Set<TrafficGraphEdgeID>
     }
 }
 
@@ -555,6 +599,7 @@ private struct TrafficGraphCanvas: View {
     @Binding var selectedNode: TrafficGraphNodeID?
     @Binding var selectedEdge: TrafficGraphEdgeID?
     var reduceMotion: Bool
+    var onToggleGroup: (TrafficGraphNodeID) -> Void
     @State private var hoveredNode: TrafficGraphNodeID?
     @State private var hoveredEdge: TrafficGraphEdgeID?
     @State private var cachedLayout = TrafficGraphLayoutSnapshot(nodeFrames: [:], edgeCurves: [:])
@@ -660,8 +705,12 @@ private struct TrafficGraphCanvas: View {
                         hovered: hoveredNode == node.id,
                         dimmed: isNodeDimmed(node.id)
                     ) {
-                        selectedNode = node.id
-                        selectedEdge = nil
+                        if node.isCollapsedGroup {
+                            onToggleGroup(node.id)
+                        } else {
+                            selectedNode = node.id
+                            selectedEdge = nil
+                        }
                     }
                     .frame(width: frame.width, height: frame.height)
                     .position(x: frame.midX, y: frame.midY)
@@ -768,18 +817,46 @@ private struct TrafficGraphCanvas: View {
 
                 let counters = edge.displayedCounters
                 let width = layout.edgeWidths[edge.id] ?? 1
-                context.fill(ribbonPath(curve, width: width),
-                             with: .color(FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)))
+                let ribbonColor = FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)
+                if curve.routingPoints.count >= 2 {
+                    context.stroke(
+                        path(curve),
+                        with: .color(ribbonColor),
+                        style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round)
+                    )
+                } else {
+                    context.fill(ribbonPath(curve, width: width), with: .color(ribbonColor))
+                }
                 guard emphasized, counters.total > 0 else { continue }
 
                 let lanes = TrafficGraphFlowDash.lanes(counters: counters, totalWidth: width)
                 if lanes.received.width > 0 {
-                    context.fill(ribbonPath(curve, width: lanes.received.width, offset: lanes.received.offset),
-                                 with: .color(FL.graphReceived.opacity(0.88)))
+                    if curve.routingPoints.count >= 2 {
+                        context.stroke(
+                            path(curve.offset(by: lanes.received.offset)),
+                            with: .color(FL.graphReceived.opacity(0.88)),
+                            style: StrokeStyle(lineWidth: lanes.received.width, lineCap: .round, lineJoin: .round)
+                        )
+                    } else {
+                        context.fill(
+                            ribbonPath(curve, width: lanes.received.width, offset: lanes.received.offset),
+                            with: .color(FL.graphReceived.opacity(0.88))
+                        )
+                    }
                 }
                 if lanes.sent.width > 0 {
-                    context.fill(ribbonPath(curve, width: lanes.sent.width, offset: lanes.sent.offset),
-                                 with: .color(FL.graphSent.opacity(0.88)))
+                    if curve.routingPoints.count >= 2 {
+                        context.stroke(
+                            path(curve.offset(by: lanes.sent.offset)),
+                            with: .color(FL.graphSent.opacity(0.88)),
+                            style: StrokeStyle(lineWidth: lanes.sent.width, lineCap: .round, lineJoin: .round)
+                        )
+                    } else {
+                        context.fill(
+                            ribbonPath(curve, width: lanes.sent.width, offset: lanes.sent.offset),
+                            with: .color(FL.graphSent.opacity(0.88))
+                        )
+                    }
                 }
             }
         }
@@ -792,6 +869,9 @@ private struct TrafficGraphCanvas: View {
         visible: TrafficGraphVisibleRegion
     ) -> some View {
         if !reduceMotion {
+            let edgeSpeeds = TrafficGraphFlowDash.speeds(
+                for: snapshot.edges.filter(TrafficGraphFlowDash.animates).map(\.id)
+            )
             TimelineView(.periodic(from: .now, by: TrafficGraphFlowDash.frameInterval)) { timeline in
                 Canvas { context, _ in
                     let time = timeline.date.timeIntervalSinceReferenceDate
@@ -799,6 +879,13 @@ private struct TrafficGraphCanvas: View {
                         && visible.edgeIDs.contains(edge.id) && isEdgeRelated(edge) {
                         guard let curve = layout.edgeCurves[edge.id],
                               let width = layout.edgeWidths[edge.id] else { continue }
+                        let emphasized = TrafficGraphSelection.emphasizes(
+                            edge,
+                            selectedNode: selectedNode,
+                            selectedEdge: selectedEdge,
+                            hoveredEdge: hoveredEdge
+                        )
+                        let dashOpacity = emphasized ? 0.9 : 0.34
                         let lanes = TrafficGraphFlowDash.lanes(
                             counters: edge.displayedCounters,
                             totalWidth: width
@@ -809,10 +896,12 @@ private struct TrafficGraphCanvas: View {
                                     totalWidth: width,
                                     direction: .sent
                                 ))),
-                                with: .color(FL.graphSent.opacity(0.9)),
+                                with: .color(FL.graphSent.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
+                                    edgeID: edge.id,
                                     direction: .sent,
+                                    speed: edgeSpeeds[edge.id],
                                     lineWidth: TrafficGraphFlowDash.strokeWidth
                                 )
                             )
@@ -823,10 +912,12 @@ private struct TrafficGraphCanvas: View {
                                     totalWidth: width,
                                     direction: .received
                                 ))),
-                                with: .color(FL.graphReceived.opacity(0.9)),
+                                with: .color(FL.graphReceived.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
+                                    edgeID: edge.id,
                                     direction: .received,
+                                    speed: edgeSpeeds[edge.id],
                                     lineWidth: TrafficGraphFlowDash.strokeWidth
                                 )
                             )
@@ -841,12 +932,23 @@ private struct TrafficGraphCanvas: View {
 
     private func flowDashStyle(
         at time: TimeInterval,
+        edgeID: TrafficGraphEdgeID,
         direction: TrafficGraphFlowDirection,
+        speed: CGFloat?,
         lineWidth: CGFloat
     ) -> StrokeStyle {
-        StrokeStyle(lineWidth: lineWidth, lineCap: .butt,
-                    dash: TrafficGraphFlowDash.pattern,
-                    dashPhase: TrafficGraphFlowDash.phase(at: time, direction: direction))
+        StrokeStyle(
+            lineWidth: lineWidth,
+            lineCap: .butt,
+            lineJoin: .round,
+            dash: TrafficGraphFlowDash.pattern,
+            dashPhase: TrafficGraphFlowDash.phase(
+                at: time,
+                edgeID: edgeID,
+                direction: direction,
+                speed: speed
+            )
+        )
     }
 
     private func relationshipControls(_ layout: TrafficGraphLayoutSnapshot) -> some View {
@@ -917,8 +1019,40 @@ private struct TrafficGraphCanvas: View {
     private func path(_ curve: TrafficGraphCurve) -> Path {
         Path { path in
             path.move(to: curve.start)
-            path.addCurve(to: curve.end, control1: curve.control1, control2: curve.control2)
+            if curve.routingPoints.count >= 2 {
+                addRoundedRoute(curve.routingPoints, to: &path)
+            } else {
+                path.addCurve(to: curve.end, control1: curve.control1, control2: curve.control2)
+            }
         }
+    }
+
+    private func addRoundedRoute(_ points: [CGPoint], to path: inout Path) {
+        guard points.count > 2 else {
+            path.addLines(Array(points.dropFirst()))
+            return
+        }
+        let radius: CGFloat = 8
+        for index in 1..<(points.count - 1) {
+            let previous = points[index - 1]
+            let corner = points[index]
+            let next = points[index + 1]
+            let incomingLength = hypot(corner.x - previous.x, corner.y - previous.y)
+            let outgoingLength = hypot(next.x - corner.x, next.y - corner.y)
+            let incoming = min(radius, incomingLength / 2)
+            let outgoing = min(radius, outgoingLength / 2)
+            let before = CGPoint(
+                x: corner.x + (previous.x - corner.x) * incoming / max(incomingLength, 0.001),
+                y: corner.y + (previous.y - corner.y) * incoming / max(incomingLength, 0.001)
+            )
+            let after = CGPoint(
+                x: corner.x + (next.x - corner.x) * outgoing / max(outgoingLength, 0.001),
+                y: corner.y + (next.y - corner.y) * outgoing / max(outgoingLength, 0.001)
+            )
+            path.addLine(to: before)
+            path.addQuadCurve(to: after, control: corner)
+        }
+        if let last = points.last { path.addLine(to: last) }
     }
 
     private func ribbonPath(_ curve: TrafficGraphCurve, width: CGFloat, offset: CGFloat = 0) -> Path {
@@ -926,9 +1060,17 @@ private struct TrafficGraphCanvas: View {
         let bottom = curve.offset(by: offset + width / 2)
         return Path { path in
             path.move(to: top.start)
-            path.addCurve(to: top.end, control1: top.control1, control2: top.control2)
+            if top.routingPoints.count >= 2 {
+                path.addLines(Array(top.routingPoints.dropFirst()))
+            } else {
+                path.addCurve(to: top.end, control1: top.control1, control2: top.control2)
+            }
             path.addLine(to: bottom.end)
-            path.addCurve(to: bottom.start, control1: bottom.control2, control2: bottom.control1)
+            if bottom.routingPoints.count >= 2 {
+                path.addLines(Array(bottom.routingPoints.dropLast().reversed()))
+            } else {
+                path.addCurve(to: bottom.start, control1: bottom.control2, control2: bottom.control1)
+            }
             path.closeSubpath()
         }
     }
@@ -958,13 +1100,22 @@ private struct TrafficGraphNodeView: View {
             }
         }
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(L("Select to inspect this traffic"))
+        .accessibilityHint(node.isCollapsedGroup
+                           ? L("Reveal the exact chart items in this group")
+                           : L("Select to inspect this traffic"))
         .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : [])
     }
 
     private var appContent: some View {
         HStack(spacing: 9) {
-            AppIconView(path: node.appPath, size: 30)
+            if node.isCollapsedGroup {
+                Image(systemName: "square.grid.2x2")
+                    .font(.title2)
+                    .foregroundStyle(FL.accent)
+                    .frame(width: 30, height: 30)
+            } else {
+                AppIconView(path: node.appPath, size: 30)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(node.title).font(.caption.bold()).foregroundStyle(FL.ink).lineLimit(2)
                 if let role = roleLabel {
@@ -1011,6 +1162,7 @@ private struct TrafficGraphNodeView: View {
     }
 
     private var nodeIcon: String {
+        if node.isCollapsedGroup { return "square.grid.2x2" }
         switch node.kind {
         case .service: return "sparkles"
         case .tool: return "hammer"
@@ -1029,6 +1181,7 @@ private struct TrafficGraphNodeView: View {
 private struct TrafficGraphInspector: View {
     var selection: GraphSelection?
     var granularity: Granularity
+    var onExpandEdgeGroup: ((TrafficGraphEdgeID) -> Void)? = nil
     @EnvironmentObject private var nav: AppNavigation
 
     var body: some View {
@@ -1131,6 +1284,13 @@ private struct TrafficGraphInspector: View {
                    systemImage: relationshipIcon(edge.relationship),
                    color: edge.relationship == .blocked ? FL.critical
                     : edge.relationship == .observed ? FL.muted : FL.graphInvocation)
+            if edge.isCollapsedGroup {
+                Text(L("%lld exact items", Int64(edge.collapsedEdgeIDs.count)))
+                    .font(.caption).foregroundStyle(FL.muted)
+                if let onExpandEdgeGroup {
+                    Button(L("Reveal the exact chart items in this group")) { onExpandEdgeGroup(edge.id) }
+                }
+            }
             if edge.isTrafficRibbon {
                 metrics(edge.displayedCounters)
                 if edge.relationship == .observed {

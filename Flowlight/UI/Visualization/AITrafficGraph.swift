@@ -747,7 +747,9 @@ enum AITrafficGraphBuilder {
             LocalGatewayResolver.resolve($0)
         },
         includeConfiguredOnlyAgents: Bool = true,
-        mapLimits: AITrafficGraphLimits = .standard
+        mapLimits: AITrafficGraphLimits = .standard,
+        expandedGroupIDs: Set<TrafficGraphNodeID> = [],
+        expandedEdgeGroupIDs: Set<TrafficGraphEdgeID> = []
     ) -> TrafficGraphBuild where Rows.Element == BreakdownRow {
         let rows = Array(sourceRows)
         var complete = build(
@@ -763,10 +765,14 @@ enum AITrafficGraphBuilder {
         guard mapLimits != .unbounded else {
             return TrafficGraphBuild(complete: complete, map: complete)
         }
-        return TrafficGraphBuild(
-            complete: complete,
-            map: TrafficGraphMapProjector.project(complete, limits: mapLimits)
-        )
+        let map = mapLimits == .standard
+            ? TrafficGraphMapGrouping.project(
+                complete,
+                expandedGroupIDs: expandedGroupIDs,
+                expandedEdgeGroupIDs: expandedEdgeGroupIDs
+            )
+            : TrafficGraphMapProjector.project(complete, limits: mapLimits)
+        return TrafficGraphBuild(complete: complete, map: map)
     }
 
     private static func toolIdentity(_ row: BreakdownRow, agent: AgentIdentity) -> ToolIdentity? {
@@ -781,7 +787,6 @@ enum AITrafficGraphBuilder {
     private static func prefersMetadata(_ candidate: ToolMetadata, over current: ToolMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
-        if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
     }
@@ -789,7 +794,6 @@ enum AITrafficGraphBuilder {
     private static func prefersMetadata(_ candidate: LauncherMetadata, over current: LauncherMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
-        if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
     }
@@ -797,7 +801,6 @@ enum AITrafficGraphBuilder {
     private static func prefersMetadata(_ candidate: RelayMetadata, over current: RelayMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
-        if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
     }
