@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentação</p>
     <h1>Usar o Flowlight</h1>
-    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.16.8, macOS 15 ou posterior.</p>
+    <p class="lede">Tudo, da primeira abertura ao ajuste das regras dos agentes. Flowlight 0.16.9, macOS 15 ou posterior.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Nesta página">
@@ -181,7 +181,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <figcaption class="caption">Em direto, a vista com que o Flowlight abre.</figcaption></figure>
       <p>Em Relatórios, passe o rato sobre uma barra para ver que apps a produziram, clique nela para ampliar e faça duplo clique numa linha para restringir o relatório a essa linha.</p>
       <h2 id="visualize">Visualizar tráfego</h2>
-      <p>Visualizar mostra aplicações e destinos exatos como nós estáveis. A largura representa bytes e as partículas mostram a direção. A lista contém os mesmos valores. Ligações significa fluxos de rede, não pedidos HTTP; Observado não é uma decisão de permissão.</p>
+      <p><strong>Visualizar</strong> mostra cada aplicação, destino exato e relação observada no período, pesquisa e foco atuais. A largura representa bytes. Traços rosa e azuis esparsos movem-se em sentidos opostos para envio e receção; cada aresta tem a sua própria velocidade estável e Reduzir movimento mantém os mesmos percursos estáticos.</p>
+      <p>Quando o mapa exato seria demasiado denso, o Flowlight mostra grupos determinísticos com a contagem visível de itens exatos. Selecione um grupo para revelar os seus nós e relações; <strong>Recolher grupos</strong> repõe a visão geral. A pesquisa e o Foco revelam diretamente as correspondências, mesmo com pouco tráfego. O agrupamento só altera a apresentação: identidades, bytes recebidos e enviados, ligações e pertença coincidem com Relatórios para o mesmo âmbito.</p>
+      <p>Selecione um nó ou ligação para ver valores exatos e continue para Relatórios, Inspecionar ou uma regra não guardada com a mesma aplicação e destino. <strong>Lista</strong> fornece o mesmo grafo completo ao teclado e VoiceOver. Ligações significa fluxos de rede, não pedidos HTTP; Observado não é uma decisão de permissão.</p>
 
       <h2 id="agents">Regras dos agentes de IA</h2>
       <p>Uma app conta como agente se o Flowlight a conhecer pelo nome (16 hoje, entre elas o Claude Code, o Codex, o Cursor, o GitHub Copilot,
@@ -754,7 +756,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Quem contribui para o Flowlight. O Flowlight é software livre, publicado sob a <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versão 0.16.8 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
+      <span>Versão 0.16.9 · Sem qualquer ligação à Apple ou a algum fornecedor de IA mencionado neste site.</span>
     </div>
   </div>
 </footer>

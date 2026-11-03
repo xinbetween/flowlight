@@ -40,6 +40,13 @@ struct TrafficGraphNode: Identifiable, Sendable {
     var members: [TrafficGraphMember] = []
     var roleEvidence: [TrafficGraphRoleEvidence] = []
     var isFilterExact = true
+    /// Exact semantic node IDs represented by this collapsed Map group. Exact nodes leave this empty.
+    var collapsedNodeIDs: [TrafficGraphNodeID] = []
+
+    var isCollapsedGroup: Bool { !collapsedNodeIDs.isEmpty }
+    var representedNodeIDs: Set<TrafficGraphNodeID> {
+        isCollapsedGroup ? Set(collapsedNodeIDs) : [id]
+    }
 }
 
 enum TrafficGraphRelationship: String, Sendable, Hashable {
@@ -88,9 +95,15 @@ struct TrafficGraphEdge: Identifiable, Sendable {
     /// Captured bytes represented by this route segment when `counters` must remain zero to avoid counting one flow
     /// more than once in snapshot totals. Configured-only relationships never carry this value.
     var trafficVolume: FlowCounters? = nil
+    /// Exact semantic edge IDs represented by this collapsed Map relationship. Exact edges leave this empty.
+    var collapsedEdgeIDs: [TrafficGraphEdgeID] = []
 
     var displayedCounters: FlowCounters { trafficVolume ?? counters }
     var isTrafficRibbon: Bool { relationship == .observed || trafficVolume != nil }
+    var isCollapsedGroup: Bool { !collapsedEdgeIDs.isEmpty }
+    var representedEdgeIDs: Set<TrafficGraphEdgeID> {
+        isCollapsedGroup ? Set(collapsedEdgeIDs) : [id]
+    }
 }
 
 extension FlowCounters {
@@ -123,6 +136,14 @@ struct TrafficGraphSnapshot: Sendable {
     var visibleTotal: FlowCounters {
         edges.lazy.filter { $0.relationship == .observed }
             .reduce(into: FlowCounters()) { $0 += $1.counters }
+    }
+
+    var representedNodeIDs: Set<TrafficGraphNodeID> {
+        nodes.reduce(into: Set<TrafficGraphNodeID>()) { $0.formUnion($1.representedNodeIDs) }
+    }
+
+    var representedEdgeIDs: Set<TrafficGraphEdgeID> {
+        edges.reduce(into: Set<TrafficGraphEdgeID>()) { $0.formUnion($1.representedEdgeIDs) }
     }
 }
 
@@ -588,6 +609,187 @@ enum TrafficGraphMapProjector {
     }
 }
 
+enum TrafficGraphMapGrouping {
+    static let groupThreshold = 12
+
+    private struct AlphabetBucket: Hashable {
+        var id: String
+        var title: String
+    }
+
+    static func project(
+        _ complete: TrafficGraphSnapshot,
+        expandedGroupIDs: Set<TrafficGraphNodeID> = [],
+        expandedEdgeGroupIDs: Set<TrafficGraphEdgeID> = []
+    ) -> TrafficGraphSnapshot {
+        let nodesByKind = Dictionary(grouping: complete.nodes, by: { $0.kind.rawValue })
+        var projectedNodes: [TrafficGraphNode] = []
+        var representativeByID: [TrafficGraphNodeID: TrafficGraphNodeID] = [:]
+
+        for kindKey in nodesByKind.keys.sorted() {
+            guard let kindNodes = nodesByKind[kindKey]?.sorted(by: { $0.id < $1.id }) else { continue }
+            guard kindNodes.count > groupThreshold else {
+                projectedNodes.append(contentsOf: kindNodes)
+                for node in kindNodes { representativeByID[node.id] = node.id }
+                continue
+            }
+
+            let buckets = Dictionary(grouping: kindNodes, by: { alphabetBucket(for: $0.title) })
+            for bucket in buckets.keys.sorted(by: { $0.id < $1.id }) {
+                guard let members = buckets[bucket]?.sorted(by: { $0.id < $1.id }),
+                      let first = members.first else { continue }
+                let groupID = TrafficGraphNodeID(
+                    rawValue: stableID(["map-group", first.kind.rawValue, bucket.id])
+                )
+                if members.count == 1 || expandedGroupIDs.contains(groupID) {
+                    projectedNodes.append(contentsOf: members)
+                    for node in members { representativeByID[node.id] = node.id }
+                    continue
+                }
+
+                let counters = members.reduce(into: FlowCounters()) { $0 += $1.counters }
+                let group = TrafficGraphNode(
+                    id: groupID,
+                    kind: first.kind,
+                    title: "\(kindTitle(first.kind)) \(bucket.title)",
+                    detail: L("%lld exact items", Int64(members.count)),
+                    appPath: "",
+                    filter: .none,
+                    counters: counters,
+                    isFilterExact: false,
+                    collapsedNodeIDs: members.map(\.id)
+                )
+                projectedNodes.append(group)
+                for node in members { representativeByID[node.id] = groupID }
+            }
+        }
+
+        let edgeGroups = Dictionary(grouping: complete.edges) { edge in
+            let source = representativeByID[edge.source] ?? edge.source
+            let target = representativeByID[edge.target] ?? edge.target
+            let groupID = TrafficGraphEdgeID(rawValue: stableID([
+                "map-edge",
+                source.rawValue,
+                edge.relationship.rawValue,
+                target.rawValue,
+            ]))
+            if expandedEdgeGroupIDs.contains(groupID) {
+                return stableID(["map-exact-edge", edge.id.rawValue])
+            }
+            return groupID.rawValue
+        }
+
+        let projectedEdges = edgeGroups.keys.sorted().compactMap { key -> TrafficGraphEdge? in
+            guard let edges = edgeGroups[key]?.sorted(by: { $0.id < $1.id }),
+                  let first = edges.first else { return nil }
+            let source = representativeByID[first.source] ?? first.source
+            let target = representativeByID[first.target] ?? first.target
+            let groupID = TrafficGraphEdgeID(rawValue: stableID([
+                "map-edge",
+                source.rawValue,
+                first.relationship.rawValue,
+                target.rawValue,
+            ]))
+            if edges.count == 1, expandedEdgeGroupIDs.contains(groupID) {
+                var exact = first
+                exact.source = source
+                exact.target = target
+                exact.collapsedEdgeIDs = []
+                return exact
+            }
+            if edges.count == 1, source == first.source, target == first.target {
+                return first
+            }
+
+            let counters = edges.reduce(into: FlowCounters()) { $0 += $1.counters }
+            var trafficVolume: FlowCounters?
+            var membersByID: [String: TrafficGraphMember] = [:]
+            for edge in edges {
+                if let volume = edge.trafficVolume {
+                    if trafficVolume == nil { trafficVolume = FlowCounters() }
+                    trafficVolume? += volume
+                }
+                for member in edge.members {
+                    if var existing = membersByID[member.id] {
+                        existing.counters += member.counters
+                        membersByID[member.id] = existing
+                    } else {
+                        membersByID[member.id] = member
+                    }
+                }
+            }
+            let enforcementValues = edges.compactMap(\.enforcement)
+            let enforcement = enforcementValues.isEmpty ? nil : TrafficGraphEnforcement(
+                count: enforcementValues.reduce(Int64(0)) { $0 + $1.count },
+                category: Set(enforcementValues.map(\.category)).sorted().joined(separator: ", "),
+                source: Set(enforcementValues.map(\.source)).sorted().joined(separator: ", "),
+                detail: Set(enforcementValues.map(\.detail)).sorted().joined(separator: ", ")
+            )
+            let filter = edges.dropFirst().allSatisfy { $0.filter == first.filter }
+                ? first.filter
+                : .none
+            let configuration = edges.dropFirst().allSatisfy { $0.configuration == first.configuration }
+                ? first.configuration
+                : nil
+            return TrafficGraphEdge(
+                id: groupID,
+                source: source,
+                target: target,
+                counters: counters,
+                filter: filter,
+                relationship: first.relationship,
+                members: membersByID.values.sorted { $0.id < $1.id },
+                enforcement: enforcement,
+                configuration: configuration,
+                trafficVolume: trafficVolume,
+                collapsedEdgeIDs: edges.flatMap { $0.representedEdgeIDs }.sorted()
+            )
+        }
+
+        return TrafficGraphSnapshot(
+            nodes: projectedNodes.sorted { $0.id < $1.id },
+            edges: projectedEdges,
+            total: complete.total,
+            hidden: .none
+        )
+    }
+
+    private static func alphabetBucket(for title: String) -> AlphabetBucket {
+        let folded = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        guard let scalar = folded.lowercased().unicodeScalars.first else {
+            return AlphabetBucket(id: "other", title: "#")
+        }
+        switch scalar.value {
+        case 97...100: return AlphabetBucket(id: "a-d", title: "A–D")
+        case 101...104: return AlphabetBucket(id: "e-h", title: "E–H")
+        case 105...108: return AlphabetBucket(id: "i-l", title: "I–L")
+        case 109...112: return AlphabetBucket(id: "m-p", title: "M–P")
+        case 113...116: return AlphabetBucket(id: "q-t", title: "Q–T")
+        case 117...122: return AlphabetBucket(id: "u-z", title: "U–Z")
+        case 48...57: return AlphabetBucket(id: "0-9", title: "0–9")
+        default: return AlphabetBucket(id: "other", title: "#")
+        }
+    }
+
+    private static func kindTitle(_ kind: TrafficGraphNode.Kind) -> String {
+        switch kind {
+        case .app: return L("Applications")
+        case .agent: return L("Agents")
+        case .destination: return L("Destinations")
+        case .service: return L("Services")
+        case .tool: return L("Tools")
+        case .mcp: return L("MCP services")
+        case .launcher: return L("Launchers")
+        case .proxy: return L("Proxies")
+        }
+    }
+
+    private static func stableID(_ components: [String]) -> String {
+        components.map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
+    }
+}
+
 enum TrafficGraphSelection {
     static func isRelated(
         _ edge: TrafficGraphEdge,
@@ -1032,7 +1234,9 @@ enum TrafficGraphBuilder {
     static func buildForPresentation<Rows: Sequence>(
         rows sourceRows: Rows,
         blockedAttempts: [BlockedAttemptRow] = [],
-        mapLimits: TrafficGraphLimits = .standard
+        mapLimits: TrafficGraphLimits = .standard,
+        expandedGroupIDs: Set<TrafficGraphNodeID> = [],
+        expandedEdgeGroupIDs: Set<TrafficGraphEdgeID> = []
     ) -> TrafficGraphBuild where Rows.Element == BreakdownRow {
         let rows = Array(sourceRows)
         var complete = build(rows: rows, blockedAttempts: blockedAttempts, limits: .unbounded)
@@ -1040,10 +1244,14 @@ enum TrafficGraphBuilder {
         guard mapLimits != .unbounded else {
             return TrafficGraphBuild(complete: complete, map: complete)
         }
-        return TrafficGraphBuild(
-            complete: complete,
-            map: TrafficGraphMapProjector.project(complete, limits: mapLimits)
-        )
+        let map = mapLimits == .standard
+            ? TrafficGraphMapGrouping.project(
+                complete,
+                expandedGroupIDs: expandedGroupIDs,
+                expandedEdgeGroupIDs: expandedEdgeGroupIDs
+            )
+            : TrafficGraphMapProjector.project(complete, limits: mapLimits)
+        return TrafficGraphBuild(complete: complete, map: map)
     }
 
     private struct RepresentativeResource: Hashable {
@@ -1165,7 +1373,6 @@ enum TrafficGraphBuilder {
     private static func prefersMetadata(_ candidate: AppMetadata, over current: AppMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
-        if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
     }
@@ -1173,7 +1380,6 @@ enum TrafficGraphBuilder {
     private static func prefersMetadata(_ candidate: RelayMetadata, over current: RelayMetadata) -> Bool {
         if candidate.path.isEmpty != current.path.isEmpty { return !candidate.path.isEmpty }
         if candidate.name.isEmpty != current.name.isEmpty { return !candidate.name.isEmpty }
-        if candidate.weight != current.weight { return candidate.weight > current.weight }
         if candidate.name != current.name { return candidate.name < current.name }
         return candidate.path < current.path
     }

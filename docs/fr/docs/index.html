@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.16.8, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.16.9, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -181,7 +181,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <figcaption class="caption">En direct, l’écran sur lequel Flowlight s’ouvre.</figcaption></figure>
       <p>Dans Rapports, survolez une barre pour voir quelles apps l’ont produite, cliquez pour zoomer, et double-cliquez n’importe quelle ligne pour y restreindre le rapport.</p>
       <h2 id="visualize">Visualiser le trafic</h2>
-      <p>Visualiser affiche les apps et leurs destinations exactes sous forme de nœuds stables. La largeur représente les octets et les particules indiquent le sens. La liste contient les mêmes valeurs. Connexions signifie flux réseau, pas requêtes HTTP ; Observé n’est pas une décision d’autorisation.</p>
+      <p><strong>Visualiser</strong> affiche chaque app, destination exacte et relation observée dans la période, la recherche et le focus courants. La largeur représente les octets. De rares tirets roses et bleus se déplacent en sens opposés pour l’envoi et la réception ; chaque arête possède sa propre vitesse stable et Réduire les animations conserve les mêmes chemins statiques.</p>
+      <p>Si la carte exacte serait trop dense, Flowlight affiche des groupes déterministes avec leur nombre visible d’éléments exacts. Sélectionnez un groupe pour révéler ses nœuds et relations ; <strong>Réduire les groupes</strong> rétablit la vue d’ensemble. Recherche et Focus révèlent directement les correspondances, même à faible volume. Le regroupement ne change que la présentation : identités, octets reçus et envoyés, connexions et appartenance correspondent à Rapports pour le même périmètre.</p>
+      <p>Sélectionnez un nœud ou une connexion pour obtenir les valeurs exactes, puis ouvrez Rapports, Inspecter ou une règle non enregistrée avec la même app et la même destination. <strong>Liste</strong> fournit le même graphe complet au clavier et à VoiceOver. Connexions signifie flux réseau, pas requêtes HTTP ; Observé n’est pas une décision d’autorisation.</p>
 
       <h2 id="agents">Règles pour les agents IA</h2>
       <p>Une app compte comme agent si Flowlight la connaît par son nom (16 à ce jour, dont Claude Code, Codex, Cursor, GitHub Copilot,
@@ -760,7 +762,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.16.8 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.16.9 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

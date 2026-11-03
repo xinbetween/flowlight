@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.16.8，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.16.9，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -180,7 +180,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <figcaption class="caption">即時，Flowlight 開啟時的那個畫面。</figcaption></figure>
       <p>在「報告」中，把指標移到長條上可以看出是哪些 App 造成的，點一下可以放大，任一列雙按則把報告縮小到那一列。</p>
       <h2 id="visualize">流量視覺化</h2>
-      <p>視覺化以穩定節點顯示應用程式與精確目的地。寬度代表位元組數，移動粒子表示方向，列表則提供相同數值。連線代表網路流，不是 HTTP 請求數；已觀察並不是允許決定。</p>
+      <p><strong>視覺化</strong>會顯示目前時間、搜尋與專注範圍內的每個 App、精確目標和已觀察關係。路徑寬度代表位元組數；稀疏的玫紅色與藍色虛線分別朝相反的傳送與接收方向移動。每條邊都有自己穩定且獨特的速度，而「減少動態效果」會保留同樣準確的靜態路徑。</p>
+      <p>當精確地圖過於密集時，Flowlight 會顯示附有精確項目數量的確定性群組。選取群組即可展開其中的精確節點與關係；<strong>收合群組</strong>會回復總覽。搜尋與專注會直接顯示相符項目，包括低流量證據。群組只改變呈現方式：同一範圍內的 App 與目標身分、接收與傳送位元組數、連線數和關係成員都與「報告」完全一致。</p>
+      <p>選取節點或連線即可查看精確數值，接著帶著同一 App 與目標前往「報告」、「檢查」或未儲存的規則。<strong>列表</strong>為鍵盤與 VoiceOver 提供同一張完整圖。連線代表網路流，不是 HTTP 請求數；已觀察並不是允許決定。</p>
 
       <h2 id="agents">AI 代理規則</h2>
       <p>只要 Flowlight 認得一個 App 的名字（目前有 16 個，包含 Claude Code、Codex、Cursor、GitHub Copilot、
@@ -717,7 +719,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.16.8 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.16.9 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

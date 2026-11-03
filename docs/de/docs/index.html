@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Dokumentation</p>
     <h1>Flowlight benutzen</h1>
-    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.16.8, macOS 15 oder neuer.</p>
+    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.16.9, macOS 15 oder neuer.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Auf dieser Seite">
@@ -182,13 +182,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Fahre in Berichte über einen Balken, um zu sehen, welche Apps ihn getrieben haben, klicke ihn an, um hineinzuzoomen, und doppelklicke eine Zeile, um den Bericht darauf einzugrenzen.</p>
 
       <h2 id="visualize">Datenverkehr visualisieren</h2>
-      <p><strong>Visualisieren</strong> zeichnet jede sichtbare App und jedes Ziel als nativen, auswählbaren Knoten. Die Pfadbreite folgt den
-        Bytes; rosafarbene Punkte laufen für gesendeten Verkehr von der App weg und blaue für empfangenen Verkehr zurück. Es gibt keine
-        Pfeilspitzen, und die Knoten bleiben stehen, wenn sich nur Zähler ändern. „Bewegung reduzieren“ entfernt die wandernden Punkte.</p>
-      <p>Wähle einen Knoten oder eine Verbindung für genaue Werte zu Empfang, Versand und Verbindungen und gehe dann mit derselben App und
-        demselben exakten Host oder derselben Adresse zu Berichte, Inspizieren oder in einen ungespeicherten Regeleditor. <strong>Liste</strong>
-        zeigt dieselben begrenzten Daten für Tastatur und VoiceOver. „Verbindungen“ sind Netzwerkflüsse, keine HTTP-Anfragen. „Beobachtet“
-        ist keine Erlaubnisentscheidung.</p>
+      <p><strong>Visualisieren</strong> zeigt jede App, jedes genaue Ziel und jede beobachtete Beziehung im aktuellen Zeitraum sowie im Such- und Fokusbereich. Die Pfadbreite folgt den Bytes. Sparsame rosa und blaue Striche bewegen sich in entgegengesetzte Sende- und Empfangsrichtungen; jede Kante hat ihr eigenes stabiles Tempo, und „Bewegung reduzieren“ lässt dieselben wahrheitsgetreuen statischen Pfade stehen.</p>
+      <p>Wird die genaue Karte zu dicht, zeigt Flowlight deterministische Gruppen mit einer sichtbaren Anzahl genauer Elemente. Wähle eine Gruppe, um ihre genauen Knoten und Beziehungen aufzudecken; <strong>Gruppen reduzieren</strong> stellt die Übersicht wieder her. Suche und Fokus zeigen passende Kartenelemente direkt, auch bei geringem Datenverkehr. Die Gruppierung ändert nur die Darstellung: App- und Zielidentitäten, Empfang, Versand, Verbindungen und Mitgliedschaften bleiben für denselben Bereich mit Berichte identisch.</p>
+      <p>Wähle einen Knoten oder eine Verbindung für genaue Werte und öffne anschließend Berichte, Inspizieren oder einen ungespeicherten Regeleditor mit derselben App und demselben Ziel. <strong>Liste</strong> stellt denselben vollständigen Graphen für Tastatur und VoiceOver bereit. „Verbindungen“ sind Netzwerkflüsse, keine HTTP-Anfragen; „Beobachtet“ ist keine Erlaubnisentscheidung.</p>
 
       <h2 id="agents">Regeln für KI-Agenten</h2>
       <p>Eine App gilt als Agent, wenn Flowlight sie am Namen kennt (heute 16, darunter Claude Code, Codex, Cursor, GitHub Copilot,
@@ -767,7 +763,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.16.8 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.16.9 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.9, macOS 15 or later.
 
  On this page
 
@@ -178,22 +178,13 @@ open build/Build/Products/Release/Flowlight.app
 
  Visualize traffic
 
- Visualize draws every visible app and destination as a native, selectable node. Path width follows total bytes;
- rose particles travel from an app for sent traffic and blue particles travel back for received traffic. There are no arrowheads,
- and the nodes stay in place when only the counters change. Reduce Motion removes the travelling particles.
+ Visualize draws every app, exact destination, and observed relationship in the current time, Search, and Focus scope. Path width follows total bytes. Sparse rose and blue dashes travel in opposite sent and received directions; every edge has its own stable speed, and Reduce Motion keeps the same truthful static paths.
 
- Choose Traffic for every observed application, or AI activity for proved agent clients, their
- attributed tools and MCP servers, LLM services, and every other destination they reached. A browser is never called an agent only
- because someone opened an AI service in it. Tool traffic counts toward its parent agent while the tool remains selectable; the
- dashed works for relationship is process-lineage evidence, not a claimed invocation.
+ Choose Traffic for every observed application, or AI activity for proved agent clients, their attributed tools and MCP servers, launchers, gateways, Flowlight's inspection proxy, LLM services, and every other destination they reached. Process-lineage and configured-route relationships stay visually distinct from observed traffic and never invent byte totals or invocations.
 
- Select a node or connection for exact received, sent and connection totals, then continue to Reports or an unsaved
- blocking-rule editor with the same app and exact destination. Inspect is also available when that destination has a recorded
- hostname; HTTP exchanges do not store the resolved destination address. LLM service grouping is visual only: choose one of its exact
- hostname and address members before any action. Map uses a bounded projection to stay readable, while
- List retains every relationship in the current search and Focus scope and reveals them 25 at a time for keyboard,
- VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
- not an allow verdict.
+ When the exact Map would be too dense, Flowlight shows deterministic groups with a visible exact-item count. Select a group to reveal its exact nodes and relationships; Collapse groups restores the overview. Search and Focus reveal exact matching chart items directly, including low-volume evidence. Grouping changes presentation only: application identities, destination identities, received bytes, sent bytes, connections, and relationship membership remain identical to Reports for the same scope.
+
+ Select a node or connection for exact values, then continue to Reports, Inspect, or an unsaved blocking-rule editor with the same app and exact destination. List exposes the same complete graph 25 relationships at a time for keyboard, VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is not an allow verdict.
 
  AI agent rules
 
@@ -929,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.9macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1672,8 +1663,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.8
+ 0.16.9
 November 2, 2026Latest
+
+ Put every application and destination on the Map. Dense stages use deterministic expandable groups that retain every exact node and relationship ID instead of silently dropping low-volume evidence.
+
+ Make Visualize reconcile with Reports. Identical time, Search, and Focus scopes now preserve the same raw applications, exact destinations, canonical relationships, received bytes, sent bytes, and connections.
+
+ Reveal quiet evidence directly. Search and Focus produce exact scoped chart items, while selecting a visible group expands its members and Collapse groups restores the stable overview without changing totals.
+
+ Give every relationship its own motion. All edges use the accepted smooth curve family, and each edge receives a distinct deterministic dash speed; sent and received lanes share that speed and travel in opposite directions.
+
+ Keep the public picture current. The localized documentation and Visualize screenshot now show the complete expandable Map and its final edge design.
+
+ 0.16.8
+November 2, 2026
 
  Read direction without chasing dots. Sparse animated dashes now move with sent and received traffic in opposite directions, while Reduce Motion keeps the same truthful static ribbons and colors.
 

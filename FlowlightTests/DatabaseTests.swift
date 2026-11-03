@@ -610,8 +610,12 @@ final class DatabaseTests: XCTestCase {
 
         let from = Date(timeIntervalSince1970: TimeInterval(t0))
         let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
-        let reports = try db.breakdown(.second, from: from, to: to, limit: .max)
-        let visualization = try db.appDestinationRows(.second, from: from, to: to)
+        let (reports, visualization) = try db.readSnapshot {
+            (
+                try db.breakdown(.second, from: from, to: to, limit: .max),
+                try db.appDestinationRows(.second, from: from, to: to)
+            )
+        }
         let reportTotals = Dictionary(grouping: reports, by: \.bundleID).mapValues {
             $0.reduce(into: FlowCounters()) { $0 += $1.counters }
         }
@@ -619,7 +623,29 @@ final class DatabaseTests: XCTestCase {
             $0.reduce(into: FlowCounters()) { $0 += $1.counters }
         }
 
+        let reportRelationships = Set(reports.map {
+            "\($0.bundleID)|\($0.domain)|\($0.remoteIP)"
+        })
+        let visualizationRelationships = Set(visualization.map {
+            "\($0.bundleID)|\($0.domain)|\($0.remoteIP)"
+        })
+        let reportTotal = reports.reduce(into: FlowCounters()) { $0 += $1.counters }
+        let build = TrafficGraphBuilder.buildForPresentation(rows: visualization)
+        let observed = build.complete.edges.filter { $0.relationship == .observed }
+        let graphApps = Set(build.complete.nodes.compactMap { node in
+            node.kind == .app ? node.filter.bundleID : nil
+        })
+
         XCTAssertEqual(visualizationTotals, reportTotals)
+        XCTAssertEqual(visualizationRelationships, reportRelationships)
+        XCTAssertEqual(Set(visualization.map(\.bundleID)), Set(reports.map(\.bundleID)))
+        XCTAssertEqual(graphApps, Set(reports.map(\.bundleID)))
+        XCTAssertEqual(observed.count, reportRelationships.count)
+        XCTAssertEqual(build.complete.visibleTotal, reportTotal)
+        XCTAssertEqual(build.map.visibleTotal, reportTotal)
+        XCTAssertEqual(build.map.representedNodeIDs, Set(build.complete.nodes.map(\.id)))
+        XCTAssertEqual(build.map.representedEdgeIDs, Set(build.complete.edges.map(\.id)))
+        XCTAssertEqual(build.map.hidden, .none)
     }
 
     func testAIVisualizationProjectionPreservesAttributionAndScope() throws {

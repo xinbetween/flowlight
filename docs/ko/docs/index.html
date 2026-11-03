@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">문서</p>
     <h1>Flowlight 사용하기</h1>
-    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.16.8, macOS 15 이상.</p>
+    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.16.9, macOS 15 이상.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="이 페이지 안에서">
@@ -180,7 +180,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <figcaption class="caption">실시간, Flowlight가 처음 여는 화면.</figcaption></figure>
       <p>보고서에서는 막대에 포인터를 올려 어떤 앱이 만든 것인지 보고, 클릭해 확대하고, 아무 행이나 두 번 클릭해 보고서를 그 항목으로 좁힐 수 있습니다.</p>
       <h2 id="visualize">트래픽 시각화</h2>
-      <p>시각화는 앱과 정확한 목적지를 안정적인 노드로 표시합니다. 너비는 바이트 수를, 입자는 방향을 나타내며 목록에도 같은 값이 있습니다. 연결은 네트워크 흐름이며 HTTP 요청 수가 아닙니다. 관찰됨은 허용 결정이 아닙니다.</p>
+      <p><strong>시각화</strong>는 현재 기간·검색·포커스 범위의 모든 앱, 정확한 목적지, 관찰된 관계를 표시합니다. 경로 너비는 바이트 수를 나타냅니다. 드문 분홍색과 파란색 대시가 보내기와 받기의 반대 방향으로 움직이고, 각 에지는 고유하면서 안정적인 속도를 가집니다. 동작 줄이기에서는 같은 정확한 정적 경로가 유지됩니다.</p>
+      <p>정확한 맵이 너무 복잡해지면 Flowlight는 정확한 항목 수가 표시된 결정적 그룹을 만듭니다. 그룹을 선택하면 정확한 노드와 관계가 펼쳐지고 <strong>그룹 접기</strong>로 개요로 돌아갑니다. 검색과 포커스는 트래픽이 적은 항목도 일치하면 직접 보여 줍니다. 그룹화는 표현만 바꾸므로 같은 범위의 앱·목적지 식별자, 받은·보낸 바이트, 연결 수, 관계 구성은 보고서와 동일합니다.</p>
+      <p>노드나 연결을 선택해 정확한 값을 확인한 뒤 같은 앱과 목적지로 보고서, 검사 또는 저장하지 않은 규칙을 열 수 있습니다. <strong>목록</strong>은 키보드와 VoiceOver에 같은 전체 그래프를 제공합니다. 연결은 네트워크 흐름이며 HTTP 요청 수가 아니고, 관찰됨은 허용 결정이 아닙니다.</p>
 
       <h2 id="agents">AI 에이전트 규칙</h2>
       <p>Flowlight가 이름으로 아는 앱(현재 16종, Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, Ollama, ZCode 등)이거나
@@ -748,7 +750,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.16.8 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.16.9 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>
