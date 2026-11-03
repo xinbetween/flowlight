@@ -105,6 +105,14 @@ Reports and Visualize now share an explicit parity contract for the same half-op
 
 Every relationship uses the same smooth cubic curve family. Direction is drawn with sparse border-aligned dashes whose speed is unique per edge but stable across refreshes and launches; received and sent motion on one edge has equal magnitude and opposite direction. Swift's randomized `Hasher` is deliberately not part of the identity or animation contract.
 
+## 0.16.10 — ranked overview and endpoint focus
+
+The default Map is a bounded overview rather than a picture of the entire topology. Traffic mode selects the ten application roots with the greatest aggregate received-plus-sent traffic. AI activity selects the ten proved agent roots with the greatest aggregate traffic across the root and its attributed child processes. Equal totals use stable semantic node IDs as the tie-break, matching the ranking contract used by Reports and AI Agents.
+
+Two searchable optional selectors narrow the evidence by source application or AI agent and by exact destination. They support any source to any destination, one source to any destination, any source to one destination, and one source to one destination. A focused Map carries every connected semantic dependency required to explain the selected observed or blocked relationships, including launcher, lineage, tool/MCP, configured gateway, observed route, Flowlight proxy, and destination stages.
+
+A small focused neighborhood is shown exactly. A large one groups progressively only after the focused evidence exceeds the Map bounds, and every group retains its exact represented node and relationship IDs. The complete scoped snapshot still backs List and Reports, so every relationship remains searchable and exact totals never depend on what the Map can draw comfortably.
+
 ### Acceptance tests
 
 1. Known agents, attributed parents, and non-browser provider callers are included; browsers are not auto-discovered.

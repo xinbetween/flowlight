@@ -1805,6 +1805,15 @@
 "Traffic map" = "트래픽 지도";
 "All applications" = "모든 애플리케이션";
 "Observed connections during %@" = "%@ 동안 관찰된 연결";
+"Any application" = "모든 애플리케이션";
+"Any AI agent" = "모든 AI 에이전트";
+"Search applications" = "애플리케이션 검색";
+"Search AI agents" = "AI 에이전트 검색";
+"Any destination" = "모든 목적지";
+"Search destinations" = "목적지 검색";
+"Map shows the top 10 sources by traffic. List keeps every exact relationship." = "지도에는 트래픽 상위 10개 소스가 표시됩니다. 목록에는 모든 정확한 관계가 유지됩니다.";
+"Focused scope shows every connected relationship; large neighborhoods group progressively." = "집중 범위에는 연결된 모든 관계가 표시되며 큰 이웃은 점진적으로 그룹화됩니다.";
+"Clear scope" = "범위 지우기";
 "%lld exact items" = "정확한 항목 %lld개";
 "Agents" = "에이전트";
 "Services" = "서비스";

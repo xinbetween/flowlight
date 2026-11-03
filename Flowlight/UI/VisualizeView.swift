@@ -34,6 +34,28 @@ enum VisualizeSelectionPolicy {
     ) -> TrafficGraphNode? {
         snapshot.nodes.first { $0.id == id }
     }
+
+    static func validEndpointSelection(
+        _ selection: TrafficGraphNodeID?,
+        options: [TrafficGraphEndpointOption]
+    ) -> TrafficGraphNodeID? {
+        guard let selection else { return nil }
+        return options.contains { $0.id == selection } ? selection : nil
+    }
+
+    static func revealedNodeFocus(
+        afterExpanding id: TrafficGraphNodeID,
+        in snapshot: TrafficGraphSnapshot
+    ) -> TrafficGraphNodeID? {
+        snapshot.nodes.first { $0.id == id }?.collapsedNodeIDs.sorted().first
+    }
+
+    static func revealedEdgeFocus(
+        afterExpanding id: TrafficGraphEdgeID,
+        in snapshot: TrafficGraphSnapshot
+    ) -> TrafficGraphEdgeID? {
+        snapshot.edges.first { $0.id == id }?.collapsedEdgeIDs.sorted().first
+    }
 }
 
 enum VisualizeEvidenceScope {
@@ -216,6 +238,10 @@ struct VisualizeView: View {
     @State private var listVisibleCount = TrafficGraphListPager.pageSize
     @State private var selectedNode: TrafficGraphNodeID?
     @State private var selectedEdge: TrafficGraphEdgeID?
+    @State private var sourceOptions: [TrafficGraphEndpointOption] = []
+    @State private var destinationOptions: [TrafficGraphEndpointOption] = []
+    @State private var selectedSource: TrafficGraphNodeID?
+    @State private var selectedDestination: TrafficGraphNodeID?
     @State private var query = ""
     @State private var loading = false
     @State private var loadID = UUID()
@@ -252,6 +278,7 @@ struct VisualizeView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
+            endpointToolbar
             Divider()
             if completeSnapshot.nodes.isEmpty, loading {
                 ProgressView(L("Loading visualization…"))
@@ -280,6 +307,8 @@ struct VisualizeView: View {
         }
         .task(id: RebuildKey(loadID: loadID, query: query, mode: mode,
                              focus: focus.scope, gatewayVersion: gatewayVersion,
+                             selectedSource: selectedSource,
+                             selectedDestination: selectedDestination,
                              expandedGroupIDs: expandedGroupIDs,
                              expandedEdgeGroupIDs: expandedEdgeGroupIDs)) { await rebuild() }
         .onChange(of: mode) { _, _ in
@@ -291,6 +320,10 @@ struct VisualizeView: View {
             listVisibleCount = TrafficGraphListPager.pageSize
             selectedNode = nil
             selectedEdge = nil
+            sourceOptions = []
+            destinationOptions = []
+            selectedSource = nil
+            selectedDestination = nil
             loadID = UUID()
         }
         .onChange(of: granularity) { _, _ in
@@ -311,6 +344,8 @@ struct VisualizeView: View {
             selectedNode = nil
             selectedEdge = nil
         }
+        .onChange(of: selectedSource) { _, _ in resetEndpointContext() }
+        .onChange(of: selectedDestination) { _, _ in resetEndpointContext() }
         .onChange(of: presentation) { _, current in
             let omitsSelection = switch current {
             case .map:
@@ -382,6 +417,48 @@ struct VisualizeView: View {
             .frame(width: 170)
         }
         .padding(.horizontal, Spacing.l).padding(.vertical, Spacing.m)
+        .background(FL.surface)
+    }
+
+    private var endpointToolbar: some View {
+        HStack(spacing: Spacing.m) {
+            TrafficGraphEndpointPicker(
+                label: L("Source"),
+                anyTitle: mode == .traffic ? L("Any application") : L("Any AI agent"),
+                searchPrompt: mode == .traffic ? L("Search applications") : L("Search AI agents"),
+                systemImage: mode == .traffic ? "app" : "sparkles",
+                options: sourceOptions,
+                selection: $selectedSource
+            )
+            Image(systemName: "arrow.right")
+                .font(.caption.bold())
+                .foregroundStyle(FL.muted)
+                .accessibilityHidden(true)
+            TrafficGraphEndpointPicker(
+                label: L("Destination"),
+                anyTitle: L("Any destination"),
+                searchPrompt: L("Search destinations"),
+                systemImage: "globe",
+                options: destinationOptions,
+                selection: $selectedDestination
+            )
+            Text(selectedSource == nil && selectedDestination == nil
+                 ? L("Map shows the top 10 sources by traffic. List keeps every exact relationship.")
+                 : L("Focused scope shows every connected relationship; large neighborhoods group progressively."))
+                .font(.caption)
+                .foregroundStyle(FL.muted)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            if selectedSource != nil || selectedDestination != nil {
+                Button(L("Clear scope")) {
+                    selectedSource = nil
+                    selectedDestination = nil
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.horizontal, Spacing.l)
+        .padding(.vertical, Spacing.s)
         .background(FL.surface)
     }
 
@@ -487,6 +564,10 @@ struct VisualizeView: View {
         let focusScope = focus.scope
         let expandedGroupIDs = expandedGroupIDs
         let expandedEdgeGroupIDs = expandedEdgeGroupIDs
+        let endpointQuery = TrafficGraphEndpointQuery(
+            source: selectedSource,
+            destination: selectedDestination
+        )
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let built = await Task.detached(priority: .userInitiated) {
             let visibleRows = VisualizeEvidenceScope.rows(
@@ -504,6 +585,7 @@ struct VisualizeView: View {
                 return TrafficGraphBuilder.buildForPresentation(
                     rows: visibleRows,
                     blockedAttempts: visibleEnforcement,
+                    endpointQuery: endpointQuery,
                     expandedGroupIDs: expandedGroupIDs,
                     expandedEdgeGroupIDs: expandedEdgeGroupIDs
                 )
@@ -531,14 +613,32 @@ struct VisualizeView: View {
                     resolveGateway: { endpoint in
                         scopedGateways.first { $0.0.endpoint == endpoint }?.1
                     },
+                    endpointQuery: endpointQuery,
                     expandedGroupIDs: expandedGroupIDs,
                     expandedEdgeGroupIDs: expandedEdgeGroupIDs
                 )
             }
         }.value
         guard !Task.isCancelled else { return }
+        let validSource = VisualizeSelectionPolicy.validEndpointSelection(
+            endpointQuery.source,
+            options: built.sourceOptions
+        )
+        let validDestination = VisualizeSelectionPolicy.validEndpointSelection(
+            endpointQuery.destination,
+            options: built.destinationOptions
+        )
+        if validSource != endpointQuery.source || validDestination != endpointQuery.destination {
+            sourceOptions = built.sourceOptions
+            destinationOptions = built.destinationOptions
+            selectedSource = validSource
+            selectedDestination = validDestination
+            return
+        }
         completeSnapshot = built.complete
         mapSnapshot = built.map
+        sourceOptions = built.sourceOptions
+        destinationOptions = built.destinationOptions
         let selectionSnapshot = presentation == .map ? built.map : built.complete
         let visibleEdgeIDs = Set(selectionSnapshot.edges.map(\.id))
         let visibleNodeIDs = Set(selectionSnapshot.nodes.map(\.id))
@@ -550,16 +650,26 @@ struct VisualizeView: View {
         )
     }
 
-    private func expandGroup(_ id: TrafficGraphNodeID) {
-        expandedGroupIDs.insert(id)
+    private func resetEndpointContext() {
+        listVisibleCount = TrafficGraphListPager.pageSize
+        expandedGroupIDs = []
+        expandedEdgeGroupIDs = []
         selectedNode = nil
         selectedEdge = nil
     }
 
+    private func expandGroup(_ id: TrafficGraphNodeID) {
+        let revealed = VisualizeSelectionPolicy.revealedNodeFocus(afterExpanding: id, in: mapSnapshot)
+        expandedGroupIDs.insert(id)
+        selectedNode = revealed
+        selectedEdge = nil
+    }
+
     private func expandEdgeGroup(_ id: TrafficGraphEdgeID) {
+        let revealed = VisualizeSelectionPolicy.revealedEdgeFocus(afterExpanding: id, in: mapSnapshot)
         expandedEdgeGroupIDs.insert(id)
         selectedNode = nil
-        selectedEdge = nil
+        selectedEdge = revealed
     }
 
     private struct LoadKey: Equatable {
@@ -577,8 +687,129 @@ struct VisualizeView: View {
         var mode: Mode
         var focus: FocusScope
         var gatewayVersion: String
+        var selectedSource: TrafficGraphNodeID?
+        var selectedDestination: TrafficGraphNodeID?
         var expandedGroupIDs: Set<TrafficGraphNodeID>
         var expandedEdgeGroupIDs: Set<TrafficGraphEdgeID>
+    }
+}
+
+private struct TrafficGraphEndpointPicker: View {
+    var label: String
+    var anyTitle: String
+    var searchPrompt: String
+    var systemImage: String
+    var options: [TrafficGraphEndpointOption]
+    @Binding var selection: TrafficGraphNodeID?
+    @State private var isPresented = false
+    @State private var query = ""
+
+    private var selectedOption: TrafficGraphEndpointOption? {
+        options.first { $0.id == selection }
+    }
+
+    private var filteredOptions: [TrafficGraphEndpointOption] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return options }
+        return options.filter {
+            $0.title.localizedCaseInsensitiveContains(needle)
+                || $0.detail.localizedCaseInsensitiveContains(needle)
+        }
+    }
+
+    var body: some View {
+        Button {
+            isPresented = true
+        } label: {
+            HStack(spacing: Spacing.s) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(FL.accent)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(FL.muted)
+                    Text(selectedOption?.title ?? anyTitle)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(FL.ink)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.bold())
+                    .foregroundStyle(FL.muted)
+            }
+            .padding(.horizontal, Spacing.m)
+            .padding(.vertical, 7)
+            .frame(width: 240)
+            .background(FL.ground, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                    .stroke(FL.line, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label): \(selectedOption?.title ?? anyTitle)")
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+            VStack(spacing: 0) {
+                TextField(searchPrompt, text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(Spacing.m)
+                Divider()
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        optionButton(id: nil, title: anyTitle, detail: nil, counters: nil)
+                        ForEach(filteredOptions) { option in
+                            optionButton(
+                                id: option.id,
+                                title: option.title,
+                                detail: option.detail,
+                                counters: option.counters
+                            )
+                        }
+                    }
+                    .padding(Spacing.s)
+                }
+                .frame(height: 320)
+            }
+            .frame(width: 360)
+            .onDisappear { query = "" }
+        }
+    }
+
+    private func optionButton(
+        id: TrafficGraphNodeID?,
+        title: String,
+        detail: String?,
+        counters: FlowCounters?
+    ) -> some View {
+        Button {
+            selection = id
+            isPresented = false
+        } label: {
+            HStack(spacing: Spacing.s) {
+                Image(systemName: selection == id ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selection == id ? FL.accent : FL.muted)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).foregroundStyle(FL.ink).lineLimit(1)
+                    if let detail, !detail.isEmpty {
+                        Text(detail).font(.caption).foregroundStyle(FL.muted).lineLimit(1)
+                    }
+                }
+                Spacer()
+                if let counters {
+                    Text(ByteFormat.string(counters.total))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(FL.muted)
+                }
+            }
+            .contentShape(Rectangle())
+            .padding(.horizontal, Spacing.s)
+            .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selection == id ? .isSelected : [])
     }
 }
 

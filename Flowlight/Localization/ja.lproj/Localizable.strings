@@ -1806,6 +1806,15 @@
 "Traffic map" = "トラフィックマップ";
 "All applications" = "すべてのアプリ";
 "Observed connections during %@" = "%@に観測された接続";
+"Any application" = "すべてのアプリ";
+"Any AI agent" = "すべてのAIエージェント";
+"Search applications" = "アプリを検索";
+"Search AI agents" = "AIエージェントを検索";
+"Any destination" = "すべての接続先";
+"Search destinations" = "接続先を検索";
+"Map shows the top 10 sources by traffic. List keeps every exact relationship." = "マップには通信量上位10件のソースを表示します。リストにはすべての正確な関係を保持します。";
+"Focused scope shows every connected relationship; large neighborhoods group progressively." = "絞り込んだ範囲では接続されたすべての関係を表示し、大きな近傍は段階的にグループ化します。";
+"Clear scope" = "範囲をクリア";
 "%lld exact items" = "%lld 個の正確な項目";
 "Agents" = "エージェント";
 "Services" = "サービス";

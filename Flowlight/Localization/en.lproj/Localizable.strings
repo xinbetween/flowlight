@@ -1805,6 +1805,15 @@
 "Traffic map" = "Traffic map";
 "All applications" = "All applications";
 "Observed connections during %@" = "Observed connections during %@";
+"Any application" = "Any application";
+"Any AI agent" = "Any AI agent";
+"Search applications" = "Search applications";
+"Search AI agents" = "Search AI agents";
+"Any destination" = "Any destination";
+"Search destinations" = "Search destinations";
+"Map shows the top 10 sources by traffic. List keeps every exact relationship." = "Map shows the top 10 sources by traffic. List keeps every exact relationship.";
+"Focused scope shows every connected relationship; large neighborhoods group progressively." = "Focused scope shows every connected relationship; large neighborhoods group progressively.";
+"Clear scope" = "Clear scope";
 "%lld exact items" = "%lld exact items";
 "Agents" = "Agents";
 "Services" = "Services";

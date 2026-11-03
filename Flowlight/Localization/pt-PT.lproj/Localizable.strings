@@ -1805,6 +1805,15 @@
 "Traffic map" = "Mapa de tráfego";
 "All applications" = "Todas as aplicações";
 "Observed connections during %@" = "Ligações observadas durante %@";
+"Any application" = "Qualquer aplicação";
+"Any AI agent" = "Qualquer agente de IA";
+"Search applications" = "Pesquisar aplicações";
+"Search AI agents" = "Pesquisar agentes de IA";
+"Any destination" = "Qualquer destino";
+"Search destinations" = "Pesquisar destinos";
+"Map shows the top 10 sources by traffic. List keeps every exact relationship." = "O mapa mostra as 10 origens com mais tráfego. A lista mantém todas as relações exatas.";
+"Focused scope shows every connected relationship; large neighborhoods group progressively." = "O âmbito focado mostra todas as relações ligadas; vizinhanças grandes são agrupadas progressivamente.";
+"Clear scope" = "Limpar âmbito";
 "%lld exact items" = "%lld itens exatos";
 "Agents" = "Agentes";
 "Services" = "Serviços";

@@ -637,9 +637,12 @@ enum AITrafficGraphBuilder {
             ))
         }
         var launcherMetadata: [LauncherIdentity: LauncherMetadata] = [:]
+        var launcherTraffic: [TrafficGraphNodeID: Int64] = [:]
         for entry in included where visibleAgents.contains(agentID(entry.agent)) {
             for row in proofGroups[entry.agent] ?? [] where !row.launcherBundleID.isEmpty {
                 let launcher = LauncherIdentity(agent: entry.agent, bundleID: row.launcherBundleID)
+                let nodeID = launcherID(bundleID: row.launcherBundleID)
+                launcherTraffic[nodeID, default: 0] += row.counters.total
                 let candidate = LauncherMetadata(
                     name: row.launcherName,
                     path: row.launcherPath,
@@ -658,7 +661,9 @@ enum AITrafficGraphBuilder {
             if current == nil || prefersMetadata(metadata, over: current!) { nodeMetadata[nodeID] = metadata }
         }
         let rankedLaunchers = nodeMetadata.sorted {
-            if $0.value.weight != $1.value.weight { return $0.value.weight > $1.value.weight }
+            let leftTraffic = launcherTraffic[$0.key, default: 0]
+            let rightTraffic = launcherTraffic[$1.key, default: 0]
+            if leftTraffic != rightTraffic { return leftTraffic > rightTraffic }
             return $0.key < $1.key
         }
         let visibleLaunchers = Set(rankedLaunchers.prefix(max(0, limits.maxLaunchers)).map(\.key))
@@ -748,11 +753,12 @@ enum AITrafficGraphBuilder {
         },
         includeConfiguredOnlyAgents: Bool = true,
         mapLimits: AITrafficGraphLimits = .standard,
+        endpointQuery: TrafficGraphEndpointQuery = .init(),
         expandedGroupIDs: Set<TrafficGraphNodeID> = [],
         expandedEdgeGroupIDs: Set<TrafficGraphEdgeID> = []
     ) -> TrafficGraphBuild where Rows.Element == BreakdownRow {
         let rows = Array(sourceRows)
-        var complete = build(
+        var evidence = build(
             rows: rows,
             visibleRows: visibleRows,
             blockedAttempts: blockedAttempts,
@@ -761,18 +767,30 @@ enum AITrafficGraphBuilder {
             includeConfiguredOnlyAgents: includeConfiguredOnlyAgents,
             limits: .unbounded
         )
-        complete.hidden = .none
-        guard mapLimits != .unbounded else {
-            return TrafficGraphBuild(complete: complete, map: complete)
-        }
-        let map = mapLimits == .standard
-            ? TrafficGraphMapGrouping.project(
+        evidence.hidden = .none
+        let sourceOptions = TrafficGraphEndpointProjector.sourceOptions(in: evidence)
+        let destinationOptions = TrafficGraphEndpointProjector.destinationOptions(in: evidence)
+        let complete = TrafficGraphEndpointProjector.scope(evidence, query: endpointQuery)
+        let map: TrafficGraphSnapshot
+        if mapLimits == .unbounded {
+            map = complete
+        } else if endpointQuery.isFocused {
+            map = TrafficGraphEndpointProjector.focusedMap(
                 complete,
                 expandedGroupIDs: expandedGroupIDs,
                 expandedEdgeGroupIDs: expandedEdgeGroupIDs
             )
-            : TrafficGraphMapProjector.project(complete, limits: mapLimits)
-        return TrafficGraphBuild(complete: complete, map: map)
+        } else if mapLimits == .standard {
+            map = TrafficGraphEndpointProjector.defaultMap(complete)
+        } else {
+            map = TrafficGraphMapProjector.project(complete, limits: mapLimits)
+        }
+        return TrafficGraphBuild(
+            complete: complete,
+            map: map,
+            sourceOptions: sourceOptions,
+            destinationOptions: destinationOptions
+        )
     }
 
     private static func toolIdentity(_ row: BreakdownRow, agent: AgentIdentity) -> ToolIdentity? {
@@ -935,6 +953,7 @@ enum TrafficGraphApplicationCoalescer {
             var enforcementCategory: String?
             var enforcementSource: String?
             var enforcementDetail: String?
+            var blockedFilter: String?
         }
         var remappedEdges: [EdgeKey: TrafficGraphEdge] = [:]
         for original in edges {
@@ -949,7 +968,8 @@ enum TrafficGraphApplicationCoalescer {
                 configuration: edge.configuration,
                 enforcementCategory: edge.enforcement?.category,
                 enforcementSource: edge.enforcement?.source,
-                enforcementDetail: edge.enforcement?.detail
+                enforcementDetail: edge.enforcement?.detail,
+                blockedFilter: edge.relationship == .blocked ? blockedFilterIdentity(edge.filter) : nil
             )
             if var current = remappedEdges[key] {
                 current.counters += edge.counters
@@ -981,6 +1001,9 @@ enum TrafficGraphApplicationCoalescer {
                         + component(enforcement.category)
                         + component(enforcement.detail)
                 }
+                if edge.relationship == .blocked {
+                    rawID += "→filter→" + blockedFilterIdentity(edge.filter)
+                }
                 edge.id = TrafficGraphEdgeID(rawValue: rawID)
                 remappedEdges[key] = edge
             }
@@ -998,6 +1021,21 @@ enum TrafficGraphApplicationCoalescer {
             mergedNodes.values.sorted { $0.id < $1.id },
             normalizedEdges.sorted { $0.id < $1.id }
         )
+    }
+
+    private static func blockedFilterIdentity(_ filter: TrafficFilter) -> String {
+        [
+            filter.bundleID ?? "",
+            filter.bundleIDs.sorted().joined(separator: "\u{1F}"),
+            filter.agentParent ?? "",
+            filter.mcpServer ?? "",
+            filter.domain ?? "",
+            filter.remoteIP ?? "",
+            filter.owner ?? "",
+            filter.domainSuffix ?? "",
+            filter.appProtocol ?? "",
+            filter.channel.map { String(describing: $0) } ?? ""
+        ].map(component).joined()
     }
 
     private static func roleEvidenceDetail(_ relationship: TrafficGraphRelationship) -> String {
