@@ -1664,7 +1664,7 @@ Releases
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
  0.16.9
-November 2, 2026Latest
+November 3, 2026Latest
 
  Put every application and destination on the Map. Dense stages use deterministic expandable groups that retain every exact node and relationship ID instead of silently dropping low-volume evidence.
 
