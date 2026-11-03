@@ -1106,7 +1106,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "앱 › 도메인 › IP, 목적지 › 앱 › IP 또는 IP › 앱";
 "Choose a longer window or clear filters." = "기간을 늘리거나 필터를 지우세요.";
 "Back" = "뒤로";
-"Return to the previous zoom level" = "이전 확대 단계로 돌아갑니다";
+"Return to the previous report scope" = "이전 보고서 범위로 돌아갑니다";
 "Granularity" = "단위";
 "Earlier (⌘[)" = "이전 (⌘[)";
 "Earlier" = "이전";
@@ -1136,6 +1136,8 @@
 "Bytes" = "바이트";
 "Filtered traffic" = "필터된 트래픽";
 "Click a bar to zoom in" = "막대를 클릭하면 확대됩니다";
+"Use the Left and Right Arrow keys to inspect time buckets." = "왼쪽 및 오른쪽 화살표 키로 시간 구간을 살펴보세요.";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "왼쪽 및 오른쪽 화살표 키로 시간 구간을 살펴본 다음 Return 키를 눌러 확대하세요.";
 "1 new flow" = "새 흐름 1개";
 "%@ new flows" = "새 흐름 %@개";
 "+ %@ more app · %@" = "+ 앱 %@개 더 · %@";
@@ -1818,7 +1820,7 @@
 "%lld connections" = "연결 %lld개";
 "%@, received %@, sent %@, %lld connections" = "%@, 수신 %@, 송신 %@, 연결 %lld개";
 "Select a node or connection" = "노드 또는 연결 선택";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "트래픽 값이 업데이트되어도 지도 위치는 유지됩니다. 움직이는 입자가 방향을 보여 줍니다. 움직임 없이 같은 값을 보려면 목록을 사용하세요.";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "트래픽 값이 업데이트되어도 지도 위치는 유지됩니다. 움직이는 점선이 방향을 보여 주고 수신 및 송신 트래픽 너비와 일치합니다. 움직임 없이 모든 관계를 보려면 목록을 사용하세요.";
 "Observed" = "관찰됨";
 "Connections" = "연결";
 "Traffic connections" = "트래픽 연결";

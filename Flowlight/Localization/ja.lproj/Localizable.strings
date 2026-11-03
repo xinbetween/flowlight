@@ -1083,7 +1083,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP、Destination › App › IP、または IP › App";
 "Choose a longer window or clear filters." = "より長い期間を選ぶか、絞り込みを解除してください。";
 "Back" = "戻る";
-"Return to the previous zoom level" = "1 つ前のズーム段階に戻ります";
+"Return to the previous report scope" = "前のレポート範囲に戻ります";
 "Granularity" = "粒度";
 "Earlier (⌘[)" = "前へ（⌘[）";
 "Earlier" = "前へ";
@@ -1113,6 +1113,8 @@
 "Bytes" = "バイト";
 "Filtered traffic" = "絞り込んだトラフィック";
 "Click a bar to zoom in" = "バーをクリックすると拡大します";
+"Use the Left and Right Arrow keys to inspect time buckets." = "左右の矢印キーで時間区間を確認します。";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "左右の矢印キーで時間区間を確認し、Return キーを押して拡大します。";
 "1 new flow" = "新しいフロー 1 件";
 "%@ new flows" = "新しいフロー %@ 件";
 "+ %@ more app · %@" = "+ ほか %@ 個のアプリ · %@";
@@ -1819,7 +1821,7 @@
 "%lld connections" = "%lld件の接続";
 "%@, received %@, sent %@, %lld connections" = "%@、受信%@、送信%@、%lld件の接続";
 "Select a node or connection" = "ノードまたは接続を選択";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "値が更新されてもマップの位置は変わりません。動く粒子が方向を示します。動きなしで同じ値を見るにはリストを使用してください。";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "値が更新されてもマップの位置は変わりません。動く破線が方向を示し、受信・送信トラフィックの幅に対応します。すべての関係を動きなしで見るにはリストを使用してください。";
 "Observed" = "観測済み";
 "Connections" = "接続";
 "Traffic connections" = "トラフィック接続";

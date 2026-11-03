@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.8, macOS 15 or later.
 
  On this page
 
@@ -190,8 +190,9 @@ open build/Build/Products/Release/Flowlight.app
  Select a node or connection for exact received, sent and connection totals, then continue to Reports or an unsaved
  blocking-rule editor with the same app and exact destination. Inspect is also available when that destination has a recorded
  hostname; HTTP exchanges do not store the resolved destination address. LLM service grouping is visual only: choose one of its exact
- hostname and address members before any action. List exposes the same bounded data for keyboard, VoiceOver and
- anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
+ hostname and address members before any action. Map uses a bounded projection to stay readable, while
+ List retains every relationship in the current search and Focus scope and reveals them 25 at a time for keyboard,
+ VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is
  not an allow verdict.
 
  AI agent rules
@@ -928,7 +929,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1671,8 +1672,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.7
+ 0.16.8
 November 2, 2026Latest
+
+ Read direction without chasing dots. Sparse animated dashes now move with sent and received traffic in opposite directions, while Reduce Motion keeps the same truthful static ribbons and colors.
+
+ Keep cables away from cards. Every relationship now routes around every unrelated node with clearance for the full ribbon and animated dash, including launcher, agent, tool, gateway, proxy, and destination lanes.
+
+ Move between Map, List, Reports, and Inspect without losing context. Map selection uses its bounded projection, List retains and pages the complete semantic graph, merged application aliases stay exact in Inspect, and Back restores the full report filter, time window, and cross-screen origin.
+
+ Make investigation work without a pointer. Reports time buckets support Left and Right Arrow inspection plus Return drill-in; Map and List expose selected state to VoiceOver and restore focus after presentation changes and page expansion.
+
+ Offer every supported install path. The localized homepage now links through Apple's official Mac App Store badge while retaining direct DMG, GitHub, and Homebrew options, and Store products explicitly declare their export-compliance status.
+
+ 0.16.7
+November 2, 2026
 
  Keep large maps calm. Stable barycentric sweeps reduce avoidable relationship crossings, while topology-aware horizontal and vertical spacing keeps every semantic stage and card inside the canvas.
 

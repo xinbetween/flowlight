@@ -14,6 +14,26 @@ enum VisualizeSelectionPolicy {
         if let selectedNode, !map.nodes.contains(where: { $0.id == selectedNode }) { return true }
         return false
     }
+
+    static func listOmitsSelection(
+        selectedNode selectedNodeID: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?,
+        complete: TrafficGraphSnapshot
+    ) -> Bool {
+        if let selectedEdge, !complete.edges.contains(where: { $0.id == selectedEdge }) { return true }
+        if let selectedNodeID {
+            guard let node = selectedNode(selectedNodeID, in: complete) else { return true }
+            return node.roleEvidence.isEmpty
+        }
+        return false
+    }
+
+    static func selectedNode(
+        _ id: TrafficGraphNodeID,
+        in snapshot: TrafficGraphSnapshot
+    ) -> TrafficGraphNode? {
+        snapshot.nodes.first { $0.id == id }
+    }
 }
 
 enum VisualizeOmissionLabel {
@@ -138,8 +158,7 @@ enum VisualizeGatewayScope {
 @MainActor
 enum VisualizeActionScope {
     static func canInspect(_ filter: TrafficFilter) -> Bool {
-        guard let domain = filter.domain else { return false }
-        return HostCanonicalizer.host(domain) != nil && HostCanonicalizer.address(domain) == nil
+        InspectNavigationScope.canInspect(filter)
     }
 
     static func canBlock(_ filter: TrafficFilter) -> Bool {
@@ -147,13 +166,7 @@ enum VisualizeActionScope {
     }
 
     static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil) {
-        guard canInspect(filter), let host = filter.domain else { return }
-        let app = filter.bundleIDs.isEmpty
-            ? filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
-            : nil
-        nav.showInspect(app: app, host: host, hostIncludesSubdomains: false,
-                        includeAttributedChildren: filter.includeAttributedChildren,
-                        agentParent: filter.agentParent, mcpServer: filter.mcpServer)
+        InspectNavigationScope.showInspect(nav, filter: filter, sourceTitle: sourceTitle)
     }
 
     static func blockRule(for filter: TrafficFilter) -> Rule? {
@@ -224,11 +237,22 @@ struct VisualizeView: View {
             "\($0.agent)|\($0.endpoint.description)|\($0.source)|\($0.sourceKey)"
         }.sorted().joined(separator: "\n")
     }
+    private var selectionSnapshot: TrafficGraphSnapshot {
+        presentation == .map ? mapSnapshot : completeSnapshot
+    }
+
     private var selection: GraphSelection? {
-        if let selectedEdge, let edge = completeSnapshot.edges.first(where: { $0.id == selectedEdge }) {
-            return .edge(edge, source: node(edge.source), target: node(edge.target))
+        if let selectedEdge, let edge = selectionSnapshot.edges.first(where: { $0.id == selectedEdge }) {
+            return .edge(
+                edge,
+                source: VisualizeSelectionPolicy.selectedNode(edge.source, in: selectionSnapshot),
+                target: VisualizeSelectionPolicy.selectedNode(edge.target, in: selectionSnapshot)
+            )
         }
-        if let selectedNode, let node = node(selectedNode) { return .node(node) }
+        if let selectedNode,
+           let node = VisualizeSelectionPolicy.selectedNode(selectedNode, in: selectionSnapshot) {
+            return .node(node)
+        }
         return nil
     }
 
@@ -287,13 +311,21 @@ struct VisualizeView: View {
             selectedEdge = nil
         }
         .onChange(of: presentation) { _, current in
-            guard current == .map,
-                  VisualizeSelectionPolicy.mapOmitsSelection(
+            let omitsSelection = switch current {
+            case .map:
+                VisualizeSelectionPolicy.mapOmitsSelection(
                     selectedNode: selectedNode,
                     selectedEdge: selectedEdge,
                     map: mapSnapshot
-                  )
-            else { return }
+                )
+            case .list:
+                VisualizeSelectionPolicy.listOmitsSelection(
+                    selectedNode: selectedNode,
+                    selectedEdge: selectedEdge,
+                    complete: completeSnapshot
+                )
+            }
+            guard omitsSelection else { return }
             selectedNode = nil
             selectedEdge = nil
         }
@@ -383,10 +415,6 @@ struct VisualizeView: View {
                  : L("No observed connections match this search."))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func node(_ id: TrafficGraphNodeID) -> TrafficGraphNode? {
-        completeSnapshot.nodes.first { $0.id == id }
     }
 
     @MainActor
@@ -510,6 +538,13 @@ struct VisualizeView: View {
     }
 }
 
+private enum TrafficGraphAccessibilityFocus: Hashable {
+    case node(TrafficGraphNodeID)
+    case edge(TrafficGraphEdgeID)
+    case role(String)
+    case more
+}
+
 private enum GraphSelection {
     case node(TrafficGraphNode)
     case edge(TrafficGraphEdge, source: TrafficGraphNode?, target: TrafficGraphNode?)
@@ -527,6 +562,7 @@ private struct TrafficGraphCanvas: View {
     @State private var panStart: TrafficGraphViewport?
     @State private var zoomStart: TrafficGraphViewport?
     @State private var viewportIsUserControlled = false
+    @AccessibilityFocusState private var accessibilityFocus: TrafficGraphAccessibilityFocus?
 
     var body: some View {
         GeometryReader { geometry in
@@ -598,6 +634,12 @@ private struct TrafficGraphCanvas: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(L("Traffic relationship map"))
             .accessibilityHint(L("Drag to pan, pinch to zoom, or use the map controls."))
+            .task {
+                await Task.yield()
+                restoreAccessibilityFocus()
+            }
+            .onChange(of: selectedNode) { _, _ in restoreAccessibilityFocus() }
+            .onChange(of: selectedEdge) { _, _ in restoreAccessibilityFocus() }
         }
     }
 
@@ -608,7 +650,7 @@ private struct TrafficGraphCanvas: View {
     ) -> some View {
         ZStack(alignment: .topLeading) {
             edgeLayer(layout, visible: visible)
-            particleLayer(layout, visible: visible)
+            flowDashLayer(layout, visible: visible)
             relationshipControls(layout)
             ForEach(snapshot.nodes) { node in
                 if let frame = layout.nodeFrames[node.id] {
@@ -626,6 +668,7 @@ private struct TrafficGraphCanvas: View {
                     .onHover { inside in
                         hoveredNode = inside ? node.id : (hoveredNode == node.id ? nil : hoveredNode)
                     }
+                    .accessibilityFocused($accessibilityFocus, equals: .node(node.id))
                 }
             }
         }
@@ -729,16 +772,13 @@ private struct TrafficGraphCanvas: View {
                              with: .color(FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)))
                 guard emphasized, counters.total > 0 else { continue }
 
-                let receivedWidth = width * CGFloat(counters.bytesIn) / CGFloat(counters.total)
-                let sentWidth = width - receivedWidth
-                if receivedWidth > 0 {
-                    let offset = -(width - receivedWidth) / 2
-                    context.fill(ribbonPath(curve, width: receivedWidth, offset: offset),
+                let lanes = TrafficGraphFlowDash.lanes(counters: counters, totalWidth: width)
+                if lanes.received.width > 0 {
+                    context.fill(ribbonPath(curve, width: lanes.received.width, offset: lanes.received.offset),
                                  with: .color(FL.graphReceived.opacity(0.88)))
                 }
-                if sentWidth > 0 {
-                    let offset = (width - sentWidth) / 2
-                    context.fill(ribbonPath(curve, width: sentWidth, offset: offset),
+                if lanes.sent.width > 0 {
+                    context.fill(ribbonPath(curve, width: lanes.sent.width, offset: lanes.sent.offset),
                                  with: .color(FL.graphSent.opacity(0.88)))
                 }
             }
@@ -747,23 +787,49 @@ private struct TrafficGraphCanvas: View {
     }
 
     @ViewBuilder
-    private func particleLayer(
+    private func flowDashLayer(
         _ layout: TrafficGraphLayoutSnapshot,
         visible: TrafficGraphVisibleRegion
     ) -> some View {
         if !reduceMotion {
-            TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+            TimelineView(.periodic(from: .now, by: TrafficGraphFlowDash.frameInterval)) { timeline in
                 Canvas { context, _ in
-                    for edge in snapshot.edges where visible.edgeIDs.contains(edge.id) && isEdgeRelated(edge) {
-                        for particle in layout.particles(for: edge, at: timeline.date.timeIntervalSinceReferenceDate,
-                                                         reduceMotion: reduceMotion) {
-                            let rect = CGRect(x: particle.position.x - particle.radius, y: particle.position.y - particle.radius,
-                                              width: particle.radius * 2, height: particle.radius * 2)
-                            let color = particle.direction == .received ? FL.graphReceived
-                                : particle.direction == .sent ? FL.graphSent : FL.graphInvocation
-                            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.85)))
-                            context.stroke(Path(ellipseIn: rect.insetBy(dx: -1, dy: -1)),
-                                           with: .color(FL.ground), lineWidth: 1)
+                    let time = timeline.date.timeIntervalSinceReferenceDate
+                    for edge in snapshot.edges where TrafficGraphFlowDash.animates(edge)
+                        && visible.edgeIDs.contains(edge.id) && isEdgeRelated(edge) {
+                        guard let curve = layout.edgeCurves[edge.id],
+                              let width = layout.edgeWidths[edge.id] else { continue }
+                        let lanes = TrafficGraphFlowDash.lanes(
+                            counters: edge.displayedCounters,
+                            totalWidth: width
+                        )
+                        if lanes.sent.width > 0 {
+                            context.stroke(
+                                path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
+                                    totalWidth: width,
+                                    direction: .sent
+                                ))),
+                                with: .color(FL.graphSent.opacity(0.9)),
+                                style: flowDashStyle(
+                                    at: time,
+                                    direction: .sent,
+                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                )
+                            )
+                        }
+                        if lanes.received.width > 0 {
+                            context.stroke(
+                                path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
+                                    totalWidth: width,
+                                    direction: .received
+                                ))),
+                                with: .color(FL.graphReceived.opacity(0.9)),
+                                style: flowDashStyle(
+                                    at: time,
+                                    direction: .received,
+                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                )
+                            )
                         }
                     }
                 }
@@ -771,6 +837,16 @@ private struct TrafficGraphCanvas: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+
+    private func flowDashStyle(
+        at time: TimeInterval,
+        direction: TrafficGraphFlowDirection,
+        lineWidth: CGFloat
+    ) -> StrokeStyle {
+        StrokeStyle(lineWidth: lineWidth, lineCap: .butt,
+                    dash: TrafficGraphFlowDash.pattern,
+                    dashPhase: TrafficGraphFlowDash.phase(at: time, direction: direction))
     }
 
     private func relationshipControls(_ layout: TrafficGraphLayoutSnapshot) -> some View {
@@ -783,6 +859,8 @@ private struct TrafficGraphCanvas: View {
                 .position(curve.point(at: 0.5))
                 .accessibilityLabel(edgeAccessibilityLabel(edge))
                 .accessibilityHint(L("Select to inspect this connection"))
+                .accessibilityAddTraits(selectedEdge == edge.id ? AccessibilityTraits.isSelected : [])
+                .accessibilityFocused($accessibilityFocus, equals: .edge(edge.id))
             }
         }
     }
@@ -810,6 +888,14 @@ private struct TrafficGraphCanvas: View {
     private func select(_ edge: TrafficGraphEdgeID) {
         selectedEdge = edge
         selectedNode = nil
+    }
+
+    private func restoreAccessibilityFocus() {
+        if let selectedEdge {
+            accessibilityFocus = .edge(selectedEdge)
+        } else if let selectedNode {
+            accessibilityFocus = .node(selectedNode)
+        }
     }
 
     private func isEdgeRelated(_ edge: TrafficGraphEdge) -> Bool {
@@ -873,6 +959,7 @@ private struct TrafficGraphNodeView: View {
         }
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(L("Select to inspect this traffic"))
+        .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : [])
     }
 
     private var appContent: some View {
@@ -954,7 +1041,7 @@ private struct TrafficGraphInspector: View {
             } else {
                 Label(L("Select a node or connection"), systemImage: "cursorarrow.click")
                     .font(.headline).foregroundStyle(FL.ink)
-                Text(L("The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion."))
+                Text(L("The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion."))
                     .font(.callout).foregroundStyle(FL.muted)
                 legend
                 Spacer()
@@ -1227,6 +1314,7 @@ private struct TrafficGraphList: View {
     @Binding var visibleCount: Int
     @Binding var selectedEdge: TrafficGraphEdgeID?
     @Binding var selectedNode: TrafficGraphNodeID?
+    @AccessibilityFocusState private var accessibilityFocus: TrafficGraphAccessibilityFocus?
 
     private let columns = [
         GridItem(.flexible(minimum: 120), alignment: .leading),
@@ -1264,13 +1352,11 @@ private struct TrafficGraphList: View {
                                 .foregroundStyle(FL.muted)
                             Button(L("Show %lld more relationships", min(TrafficGraphListPager.pageSize,
                                                                          page.remainingCount))) {
-                                visibleCount = TrafficGraphListPager.nextVisibleCount(
-                                    current: page.shownCount,
-                                    total: page.totalCount
-                                )
+                                showMore()
                             }
                             .buttonStyle(.link)
                             .accessibilityHint(L("Loads the next page without changing the Map"))
+                            .accessibilityFocused($accessibilityFocus, equals: .more)
                         }
                         .padding(.vertical, Spacing.m)
                     }
@@ -1280,6 +1366,12 @@ private struct TrafficGraphList: View {
         }
         .padding(Spacing.l)
         .accessibilityLabel(L("Traffic connections"))
+        .task {
+            await Task.yield()
+            restoreAccessibilityFocus()
+        }
+        .onChange(of: selectedNode) { _, _ in restoreAccessibilityFocus() }
+        .onChange(of: selectedEdge) { _, _ in restoreAccessibilityFocus() }
     }
 
     private func header(_ title: String) -> some View {
@@ -1317,6 +1409,8 @@ private struct TrafficGraphList: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(item.node.title), \(item.evidence.detail), \(L("Relationship evidence"))")
+        .accessibilityAddTraits(selectedNode == item.node.id ? AccessibilityTraits.isSelected : [])
+        .accessibilityFocused($accessibilityFocus, equals: .role(item.id))
     }
 
     private func row(_ edge: TrafficGraphEdge) -> some View {
@@ -1349,6 +1443,8 @@ private struct TrafficGraphList: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(rowAccessibilityLabel(edge))
+        .accessibilityAddTraits(selectedEdge == edge.id ? AccessibilityTraits.isSelected : [])
+        .accessibilityFocused($accessibilityFocus, equals: .edge(edge.id))
     }
 
     private func node(_ id: TrafficGraphNodeID) -> TrafficGraphNode? { snapshot.nodes.first { $0.id == id } }
@@ -1356,6 +1452,41 @@ private struct TrafficGraphList: View {
     private func select(_ edge: TrafficGraphEdge) {
         selectedEdge = edge.id
         selectedNode = nil
+    }
+
+    private func showMore() {
+        let firstNewIndex = page.shownCount
+        let nextCount = TrafficGraphListPager.nextVisibleCount(current: page.shownCount, total: page.totalCount)
+        let nextPage = TrafficGraphListPager.page(in: snapshot, visibleCount: nextCount)
+        visibleCount = nextCount
+        if firstNewIndex < nextPage.edges.count {
+            accessibilityFocus = .edge(nextPage.edges[firstNewIndex].id)
+        } else {
+            let roleIndex = firstNewIndex - nextPage.edges.count
+            if nextPage.roleItems.indices.contains(roleIndex) {
+                accessibilityFocus = .role(nextPage.roleItems[roleIndex].id)
+            }
+        }
+    }
+
+    private func restoreAccessibilityFocus() {
+        let all = TrafficGraphListPager.page(in: snapshot, visibleCount: Int.max)
+        let targetIndex: Int
+        let target: TrafficGraphAccessibilityFocus
+        if let selectedEdge, let index = all.edges.firstIndex(where: { $0.id == selectedEdge }) {
+            targetIndex = index
+            target = .edge(selectedEdge)
+        } else if let selectedNode,
+                  let index = all.roleItems.firstIndex(where: { $0.node.id == selectedNode }) {
+            targetIndex = all.edges.count + index
+            target = .role(all.roleItems[index].id)
+        } else {
+            return
+        }
+        let requiredCount = min(all.totalCount,
+                                ((targetIndex / TrafficGraphListPager.pageSize) + 1) * TrafficGraphListPager.pageSize)
+        visibleCount = max(visibleCount, requiredCount)
+        accessibilityFocus = target
     }
 
     private func relationshipLabel(_ relationship: TrafficGraphRelationship) -> String {

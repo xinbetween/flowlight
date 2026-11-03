@@ -50,7 +50,7 @@ Provider nodes are a visual grouping only. Every grouped edge retains its exact 
 - **Works for**: agent → attributed tool/MCP process. This is process-lineage evidence, not a network flow and has no byte width.
 - **Invoked**: shown only when an inspected request/tool-call record proves a concrete invocation. Process lineage alone must not be labeled as an invocation or given an invocation count.
 
-Direction colors remain separate from status colors. Received, sent, and proved invocation/lineage relationships also differ by particles, labels, or line pattern so color is never the only channel.
+Direction colors remain separate from status colors. Received, sent, and proved invocation/lineage relationships also differ by moving dashes, labels, or line pattern so color is never the only channel.
 
 ### Data projection
 
@@ -93,8 +93,8 @@ Map geometry is now a stable product of semantic IDs and viewport size. Counter 
 - Alternating barycentric sweeps use normalized positions across launcher, source, tool/MCP, gateway, inspection proxy, and destination lanes to reduce avoidable crossings deterministically.
 - Ribbon ports reserve topology-stable capacity. Traffic changes can widen or narrow a ribbon inside its reserved slot without shifting another relationship.
 - Layout runs outside the main actor and is cached by `TrafficGraphLayoutKey`; stale cancelled work cannot replace a newer topology.
-- The screen viewport is converted exactly into graph coordinates. Ribbon and particle drawing outside a padded visible region is skipped, while every card and relationship control remains available to keyboard and VoiceOver and the complete List stays unchanged.
-- Fit still includes every card and relationship. After a person pans, zooms, or resets, asynchronous topology refreshes preserve that viewport until they choose Fit again. Anchored zoom round-trips between graph and screen coordinates, and Reduce Motion continues to remove particles.
+- The screen viewport is converted exactly into graph coordinates. Ribbon and moving-dash drawing outside a padded visible region is skipped, while every card and relationship control remains available to keyboard and VoiceOver and the complete List stays unchanged.
+- Fit still includes every card and relationship. After a person pans, zooms, or resets, asynchronous topology refreshes preserve that viewport until they choose Fit again. Anchored zoom round-trips between graph and screen coordinates, and Reduce Motion continues to remove moving dashes.
 - A 600-relationship benchmark guards layout cost in addition to deterministic geometry, collision, route-avoidance, crossing, hit-testing, Fit, and accessibility coverage.
 
 ### Acceptance tests
@@ -107,5 +107,5 @@ Map geometry is now a stable product of semantic IDs and viewport size. Counter 
 6. Complete semantics retain every relationship; deterministic Map IDs are a subset, and visible plus omitted observed totals equal the full source totals.
 7. List paging and counter-only refreshes leave Map IDs, node positions, and curves unchanged.
 8. No feasible full-frame overlaps; hover and selection never mutate geometry.
-9. Reduce Motion removes traveling particles; the list and accessibility labels retain direction and values.
+9. Reduce Motion removes moving dashes; the list and accessibility labels retain direction and values.
 10. Status overlays never classify ordinary observed traffic as an allow decision.

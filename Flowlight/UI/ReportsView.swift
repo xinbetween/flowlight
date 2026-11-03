@@ -15,6 +15,42 @@ enum SeriesAnomalies {
     }
 }
 
+enum ReportChartKeyboardDirection {
+    case left, right
+}
+
+enum ReportChartKeyboardSelection {
+    static func move(from current: Date?, direction: ReportChartKeyboardDirection, dates: [Date]) -> Date? {
+        guard !dates.isEmpty else { return nil }
+        guard let current, let index = dates.firstIndex(of: current) else { return dates[0] }
+        switch direction {
+        case .left: return dates[max(0, index - 1)]
+        case .right: return dates[min(dates.count - 1, index + 1)]
+        }
+    }
+}
+
+struct ReportNavigationState: Equatable {
+    var granularity: Granularity
+    var endDate: Date
+    var followNow: Bool
+    var filter: TrafficFilter
+}
+
+struct ReportNavigationHistory: Equatable {
+    private var states: [ReportNavigationState] = []
+
+    var isEmpty: Bool { states.isEmpty }
+
+    mutating func push(_ state: ReportNavigationState) {
+        guard states.last != state else { return }
+        states.append(state)
+    }
+
+    mutating func pop() -> ReportNavigationState? { states.popLast() }
+    mutating func clear() { states.removeAll() }
+}
+
 struct ReportsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
@@ -34,12 +70,14 @@ struct ReportsView: View {
     @State private var loading = false
     @State private var reloadID = UUID()
     @State private var hovered: SeriesPoint?
-    /// Top apps per bucket, fetched on hover and cached until the next reload.
+    @State private var keyboardBucketDate: Date?
+    @FocusState private var chartFocused: Bool
+    /// Top apps per bucket, fetched on hover or keyboard selection and cached until the next reload.
     @State private var contributors: [Date: BucketContributors] = [:]
     /// How many children each parent row shows (grown by "Show more"); "__root__" is the app list.
     @State private var childLimits: [String: Int] = [:]
     @State private var breakdownTruncated = false
-    @State private var history: [Scope] = []
+    @State private var history = ReportNavigationHistory()
     @AppStorage("reports.lowerMode") private var lowerMode: LowerMode = .breakdown
     @AppStorage("reports.grouping") private var grouping: BreakdownGrouping = .app
     /// Raw breakdown rows; the tree is rebuilt from these when the grouping changes (no re-query).
@@ -64,12 +102,15 @@ struct ReportsView: View {
         }
     }
 
-    /// A snapshot of what is on screen, for the drill-down back stack.
-    private struct Scope { var granularity: Granularity; var endDate: Date; var followNow: Bool }
-
     private var startDate: Date { endDate.addingTimeInterval(-granularity.defaultWindow) }
     /// From the series, not the table rows, so shares stay right even if the table is capped.
     private var grandTotal: Int64 { max(1, series.reduce(0) { $0 + $1.total }) }
+    private var highlightedPoint: SeriesPoint? {
+        if chartFocused, let keyboardBucketDate {
+            return series.first { $0.date == keyboardBucketDate }
+        }
+        return hovered
+    }
 
     var body: some View {
         GeometryReader { _ in
@@ -123,7 +164,12 @@ struct ReportsView: View {
         .onChange(of: query) { recompute() }
         .onChange(of: sigma) { flagged = SeriesAnomalies.flagged(series, sigma: sigma) }
         .onChange(of: nav.reportRequest, initial: true) { apply(nav.reportRequest) }
-        .task(id: hovered?.date) { await loadContributors(for: hovered) }
+        .onChange(of: ReportNavigationState(granularity: granularity, endDate: endDate,
+                                            followNow: followNow, filter: filter), initial: true) { _, scope in
+            nav.updateCurrentReportScope(filter: scope.filter, granularity: scope.granularity,
+                                         endDate: scope.endDate, followNow: scope.followNow)
+        }
+        .task(id: highlightedPoint?.date) { await loadContributors(for: highlightedPoint) }
     }
 
     /// What the screen actually queries: the filter chosen here, narrowed by Focus when it's on.
@@ -163,6 +209,7 @@ struct ReportsView: View {
                 header
                 lowerModeBar
                 BehaviourPanel(findings: behaviour, period: granularity.periodName) { finding in
+                    pushHistory()
                     filter = TrafficFilter(bundleID: finding.bundleID)
                     lowerMode = .breakdown
                 }
@@ -240,8 +287,12 @@ struct ReportsView: View {
             .toggleStyle(.switch)
             .disabled(!LocalRiskSettings.canAnalyze)
             #if !APP_STORE
-            if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0 {
-                Button(L("Show in Inspect")) { nav.showInspect(search: "", potentialHarmOnly: true) }
+            if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0
+                && InspectNavigationScope.canInspect(filter, requireDestination: false) {
+                Button(L("Show in Inspect")) {
+                    InspectNavigationScope.showInspect(nav, filter: filter, requireDestination: false,
+                                                       potentialHarmOnly: true)
+                }
             }
             #endif
         }
@@ -308,7 +359,8 @@ struct ReportsView: View {
     }
 
     private func narrow(to entity: InsightEntity) {
-        guard let next = entity.narrowing(filter) else { return }
+        guard let next = entity.narrowing(filter), next != filter else { return }
+        pushHistory()
         filter = next
     }
 
@@ -316,9 +368,13 @@ struct ReportsView: View {
         HStack(spacing: 8) {
             if !history.isEmpty {
                 Button { goBack() } label: { Label(L("Back"), systemImage: "arrow.uturn.backward") }
-                    .help(L("Return to the previous zoom level"))
+                    .help(L("Return to the previous report scope"))
             }
-            Picker(L("Granularity"), selection: Binding(get: { granularity }, set: { history.removeAll(); granularity = $0 })) {
+            Picker(L("Granularity"), selection: Binding(get: { granularity }, set: { next in
+                guard next != granularity else { return }
+                pushHistory()
+                granularity = next
+            })) {
                 ForEach(Granularity.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -373,15 +429,25 @@ struct ReportsView: View {
             if let ip = filter.remoteIP { chip(L("IP: %@", ip)) { filter.remoteIP = nil } }
             if let proto = filter.appProtocol { chip(L("Protocol: %@", proto)) { filter.appProtocol = nil } }
             if let channel = filter.channel { chip(L("Way out: %@", channel.localizedTitle)) { filter.channel = nil } }
-            Button(L("Clear")) { filter = .none }.buttonStyle(.link).font(.caption)
+            Button(L("Clear")) {
+                guard !filter.isEmpty else { return }
+                pushHistory()
+                filter = .none
+            }
+            .buttonStyle(.link).font(.caption)
         }
     }
 
     private func chip(_ text: String, remove: @escaping () -> Void) -> some View {
         HStack(spacing: 4) {
             Text(text).font(.caption)
-            Button(action: remove) { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.plain).accessibilityLabel(L("Remove filter %@", text))
+            Button {
+                pushHistory()
+                remove()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain).accessibilityLabel(L("Remove filter %@", text))
         }
         .padding(.horizontal, 8).padding(.vertical, 3)
         .background(FL.accent.opacity(0.15), in: Capsule())
@@ -418,17 +484,18 @@ struct ReportsView: View {
     }
 
     private var chart: some View {
-        GroupBox {
+        let highlighted = highlightedPoint
+        return GroupBox {
             Chart {
                 ForEach(series) { point in
                     BarMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent),
                             y: .value(L("Bytes"), point.bytesIn))
                         .foregroundStyle(by: .value(L("Direction"), L("Received")))
-                        .opacity(hovered == nil || hovered?.date == point.date ? 1 : 0.55)
+                        .opacity(highlighted == nil || highlighted?.date == point.date ? 1 : 0.55)
                     BarMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent),
                             y: .value(L("Bytes"), point.bytesOut))
                         .foregroundStyle(by: .value(L("Direction"), L("Sent")))
-                        .opacity(hovered == nil || hovered?.date == point.date ? 1 : 0.55)
+                        .opacity(highlighted == nil || highlighted?.date == point.date ? 1 : 0.55)
                 }
                 ForEach(series.filter { flagged.contains($0.date) }) { point in
                     PointMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent), y: .value(L("Bytes"), point.total))
@@ -437,11 +504,11 @@ struct ReportsView: View {
                         .foregroundStyle(TrafficColors.anomaly)
                         .offset(y: -8)
                 }
-                if let hovered {
-                    RuleMark(x: .value(L("Time"), hovered.date, unit: granularity.calendarComponent))
+                if let highlighted {
+                    RuleMark(x: .value(L("Time"), highlighted.date, unit: granularity.calendarComponent))
                         .foregroundStyle(.secondary.opacity(0.25))
                         .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
-                            tooltip(for: hovered)
+                            tooltip(for: highlighted)
                         }
                 }
             }
@@ -466,6 +533,44 @@ struct ReportsView: View {
                         }
                 }
             }
+            .focusable()
+            .focused($chartFocused)
+            .onChange(of: chartFocused) { _, focused in
+                guard focused else { return }
+                keyboardBucketDate = ReportChartKeyboardSelection.move(
+                    from: keyboardBucketDate,
+                    direction: .right,
+                    dates: series.map(\.date)
+                )
+            }
+            .onChange(of: series.map(\.date)) { _, dates in
+                guard chartFocused, !dates.contains(keyboardBucketDate ?? .distantPast) else { return }
+                keyboardBucketDate = ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: dates)
+            }
+            .onMoveCommand { direction in
+                let keyboardDirection: ReportChartKeyboardDirection
+                switch direction {
+                case .left: keyboardDirection = .left
+                case .right: keyboardDirection = .right
+                default: return
+                }
+                hovered = nil
+                keyboardBucketDate = ReportChartKeyboardSelection.move(
+                    from: keyboardBucketDate,
+                    direction: keyboardDirection,
+                    dates: series.map(\.date)
+                )
+            }
+            .onKeyPress(keys: [.return, .space]) { _ in
+                guard let highlighted, granularity.finer != nil else { return .ignored }
+                drill(into: highlighted)
+                return .handled
+            }
+            .accessibilityLabel(L("Traffic"))
+            .accessibilityValue(highlighted.map(chartAccessibilityValue) ?? "")
+            .accessibilityHint(granularity.finer == nil
+                               ? L("Use the Left and Right Arrow keys to inspect time buckets.")
+                               : L("Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in."))
             .frame(height: 220)
             .overlay { if loading && series.isEmpty { ProgressView() } }
         } label: {
@@ -477,6 +582,12 @@ struct ReportsView: View {
                 }
             }
         }
+    }
+
+    private func chartAccessibilityValue(for point: SeriesPoint) -> String {
+        "\(label(for: point.date)), \(L("Received")) \(ByteFormat.string(point.bytesIn)), "
+            + "\(L("Sent")) \(ByteFormat.string(point.bytesOut)), "
+            + L("%@ new flows", point.flows.formatted())
     }
 
     private func tooltip(for point: SeriesPoint) -> some View {
@@ -628,15 +739,16 @@ struct ReportsView: View {
                 Button(L("Show Only This")) { applyFilter(node) }
                 if node.kind != .app, let bundleID = node.bundleID {
                     Button(L("Show Only %@", node.appName ?? bundleID)) {
-                        var f = filter
-                        f.bundleID = bundleID
-                        f.bundleIDs = []
-                        filter = f
+                        var next = filter
+                        next.narrowToApp(bundleID)
+                        guard next != filter else { return }
+                        pushHistory()
+                        filter = next
                     }
                 }
                 Divider()
-                InspectMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
-                                 host: node.kind == .domain || node.kind == .ip ? node.title : nil)
+                InspectMenuItems(filter: node.filter,
+                                 app: node.bundleID.map { ($0, node.appName ?? node.title) })
                 FocusMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
                                host: node.kind == .domain ? node.title : node.kind == .ip ? node.title : nil)
                 RuleMenuItems(app: node.kind == .app ? (node.bundleID ?? "", node.title) : nil,
@@ -679,7 +791,7 @@ struct ReportsView: View {
 
     private func apply(_ request: ReportRequest?) {
         guard let request else { return }
-        history.removeAll()
+        history.clear()
         filter = request.filter
         if let g = request.granularity { granularity = g }
         if let end = request.end, end < Date() { endDate = end; followNow = false } else { followNow = true; endDate = Date() }
@@ -694,7 +806,7 @@ struct ReportsView: View {
 
     private func drill(into point: SeriesPoint) {
         guard let finer = granularity.finer else { return }
-        history.append(Scope(granularity: granularity, endDate: endDate, followNow: followNow))
+        pushHistory()
         let bucketEnd = Calendar.current.date(byAdding: granularity.calendarComponent, value: 1, to: point.date) ?? point.date
         // Show the finer window ending at the bucket's end (or its own natural span, whichever is shorter).
         let end = min(bucketEnd, point.date.addingTimeInterval(finer.defaultWindow))
@@ -703,14 +815,26 @@ struct ReportsView: View {
         hovered = nil
     }
 
+    private func pushHistory() {
+        history.push(ReportNavigationState(
+            granularity: granularity,
+            endDate: endDate,
+            followNow: followNow,
+            filter: filter
+        ))
+    }
+
     private func goBack() {
-        guard let scope = history.popLast() else { return }
+        guard let scope = history.pop() else { return }
         granularity = scope.granularity
         endDate = scope.endDate
         followNow = scope.followNow
+        filter = scope.filter
     }
 
     private func applyFilter(_ node: TrafficNode) {
+        guard node.filter != filter else { return }
+        pushHistory()
         filter = node.filter
     }
 

@@ -1083,7 +1083,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domaine › IP, Destination › App › IP ou IP › App";
 "Choose a longer window or clear filters." = "Choisir une période plus longue ou effacer les filtres.";
 "Back" = "Retour";
-"Return to the previous zoom level" = "Revenir au niveau de zoom précédent";
+"Return to the previous report scope" = "Revenir au périmètre de rapport précédent";
 "Granularity" = "Granularité";
 "Earlier (⌘[)" = "Plus tôt (⌘[)";
 "Earlier" = "Plus tôt";
@@ -1113,6 +1113,8 @@
 "Bytes" = "Octets";
 "Filtered traffic" = "Trafic filtré";
 "Click a bar to zoom in" = "Cliquer sur une barre pour zoomer";
+"Use the Left and Right Arrow keys to inspect time buckets." = "Utilisez les flèches gauche et droite pour parcourir les intervalles de temps.";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Utilisez les flèches gauche et droite pour parcourir les intervalles de temps, puis appuyez sur Retour pour zoomer.";
 "1 new flow" = "1 nouveau flux";
 "%@ new flows" = "%@ nouveaux flux";
 "+ %@ more app · %@" = "+ %@ app de plus · %@";
@@ -1819,7 +1821,7 @@
 "%lld connections" = "%lld connexions";
 "%@, received %@, sent %@, %lld connections" = "%@, %@ reçus, %@ envoyés, %lld connexions";
 "Select a node or connection" = "Sélectionnez un nœud ou une connexion";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "La carte reste stable pendant la mise à jour des valeurs. Les particules indiquent le sens ; utilisez Liste pour les mêmes valeurs sans mouvement.";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "La carte reste stable pendant la mise à jour des valeurs. Les tirets animés indiquent le sens et correspondent au trafic reçu et envoyé ; utilisez Liste pour voir toutes les relations sans mouvement.";
 "Observed" = "Observé";
 "Connections" = "Connexions";
 "Traffic connections" = "Connexions réseau";

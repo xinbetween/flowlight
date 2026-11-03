@@ -104,6 +104,12 @@ struct TrafficFilter: Equatable, Sendable {
     }
     /// True when the filter pins a destination (hostname, domain, owner or IP).
     var pinsDestination: Bool { domain != nil || domainSuffix != nil || owner != nil || remoteIP != nil }
+
+    mutating func narrowToApp(_ bundleID: String) {
+        self.bundleID = bundleID
+        bundleIDs = []
+        includeAttributedChildren = false
+    }
 }
 
 struct SeriesPoint: Identifiable, Sendable, Equatable {
@@ -2630,9 +2636,9 @@ final class TrafficDatabase: @unchecked Sendable {
     ///   response body that merely mentions the app's name — which is how asking for Claude Code's traffic
     ///   returned every GitHub page whose HTML says "Claude Code".
     func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
-                   app: String? = nil, host: String? = nil, hostIncludesSubdomains: Bool = true,
-                   includeAttributedChildren: Bool = false, agentParent: String? = nil,
-                   mcpServer: String? = nil) throws -> [HTTPExchange] {
+                   app: String? = nil, apps: [String] = [], host: String? = nil,
+                   hostIncludesSubdomains: Bool = true, includeAttributedChildren: Bool = false,
+                   agentParent: String? = nil, mcpServer: String? = nil) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -2640,6 +2646,15 @@ final class TrafficDatabase: @unchecked Sendable {
             scopeClause += includeAttributedChildren ? " AND (bundle_id = ? OR agent = ?)" : " AND bundle_id = ?"
             scopeValues.append(.text(app))
             if includeAttributedChildren { scopeValues.append(.text(app)) }
+        }
+        let apps = Array(Set(apps.filter { !$0.isEmpty })).sorted()
+        if !apps.isEmpty {
+            let marks = Array(repeating: "?", count: apps.count).joined(separator: ",")
+            scopeClause += includeAttributedChildren
+                ? " AND (bundle_id IN (\(marks)) OR agent IN (\(marks)))"
+                : " AND bundle_id IN (\(marks))"
+            scopeValues += apps.map { .text($0) }
+            if includeAttributedChildren { scopeValues += apps.map { .text($0) } }
         }
         if let agentParent, !agentParent.isEmpty {
             scopeClause += " AND agent = ?"

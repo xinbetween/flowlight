@@ -1106,7 +1106,7 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "应用 › 域名 › IP、目标 › 应用 › IP，或 IP › 应用";
 "Choose a longer window or clear filters." = "请选择更长的时间窗口，或清除筛选条件。";
 "Back" = "返回";
-"Return to the previous zoom level" = "返回上一级缩放";
+"Return to the previous report scope" = "返回上一个报告范围";
 "Granularity" = "粒度";
 "Earlier (⌘[)" = "更早（⌘[）";
 "Earlier" = "更早";
@@ -1136,6 +1136,8 @@
 "Bytes" = "字节";
 "Filtered traffic" = "已筛选的流量";
 "Click a bar to zoom in" = "点按柱状条可放大查看";
+"Use the Left and Right Arrow keys to inspect time buckets." = "使用左右箭头键查看各时间段。";
+"Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "使用左右箭头键查看各时间段，然后按 Return 键放大。";
 "1 new flow" = "1 条新流";
 "%@ new flows" = "%@ 条新流";
 "+ %@ more app · %@" = "+ 还有 %@ 个应用 · %@";
@@ -1818,7 +1820,7 @@
 "%lld connections" = "%lld 个连接";
 "%@, received %@, sent %@, %lld connections" = "%@，接收 %@，发送 %@，%lld 个连接";
 "Select a node or connection" = "选择节点或连接";
-"The map stays still while traffic values update. Moving particles show direction; use List for the exact same values without motion." = "流量数值更新时地图位置保持不变。移动的粒子表示方向；使用列表可查看相同数值且无动画。";
+"The map stays still while traffic values update. Moving dashes show direction and match received and sent traffic; use List for every relationship without motion." = "流量数值更新时地图位置保持不变。移动的虚线表示方向，并与接收和发送流量的宽度一致；使用列表可查看所有关系且无动画。";
 "Observed" = "已观察";
 "Connections" = "连接";
 "Traffic connections" = "流量连接";

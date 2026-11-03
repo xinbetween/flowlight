@@ -45,6 +45,45 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarItem.visualize.englishTitle, "Visualize")
     }
 
+    func testCrossScreenBackRestoresReportOriginAndScope() {
+        let nav = AppNavigation()
+        nav.show(.visualize)
+        let reportFilter = TrafficFilter(bundleID: "claude", domain: "api.anthropic.com")
+
+        nav.showReport(filter: reportFilter, granularity: .hour, end: Date(timeIntervalSince1970: 42))
+        nav.updateCurrentReportScope(filter: reportFilter, granularity: .hour,
+                                     endDate: Date(timeIntervalSince1970: 42), followNow: false)
+        nav.showInspect(app: ("claude", "Claude Code"), host: "api.anthropic.com")
+
+        XCTAssertEqual(nav.backDestination, .reports)
+        nav.goBack()
+        XCTAssertEqual(nav.selection, .reports)
+        XCTAssertEqual(nav.reportRequest?.filter, reportFilter)
+        XCTAssertEqual(nav.reportRequest?.granularity, .hour)
+        XCTAssertEqual(nav.reportRequest?.end, Date(timeIntervalSince1970: 42))
+        XCTAssertEqual(nav.backDestination, .visualize)
+        nav.goBack()
+        XCTAssertEqual(nav.selection, .visualize)
+        XCTAssertNil(nav.backDestination)
+    }
+
+    func testPackReviewNavigationClearsCrossScreenTrailAndOpensPacks() {
+        let nav = AppNavigation()
+        nav.show(.visualize)
+        nav.showReport(filter: TrafficFilter(domain: "api.anthropic.com"))
+        nav.showInspect(app: ("claude", "Claude Code"), host: "api.anthropic.com")
+        XCTAssertNotNil(nav.backDestination)
+
+        nav.showPackReviews()
+
+        XCTAssertEqual(nav.selection, .rules)
+        XCTAssertEqual(nav.rulesTab, .packs)
+        XCTAssertNil(
+            nav.backDestination,
+            "pack review navigation starts a new task and must not retain an unrelated investigation trail"
+        )
+    }
+
     func testExactInspectNavigationCarriesExactMemberScope() {
         let nav = AppNavigation()
         VisualizeActionScope.showInspect(nav, filter: TrafficFilter(
@@ -85,7 +124,7 @@ final class VisualizeNavigationTests: XCTestCase {
         }
     }
 
-    func testMergedAliasScopeDoesNotOfferAmbiguousInspectOrBlockActions() {
+    func testMergedAliasScopePreservesExactInspectAliasesAndDisablesAmbiguousBlock() {
         let nav = AppNavigation()
         let filter = TrafficFilter(
             bundleIDs: ["claude", "claude-code"],
@@ -95,6 +134,8 @@ final class VisualizeNavigationTests: XCTestCase {
         VisualizeActionScope.showInspect(nav, filter: filter, sourceTitle: "Claude Code")
 
         XCTAssertNil(nav.inspectRequest?.appID)
+        XCTAssertEqual(nav.inspectRequest?.appIDs, ["claude", "claude-code"])
+        XCTAssertEqual(nav.inspectRequest?.appName, "Claude Code")
         XCTAssertEqual(nav.inspectRequest?.host, "api.anthropic.com")
         XCTAssertNil(VisualizeActionScope.blockRule(for: filter))
     }
@@ -111,6 +152,21 @@ final class VisualizeNavigationTests: XCTestCase {
 
         XCTAssertEqual(nav.inspectRequest?.appID, "claude")
         XCTAssertEqual(VisualizeActionScope.blockRule(for: filter)?.app, "claude")
+    }
+
+    func testReportsOfferInspectOnlyWhenTheCompleteScopeIsRepresentable() {
+        XCTAssertTrue(InspectNavigationScope.canInspect(
+            TrafficFilter(bundleID: "node", agentParent: "claude", mcpServer: "github", domain: "api.github.com"),
+            requireDestination: false
+        ))
+        XCTAssertFalse(InspectNavigationScope.canInspect(
+            TrafficFilter(bundleID: "node", remoteIP: "203.0.113.9"),
+            requireDestination: false
+        ))
+        XCTAssertFalse(InspectNavigationScope.canInspect(
+            TrafficFilter(bundleID: "node", domainSuffix: "github.com"),
+            requireDestination: false
+        ))
     }
 
     func testAttributedChildBlockDraftTargetsTheProvenAgent() {

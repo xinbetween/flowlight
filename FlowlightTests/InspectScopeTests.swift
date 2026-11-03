@@ -39,6 +39,20 @@ final class InspectScopeTests: XCTestCase {
         XCTAssertEqual(searched.count, 2, "precondition: searching the text matches the page that mentions it")
     }
 
+    func testScopingToMergedAliasesKeepsOnlyExactMembers() throws {
+        let db = try database()
+        _ = try db.insertExchange(exchange(app: ("claude", "Claude Code"), host: "api.anthropic.com"))
+        _ = try db.insertExchange(exchange(app: ("claude-code", "Claude Code"), host: "api.anthropic.com"))
+        _ = try db.insertExchange(exchange(app: ("com.google.Chrome", "Google Chrome"), host: "api.anthropic.com"))
+
+        let scoped = try db.exchanges(
+            since: Date().addingTimeInterval(-60),
+            apps: ["claude", "claude-code"]
+        )
+
+        XCTAssertEqual(Set(scoped.map(\.bundleID)), ["claude", "claude-code"])
+    }
+
     func testScopingToAHostKeepsItsSubdomains() throws {
         let db = try database()
         _ = try db.insertExchange(exchange(app: ("a", "A"), host: "api.github.com"))

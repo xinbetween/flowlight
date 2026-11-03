@@ -173,11 +173,40 @@ final class AppNavigation: ObservableObject {
     @Published var inspectRequest: InspectRequest?
     @Published var ruleRequest: RuleRequest?
 
-    /// Opens the Rules screen with this rule in the editor, unsaved. Writing a rule from a table row should land
-    /// somewhere it can be read back and changed, not quietly take effect out of sight.
+    private struct TrailEntry {
+        var item: SidebarItem
+        var report: ReportRequest?
+    }
+
+    private var trail: [TrailEntry] = []
+    private var currentReportScope: ReportRequest?
+
+    var backDestination: SidebarItem? { trail.last?.item }
+
+    /// Sidebar choices start a new task. In-content links use `followLink` below so their exact origin can be restored.
     func show(_ item: SidebarItem) {
         guard SidebarItem.availableCases.contains(item) else { return }
+        trail.removeAll()
         if item == .rules { rulesTab = .rules }
+        selection = item
+    }
+
+    func updateCurrentReportScope(filter: TrafficFilter, granularity: Granularity,
+                                  endDate: Date, followNow: Bool) {
+        currentReportScope = ReportRequest(filter: filter, granularity: granularity,
+                                           end: followNow ? nil : endDate)
+    }
+
+    func goBack() {
+        guard let entry = trail.popLast() else { return }
+        if entry.item == .reports { reportRequest = entry.report }
+        selection = entry.item
+    }
+
+    private func followLink(to item: SidebarItem) {
+        guard SidebarItem.availableCases.contains(item), selection != item else { return }
+        trail.append(TrailEntry(item: selection,
+                                report: selection == .reports ? currentReportScope : nil))
         selection = item
     }
 
@@ -191,13 +220,13 @@ final class AppNavigation: ObservableObject {
     }
 
     func showPackReviews() {
+        show(.rules)
         rulesTab = .packs
-        selection = .rules
     }
 
     func showReport(filter: TrafficFilter, granularity: Granularity? = nil, end: Date? = nil) {
         reportRequest = ReportRequest(filter: filter, granularity: granularity, end: end)
-        selection = .reports
+        followLink(to: .reports)
     }
 
     /// Open Inspect already looking at one app, host or address.
@@ -208,7 +237,7 @@ final class AppNavigation: ObservableObject {
     func showInspect(search: String, potentialHarmOnly: Bool = false) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: search, potentialHarmOnly: potentialHarmOnly)
-        show(.inspect)
+        followLink(to: .inspect)
     }
 
     /// Scope Inspect to one app or one destination, rather than searching for its name.
@@ -216,25 +245,56 @@ final class AppNavigation: ObservableObject {
     /// The first version of this put the name in the search field, which reads well — visible, editable — but
     /// Inspect searches response bodies too, so "Claude Code" matched every page whose HTML happens to contain
     /// those words. The scope is still shown and still removable; it is just no longer a text match.
-    func showInspect(app: (bundleID: String, name: String)? = nil, host: String? = nil,
+    func showInspect(app: (bundleID: String, name: String)? = nil,
+                     appIDs: [String] = [], appName: String? = nil, host: String? = nil,
                      hostIncludesSubdomains: Bool = true,
                      includeAttributedChildren: Bool = false, agentParent: String? = nil,
                      mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
-        inspectRequest = InspectRequest(search: "", appID: app?.bundleID, appName: app?.name, host: host,
+        inspectRequest = InspectRequest(search: "", appID: app?.bundleID,
+                                       appIDs: app == nil ? appIDs : [], appName: app?.name ?? appName, host: host,
                                        hostIncludesSubdomains: hostIncludesSubdomains,
                                        includeAttributedChildren: includeAttributedChildren,
                                        agentParent: agentParent, mcpServer: mcpServer,
                                        potentialHarmOnly: potentialHarmOnly)
-        show(.inspect)
+        followLink(to: .inspect)
+    }
+}
+
+@MainActor
+enum InspectNavigationScope {
+    static func canInspect(_ filter: TrafficFilter, requireDestination: Bool = true) -> Bool {
+        if filter.owner != nil || filter.domainSuffix != nil || filter.appProtocol != nil || filter.channel != nil {
+            return false
+        }
+        // Inspected exchanges retain the requested host but not its resolved address. An address-only Reports row
+        // therefore cannot be represented honestly; a host row may still carry its observed address as evidence.
+        if filter.remoteIP != nil, filter.domain == nil { return false }
+        guard let domain = filter.domain else { return !requireDestination }
+        return HostCanonicalizer.host(domain) != nil && HostCanonicalizer.address(domain) == nil
+    }
+
+    static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil,
+                            requireDestination: Bool = true, potentialHarmOnly: Bool = false) {
+        guard canInspect(filter, requireDestination: requireDestination) else { return }
+        let app = filter.bundleIDs.isEmpty
+            ? filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
+            : nil
+        let host = filter.domain.flatMap(HostCanonicalizer.host)
+        nav.showInspect(app: app, appIDs: filter.bundleIDs, appName: sourceTitle,
+                        host: host, hostIncludesSubdomains: false,
+                        includeAttributedChildren: filter.includeAttributedChildren,
+                        agentParent: filter.agentParent, mcpServer: filter.mcpServer,
+                        potentialHarmOnly: potentialHarmOnly)
     }
 }
 
 /// A request from another screen to open Inspect scoped to something.
 struct InspectRequest: Equatable {
     var search: String
-    /// The app to scope to, and the name to show on the chip that says so.
+    /// The exact app identity or merged alias set to scope to, and the name to show on the chip that says so.
     var appID: String? = nil
+    var appIDs: [String] = []
     var appName: String? = nil
     var host: String? = nil
     var hostIncludesSubdomains = true

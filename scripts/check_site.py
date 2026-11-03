@@ -24,6 +24,8 @@ OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-p
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
 OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
 PAGES_WORKFLOW = ROOT / ".github/workflows/pages.yml"
+APP_STORE_URL = "https://apps.apple.com/us/app/flowlight-network-monitor/id6826130038?mt=12"
+APP_STORE_BADGE = OUT / "assets/app-store-badge.svg"
 PROJECT = (ROOT / "project.yml").read_text()
 APP_VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', PROJECT).group(1)
 
@@ -399,11 +401,21 @@ def problems():
     if "Sitemap: https://flowlight.xinbetween.com/sitemap.xml" not in robots:
         found.append("docs/robots.txt: missing or incorrect sitemap declaration")
 
-    # 15. The home is intentionally static/lightweight. A loop here has previously caused real-machine jank.
+    # 15. The Mac App Store is a distinct signed product, not a replacement for the direct DMG. Every localized
+    #     home must expose Apple's unmodified badge and exact listing while retaining the existing direct download.
+    if not APP_STORE_BADGE.is_file():
+        found.append("docs/assets/app-store-badge.svg: official Mac App Store badge is missing")
     for source in sorted((ROOT / "site/pages").glob("**/index.html")):
         source_text = source.read_text()
+        label = str(source.relative_to(ROOT))
+        if APP_STORE_URL not in source_text or "assets/app-store-badge.svg" not in source_text:
+            found.append(f"{label}: Mac App Store badge or exact listing URL is missing")
+        if "{{dmg}}" not in source_text:
+            found.append(f"{label}: direct DMG download was removed while adding the Store badge")
+
+        # The home is intentionally static/lightweight. A loop here has previously caused real-machine jank.
         if re.search(r"\b(setInterval|setTimeout|requestAnimationFrame)\s*\(", source_text):
-            found.append(f"{source.relative_to(ROOT)}: home page has recurring JavaScript animation")
+            found.append(f"{label}: home page has recurring JavaScript animation")
 
     # 16. Pages occasionally needs redeploying without changing public bytes. A manual dispatch has no `before`
     # SHA, so it must compare with the signed catalog already being served rather than a guessed commit. Keep these

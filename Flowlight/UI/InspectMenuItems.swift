@@ -9,10 +9,12 @@ import SwiftUI
 struct InspectMenuItems: View {
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var monitor: TrafficMonitor
+    /// An exact combined Reports/Visualize scope. When present, it takes precedence over the legacy app/host pair.
+    var filter: TrafficFilter? = nil
     /// The app the row is about, if it is about one.
-    var app: (bundleID: String, name: String)?
+    var app: (bundleID: String, name: String)? = nil
     /// The destination the row is about: a hostname or an address.
-    var host: String?
+    var host: String? = nil
 
     var body: some View {
         #if APP_STORE
@@ -21,15 +23,33 @@ struct InspectMenuItems: View {
         // These scope the list rather than search it. The first version put the name in the search field, which
         // also searches response bodies — so "Inspect Claude Code's Traffic" returned every GitHub page whose
         // HTML contains those two words, and the app whose traffic you asked for was nowhere in it.
-        // The destination form. Named separately from the app form below because in English the two differ
-        // only by word order, which tells a translator nothing about which is which.
-        if let host, !host.isEmpty {
-            Button(L("Inspect Traffic to %@", host)) { nav.showInspect(host: host) }
-                .help(helpText)
-        }
-        if let app, !app.name.isEmpty {
-            Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app) }
-                .help(helpText)
+        if let filter {
+            if InspectNavigationScope.canInspect(filter, requireDestination: false) {
+                if let destination = filter.domain.flatMap(HostCanonicalizer.host) {
+                    Button(L("Inspect Traffic to %@", destination)) {
+                        InspectNavigationScope.showInspect(nav, filter: filter, sourceTitle: app?.name,
+                                                           requireDestination: false)
+                    }
+                    .help(helpText)
+                } else if let name = app?.name ?? filter.bundleID ?? filter.agentParent {
+                    Button(L("Inspect %@'s Traffic", name)) {
+                        InspectNavigationScope.showInspect(nav, filter: filter, sourceTitle: app?.name,
+                                                           requireDestination: false)
+                    }
+                    .help(helpText)
+                }
+            }
+        } else {
+            // The destination form. Named separately from the app form below because in English the two differ
+            // only by word order, which tells a translator nothing about which is which.
+            if let host, !host.isEmpty {
+                Button(L("Inspect Traffic to %@", host)) { nav.showInspect(host: host) }
+                    .help(helpText)
+            }
+            if let app, !app.name.isEmpty {
+                Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app) }
+                    .help(helpText)
+            }
         }
         #endif
     }

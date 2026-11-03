@@ -91,6 +91,15 @@ struct ContentView: View {
             // One help button for every screen, because the documentation is grouped the way this sidebar
             // is: whatever is on screen, the button opens the section about it rather than the top of the page.
             .toolbar {
+                if let destination = nav.backDestination {
+                    ToolbarItem(placement: .navigation) {
+                        Button { nav.goBack() } label: {
+                            Label(L("Back"), systemImage: "chevron.backward")
+                        }
+                        .help("\(L("Back")): \(destination.title)")
+                        .accessibilityLabel("\(L("Back")): \(destination.title)")
+                    }
+                }
                 ToolbarItem {
                     Button { NSWorkspace.shared.open(Help.forScreen(nav.selection)) } label: {
                         Image(systemName: "questionmark.circle")
