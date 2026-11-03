@@ -1,6 +1,48 @@
 import CoreGraphics
+import Foundation
 import XCTest
 @testable import Flowlight
+
+private final class TrafficGraphPlacementGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var isReleased = false
+    private var placements = 0
+
+    func observePlacement() {
+        condition.lock()
+        placements += 1
+        if placements == 1 {
+            condition.broadcast()
+            while !isReleased {
+                condition.wait()
+            }
+        }
+        condition.unlock()
+    }
+
+    func waitForFirstPlacement(timeout: TimeInterval) -> Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        let deadline = Date().addingTimeInterval(timeout)
+        while placements == 0 {
+            guard condition.wait(until: deadline) else { return false }
+        }
+        return true
+    }
+
+    var placementCount: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return placements
+    }
+
+    func release() {
+        condition.lock()
+        isReleased = true
+        condition.broadcast()
+        condition.unlock()
+    }
+}
 
 final class TrafficGraphTests: XCTestCase {
     func testUnrelatedHoveredEdgeDoesNotOverrideNodeSelection() {
@@ -2873,5 +2915,206 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertLessThanOrEqual(bottomRight.y, bounds.maxY - 31.9)
         XCTAssertEqual((topLeft.x + bottomRight.x) / 2, bounds.midX, accuracy: 0.001)
         XCTAssertEqual((topLeft.y + bottomRight.y) / 2, bounds.midY, accuracy: 0.001)
+    }
+
+    func testBarycentricSweepsRemoveAvoidableLaneCrossings() {
+        let snapshot = TrafficGraphBuilder.build(rows: (0..<8).map { index in
+            row(
+                app: "app.\(index)",
+                domain: "host\(7 - index).example",
+                ip: "203.0.113.\(8 - index)",
+                bytesIn: 100
+            )
+        }, limits: .unbounded)
+        let bounds = CGRect(
+            x: 0,
+            y: 0,
+            width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+            height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        )
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
+
+        XCTAssertEqual(TrafficGraphLayout.crossingCount(snapshot: snapshot, layout: layout), 0)
+    }
+
+    func testDensityAwareCanvasKeepsEverySemanticColumnInsideBounds() {
+        var routed = row(
+            app: "node", name: "Node", domain: "api.example.com", ip: "203.0.113.8",
+            bytesOut: 100, parent: "claude", parentName: "Claude Code",
+            launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")
+        )
+        routed.routeProxyBundleID = "com.flowlight.app"
+        routed.routeProxyName = "Flowlight"
+        routed.routeProxyPath = "/Applications/Flowlight.app"
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app"
+        )
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: [routed], gateways: [gateway], resolveGateway: { _ in identity }, limits: .unbounded
+        )
+        let width = TrafficGraphLayout.minimumCanvasWidth(for: snapshot)
+        let height = TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
+
+        XCTAssertGreaterThan(width, 900, "dense six-stage topology needs more than the legacy fixed width")
+        for frame in layout.nodeFrames.values {
+            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX + 23.9)
+            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX - 23.9)
+        }
+    }
+
+    func testCounterRefreshUpdatesWidthsWithoutRecomputingGeometry() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "app", domain: "quiet.example", ip: "203.0.113.1", bytesIn: 100),
+            row(app: "app", domain: "busy.example", ip: "203.0.113.2", bytesIn: 1_000_000)
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 1_000, height: 760)
+        )
+        var inverted = snapshot
+        inverted.edges = snapshot.edges.map { edge in
+            var edge = edge
+            edge.counters.bytesIn = edge.counters.bytesIn == 100 ? 1_000_000 : 100
+            return edge
+        }
+
+        let refreshed = layout.updatingTrafficWidths(for: inverted)
+
+        XCTAssertEqual(refreshed.nodeFrames, layout.nodeFrames)
+        XCTAssertEqual(refreshed.edgeCurves, layout.edgeCurves)
+        XCTAssertNotEqual(refreshed.edgeWidths, layout.edgeWidths)
+    }
+
+    func testRibbonWidthsStayGloballyMonotonicAcrossDifferentFanout() {
+        let crowded = (0..<20).map { index in
+            row(
+                app: "crowded",
+                domain: "host\(index).example",
+                ip: "203.0.113.\(index + 1)",
+                bytesIn: index == 0 ? 1_000_000 : 1
+            )
+        }
+        let snapshot = TrafficGraphBuilder.build(rows: crowded + [
+            row(app: "isolated", domain: "single.example", ip: "198.51.100.1", bytesIn: 1)
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(
+                x: 0,
+                y: 0,
+                width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+                height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+            )
+        )
+        let ordered = snapshot.edges.compactMap { edge -> (Int64, CGFloat)? in
+            guard let width = layout.edgeWidths[edge.id] else { return nil }
+            return (edge.displayedCounters.total, width)
+        }.sorted { left, right in
+            left.0 == right.0 ? left.1 < right.1 : left.0 < right.0
+        }
+
+        for pair in zip(ordered, ordered.dropFirst()) {
+            XCTAssertLessThanOrEqual(pair.0.1, pair.1.1 + 0.0001,
+                                     "less traffic must never render wider because another node has more fanout")
+        }
+    }
+
+    func testViewportVisibilityCullsOffscreenGeometryButFitIncludesEverything() {
+        let snapshot = TrafficGraphBuilder.build(rows: (0..<80).map { index in
+            row(
+                app: "app.\(index % 8)", domain: "host\(index % 40).example",
+                ip: "203.0.113.\(index % 40)", bytesIn: Int64(index + 1)
+            )
+        }, limits: .unbounded)
+        let graphBounds = CGRect(
+            x: 0,
+            y: 0,
+            width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+            height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        )
+        let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: graphBounds)
+        let screenBounds = CGRect(x: 0, y: 0, width: 800, height: 500)
+        let top = layout.visibleRegion(
+            in: TrafficGraphViewport().visibleGraphRect(in: screenBounds),
+            margin: 0
+        )
+        var fitted = TrafficGraphViewport()
+        fitted.fit(content: layout.contentBounds, in: screenBounds)
+        let all = layout.visibleRegion(in: fitted.visibleGraphRect(in: screenBounds), margin: 1)
+
+        XCTAssertLessThan(top.nodeIDs.count, snapshot.nodes.count)
+        XCTAssertLessThan(top.edgeIDs.count, snapshot.edges.count)
+        XCTAssertEqual(all.nodeIDs, Set(snapshot.nodes.map(\.id)))
+        XCTAssertEqual(all.edgeIDs, Set(snapshot.edges.map(\.id)))
+    }
+
+    func testViewportInteractionPreventsLaterTopologyFromAutomaticallyFitting() {
+        XCTAssertTrue(TrafficGraphViewportPolicy.shouldAutoFit(isUserControlled: false))
+        XCTAssertFalse(TrafficGraphViewportPolicy.shouldAutoFit(isUserControlled: true))
+    }
+
+    func testCancelledLargeLayoutDoesNotPublishPartialGeometry() async {
+        let snapshot = TrafficGraphBuilder.build(rows: (0..<600).map { index in
+            row(
+                app: "app.\(index % 60)", domain: "host\(index).example",
+                ip: "203.0.\(index / 256).\(index % 256)", bytesIn: Int64(index + 1)
+            )
+        }, limits: .unbounded)
+        let bounds = CGRect(
+            x: 0,
+            y: 0,
+            width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+            height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        )
+        let gate = TrafficGraphPlacementGate()
+        let task = Task.detached(priority: .userInitiated) {
+            TrafficGraphLayout.layout(
+                snapshot: snapshot,
+                in: bounds,
+                placementObserver: { gate.observePlacement() }
+            )
+        }
+
+        XCTAssertTrue(gate.waitForFirstPlacement(timeout: 2))
+        task.cancel()
+        let releaseTask = Task.detached(priority: .userInitiated) {
+            gate.release()
+        }
+        await releaseTask.value
+        let layout = await task.value
+
+        XCTAssertEqual(gate.placementCount, 1)
+        XCTAssertTrue(layout.nodeFrames.isEmpty)
+        XCTAssertTrue(layout.edgeCurves.isEmpty)
+    }
+
+    func testLargeTopologyLayoutBenchmark() {
+        let snapshot = TrafficGraphBuilder.build(rows: (0..<600).map { index in
+            row(
+                app: "app.\(index % 60)", domain: "host\(index).example",
+                ip: "203.0.\(index / 256).\(index % 256)", bytesIn: Int64(index + 1)
+            )
+        }, limits: .unbounded)
+        XCTAssertEqual(snapshot.edges.count, 600)
+        let bounds = CGRect(
+            x: 0,
+            y: 0,
+            width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+            height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+        )
+
+        measure(metrics: [XCTClockMetric()]) {
+            let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
+            XCTAssertEqual(layout.nodeFrames.count, snapshot.nodes.count)
+            XCTAssertEqual(layout.edgeCurves.count, snapshot.edges.count)
+        }
     }
 }

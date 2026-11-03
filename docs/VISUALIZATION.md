@@ -85,6 +85,18 @@ A later status overlay must expose completeness/retention and join only structur
 - Separate caps apply only to the Map projection: agents, tools/MCP nodes, services/destinations, and relationships remain complete in List.
 - Map omission summaries are the exact ID-set difference from the complete semantic graph and include only omitted observed traffic in byte and connection totals.
 
+## 0.16.7 — scalable map geometry
+
+Map geometry is now a stable product of semantic IDs and viewport size. Counter refreshes recompute only bounded ribbon widths; node frames, ordered ports, route curves, Fit bounds, and hit-testing geometry stay fixed until topology or canvas size changes.
+
+- Canvas width and height derive from active semantic stages, card footprint, and relationship density instead of assuming a 900-point surface.
+- Alternating barycentric sweeps use normalized positions across launcher, source, tool/MCP, gateway, inspection proxy, and destination lanes to reduce avoidable crossings deterministically.
+- Ribbon ports reserve topology-stable capacity. Traffic changes can widen or narrow a ribbon inside its reserved slot without shifting another relationship.
+- Layout runs outside the main actor and is cached by `TrafficGraphLayoutKey`; stale cancelled work cannot replace a newer topology.
+- The screen viewport is converted exactly into graph coordinates. Ribbon and particle drawing outside a padded visible region is skipped, while every card and relationship control remains available to keyboard and VoiceOver and the complete List stays unchanged.
+- Fit still includes every card and relationship. After a person pans, zooms, or resets, asynchronous topology refreshes preserve that viewport until they choose Fit again. Anchored zoom round-trips between graph and screen coordinates, and Reduce Motion continues to remove particles.
+- A 600-relationship benchmark guards layout cost in addition to deterministic geometry, collision, route-avoidance, crossing, hit-testing, Fit, and accessibility coverage.
+
 ### Acceptance tests
 
 1. Known agents, attributed parents, and non-browser provider callers are included; browsers are not auto-discovered.

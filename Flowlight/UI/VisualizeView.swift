@@ -526,23 +526,32 @@ private struct TrafficGraphCanvas: View {
     @State private var viewport = TrafficGraphViewport()
     @State private var panStart: TrafficGraphViewport?
     @State private var zoomStart: TrafficGraphViewport?
+    @State private var viewportIsUserControlled = false
 
     var body: some View {
         GeometryReader { geometry in
             let graphSize = CGSize(
-                width: max(900, geometry.size.width),
+                width: max(TrafficGraphLayout.minimumCanvasWidth(for: snapshot), geometry.size.width),
                 height: max(TrafficGraphLayout.minimumCanvasHeight(for: snapshot), geometry.size.height)
             )
             let graphBounds = CGRect(origin: .zero, size: graphSize)
-            let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: graphBounds,
-                                                    preserving: cachedLayout.nodeFrames.isEmpty ? nil : cachedLayout)
             let layoutKey = TrafficGraphLayoutKey(snapshot: snapshot, size: graphSize)
+            let layout = cachedLayout.updatingTrafficWidths(for: snapshot)
+            let screenBounds = CGRect(origin: .zero, size: geometry.size)
+            let visible = layout.visibleRegion(
+                in: viewport.visibleGraphRect(in: screenBounds),
+                margin: 96 / max(viewport.scale, 0.01)
+            )
             ZStack(alignment: .topLeading) {
                 Color.clear
-                graphContent(layout, size: graphSize)
+                if layout.nodeFrames.isEmpty, !snapshot.nodes.isEmpty {
+                    ProgressView(L("Loading visualization…"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                graphContent(layout, visible: visible, size: graphSize)
                     .scaleEffect(viewport.scale, anchor: .topLeading)
                     .offset(viewport.offset)
-                viewportControls(layout: layout, in: CGRect(origin: .zero, size: geometry.size))
+                viewportControls(layout: layout, in: screenBounds)
             }
             .clipped()
             .contentShape(Rectangle())
@@ -566,9 +575,25 @@ private struct TrafficGraphCanvas: View {
             .gesture(panGesture)
             .simultaneousGesture(zoomGesture(in: geometry.size))
             .task(id: layoutKey) {
-                cachedLayout = layout
-                viewport.fit(content: layout.contentBounds,
-                             in: CGRect(origin: .zero, size: geometry.size))
+                let previous = cachedLayout.nodeFrames.isEmpty ? nil : cachedLayout
+                let worker = Task.detached(priority: .userInitiated) {
+                    TrafficGraphLayout.layout(
+                        snapshot: snapshot,
+                        in: graphBounds,
+                        preserving: previous
+                    )
+                }
+                let nextLayout = await withTaskCancellationHandler(
+                    operation: { await worker.value },
+                    onCancel: { worker.cancel() }
+                )
+                guard !Task.isCancelled, !nextLayout.nodeFrames.isEmpty else { return }
+                cachedLayout = nextLayout
+                if TrafficGraphViewportPolicy.shouldAutoFit(
+                    isUserControlled: viewportIsUserControlled
+                ) {
+                    viewport.fit(content: nextLayout.contentBounds, in: screenBounds)
+                }
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(L("Traffic relationship map"))
@@ -576,10 +601,14 @@ private struct TrafficGraphCanvas: View {
         }
     }
 
-    private func graphContent(_ layout: TrafficGraphLayoutSnapshot, size: CGSize) -> some View {
+    private func graphContent(
+        _ layout: TrafficGraphLayoutSnapshot,
+        visible: TrafficGraphVisibleRegion,
+        size: CGSize
+    ) -> some View {
         ZStack(alignment: .topLeading) {
-            edgeLayer(layout)
-            particleLayer(layout)
+            edgeLayer(layout, visible: visible)
+            particleLayer(layout, visible: visible)
             relationshipControls(layout)
             ForEach(snapshot.nodes) { node in
                 if let frame = layout.nodeFrames[node.id] {
@@ -607,7 +636,10 @@ private struct TrafficGraphCanvas: View {
         DragGesture(minimumDistance: 3)
             .onChanged { value in
                 let start = panStart ?? viewport
-                if panStart == nil { panStart = start }
+                if panStart == nil {
+                    panStart = start
+                    viewportIsUserControlled = true
+                }
                 var next = start
                 next.pan(by: value.translation)
                 viewport = next
@@ -619,7 +651,10 @@ private struct TrafficGraphCanvas: View {
         MagnificationGesture()
             .onChanged { factor in
                 let start = zoomStart ?? viewport
-                if zoomStart == nil { zoomStart = start }
+                if zoomStart == nil {
+                    zoomStart = start
+                    viewportIsUserControlled = true
+                }
                 var next = start
                 next.zoom(by: factor, around: CGPoint(x: size.width / 2, y: size.height / 2))
                 viewport = next
@@ -629,19 +664,31 @@ private struct TrafficGraphCanvas: View {
 
     private func viewportControls(layout: TrafficGraphLayoutSnapshot, in bounds: CGRect) -> some View {
         HStack(spacing: 2) {
-            Button { viewport.zoom(by: 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY)) } label: {
+            Button {
+                viewportIsUserControlled = true
+                viewport.zoom(by: 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY))
+            } label: {
                 Image(systemName: "plus")
             }
             .help(L("Zoom in"))
-            Button { viewport.zoom(by: 1 / 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY)) } label: {
+            Button {
+                viewportIsUserControlled = true
+                viewport.zoom(by: 1 / 1.2, around: CGPoint(x: bounds.midX, y: bounds.midY))
+            } label: {
                 Image(systemName: "minus")
             }
             .help(L("Zoom out"))
             Divider().frame(height: 16)
-            Button(L("Fit")) { viewport.fit(content: layout.contentBounds, in: bounds) }
-                .help(L("Fit the map in the window"))
-            Button(L("Reset")) { viewport.reset() }
-                .help(L("Reset zoom and position"))
+            Button(L("Fit")) {
+                viewportIsUserControlled = false
+                viewport.fit(content: layout.contentBounds, in: bounds)
+            }
+            .help(L("Fit the map in the window"))
+            Button(L("Reset")) {
+                viewportIsUserControlled = true
+                viewport.reset()
+            }
+            .help(L("Reset zoom and position"))
         }
         .buttonStyle(.borderless)
         .controlSize(.small)
@@ -652,9 +699,12 @@ private struct TrafficGraphCanvas: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    private func edgeLayer(_ layout: TrafficGraphLayoutSnapshot) -> some View {
+    private func edgeLayer(
+        _ layout: TrafficGraphLayoutSnapshot,
+        visible: TrafficGraphVisibleRegion
+    ) -> some View {
         Canvas { context, _ in
-            for edge in snapshot.edges {
+            for edge in snapshot.edges where visible.edgeIDs.contains(edge.id) {
                 guard let curve = layout.edgeCurves[edge.id] else { continue }
                 let emphasized = TrafficGraphSelection.emphasizes(
                     edge,
@@ -697,11 +747,14 @@ private struct TrafficGraphCanvas: View {
     }
 
     @ViewBuilder
-    private func particleLayer(_ layout: TrafficGraphLayoutSnapshot) -> some View {
+    private func particleLayer(
+        _ layout: TrafficGraphLayoutSnapshot,
+        visible: TrafficGraphVisibleRegion
+    ) -> some View {
         if !reduceMotion {
             TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
                 Canvas { context, _ in
-                    for edge in snapshot.edges where isEdgeRelated(edge) {
+                    for edge in snapshot.edges where visible.edgeIDs.contains(edge.id) && isEdgeRelated(edge) {
                         for particle in layout.particles(for: edge, at: timeline.date.timeIntervalSinceReferenceDate,
                                                          reduceMotion: reduceMotion) {
                             let rect = CGRect(x: particle.position.x - particle.radius, y: particle.position.y - particle.radius,
