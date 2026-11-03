@@ -450,11 +450,15 @@ struct VisualizeView: View {
                 .lineLimit(2)
             Spacer(minLength: 0)
             if selectedSource != nil || selectedDestination != nil {
-                Button(L("Clear scope")) {
+                Button {
                     selectedSource = nil
                     selectedDestination = nil
+                } label: {
+                    Label(L("Reset"), systemImage: "arrow.counterclockwise")
                 }
                 .buttonStyle(.borderless)
+                .help(L("Clear scope"))
+                .accessibilityLabel(L("Clear scope"))
             }
         }
         .padding(.horizontal, Spacing.l)

@@ -182,7 +182,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Choose Traffic for every observed application, or AI activity for proved agent clients, their attributed tools and MCP servers, launchers, gateways, Flowlight's inspection proxy, LLM services, and every other destination they reached. Process-lineage and configured-route relationships stay visually distinct from observed traffic and never invent byte totals or invocations.
 
- By default, Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic. Use the optional searchable source and destination selectors for any-to-any, one-to-any, any-to-one, or one-to-one investigation. A focused Map includes every connected launcher, agent, tool or MCP service, gateway, Flowlight proxy stage, destination, and observed or blocked relationship. Only an unusually large focused neighborhood groups progressively; each group retains every exact member ID. List and Reports remain complete and numerically identical.
+ By default, Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic. Use the optional searchable source and destination selectors for any-to-any, one-to-any, any-to-one, or one-to-one investigation. Each choice limits the opposite selector to endpoints with observed or blocked evidence, while Any stays available; Reset returns both selectors to Any. A focused Map includes every connected launcher, agent, tool or MCP service, gateway, Flowlight proxy stage, destination, and observed or blocked relationship. Only an unusually large focused neighborhood groups progressively; each group retains every exact member ID. List and Reports remain complete and numerically identical.
 
  Select a node or connection for exact values, then continue to Reports, Inspect, or an unsaved blocking-rule editor with the same app and exact destination. List exposes the same complete graph 25 relationships at a time for keyboard, VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is not an allow verdict.
 
@@ -1668,7 +1668,7 @@ November 3, 2026Latest
 
  Start with the traffic that matters most. Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic with deterministic ties.
 
- Trace any source to any destination. Two searchable optional selectors cover every endpoint combination and reveal the complete connected semantic neighborhood, including launchers, agents, tools, MCP services, gateways, Flowlight proxy stages, observed traffic, and enforcement evidence.
+ Trace any source to any destination. Two searchable optional selectors cover every endpoint combination, mutually limit choices to pairs with observed or blocked evidence, and provide a one-click Reset while revealing the complete connected semantic neighborhood.
 
  Keep dense investigations exact. Large focused neighborhoods group progressively while retaining every represented node and relationship ID; List and Reports remain exhaustive, searchable, and numerically identical.
 

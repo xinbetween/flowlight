@@ -768,8 +768,14 @@ enum AITrafficGraphBuilder {
             limits: .unbounded
         )
         evidence.hidden = .none
-        let sourceOptions = TrafficGraphEndpointProjector.sourceOptions(in: evidence)
-        let destinationOptions = TrafficGraphEndpointProjector.destinationOptions(in: evidence)
+        let sourceOptions = TrafficGraphEndpointProjector.sourceOptions(
+            in: evidence,
+            matchingDestination: endpointQuery.destination
+        )
+        let destinationOptions = TrafficGraphEndpointProjector.destinationOptions(
+            in: evidence,
+            matchingSource: endpointQuery.source
+        )
         let complete = TrafficGraphEndpointProjector.scope(evidence, query: endpointQuery)
         let map: TrafficGraphSnapshot
         if mapLimits == .unbounded {

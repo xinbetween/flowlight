@@ -2541,6 +2541,42 @@ final class TrafficGraphTests: XCTestCase {
                        exact.edges.count, "List must retain every exact relationship in the selected scope")
     }
 
+    func testEndpointOptionsMutuallyFilterByTheOppositeSelection() throws {
+        let rows = [
+            row(app: "app.one", domain: "one.example", ip: "203.0.113.1", bytesOut: 10),
+            row(app: "app.one", domain: "shared.example", ip: "203.0.113.2", bytesOut: 20),
+            row(app: "app.two", domain: "shared.example", ip: "203.0.113.2", bytesOut: 30),
+            row(app: "app.two", domain: "two.example", ip: "203.0.113.3", bytesOut: 40)
+        ]
+        let evidence = TrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: .unbounded).complete
+        let appOne = try XCTUnwrap(evidence.nodes.first { $0.filter.bundleID == "app.one" }?.id)
+        let oneDestination = try XCTUnwrap(evidence.nodes.first { $0.title == "one.example" }?.id)
+
+        let compatibleSources = TrafficGraphEndpointProjector.sourceOptions(
+            in: evidence,
+            matchingDestination: oneDestination
+        )
+        let compatibleDestinations = TrafficGraphEndpointProjector.destinationOptions(
+            in: evidence,
+            matchingSource: appOne
+        )
+        let destinationFocused = TrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            mapLimits: .unbounded,
+            endpointQuery: .init(destination: oneDestination)
+        )
+        let sourceFocused = TrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            mapLimits: .unbounded,
+            endpointQuery: .init(source: appOne)
+        )
+
+        XCTAssertEqual(compatibleSources.map(\.id), [appOne])
+        XCTAssertEqual(Set(compatibleDestinations.map(\.title)), ["one.example", "shared.example"])
+        XCTAssertEqual(destinationFocused.sourceOptions.map(\.id), [appOne])
+        XCTAssertEqual(Set(sourceFocused.destinationOptions.map(\.title)), ["one.example", "shared.example"])
+    }
+
     func testEndpointProjectionKeepsASelectedQuietSourceAndDestinationExact() throws {
         let rows = (0..<12).map { index in
             row(app: "app.\(index)", domain: "host\(index).example",
@@ -2634,13 +2670,16 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(agentOneOption.counters.bytesOut, 40)
         XCTAssertEqual(agentTwoOption.counters.bytesOut, 60)
 
-        let focused = AITrafficGraphBuilder.buildForPresentation(
+        let focusedBuild = AITrafficGraphBuilder.buildForPresentation(
             rows: rows,
             mapLimits: .unbounded,
             endpointQuery: .init(source: agentOneOption.id)
-        ).complete
+        )
+        let focused = focusedBuild.complete
         let observed = try XCTUnwrap(focused.edges.first { $0.relationship == .observed })
 
+        XCTAssertEqual(focusedBuild.destinationOptions.count, 1)
+        XCTAssertEqual(focusedBuild.destinationOptions.first?.counters.bytesOut, 40)
         XCTAssertEqual(focused.visibleTotal.bytesOut, 40)
         XCTAssertEqual(observed.counters.bytesOut, 40)
         XCTAssertEqual(Set(observed.members.compactMap(\.filter.agentParent)), ["agent.one"])
@@ -2671,19 +2710,21 @@ final class TrafficGraphTests: XCTestCase {
             evidence.complete.nodes.first { $0.id == option.id }?.filter.bundleID == "agent.two"
         })
 
-        let agentOneScope = AITrafficGraphBuilder.buildForPresentation(
+        let agentOneBuild = AITrafficGraphBuilder.buildForPresentation(
             rows: [BreakdownRow](), blockedAttempts: blocked, mapLimits: .unbounded,
             endpointQuery: .init(source: agentOne.id)
-        ).complete
-        let agentTwoScope = AITrafficGraphBuilder.buildForPresentation(
+        )
+        let agentTwoBuild = AITrafficGraphBuilder.buildForPresentation(
             rows: [BreakdownRow](), blockedAttempts: blocked, mapLimits: .unbounded,
             endpointQuery: .init(source: agentTwo.id)
-        ).complete
+        )
 
         XCTAssertEqual(agentOne.enforcementCount, 2)
         XCTAssertEqual(agentTwo.enforcementCount, 3)
-        XCTAssertEqual(agentOneScope.edges.first { $0.relationship == .blocked }?.enforcement?.count, 2)
-        XCTAssertEqual(agentTwoScope.edges.first { $0.relationship == .blocked }?.enforcement?.count, 3)
+        XCTAssertEqual(agentOneBuild.destinationOptions.first?.enforcementCount, 2)
+        XCTAssertEqual(agentTwoBuild.destinationOptions.first?.enforcementCount, 3)
+        XCTAssertEqual(agentOneBuild.complete.edges.first { $0.relationship == .blocked }?.enforcement?.count, 2)
+        XCTAssertEqual(agentTwoBuild.complete.edges.first { $0.relationship == .blocked }?.enforcement?.count, 3)
     }
 
     func testBlockedOnlyTrafficPresentationRemainsSelectableAndBounded() {
