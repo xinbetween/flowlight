@@ -74,12 +74,36 @@ enum AgentLauncher {
     /// Shells are skipped. The first thing above them decides: a terminal means the old behaviour is right, and
     /// anything else is a supervisor whose environment its children will inherit.
     static func find(ancestors: [(pid: Int32, name: String, bundleID: String, argv: [String])]) -> Launcher? {
-        for entry in ancestors {
+        findChain(ancestors: ancestors).first
+    }
+
+    /// Distinct non-shell launchers, nearest first. A supervisor may have both a client and daemon process in the
+    /// ancestry; keep the nearest exact process once, then continue to the terminal or supervisor above it.
+    static func findChain(
+        ancestors: [(pid: Int32, name: String, bundleID: String, argv: [String])]
+    ) -> [Launcher] {
+        var seen: Set<String> = []
+        return ancestors.compactMap { entry in
             let kind = kind(name: entry.name, bundleID: entry.bundleID)
-            if kind == .shell { continue }
-            return Launcher(pid: entry.pid, name: entry.name, bundleID: entry.bundleID, kind: kind, argv: entry.argv)
+            guard kind != .shell else { return nil }
+            let identity: String
+            if !entry.bundleID.isEmpty {
+                identity = "bundle:" + entry.bundleID.lowercased()
+            } else {
+                let executable = entry.argv.first ?? entry.name
+                let undashed = executable.hasPrefix("-") ? String(executable.dropFirst()) : executable
+                let bare = undashed.split(separator: "/").last.map(String.init) ?? undashed
+                identity = "exec:" + bare.lowercased()
+            }
+            guard seen.insert(identity).inserted else { return nil }
+            return Launcher(
+                pid: entry.pid,
+                name: entry.name,
+                bundleID: entry.bundleID,
+                kind: kind,
+                argv: entry.argv
+            )
         }
-        return nil
     }
 
     /// The command that starts a supervisor again, from the argv it is running with.

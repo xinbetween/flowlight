@@ -40,7 +40,9 @@ final class MCPAttributionTests: XCTestCase {
             200: ProcessSnapshot(pid: 200, ppid: 150, bundleID: "curl", name: "curl", argv: ["curl"]),
             150: ProcessSnapshot(pid: 150, ppid: 100, bundleID: "zsh", name: "zsh", argv: ["zsh"]),
             100: ProcessSnapshot(pid: 100, ppid: 50, bundleID: "claude", name: "claude", argv: ["claude"]),
-            50: ProcessSnapshot(pid: 50, ppid: 1, bundleID: "com.mitchellh.ghostty", name: "Ghostty",
+            50: ProcessSnapshot(pid: 50, ppid: 40, bundleID: "herdr", name: "herdr",
+                                argv: ["/Users/x/.local/bin/herdr", "server"]),
+            40: ProcessSnapshot(pid: 40, ppid: 1, bundleID: "com.mitchellh.ghostty", name: "Ghostty",
                                 argv: ["/Applications/Ghostty.app/Contents/MacOS/ghostty"])
         ]
         let attributor = AgentAttributor(processLookup: { table[$0] })
@@ -55,8 +57,12 @@ final class MCPAttributionTests: XCTestCase {
         ])[0].records[0].key
 
         XCTAssertEqual(enriched.parentAgent, "claude")
-        XCTAssertEqual(enriched.launcherBundleID, "com.mitchellh.ghostty")
-        XCTAssertEqual(enriched.launcherName, "Ghostty")
+        XCTAssertEqual(enriched.launcherBundleID, "herdr")
+        XCTAssertEqual(enriched.launcherName, "herdr")
+        XCTAssertEqual(enriched.launcherPath, "/Users/x/.local/bin/herdr")
+        XCTAssertEqual(enriched.upstreamLauncherBundleID, "com.mitchellh.ghostty")
+        XCTAssertEqual(enriched.upstreamLauncherName, "Ghostty")
+        XCTAssertEqual(enriched.upstreamLauncherPath, "/Applications/Ghostty.app/Contents/MacOS/ghostty")
     }
 
     func testSignatureAndMatching() {

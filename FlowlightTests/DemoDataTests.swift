@@ -79,6 +79,43 @@ final class DemoDataTests: XCTestCase {
                        observed.reduce(into: FlowCounters()) { $0 += $1.counters })
     }
 
+    func testAIVisualizationFixtureShowsGhosttyHerdrClaudeLineage() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-lineage-\(UUID()).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let db = try TrafficDatabase(url: url)
+        let now = Date()
+        try DemoData.seed(db, now: now)
+
+        let rows = try db.aiVisualizationRows(.hour, from: now.addingTimeInterval(-24 * 3600), to: now)
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, limits: .unbounded)
+        let ghostty = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Ghostty" })
+        let herdr = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Herdr" })
+        let claude = try XCTUnwrap(snapshot.nodes.first { $0.kind == .agent && $0.filter.bundleID == "claude" })
+
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .launched && $0.source == ghostty.id && $0.target == herdr.id
+        })
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .launched && $0.source == herdr.id && $0.target == claude.id
+        })
+
+        let map = AITrafficGraphBuilder.build(rows: rows, limits: .standard)
+        let mapGhostty = try XCTUnwrap(map.nodes.first { $0.kind == .launcher && $0.title == "Ghostty" })
+        let mapHerdr = try XCTUnwrap(map.nodes.first { $0.kind == .launcher && $0.title == "Herdr" })
+        let mapClaude = try XCTUnwrap(map.nodes.first { $0.kind == .agent && $0.filter.bundleID == "claude" })
+        XCTAssertTrue(map.edges.contains {
+            $0.relationship == .launched && $0.source == mapGhostty.id && $0.target == mapHerdr.id
+        })
+        let layout = TrafficGraphLayout.layout(
+            snapshot: map,
+            in: CGRect(x: 0, y: 0, width: 1_200, height: 760)
+        )
+        XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[mapGhostty.id]).maxX,
+                          try XCTUnwrap(layout.nodeFrames[mapHerdr.id]).minX)
+        XCTAssertLessThan(try XCTUnwrap(layout.nodeFrames[mapHerdr.id]).maxX,
+                          try XCTUnwrap(layout.nodeFrames[mapClaude.id]).minX)
+    }
+
     func testPackReviewFixtureWritesStaleConsentWithoutEnablingThePack() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-pack-review-\(UUID()).sqlite")
         defer { try? FileManager.default.removeItem(at: url) }

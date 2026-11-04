@@ -101,6 +101,7 @@ final class TrafficGraphTests: XCTestCase {
         parentName: String = "",
         mcp: String = "",
         launcher: (id: String, name: String, path: String)? = nil,
+        upstreamLauncher: (id: String, name: String, path: String)? = nil,
         relay: (id: String, name: String, path: String)? = nil,
         protocol appProtocol: String = "https",
         channel: NetworkChannel = .ip
@@ -121,6 +122,9 @@ final class TrafficGraphTests: XCTestCase {
             launcherBundleID: launcher?.id ?? "",
             launcherName: launcher?.name ?? "",
             launcherPath: launcher?.path ?? "",
+            upstreamLauncherBundleID: upstreamLauncher?.id ?? "",
+            upstreamLauncherName: upstreamLauncher?.name ?? "",
+            upstreamLauncherPath: upstreamLauncher?.path ?? "",
             routeProxyBundleID: relay?.id ?? "",
             routeProxyName: relay?.name ?? "",
             routeProxyPath: relay?.path ?? "",
@@ -325,6 +329,52 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertTrue(snapshot.edges.contains { $0.relationship == .launched })
         XCTAssertTrue(snapshot.edges.contains { $0.relationship == .blocked })
         XCTAssertEqual(snapshot.total, FlowCounters(), "hidden observed rows must not leak into searched totals")
+    }
+
+    func testAIBuilderPreservesGhosttyHerdrAgentLauncherChain() throws {
+        let rows = [
+            row(
+                app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
+                bytesOut: 25,
+                launcher: ("herdr", "Herdr", "/Users/x/.local/bin/herdr"),
+                upstreamLauncher: (
+                    "com.mitchellh.ghostty", "Ghostty",
+                    "/Applications/Ghostty.app/Contents/MacOS/ghostty"
+                )
+            )
+        ]
+
+        let snapshot = AITrafficGraphBuilder.build(rows: rows, limits: .unbounded)
+        let herdr = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Herdr" })
+        let ghostty = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Ghostty" })
+        let claude = try XCTUnwrap(snapshot.nodes.first { $0.kind == .agent && $0.filter.bundleID == "claude" })
+
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .launched && $0.source == ghostty.id && $0.target == herdr.id
+        })
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .launched && $0.source == herdr.id && $0.target == claude.id
+        })
+        XCTAssertEqual(snapshot.hidden, .none)
+
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 1_200, height: 760)
+        )
+        let ghosttyFrame = try XCTUnwrap(layout.nodeFrames[ghostty.id])
+        let herdrFrame = try XCTUnwrap(layout.nodeFrames[herdr.id])
+        let claudeFrame = try XCTUnwrap(layout.nodeFrames[claude.id])
+        XCTAssertLessThan(ghosttyFrame.maxX, herdrFrame.minX)
+        XCTAssertLessThan(herdrFrame.maxX, claudeFrame.minX)
+
+        let capped = AITrafficGraphBuilder.build(
+            rows: rows,
+            limits: AITrafficGraphLimits(maxAgents: 1, maxTools: 0, maxDestinations: 1,
+                                         maxObservedEdges: 1, maxLaunchers: 1, maxBlockedEdges: 0)
+        )
+        XCTAssertTrue(capped.nodes.contains { $0.kind == .launcher && $0.title == "Herdr" },
+                      "the immediate restart target has priority when launcher capacity is scarce")
+        XCTAssertFalse(capped.nodes.contains { $0.kind == .launcher && $0.title == "Ghostty" })
     }
 
     func testVisualizationSelectionClearsWhenSearchContextChanges() {
@@ -2577,6 +2627,71 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(Set(sourceFocused.destinationOptions.map(\.title)), ["one.example", "shared.example"])
     }
 
+    func testEndpointProjectionSupportsMultipleSourcesAndDestinations() throws {
+        let rows = [
+            row(app: "app.one", domain: "one.example", ip: "203.0.113.1", bytesOut: 10),
+            row(app: "app.one", domain: "shared.example", ip: "203.0.113.2", bytesOut: 20),
+            row(app: "app.two", domain: "one.example", ip: "203.0.113.1", bytesOut: 30),
+            row(app: "app.two", domain: "shared.example", ip: "203.0.113.2", bytesOut: 40),
+            row(app: "app.three", domain: "shared.example", ip: "203.0.113.2", bytesOut: 50)
+        ]
+        let complete = TrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: .unbounded).complete
+        let appOne = try XCTUnwrap(complete.nodes.first { $0.filter.bundleID == "app.one" }?.id)
+        let appTwo = try XCTUnwrap(complete.nodes.first { $0.filter.bundleID == "app.two" }?.id)
+        let appThree = try XCTUnwrap(complete.nodes.first { $0.filter.bundleID == "app.three" }?.id)
+        let one = try XCTUnwrap(complete.nodes.first { $0.title == "one.example" }?.id)
+        let shared = try XCTUnwrap(complete.nodes.first { $0.title == "shared.example" }?.id)
+
+        let query = TrafficGraphEndpointQuery(
+            sources: [appOne, appTwo],
+            destinations: [one, shared]
+        )
+        let scoped = TrafficGraphEndpointProjector.scope(complete, query: query)
+        let compatibleSources = TrafficGraphEndpointProjector.sourceOptions(
+            in: complete,
+            matchingDestinations: [one, shared]
+        )
+        let compatibleDestinations = TrafficGraphEndpointProjector.destinationOptions(
+            in: complete,
+            matchingSources: [appOne, appTwo]
+        )
+
+        XCTAssertEqual(scoped.edges.filter { $0.relationship == .observed }.count, 4)
+        XCTAssertEqual(scoped.visibleTotal.bytesOut, 100)
+        XCTAssertEqual(Set(compatibleSources.map(\.id)), [appOne, appTwo])
+        XCTAssertFalse(compatibleSources.contains { $0.id == appThree })
+        XCTAssertEqual(Set(compatibleDestinations.map(\.id)), [one, shared])
+    }
+
+    func testEndpointMultiSelectionKeepsBlockedOnlyPairsCompatible() throws {
+        let blocked = [
+            BlockedAttemptRow(bundleID: "app.one", appName: "One", agentKey: "", agentName: "",
+                              destination: "blocked.example", port: 443, count: 2,
+                              category: "tracking", source: "managed-pack:test", detail: ""),
+            BlockedAttemptRow(bundleID: "app.two", appName: "Two", agentKey: "", agentName: "",
+                              destination: "blocked.example", port: 443, count: 3,
+                              category: "tracking", source: "managed-pack:test", detail: "")
+        ]
+        let complete = TrafficGraphBuilder.buildForPresentation(
+            rows: [BreakdownRow](), blockedAttempts: blocked, mapLimits: .unbounded
+        ).complete
+        let sources = Set(complete.nodes.filter { $0.kind == .app }.map(\.id))
+        let destination = try XCTUnwrap(complete.nodes.first { $0.title == "blocked.example" }?.id)
+
+        let options = TrafficGraphEndpointProjector.destinationOptions(
+            in: complete,
+            matchingSources: sources
+        )
+        let scoped = TrafficGraphEndpointProjector.scope(
+            complete,
+            query: TrafficGraphEndpointQuery(sources: sources, destinations: [destination])
+        )
+
+        XCTAssertEqual(options.map(\.id), [destination])
+        XCTAssertEqual(options.first?.enforcementCount, 5)
+        XCTAssertEqual(scoped.edges.filter { $0.relationship == .blocked }.count, 2)
+    }
+
     func testEndpointProjectionKeepsASelectedQuietSourceAndDestinationExact() throws {
         let rows = (0..<12).map { index in
             row(app: "app.\(index)", domain: "host\(index).example",
@@ -2771,7 +2886,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertGreaterThan(build.map.hidden.edgeCount, 0)
     }
 
-    func testEndpointSelectionIsClearedWhenItsOptionDisappears() {
+    func testEndpointSelectionPrunesOnlyOptionsThatDisappear() {
         let retained = TrafficGraphEndpointOption(
             id: TrafficGraphNodeID(rawValue: "app:retained"),
             title: "Retained", detail: "", counters: FlowCounters()
@@ -2779,11 +2894,11 @@ final class TrafficGraphTests: XCTestCase {
         let missing = TrafficGraphNodeID(rawValue: "app:missing")
 
         XCTAssertEqual(
-            VisualizeSelectionPolicy.validEndpointSelection(retained.id, options: [retained]),
-            retained.id
+            VisualizeSelectionPolicy.validEndpointSelection([retained.id, missing], options: [retained]),
+            [retained.id]
         )
-        XCTAssertNil(VisualizeSelectionPolicy.validEndpointSelection(missing, options: [retained]))
-        XCTAssertNil(VisualizeSelectionPolicy.validEndpointSelection(nil, options: [retained]))
+        XCTAssertEqual(VisualizeSelectionPolicy.validEndpointSelection([missing], options: [retained]), [])
+        XCTAssertEqual(VisualizeSelectionPolicy.validEndpointSelection([], options: [retained]), [])
     }
 
     func testAllApplicationsMapReconcilesWithCompleteReportTotals() {
@@ -3547,10 +3662,14 @@ final class TrafficGraphTests: XCTestCase {
             }
             for step in 1..<100 {
                 let point = curve.point(at: CGFloat(step) / 100)
-                XCTAssertFalse(
-                    obstacles.values.contains { $0.insetBy(dx: -10, dy: -10).contains(point) },
-                    "demo route \(edge.id.rawValue) crosses an unrelated card near \(point)"
-                )
+                if let obstacle = obstacles.first(where: {
+                    $0.value.insetBy(dx: -10, dy: -10).contains(point)
+                }) {
+                    XCTFail(
+                        "demo route \(edge.id.rawValue) crosses \(obstacle.key.rawValue) "
+                            + "at \(obstacle.value) near \(point); curve \(curve)"
+                    )
+                }
             }
         }
         for leftIndex in build.map.edges.indices {
@@ -4135,6 +4254,25 @@ final class TrafficGraphTests: XCTestCase {
     func testViewportInteractionPreventsLaterTopologyFromAutomaticallyFitting() {
         XCTAssertTrue(TrafficGraphViewportPolicy.shouldAutoFit(isUserControlled: false))
         XCTAssertFalse(TrafficGraphViewportPolicy.shouldAutoFit(isUserControlled: true))
+    }
+
+    func testFocusedTopologyDoesNotPreserveStrandedLayoutPositions() throws {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "app.one", domain: "one.example", ip: "203.0.113.1", bytesOut: 10),
+            row(app: "app.two", domain: "two.example", ip: "203.0.113.2", bytesOut: 20)
+        ], limits: .unbounded)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(x: 0, y: 0, width: 900, height: 700)
+        )
+        let source = try XCTUnwrap(snapshot.nodes.first { $0.filter.bundleID == "app.one" }?.id)
+        let focused = TrafficGraphEndpointProjector.scope(
+            snapshot,
+            query: TrafficGraphEndpointQuery(source: source)
+        )
+
+        XCTAssertTrue(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: snapshot, previous: layout))
+        XCTAssertFalse(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: focused, previous: layout))
     }
 
     func testCancelledLargeLayoutDoesNotPublishPartialGeometry() async {

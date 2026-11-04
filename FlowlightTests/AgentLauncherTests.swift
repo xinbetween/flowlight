@@ -34,6 +34,21 @@ final class AgentLauncherTests: XCTestCase {
         XCTAssertTrue(found!.restartEndsSessions)
     }
 
+    func testLauncherChainKeepsGhosttyAboveHerdrWithoutDuplicatingHerdr() {
+        let ancestors = [entry(23900, "-zsh"),
+                         entry(23361, "herdr", "", ["/Users/x/.local/bin/herdr", "server"]),
+                         entry(23360, "herdr"),
+                         entry(1700, "-zsh"),
+                         entry(1617, "ghostty", "com.mitchellh.ghostty")]
+
+        let chain = AgentLauncher.findChain(ancestors: ancestors)
+
+        XCTAssertEqual(chain.map(\.pid), [23361, 1617])
+        XCTAssertEqual(chain.map(\.name), ["herdr", "ghostty"])
+        XCTAssertEqual(chain.first?.argv, ["/Users/x/.local/bin/herdr", "server"])
+        XCTAssertEqual(AgentLauncher.find(ancestors: ancestors), chain.first)
+    }
+
     /// Its own argv, because `herdr server` is not `herdr` — restarting the bare name would start something
     /// that does not spawn agents.
     func testASupervisorIsRestartedWithTheArgumentsItIsRunning() {

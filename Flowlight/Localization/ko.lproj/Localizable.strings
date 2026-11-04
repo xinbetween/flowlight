@@ -1868,6 +1868,7 @@
 "Fit" = "맞춤";
 "Fit the map in the window" = "창에 지도 맞추기";
 "Reset" = "재설정";
+"%lld selected" = "%lld개 선택됨";
 "Reset zoom and position" = "확대/축소 및 위치 재설정";
 "Select to inspect this connection" = "선택하여 이 연결 조사";
 "%lld exact destinations" = "정확한 대상 %lld개";

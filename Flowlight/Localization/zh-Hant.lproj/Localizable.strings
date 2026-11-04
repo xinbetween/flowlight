@@ -1868,6 +1868,7 @@
 "Fit" = "符合視窗";
 "Fit the map in the window" = "使地圖符合視窗";
 "Reset" = "重設";
+"%lld selected" = "已選取 %lld 項";
 "Reset zoom and position" = "重設縮放和位置";
 "Select to inspect this connection" = "選取以檢查此連線";
 "%lld exact destinations" = "%lld 個精確目的地";

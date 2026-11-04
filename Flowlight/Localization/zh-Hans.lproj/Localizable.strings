@@ -1868,6 +1868,7 @@
 "Fit" = "适应窗口";
 "Fit the map in the window" = "使地图适应窗口";
 "Reset" = "重置";
+"%lld selected" = "已选择 %lld 项";
 "Reset zoom and position" = "重置缩放和位置";
 "Select to inspect this connection" = "选择以检查此连接";
 "%lld exact destinations" = "%lld 个精确目标";

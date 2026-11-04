@@ -1869,6 +1869,7 @@
 "Fit" = "Ajustar";
 "Fit the map in the window" = "Ajustar el mapa a la ventana";
 "Reset" = "Restablecer";
+"%lld selected" = "%lld seleccionados";
 "Reset zoom and position" = "Restablecer zoom y posición";
 "Select to inspect this connection" = "Selecciona para examinar esta conexión";
 "%lld exact destinations" = "%lld destinos exactos";

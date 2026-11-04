@@ -127,12 +127,18 @@ final class AgentAttributor: @unchecked Sendable {
     }
 
     private func applyLauncher(forAgentPID pid: Int32, to key: inout FlowKey) {
-        guard pid > 1,
-              let launcher = AgentLineage.launcher(forAgentPID: pid, lookup: processLookup)
-        else { return }
+        guard pid > 1 else { return }
+        let launchers = AgentLineage.launchers(forAgentPID: pid, lookup: processLookup)
+        guard let launcher = launchers.first else { return }
         key.launcherBundleID = launcher.bundleID
         key.launcherName = launcher.name
         key.launcherPath = launcher.argv.first
+        if launchers.count > 1 {
+            let upstream = launchers[1]
+            key.upstreamLauncherBundleID = upstream.bundleID
+            key.upstreamLauncherName = upstream.name
+            key.upstreamLauncherPath = upstream.argv.first
+        }
     }
 
     private func context(for key: FlowKey, servers: [MCPServerConfig]) -> AgentContext? {
