@@ -31,6 +31,10 @@ struct FlowKey: Hashable, Codable, Sendable {
     var launcherBundleID: String? = nil
     var launcherName: String? = nil
     var launcherPath: String? = nil
+    /// The next distinct terminal or supervisor above `launcher*`, when capture observed one.
+    var upstreamLauncherBundleID: String? = nil
+    var upstreamLauncherName: String? = nil
+    var upstreamLauncherPath: String? = nil
     /// An explicit local relay this counted connection traversed. Counters remain on this one record; graph route
     /// evidence must never restore the hidden loopback leg and count it again.
     var routeProxyBundleID: String? = nil
@@ -130,6 +134,9 @@ extension FlowKey {
         launcherBundleID = try c.decodeIfPresent(String.self, forKey: .launcherBundleID)
         launcherName = try c.decodeIfPresent(String.self, forKey: .launcherName)
         launcherPath = try c.decodeIfPresent(String.self, forKey: .launcherPath)
+        upstreamLauncherBundleID = try c.decodeIfPresent(String.self, forKey: .upstreamLauncherBundleID)
+        upstreamLauncherName = try c.decodeIfPresent(String.self, forKey: .upstreamLauncherName)
+        upstreamLauncherPath = try c.decodeIfPresent(String.self, forKey: .upstreamLauncherPath)
         routeProxyBundleID = try c.decodeIfPresent(String.self, forKey: .routeProxyBundleID)
         routeProxyName = try c.decodeIfPresent(String.self, forKey: .routeProxyName)
         routeProxyPath = try c.decodeIfPresent(String.self, forKey: .routeProxyPath)

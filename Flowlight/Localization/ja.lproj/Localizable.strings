@@ -1869,6 +1869,7 @@
 "Fit" = "全体表示";
 "Fit the map in the window" = "マップ全体をウインドウに表示";
 "Reset" = "リセット";
+"%lld selected" = "%lld件を選択";
 "Reset zoom and position" = "拡大率と位置をリセット";
 "Select to inspect this connection" = "選択してこの接続を調べる";
 "%lld exact destinations" = "%lld件の正確な宛先";

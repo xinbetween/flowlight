@@ -64,6 +64,7 @@ enum DemoData {
         /// Set for tools and MCP servers an agent started: (agent bundle ID, agent name, MCP server).
         var parent: (id: String, name: String, mcp: String?)? = nil
         var launcher: (id: String, name: String, path: String)? = nil
+        var upstreamLauncher: (id: String, name: String, path: String)? = nil
         var routedThroughFlowlight = false
 
         func key(_ flow: Flow) -> FlowKey {
@@ -71,6 +72,9 @@ enum DemoData {
                     remoteIP: flow.ip, domain: flow.host, port: flow.port, transport: flow.transport, appProtocol: flow.proto,
                     channel: flow.channel, parentAgent: parent?.id, parentAgentName: parent?.name, mcpServer: parent?.mcp,
                     launcherBundleID: launcher?.id, launcherName: launcher?.name, launcherPath: launcher?.path,
+                    upstreamLauncherBundleID: upstreamLauncher?.id,
+                    upstreamLauncherName: upstreamLauncher?.name,
+                    upstreamLauncherPath: upstreamLauncher?.path,
                     routeProxyBundleID: routedThroughFlowlight ? "com.flowlight.app" : nil,
                     routeProxyName: routedThroughFlowlight ? "Flowlight" : nil,
                     routeProxyPath: routedThroughFlowlight ? "/Applications/Flowlight.app" : nil)
@@ -111,7 +115,8 @@ enum DemoData {
             Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 700_000, outRate: 1_400_000),
             Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 300_000, outRate: 10_000),
             Flow(host: "github.com", ip: "198.51.100.11", port: 22, proto: "ssh", inRate: 50_000, outRate: 30_000),
-        ], launcher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
+        ], launcher: ("herdr", "Herdr", "/Users/demo/.local/bin/herdr"),
+           upstreamLauncher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
         App(bundleID: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app", weight: 0.9, flows: [
             Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 4_000_000, outRate: 8_000_000),
             Flow(host: "api.openai.com", ip: "198.51.100.90", port: 443, proto: "https", inRate: 2_000_000, outRate: 3_000_000),

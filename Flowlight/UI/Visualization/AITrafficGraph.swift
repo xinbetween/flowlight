@@ -113,6 +113,11 @@ enum AITrafficGraphBuilder {
         var weight: Int64
     }
 
+    private struct LauncherLink: Hashable {
+        var source: TrafficGraphNodeID
+        var target: TrafficGraphNodeID
+    }
+
     private struct ToolMetadata {
         var name: String
         var path: String
@@ -637,11 +642,17 @@ enum AITrafficGraphBuilder {
             ))
         }
         var launcherMetadata: [LauncherIdentity: LauncherMetadata] = [:]
+        var nodeMetadata: [TrafficGraphNodeID: LauncherMetadata] = [:]
+        var launcherBundleIDs: [TrafficGraphNodeID: String] = [:]
         var launcherTraffic: [TrafficGraphNodeID: Int64] = [:]
+        var immediateLauncherIDs: Set<TrafficGraphNodeID> = []
+        var upstreamLauncherLinks: Set<LauncherLink> = []
         for entry in included where visibleAgents.contains(agentID(entry.agent)) {
             for row in proofGroups[entry.agent] ?? [] where !row.launcherBundleID.isEmpty {
                 let launcher = LauncherIdentity(agent: entry.agent, bundleID: row.launcherBundleID)
                 let nodeID = launcherID(bundleID: row.launcherBundleID)
+                immediateLauncherIDs.insert(nodeID)
+                launcherBundleIDs[nodeID] = row.launcherBundleID
                 launcherTraffic[nodeID, default: 0] += row.counters.total
                 let candidate = LauncherMetadata(
                     name: row.launcherName,
@@ -652,15 +663,32 @@ enum AITrafficGraphBuilder {
                 if current == nil || prefersMetadata(candidate, over: current!) {
                     launcherMetadata[launcher] = candidate
                 }
+                let nodeCurrent = nodeMetadata[nodeID]
+                if nodeCurrent == nil || prefersMetadata(candidate, over: nodeCurrent!) {
+                    nodeMetadata[nodeID] = candidate
+                }
+
+                guard !row.upstreamLauncherBundleID.isEmpty else { continue }
+                let upstreamNodeID = launcherID(bundleID: row.upstreamLauncherBundleID)
+                guard upstreamNodeID != nodeID else { continue }
+                launcherBundleIDs[upstreamNodeID] = row.upstreamLauncherBundleID
+                launcherTraffic[upstreamNodeID, default: 0] += row.counters.total
+                let upstream = LauncherMetadata(
+                    name: row.upstreamLauncherName,
+                    path: row.upstreamLauncherPath,
+                    weight: row.counters.total
+                )
+                let upstreamCurrent = nodeMetadata[upstreamNodeID]
+                if upstreamCurrent == nil || prefersMetadata(upstream, over: upstreamCurrent!) {
+                    nodeMetadata[upstreamNodeID] = upstream
+                }
+                upstreamLauncherLinks.insert(LauncherLink(source: upstreamNodeID, target: nodeID))
             }
         }
-        var nodeMetadata: [TrafficGraphNodeID: LauncherMetadata] = [:]
-        for (launcher, metadata) in launcherMetadata {
-            let nodeID = launcherID(bundleID: launcher.bundleID)
-            let current = nodeMetadata[nodeID]
-            if current == nil || prefersMetadata(metadata, over: current!) { nodeMetadata[nodeID] = metadata }
-        }
         let rankedLaunchers = nodeMetadata.sorted {
+            let leftIsImmediate = immediateLauncherIDs.contains($0.key)
+            let rightIsImmediate = immediateLauncherIDs.contains($1.key)
+            if leftIsImmediate != rightIsImmediate { return leftIsImmediate }
             let leftTraffic = launcherTraffic[$0.key, default: 0]
             let rightTraffic = launcherTraffic[$1.key, default: 0]
             if leftTraffic != rightTraffic { return leftTraffic > rightTraffic }
@@ -672,27 +700,33 @@ enum AITrafficGraphBuilder {
                 id: launcherNodeID, kind: .launcher,
                 title: metadata.name.isEmpty ? launcherNodeID.rawValue : metadata.name,
                 detail: L("Started agent"), appPath: metadata.path,
-                filter: TrafficFilter(
-                    bundleID: launcherMetadata.keys.first {
-                        launcherID(bundleID: $0.bundleID) == launcherNodeID
-                    }?.bundleID
-                ),
+                filter: TrafficFilter(bundleID: launcherBundleIDs[launcherNodeID]),
                 counters: FlowCounters()
             )
         }
-        let visibleLauncherEdges = launcherMetadata.keys.sorted {
+        let visibleImmediateLauncherEdges = launcherMetadata.keys.sorted {
             let left = launcherID(bundleID: $0.bundleID)
             let right = launcherID(bundleID: $1.bundleID)
             if left != right { return left < right }
             return agentID($0.agent) < agentID($1.agent)
         }.filter { visibleLaunchers.contains(launcherID(bundleID: $0.bundleID)) }
-        for launcher in visibleLauncherEdges {
+        for launcher in visibleImmediateLauncherEdges {
             let launcherNodeID = launcherID(bundleID: launcher.bundleID)
             let agentNodeID = agentID(launcher.agent)
             edges.append(TrafficGraphEdge(
                 id: TrafficGraphEdgeID(rawValue: launcherNodeID.rawValue + "→launched→" + agentNodeID.rawValue),
                 source: launcherNodeID, target: agentNodeID, counters: FlowCounters(),
                 filter: allNodes[agentNodeID]?.filter ?? .none, relationship: .launched
+            ))
+        }
+        for link in upstreamLauncherLinks.sorted(by: {
+            if $0.source != $1.source { return $0.source < $1.source }
+            return $0.target < $1.target
+        }) where visibleLaunchers.contains(link.source) && visibleLaunchers.contains(link.target) {
+            edges.append(TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: link.source.rawValue + "→launched→" + link.target.rawValue),
+                source: link.source, target: link.target, counters: FlowCounters(),
+                filter: allNodes[link.target]?.filter ?? .none, relationship: .launched
             ))
         }
         for toolNodeID in visibleTools.sorted() {
@@ -721,8 +755,8 @@ enum AITrafficGraphBuilder {
         let allDestinationCount = Set(observedCounters.keys.map { destinationID($0.destination) })
             .union(blocked.keys.map { destinationID(blockedDestination($0)) }).count
         let lineageCount = toolMetadata.values.filter(\.hasLineage).count
-        let allLauncherNodes = Set(launcherMetadata.keys.map { launcherID(bundleID: $0.bundleID) }).count
-        let allLauncherEdges = launcherMetadata.count
+        let allLauncherNodes = nodeMetadata.count
+        let allLauncherEdges = launcherMetadata.count + upstreamLauncherLinks.count
         let allObservedGatewayNodeIDs = Set(observedCounters.keys.map(\.source).filter {
             $0.rawValue.hasPrefix("proxy:")
         })
@@ -770,11 +804,11 @@ enum AITrafficGraphBuilder {
         evidence.hidden = .none
         let sourceOptions = TrafficGraphEndpointProjector.sourceOptions(
             in: evidence,
-            matchingDestination: endpointQuery.destination
+            matchingDestinations: endpointQuery.destinations
         )
         let destinationOptions = TrafficGraphEndpointProjector.destinationOptions(
             in: evidence,
-            matchingSource: endpointQuery.source
+            matchingSources: endpointQuery.sources
         )
         let complete = TrafficGraphEndpointProjector.scope(evidence, query: endpointQuery)
         let map: TrafficGraphSnapshot

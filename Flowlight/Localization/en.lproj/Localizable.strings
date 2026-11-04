@@ -1868,6 +1868,7 @@
 "Fit" = "Fit";
 "Fit the map in the window" = "Fit the map in the window";
 "Reset" = "Reset";
+"%lld selected" = "%lld selected";
 "Reset zoom and position" = "Reset zoom and position";
 "Select to inspect this connection" = "Select to inspect this connection";
 "%lld exact destinations" = "%lld exact destinations";

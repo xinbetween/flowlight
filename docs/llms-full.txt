@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.10, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.16.11, macOS 15 or later.
 
  On this page
 
@@ -920,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.10macOS 15+UniversalGPL-3.0No telemetry
+ v0.16.11macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1663,8 +1663,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.16.10
+ 0.16.11
 November 3, 2026Latest
+
+ Keep every route in one visual language. Every connection is one smooth cubic curve; nearby obstacle corridors are preferred over deep canvas-edge U-turns, while card clearance, endpoint attachment, route separation, hit testing, and bounded layout remain intact.
+
+ Compare several endpoints at once. Source and destination selectors now support complete multi-selection with exclusive Any behavior, all-to-all evidence compatibility, blocked-only pairs, accessible selected states, and one-click Reset.
+
+ Show who started the starter. Capture-time launcher evidence now preserves one upstream non-shell launcher, so AI activity can truthfully show Ghostty → Herdr → Claude while Herdr remains the immediate restart target.
+
+ Refit each changed investigation. Endpoint scope changes discard incompatible coordinates and automatically center the new topology; Traffic and AI activity transitions show a flipping Flowlight mark until the final layout is ready instead of flashing partial geometry.
+
+ Make installation choices scan as one unit. Mac App Store, direct Mac download, and GitHub share one equal-height row, with the complete copyable Homebrew command directly below.
+
+ 0.16.10
+November 3, 2026
 
  Start with the traffic that matters most. Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic with deterministic ties.
 

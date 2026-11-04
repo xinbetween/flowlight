@@ -155,15 +155,20 @@ struct TrafficGraphBuild: Sendable {
 }
 
 struct TrafficGraphEndpointQuery: Equatable, Sendable {
-    var source: TrafficGraphNodeID?
-    var destination: TrafficGraphNodeID?
+    var sources: Set<TrafficGraphNodeID>
+    var destinations: Set<TrafficGraphNodeID>
 
     init(source: TrafficGraphNodeID? = nil, destination: TrafficGraphNodeID? = nil) {
-        self.source = source
-        self.destination = destination
+        sources = source.map { [$0] } ?? []
+        destinations = destination.map { [$0] } ?? []
     }
 
-    var isFocused: Bool { source != nil || destination != nil }
+    init(sources: Set<TrafficGraphNodeID>, destinations: Set<TrafficGraphNodeID>) {
+        self.sources = sources
+        self.destinations = destinations
+    }
+
+    var isFocused: Bool { !sources.isEmpty || !destinations.isEmpty }
 }
 
 struct TrafficGraphEndpointOption: Identifiable, Sendable {
@@ -303,33 +308,72 @@ enum TrafficGraphEndpointProjector {
         }
     }
 
+    private struct PairEvidence {
+        var counters = FlowCounters()
+        var enforcementCount: Int64 = 0
+
+        static func + (left: PairEvidence, right: PairEvidence) -> PairEvidence {
+            var counters = left.counters
+            counters += right.counters
+            return PairEvidence(
+                counters: counters,
+                enforcementCount: left.enforcementCount + right.enforcementCount
+            )
+        }
+    }
+
+    private static func trafficPairs(
+        in snapshot: TrafficGraphSnapshot,
+        index: Index
+    ) -> [TrafficGraphNodeID: [TrafficGraphNodeID: PairEvidence]] {
+        var pairs: [TrafficGraphNodeID: [TrafficGraphNodeID: PairEvidence]] = [:]
+        for edge in snapshot.edges where Index.isTraffic(edge) {
+            guard let destination = index.nodesByID[edge.target],
+                  destination.kind == .destination || destination.kind == .service else { continue }
+            for root in index.rootIDs(for: edge) {
+                guard let scoped = index.scopedEdge(edge, sourceIDs: [root]) else { continue }
+                var evidence = pairs[root]?[edge.target] ?? PairEvidence()
+                if scoped.relationship == .observed {
+                    evidence.counters += scoped.counters
+                } else {
+                    evidence.enforcementCount += scoped.enforcement?.count ?? 0
+                }
+                pairs[root, default: [:]][edge.target] = evidence
+            }
+        }
+        return pairs
+    }
+
     static func sourceOptions(
         in snapshot: TrafficGraphSnapshot,
         matchingDestination destination: TrafficGraphNodeID? = nil
     ) -> [TrafficGraphEndpointOption] {
+        sourceOptions(
+            in: snapshot,
+            matchingDestinations: destination.map { [$0] } ?? []
+        )
+    }
+
+    static func sourceOptions(
+        in snapshot: TrafficGraphSnapshot,
+        matchingDestinations destinations: Set<TrafficGraphNodeID>
+    ) -> [TrafficGraphEndpointOption] {
         let index = Index(snapshot)
-        var counters: [TrafficGraphNodeID: FlowCounters] = [:]
-        var enforcementCounts: [TrafficGraphNodeID: Int64] = [:]
-        for edge in snapshot.edges where Index.isTraffic(edge) {
-            if let destination, edge.target != destination { continue }
-            for root in index.rootIDs(for: edge) {
-                if edge.relationship == .observed {
-                    let attributed = index.scopedEdge(edge, sourceIDs: [root])?.counters ?? FlowCounters()
-                    counters[root, default: FlowCounters()] += attributed
-                } else {
-                    if counters[root] == nil { counters[root] = FlowCounters() }
-                    enforcementCounts[root, default: 0] += edge.enforcement?.count ?? 0
+        let pairs = trafficPairs(in: snapshot, index: index)
+        return pairs.compactMap { id, evidenceByDestination in
+            guard destinations.isSubset(of: Set(evidenceByDestination.keys)),
+                  let node = index.nodesByID[id] else { return nil }
+            let evidence = destinations.isEmpty
+                ? evidenceByDestination.values.reduce(PairEvidence(), +)
+                : destinations.reduce(PairEvidence()) { result, destination in
+                    result + (evidenceByDestination[destination] ?? PairEvidence())
                 }
-            }
-        }
-        return counters.compactMap { id, counters in
-            guard let node = index.nodesByID[id] else { return nil }
             return TrafficGraphEndpointOption(
                 id: id,
                 title: node.title,
                 detail: node.detail,
-                counters: counters,
-                enforcementCount: enforcementCounts[id, default: 0]
+                counters: evidence.counters,
+                enforcementCount: evidence.enforcementCount
             )
         }.sorted {
             if $0.counters.total != $1.counters.total { return $0.counters.total > $1.counters.total }
@@ -342,29 +386,33 @@ enum TrafficGraphEndpointProjector {
         in snapshot: TrafficGraphSnapshot,
         matchingSource source: TrafficGraphNodeID? = nil
     ) -> [TrafficGraphEndpointOption] {
+        destinationOptions(
+            in: snapshot,
+            matchingSources: source.map { [$0] } ?? []
+        )
+    }
+
+    static func destinationOptions(
+        in snapshot: TrafficGraphSnapshot,
+        matchingSources sources: Set<TrafficGraphNodeID>
+    ) -> [TrafficGraphEndpointOption] {
         let index = Index(snapshot)
-        let sourceIDs = source.map { Set([$0]) } ?? []
-        var counters: [TrafficGraphNodeID: FlowCounters] = [:]
-        var enforcementCounts: [TrafficGraphNodeID: Int64] = [:]
-        for original in snapshot.edges where Index.isTraffic(original) {
-            guard let edge = index.scopedEdge(original, sourceIDs: sourceIDs) else { continue }
-            guard let node = index.nodesByID[edge.target],
-                  node.kind == .destination || node.kind == .service else { continue }
-            if edge.relationship == .observed {
-                counters[edge.target, default: FlowCounters()] += edge.counters
-            } else {
-                if counters[edge.target] == nil { counters[edge.target] = FlowCounters() }
-                enforcementCounts[edge.target, default: 0] += edge.enforcement?.count ?? 0
-            }
+        let pairs = trafficPairs(in: snapshot, index: index)
+        let destinationIDs = pairs.values.reduce(into: Set<TrafficGraphNodeID>()) {
+            $0.formUnion($1.keys)
         }
-        return counters.compactMap { id, counters in
-            guard let node = index.nodesByID[id] else { return nil }
+        return destinationIDs.compactMap { id in
+            guard sources.allSatisfy({ pairs[$0]?[id] != nil }),
+                  let node = index.nodesByID[id] else { return nil }
+            let evidence = (sources.isEmpty ? Set(pairs.keys) : sources).reduce(PairEvidence()) { result, source in
+                result + (pairs[source]?[id] ?? PairEvidence())
+            }
             return TrafficGraphEndpointOption(
                 id: id,
                 title: node.title,
                 detail: node.detail,
-                counters: counters,
-                enforcementCount: enforcementCounts[id, default: 0]
+                counters: evidence.counters,
+                enforcementCount: evidence.enforcementCount
             )
         }.sorted {
             if $0.counters.total != $1.counters.total { return $0.counters.total > $1.counters.total }
@@ -376,12 +424,12 @@ enum TrafficGraphEndpointProjector {
 
     static func scope(_ snapshot: TrafficGraphSnapshot, query: TrafficGraphEndpointQuery) -> TrafficGraphSnapshot {
         guard query.isFocused else { return snapshot }
-        return scope(snapshot, sourceIDs: query.source.map { [$0] } ?? [], destination: query.destination)
+        return scope(snapshot, sourceIDs: query.sources, destinationIDs: query.destinations)
     }
 
     static func defaultMap(_ snapshot: TrafficGraphSnapshot, sourceLimit: Int = 10) -> TrafficGraphSnapshot {
         let sources = Set(sourceOptions(in: snapshot).prefix(max(0, sourceLimit)).map(\.id))
-        let scoped = sources.isEmpty ? snapshot : scope(snapshot, sourceIDs: sources, destination: nil)
+        let scoped = sources.isEmpty ? snapshot : scope(snapshot, sourceIDs: sources, destinationIDs: [])
         var map: TrafficGraphSnapshot
         if scoped.nodes.contains(where: { $0.kind == .agent }) {
             map = TrafficGraphMapProjector.project(
@@ -419,12 +467,12 @@ enum TrafficGraphEndpointProjector {
     private static func scope(
         _ snapshot: TrafficGraphSnapshot,
         sourceIDs: Set<TrafficGraphNodeID>,
-        destination: TrafficGraphNodeID?
+        destinationIDs: Set<TrafficGraphNodeID>
     ) -> TrafficGraphSnapshot {
         let index = Index(snapshot)
         let trafficEdges = snapshot.edges.compactMap { edge -> TrafficGraphEdge? in
             guard Index.isTraffic(edge) else { return nil }
-            if let destination, edge.target != destination { return nil }
+            if !destinationIDs.isEmpty, !destinationIDs.contains(edge.target) { return nil }
             return index.scopedEdge(edge, sourceIDs: sourceIDs)
         }
         var nodeIDs: Set<TrafficGraphNodeID> = []
@@ -451,7 +499,7 @@ enum TrafficGraphEndpointProjector {
         }
         if trafficEdges.isEmpty {
             nodeIDs.formUnion(sourceIDs)
-            if let destination { nodeIDs.insert(destination) }
+            nodeIDs.formUnion(destinationIDs)
         }
         for (id, volume) in supportVolumes {
             edgesByID[id]?.trafficVolume = volume
@@ -1561,11 +1609,11 @@ enum TrafficGraphBuilder {
         evidence.hidden = .none
         let sourceOptions = TrafficGraphEndpointProjector.sourceOptions(
             in: evidence,
-            matchingDestination: endpointQuery.destination
+            matchingDestinations: endpointQuery.destinations
         )
         let destinationOptions = TrafficGraphEndpointProjector.destinationOptions(
             in: evidence,
-            matchingSource: endpointQuery.source
+            matchingSources: endpointQuery.sources
         )
         let complete = TrafficGraphEndpointProjector.scope(evidence, query: endpointQuery)
         let map: TrafficGraphSnapshot

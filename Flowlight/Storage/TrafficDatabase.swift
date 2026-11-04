@@ -147,6 +147,9 @@ struct BreakdownRow: Sendable {
     var launcherBundleID: String = ""
     var launcherName: String = ""
     var launcherPath: String = ""
+    var upstreamLauncherBundleID: String = ""
+    var upstreamLauncherName: String = ""
+    var upstreamLauncherPath: String = ""
     var routeProxyBundleID: String = ""
     var routeProxyName: String = ""
     var routeProxyPath: String = ""
@@ -377,7 +380,8 @@ final class TrafficDatabase: @unchecked Sendable {
 
         let columns = "ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, " +
                       "bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server, " +
-                      "launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, " +
+                      "launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id, " +
+                      "upstream_launcher_name, upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, " +
                       "route_proxy_path, channel, attribution_exact, attribution_epoch"
         for (version, real) in realName {
             for table in Self.tables {
@@ -388,12 +392,14 @@ final class TrafficDatabase: @unchecked Sendable {
                     INSERT INTO \(table) (\(columns))
                     SELECT ts, pid, ?, ?, app_path, remote_ip, domain, port, transport, protocol,
                            bytes_in, bytes_out, flows, agent_parent, agent_parent_name, mcp_server,
-                           launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name,
+                           launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id,
+                           upstream_launcher_name, upstream_launcher_path, route_proxy_bundle_id, route_proxy_name,
                            route_proxy_path, channel, attribution_exact, attribution_epoch
                     FROM \(table) WHERE bundle_id = ?
                     ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
                                 agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name,
-                                launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                                launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+                                upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                                 attribution_exact, attribution_epoch)
                     DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
                                   bytes_out = bytes_out + excluded.bytes_out,
@@ -407,12 +413,14 @@ final class TrafficDatabase: @unchecked Sendable {
                     INSERT INTO \(table) (\(columns))
                     SELECT ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol,
                            bytes_in, bytes_out, flows, ?, ?, mcp_server,
-                           launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name,
+                           launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id,
+                           upstream_launcher_name, upstream_launcher_path, route_proxy_bundle_id, route_proxy_name,
                            route_proxy_path, channel, attribution_exact, attribution_epoch
                     FROM \(table) WHERE agent_parent = ?
                     ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
                                 agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name,
-                                launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                                launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+                                upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                                 attribution_exact, attribution_epoch)
                     DO UPDATE SET bytes_in = bytes_in + excluded.bytes_in,
                                   bytes_out = bytes_out + excluded.bytes_out,
@@ -517,7 +525,8 @@ final class TrafficDatabase: @unchecked Sendable {
             // from one executable working for different agents or MCP services cannot merge before visualization.
             let columns = Set(try conn.query("PRAGMA table_info(\(table))") { $0.text(1) })
             for column in ["agent_parent", "agent_parent_name", "mcp_server", "launcher_bundle_id", "launcher_name",
-                           "launcher_path", "route_proxy_bundle_id", "route_proxy_name", "route_proxy_path"]
+                           "launcher_path", "upstream_launcher_bundle_id", "upstream_launcher_name",
+                           "upstream_launcher_path", "route_proxy_bundle_id", "route_proxy_name", "route_proxy_path"]
             where !columns.contains(column) {
                 try conn.execute("ALTER TABLE \(table) ADD COLUMN \(column) TEXT NOT NULL DEFAULT ''")
             }
@@ -548,9 +557,11 @@ final class TrafficDatabase: @unchecked Sendable {
             DROP INDEX IF EXISTS \(table)_key3;
             DROP INDEX IF EXISTS \(table)_key4;
             DROP INDEX IF EXISTS \(table)_key5;
-            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key6 ON \(table)(
+            DROP INDEX IF EXISTS \(table)_key6;
+            CREATE UNIQUE INDEX IF NOT EXISTS \(table)_key7 ON \(table)(
                 ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
                 agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                 route_proxy_bundle_id, route_proxy_name, route_proxy_path, attribution_exact, attribution_epoch
             );
             """)
@@ -777,11 +788,13 @@ final class TrafficDatabase: @unchecked Sendable {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
                               agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                              upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                               route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                               attribution_exact, attribution_epoch)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
-                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+                    upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                     attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """
@@ -795,6 +808,8 @@ final class TrafficDatabase: @unchecked Sendable {
                                        .int(r.counters.bytesOut), .int(r.counters.flows),
                                        .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
                                        .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
+                                       .text(k.upstreamLauncherBundleID ?? ""), .text(k.upstreamLauncherName ?? ""),
+                                       .text(k.upstreamLauncherPath ?? ""),
                                        .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
                                        .text(k.channel.rawValue)])
                 }
@@ -812,11 +827,13 @@ final class TrafficDatabase: @unchecked Sendable {
         let sql = """
         INSERT INTO \(table) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
                               agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                              upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                               route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                               attribution_exact, attribution_epoch)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
-                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+                    upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                     attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """
@@ -828,6 +845,8 @@ final class TrafficDatabase: @unchecked Sendable {
                                    .text(k.appProtocol), .int(r.counters.bytesIn), .int(r.counters.bytesOut), .int(r.counters.flows),
                                    .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
                                    .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
+                                   .text(k.upstreamLauncherBundleID ?? ""), .text(k.upstreamLauncherName ?? ""),
+                                   .text(k.upstreamLauncherPath ?? ""),
                                    .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
                                    .text(k.channel.rawValue)])
             }
@@ -873,18 +892,22 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.run("""
         INSERT INTO \(target) (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
                                agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                               upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                                route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel,
                                attribution_exact, attribution_epoch)
         SELECT \(bucket), pid, bundle_id, MAX(app_name), MAX(app_path), remote_ip, domain, port, transport, protocol,
                SUM(bytes_in), SUM(bytes_out), SUM(flows), agent_parent, agent_parent_name, mcp_server,
-               launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+               launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+               upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                channel, attribution_exact, attribution_epoch
         FROM \(source) WHERE ts >= ? AND ts < ?
         GROUP BY 1, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel,
                  agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                 upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                  route_proxy_bundle_id, route_proxy_name, route_proxy_path, attribution_exact, attribution_epoch
         ON CONFLICT(ts, pid, bundle_id, remote_ip, domain, port, transport, protocol, channel, agent_parent, agent_parent_name, mcp_server,
-                    launcher_bundle_id, launcher_name, launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
+                    launcher_bundle_id, launcher_name, launcher_path, upstream_launcher_bundle_id, upstream_launcher_name,
+                    upstream_launcher_path, route_proxy_bundle_id, route_proxy_name, route_proxy_path,
                     attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """, [.int(lower), .int(upper)])
@@ -1166,6 +1189,9 @@ final class TrafficDatabase: @unchecked Sendable {
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_bundle_id ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_name ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_path ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_path ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_bundle_id ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_name ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
@@ -1173,16 +1199,19 @@ final class TrafficDatabase: @unchecked Sendable {
                 FROM \(granularity.table) WHERE \(clause)
                 GROUP BY bundle_id, domain, remote_ip, protocol, channel, attribution_exact, attribution_epoch,
                          launcher_bundle_id, launcher_name, launcher_path,
+                         upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                          route_proxy_bundle_id, route_proxy_name, route_proxy_path
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(17), asn: Int(row.int(18)),
+                         owner: row.text(20), asn: Int(row.int(21)),
                          launcherBundleID: row.text(10), launcherName: row.text(11), launcherPath: row.text(12),
-                         routeProxyBundleID: row.text(13), routeProxyName: row.text(14), routeProxyPath: row.text(15),
-                         channel: NetworkChannel(rawValue: row.text(16)) ?? .ip)
+                         upstreamLauncherBundleID: row.text(13), upstreamLauncherName: row.text(14),
+                         upstreamLauncherPath: row.text(15),
+                         routeProxyBundleID: row.text(16), routeProxyName: row.text(17), routeProxyPath: row.text(18),
+                         channel: NetworkChannel(rawValue: row.text(19)) ?? .ip)
         }
     }
 
@@ -1203,6 +1232,9 @@ final class TrafficDatabase: @unchecked Sendable {
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_bundle_id ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_name ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_path ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_bundle_id ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_name ELSE '' END,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN upstream_launcher_path ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_bundle_id ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_name ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
@@ -1210,17 +1242,20 @@ final class TrafficDatabase: @unchecked Sendable {
                 FROM \(granularity.table) WHERE \(clause)
                 GROUP BY bundle_id, domain, remote_ip, attribution_exact, attribution_epoch,
                          agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                         upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                          route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel, protocol
             ) t LEFT JOIN ip_owners o ON o.ip = t.remote_ip
             """, values) { row in
             BreakdownRow(bundleID: row.text(0), appName: row.text(1), appPath: row.text(2), domain: row.text(3),
                          remoteIP: row.text(4), ports: row.text(5), protocols: row.text(6),
                          counters: FlowCounters(bytesIn: row.int(7), bytesOut: row.int(8), flows: row.int(9)),
-                         owner: row.text(20), asn: Int(row.int(21)), parentAgent: row.text(10),
+                         owner: row.text(23), asn: Int(row.int(24)), parentAgent: row.text(10),
                          parentAgentName: row.text(11), mcpServer: row.text(12),
                          launcherBundleID: row.text(13), launcherName: row.text(14), launcherPath: row.text(15),
-                         routeProxyBundleID: row.text(16), routeProxyName: row.text(17), routeProxyPath: row.text(18),
-                         channel: NetworkChannel(rawValue: row.text(19)) ?? .ip)
+                         upstreamLauncherBundleID: row.text(16), upstreamLauncherName: row.text(17),
+                         upstreamLauncherPath: row.text(18),
+                         routeProxyBundleID: row.text(19), routeProxyName: row.text(20), routeProxyPath: row.text(21),
+                         channel: NetworkChannel(rawValue: row.text(22)) ?? .ip)
         }
     }
 

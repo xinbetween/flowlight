@@ -170,6 +170,13 @@ enum AgentLineage {
     /// Capture-time launcher evidence for an agent. Historical PIDs are never consulted by visualization queries.
     static func launcher(forAgentPID pid: Int32, lookup: (Int32) -> ProcessSnapshot?,
                          maxDepth: Int = 8) -> AgentLauncher.Launcher? {
+        launchers(forAgentPID: pid, lookup: lookup, maxDepth: maxDepth).first
+    }
+
+    /// Distinct non-shell launchers, nearest first. The first item retains restart semantics; the second preserves
+    /// the terminal or supervisor that started that launcher for topology evidence.
+    static func launchers(forAgentPID pid: Int32, lookup: (Int32) -> ProcessSnapshot?,
+                          maxDepth: Int = 8) -> [AgentLauncher.Launcher] {
         var ancestors: [(pid: Int32, name: String, bundleID: String, argv: [String])] = []
         var current = pid
         for _ in 0..<maxDepth {
@@ -178,7 +185,7 @@ enum AgentLineage {
             ancestors.append((parent.pid, parent.name, parent.bundleID, parent.argv))
             current = parent.pid
         }
-        return AgentLauncher.find(ancestors: ancestors)
+        return Array(AgentLauncher.findChain(ancestors: ancestors).prefix(2))
     }
 
     /// Walks up from `pid` to the nearest ancestor that is an agent. The process itself being an agent means it

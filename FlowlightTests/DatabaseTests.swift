@@ -862,15 +862,19 @@ final class DatabaseTests: XCTestCase {
         let decoded = try JSONDecoder().decode([TrafficBatch].self, from: Data(legacy.utf8))
         XCTAssertNil(decoded[0].records[0].key.parentAgent)
         XCTAssertNil(decoded[0].records[0].key.launcherBundleID)
+        XCTAssertNil(decoded[0].records[0].key.upstreamLauncherBundleID)
         XCTAssertNil(decoded[0].records[0].key.routeProxyBundleID)
     }
 
     func testVisualizationProvenanceRoundTripsThroughRollups() throws {
         let t0: Int64 = 1_700_000_000 - (1_700_000_000 % 3600)
         var routed = key("claude", "api.anthropic.com", ip: "203.0.113.8")
-        routed.launcherBundleID = "com.mitchellh.ghostty"
-        routed.launcherName = "Ghostty"
-        routed.launcherPath = "/Applications/Ghostty.app"
+        routed.launcherBundleID = "herdr"
+        routed.launcherName = "Herdr"
+        routed.launcherPath = "/Users/x/.local/bin/herdr"
+        routed.upstreamLauncherBundleID = "com.mitchellh.ghostty"
+        routed.upstreamLauncherName = "Ghostty"
+        routed.upstreamLauncherPath = "/Applications/Ghostty.app/Contents/MacOS/ghostty"
         routed.routeProxyBundleID = "com.flowlight.app"
         routed.routeProxyName = "Flowlight"
         routed.routeProxyPath = "/Applications/Flowlight.app"
@@ -886,10 +890,35 @@ final class DatabaseTests: XCTestCase {
                 from: Date(timeIntervalSince1970: TimeInterval(t0)),
                 to: Date(timeIntervalSince1970: TimeInterval(t0 + 3_600))
             )
-            XCTAssertEqual(rows.first?.launcherBundleID, "com.mitchellh.ghostty")
+            XCTAssertEqual(rows.first?.launcherBundleID, "herdr")
+            XCTAssertEqual(rows.first?.upstreamLauncherBundleID, "com.mitchellh.ghostty")
+            XCTAssertEqual(rows.first?.upstreamLauncherName, "Ghostty")
             XCTAssertEqual(rows.first?.routeProxyBundleID, "com.flowlight.app")
             XCTAssertEqual(rows.first?.counters, FlowCounters(bytesIn: 10, bytesOut: 20, flows: 1))
         }
+    }
+
+    func testUpstreamLauncherIsPartOfExactFlowIdentity() throws {
+        let timestamp: Int64 = 1_700_000_100
+        var ghostty = key("claude", "api.anthropic.com", ip: "203.0.113.8")
+        ghostty.launcherBundleID = "herdr"
+        ghostty.launcherName = "Herdr"
+        ghostty.upstreamLauncherBundleID = "com.mitchellh.ghostty"
+        ghostty.upstreamLauncherName = "Ghostty"
+        var terminal = ghostty
+        terminal.upstreamLauncherBundleID = "com.apple.Terminal"
+        terminal.upstreamLauncherName = "Terminal"
+
+        try db.insert([TrafficBatch(timestamp: timestamp, records: [
+            TrafficRecord(key: ghostty, counters: FlowCounters(bytesOut: 10, flows: 1)),
+            TrafficRecord(key: terminal, counters: FlowCounters(bytesOut: 20, flows: 1))
+        ])])
+
+        let rows = try db.raw(
+            "SELECT upstream_launcher_bundle_id, bytes_out FROM flows_1s ORDER BY upstream_launcher_bundle_id"
+        ) { ($0.text(0), $0.int(1)) }
+        XCTAssertEqual(rows.map(\.0), ["com.apple.Terminal", "com.mitchellh.ghostty"])
+        XCTAssertEqual(rows.map(\.1), [20, 10])
     }
 
     func testLegacyMergedAttributionIsUntrustedWithoutLosingTraffic() throws {

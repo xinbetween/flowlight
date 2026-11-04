@@ -1869,6 +1869,7 @@
 "Fit" = "Einpassen";
 "Fit the map in the window" = "Karte an das Fenster anpassen";
 "Reset" = "Zurücksetzen";
+"%lld selected" = "%lld ausgewählt";
 "Reset zoom and position" = "Zoom und Position zurücksetzen";
 "Select to inspect this connection" = "Auswählen, um diese Verbindung zu untersuchen";
 "%lld exact destinations" = "%lld exakte Ziele";
