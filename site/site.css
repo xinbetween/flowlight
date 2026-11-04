@@ -222,20 +222,26 @@
   .hero h1 { font-size: clamp(40px, 4.8vw, 58px); font-weight: 800; }
   .hero h1 .flow { color: var(--accent); }
   .hero .lede { margin-top: 20px; }
-  .cta { display: grid; gap: 12px; margin-top: 28px; align-items: start; max-width: 520px; }
-  .install-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
-  .install-choice { box-sizing: border-box; justify-content: center; width: 100%; min-height: 64px; height: 64px; }
-  .direct-download { box-shadow: none; }
-  /* Apple artwork stays unmodified at its 40 px minimum screen height. Its peer card supplies the required clear
-     space while giving direct download and the Store equal visual weight. */
-  .app-store-badge { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 11px 14px;
-                     border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-  .app-store-badge img { display: block; width: auto; height: 40px; }
-  .install-utility { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .github-link { display: inline-flex; align-items: center; gap: 7px; flex: none; color: var(--muted);
-                 font-size: 13px; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-  .github-link:hover { color: var(--ink); }
-  .github-link svg { width: 16px; height: 16px; }
+  .cta { display: grid; grid-template-columns: max-content minmax(170px, 1fr) max-content; gap: 10px;
+         margin-top: 28px; align-items: stretch; max-width: 620px; }
+  /* These wrappers preserve the semantic install groups while their children form one visual grid: Store, direct
+     DMG and source on the first line; the complete Homebrew command on the second. */
+  .install-choices, .install-utility { display: contents; }
+  .install-choice { box-sizing: border-box; justify-content: center; min-height: 44px; height: 44px; }
+  .direct-download { border-color: #000; background: #000; color: #fff; box-shadow: none; white-space: nowrap; }
+  .direct-download:hover { background: #1c1c1e; transform: none; }
+  .direct-download svg { display: none; }
+  .direct-download::before { content: "\f8ff"; font: 600 20px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+  /* Keep Apple's supplied badge artwork unmodified while matching the shared control height. */
+  .app-store-badge { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 0; }
+  .app-store-badge img { display: block; width: auto; height: 44px; }
+  .github-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; height: 44px;
+                 box-sizing: border-box; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px;
+                 background: var(--surface); color: var(--muted); font-size: 14px; font-weight: 600;
+                 text-decoration: none; white-space: nowrap; }
+  .github-link:hover { color: var(--ink); border-color: color-mix(in srgb, var(--muted) 55%, var(--line)); }
+  .github-link svg { width: 17px; height: 17px; }
+  .cta .brew, .cta .meta-row { grid-column: 1 / -1; width: 100%; box-sizing: border-box; }
   .cta .meta-row { margin-top: 2px; }
   .cta-note { font-size: 13px; color: var(--faint); width: 100%; }
 
@@ -407,12 +413,20 @@
     .wrap { padding-inline: 16px; }
     .hero h1 { font-size: clamp(32px, 9vw, 46px); }
     .lede { font-size: 16.5px; }
-    .cta { gap: 10px; margin-top: 24px; max-width: none; }
-    .install-choices { grid-template-columns: minmax(0, 1fr); }
-    .install-choice { min-height: 56px; }
-    .install-utility { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
-    .brew { width: 100%; order: 1; flex: none; }
-    .github-link { order: 2; align-self: flex-start; }
+    .cta { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; max-width: none; }
+    .install-choice { width: 100%; min-height: 44px; height: 44px; }
+    .app-store-badge img { height: 44px; }
+    .github-link { grid-column: auto; justify-self: center; width: min(100%, 171.7px); min-height: 44px; height: 44px; padding-inline: 10px; }
+    .github-link svg { width: 20px; height: 20px; }
+    .cta .brew { grid-column: auto; width: 100%; height: 44px; min-width: 0; flex: none; gap: 8px; padding: 5px 6px 5px 11px; }
+    .cta .brew code { overflow: hidden; text-overflow: ellipsis; }
+    .cta .brew button { position: relative; width: 30px; height: 30px; padding: 0; font-size: 0; }
+    .cta .brew button::before, .cta .brew button::after {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 12px;
+      box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 2px;
+    }
+    .cta .brew button::before { transform: translate(-7px, -7px); }
+    .cta .brew button::after { transform: translate(-3px, -3px); background: var(--surface-2); }
     /* A table this wide can only scroll; say so rather than letting it look cut off. */
     .table-wrap { position: relative; }
     .table-wrap::after {
@@ -527,6 +541,18 @@
   /* The table of contents, in sections. Twenty-eight links in one column is a list nobody reads to the end of;
      eight labelled groups is something you can scan. */
   .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 14px; }
+  .toc:not(:has(> .toc-sheet)) {
+    display: grid; gap: 0; padding-block: 24px; border-block: 1px solid var(--line);
+  }
+  .toc:not(:has(> .toc-sheet)) > strong {
+    margin: 0 0 12px; font: 600 11px var(--mono); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink);
+  }
+  .toc:not(:has(> .toc-sheet)) > a {
+    display: block; padding: 6px 0 6px 14px; color: var(--muted); font-size: 14px;
+    line-height: 1.35; text-decoration: none;
+  }
+  .toc:not(:has(> .toc-sheet)) > a:hover { color: var(--ink); }
   .toc-sheet { --toc-group-gap: 10px; }
   /* Plain on a wide screen; the phone rules below give it a card, where it folds up. */
   .toc-sheet { display: grid; gap: var(--toc-group-gap, 26px); }
@@ -615,6 +641,7 @@
     .toc-sheet:not([open]) { gap: 0; }
     .toc-sheet { --toc-group-gap: 6px; }
     .toc-group > a { padding-block: 3px; }
+    .prose table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .footer-brand { grid-column: 1 / -1; }
   }
