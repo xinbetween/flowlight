@@ -97,7 +97,7 @@ struct AlertsView: View {
                 }
                 Divider()
             }
-            Button(L("Show Traffic in Reports")) { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)
+            Button(L("Show Traffic in History")) { if let a = alert(ids.first) { openReport(a) } }.disabled(ids.count != 1)
             Button(L("Acknowledge")) { monitor.acknowledgeAlerts(ids: Array(ids)) }
             Button(L("Copy Detail")) {
                 NSPasteboard.general.clearContents()

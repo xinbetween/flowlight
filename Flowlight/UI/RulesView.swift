@@ -247,7 +247,7 @@ struct RulesView: View {
         ContentUnavailableView {
             Label(L("No rules yet"), systemImage: "hand.raised")
         } description: {
-            Text(L("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by."))
+            Text(L("A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by."))
         } actions: {
             Button(L("Browse Templates…")) { sheet = .library(nil, RuleTemplate.Subject()) }
             Button(L("Write One…")) { sheet = .editor(Rule(), isNew: true) }

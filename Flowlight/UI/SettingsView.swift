@@ -68,7 +68,7 @@ struct SettingsView: View {
                     Toggle(L("First contact with a new domain"), isOn: $firstContact)
                     Toggle(L("Connections to non-standard ports"), isOn: $nonStandardPorts)
                     Toggle(L("Ignore Apple's own apps"), isOn: $ignoreAppleApps)
-                    Text(L("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail."))
+                    Text(L("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {

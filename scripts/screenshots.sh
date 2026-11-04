@@ -1,15 +1,17 @@
 #!/bin/zsh
-# Regenerates the marketing screenshots in docs/assets/screenshots/.
+# Regenerates the marketing screenshots in docs/assets/screenshots/, or another FL_OUT directory.
 #
 # Every shot is taken from demo data (-FLDemo YES), which lives in its own database, so nothing real is ever
 # published. The screen and the window size come from launch arguments rather than synthetic keystrokes: a
 # keystroke goes to whichever window is frontmost, which is somebody else's window often enough to matter.
+# Set FL_FORCE_SIZE and FL_EXPECT_PIXELS together for a uniform App Store-ready set.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-OUT="docs/assets/screenshots"
+OUT="${FL_OUT:-docs/assets/screenshots}"
 SIZE="${FL_SIZE:-1600x1075}"
 WANT=$(sed -n 's/.*MARKETING_VERSION: "\(.*\)"/\1/p' project.yml)
+WANT_BUILD=$(sed -n 's/.*CURRENT_PROJECT_VERSION: "\(.*\)"/\1/p' project.yml)
 
 # Ask xcodebuild where it actually put the app. A hard-coded build/ path is how these screenshots were once
 # taken from a months-old bundle: it existed, it launched, and nothing said it was the wrong version.
@@ -22,8 +24,13 @@ fi
 [ -d "$APP" ] || { echo "No app at $APP — build Release first."; exit 1; }
 
 GOT=$(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString)
+GOT_BUILD=$(defaults read "$APP/Contents/Info.plist" CFBundleVersion)
 [ "$GOT" = "$WANT" ] || { echo "$APP is $GOT, project.yml says $WANT — build Release first."; exit 1; }
-echo "Shooting Flowlight $GOT from $APP"
+[ "$GOT_BUILD" = "$WANT_BUILD" ] || {
+  echo "$APP is build $GOT_BUILD, project.yml says $WANT_BUILD — build Release first."
+  exit 1
+}
+echo "Shooting Flowlight $GOT ($GOT_BUILD) from $APP"
 mkdir -p "$OUT"
 
 # name:screen:agent-tab:height — a couple of shots are taller or shorter than the default.
@@ -39,6 +46,11 @@ SHOTS=(
   "inspect:inspect::"
   "visualize:visualize::1600x994"
 )
+# Rules is Store-capable but not one of the website's ten published assets. Add it only when an explicit capture set
+# asks for it, keeping the default website inventory and its all-images manifest stable.
+if [ -n "${FL_ONLY:-}" ] && [[ ",${FL_ONLY}," == *",rules,"* ]]; then
+  SHOTS+=("rules:rules::")
+fi
 
 exact_app_pids() {
   local expected="$1" pid command
@@ -65,9 +77,21 @@ expected_window_title() {
     agents) print -r -- "AI Agents" ;;
     reports) print -r -- "History" ;;
     alerts) print -r -- "Alerts" ;;
+    rules) print -r -- "Rules" ;;
     inspect) print -r -- "Inspect" ;;
     visualize) print -r -- "Connections" ;;
     *) echo "    no expected window title for screen $1" >&2; return 1 ;;
+  esac
+}
+
+title_matches_screen() {
+  local screen="$1" actual="$2" expected
+  expected=$(expected_window_title "$screen") || return 1
+  case "$screen" in
+    alerts) [[ "$actual" == "$expected" || "$actual" == "$expected – "* ]] ;;
+    rules) [[ "$actual" == "$expected" || "$actual" == "$expected – "*" in force" ]] ;;
+    inspect) [[ "$actual" == "$expected" || "$actual" == "$expected – Off" ]] ;;
+    *) [[ "$actual" == "$expected" ]] ;;
   esac
 }
 
@@ -85,7 +109,8 @@ OSA
 }
 
 capture() {
-  local name="$1" screen="$2" tab="$3" size="${4:-$SIZE}"
+  local name="$1" screen="$2" tab="$3" requested_size="$4"
+  local size="${FL_FORCE_SIZE:-${requested_size:-$SIZE}}"
   echo "  $name ($screen${tab:+ · $tab})"
   local w="${size%x*}" h="${size#*x}"
   local executable
@@ -100,7 +125,8 @@ capture() {
   # arrive after demo seeding and replace the requested screen. Pin English too, so the title check below is stable.
   open -n "$APP" --args -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
     -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -AppleInterfaceStyle Light \
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
+    -AppleInterfaceStyle Light \
     "${banner[@]}" "${visualization[@]}"
   local pid=""
   for _ in {1..40}; do
@@ -121,8 +147,15 @@ OSA
   local expected actual
   expected=$(expected_window_title "$screen")
   actual=$(window_title "$pid" 2>/dev/null || true)
-  if [ "$actual" != "$expected" ]; then
+  if ! title_matches_screen "$screen" "$actual"; then
     echo "    refusing to capture $name: expected $expected, found ${actual:-no window}"
+    stop_exact_app "$pid" "$executable"
+    return 1
+  fi
+  local open_files
+  open_files=$(lsof -p "$pid" -Fn 2>/dev/null || true)
+  if [[ "$open_files" == *traffic.sqlite* || "$open_files" != *demo.sqlite* ]]; then
+    echo "    refusing to capture $name: demo.sqlite is not the only traffic database"
     stop_exact_app "$pid" "$executable"
     return 1
   fi
@@ -136,6 +169,20 @@ OSA
   if ! screencapture -x -o -l"$id" "$OUT/$name.png"; then
     stop_exact_app "$pid" "$executable"
     return 1
+  fi
+  if [ -n "${FL_EXPECT_PIXELS:-}" ]; then
+    local expected_width="${FL_EXPECT_PIXELS%x*}" expected_height="${FL_EXPECT_PIXELS#*x}"
+    local actual_width actual_height
+    actual_width=$(sips -g pixelWidth "$OUT/$name.png" | sed -n 's/.*pixelWidth: //p')
+    actual_height=$(sips -g pixelHeight "$OUT/$name.png" | sed -n 's/.*pixelHeight: //p')
+    if [ "$actual_width" != "$expected_width" ] || [ "$actual_height" != "$expected_height" ]; then
+      echo "    refusing $name: expected ${expected_width}x${expected_height}, captured ${actual_width}x${actual_height}"
+      stop_exact_app "$pid" "$executable"
+      return 1
+    fi
+  fi
+  if [ "${FL_SKIP_MANIFEST:-NO}" != "YES" ]; then
+    python3 scripts/screenshot_manifest.py --directory "$OUT" --version "$GOT" "$name.png"
   fi
   stop_exact_app "$pid" "$executable"
   sleep 2

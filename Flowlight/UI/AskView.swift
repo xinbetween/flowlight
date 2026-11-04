@@ -295,7 +295,7 @@ private struct AskTurnView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(call.filter == nil && call.screen == nil)
-                .help(call.filter != nil ? L("Open these rows in Reports")
+                .help(call.filter != nil ? L("Open these rows in History")
                       : call.screen != nil ? L("Open %@", call.screen!.title) : call.summary)
                 if index < turn.calls.count - 1 { Divider() }
             }

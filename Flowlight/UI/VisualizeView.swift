@@ -1534,14 +1534,14 @@ private struct TrafficGraphInspector: View {
             }
             Divider()
             if !node.isFilterExact {
-                Text(L("Select a relationship for an exact Reports scope."))
+                Text(L("Select a relationship for an exact History scope."))
                     .font(.callout)
                     .foregroundStyle(FL.muted)
             } else if node.kind == .launcher || node.kind == .proxy || node.counters.isEmpty {
                 EmptyView()
             } else if !node.members.isEmpty && (node.filter.domainSuffix != nil || node.members.count > 1) {
                 if node.filter.domainSuffix != nil {
-                    Button(L("Show domain family in Reports")) {
+                    Button(L("Show domain family in History")) {
                         nav.showReport(filter: node.filter, granularity: granularity)
                     }
                 }
@@ -1552,7 +1552,7 @@ private struct TrafficGraphInspector: View {
                     }
                 }
             } else {
-                Button(L("Show in Reports")) { nav.showReport(filter: node.filter, granularity: granularity) }
+                Button(L("Show in History")) { nav.showReport(filter: node.filter, granularity: granularity) }
                 #if !APP_STORE
                 if node.kind == .destination || node.kind == .service {
                     if VisualizeActionScope.canInspect(node.filter) {
@@ -1724,7 +1724,7 @@ private struct TrafficGraphInspector: View {
 
     private func exactActions(_ filter: TrafficFilter, source: TrafficGraphNode?) -> some View {
         HStack(spacing: Spacing.s) {
-            Button(L("Reports")) { nav.showReport(filter: filter, granularity: granularity) }
+            Button(L("History")) { nav.showReport(filter: filter, granularity: granularity) }
             #if !APP_STORE
             if VisualizeActionScope.canInspect(filter) {
                 Button(L("Inspect")) {

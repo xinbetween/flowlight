@@ -343,7 +343,7 @@ private struct InspectContent: View {
             .toggleStyle(.button)
             .disabled(!LocalRiskSettings.isActive)
             .help(LocalRiskSettings.isActive ? L("Show only medium and high local risk assessments")
-                                             : L("Turn on Local risk analysis in Reports or Settings to use this filter"))
+                                             : L("Turn on Local risk analysis in History or Settings to use this filter"))
             Picker(L("Window"), selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
             }

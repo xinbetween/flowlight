@@ -49,7 +49,7 @@ struct LiveView: View {
             GroupBox {
                 Table(monitor.talkers.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
                     TableColumn(L("Application"), value: \.name) { t in
-                        HStack { AppIconView(path: t.path); Text(t.name) }.help(L("%@\nDouble-click to open in Reports", t.bundleID))
+                        HStack { AppIconView(path: t.path); Text(t.name) }.help(L("%@\nDouble-click to open in History", t.bundleID))
                     }
                     .width(min: 130)
                     TableColumn(L("↓ In"), value: \.rateIn) { Text("\(ByteFormat.compact($0.rateIn))/s").monospacedDigit().help(ByteFormat.rate($0.rateIn)) }
@@ -67,7 +67,7 @@ struct LiveView: View {
                 }
                 .contextMenu(forSelectionType: LiveTalker.ID.self) { ids in
                     if let id = ids.first {
-                        Button(L("Show in Reports")) { openReport(id) }
+                        Button(L("Show in History")) { openReport(id) }
                         InspectMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
                                          host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
                         FocusMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id))

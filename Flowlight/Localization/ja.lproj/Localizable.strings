@@ -65,7 +65,6 @@
 /* App/AppNavigation.swift */
 "Live" = "ライブ";
 "AI Agents" = "AI エージェント";
-"Reports" = "レポート";
 "Alerts" = "アラート";
 "Rules" = "ルール";
 "Ask" = "質問";
@@ -321,7 +320,7 @@
 "flowlight" = "flowlight";
 "Include this Mac's host name" = "この Mac のホスト名を含める";
 "What Flowlight sends" = "Flowlight が送信する内容";
-"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "集計は、1 つのアプリ・1 つのホスト名・1 つの IP アドレスを、レポートと同じ分単位の粒度で期間ごとに合計したものです。接続ごとでもパケットごとでもありません。集計は、対象の分が終わってから 2 分ほど遅れて送られます。アラートは発生した時点で送られます。接続できないコレクターへは間隔を広げながら再試行し、停止している間は最大 10,000 件を保持します。";
+"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "集計は、1 つのアプリ・1 つのホスト名・1 つの IP アドレスを、履歴と同じ分単位の粒度で期間ごとに合計したものです。接続ごとでもパケットごとでもありません。集計は、対象の分が終わってから 2 分ほど遅れて送られます。アラートは発生した時点で送られます。接続できないコレクターへは間隔を広げながら再試行し、停止している間は最大 10,000 件を保持します。";
 "Every field that can leave this Mac (%lld)" = "この Mac から出る可能性のあるフィールドのすべて（%lld）";
 "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export." = "このリストがすべてです。ペイロードを組み立てるのと同じ宣言から生成しているため、コードから遅れることはありません。どの形式でも、ほかに何をオンにしていても送信されないもの: HTTPS インスペクションが記録した内容です。リクエストとレスポンスのヘッダ、本文、ツール呼び出し、復号したやり取りの中身が書き出しに入る経路はありません。";
 "Show What Would Be Sent…" = "送信される内容を表示…";
@@ -338,7 +337,7 @@
 "Dropped" = "破棄";
 "Retrying" = "再試行中";
 "Status" = "状況";
-"Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "書き出しは Flowlight 自身のトラフィックとして出ていきます。そのためライブとレポートには、ほかのアプリと同じように表示され、初めて新しい宛先へ送るときには Flowlight についての初回接続アラートが出ます。";
+"Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "書き出しは Flowlight 自身のトラフィックとして出ていきます。そのためライブと履歴には、ほかのアプリと同じように表示され、初めて新しい宛先へ送るときには Flowlight についての初回接続アラートが出ます。";
 "What would be sent" = "送信される内容";
 "Copy" = "コピー";
 "Done" = "完了";
@@ -442,7 +441,7 @@
 "%@ of this agent's uploads went to non-AI hosts" = "このエージェントの送信のうち %@ が AI 以外のホストへ送られました";
 "Allowlist" = "許可リスト";
 "Risk" = "リスク";
-"Show Traffic in Reports" = "トラフィックをレポートで表示";
+"Show Traffic in History" = "トラフィックを履歴で表示";
 "None seen" = "検出なし";
 "Large upload" = "大量の送信";
 "%@ sent to hosts that aren't AI providers" = "AI プロバイダ以外のホストへ %@ を送信しました";
@@ -481,7 +480,7 @@
 "MCP servers (%lld)" = "MCP サーバ（%lld）";
 "MCP servers" = "MCP サーバ";
 "Guardrails" = "ガードレール";
-"Open in Reports" = "レポートで開く";
+"Open in History" = "履歴で開く";
 "Only AI providers. Nothing else was contacted." = "AI プロバイダのみです。ほかへの接続はありません。";
 "the tool calls its model asks for" = "モデルが要求するツール呼び出し";
 "tool calls" = "ツール呼び出し";
@@ -616,7 +615,7 @@
 "Documentation" = "ドキュメント";
 "1 query · %@" = "問い合わせ 1 件 · %@";
 "%lld queries · %@" = "問い合わせ %lld 件 · %@";
-"Open these rows in Reports" = "これらの行をレポートで開きます";
+"Open these rows in History" = "これらの行を履歴で開きます";
 "Answered on this Mac · %@" = "この Mac で回答 · %@";
 "1 request left this Mac · %@" = "リクエスト 1 件がこの Mac から出ました · %@";
 "%lld requests left this Mac · %@" = "リクエスト %lld 件がこの Mac から出ました · %@";
@@ -1022,13 +1021,13 @@
 "Zero" = "ゼロ";
 "Last 2 minutes" = "過去 2 分";
 "Application" = "アプリケーション";
-"%@\nDouble-click to open in Reports" = "%@\nダブルクリックするとレポートで開きます";
+"%@\nDouble-click to open in History" = "%@\nダブルクリックすると履歴で開きます";
 "↓ In" = "↓ 受信";
 "↑ Out" = "↑ 送信";
 "Session ↓" = "セッション ↓";
 "Session ↑" = "セッション ↑";
 "Busiest destination" = "通信量の多い接続先";
-"Show in Reports" = "レポートで表示";
+"Show in History" = "履歴で表示";
 "Copy Bundle ID" = "バンドル ID をコピー";
 "Top talkers · average of the last 5 seconds" = "通信量の多いアプリ · 過去 5 秒の平均";
 "The network is quiet" = "ネットワークは静かです";
@@ -1265,7 +1264,7 @@
 "Nothing is being refused until %@." = "%@ まで、何も拒否しません。";
 "Resume now" = "今すぐ再開";
 "No rules yet" = "ルールがありません";
-"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "ルールは対象（アプリ、エージェント、接続先、URL）を指定し、ブロックか許可を決めます。ライブ、レポート、AI エージェント、インスペクトの行を右クリックすれば、いま見ているものについてルールを作れます。テンプレートから始めることもできます。パッケージのインストールがどのホストに接続するか、ファイルがどのホストから出ていくかは、すでに書かれています。";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "ルールは対象（アプリ、エージェント、接続先、URL）を指定し、ブロックか許可を決めます。ライブ、履歴、AI エージェント、インスペクトの行を右クリックすれば、いま見ているものについてルールを作れます。テンプレートから始めることもできます。パッケージのインストールがどのホストに接続するか、ファイルがどのホストから出ていくかは、すでに書かれています。";
 "Browse Templates…" = "テンプレートを見る…";
 "Write One…" = "作成する…";
 "Nothing yet" = "まだ何もありません";
@@ -1341,7 +1340,7 @@
 "First contact with a new domain" = "新しいドメインへの初回接続";
 "Connections to non-standard ports" = "非標準ポートへの接続";
 "Ignore Apple's own apps" = "Apple 純正アプリを除外";
-"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS は Apple と絶えず通信しています（アップデート、iCloud、プッシュ、時刻）。そのすべてを報告すると、本当に重要な 1 行が埋もれてしまいます。Apple のアプリのトラフィックも記録は続き、ライブとレポートには表示され、すべてのルールとガードレールの対象になります。";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail." = "macOS は Apple と絶えず通信しています（アップデート、iCloud、プッシュ、時刻）。そのすべてを報告すると、本当に重要な 1 行が埋もれてしまいます。Apple のアプリのトラフィックも記録は続き、ライブと履歴には表示され、すべてのルールとガードレールの対象になります。";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "エージェントがメール・ファイル転送・SSH・トンネル・データベースを使用";
 "Agent connects to a raw IP on an unusual port" = "エージェントが異常なポートで生 IP に接続";
 "Uploads to non-AI hosts above" = "AI 以外のホストへの送信が";
@@ -1618,7 +1617,7 @@
 "Reinstall Filter" = "Reinstall Filter";
 "Potential harm" = "Potential harm";
 "Show only medium and high local risk assessments" = "Show only medium and high local risk assessments";
-"Turn on Local risk analysis in Reports or Settings to use this filter" = "Turn on Local risk analysis in Reports or Settings to use this filter";
+"Turn on Local risk analysis in History or Settings to use this filter" = "Turn on Local risk analysis in History or Settings to use this filter";
 "Showing only requests with medium or high potential harm" = "Showing only requests with medium or high potential harm";
 "Response modified" = "Response modified";
 "%@ answered, then Flowlight changed the response using %@ before the app received it" = "%@ answered, then Flowlight changed the response using %@ before the app received it";
@@ -1820,7 +1819,7 @@
 "Showing %lld of %lld relationships" = "%2$lld件中%1$lld件の関係を表示";
 "Show %lld more relationships" = "さらに%lld件の関係を表示";
 "Loads the next page without changing the Map" = "マップを変更せずに次のページを読み込みます";
-"Select a relationship for an exact Reports scope." = "正確なレポート範囲を表示するには関係を選択してください。";
+"Select a relationship for an exact History scope." = "正確な履歴範囲を表示するには関係を選択してください。";
 "Period" = "期間";
 "No traffic to visualize" = "可視化するトラフィックがありません";
 "Flowlight has not observed any connections in this period." = "この期間にFlowlightが観測した接続はありません。";
@@ -1866,7 +1865,7 @@
 "Select to inspect this connection" = "選択してこの接続を調べる";
 "%lld exact destinations" = "%lld件の正確な宛先";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@から%@、受信%@、送信%@、%lld件の接続";
-"Show domain family in Reports" = "ドメインファミリーをレポートに表示";
+"Show domain family in History" = "ドメインファミリーを履歴に表示";
 
 /* 0.17.0 History and Connections */
 "1 mo" = "1か月";

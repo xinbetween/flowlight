@@ -8,7 +8,7 @@ roadmap still advertising what you can already download. None of that stops the 
 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
-import re, sys, pathlib, collections, json, subprocess, time
+import re, sys, pathlib, collections, hashlib, json, subprocess, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -312,11 +312,82 @@ def problems():
             referenced.add(name)
             if not (shots / name).exists():
                 found.append(f"{page.relative_to(ROOT)}: screenshot {name} does not exist")
-    for shot in sorted(shots.glob("*.png")):
+    screenshot_files = sorted(shots.glob("*.png"))
+    for shot in screenshot_files:
         if shot.name not in referenced:
             found.append(f"{shot.relative_to(ROOT)}: no page shows this screenshot")
 
-    # 11. A declared size that isn't the image's size. The width and height are there to reserve the space
+    # 11. Every screenshot records the app version, exact bytes and dimensions from its own capture. A selective
+    #     refresh must not bless untouched images: each entry advances only when that image is actually recaptured.
+    manifest_path = shots / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text())
+        entries = manifest["screenshots"] if manifest.get("schema") == 1 else None
+        if not isinstance(entries, dict):
+            raise ValueError("unsupported shape")
+    except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
+        found.append(f"{manifest_path.relative_to(ROOT)}: unreadable screenshot manifest ({error})")
+        entries = {}
+    names = {shot.name for shot in screenshot_files}
+    if set(entries) != names:
+        missing = sorted(names - set(entries))
+        extra = sorted(set(entries) - names)
+        found.append(f"{manifest_path.relative_to(ROOT)}: screenshot entries differ; missing={missing}, extra={extra}")
+    for shot in screenshot_files:
+        entry = entries.get(shot.name)
+        if not isinstance(entry, dict):
+            continue
+        raw = shot.read_bytes()
+        real = (int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big"))
+        if entry.get("version") != APP_VERSION:
+            found.append(f"{shot.relative_to(ROOT)}: captured for {entry.get('version')}, app is {APP_VERSION}")
+        if entry.get("sha256") != hashlib.sha256(raw).hexdigest():
+            found.append(f"{shot.relative_to(ROOT)}: bytes differ from the screenshot manifest")
+        if (entry.get("width"), entry.get("height")) != real:
+            found.append(f"{shot.relative_to(ROOT)}: dimensions differ from the screenshot manifest")
+
+    # The Store set is a release artifact too. Keep its complete upload order, source build, bytes, and required
+    # 2880x1800 dimensions reviewable so App Store Connect cannot silently retain a mixed-version screenshot.
+    store_shots = ROOT / "packaging/app-store/screenshots/macos"
+    expected_store_names = {
+        "01-connections.png", "02-ai-agents.png", "03-history.png", "04-rules.png", "05-live.png",
+        "06-alerts.png", "07-agent-detail.png", "08-agent-tools.png", "09-mcp-servers.png",
+    }
+    store_files = sorted(store_shots.glob("*.png"))
+    store_names = {shot.name for shot in store_files}
+    if store_names != expected_store_names:
+        found.append(f"{store_shots.relative_to(ROOT)}: Store screenshots differ; "
+                     f"missing={sorted(expected_store_names - store_names)}, "
+                     f"extra={sorted(store_names - expected_store_names)}")
+    store_manifest_path = store_shots / "manifest.json"
+    try:
+        store_manifest = json.loads(store_manifest_path.read_text())
+        store_entries = store_manifest["screenshots"] if store_manifest.get("schema") == 1 else None
+        if not isinstance(store_entries, dict):
+            raise ValueError("unsupported shape")
+    except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
+        found.append(f"{store_manifest_path.relative_to(ROOT)}: unreadable screenshot manifest ({error})")
+        store_entries = {}
+    if set(store_entries) != expected_store_names:
+        found.append(f"{store_manifest_path.relative_to(ROOT)}: Store manifest entries differ; "
+                     f"missing={sorted(expected_store_names - set(store_entries))}, "
+                     f"extra={sorted(set(store_entries) - expected_store_names)}")
+    for shot in store_files:
+        entry = store_entries.get(shot.name)
+        if not isinstance(entry, dict):
+            continue
+        raw = shot.read_bytes()
+        real = (int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big"))
+        if entry.get("version") != APP_VERSION:
+            found.append(f"{shot.relative_to(ROOT)}: captured for {entry.get('version')}, app is {APP_VERSION}")
+        if entry.get("sha256") != hashlib.sha256(raw).hexdigest():
+            found.append(f"{shot.relative_to(ROOT)}: bytes differ from the screenshot manifest")
+        if (entry.get("width"), entry.get("height")) != real:
+            found.append(f"{shot.relative_to(ROOT)}: dimensions differ from the screenshot manifest")
+        if real != (2880, 1800):
+            found.append(f"{shot.relative_to(ROOT)}: Store screenshot is {real[0]}x{real[1]}, expected 2880x1800")
+
+    # 12. A declared size that isn't the image's size. The width and height are there to reserve the space
     #     before the image loads; a re-capture at a different aspect ratio makes them a lie and the page jumps.
     for page in PAGES:
         for src, attrs in IMG.findall(page.read_text()):
