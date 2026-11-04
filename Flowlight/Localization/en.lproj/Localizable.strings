@@ -1874,3 +1874,29 @@
 "%lld exact destinations" = "%lld exact destinations";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ to %@, received %@, sent %@, %lld connections";
 "Show domain family in Reports" = "Show domain family in Reports";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1 mo";
+"15 min" = "15 min";
+"1d" = "1d";
+"1h" = "1h";
+"1w" = "1w";
+"1y" = "1y";
+"6 mo" = "6 mo";
+"6h" = "6h";
+"All" = "All";
+"All history" = "All history";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys.";
+"Flowlight network activity" = "Flowlight network activity";
+"Flowlight, restart required to finish updating the filter" = "Flowlight, restart required to finish updating the filter";
+"Full history" = "Full history";
+"History" = "History";
+"History overview failed: %@" = "History overview failed: %@";
+"History range navigator" = "History range navigator";
+"Nearby" = "Nearby";
+"Nearby context" = "Nearby context";
+"Open the filter update notice in Flowlight" = "Open the filter update notice in Flowlight";
+"Range" = "Range";
+"Restart or reinstall the filter to finish the update" = "Restart or reinstall the filter to finish the update";
+"Return to the previous history scope" = "Return to the previous history scope";
+"Selected" = "Selected";

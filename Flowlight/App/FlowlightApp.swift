@@ -188,6 +188,7 @@ struct FlowlightApp: App {
         MenuBarExtra {
             MenuBarContent()
                 .environmentObject(monitor)
+                .environmentObject(extensionManager)
                 .environmentObject(nav)
                 .environmentObject(updater)
                 .environmentObject(focus)
@@ -207,6 +208,7 @@ struct FlowlightApp: App {
 
 struct MenuBarLabel: View {
     @EnvironmentObject var monitor: TrafficMonitor
+    @EnvironmentObject var extensionManager: ExtensionManager
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
     @Environment(\.openWindow) private var openWindow
@@ -225,13 +227,27 @@ struct MenuBarLabel: View {
             #endif
     }
 
-    @ViewBuilder private var label: some View {
-        if showRates {
-            Text("↓\(ByteFormat.compact(monitor.currentIn)) ↑\(ByteFormat.compact(monitor.currentOut))")
-                .monospacedDigit()
-        } else {
-            Image(systemName: monitor.unacknowledgedAlerts > 0 ? "exclamationmark.arrow.triangle.2.circlepath" : "arrow.up.arrow.down.circle")
+    private var label: some View {
+        HStack(spacing: 4) {
+            if extensionManager.state.showsMenuBarNotice {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .accessibilityHidden(true)
+            }
+            if showRates {
+                Text("↓\(ByteFormat.compact(monitor.currentIn)) ↑\(ByteFormat.compact(monitor.currentOut))")
+                    .monospacedDigit()
+            } else {
+                Image(systemName: monitor.unacknowledgedAlerts > 0 ? "exclamationmark.arrow.triangle.2.circlepath" : "arrow.up.arrow.down.circle")
+                    .accessibilityHidden(true)
+            }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(extensionManager.state.showsMenuBarNotice
+                            ? L("Flowlight, restart required to finish updating the filter")
+                            : L("Flowlight network activity"))
+        .help(extensionManager.state.showsMenuBarNotice
+              ? L("Restart or reinstall the filter to finish the update")
+              : L("Open Flowlight"))
     }
 }
 

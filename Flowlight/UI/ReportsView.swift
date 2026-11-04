@@ -15,6 +15,133 @@ enum SeriesAnomalies {
     }
 }
 
+enum HistoryRangePreset: String, CaseIterable, Identifiable {
+    case fifteenMinutes, oneHour, sixHours, oneDay, oneWeek, oneMonth, sixMonths, oneYear, all
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fifteenMinutes: return L("15 min")
+        case .oneHour: return L("1h")
+        case .sixHours: return L("6h")
+        case .oneDay: return L("1d")
+        case .oneWeek: return L("1w")
+        case .oneMonth: return L("1 mo")
+        case .sixMonths: return L("6 mo")
+        case .oneYear: return L("1y")
+        case .all: return L("All")
+        }
+    }
+
+    var duration: TimeInterval? {
+        switch self {
+        case .fifteenMinutes: return 15 * 60
+        case .oneHour: return 3_600
+        case .sixHours: return 6 * 3_600
+        case .oneDay: return 86_400
+        case .oneWeek: return 7 * 86_400
+        case .oneMonth: return 30 * 86_400
+        case .sixMonths: return 183 * 86_400
+        case .oneYear: return 365 * 86_400
+        case .all: return nil
+        }
+    }
+
+    func window(endingAt end: Date, available: ClosedRange<Date>) -> HistoryWindow {
+        let requestedStart = duration.map { end.addingTimeInterval(-$0) } ?? available.lowerBound
+        return HistoryWindow(
+            start: max(available.lowerBound, requestedStart),
+            end: min(available.upperBound, end),
+            followNow: true
+        ).clamped(to: available)
+    }
+}
+
+struct HistoryWindow: Equatable {
+    var start: Date
+    var end: Date
+    var followNow: Bool
+
+    var duration: TimeInterval { max(0, end.timeIntervalSince(start)) }
+
+    var granularity: Granularity {
+        switch duration {
+        case ..<(12 * 3_600): return .minute
+        case ..<(14 * 86_400): return .hour
+        case ..<(400 * 86_400): return .day
+        case ..<(3 * 365 * 86_400): return .week
+        default: return .month
+        }
+    }
+
+    func clamped(to available: ClosedRange<Date>) -> HistoryWindow {
+        let availableDuration = available.upperBound.timeIntervalSince(available.lowerBound)
+        let width = min(max(60, duration), max(60, availableDuration))
+        var nextEnd = min(max(end, available.lowerBound), available.upperBound)
+        var nextStart = nextEnd.addingTimeInterval(-width)
+        if nextStart < available.lowerBound {
+            nextStart = available.lowerBound
+            nextEnd = min(available.upperBound, nextStart.addingTimeInterval(width))
+        }
+        return HistoryWindow(start: nextStart, end: nextEnd,
+                             followNow: followNow && nextEnd >= available.upperBound)
+    }
+
+    func panned(by offset: TimeInterval, within available: ClosedRange<Date>) -> HistoryWindow {
+        HistoryWindow(start: start.addingTimeInterval(offset),
+                      end: end.addingTimeInterval(offset),
+                      followNow: false).clamped(to: available)
+    }
+
+    func resized(start requestedStart: Date, end requestedEnd: Date,
+                 within available: ClosedRange<Date>, minimumDuration: TimeInterval) -> HistoryWindow {
+        let lower = min(max(requestedStart, available.lowerBound), available.upperBound)
+        let upper = min(max(requestedEnd, available.lowerBound), available.upperBound)
+        let orderedStart = min(lower, upper)
+        let orderedEnd = max(lower, upper)
+        let width = max(minimumDuration, orderedEnd.timeIntervalSince(orderedStart))
+        return HistoryWindow(start: orderedStart,
+                             end: orderedStart.addingTimeInterval(width),
+                             followNow: false).clamped(to: available)
+    }
+}
+
+enum HistoryNavigatorDomain {
+    static func range(available: ClosedRange<Date>, selection: HistoryWindow) -> ClosedRange<Date> {
+        let total = max(60, available.upperBound.timeIntervalSince(available.lowerBound))
+        let desired = min(total, max(6 * 3_600, max(60, selection.duration) * 24))
+        guard desired < total * 0.9 else { return available }
+
+        if selection.followNow {
+            return max(available.lowerBound, available.upperBound.addingTimeInterval(-desired))...available.upperBound
+        }
+
+        let midpoint = selection.start.addingTimeInterval(selection.duration / 2)
+        var lower = midpoint.addingTimeInterval(-desired / 2)
+        var upper = lower.addingTimeInterval(desired)
+        if lower < available.lowerBound {
+            lower = available.lowerBound
+            upper = lower.addingTimeInterval(desired)
+        }
+        if upper > available.upperBound {
+            upper = available.upperBound
+            lower = upper.addingTimeInterval(-desired)
+        }
+        return lower...upper
+    }
+}
+
+enum ReportChartHoverLayout {
+    static func cardX(lineX: CGFloat, chartWidth: CGFloat,
+                      cardWidth: CGFloat = 260, gap: CGFloat = 8) -> CGFloat {
+        let proposed = lineX + gap + cardWidth <= chartWidth
+            ? lineX + gap
+            : lineX - gap - cardWidth
+        return min(max(0, proposed), max(0, chartWidth - cardWidth))
+    }
+}
+
 enum ReportChartKeyboardDirection {
     case left, right
 }
@@ -32,6 +159,7 @@ enum ReportChartKeyboardSelection {
 
 struct ReportNavigationState: Equatable {
     var granularity: Granularity
+    var startDate: Date? = nil
     var endDate: Date
     var followNow: Bool
     var filter: TrafficFilter
@@ -57,8 +185,13 @@ struct ReportsView: View {
     @EnvironmentObject var focus: FocusStore
     @AppStorage("reports.granularity") private var granularity: Granularity = .minute
     @AppStorage(AnomalySettings.Keys.sigma) private var sigma = 3.0
+    @State private var startDate = Date().addingTimeInterval(-6 * 3_600)
     @State private var endDate = Date()
     @State private var followNow = true
+    @State private var selectedPreset: HistoryRangePreset? = .sixHours
+    @State private var availableRange = Date().addingTimeInterval(-5 * 365 * 86_400)...Date()
+    @State private var overview: [SeriesPoint] = []
+    @State private var navigatorDetail: [SeriesPoint] = []
     @State private var filter = TrafficFilter.none
     @State private var query = ""
     @State private var series: [SeriesPoint] = []
@@ -70,6 +203,9 @@ struct ReportsView: View {
     @State private var loading = false
     @State private var reloadID = UUID()
     @State private var hovered: SeriesPoint?
+    @State private var hoverLineX: CGFloat?
+    @State private var tooltipHovered = false
+    @State private var hoverDismissID = UUID()
     @State private var keyboardBucketDate: Date?
     @FocusState private var chartFocused: Bool
     /// Top apps per bucket, fetched on hover or keyboard selection and cached until the next reload.
@@ -102,7 +238,10 @@ struct ReportsView: View {
         }
     }
 
-    private var startDate: Date { endDate.addingTimeInterval(-granularity.defaultWindow) }
+    private var window: HistoryWindow {
+        HistoryWindow(start: startDate, end: endDate, followNow: followNow)
+    }
+
     /// From the series, not the table rows, so shares stay right even if the table is capped.
     private var grandTotal: Int64 { max(1, series.reduce(0) { $0 + $1.total }) }
     private var highlightedPoint: SeriesPoint? {
@@ -123,7 +262,7 @@ struct ReportsView: View {
         // The Local Risk card made the old intrinsic report taller than the split view. Give every mode the real
         // detail viewport so the table takes the remaining height instead of pushing the report header under the bar.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .navigationTitle(L("Reports"))
+        .navigationTitle(L("History"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, IP, port"))
         .toolbar {
             ToolbarItem {
@@ -147,9 +286,22 @@ struct ReportsView: View {
                 .help(L("Export the current report as CSV"))
             }
         }
-        .task(id: ReloadKey(granularity: granularity, end: followNow ? nil : endDate, filter: scoped, version: monitor.dataVersion,
-                            localRiskVersion: monitor.localRiskVersion, mode: lowerMode, metric: metric)) {
+        .task(id: ReloadKey(granularity: granularity,
+                            duration: endDate.timeIntervalSince(startDate),
+                            end: followNow ? nil : endDate, filter: scoped,
+                            version: monitor.dataVersion,
+                            localRiskVersion: monitor.localRiskVersion,
+                            mode: lowerMode, metric: metric)) {
             await reload()
+        }
+        .task(id: NavigatorKey(filter: scoped, version: monitor.dataVersion)) {
+            await reloadNavigator()
+        }
+        .task(id: NavigatorDetailKey(filter: scoped, version: monitor.dataVersion,
+                                     start: startDate, end: endDate,
+                                     availableStart: availableRange.lowerBound,
+                                     availableEnd: availableRange.upperBound)) {
+            await reloadNavigatorDetail()
         }
         .task(id: granularity) {
             // Second-level data changes every second; other tiers refresh after each rollup.
@@ -164,10 +316,12 @@ struct ReportsView: View {
         .onChange(of: query) { recompute() }
         .onChange(of: sigma) { flagged = SeriesAnomalies.flagged(series, sigma: sigma) }
         .onChange(of: nav.reportRequest, initial: true) { apply(nav.reportRequest) }
-        .onChange(of: ReportNavigationState(granularity: granularity, endDate: endDate,
-                                            followNow: followNow, filter: filter), initial: true) { _, scope in
+        .onChange(of: ReportNavigationState(granularity: granularity, startDate: startDate,
+                                            endDate: endDate, followNow: followNow,
+                                            filter: filter), initial: true) { _, scope in
             nav.updateCurrentReportScope(filter: scope.filter, granularity: scope.granularity,
-                                         endDate: scope.endDate, followNow: scope.followNow)
+                                         startDate: startDate, endDate: scope.endDate,
+                                         followNow: scope.followNow)
         }
         .task(id: highlightedPoint?.date) { await loadContributors(for: highlightedPoint) }
     }
@@ -181,8 +335,23 @@ struct ReportsView: View {
         return scoped
     }
 
+    private struct NavigatorKey: Equatable {
+        var filter: TrafficFilter
+        var version: Int
+    }
+
+    private struct NavigatorDetailKey: Equatable {
+        var filter: TrafficFilter
+        var version: Int
+        var start: Date
+        var end: Date
+        var availableStart: Date
+        var availableEnd: Date
+    }
+
     private struct ReloadKey: Equatable {
-        var granularity: Granularity; var end: Date?; var filter: TrafficFilter; var version: Int; var localRiskVersion: Int
+        var granularity: Granularity; var duration: TimeInterval; var end: Date?
+        var filter: TrafficFilter; var version: Int; var localRiskVersion: Int
         var mode: LowerMode; var metric: InsightMetric
     }
 
@@ -368,34 +537,29 @@ struct ReportsView: View {
         HStack(spacing: 8) {
             if !history.isEmpty {
                 Button { goBack() } label: { Label(L("Back"), systemImage: "arrow.uturn.backward") }
-                    .help(L("Return to the previous report scope"))
+                    .help(L("Return to the previous history scope"))
             }
-            Picker(L("Granularity"), selection: Binding(get: { granularity }, set: { next in
-                guard next != granularity else { return }
-                pushHistory()
-                granularity = next
-            })) {
-                ForEach(Granularity.allCases) { Text($0.title).tag($0) }
+            Text(L("Range"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            ForEach(HistoryRangePreset.allCases) { preset in
+                Button(preset.title) { apply(preset) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(selectedPreset == preset ? FL.accent : nil)
+                    .accessibilityValue(selectedPreset == preset ? L("Selected") : "")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 520)
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-                .help(L("Earlier (⌘[)")).accessibilityLabel(L("Earlier"))
-                .keyboardShortcut("[", modifiers: .command)
             Text(rangeLabel)
                 .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
                 .lineLimit(1)
                 .fixedSize()
                 .help("\(startDate.formatted(date: .complete, time: .shortened)) – \(endDate.formatted(date: .complete, time: .shortened))")
-            Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                .help(L("Later (⌘])")).accessibilityLabel(L("Later"))
-                .keyboardShortcut("]", modifiers: .command)
-                .disabled(followNow)
-            Button(L("Now")) { followNow = true; endDate = Date() }.disabled(followNow)
+            if !followNow {
+                Button(L("Now")) { apply(selectedPreset ?? .sixHours) }
+            }
         }
     }
 
@@ -486,7 +650,9 @@ struct ReportsView: View {
     private var chart: some View {
         let highlighted = highlightedPoint
         return GroupBox {
-            Chart {
+            VStack(spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    Chart {
                 ForEach(series) { point in
                     BarMark(x: .value(L("Time"), point.date, unit: granularity.calendarComponent),
                             y: .value(L("Bytes"), point.bytesIn))
@@ -507,9 +673,6 @@ struct ReportsView: View {
                 if let highlighted {
                     RuleMark(x: .value(L("Time"), highlighted.date, unit: granularity.calendarComponent))
                         .foregroundStyle(.secondary.opacity(0.25))
-                        .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
-                            tooltip(for: highlighted)
-                        }
                 }
             }
             .chartForegroundStyleScale([L("Received"): TrafficColors.inbound, L("Sent"): TrafficColors.outbound])
@@ -524,16 +687,20 @@ struct ReportsView: View {
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .onContinuousHover { phase in
                             switch phase {
-                            case .active(let location): hovered = point(at: location, proxy: proxy, geo: geo)
-                            case .ended: hovered = nil
+                            case .active(let location):
+                                hoverDismissID = UUID()
+                                tooltipHovered = false
+                                hovered = point(at: location, proxy: proxy, geo: geo)
+                                hoverLineX = hovered.flatMap { lineX(for: $0, proxy: proxy, geo: geo) }
+                                    ?? location.x
+                            case .ended:
+                                scheduleHoverDismissal()
                             }
-                        }
-                        .onTapGesture { location in
-                            if let point = point(at: location, proxy: proxy, geo: geo) { drill(into: point) }
                         }
                 }
             }
             .focusable()
+            .focusEffectDisabled()
             .focused($chartFocused)
             .onChange(of: chartFocused) { _, focused in
                 guard focused else { return }
@@ -555,6 +722,7 @@ struct ReportsView: View {
                 default: return
                 }
                 hovered = nil
+                hoverLineX = nil
                 keyboardBucketDate = ReportChartKeyboardSelection.move(
                     from: keyboardBucketDate,
                     direction: keyboardDirection,
@@ -571,15 +739,35 @@ struct ReportsView: View {
             .accessibilityHint(granularity.finer == nil
                                ? L("Use the Left and Right Arrow keys to inspect time buckets.")
                                : L("Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in."))
-            .frame(height: 220)
-            .overlay { if loading && series.isEmpty { ProgressView() } }
+                    .frame(height: 300)
+                    .overlay { if loading && series.isEmpty { ProgressView() } }
+                    if let highlighted {
+                        GeometryReader { geometry in
+                            tooltip(for: highlighted)
+                                .offset(x: ReportChartHoverLayout.cardX(
+                                    lineX: hoverLineX ?? 0,
+                                    chartWidth: geometry.size.width
+                                ), y: 8)
+                                .onHover { inside in
+                                    tooltipHovered = inside
+                                    if inside {
+                                        hoverDismissID = UUID()
+                                    } else {
+                                        scheduleHoverDismissal()
+                                    }
+                                }
+                        }
+                    }
+                }
+                .frame(height: 300)
+                HistoryNavigator(points: overview, contextPoints: navigatorDetail,
+                                 available: availableRange, selection: window, onCommit: apply)
+                    .frame(height: 72)
+            }
         } label: {
             HStack {
                 Text(filter.isEmpty ? L("All traffic") : L("Filtered traffic"))
                 Spacer()
-                if granularity.finer != nil {
-                    Text(L("Click a bar to zoom in")).font(.caption).foregroundStyle(.secondary)
-                }
             }
         }
     }
@@ -605,17 +793,23 @@ struct ReportsView: View {
             }
             if let apps, !apps.isEmpty, point.total > 0 {
                 Divider().padding(.vertical, 2)
-                ForEach(Array(apps.enumerated()), id: \.element.id) { index, app in
-                    contributorRow(app, share: Double(app.counters.total) / Double(point.total),
-                                   emphasized: isAbnormal && index == 0)
+                ScrollView(.vertical) {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(apps.enumerated()), id: \.element.id) { index, app in
+                            contributorRow(app, share: Double(app.counters.total) / Double(point.total),
+                                           emphasized: isAbnormal && index == 0)
+                        }
+                        if let bucket, bucket.remainingApps > 0 {
+                            let count = bucket.remainingApps.formatted()
+                            let share = ShareFormat.string(Double(bucket.remaining.total) / Double(point.total))
+                            Text(bucket.remainingApps == 1 ? L("+ %@ more app · %@", count, share)
+                                                           : L("+ %@ more apps · %@", count, share))
+                                .font(.caption2).foregroundStyle(.secondary).padding(.leading, 26)
+                        }
+                    }
                 }
-                if let bucket, bucket.remainingApps > 0 {
-                    let count = bucket.remainingApps.formatted()
-                    let share = ShareFormat.string(Double(bucket.remaining.total) / Double(point.total))
-                    Text(bucket.remainingApps == 1 ? L("+ %@ more app · %@", count, share)
-                                                   : L("+ %@ more apps · %@", count, share))
-                        .font(.caption2).foregroundStyle(.secondary).padding(.leading, 26)
-                }
+                .frame(height: min(220, max(52, CGFloat(apps.count) * 52)))
+                .scrollIndicators(.visible)
             } else if point.total > 0 {
                 ProgressView().controlSize(.mini)
             }
@@ -660,7 +854,9 @@ struct ReportsView: View {
         guard !Task.isCancelled else { return }
         let end = Calendar.current.date(byAdding: granularity.calendarComponent, value: 1, to: point.date) ?? point.date
         let (g, f) = (granularity, scoped)
-        if let apps = try? await monitor.read({ try $0.contributors(g, from: point.date, to: end, filter: f) }),
+        if let apps = try? await monitor.read({
+            try $0.contributors(g, from: point.date, to: end, filter: f, limit: 50)
+        }),
            g == granularity, f == scoped {
             contributors[point.date] = apps
         }
@@ -794,30 +990,53 @@ struct ReportsView: View {
         history.clear()
         filter = request.filter
         if let g = request.granularity { granularity = g }
-        if let end = request.end, end < Date() { endDate = end; followNow = false } else { followNow = true; endDate = Date() }
+        let requestedEnd = request.end.map { min($0, Date()) } ?? Date()
+        endDate = requestedEnd
+        startDate = request.start ?? requestedEnd.addingTimeInterval(-granularity.defaultWindow)
+        followNow = request.end == nil
+        selectedPreset = nil
         nav.reportRequest = nil
     }
 
-    private func shift(_ direction: Double) {
-        let base = followNow ? Date() : endDate
-        let next = base.addingTimeInterval(direction * granularity.defaultWindow)
-        if next >= Date() { followNow = true; endDate = Date() } else { followNow = false; endDate = next }
+    private func apply(_ preset: HistoryRangePreset) {
+        pushHistory()
+        let next = preset.window(endingAt: Date(), available: availableRange)
+        selectedPreset = preset
+        startDate = next.start
+        endDate = next.end
+        followNow = next.followNow
+        granularity = next.granularity
+        hovered = nil
+    }
+
+    private func apply(_ next: HistoryWindow) {
+        let clamped = next.clamped(to: availableRange)
+        selectedPreset = nil
+        startDate = clamped.start
+        endDate = clamped.end
+        followNow = clamped.followNow
+        granularity = clamped.granularity
+        hovered = nil
     }
 
     private func drill(into point: SeriesPoint) {
-        guard let finer = granularity.finer else { return }
+        guard point.total > 0, let finer = granularity.finer else { return }
         pushHistory()
         let bucketEnd = Calendar.current.date(byAdding: granularity.calendarComponent, value: 1, to: point.date) ?? point.date
         // Show the finer window ending at the bucket's end (or its own natural span, whichever is shorter).
         let end = min(bucketEnd, point.date.addingTimeInterval(finer.defaultWindow))
         granularity = finer
-        if end >= Date() { followNow = true; endDate = Date() } else { followNow = false; endDate = end }
+        endDate = min(end, Date())
+        startDate = max(point.date, endDate.addingTimeInterval(-finer.defaultWindow))
+        followNow = endDate >= Date()
+        selectedPreset = nil
         hovered = nil
     }
 
     private func pushHistory() {
         history.push(ReportNavigationState(
             granularity: granularity,
+            startDate: startDate,
             endDate: endDate,
             followNow: followNow,
             filter: filter
@@ -827,6 +1046,7 @@ struct ReportsView: View {
     private func goBack() {
         guard let scope = history.pop() else { return }
         granularity = scope.granularity
+        startDate = scope.startDate ?? scope.endDate.addingTimeInterval(-scope.granularity.defaultWindow)
         endDate = scope.endDate
         followNow = scope.followNow
         filter = scope.filter
@@ -869,6 +1089,23 @@ struct ReportsView: View {
         let origin = geo[plot].origin
         guard let date: Date = proxy.value(atX: location.x - origin.x) else { return nil }
         return series.last { $0.date <= date } ?? series.first
+    }
+
+    private func lineX(for point: SeriesPoint, proxy: ChartProxy, geo: GeometryProxy) -> CGFloat? {
+        guard let plot = proxy.plotFrame,
+              let x = proxy.position(forX: point.date) else { return nil }
+        return geo[plot].origin.x + x
+    }
+
+    private func scheduleHoverDismissal() {
+        let requestID = UUID()
+        hoverDismissID = requestID
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard hoverDismissID == requestID, !tooltipHovered else { return }
+            hovered = nil
+            hoverLineX = nil
+        }
     }
 
     /// Compact window label: times only when the window is within today, dates for longer spans.
@@ -931,8 +1168,75 @@ struct ReportsView: View {
         ).displayed
     }
 
+    private func reloadNavigator() async {
+        let activeFilter = scoped
+        do {
+            let loaded = try await monitor.read { db -> (ClosedRange<Date>, [SeriesPoint]) in
+                try db.readSnapshot {
+                    let now = Date()
+                    let retained = try db.trafficDateBounds()
+                        ?? now.addingTimeInterval(-6 * 3_600)...now
+                    let bounds = retained.lowerBound...max(retained.upperBound, now)
+                    let resolution = HistoryWindow(
+                        start: bounds.lowerBound,
+                        end: bounds.upperBound,
+                        followNow: true
+                    ).granularity
+                    return (bounds, try db.series(resolution, from: bounds.lowerBound,
+                                                  to: bounds.upperBound, filter: activeFilter))
+                }
+            }
+            guard !Task.isCancelled else { return }
+            availableRange = loaded.0
+            overview = loaded.1
+            let next = window.clamped(to: loaded.0)
+            startDate = next.start
+            endDate = next.end
+            followNow = next.followNow
+        } catch {
+            guard !Task.isCancelled else { return }
+            monitor.lastError = L("History overview failed: %@", error.localizedDescription)
+        }
+    }
+
+    private func reloadNavigatorDetail() async {
+        let bounds = availableRange
+        let selected = window.clamped(to: bounds)
+        let domain = HistoryNavigatorDomain.range(available: bounds, selection: selected)
+        guard domain != bounds else {
+            navigatorDetail = []
+            return
+        }
+
+        let activeFilter = scoped
+        let resolution = HistoryWindow(start: domain.lowerBound, end: domain.upperBound,
+                                       followNow: selected.followNow).granularity
+        do {
+            let loaded = try await monitor.read { db in
+                try db.readSnapshot {
+                    try db.series(resolution, from: domain.lowerBound,
+                                  to: domain.upperBound, filter: activeFilter)
+                }
+            }
+            guard !Task.isCancelled,
+                  activeFilter == scoped,
+                  domain == HistoryNavigatorDomain.range(
+                    available: availableRange,
+                    selection: window.clamped(to: availableRange)
+                  ) else { return }
+            navigatorDetail = loaded
+        } catch {
+            guard !Task.isCancelled else { return }
+            monitor.lastError = L("History overview failed: %@", error.localizedDescription)
+        }
+    }
+
     private func reload() async {
-        if followNow { endDate = Date() }
+        if followNow {
+            let width = max(60, endDate.timeIntervalSince(startDate))
+            endDate = Date()
+            startDate = endDate.addingTimeInterval(-width)
+        }
         let requestID = UUID()
         reloadID = requestID
         loading = true
@@ -1008,6 +1312,159 @@ struct ReportsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do { try csv.write(to: url, atomically: true, encoding: .utf8) } catch { monitor.lastError = L("Export failed: %@", error.localizedDescription) }
         }
+    }
+}
+
+private struct HistoryNavigator: View {
+    enum DragMode { case start, pan, end }
+
+    var points: [SeriesPoint]
+    var contextPoints: [SeriesPoint]
+    var available: ClosedRange<Date>
+    var selection: HistoryWindow
+    var onCommit: (HistoryWindow) -> Void
+
+    @State private var draft: HistoryWindow?
+    @State private var dragMode: DragMode?
+    @State private var dragOrigin: HistoryWindow?
+    @State private var showsFullHistory = false
+
+    private var visible: HistoryWindow { draft ?? selection }
+    private var nearbyDomain: ClosedRange<Date> {
+        HistoryNavigatorDomain.range(available: available, selection: dragOrigin ?? visible)
+    }
+    private var usesNearbyDomain: Bool { nearbyDomain != available }
+    private var domain: ClosedRange<Date> { showsFullHistory ? available : nearbyDomain }
+    private var domainDuration: TimeInterval {
+        max(1, domain.upperBound.timeIntervalSince(domain.lowerBound))
+    }
+    private var plottedPoints: [SeriesPoint] {
+        let source = showsFullHistory || contextPoints.isEmpty ? points : contextPoints
+        return source.filter { domain.contains($0.date) }
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Text(showsFullHistory || !usesNearbyDomain ? L("Full history") : L("Nearby context"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if usesNearbyDomain {
+                    Button(showsFullHistory ? L("Nearby") : L("All history")) {
+                        showsFullHistory.toggle()
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.mini)
+                    .font(.caption2)
+                }
+            }
+            .padding(.horizontal, 2)
+
+            GeometryReader { geometry in
+                Canvas { context, size in
+                    drawOverview(context: &context, size: size)
+                    drawSelection(context: &context, size: size)
+                }
+                .contentShape(Rectangle())
+                .gesture(dragGesture(width: geometry.size.width))
+                .focusable()
+                .focusEffectDisabled()
+                .onMoveCommand { direction in
+                    let step = max(60, visible.duration * 0.1)
+                    switch direction {
+                    case .left: onCommit(visible.panned(by: -step, within: available))
+                    case .right: onCommit(visible.panned(by: step, within: available))
+                    default: break
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L("History range navigator"))
+                .accessibilityValue("\(visible.start.formatted(date: .abbreviated, time: .shortened)) – \(visible.end.formatted(date: .abbreviated, time: .shortened))")
+                .accessibilityHint(L("Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys."))
+                .accessibilityAdjustableAction { direction in
+                    let step = max(60, visible.duration * 0.1)
+                    switch direction {
+                    case .increment: onCommit(visible.panned(by: step, within: available))
+                    case .decrement: onCommit(visible.panned(by: -step, within: available))
+                    @unknown default: break
+                    }
+                }
+            }
+        }
+    }
+
+    private func x(for date: Date, width: CGFloat) -> CGFloat {
+        let offset = date.timeIntervalSince(domain.lowerBound)
+        return width * CGFloat(min(1, max(0, offset / domainDuration)))
+    }
+
+    private func drawOverview(context: inout GraphicsContext, size: CGSize) {
+        let surface = Path(CGRect(origin: .zero, size: size))
+        context.fill(surface, with: .color(FL.surface2))
+        guard !plottedPoints.isEmpty,
+              let peak = plottedPoints.map(\.total).max(), peak > 0 else { return }
+        var path = Path()
+        for (index, point) in plottedPoints.enumerated() {
+            let px = x(for: point.date, width: size.width)
+            let ratio = CGFloat(Double(point.total) / Double(peak))
+            let py = size.height - 6 - ratio * max(1, size.height - 12)
+            if index == 0 { path.move(to: CGPoint(x: px, y: py)) }
+            else { path.addLine(to: CGPoint(x: px, y: py)) }
+        }
+        context.stroke(path, with: .color(FL.accent.opacity(0.7)), lineWidth: 1.5)
+    }
+
+    private func brushBounds(width: CGFloat) -> (start: CGFloat, end: CGFloat) {
+        let actualStart = x(for: visible.start, width: width)
+        let actualEnd = x(for: visible.end, width: width)
+        let minimumWidth = min(32, width)
+        guard actualEnd - actualStart < minimumWidth else { return (actualStart, actualEnd) }
+
+        let proposedStart = (actualStart + actualEnd - minimumWidth) / 2
+        let start = min(max(0, proposedStart), max(0, width - minimumWidth))
+        return (start, start + minimumWidth)
+    }
+
+    private func drawSelection(context: inout GraphicsContext, size: CGSize) {
+        let (startX, endX) = brushBounds(width: size.width)
+        let rect = CGRect(x: startX, y: 1, width: endX - startX, height: max(2, size.height - 2))
+        context.fill(Path(rect), with: .color(FL.accent.opacity(0.14)))
+        context.stroke(Path(rect), with: .color(FL.accent.opacity(0.8)), lineWidth: 1)
+        for handleX in [startX, endX] {
+            let handle = CGRect(x: handleX - 2, y: size.height / 2 - 10, width: 4, height: 20)
+            context.fill(Path(roundedRect: handle, cornerRadius: 2), with: .color(FL.accent))
+        }
+    }
+
+    private func dragGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if dragMode == nil {
+                    let (startX, endX) = brushBounds(width: width)
+                    dragMode = abs(value.startLocation.x - startX) <= 14 ? .start
+                        : abs(value.startLocation.x - endX) <= 14 ? .end : .pan
+                    dragOrigin = visible
+                }
+                guard let dragMode, let origin = dragOrigin else { return }
+                let delta = domainDuration * Double(value.translation.width / max(1, width))
+                switch dragMode {
+                case .start:
+                    draft = origin.resized(start: origin.start.addingTimeInterval(delta), end: origin.end,
+                                           within: available, minimumDuration: 60)
+                case .end:
+                    draft = origin.resized(start: origin.start, end: origin.end.addingTimeInterval(delta),
+                                           within: available, minimumDuration: 60)
+                case .pan:
+                    draft = origin.panned(by: delta, within: available)
+                }
+            }
+            .onEnded { _ in
+                if let draft { onCommit(draft) }
+                self.draft = nil
+                dragOrigin = nil
+                dragMode = nil
+            }
     }
 }
 

@@ -210,6 +210,16 @@ enum VisualizeActionScope {
     }
 }
 
+enum ConnectionsRenderPolicy {
+    static func showsLoading(isLoading: Bool, hasSnapshot: Bool) -> Bool {
+        isLoading || !hasSnapshot
+    }
+
+    static func canCommit(requestID: UUID, currentID: UUID, cancelled: Bool) -> Bool {
+        !cancelled && requestID == currentID
+    }
+}
+
 struct VisualizeView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case traffic, ai
@@ -247,8 +257,9 @@ struct VisualizeView: View {
     @State private var selectedSources: Set<TrafficGraphNodeID> = []
     @State private var selectedDestinations: Set<TrafficGraphNodeID> = []
     @State private var query = ""
-    @State private var loading = false
+    @State private var loading = true
     @State private var loadID = UUID()
+    @State private var rebuildID = UUID()
 
     private var endDate: Date { Date() }
     private var startDate: Date { endDate.addingTimeInterval(-granularity.defaultWindow) }
@@ -284,8 +295,11 @@ struct VisualizeView: View {
             toolbar
             endpointToolbar
             Divider()
-            if completeSnapshot.nodes.isEmpty, loading {
-                ProgressView(L("Loading visualization…"))
+            if ConnectionsRenderPolicy.showsLoading(
+                isLoading: loading,
+                hasSnapshot: !completeSnapshot.nodes.isEmpty
+            ) {
+                TrafficGraphLoadingView(reduceMotion: reduceMotion)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if completeSnapshot.nodes.isEmpty {
                 emptyState
@@ -296,7 +310,7 @@ struct VisualizeView: View {
             }
         }
         .background(FL.ground)
-        .navigationTitle(L("Visualize"))
+        .navigationTitle(L("Connections"))
         .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, or IP"))
         .task { workspaceStore.refresh(gatewaysOnly: true) }
         .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope,
@@ -309,13 +323,14 @@ struct VisualizeView: View {
                 if !Task.isCancelled { await reload() }
             }
         }
-        .task(id: RebuildKey(loadID: loadID, query: query, mode: mode,
+        .task(id: RebuildKey(loadID: rebuildID, query: query, mode: mode,
                              focus: focus.scope, gatewayVersion: gatewayVersion,
                              selectedSources: selectedSources,
                              selectedDestinations: selectedDestinations,
                              expandedGroupIDs: expandedGroupIDs,
                              expandedEdgeGroupIDs: expandedEdgeGroupIDs)) { await rebuild() }
         .onChange(of: mode) { _, _ in
+            loading = true
             rows = []
             completeSnapshot = .empty
             mapSnapshot = .empty
@@ -329,11 +344,16 @@ struct VisualizeView: View {
             selectedSources = []
             selectedDestinations = []
             loadID = UUID()
+            rebuildID = UUID()
         }
         .onChange(of: granularity) { _, _ in
+            loading = true
+            completeSnapshot = .empty
+            mapSnapshot = .empty
             listVisibleCount = TrafficGraphListPager.pageSize
         }
         .onChange(of: focus.scope) { _, _ in
+            beginRebuild()
             listVisibleCount = TrafficGraphListPager.pageSize
             expandedGroupIDs = []
             expandedEdgeGroupIDs = []
@@ -341,6 +361,7 @@ struct VisualizeView: View {
             selectedEdge = nil
         }
         .onChange(of: query) { previous, current in
+            beginRebuild()
             listVisibleCount = TrafficGraphListPager.pageSize
             expandedGroupIDs = []
             expandedEdgeGroupIDs = []
@@ -404,12 +425,12 @@ struct VisualizeView: View {
                 }
                 .buttonStyle(.borderless)
             }
-            Picker(L("Mode"), selection: $mode) {
+            Picker(L("Mode"), selection: Binding(get: { mode }, set: changeMode)) {
                 ForEach(Mode.allCases) { Label($0.title, systemImage: $0.icon).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 220)
-            Picker(L("Period"), selection: $granularity) {
+            Picker(L("Period"), selection: Binding(get: { granularity }, set: changeGranularity)) {
                 ForEach(Granularity.allCases) { Text($0.title).tag($0) }
             }
             .labelsHidden()
@@ -526,11 +547,40 @@ struct VisualizeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func changeMode(_ next: Mode) {
+        guard next != mode else { return }
+        beginDataTransition()
+        mode = next
+    }
+
+    private func changeGranularity(_ next: Granularity) {
+        guard next != granularity else { return }
+        beginDataTransition()
+        granularity = next
+    }
+
+    private func beginDataTransition() {
+        loading = true
+        loadID = UUID()
+        rebuildID = UUID()
+        rows = []
+        blockedAttempts = []
+        completeSnapshot = .empty
+        mapSnapshot = .empty
+    }
+
+    private func beginRebuild() {
+        loading = true
+        rebuildID = UUID()
+        completeSnapshot = .empty
+        mapSnapshot = .empty
+    }
+
     @MainActor
     private func reload() async {
         let requestID = UUID()
         loadID = requestID
-        loading = true
+        if completeSnapshot.nodes.isEmpty { loading = true }
         let granularity = granularity
         let mode = mode
         let to = Date()
@@ -547,23 +597,32 @@ struct VisualizeView: View {
                 let attempts = try database.blockedAttempts(from: from, to: to)
                 return (rows, attempts)
             }
-            guard !Task.isCancelled, loadID == requestID else { return }
+            guard ConnectionsRenderPolicy.canCommit(
+                requestID: requestID,
+                currentID: loadID,
+                cancelled: Task.isCancelled
+            ) else { return }
             rows = loaded.0
             blockedAttempts = loaded.1
-            loading = false
-            loadID = UUID()
+            rebuildID = UUID()
         } catch {
-            guard !Task.isCancelled, loadID == requestID else { return }
+            guard ConnectionsRenderPolicy.canCommit(
+                requestID: requestID,
+                currentID: loadID,
+                cancelled: Task.isCancelled
+            ) else { return }
             rows = []
             blockedAttempts = []
+            completeSnapshot = .empty
+            mapSnapshot = .empty
             loading = false
-            loadID = UUID()
             monitor.lastError = error.localizedDescription
         }
     }
 
     @MainActor
     private func rebuild() async {
+        let requestID = rebuildID
         let source = rows
         let enforcement = blockedAttempts
         let gateways = agentGateways
@@ -627,7 +686,11 @@ struct VisualizeView: View {
                 )
             }
         }.value
-        guard !Task.isCancelled else { return }
+        guard ConnectionsRenderPolicy.canCommit(
+            requestID: requestID,
+            currentID: rebuildID,
+            cancelled: Task.isCancelled
+        ) else { return }
         let validSources = VisualizeSelectionPolicy.validEndpointSelection(
             endpointQuery.sources,
             options: built.sourceOptions
@@ -656,9 +719,11 @@ struct VisualizeView: View {
             current: listVisibleCount,
             in: built.complete
         )
+        loading = false
     }
 
     private func resetEndpointContext() {
+        beginRebuild()
         listVisibleCount = TrafficGraphListPager.pageSize
         expandedGroupIDs = []
         expandedEdgeGroupIDs = []

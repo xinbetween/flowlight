@@ -13,6 +13,8 @@ final class ExtensionManager: NSObject, ObservableObject {
         /// macOS accepted the replacement but will not perform it until the Mac restarts. Nothing the app does
         /// changes that: the extension's lifecycle belongs to the system, not to this process.
         case needsReboot
+        var showsMenuBarNotice: Bool { self == .needsReboot }
+
         var label: String {
             switch self {
             case .unknown: return L("Unknown")

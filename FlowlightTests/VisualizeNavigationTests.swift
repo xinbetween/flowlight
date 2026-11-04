@@ -40,9 +40,23 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarItem.rules.shortcut, "5")
     }
 
-    func testVisualizeUsesItsOwnHelpSection() {
+    func testConnectionsKeepsTheCompatibleVisualizeRouteAndHelpAnchor() {
+        XCTAssertEqual(SidebarItem.visualize.rawValue, "visualize")
         XCTAssertEqual(SidebarItem.visualize.helpAnchor, "visualize")
-        XCTAssertEqual(SidebarItem.visualize.englishTitle, "Visualize")
+        XCTAssertEqual(SidebarItem.visualize.englishTitle, "Connections")
+    }
+
+    func testConnectionsLoadingAlwaysOutranksAStaleSnapshot() {
+        XCTAssertTrue(ConnectionsRenderPolicy.showsLoading(isLoading: true, hasSnapshot: true))
+        XCTAssertTrue(ConnectionsRenderPolicy.showsLoading(isLoading: true, hasSnapshot: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.showsLoading(isLoading: false, hasSnapshot: true))
+    }
+
+    func testConnectionsRejectsAStaleAsyncCompletion() {
+        let current = UUID()
+        XCTAssertTrue(ConnectionsRenderPolicy.canCommit(requestID: current, currentID: current, cancelled: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.canCommit(requestID: UUID(), currentID: current, cancelled: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.canCommit(requestID: current, currentID: current, cancelled: true))
     }
 
     func testCrossScreenBackRestoresReportOriginAndScope() {
@@ -52,6 +66,7 @@ final class VisualizeNavigationTests: XCTestCase {
 
         nav.showReport(filter: reportFilter, granularity: .hour, end: Date(timeIntervalSince1970: 42))
         nav.updateCurrentReportScope(filter: reportFilter, granularity: .hour,
+                                     startDate: Date(timeIntervalSince1970: 0),
                                      endDate: Date(timeIntervalSince1970: 42), followNow: false)
         nav.showInspect(app: ("claude", "Claude Code"), host: "api.anthropic.com")
 

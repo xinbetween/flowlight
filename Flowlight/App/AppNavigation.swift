@@ -39,8 +39,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .live: return "Live"
         case .agents: return "AI Agents"
-        case .reports: return "Reports"
-        case .visualize: return "Visualize"
+        case .reports: return "History"
+        case .visualize: return "Connections"
         case .alerts: return "Alerts"
         case .rules: return "Rules"
         case .ask: return "Ask"
@@ -55,8 +55,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .live: return L("Live")
         case .agents: return L("AI Agents")
-        case .reports: return L("Reports")
-        case .visualize: return L("Visualize")
+        case .reports: return L("History")
+        case .visualize: return L("Connections")
         case .alerts: return L("Alerts")
         case .rules: return L("Rules")
         case .ask: return L("Ask")
@@ -157,6 +157,7 @@ struct RuleRequest: Equatable {
 struct ReportRequest: Equatable {
     var filter: TrafficFilter
     var granularity: Granularity?
+    var start: Date? = nil
     var end: Date?
     var id = UUID()
 }
@@ -192,8 +193,9 @@ final class AppNavigation: ObservableObject {
     }
 
     func updateCurrentReportScope(filter: TrafficFilter, granularity: Granularity,
-                                  endDate: Date, followNow: Bool) {
+                                  startDate: Date, endDate: Date, followNow: Bool) {
         currentReportScope = ReportRequest(filter: filter, granularity: granularity,
+                                           start: followNow ? nil : startDate,
                                            end: followNow ? nil : endDate)
     }
 
@@ -224,8 +226,10 @@ final class AppNavigation: ObservableObject {
         rulesTab = .packs
     }
 
-    func showReport(filter: TrafficFilter, granularity: Granularity? = nil, end: Date? = nil) {
-        reportRequest = ReportRequest(filter: filter, granularity: granularity, end: end)
+    func showReport(filter: TrafficFilter, granularity: Granularity? = nil,
+                    start: Date? = nil, end: Date? = nil) {
+        reportRequest = ReportRequest(filter: filter, granularity: granularity,
+                                      start: start, end: end)
         followLink(to: .reports)
     }
 

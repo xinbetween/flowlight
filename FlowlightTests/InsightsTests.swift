@@ -155,6 +155,12 @@ final class InsightsTests: XCTestCase {
         XCTAssertNil(InsightEntity.other.narrowing(.none))
     }
 
+    func testReportHoverCardTracksTheCursorLineAndFlipsAtTheEdge() {
+        XCTAssertEqual(ReportChartHoverLayout.cardX(lineX: 100, chartWidth: 1_000), 108)
+        XCTAssertEqual(ReportChartHoverLayout.cardX(lineX: 900, chartWidth: 1_000), 632)
+        XCTAssertEqual(ReportChartHoverLayout.cardX(lineX: 10, chartWidth: 200), 0)
+    }
+
     func testReportChartKeyboardSelectionMovesAcrossBuckets() {
         let dates = [10.0, 20.0, 30.0].map(Date.init(timeIntervalSince1970:))
 
@@ -163,6 +169,53 @@ final class InsightsTests: XCTestCase {
         XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[1], direction: .left, dates: dates), dates[0])
         XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[0], direction: .left, dates: dates), dates[0])
         XCTAssertNil(ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: []))
+    }
+
+    func testHistoryPresetUsesAnIndependentVisibleWindowAndResolution() {
+        let end = Date(timeIntervalSince1970: 2_000_000)
+        let available = Date(timeIntervalSince1970: 0)...end
+        let window = HistoryRangePreset.oneWeek.window(endingAt: end, available: available)
+
+        XCTAssertEqual(window.duration, 7 * 86_400, accuracy: 0.5)
+        XCTAssertEqual(window.granularity, .hour)
+        XCTAssertTrue(window.followNow)
+
+        let minuteWindow = HistoryRangePreset.fifteenMinutes.window(endingAt: end, available: available)
+        XCTAssertEqual(minuteWindow.duration, 15 * 60, accuracy: 0.5)
+        XCTAssertEqual(minuteWindow.granularity, .minute)
+    }
+
+    func testHistoryNavigatorMagnifiesShortRangesWithoutLosingTheFullBounds() {
+        let end = Date(timeIntervalSince1970: 30 * 86_400)
+        let available = Date(timeIntervalSince1970: 0)...end
+        let selection = HistoryWindow(start: end.addingTimeInterval(-15 * 60),
+                                      end: end,
+                                      followNow: true)
+
+        let nearby = HistoryNavigatorDomain.range(available: available, selection: selection)
+        XCTAssertEqual(nearby.upperBound, available.upperBound)
+        XCTAssertEqual(nearby.upperBound.timeIntervalSince(nearby.lowerBound), 6 * 3_600, accuracy: 0.5)
+        XCTAssertTrue(nearby.contains(selection.start))
+        XCTAssertTrue(nearby.contains(selection.end))
+    }
+
+    func testHistoryWindowClampsPanAndResizeToAvailableEvidence() {
+        let available = Date(timeIntervalSince1970: 100)...Date(timeIntervalSince1970: 1_100)
+        let window = HistoryWindow(start: Date(timeIntervalSince1970: 300),
+                                   end: Date(timeIntervalSince1970: 500),
+                                   followNow: false)
+
+        let earlier = window.panned(by: -500, within: available)
+        XCTAssertEqual(earlier.start, available.lowerBound)
+        XCTAssertEqual(earlier.end.timeIntervalSince(earlier.start), 200, accuracy: 0.5)
+
+        let resized = window.resized(start: Date(timeIntervalSince1970: 450),
+                                     end: Date(timeIntervalSince1970: 451),
+                                     within: available,
+                                     minimumDuration: 60)
+        XCTAssertEqual(resized.duration, 60, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(resized.start, available.lowerBound)
+        XCTAssertLessThanOrEqual(resized.end, available.upperBound)
     }
 
     func testReportNavigationHistoryRestoresTheCompleteFilter() {
