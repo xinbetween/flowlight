@@ -451,17 +451,18 @@ comes after publication so the site can only ever describe something downloadabl
 force-push or move a pushed version. If a tag is wrong or a release needs another change, bump the patch version and
 begin a new release branch and tag.
 
-A tag push starts `release.yml` automatically in dry-run-only mode; push-triggered runs cannot publish. It must build,
-sign, notarize and pass Gatekeeper verification before an explicit production dispatch for the immutable tag. After
-production succeeds, verify the GitHub release page and downloaded DMG, PKG and
-`SHA256SUMS.txt` checksums before merging the release PR.
+A tag push starts `release.yml` automatically in dry-run-only mode; push-triggered runs cannot publish. It first
+requires an open or merged `main` pull request and the latest successful CI and CodeQL checks at the exact tagged
+commit, rather than running the same test suite a second time. It must then build, sign, notarize and pass Gatekeeper
+verification before an explicit production dispatch for the immutable tag. After production succeeds, verify the
+GitHub release page and downloaded DMG, PKG and `SHA256SUMS.txt` checksums before merging the release PR.
 
 ## Releasing from CI
 
-`.github/workflows/release.yml` checks the tag matches `MARKETING_VERSION`, runs the tests, signs, notarizes and
-verifies with `spctl`. A tag push always stops there; an explicit dispatch for that tag publishes the release and updates
-the Homebrew cask. `.github/workflows/ci.yml` builds and tests every push and pull request, and fails if `docs/` is out
-of date with `site/`.
+`.github/workflows/release.yml` checks the tag matches `MARKETING_VERSION`, verifies the exact commit already passed
+the required PR CI and CodeQL checks, then signs, notarizes and verifies with `spctl`. A tag push always stops there;
+an explicit dispatch for that tag publishes the release and updates the Homebrew cask. `.github/workflows/ci.yml`
+builds and tests every push and pull request, and fails if `docs/` is out of date with `site/`.
 
 ```sh
 scripts/ci-secrets.sh                                  # upload the secrets once
