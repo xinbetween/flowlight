@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "screenshots": {
+    "agent-detail.png": {
+      "height": 1988,
+      "sha256": "ac80daa5d6e4873c09ff587e5777b25d1f5ef518d40f16cead97fa16fa92519b",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "agent-tools.png": {
+      "height": 1424,
+      "sha256": "28ded766cff3de5e0b16150f9ca71aa03c1a71e7e4289a3c60c73105cd55f2c6",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "agents.png": {
+      "height": 1988,
+      "sha256": "474c014faa6ea955c31c2a2be33d79a107545439e48524c7e0721fdfb2c4beb6",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "alerts.png": {
+      "height": 1988,
+      "sha256": "f85e2dbd213ce5e683e49da76b44c0632342374f3e91d70ed9d7dabbd74ac9e7",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "always-monitor.png": {
+      "height": 1988,
+      "sha256": "35705e00b12c44d8ff2f8b9303beb5315e57235c09f96bb9628a43c442b390ea",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "inspect.png": {
+      "height": 1988,
+      "sha256": "8e38acb6cdbc200c50f31aa4fc221db998d4fb9b2e429dc4b6140fd3eb8f3fd4",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "live.png": {
+      "height": 1988,
+      "sha256": "264e60b78c786ad60d83271ab1d7ed0aae61091e6fa9c17ba2af5ca0c38ad269",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "mcp-servers.png": {
+      "height": 1424,
+      "sha256": "d48c5dcedb58d1bafc3c4bbb5bdc2024a2379550737ce019de62d642cd7f1e39",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "reports.png": {
+      "height": 1988,
+      "sha256": "dfa6af58c9d504ca3a2959dda551fbec3880190e44153036917bd726c09f75db",
+      "version": "0.17.1",
+      "width": 3200
+    },
+    "visualize.png": {
+      "height": 1988,
+      "sha256": "fb66b26178b8e0f3928848a8073660615dbc9dbb377f65a43d49eb62352284fc",
+      "version": "0.17.1",
+      "width": 3200
+    }
+  }
+}

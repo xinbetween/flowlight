@@ -65,7 +65,6 @@
 /* App/AppNavigation.swift */
 "Live" = "即時";
 "AI Agents" = "AI 代理";
-"Reports" = "報告";
 "Alerts" = "警示";
 "Rules" = "規則";
 "Ask" = "提問";
@@ -344,7 +343,7 @@
 "flowlight" = "flowlight";
 "Include this Mac's host name" = "包含這台 Mac 的主機名稱";
 "What Flowlight sends" = "Flowlight 傳送的內容";
-"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "一筆彙總資料是一個 App、一個主機名稱和一個 IP 位址在該時間範圍內的累加，精細度與「報告」相同，以分鐘為單位 — 絕不是逐條連線，也絕不是逐個封包。彙總資料大約延後兩分鐘送出，等它所屬的那一分鐘結束之後；警示則在發出時立即送出。連不上的收集器會以逐漸拉長的間隔重試，在它無法連線期間，最多保留 10,000 筆記錄。";
+"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "一筆彙總資料是一個 App、一個主機名稱和一個 IP 位址在該時間範圍內的累加，精細度與「歷史記錄」相同，以分鐘為單位 — 絕不是逐條連線，也絕不是逐個封包。彙總資料大約延後兩分鐘送出，等它所屬的那一分鐘結束之後；警示則在發出時立即送出。連不上的收集器會以逐漸拉長的間隔重試，在它無法連線期間，最多保留 10,000 筆記錄。";
 "Every field that can leave this Mac (%lld)" = "所有可能離開這台 Mac 的欄位（%lld）";
 "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export." = "這份清單就是全部 — 它是由建立傳送內容所用的同一份宣告產生的，所以不會落後於程式碼。無論格式為何、無論還開啟了什麼，以下內容一律不會送出：HTTPS 檢查記錄的任何東西。請求與回應的標頭、內文、工具呼叫，以及任何解密後交換的內容，都沒有任何管道進入匯出資料。";
 "Show What Would Be Sent…" = "顯示將傳送的內容…";
@@ -361,7 +360,7 @@
 "Dropped" = "已丟棄";
 "Retrying" = "重試中";
 "Status" = "狀態";
-"Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "匯出是以 Flowlight 自己的流量送出的，所以你會像看其他 App 一樣，在「即時」和「報告」中看到它們；而第一次送到新的地方時，你會收到一則關於 Flowlight 的首次連線警示。";
+"Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "匯出是以 Flowlight 自己的流量送出的，所以你會像看其他 App 一樣，在「即時」和「歷史記錄」中看到它們；而第一次送到新的地方時，你會收到一則關於 Flowlight 的首次連線警示。";
 "What would be sent" = "將傳送的內容";
 "Copy" = "拷貝";
 "Done" = "完成";
@@ -465,7 +464,7 @@
 "%@ of this agent's uploads went to non-AI hosts" = "這個代理有 %@ 的上傳量送到了非 AI 主機";
 "Allowlist" = "允許清單";
 "Risk" = "風險";
-"Show Traffic in Reports" = "在「報告」中顯示流量";
+"Show Traffic in History" = "在「歷史記錄」中顯示流量";
 "None seen" = "未看到任何項目";
 "Large upload" = "大量上傳";
 "%@ sent to hosts that aren't AI providers" = "已傳送 %@ 到非 AI 供應商的主機";
@@ -504,7 +503,7 @@
 "MCP servers (%lld)" = "MCP 伺服器（%lld）";
 "MCP servers" = "MCP 伺服器";
 "Guardrails" = "防護機制";
-"Open in Reports" = "在「報告」中開啟";
+"Open in History" = "在「歷史記錄」中開啟";
 "Only AI providers. Nothing else was contacted." = "只有 AI 供應商，沒有連線其他目標。";
 "the tool calls its model asks for" = "它的模型要求的工具呼叫";
 "tool calls" = "工具呼叫";
@@ -639,7 +638,7 @@
 "Documentation" = "說明文件";
 "1 query · %@" = "1 個查詢 · %@";
 "%lld queries · %@" = "%lld 個查詢 · %@";
-"Open these rows in Reports" = "在「報告」中開啟這些列";
+"Open these rows in History" = "在「歷史記錄」中開啟這些列";
 "Answered on this Mac · %@" = "在這台 Mac 上作答 · %@";
 "1 request left this Mac · %@" = "1 個請求離開了這台 Mac · %@";
 "%lld requests left this Mac · %@" = "%lld 個請求離開了這台 Mac · %@";
@@ -1045,13 +1044,13 @@
 "Zero" = "零";
 "Last 2 minutes" = "最近 2 分鐘";
 "Application" = "應用程式";
-"%@\nDouble-click to open in Reports" = "%@\n按兩下可在「報告」中開啟";
+"%@\nDouble-click to open in History" = "%@\n按兩下可在「歷史記錄」中開啟";
 "↓ In" = "↓ 接收";
 "↑ Out" = "↑ 傳送";
 "Session ↓" = "工作階段 ↓";
 "Session ↑" = "工作階段 ↑";
 "Busiest destination" = "最忙碌的目標";
-"Show in Reports" = "在「報告」中顯示";
+"Show in History" = "在「歷史記錄」中顯示";
 "Copy Bundle ID" = "拷貝 Bundle ID";
 "Top talkers · average of the last 5 seconds" = "流量最高的項目 · 最近 5 秒的平均值";
 "The network is quiet" = "網路很安靜";
@@ -1288,7 +1287,7 @@
 "Nothing is being refused until %@." = "在 %@ 之前不會拒絕任何連線。";
 "Resume now" = "立即恢復";
 "No rules yet" = "還沒有任何規則";
-"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "一條規則會指名某個對象 — App、代理、目標或 URL — 並決定封鎖或允許。在「即時」、「報告」、「AI 代理」或「檢查」中對任一列按右鍵，就能針對你正在看的東西寫一條規則；也可以從範本庫開始 — 它已經知道安裝套件會連到哪些主機，以及檔案通常是從哪些主機離開的。";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "一條規則會指名某個對象 — App、代理、目標或 URL — 並決定封鎖或允許。在「即時」、「歷史記錄」、「AI 代理」或「檢查」中對任一列按右鍵，就能針對你正在看的東西寫一條規則；也可以從範本庫開始 — 它已經知道安裝套件會連到哪些主機，以及檔案通常是從哪些主機離開的。";
 "Browse Templates…" = "瀏覽範本…";
 "Write One…" = "自己寫一條…";
 "Nothing yet" = "還沒有任何項目";
@@ -1364,7 +1363,7 @@
 "First contact with a new domain" = "首次連線新網域";
 "Connections to non-standard ports" = "連線到非標準連接埠";
 "Ignore Apple's own apps" = "忽略 Apple 內建 App";
-"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS 會不斷與 Apple 通訊 — 更新、iCloud、推播、時間 — 把這些全部報告出來，只會埋掉真正重要的那一行。這些流量仍然會被記錄，仍然會顯示在「即時」和「報告」中，也仍然受所有規則和防護機制約束。";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail." = "macOS 會不斷與 Apple 通訊 — 更新、iCloud、推播、時間 — 把這些全部歷史記錄出來，只會埋掉真正重要的那一行。這些流量仍然會被記錄，仍然會顯示在「即時」和「歷史記錄」中，也仍然受所有規則和防護機制約束。";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "代理使用郵件、檔案傳輸、SSH、通道或資料庫";
 "Agent connects to a raw IP on an unusual port" = "代理透過異常連接埠連線裸 IP";
 "Uploads to non-AI hosts above" = "上傳至非 AI 主機超過";
@@ -1617,7 +1616,7 @@
 "Reinstall Filter" = "Reinstall Filter";
 "Potential harm" = "Potential harm";
 "Show only medium and high local risk assessments" = "Show only medium and high local risk assessments";
-"Turn on Local risk analysis in Reports or Settings to use this filter" = "Turn on Local risk analysis in Reports or Settings to use this filter";
+"Turn on Local risk analysis in History or Settings to use this filter" = "Turn on Local risk analysis in History or Settings to use this filter";
 "Showing only requests with medium or high potential harm" = "Showing only requests with medium or high potential harm";
 "Response modified" = "Response modified";
 "%@ answered, then Flowlight changed the response using %@ before the app received it" = "%@ answered, then Flowlight changed the response using %@ before the app received it";
@@ -1819,7 +1818,7 @@
 "Showing %lld of %lld relationships" = "正在顯示 %2$lld 個關係中的 %1$lld 個";
 "Show %lld more relationships" = "再顯示 %lld 個關係";
 "Loads the next page without changing the Map" = "載入下一頁而不變更地圖";
-"Select a relationship for an exact Reports scope." = "請選取一個關係以取得精確的報告範圍。";
+"Select a relationship for an exact History scope." = "請選取一個關係以取得精確的歷史記錄範圍。";
 "Period" = "期間";
 "No traffic to visualize" = "沒有可視覺化的流量";
 "Flowlight has not observed any connections in this period." = "Flowlight 在此期間未觀察到任何連線。";
@@ -1865,7 +1864,7 @@
 "Select to inspect this connection" = "選取以檢查此連線";
 "%lld exact destinations" = "%lld 個精確目的地";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ 到 %@，接收 %@，傳送 %@，%lld 個連線";
-"Show domain family in Reports" = "在報告中顯示網域族";
+"Show domain family in History" = "在歷史記錄中顯示網域族";
 
 /* 0.17.0 History and Connections */
 "1 mo" = "1 個月";

@@ -65,7 +65,6 @@
 /* App/AppNavigation.swift */
 "Live" = "실시간";
 "AI Agents" = "AI 에이전트";
-"Reports" = "보고서";
 "Alerts" = "알림";
 "Rules" = "규칙";
 "Ask" = "질문";
@@ -344,7 +343,7 @@
 "flowlight" = "flowlight";
 "Include this Mac's host name" = "이 Mac의 호스트 이름 포함";
 "What Flowlight sends" = "Flowlight가 보내는 내용";
-"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "집계는 앱 하나, 호스트 이름 하나, IP 주소 하나를 해당 기간 동안 합한 것이며, 보고서와 같은 분 단위를 씁니다. 연결별이나 패킷별로는 절대 보내지 않습니다. 집계는 해당 분이 끝난 뒤 약 2분 늦게 전송되고, 알림은 발생하는 즉시 전송됩니다. 연결할 수 없는 컬렉터에는 간격을 늘려가며 재시도하며, 그동안 최대 10,000개의 레코드를 보관합니다.";
+"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "집계는 앱 하나, 호스트 이름 하나, IP 주소 하나를 해당 기간 동안 합한 것이며, 기록와 같은 분 단위를 씁니다. 연결별이나 패킷별로는 절대 보내지 않습니다. 집계는 해당 분이 끝난 뒤 약 2분 늦게 전송되고, 알림은 발생하는 즉시 전송됩니다. 연결할 수 없는 컬렉터에는 간격을 늘려가며 재시도하며, 그동안 최대 10,000개의 레코드를 보관합니다.";
 "Every field that can leave this Mac (%lld)" = "이 Mac을 떠날 수 있는 모든 필드 (%lld)";
 "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export." = "이 목록이 전부입니다. 페이로드를 만드는 것과 같은 선언에서 생성되므로 코드와 어긋날 수 없습니다. 어떤 형식에서든, 다른 무엇을 켜 두었든 절대 전송되지 않는 것은 HTTPS 검사가 기록한 내용입니다. 요청과 응답의 헤더, 본문, 도구 호출, 복호화된 교환의 내용은 내보내기로 나갈 경로가 없습니다.";
 "Show What Would Be Sent…" = "보낼 내용 보기…";
@@ -361,7 +360,7 @@
 "Dropped" = "버려짐";
 "Retrying" = "재시도 중";
 "Status" = "상태";
-"Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "내보내기는 Flowlight 자신의 트래픽으로 나가므로 다른 앱과 마찬가지로 실시간과 보고서에 표시되며, 처음 새로운 곳으로 전송될 때는 Flowlight에 대한 첫 연결 알림이 발생합니다.";
+"Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "내보내기는 Flowlight 자신의 트래픽으로 나가므로 다른 앱과 마찬가지로 실시간과 기록에 표시되며, 처음 새로운 곳으로 전송될 때는 Flowlight에 대한 첫 연결 알림이 발생합니다.";
 "What would be sent" = "보낼 내용";
 "Copy" = "복사";
 "Done" = "완료";
@@ -465,7 +464,7 @@
 "%@ of this agent's uploads went to non-AI hosts" = "이 에이전트의 업로드 중 AI 외 호스트로 간 양: %@";
 "Allowlist" = "허용 목록";
 "Risk" = "위험도";
-"Show Traffic in Reports" = "보고서에서 트래픽 보기";
+"Show Traffic in History" = "기록에서 트래픽 보기";
 "None seen" = "확인된 항목 없음";
 "Large upload" = "대용량 업로드";
 "%@ sent to hosts that aren't AI providers" = "AI 제공업체가 아닌 호스트로 %@ 전송";
@@ -504,7 +503,7 @@
 "MCP servers (%lld)" = "MCP 서버 (%lld)";
 "MCP servers" = "MCP 서버";
 "Guardrails" = "가드레일";
-"Open in Reports" = "보고서에서 열기";
+"Open in History" = "기록에서 열기";
 "Only AI providers. Nothing else was contacted." = "AI 제공업체뿐입니다. 그 외에는 연결하지 않았습니다.";
 "the tool calls its model asks for" = "모델이 요청하는 도구 호출";
 "tool calls" = "도구 호출";
@@ -639,7 +638,7 @@
 "Documentation" = "문서";
 "1 query · %@" = "질의 1개 · %@";
 "%lld queries · %@" = "질의 %lld개 · %@";
-"Open these rows in Reports" = "이 행을 보고서에서 열기";
+"Open these rows in History" = "이 행을 기록에서 열기";
 "Answered on this Mac · %@" = "이 Mac에서 답변함 · %@";
 "1 request left this Mac · %@" = "요청 1건이 이 Mac을 떠났습니다 · %@";
 "%lld requests left this Mac · %@" = "요청 %lld건이 이 Mac을 떠났습니다 · %@";
@@ -1045,13 +1044,13 @@
 "Zero" = "0";
 "Last 2 minutes" = "최근 2분";
 "Application" = "응용 프로그램";
-"%@\nDouble-click to open in Reports" = "%@\n두 번 클릭하면 보고서에서 열립니다";
+"%@\nDouble-click to open in History" = "%@\n두 번 클릭하면 기록에서 열립니다";
 "↓ In" = "↓ 수신";
 "↑ Out" = "↑ 송신";
 "Session ↓" = "세션 ↓";
 "Session ↑" = "세션 ↑";
 "Busiest destination" = "가장 바쁜 목적지";
-"Show in Reports" = "보고서에서 보기";
+"Show in History" = "기록에서 보기";
 "Copy Bundle ID" = "번들 ID 복사";
 "Top talkers · average of the last 5 seconds" = "통신량 상위 · 최근 5초 평균";
 "The network is quiet" = "네트워크가 조용합니다";
@@ -1288,7 +1287,7 @@
 "Nothing is being refused until %@." = "%@까지는 아무것도 거부하지 않습니다.";
 "Resume now" = "지금 다시 시작";
 "No rules yet" = "아직 규칙이 없습니다";
-"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "규칙은 앱, 에이전트, 목적지 또는 URL을 지정하고 차단할지 허용할지 정합니다. 실시간, 보고서, AI 에이전트, 검사 화면에서 아무 행이나 오른쪽 클릭하면 지금 보고 있는 대상에 대한 규칙을 바로 작성할 수 있고, 라이브러리에서 시작할 수도 있습니다. 라이브러리는 패키지 설치가 어떤 호스트에 연결하는지, 파일이 어떤 호스트로 빠져나가는지 이미 알고 있습니다.";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "규칙은 앱, 에이전트, 목적지 또는 URL을 지정하고 차단할지 허용할지 정합니다. 실시간, 기록, AI 에이전트, 검사 화면에서 아무 행이나 오른쪽 클릭하면 지금 보고 있는 대상에 대한 규칙을 바로 작성할 수 있고, 라이브러리에서 시작할 수도 있습니다. 라이브러리는 패키지 설치가 어떤 호스트에 연결하는지, 파일이 어떤 호스트로 빠져나가는지 이미 알고 있습니다.";
 "Browse Templates…" = "템플릿 둘러보기…";
 "Write One…" = "직접 작성…";
 "Nothing yet" = "아직 없음";
@@ -1364,7 +1363,7 @@
 "First contact with a new domain" = "새 도메인에 대한 첫 연결";
 "Connections to non-standard ports" = "비표준 포트 연결";
 "Ignore Apple's own apps" = "Apple 기본 앱 무시";
-"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS는 업데이트, iCloud, 푸시, 시간 동기화 때문에 Apple과 끊임없이 통신하며, 그것을 모두 보고하면 정작 중요한 한 줄이 묻힙니다. Apple의 트래픽도 그대로 기록되고, 실시간과 보고서에 표시되며, 모든 규칙과 가드레일이 적용됩니다.";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail." = "macOS는 업데이트, iCloud, 푸시, 시간 동기화 때문에 Apple과 끊임없이 통신하며, 그것을 모두 보고하면 정작 중요한 한 줄이 묻힙니다. Apple의 트래픽도 그대로 기록되고, 실시간과 기록에 표시되며, 모든 규칙과 가드레일이 적용됩니다.";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "에이전트가 이메일, 파일 전송, SSH, 터널 또는 데이터베이스 사용";
 "Agent connects to a raw IP on an unusual port" = "에이전트가 비정상 포트로 원시 IP에 연결";
 "Uploads to non-AI hosts above" = "AI 외 호스트로 업로드가";
@@ -1617,7 +1616,7 @@
 "Reinstall Filter" = "Reinstall Filter";
 "Potential harm" = "Potential harm";
 "Show only medium and high local risk assessments" = "Show only medium and high local risk assessments";
-"Turn on Local risk analysis in Reports or Settings to use this filter" = "Turn on Local risk analysis in Reports or Settings to use this filter";
+"Turn on Local risk analysis in History or Settings to use this filter" = "Turn on Local risk analysis in History or Settings to use this filter";
 "Showing only requests with medium or high potential harm" = "Showing only requests with medium or high potential harm";
 "Response modified" = "Response modified";
 "%@ answered, then Flowlight changed the response using %@ before the app received it" = "%@ answered, then Flowlight changed the response using %@ before the app received it";
@@ -1819,7 +1818,7 @@
 "Showing %lld of %lld relationships" = "관계 %2$lld개 중 %1$lld개 표시";
 "Show %lld more relationships" = "관계 %lld개 더 표시";
 "Loads the next page without changing the Map" = "지도를 변경하지 않고 다음 페이지를 불러옵니다";
-"Select a relationship for an exact Reports scope." = "정확한 보고서 범위를 보려면 관계를 선택하십시오.";
+"Select a relationship for an exact History scope." = "정확한 기록 범위를 보려면 관계를 선택하십시오.";
 "Period" = "기간";
 "No traffic to visualize" = "시각화할 트래픽 없음";
 "Flowlight has not observed any connections in this period." = "이 기간에 Flowlight가 관찰한 연결이 없습니다.";
@@ -1865,7 +1864,7 @@
 "Select to inspect this connection" = "선택하여 이 연결 조사";
 "%lld exact destinations" = "정확한 대상 %lld개";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@에서 %@, 수신 %@, 송신 %@, 연결 %lld개";
-"Show domain family in Reports" = "보고서에서 도메인 계열 보기";
+"Show domain family in History" = "기록에서 도메인 계열 보기";
 
 /* 0.17.0 History and Connections */
 "1 mo" = "1개월";

@@ -169,7 +169,7 @@ struct AgentsView: View {
         }
         .contextMenu(forSelectionType: AgentSummary.ID.self) { ids in
             if let id = ids.first {
-                Button(L("Show Traffic in Reports")) { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
+                Button(L("Show Traffic in History")) { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
                 InspectMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
                 Divider()
@@ -622,7 +622,7 @@ struct AgentDetail: View {
                             .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
                         }
                         Spacer()
-                        Button(L("Open in Reports")) {
+                        Button(L("Open in History")) {
                             nav.showReport(filter: TrafficFilter(bundleID: agent.bundleID), granularity: window.granularity)
                         }
                         .controlSize(.small)

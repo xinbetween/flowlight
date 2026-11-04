@@ -268,6 +268,14 @@ endpoint to fall back to — the user names one or nothing is sent.
 traffic and a live synthetic feed. Suspicious destinations use reserved documentation addresses
 (`203.0.113.0/24`, `*.example`). The README and website screenshots come from this mode.
 
+`scripts/screenshots.sh` captures all website images from an exact current-version Release product and updates the
+per-image version, checksum and dimension manifest that `check_site.py` enforces. A selective capture advances only
+those images, so CI rejects a release that leaves older screenshots behind. For the Store listing, build the
+`Flowlight App Store` scheme and run `FL_APP=/absolute/path/to/Flowlight.app scripts/app-store-screenshots.sh`; it
+requires the embedded Store extension, rejects the Developer ID system-extension product, and produces the complete
+numbered 2880×1800 set under `packaging/app-store/screenshots/macos/`. Both capture paths refuse a candidate that
+opens anything other than `demo.sqlite*`, and CI validates the complete Store set against its own manifest.
+
 ## Known limitations
 
 - Thread-level attribution isn't possible (see `product.md`). Attribution is per process or app.
@@ -301,6 +309,8 @@ that has gone wrong, most of them in production:
 | Translated roadmaps list as much as English | Nine home pages promised "the rest, in this order" and then one item |
 | Every screen's `helpAnchor` has a docs section | Coverage shipped with a Help button and nothing on the page to land on |
 | Screenshots exist, and none is unused | `live.png` was served to nobody for two releases |
+| Every website and Store screenshot manifest entry matches the current version, bytes and dimensions | Two renamed menu items shipped beside eight screenshots that still showed the old sidebar |
+| The Store set contains all nine upload-ready 2880×1800 images | App Store Connect could otherwise retain screenshots from different builds |
 | The views table matches the sidebar | It gave Inspect ⌘5 long after it became ⌘7, and never listed Rules, Ask, Devices or Coverage |
 | One `<h1>` per page | A translation duplicating a heading while editing |
 

@@ -67,7 +67,6 @@
 /* App/AppNavigation.swift */
 "Live" = "Live";
 "AI Agents" = "AI Agents";
-"Reports" = "Reports";
 "Alerts" = "Alerts";
 "Rules" = "Rules";
 "Ask" = "Ask";
@@ -323,7 +322,7 @@
 "flowlight" = "flowlight";
 "Include this Mac's host name" = "Include this Mac's host name";
 "What Flowlight sends" = "What Flowlight sends";
-"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down.";
+"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down.";
 "Every field that can leave this Mac (%lld)" = "Every field that can leave this Mac (%lld)";
 "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export." = "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export.";
 "Show What Would Be Sent…" = "Show What Would Be Sent…";
@@ -340,7 +339,7 @@
 "Dropped" = "Dropped";
 "Retrying" = "Retrying";
 "Status" = "Status";
-"Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight.";
+"Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight.";
 "What would be sent" = "What would be sent";
 "Copy" = "Copy";
 "Done" = "Done";
@@ -414,7 +413,7 @@
 "%@ of this agent's uploads went to non-AI hosts" = "%@ of this agent's uploads went to non-AI hosts";
 "Allowlist" = "Allowlist";
 "Risk" = "Risk";
-"Show Traffic in Reports" = "Show Traffic in Reports";
+"Show Traffic in History" = "Show Traffic in History";
 "None seen" = "None seen";
 "Large upload" = "Large upload";
 "%@ sent to hosts that aren't AI providers" = "%@ sent to hosts that aren't AI providers";
@@ -453,7 +452,7 @@
 "MCP servers (%lld)" = "MCP servers (%lld)";
 "MCP servers" = "MCP servers";
 "Guardrails" = "Guardrails";
-"Open in Reports" = "Open in Reports";
+"Open in History" = "Open in History";
 "Only AI providers. Nothing else was contacted." = "Only AI providers. Nothing else was contacted.";
 "the tool calls its model asks for" = "the tool calls its model asks for";
 "tool calls" = "tool calls";
@@ -588,7 +587,7 @@
 "Documentation" = "Documentation";
 "1 query · %@" = "1 query · %@";
 "%lld queries · %@" = "%lld queries · %@";
-"Open these rows in Reports" = "Open these rows in Reports";
+"Open these rows in History" = "Open these rows in History";
 "Answered on this Mac · %@" = "Answered on this Mac · %@";
 "1 request left this Mac · %@" = "1 request left this Mac · %@";
 "%lld requests left this Mac · %@" = "%lld requests left this Mac · %@";
@@ -971,13 +970,13 @@
 "Zero" = "Zero";
 "Last 2 minutes" = "Last 2 minutes";
 "Application" = "Application";
-"%@\nDouble-click to open in Reports" = "%@\nDouble-click to open in Reports";
+"%@\nDouble-click to open in History" = "%@\nDouble-click to open in History";
 "↓ In" = "↓ In";
 "↑ Out" = "↑ Out";
 "Session ↓" = "Session ↓";
 "Session ↑" = "Session ↑";
 "Busiest destination" = "Busiest destination";
-"Show in Reports" = "Show in Reports";
+"Show in History" = "Show in History";
 "Copy Bundle ID" = "Copy Bundle ID";
 "Top talkers · average of the last 5 seconds" = "Top talkers · average of the last 5 seconds";
 "The network is quiet" = "The network is quiet";
@@ -1197,7 +1196,7 @@
 "Nothing is being refused until %@." = "Nothing is being refused until %@.";
 "Resume now" = "Resume now";
 "No rules yet" = "No rules yet";
-"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by.";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by.";
 "Browse Templates…" = "Browse Templates…";
 "Write One…" = "Write One…";
 "Nothing yet" = "Nothing yet";
@@ -1273,7 +1272,7 @@
 "First contact with a new domain" = "First contact with a new domain";
 "Connections to non-standard ports" = "Connections to non-standard ports";
 "Ignore Apple's own apps" = "Ignore Apple's own apps";
-"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail.";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail." = "macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail.";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "Agent uses email, file transfer, SSH, tunnels or databases";
 "Agent connects to a raw IP on an unusual port" = "Agent connects to a raw IP on an unusual port";
 "Uploads to non-AI hosts above" = "Uploads to non-AI hosts above";
@@ -1617,7 +1616,7 @@
 "Reinstall Filter" = "Reinstall Filter";
 "Potential harm" = "Potential harm";
 "Show only medium and high local risk assessments" = "Show only medium and high local risk assessments";
-"Turn on Local risk analysis in Reports or Settings to use this filter" = "Turn on Local risk analysis in Reports or Settings to use this filter";
+"Turn on Local risk analysis in History or Settings to use this filter" = "Turn on Local risk analysis in History or Settings to use this filter";
 "Showing only requests with medium or high potential harm" = "Showing only requests with medium or high potential harm";
 "Response modified" = "Response modified";
 "%@ answered, then Flowlight changed the response using %@ before the app received it" = "%@ answered, then Flowlight changed the response using %@ before the app received it";
@@ -1819,7 +1818,7 @@
 "Showing %lld of %lld relationships" = "Showing %lld of %lld relationships";
 "Show %lld more relationships" = "Show %lld more relationships";
 "Loads the next page without changing the Map" = "Loads the next page without changing the Map";
-"Select a relationship for an exact Reports scope." = "Select a relationship for an exact Reports scope.";
+"Select a relationship for an exact History scope." = "Select a relationship for an exact History scope.";
 "Period" = "Period";
 "No traffic to visualize" = "No traffic to visualize";
 "Flowlight has not observed any connections in this period." = "Flowlight has not observed any connections in this period.";
@@ -1865,7 +1864,7 @@
 "Select to inspect this connection" = "Select to inspect this connection";
 "%lld exact destinations" = "%lld exact destinations";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ to %@, received %@, sent %@, %lld connections";
-"Show domain family in Reports" = "Show domain family in Reports";
+"Show domain family in History" = "Show domain family in History";
 
 /* 0.17.0 History and Connections */
 "1 mo" = "1 mo";

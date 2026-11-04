@@ -171,7 +171,7 @@ struct ExportSettingsTab: View {
         } header: {
             Text(L("What Flowlight sends"))
         } footer: {
-            Text(L("A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down."))
+            Text(L("A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -239,7 +239,7 @@ struct ExportSettingsTab: View {
         } header: {
             Text(L("Status"))
         } footer: {
-            Text(L("Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight."))
+            Text(L("Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight."))
             .font(.caption).foregroundStyle(.secondary)
         }
     }

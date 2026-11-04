@@ -65,7 +65,6 @@
 /* App/AppNavigation.swift */
 "Live" = "Em direto";
 "AI Agents" = "Agentes de IA";
-"Reports" = "Relatórios";
 "Alerts" = "Alertas";
 "Rules" = "Regras";
 "Ask" = "Perguntar";
@@ -344,7 +343,7 @@
 "flowlight" = "flowlight";
 "Include this Mac's host name" = "Incluir o nome de anfitrião deste Mac";
 "What Flowlight sends" = "O que o Flowlight envia";
-"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity Reports uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "Uma agregação é uma app, um nome de anfitrião e um endereço IP somados ao longo do período, com a mesma granularidade de minuto que os Relatórios usam — nunca por ligação nem por pacote. As agregações seguem com cerca de dois minutos de atraso, quando o minuto a que pertencem está completo; os alertas seguem à medida que são levantados. Um coletor inacessível é tentado de novo com um atraso crescente, e são guardados no máximo 10 000 registos enquanto estiver em baixo.";
+"A rollup is one app, one hostname and one IP address added up over the window, at the same minute granularity History uses — never per connection and never per packet. Rollups go about two minutes behind, once the minute they belong to is complete; alerts go as they are raised. A collector that can't be reached is retried with a growing delay, and at most 10,000 records are held while it's down." = "Uma agregação é uma app, um nome de anfitrião e um endereço IP somados ao longo do período, com a mesma granularidade de minuto que o Histórico usa — nunca por ligação nem por pacote. As agregações seguem com cerca de dois minutos de atraso, quando o minuto a que pertencem está completo; os alertas seguem à medida que são levantados. Um coletor inacessível é tentado de novo com um atraso crescente, e são guardados no máximo 10 000 registos enquanto estiver em baixo.";
 "Every field that can leave this Mac (%lld)" = "Todos os campos que podem sair deste Mac (%lld)";
 "That list is the whole of it — it is generated from the same declaration the payload is built from, so it can't fall behind the code. Never sent, in any format and whatever else is switched on: anything HTTPS inspection records. Request and response headers, bodies, tool calls and the contents of any decrypted exchange have no path into an export." = "Essa lista é tudo — é gerada a partir da mesma declaração com que o payload é construído, por isso não pode ficar atrás do código. Nunca é enviado, em qualquer formato e com o que mais esteja ativado: tudo o que a inspeção HTTPS registe. Os cabeçalhos de pedido e de resposta, os corpos, as chamadas de ferramentas e o conteúdo de qualquer troca desencriptada não têm caminho para uma exportação.";
 "Show What Would Be Sent…" = "Mostrar o que seria enviado…";
@@ -361,7 +360,7 @@
 "Dropped" = "Descartados";
 "Retrying" = "A tentar de novo";
 "Status" = "Estado";
-"Exports leave as Flowlight's own traffic, so you'll see them in Live and Reports like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "As exportações saem como tráfego do próprio Flowlight, por isso vê-las-á em Em direto e Relatórios como as de qualquer outra app, e a primeira vez que forem para um sítio novo receberá um alerta de primeiro contacto sobre o Flowlight.";
+"Exports leave as Flowlight's own traffic, so you'll see them in Live and History like any other app's, and the first time they go somewhere new you'll get a first-contact alert about Flowlight." = "As exportações saem como tráfego do próprio Flowlight, por isso vê-las-á em Em direto e Histórico como as de qualquer outra app, e a primeira vez que forem para um sítio novo receberá um alerta de primeiro contacto sobre o Flowlight.";
 "What would be sent" = "O que seria enviado";
 "Copy" = "Copiar";
 "Done" = "Concluído";
@@ -465,7 +464,7 @@
 "%@ of this agent's uploads went to non-AI hosts" = "%@ dos envios deste agente foram para anfitriões não-IA";
 "Allowlist" = "Lista de permissões";
 "Risk" = "Risco";
-"Show Traffic in Reports" = "Ver o tráfego em Relatórios";
+"Show Traffic in History" = "Ver o tráfego no Histórico";
 "None seen" = "Nada visto";
 "Large upload" = "Envio grande";
 "%@ sent to hosts that aren't AI providers" = "%@ enviados para anfitriões que não são fornecedores de IA";
@@ -504,7 +503,7 @@
 "MCP servers (%lld)" = "Servidores MCP (%lld)";
 "MCP servers" = "Servidores MCP";
 "Guardrails" = "Proteções";
-"Open in Reports" = "Abrir em Relatórios";
+"Open in History" = "Abrir no Histórico";
 "Only AI providers. Nothing else was contacted." = "Apenas fornecedores de IA. Não foi contactado mais nada.";
 "the tool calls its model asks for" = "as chamadas de ferramentas que o seu modelo pede";
 "tool calls" = "chamadas de ferramentas";
@@ -639,7 +638,7 @@
 "Documentation" = "Documentação";
 "1 query · %@" = "1 consulta · %@";
 "%lld queries · %@" = "%lld consultas · %@";
-"Open these rows in Reports" = "Abrir estas linhas em Relatórios";
+"Open these rows in History" = "Abrir estas linhas no Histórico";
 "Answered on this Mac · %@" = "Respondido neste Mac · %@";
 "1 request left this Mac · %@" = "1 pedido saiu deste Mac · %@";
 "%lld requests left this Mac · %@" = "%lld pedidos saíram deste Mac · %@";
@@ -1045,13 +1044,13 @@
 "Zero" = "Zero";
 "Last 2 minutes" = "Últimos 2 minutos";
 "Application" = "Aplicação";
-"%@\nDouble-click to open in Reports" = "%@\nClique duas vezes para abrir em Relatórios";
+"%@\nDouble-click to open in History" = "%@\nClique duas vezes para abrir no Histórico";
 "↓ In" = "↓ Entrada";
 "↑ Out" = "↑ Saída";
 "Session ↓" = "Sessão ↓";
 "Session ↑" = "Sessão ↑";
 "Busiest destination" = "Destino mais ativo";
-"Show in Reports" = "Ver em Relatórios";
+"Show in History" = "Ver no Histórico";
 "Copy Bundle ID" = "Copiar identificador de pacote";
 "Top talkers · average of the last 5 seconds" = "Apps mais ativas · média dos últimos 5 segundos";
 "The network is quiet" = "A rede está calma";
@@ -1288,7 +1287,7 @@
 "Nothing is being refused until %@." = "Nada está a ser recusado até %@.";
 "Resume now" = "Retomar agora";
 "No rules yet" = "Ainda sem regras";
-"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "Uma regra nomeia algo — uma app, um agente, um destino ou um URL — e diz bloquear ou permitir. Clique com o botão direito em qualquer linha de Em direto, Relatórios, Agentes de IA ou Inspecionar para escrever uma sobre o que está a ver, ou comece pela biblioteca — já sabe que anfitriões uma instalação de pacote contacta e por quais sai um ficheiro.";
+"A rule names something — an app, an agent, a destination, or a URL — and says block or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at, or start from the library — it already knows which hosts a package install reaches, and which ones a file leaves by." = "Uma regra nomeia algo — uma app, um agente, um destino ou um URL — e diz bloquear ou permitir. Clique com o botão direito em qualquer linha de Em direto, Histórico, Agentes de IA ou Inspecionar para escrever uma sobre o que está a ver, ou comece pela biblioteca — já sabe que anfitriões uma instalação de pacote contacta e por quais sai um ficheiro.";
 "Browse Templates…" = "Ver os modelos…";
 "Write One…" = "Escrever uma…";
 "Nothing yet" = "Ainda nada";
@@ -1364,7 +1363,7 @@
 "First contact with a new domain" = "Primeiro contacto com um novo domínio";
 "Connections to non-standard ports" = "Ligações a portas não padrão";
 "Ignore Apple's own apps" = "Ignorar as apps da Apple";
-"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and Reports, and still subject to every rule and guardrail." = "O macOS fala com a Apple constantemente — atualizações, iCloud, notificações, hora — e comunicar tudo isso enterra a única linha que importa. O tráfego dessas apps continua a ser registado, continua visível em Em direto e Relatórios, e continua sujeito a todas as regras e proteções.";
+"macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail." = "O macOS fala com a Apple constantemente — atualizações, iCloud, notificações, hora — e comunicar tudo isso enterra a única linha que importa. O tráfego dessas apps continua a ser registado, continua visível em Em direto e Histórico, e continua sujeito a todas as regras e proteções.";
 "Agent uses email, file transfer, SSH, tunnels or databases" = "O agente usa e-mail, transferência de ficheiros, SSH, túneis ou bases de dados";
 "Agent connects to a raw IP on an unusual port" = "O agente liga-se a um IP direto numa porta invulgar";
 "Uploads to non-AI hosts above" = "Envios para anfitriões não-IA acima de";
@@ -1617,7 +1616,7 @@
 "Reinstall Filter" = "Reinstall Filter";
 "Potential harm" = "Potential harm";
 "Show only medium and high local risk assessments" = "Show only medium and high local risk assessments";
-"Turn on Local risk analysis in Reports or Settings to use this filter" = "Turn on Local risk analysis in Reports or Settings to use this filter";
+"Turn on Local risk analysis in History or Settings to use this filter" = "Turn on Local risk analysis in History or Settings to use this filter";
 "Showing only requests with medium or high potential harm" = "Showing only requests with medium or high potential harm";
 "Response modified" = "Response modified";
 "%@ answered, then Flowlight changed the response using %@ before the app received it" = "%@ answered, then Flowlight changed the response using %@ before the app received it";
@@ -1819,7 +1818,7 @@
 "Showing %lld of %lld relationships" = "A mostrar %lld de %lld relações";
 "Show %lld more relationships" = "Mostrar mais %lld relações";
 "Loads the next page without changing the Map" = "Carrega a página seguinte sem alterar o mapa";
-"Select a relationship for an exact Reports scope." = "Selecione uma relação para obter um âmbito exato nos Relatórios.";
+"Select a relationship for an exact History scope." = "Selecione uma relação para obter um âmbito exato no Histórico.";
 "Period" = "Período";
 "No traffic to visualize" = "Sem tráfego para visualizar";
 "Flowlight has not observed any connections in this period." = "O Flowlight não observou ligações neste período.";
@@ -1865,7 +1864,7 @@
 "Select to inspect this connection" = "Selecione para inspecionar esta ligação";
 "%lld exact destinations" = "%lld destinos exatos";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ para %@, recebeu %@, enviou %@, %lld ligações";
-"Show domain family in Reports" = "Mostrar família de domínios em Relatórios";
+"Show domain family in History" = "Mostrar família de domínios no Histórico";
 
 /* 0.17.0 History and Connections */
 "1 mo" = "1 mês";

@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.1, macOS 15 or later.
 
  On this page
 
@@ -920,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1663,8 +1663,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.0
+ 0.17.1
 November 4, 2026Latest
+
+ Keep every public screenshot current. All ten website images now come from the same 0.17.1 demo build, consistently show History and Connections in the sidebar, and use History throughout linked actions and guidance.
+
+ Review the Store with the same product users receive. A complete 2880×1800 Mac App Store screenshot set is captured from that exact build, title-checked screen by screen, and retained with the release for App Store Connect.
+
+ Keep synthetic evidence isolated. Screenshot capture now refuses any process that opens the real traffic database and can enforce one uniform window and pixel size for Store-ready output.
+
+ 0.17.0
+November 4, 2026
 
  Find past traffic in History. Reports is now History, with concise presets from 15 minutes to all retained evidence, an explicit date range, adaptive resolution, and a native overview navigator whose selection can be dragged, resized, or panned.
 
