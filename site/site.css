@@ -527,6 +527,18 @@
   /* The table of contents, in sections. Twenty-eight links in one column is a list nobody reads to the end of;
      eight labelled groups is something you can scan. */
   .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 14px; }
+  .toc:not(:has(> .toc-sheet)) {
+    display: grid; gap: 0; padding-block: 24px; border-block: 1px solid var(--line);
+  }
+  .toc:not(:has(> .toc-sheet)) > strong {
+    margin: 0 0 12px; font: 600 11px var(--mono); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink);
+  }
+  .toc:not(:has(> .toc-sheet)) > a {
+    display: block; padding: 6px 0 6px 14px; color: var(--muted); font-size: 14px;
+    line-height: 1.35; text-decoration: none;
+  }
+  .toc:not(:has(> .toc-sheet)) > a:hover { color: var(--ink); }
   .toc-sheet { --toc-group-gap: 10px; }
   /* Plain on a wide screen; the phone rules below give it a card, where it folds up. */
   .toc-sheet { display: grid; gap: var(--toc-group-gap, 26px); }
@@ -615,6 +627,7 @@
     .toc-sheet:not([open]) { gap: 0; }
     .toc-sheet { --toc-group-gap: 6px; }
     .toc-group > a { padding-block: 3px; }
+    .prose table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .footer-brand { grid-column: 1 / -1; }
   }
