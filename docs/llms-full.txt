@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.2, macOS 15 or later.
 
  On this page
 
@@ -155,23 +155,23 @@ open build/Build/Products/Release/Flowlight.app
 
  History⌘3Where traffic went, from a 15-minute preset through all retained history. Group by App, Destination or IP; switch to Charts or Worth a look; export CSV.
 
- Connections—A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.
+ Connections⌘4A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.
 
- Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
-
- Rules⌘5Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.
+ Alerts⌘5Everything that looked unusual, with the app, the destination and the number that tripped the rule.
 
  Ask⌘6Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.
 
  Inspect⌘7Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
 
- Devices⌘8Off until you turn it on: camera activity, Bluetooth, USB and external storage.
+ Rules⌘8Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.
 
- Coverage⌘9What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.
+ Devices⌘9Off until you turn it on: camera activity, Bluetooth, USB and external storage.
 
- Capture⌘0Which engine is recording, the extension's state, hostname learning, and where the database lives.
+ Coverage⌘0What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.
 
- The shortcuts are the sidebar's order, so ⌘0 is the tenth item rather than a skipped position.
+ Capture—Which engine is recording, the extension's state, hostname learning, and where the database lives.
+
+ The shortcuts follow the sidebar's visible order: ⌘0 is the tenth item, and an eleventh remains available without an invented key.
 
  Live, the screen Flowlight opens on.
  In History, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with Nearby context and can switch to All history: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.
@@ -304,7 +304,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Apple's own apps are left out by default. macOS contacts Apple constantly — Software Update, iCloud,
  push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
- line worth reading. Turn it off in Settings › Alerts if you want them. Either way the traffic is still
+ line worth reading. Turn it off in Settings › Detection › Rules if you want them. Either way the traffic is still
  recorded, still appears in Live, History and Ask, and is still subject to every rule, guardrail and allowlist: the setting
  decides what is listed, never what is allowed.
 
@@ -920,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.2macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1001,11 +1001,11 @@ Where did it all go? From 15 minutes through all history, grouped by app, destin
 
  Alerts
 What looked wrong? Explainable, per-app alerts with the destination and the threshold.
-⌘4
+⌘5
 
  Rules
 What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
-⌘5
+⌘8
 
  Ask
 Questions in plain language, answered from the history — with every query it ran listed underneath.
@@ -1013,7 +1013,7 @@ Questions in plain language, answered from the history — with every query it r
 
  Devices
 Bluetooth, USB, and cameras: what's paired, what's attached or active, and when that changed. Off until you turn it on.
-⌘8
+⌘9
 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
@@ -1021,6 +1021,7 @@ Optional. What did the agent actually send, and which tool call made it? Decrypt
 
  Connections
 What is communicating? A zoomable Sankey map for app traffic and proved AI-agent paths, with exact list parity.
+⌘4
 
  Capture
 
@@ -1663,8 +1664,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.1
+ 0.17.2
 November 4, 2026Latest
+
+ Keep filtered evidence unmistakable. An active Focus now stays visible above every destination with its exact scope and one-click editing, while sidebar shortcuts follow the order shown on screen.
+
+ Make warning notifications respond immediately. Turning warnings on now requests macOS authorization in the same action, reports whether access is active, not requested, or denied, and opens System Settings when recovery is needed.
+
+ Stay ready for the next macOS. Live chart, table, rate, and source state now publish as one coherent snapshot, while sidebar selection waits for AppKit's callback to finish, removing a reentrant delegate operation that macOS warns will become an assertion.
+
+ Test the exact commit a review names. Pull-request CI and CodeQL explicitly check out the head SHA, a deny-first rename-aware classifier fails unknown and release inputs closed to the full app route, and one stable gate records the tested tree and app-input fingerprint.
+
+ Keep website work independent from app releases. Explicitly allowlisted website-only changes require no application version bump, while project, packaging, screenshot, signed-catalog, workflow, and other release inputs can never skip macOS verification.
+
+ 0.17.1
+November 4, 2026
 
  Keep every public screenshot current. All ten website images now come from the same 0.17.1 demo build, consistently show History and Connections in the sidebar, and use History throughout linked actions and guidance.
 

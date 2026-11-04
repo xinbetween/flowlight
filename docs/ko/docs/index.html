@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">문서</p>
     <h1>Flowlight 사용하기</h1>
-    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.17.1, macOS 15 이상.</p>
+    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.17.2, macOS 15 이상.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="이 페이지 안에서">
@@ -165,17 +165,17 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>실시간</td><td>⌘1</td><td>지금 무엇이 움직이나. 지난 몇 초 동안의 앱별 속도와 가장 바쁜 목적지.</td></tr>
         <tr><td><a href="#agents">AI 에이전트</a></td><td>⌘2</td><td>어떤 에이전트가 활동 중이고, 어떤 AI 제공업체를 쓰며, 그 밖에 어디에 접속했나.</td></tr>
         <tr><td>기록</td><td>⌘3</td><td>트래픽이 어디로 갔나. 초에서 연까지. 앱, 목적지, IP로 묶고, 차트나 <a href="#worth-a-look">눈여겨볼 것</a>으로 바꾸고, CSV로 내보냅니다.</td></tr>
-        <tr><td><a href="#visualize">연결</a></td><td>—</td><td>앱과 정확한 목적지를 가중 경로, 움직이는 방향 표시, 연결 수, 동등한 목록으로 보여 주는 안정적인 지도입니다.</td></tr>
-        <tr><td><a href="#alerts">알림</a></td><td>⌘4</td><td>이상해 보인 모든 것. 앱과 목적지, 그리고 규칙의 기준을 넘긴 수치와 함께.</td></tr>
-        <tr><td><a href="#rules">규칙</a></td><td>⌘5</td><td>설정해 둔 모든 허용 목록과 거부, 각각이 무엇을 포괄하는지, 그리고 실제로 무엇을 막았는지.</td></tr>
+        <tr><td><a href="#visualize">연결</a></td><td>⌘4</td><td>앱과 정확한 목적지를 가중 경로, 움직이는 방향 표시, 연결 수, 동등한 목록으로 보여 주는 안정적인 지도입니다.</td></tr>
+        <tr><td><a href="#alerts">알림</a></td><td>⌘5</td><td>이상해 보인 모든 것. 앱과 목적지, 그리고 규칙의 기준을 넘긴 수치와 함께.</td></tr>
+        <tr><td><a href="#rules">규칙</a></td><td>⌘8</td><td>설정해 둔 모든 허용 목록과 거부, 각각이 무엇을 포괄하는지, 그리고 실제로 무엇을 막았는지.</td></tr>
         <tr><td><a href="#ask">질문</a></td><td>⌘6</td><td>내 트래픽에 대한 평범한 말로 된 질문. 기록된 이력에서 로컬 모델이나 호스팅 모델이 답합니다.</td></tr>
         <tr><td><a href="#inspection">검사</a></td><td>⌘7</td><td>선택 사항. Flowlight를 거치도록 지정한 에이전트의 복호화된 요청과 그 뒤에 있는 도구 호출. 검색은 요청·응답 본문까지 들어갑니다.</td></tr>
-        <tr><td><a href="#devices">기기</a></td><td>⌘8</td><td>켤 때까지는 꺼져 있습니다. Bluetooth와 USB, 외장 저장 장치. Mac은 네트워크만큼이나 이것들을 씁니다.</td></tr>
-        <tr><td><a href="#coverage">포착 범위</a></td><td>⌘9</td><td>Flowlight가 파악하지 못하는 것. 앱별로 그 트래픽이 보였는지, 이름이 붙었는지, 읽혔는지.</td></tr>
-        <tr><td><a href="#capture">캡처</a></td><td>⌘0</td><td>어떤 엔진이 기록 중인지, 확장의 상태, 호스트 이름 학습, 그리고 데이터베이스의 위치.</td></tr>
+        <tr><td><a href="#devices">기기</a></td><td>⌘9</td><td>켤 때까지는 꺼져 있습니다. Bluetooth와 USB, 외장 저장 장치. Mac은 네트워크만큼이나 이것들을 씁니다.</td></tr>
+        <tr><td><a href="#coverage">포착 범위</a></td><td>⌘0</td><td>Flowlight가 파악하지 못하는 것. 앱별로 그 트래픽이 보였는지, 이름이 붙었는지, 읽혔는지.</td></tr>
+        <tr><td><a href="#capture">캡처</a></td><td>—</td><td>어떤 엔진이 기록 중인지, 확장의 상태, 호스트 이름 학습, 그리고 데이터베이스의 위치.</td></tr>
       </table>
-      <p>단축키는 사이드바의 순서라서, ⌘0은 건너뛴 자리가 아니라 열 번째 항목입니다.</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=264e60b7" loading="lazy"
+      <p>단축키는 사이드바 순서를 따릅니다. ⌘0은 열 번째 항목이고, 열한 번째 항목은 억지로 키를 만들지 않아도 계속 사용할 수 있습니다.</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=33eb0a71" loading="lazy"
         alt="실시간 뷰: 앱 목록에 각각의 현재 보내기·받기 속도와 가장 바쁜 목적지가 함께 나열되어 있습니다."></div>
         <figcaption class="caption">실시간, Flowlight가 처음 여는 화면.</figcaption></figure>
       <p>기록에서 막대에 포인터를 올리면 포인터를 따라다니는 스크롤 가능한 카드에 기여한 앱이 표시됩니다. 막대를 클릭해 확대하지는 않습니다. 행을 두 번 클릭하면 기록을 그 항목으로 좁힐 수 있습니다.</p>
@@ -750,7 +750,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.17.1 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.17.2 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>
