@@ -528,6 +528,8 @@
 "via %@" = "via %@";
 "Opened by %@" = "Aberto por %@";
 "Not allowed" = "Não permitido";
+"Not requested" = "Não solicitado";
+"Open System Settings" = "Abrir Definições do Sistema";
 "Allow" = "Permitir";
 "Add %@ to %@'s allowlist" = "Adicionar %@ à lista de permissões de %@";
 "Click to collapse" = "Clique para recolher";

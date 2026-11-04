@@ -46,7 +46,7 @@ struct SettingsView: View {
                     }
                 }
                 Toggle(L("Show live rates in the menu bar"), isOn: $menuBarRates)
-                Toggle(L("Show notifications for warnings"), isOn: $notifications)
+                NotificationSettingsRow(enabled: $notifications)
                 #if !APP_STORE
                 UpdateSettingsRow()
                 #endif
@@ -133,6 +133,42 @@ struct SettingsView: View {
         } catch {
             loginItemError = error.localizedDescription
             launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+    }
+}
+
+private struct NotificationSettingsRow: View {
+    @Binding var enabled: Bool
+    @State private var authorization: NotificationAuthorizationState = .unknown
+
+    var body: some View {
+        Toggle(isOn: $enabled) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L("Show notifications for warnings"))
+                Text(statusTitle)
+                    .font(.caption)
+                    .foregroundStyle(authorization == .denied ? FL.warning : .secondary)
+            }
+        }
+        .onChange(of: enabled) { _, value in
+            guard value else { return }
+            Task { authorization = await Notifier.requestAuthorizationAndWait() }
+        }
+        .task { authorization = await Notifier.authorizationState() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { authorization = await Notifier.authorizationState() }
+        }
+        if authorization == .denied {
+            Button(L("Open System Settings")) { Notifier.openSystemNotificationSettings() }
+        }
+    }
+
+    private var statusTitle: String {
+        switch authorization {
+        case .active: return L("Active")
+        case .denied: return L("Not allowed")
+        case .notRequested: return L("Not requested")
+        case .unknown: return L("Unknown")
         }
     }
 }

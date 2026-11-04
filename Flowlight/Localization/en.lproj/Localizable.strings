@@ -477,6 +477,8 @@
 "via %@" = "via %@";
 "Opened by %@" = "Opened by %@";
 "Not allowed" = "Not allowed";
+"Not requested" = "Not requested";
+"Open System Settings" = "Open System Settings";
 "Allow" = "Allow";
 "Add %@ to %@'s allowlist" = "Add %@ to %@'s allowlist";
 "Click to collapse" = "Click to collapse";

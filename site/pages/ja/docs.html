@@ -95,16 +95,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>ライブ</td><td>⌘1</td><td>いま何が動いているか。直近数秒間のアプリごとの速度と、最も忙しい接続先。</td></tr>
         <tr><td><a href="#agents">AI エージェント</a></td><td>⌘2</td><td>どのエージェントが動いていて、どの AI プロバイダを使い、ほかに何と通信したか。</td></tr>
         <tr><td>履歴</td><td>⌘3</td><td>トラフィックがどこへ行ったか。秒から年まで。アプリ・接続先・IP でグループ化し、グラフや<a href="#worth-a-look">気になるもの</a>に切り替え、CSV に書き出せます。</td></tr>
-        <tr><td><a href="#visualize">接続</a></td><td>—</td><td>アプリと正確な接続先を、重み付き経路、動く方向マーカー、接続数、同等のリストで示す安定したマップ。</td></tr>
-        <tr><td><a href="#alerts">アラート</a></td><td>⌘4</td><td>いつもと違って見えたものすべて。アプリ、接続先、そしてルールのしきい値を超えた数値とともに。</td></tr>
-        <tr><td><a href="#rules">ルール</a></td><td>⌘5</td><td>設定したすべての許可リストと拒否。それぞれが何を対象にし、実際に何を止めたか。</td></tr>
+        <tr><td><a href="#visualize">接続</a></td><td>⌘4</td><td>アプリと正確な接続先を、重み付き経路、動く方向マーカー、接続数、同等のリストで示す安定したマップ。</td></tr>
+        <tr><td><a href="#alerts">アラート</a></td><td>⌘5</td><td>いつもと違って見えたものすべて。アプリ、接続先、そしてルールのしきい値を超えた数値とともに。</td></tr>
+        <tr><td><a href="#rules">ルール</a></td><td>⌘8</td><td>設定したすべての許可リストと拒否。それぞれが何を対象にし、実際に何を止めたか。</td></tr>
         <tr><td><a href="#ask">質問</a></td><td>⌘6</td><td>自分のトラフィックについての、ふつうの言葉での質問。記録された履歴から、ローカルまたはホスト型のモデルが答えます。</td></tr>
         <tr><td><a href="#inspection">インスペクト</a></td><td>⌘7</td><td>任意。Flowlight を経由させたエージェントの復号済みリクエストと、その裏にあるツール呼び出し。検索はリクエストとレスポンスの本文にも届きます。</td></tr>
-        <tr><td><a href="#devices">デバイス</a></td><td>⌘8</td><td>オンにするまではオフ。Bluetooth、USB、外部ストレージ。Mac はネットワークと同じくらいこれらを使います。</td></tr>
-        <tr><td><a href="#coverage">カバー範囲</a></td><td>⌘9</td><td>Flowlight が把握できないもの。アプリごとに、その通信が見えたか、名前が付いたか、読めたか。</td></tr>
-        <tr><td><a href="#capture">キャプチャ</a></td><td>⌘0</td><td>どのエンジンで記録しているか、機能拡張の状態、ホスト名の学習、そしてデータベースの場所。</td></tr>
+        <tr><td><a href="#devices">デバイス</a></td><td>⌘9</td><td>オンにするまではオフ。Bluetooth、USB、外部ストレージ。Mac はネットワークと同じくらいこれらを使います。</td></tr>
+        <tr><td><a href="#coverage">カバー範囲</a></td><td>⌘0</td><td>Flowlight が把握できないもの。アプリごとに、その通信が見えたか、名前が付いたか、読めたか。</td></tr>
+        <tr><td><a href="#capture">キャプチャ</a></td><td>—</td><td>どのエンジンで記録しているか、機能拡張の状態、ホスト名の学習、そしてデータベースの場所。</td></tr>
       </table>
-      <p>ショートカットはサイドバーの並び順なので、⌘0 は飛ばされた番号ではなく 10 番目の項目です。</p>
+      <p>ショートカットはサイドバーの並び順です。⌘0 は 10 番目で、11 番目の項目には架空のキーを割り当てず、そのまま利用できます。</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="ライブビュー。アプリの一覧に、現在の送信と受信の速度、そして最も忙しい接続先が並んでいます。"></div>
         <figcaption class="caption">ライブ。Flowlight が最初に開く画面です。</figcaption></figure>

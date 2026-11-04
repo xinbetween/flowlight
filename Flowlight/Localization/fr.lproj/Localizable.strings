@@ -505,6 +505,8 @@
 "via %@" = "via %@";
 "Opened by %@" = "Ouvert par %@";
 "Not allowed" = "Non autorisé";
+"Not requested" = "Non demandé";
+"Open System Settings" = "Ouvrir Réglages Système";
 "Allow" = "Autoriser";
 "Add %@ to %@'s allowlist" = "Ajouter %@ à la liste d'autorisation de %@";
 "Click to collapse" = "Cliquer pour replier";

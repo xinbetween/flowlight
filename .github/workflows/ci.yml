@@ -29,40 +29,32 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       app: ${{ steps.what.outputs.app }}
+      site: ${{ steps.what.outputs.site }}
+      python: ${{ steps.what.outputs.python }}
+      actions: ${{ steps.what.outputs.actions }}
+      pages: ${{ steps.what.outputs.pages }}
+      head_sha: ${{ steps.what.outputs.head_sha }}
+      tree: ${{ steps.what.outputs.tree }}
+      fingerprint: ${{ steps.what.outputs.fingerprint }}
+      schema: ${{ steps.what.outputs.schema }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          # A pull-request check is attached to the head SHA, so build that head—not GitHub's synthetic merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - id: what
-        name: Did anything outside the website change?
+        name: Classify the exact change
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          # Anything we can't compare against runs the full build. Being wrong in that direction costs ten
-          # minutes; being wrong the other way ships an untested commit.
-          case "${{ github.event_name }}" in
-            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
-            push)         base="${{ github.event.before }}" ;;
-            *)            base="" ;;
-          esac
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
-             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            echo "No base to compare against — building everything."
-            echo "app=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed=$(git diff --name-only "$base" "${{ github.sha }}")
-          echo "::group::Changed files"; echo "$changed"; echo "::endgroup::"
-          # The website and its sources. Everything else — Swift, project.yml, packaging, these workflows —
-          # is the app. project.yml is deliberately *not* here: it carries the version the site prints, but it
-          # also carries the build, and a version bump should be built.
-          rest=$(echo "$changed" | grep -Ev '^(site/|docs/|scripts/build_site\.py$|[^/]*\.md$|LICENSE$)' || true)
-          if [ -z "$rest" ]; then
-            echo "Website-only change — skipping the macOS build."
-            echo "app=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "app=true" >> "$GITHUB_OUTPUT"
-          fi
+          python3 -I scripts/classify_changes.py \
+            --repo . --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT" \
+            > "$RUNNER_TEMP/change-classification.json"
+          cat "$RUNNER_TEMP/change-classification.json"
 
   # Seconds of Python, so it runs on everything: the site is generated from Swift sources and project.yml as well
   # as from site/, and "docs/ is out of date" should be caught whichever of those moved.
@@ -76,6 +68,7 @@ jobs:
       # clone can only see one commit, so every page would look as though it changed today.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Validate and verify the official rule-pack catalog
@@ -161,6 +154,8 @@ jobs:
     name: test (${{ matrix.xcode }} Xcode)
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Select Xcode
         run: |
@@ -184,6 +179,8 @@ jobs:
           scripts/test-notarize.sh
           scripts/test-rule-pack-policy.sh
           scripts/test-swift-warnings.sh
+          python3 -I scripts/test_classify_changes.py
+          python3 -I scripts/test_check_site.py
           python3 scripts/test_release_checks.py
 
       # This compiles a different product graph and activation path from the Developer ID build. The build clears
@@ -272,3 +269,112 @@ jobs:
           fi
           set -e
           scripts/check-swift-warnings.sh "$LOG"
+
+  # Exact-head evidence proves what was reviewed; this separate PR-only build proves that same head still compiles
+  # when combined with the current base. The trees are intentionally different, so this is not duplicate work.
+  merge-compatibility:
+    name: merge compatibility
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.app == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: refs/pull/${{ github.event.number }}/merge
+
+      - name: Build the prospective merge
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild build -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/merge-build" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=
+
+  gate:
+    name: Review / gate
+    if: always()
+    needs: [changes, site, test, merge-compatibility]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every applicable review job
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SITE_RESULT: ${{ needs.site.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          MERGE_RESULT: ${{ needs.merge-compatibility.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          APP_ROUTE: ${{ needs.changes.outputs.app }}
+          HEAD_SHA: ${{ needs.changes.outputs.head_sha }}
+          TREE: ${{ needs.changes.outputs.tree }}
+          FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
+          SCHEMA: ${{ needs.changes.outputs.schema }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES_RESULT" == success ]] || {
+            echo "::error::Change classification did not succeed: $CHANGES_RESULT"
+            exit 1
+          }
+          [[ "$SITE_RESULT" == success ]] || {
+            echo "::error::Site verification did not succeed: $SITE_RESULT"
+            exit 1
+          }
+          case "$APP_ROUTE:$TEST_RESULT" in
+            true:success|false:skipped) ;;
+            *)
+              echo "::error::Application route $APP_ROUTE produced test result $TEST_RESULT."
+              exit 1
+              ;;
+          esac
+          if [[ "$EVENT_NAME" == pull_request && "$APP_ROUTE" == true ]]; then
+            [[ "$MERGE_RESULT" == success ]] || {
+              echo "::error::Prospective-merge compatibility did not succeed: $MERGE_RESULT"
+              exit 1
+            }
+          else
+            [[ "$MERGE_RESULT" == skipped ]] || {
+              echo "::error::Unexpected prospective-merge result: $MERGE_RESULT"
+              exit 1
+            }
+          fi
+          [[ -n "$HEAD_SHA" && -n "$TREE" && -n "$FINGERPRINT" && -n "$SCHEMA" ]] || {
+            echo "::error::The review receipt identity is incomplete."
+            exit 1
+          }
+          jq -n \
+            --arg schema "$SCHEMA" \
+            --arg repository "${{ github.repository }}" \
+            --arg workflow ".github/workflows/ci.yml" \
+            --arg event "${{ github.event_name }}" \
+            --arg source_sha "$HEAD_SHA" \
+            --arg source_tree "$TREE" \
+            --arg app_fingerprint "$FINGERPRINT" \
+            --arg app_route "$APP_ROUTE" \
+            --arg changes "$CHANGES_RESULT" \
+            --arg site "$SITE_RESULT" \
+            --arg tests "$TEST_RESULT" \
+            --arg merge_compatibility "$MERGE_RESULT" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg run_attempt "${{ github.run_attempt }}" \
+            '{schema: $schema, repository: $repository, workflow: $workflow, event: $event,
+              source_sha: $source_sha, source_tree: $source_tree, app_fingerprint: $app_fingerprint,
+              app_route: $app_route,
+              conclusions: {changes: $changes, site: $site, tests: $tests,
+                            merge_compatibility: $merge_compatibility},
+              run_id: $run_id, run_attempt: $run_attempt}' \
+            > "$RUNNER_TEMP/review-receipt.json"
+          {
+            echo "### Review gate passed"
+            echo
+            echo "- Source: \`$HEAD_SHA\`"
+            echo "- Tree: \`$TREE\`"
+            echo "- App route: \`$APP_ROUTE\`"
+            echo "- App fingerprint: \`$FINGERPRINT\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve the shadow verification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: review-receipt-${{ needs.changes.outputs.head_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-receipt.json
+          if-no-files-found: error
+          retention-days: 30

@@ -29,15 +29,40 @@ final class VisualizeNavigationTests: XCTestCase {
                        "opening Visualize must not undo the explicit Forget privacy choice")
     }
 
-    func testVisualizeIsReachableFromTrafficWithoutStealingExistingShortcuts() {
+    func testDestinationShortcutsFollowTheVisibleSidebarOrder() {
         XCTAssertTrue(SidebarItem.availableCases.contains(.visualize))
         XCTAssertEqual(SidebarItem.visualize.section, .traffic)
         XCTAssertEqual(SidebarSection.traffic.items, [.live, .agents, .reports, .visualize, .alerts])
-        XCTAssertNil(SidebarItem.visualize.shortcut,
-                     "an eleventh direct-build screen must remain reachable without hijacking Space")
-        XCTAssertEqual(SidebarItem.availableCases.filter { $0.shortcut == nil }, [.visualize])
-        XCTAssertEqual(SidebarItem.alerts.shortcut, "4")
-        XCTAssertEqual(SidebarItem.rules.shortcut, "5")
+        XCTAssertEqual(SidebarItem.sidebarOrder,
+                       [.live, .agents, .reports, .visualize, .alerts,
+                        .ask, .inspect, .rules, .devices, .coverage, .capture])
+        XCTAssertEqual(SidebarItem.visualize.shortcut, "4")
+        XCTAssertEqual(SidebarItem.alerts.shortcut, "5")
+        XCTAssertEqual(SidebarItem.rules.shortcut, "8")
+        XCTAssertEqual(SidebarItem.coverage.shortcut, "0")
+        XCTAssertNil(SidebarItem.capture.shortcut,
+                     "the eleventh destination remains reachable without inventing a shortcut")
+        XCTAssertEqual(SidebarItem.sidebarOrder.filter { $0.shortcut == nil }, [.capture])
+    }
+
+    func testFocusNoticeClaimsFilteringOnlyWhereTheWholeScopeApplies() {
+        let appOnly = FocusScope(bundleIDs: ["com.example.app"])
+        let destinationOnly = FocusScope(hosts: ["example.com"])
+        let mixed = FocusScope(bundleIDs: ["com.example.app"], hosts: ["example.com"])
+
+        XCTAssertTrue(SidebarItem.live.fullyAppliesFocus(mixed))
+        XCTAssertTrue(SidebarItem.agents.fullyAppliesFocus(mixed))
+        XCTAssertTrue(SidebarItem.reports.fullyAppliesFocus(mixed))
+        XCTAssertTrue(SidebarItem.visualize.fullyAppliesFocus(mixed))
+        XCTAssertTrue(SidebarItem.inspect.fullyAppliesFocus(mixed))
+        XCTAssertTrue(SidebarItem.alerts.fullyAppliesFocus(appOnly))
+        XCTAssertFalse(SidebarItem.alerts.fullyAppliesFocus(destinationOnly))
+        XCTAssertFalse(SidebarItem.alerts.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.ask.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.rules.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.devices.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.coverage.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.capture.fullyAppliesFocus(mixed))
     }
 
     func testConnectionsKeepsTheCompatibleVisualizeRouteAndHelpAnchor() {

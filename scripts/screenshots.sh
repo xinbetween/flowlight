@@ -58,6 +58,9 @@ exact_app_pids() {
     command=$(ps -p "$pid" -o command=)
     [[ "$command" == "$expected" || "$command" == "$expected "* ]] && print -r -- "$pid"
   done
+  # A non-matching installed Flowlight may be the final loop item. Its comparison is not this helper's result:
+  # the output is the match set, and an empty set is a successful query rather than a capture failure under pipefail.
+  return 0
 }
 
 stop_exact_app() {

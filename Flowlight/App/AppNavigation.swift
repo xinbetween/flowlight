@@ -81,11 +81,18 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .capture: return "antenna.radiowaves.left.and.right"
         }
     }
+    /// The exact visual order of the sidebar. Enum declaration order is an implementation detail and used to
+    /// make Connections appear fourth while Alerts still claimed ⌘4. Commands and documentation both promise
+    /// positional shortcuts, so derive them from the grouped navigation people can actually see.
+    static var sidebarOrder: [SidebarItem] {
+        SidebarSection.allCases.flatMap(\.items)
+    }
+
     /// ⌘1…⌘9 and then ⌘0, the way every browser numbers its tabs. Nil past the tenth: there is no eleventh
     /// digit, and the arithmetic that assumed there was turned `10` into a `Character` and trapped the moment
     /// a tenth screen was added.
     var shortcut: KeyEquivalent? {
-        guard let index = Self.availableCases.firstIndex(of: self), index < 10 else { return nil }
+        guard let index = Self.sidebarOrder.firstIndex(of: self), index < 10 else { return nil }
         return KeyEquivalent(Character("\(index == 9 ? 0 : index + 1)"))
     }
 
@@ -95,6 +102,20 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask, .inspect: return .investigate
         case .rules: return .control
         case .devices, .coverage, .capture: return .sources
+        }
+    }
+
+    /// Whether the destination can honestly say that the complete active Focus scope is filtering its content.
+    /// Alerts can apply app targets but have no destination field, while operational/configuration screens and Ask
+    /// do not apply traffic scope at all. They still show the persistent Focus notice, using neutral wording.
+    func fullyAppliesFocus(_ scope: FocusScope) -> Bool {
+        switch self {
+        case .live, .agents, .reports, .visualize, .inspect:
+            return true
+        case .alerts:
+            return scope.hosts.isEmpty
+        case .ask, .rules, .devices, .coverage, .capture:
+            return false
         }
     }
 }
