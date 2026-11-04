@@ -3,55 +3,55 @@
   "screenshots": {
     "01-connections.png": {
       "height": 1800,
-      "sha256": "c6d9d8db4a2f7078cca4b312f8cb897b0060c628ee7d62c3307252a5fb683432",
+      "sha256": "c5a8500ebb5cd4490f2c2c14053a502ea522d6ce4e9afc0c274b63e1bc773c0e",
       "version": "0.17.2",
       "width": 2880
     },
     "02-ai-agents.png": {
       "height": 1800,
-      "sha256": "04dbe625f589224b869a6bcbffd0af56d89aeff6457fb9bd9bbc71f0c2ce91d9",
+      "sha256": "fa306a0fbe5f58730aa77d7de1758f81066ee3cc701073a716c37a0d664cabb4",
       "version": "0.17.2",
       "width": 2880
     },
     "03-history.png": {
       "height": 1800,
-      "sha256": "21d9a305f91a279c0dfb59b4a17412234f03d1a26cc3e0650f8f121811c707ea",
+      "sha256": "9d36d280f4f64d0eb4325c225714246d9b25bf2fbbab124181b06d396b481ce4",
       "version": "0.17.2",
       "width": 2880
     },
     "04-rules.png": {
       "height": 1800,
-      "sha256": "4cb6ff13017da9c75df9941c73d4b7cbed870095dc47528b5cc7b11b8805ed61",
+      "sha256": "a71498af1632442d58435d38f205c7ff59b12bc97bf5e6e5da667ebec52da6e7",
       "version": "0.17.2",
       "width": 2880
     },
     "05-live.png": {
       "height": 1800,
-      "sha256": "79c84bd547d5a91e691a0ccd76a0ac184acc3544c2a0ddee4b5aa8e09936050b",
+      "sha256": "625c8b14595f84796676e33c59f04789fec531e5b922b87c2eb0f2c737e52188",
       "version": "0.17.2",
       "width": 2880
     },
     "06-alerts.png": {
       "height": 1800,
-      "sha256": "34118db3915fa68b672994a4dd69d2f1125d9c31d63639d90730b646c1791c3d",
+      "sha256": "fa252d4f18281813d38d9542da63a567670c3dcd235ad4fb08227f9270063649",
       "version": "0.17.2",
       "width": 2880
     },
     "07-agent-detail.png": {
       "height": 1800,
-      "sha256": "b9f6c6181d4b6c0c13229daf144bfddac17ed01aa35d0d0c6453eedfae1c8a3e",
+      "sha256": "f86874648fc38913aa59c09871814fc7df6b6bf9d9fcc8c285130c407d36d598",
       "version": "0.17.2",
       "width": 2880
     },
     "08-agent-tools.png": {
       "height": 1800,
-      "sha256": "815375341e2a03486cbad31c54d7095f83876363a4d5b17fc66926bbecf7e51c",
+      "sha256": "34cfea4604e19608aae557f099516d7070c0222ec6219338433bd856e36618d5",
       "version": "0.17.2",
       "width": 2880
     },
     "09-mcp-servers.png": {
       "height": 1800,
-      "sha256": "c36cb162e1fdff5cb06e8deeb7b375521e331d3803a7a7fffcda22b7fde51d03",
+      "sha256": "c329d960d97ecd8ba5faf873f5f7362f82436df0797f01d34188998cba3b27e0",
       "version": "0.17.2",
       "width": 2880
     }

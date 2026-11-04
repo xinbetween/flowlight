@@ -192,7 +192,9 @@ final class AppNavigation: ObservableObject {
         let restored = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
         return SidebarItem.availableCases.contains(restored) ? restored : .live
     }()
-    @Published var rulesTab: RulesTab = .rules
+    @Published var rulesTab: RulesTab = {
+        RulesTab(rawValue: UserDefaults.standard.string(forKey: "FLRulesTab") ?? "") ?? .rules
+    }()
     @Published var reportRequest: ReportRequest?
     @Published var inspectRequest: InspectRequest?
     @Published var ruleRequest: RuleRequest?

@@ -99,16 +99,7 @@ title_matches_screen() {
 }
 
 window_title() {
-  osascript - "$1" <<'OSA'
-on run argv
-  tell application "System Events"
-    tell first application process whose unix id is (item 1 of argv as integer)
-      if (count of windows) is 0 then return ""
-      return name of first window
-    end tell
-  end tell
-end run
-OSA
+  scripts/window-id.swift --title "$1"
 }
 
 capture() {
@@ -121,23 +112,30 @@ capture() {
   [ -z "$(exact_app_pids "$executable")" ] || { echo "    exact candidate is already running"; return 1; }
   # The always-monitor shot asks for the representative "these agents are being monitored" banner, which real
   # inspection state (absent under the demo database) would otherwise never show.
-  local banner=() visualization=()
+  local banner=() visualization=() rules=()
   [ "$name" = "always-monitor" ] && banner=(-FLDemoBanner YES)
   [ "$name" = "visualize" ] && visualization=(-visualize.mode ai -visualize.presentation map -visualize.granularity hour)
+  [ "$name" = "rules" ] && rules=(-FLRulesTab packs)
   # Ignore macOS scene state: this launch is a deterministic fixture, and restored sidebar selection can otherwise
   # arrive after demo seeding and replace the requested screen. Pin English too, so the title check below is stable.
-  open -n "$APP" --args -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
+  # Launch the exact executable directly. Launch Services may route arguments between simultaneous installations
+  # with the same bundle identifier, producing a real candidate window on the wrong screen.
+  "$executable" -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
     -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
     -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
     -AppleInterfaceStyle Light \
-    "${banner[@]}" "${visualization[@]}"
-  local pid=""
+    "${banner[@]}" "${visualization[@]}" "${rules[@]}" >/dev/null 2>&1 &
+  local pid=$!
+  local command=""
   for _ in {1..40}; do
-    pid=$(exact_app_pids "$executable" | head -1)
-    [ -n "$pid" ] && break
+    command=$(ps -p "$pid" -o command= 2>/dev/null || true)
+    [[ "$command" == "$executable" || "$command" == "$executable "* ]] && break
     sleep 0.25
   done
-  [ -n "$pid" ] || { echo "    couldn't find the candidate process"; return 1; }
+  [[ "$command" == "$executable" || "$command" == "$executable "* ]] || {
+    echo "    couldn't verify the candidate process"
+    return 1
+  }
   sleep "${FL_WAIT:-14}"   # seeding 90 days of synthetic history, then the rollups it reads
   # A window that isn't key draws its close/minimise/zoom buttons grey, which is how every published
   # screenshot lost them. Bring the exact candidate forward and let the redraw land before the shutter.
