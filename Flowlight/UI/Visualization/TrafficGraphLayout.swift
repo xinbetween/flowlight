@@ -982,7 +982,7 @@ enum TrafficGraphLayout {
         let orderedProfiles = denseSearch
             ? Array(orderedSmoothProfiles.prefix(1))
             : orderedSmoothProfiles + Array(controlProfiles.dropFirst(3))
-        let controlFactors: [CGFloat] = denseSearch ? [1, 2.6] : [1, 4 / 3, 2, 2.6, 3.2]
+        let controlFactors: [CGFloat] = denseSearch ? [1, 2.6] : [1, CGFloat(4.0 / 3.0), 2, 2.6, 3.2]
         func staysInsideCanvas(_ candidate: TrafficGraphCurve) -> Bool {
             (0...64).allSatisfy { step in
                 let point = candidate.point(at: CGFloat(step) / 64)
