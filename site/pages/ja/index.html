@@ -80,15 +80,15 @@ nav: home
       <div class="cases">
         <div class="case"><span class="view">AI エージェント</span><h3>会議中もエージェントが動いている</h3>
           <p>モデルプロバイダ以外に、エージェントとそのツールが触れたホストをすべて確認できます。許可リストを外れたとき、メールを送ったとき、新しい相手へ 100&nbsp;MB を送ったときはアラートが出ます。</p></div>
-        <div class="case"><span class="view">レポート</span><h3>送信量が急に跳ねた理由がわからない</h3>
-          <p>山にポインタを重ねれば原因のアプリがわかり、クリックすれば 1 時間から 1 分へ拡大でき、そのままドメインと IP まで追えます。</p></div>
+        <div class="case"><span class="view">履歴</span><h3>送信量が急に跳ねた理由がわからない</h3>
+          <p>山にポインタを重ねて原因のアプリをスクロール可能なカードで確認し、期間ボタンやナビゲータで 1 時間から 1 分へ移動して、ドメインと IP まで追えます。</p></div>
         <div class="case"><span class="view">アラート</span><h3>見慣れないアプリが外部と通信を始めた</h3>
           <p>新しいドメインへの初回接続、非標準ポートへの接続、トラフィックの急増は、それぞれアラートになり、アプリ名ときっかけになった数値を示します。</p></div>
         <div class="case"><span class="view">ライブ</span><h3>いま何かが回線を使い切っている</h3>
           <p>通信量の多いアプリを 1 秒ごとに更新し、アプリごとに最も忙しい接続先を表示します。現在の速度はメニューバーにも出ます。</p></div>
-        <div class="case"><span class="view">レポート</span><h3>今月のテザリング通信量が消えた</h3>
+        <div class="case"><span class="view">履歴</span><h3>今月のテザリング通信量が消えた</h3>
           <p>月表示に切り替えてアプリでグループ化すれば、最も使ったアプリが一番上に来ます。証拠が必要なら CSV に書き出せます。</p></div>
-        <div class="case"><span class="view">レポート · 接続先</span><h3>データの行き先を監査したい</h3>
+        <div class="case"><span class="view">履歴 · 接続先</span><h3>データの行き先を監査したい</h3>
           <p>接続先でグループ化すれば、そのドメインと通信するアプリがすべて並びます。IP でグループ化すれば、アドレスの向こうにあるものが見えます。</p></div>
       </div>
     </div>
@@ -106,7 +106,7 @@ nav: home
         <div class="view-card"><span class="glyph ai-agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 4.5l1.7 4.8L17 11l-4.8 1.7-1.7 4.8-1.7-4.8L4 11l4.8-1.7z"/><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
           <h3>AI エージェント</h3><p>エージェントはモデルを呼ぶ以外に何をしている？プロバイダ、ほかのホスト、リスクバッジ。</p><span class="keys">⌘2</span></div>
         <div class="view-card"><span class="glyph reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-          <h3>レポート</h3><p>結局どこへ行った？秒から年まで、アプリ・接続先・IP でグループ化、グラフと CSV 付き。</p><span class="keys">⌘3</span></div>
+          <h3>履歴</h3><p>結局どこへ行った？秒から年まで、アプリ・接続先・IP でグループ化、グラフと CSV 付き。</p><span class="keys">⌘3</span></div>
         <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
           <h3>アラート</h3><p>何がおかしかった？理由がわかるアプリ単位のアラートに、接続先としきい値を添えて。</p><span class="keys">⌘4</span></div>
         <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
@@ -118,7 +118,7 @@ nav: home
         <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
           <h3>インスペクト</h3><p>任意。エージェントは実際に何を送り、どのツール呼び出しが原因だった？復号したリクエスト、ツール呼び出し、結果。</p><span class="keys">⌘7</span></div>
         <div class="view-card"><span class="glyph visualize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6c5 0 6-1 10-1M7 7c5 1 6 9 10 11"/></svg></span>
-          <h3>可視化</h3><p>何が通信している？アプリのトラフィックと確認済み AI エージェント経路を、ズームできる Sankey マップと同じ内容のリストで表示します。</p></div>
+          <h3>接続</h3><p>何が通信している？アプリのトラフィックと確認済み AI エージェント経路を、ズームできる Sankey マップと同じ内容のリストで表示します。</p></div>
       </div>
     </div>
   </section>
@@ -401,8 +401,8 @@ nav: home
   <section class="band" aria-label="そのほかのスクリーンショット">
     <div class="wrap screens">
       <figure><div class="frame"><img src="{{root}}assets/screenshots/reports.png" width="1600" height="1075" loading="lazy"
-        alt="レポートビュー。1 時間ごとの受信と送信の棒グラフ、アプリ・接続先・プロトコルのドーナツグラフが表示されています"></div>
-        <figcaption><b>レポート。</b>秒から年までのズーム、3 つのグループ化、アプリが数百あっても読めるグラフ。</figcaption></figure>
+        alt="履歴ビュー。1 時間ごとの受信と送信の棒グラフ、アプリ・接続先・プロトコルのドーナツグラフが表示されています"></div>
+        <figcaption><b>履歴。</b>秒から年までのズーム、3 つのグループ化、アプリが数百あっても読めるグラフ。</figcaption></figure>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/alerts.png" width="1600" height="1075" loading="lazy"
         alt="アラートビュー。エージェントの情報流出、メール、FTP、離席中、トラフィック急増のアラートが並んでいます"></div>
         <figcaption><b>アラート。</b>どれもアプリ、接続先、きっかけになった数値を示します。</figcaption></figure>

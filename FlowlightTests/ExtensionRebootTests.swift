@@ -33,6 +33,13 @@ final class ExtensionRebootTests: XCTestCase {
         XCTAssertFalse(check(installed: ["0.9.5"], awaiting: [], app: "0.9.5").needsRestart)
     }
 
+    func testOnlyTheAuthoritativeRebootStateShowsTheMenuBarNotice() {
+        XCTAssertTrue(ExtensionManager.State.needsReboot.showsMenuBarNotice)
+        XCTAssertFalse(ExtensionManager.State.enabled.showsMenuBarNotice)
+        XCTAssertFalse(ExtensionManager.State.installing.showsMenuBarNotice)
+        XCTAssertFalse(ExtensionManager.State.failed("offline").showsMenuBarNotice)
+    }
+
     /// The 0.10.0 upgrade, verbatim from `systemextensionsctl list`: the new build enabled, three previous ones
     /// held for removal on reboot. It must be a restart problem, not a stale one — and "0.10.0" must sort after
     /// "0.9.x" so the enabled build is recognised as the current one.

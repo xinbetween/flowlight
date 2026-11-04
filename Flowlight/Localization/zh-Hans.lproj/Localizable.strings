@@ -1106,12 +1106,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "应用 › 域名 › IP、目标 › 应用 › IP，或 IP › 应用";
 "Choose a longer window or clear filters." = "请选择更长的时间窗口，或清除筛选条件。";
 "Back" = "返回";
-"Return to the previous report scope" = "返回上一个报告范围";
-"Granularity" = "粒度";
-"Earlier (⌘[)" = "更早（⌘[）";
-"Earlier" = "更早";
-"Later (⌘])" = "更晚（⌘]）";
-"Later" = "更晚";
 "Now" = "现在";
 "Showing only:" = "仅显示：";
 "App: %@" = "应用：%@";
@@ -1135,7 +1129,6 @@
 "Peak year" = "峰值年";
 "Bytes" = "字节";
 "Filtered traffic" = "已筛选的流量";
-"Click a bar to zoom in" = "点按柱状条可放大查看";
 "Use the Left and Right Arrow keys to inspect time buckets." = "使用左右箭头键查看各时间段。";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "使用左右箭头键查看各时间段，然后按 Return 键放大。";
 "1 new flow" = "1 条新流";
@@ -1798,7 +1791,6 @@
 "Could not prepare managed-pack review demo: %@" = "无法准备托管包审查演示：%@";
 
 /* 0.16.0 流量可视化 */
-"Visualize" = "可视化";
 "Map" = "地图";
 "List" = "列表";
 "App, domain, or IP" = "应用、域名或 IP";
@@ -1874,3 +1866,29 @@
 "%lld exact destinations" = "%lld 个精确目标";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ 到 %@，接收 %@，发送 %@，%lld 个连接";
 "Show domain family in Reports" = "在报告中显示域名族";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1个月";
+"15 min" = "15分钟";
+"1d" = "1天";
+"1h" = "1小时";
+"1w" = "1周";
+"1y" = "1年";
+"6 mo" = "6个月";
+"6h" = "6小时";
+"All" = "全部";
+"All history" = "所有历史记录";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "拖移所选范围以浏览历史记录，拖移任一边缘以调整范围大小，或使用左、右箭头键。";
+"Flowlight network activity" = "Flowlight 网络活动";
+"Flowlight, restart required to finish updating the filter" = "Flowlight，需要重新启动才能完成过滤器更新";
+"Full history" = "完整历史记录";
+"History" = "历史记录";
+"History overview failed: %@" = "无法显示历史记录概览：%@";
+"History range navigator" = "历史记录范围导航器";
+"Nearby" = "附近";
+"Nearby context" = "附近记录";
+"Open the filter update notice in Flowlight" = "在 Flowlight 中打开过滤器更新通知";
+"Range" = "范围";
+"Restart or reinstall the filter to finish the update" = "重新启动或重新安装过滤器以完成更新";
+"Return to the previous history scope" = "返回上一个历史记录范围";
+"Selected" = "已选择";

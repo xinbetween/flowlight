@@ -97,7 +97,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "rules", title: "Rules",
             summary: "Block or allow anything: an app, an agent, a destination, a URL, or a pairing of those — forever, until a time, until Flowlight quits, or between chosen hours. The most specific rule wins and a tie goes to the block.",
-            steps: ["Open Rules and press ＋, or right-click any row in Live, Reports, AI Agents or Inspect and choose Block.",
+            steps: ["Open Rules and press ＋, or right-click any row in Live, History, AI Agents or Inspect and choose Block.",
                     "Name an app or a destination, pick block or allow, and choose how long it lasts.",
                     "Pause Blocking in the toolbar stands every rule down for a while."],
             screen: .rules,
@@ -142,19 +142,19 @@ extension FeatureGuide {
             keywords: ["alert", "anomaly", "warning", "threshold", "notification", "exfiltration"]),
 
         FeatureGuide(
-            id: "reports", title: "Reports",
+            id: "reports", title: "History",
             summary: "History from second to year, grouped by app, destination or address, with charts, a Worth a look mode that points at apps whose destinations don't resemble their peers, and CSV export.",
-            steps: ["Open Reports.", "Pick a granularity, then group by App › Domain › IP, Destination › App › IP, or IP › App.",
+            steps: ["Open History.", "Pick a granularity, then group by App › Domain › IP, Destination › App › IP, or IP › App.",
                     "Use the Way out menu to narrow to the network, peer-to-peer Wi-Fi, this Mac or a tunnel."],
             screen: .reports,
-            keywords: ["history", "chart", "csv", "export csv", "breakdown", "worth a look", "group"]),
+            keywords: ["history", "reports", "chart", "csv", "export csv", "breakdown", "worth a look", "group"]),
 
         FeatureGuide(
-            id: "visualize", title: "Traffic and AI visualization",
+            id: "visualize", title: "Connections",
             summary: "One native map with separate Traffic and AI activity modes. Traffic shows every app-to-destination connection; AI activity shows proved agent clients, their attributed tools and MCP servers, LLM services, and every other destination they reached.",
-            steps: ["Open Visualize and choose Traffic or AI activity.",
+            steps: ["Open Connections and choose Traffic or AI activity.",
                     "Pick a time period and select a node or connection for exact byte and connection totals.",
-                    "For a grouped LLM service, choose an exact host and address before opening Reports, Inspect, or an unsaved blocking rule."],
+                    "For a grouped LLM service, choose an exact host and address before opening History, Inspect, or an unsaved blocking rule."],
             screen: .visualize,
             caveats: ["Connections are network flows, not HTTP request counts.",
                       "Observed means traffic exists. Runs means stored process lineage; it is not a proved invocation.",
@@ -165,7 +165,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "channels", title: "Peer-to-peer Wi-Fi",
             summary: "AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a device in the room over AWDL. Flowlight labels those flows rather than showing them as traffic to an address with no name.",
-            steps: ["Open Reports.", "Use the Way out menu in the toolbar and choose Peer-to-peer Wi-Fi."],
+            steps: ["Open History.", "Use the Way out menu in the toolbar and choose Peer-to-peer Wi-Fi."],
             screen: .reports,
             keywords: ["airdrop", "awdl", "handoff", "airplay", "sidecar", "peer to peer", "nearby"]),
 
@@ -186,7 +186,7 @@ extension FeatureGuide {
                     "Pick which fields may leave, and add any headers your collector needs."],
             screen: nil,
             caveats: ["Headers are kept in the login Keychain, not in preferences.",
-                      "Whatever it sends appears in Live and Reports like any other app's traffic."],
+                      "Whatever it sends appears in Live and History like any other app's traffic."],
             keywords: ["otlp", "siem", "splunk", "datadog", "collector", "opentelemetry", "forward"]),
 
         FeatureGuide(

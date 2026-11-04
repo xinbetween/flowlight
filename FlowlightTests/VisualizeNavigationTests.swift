@@ -40,9 +40,31 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarItem.rules.shortcut, "5")
     }
 
-    func testVisualizeUsesItsOwnHelpSection() {
+    func testConnectionsKeepsTheCompatibleVisualizeRouteAndHelpAnchor() {
+        XCTAssertEqual(SidebarItem.visualize.rawValue, "visualize")
         XCTAssertEqual(SidebarItem.visualize.helpAnchor, "visualize")
-        XCTAssertEqual(SidebarItem.visualize.englishTitle, "Visualize")
+        XCTAssertEqual(SidebarItem.visualize.englishTitle, "Connections")
+    }
+
+    func testConnectionsLoadingAlwaysOutranksAStaleSnapshotAndYieldsToEmptyState() {
+        XCTAssertTrue(ConnectionsRenderPolicy.showsLoading(isLoading: true, hasSnapshot: true))
+        XCTAssertTrue(ConnectionsRenderPolicy.showsLoading(isLoading: true, hasSnapshot: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.showsLoading(isLoading: false, hasSnapshot: true))
+        XCTAssertFalse(ConnectionsRenderPolicy.showsLoading(isLoading: false, hasSnapshot: false))
+    }
+
+    func testConnectionsRejectsAStaleAsyncCompletion() {
+        let current = UUID()
+        XCTAssertTrue(ConnectionsRenderPolicy.canCommit(requestID: current, currentID: current, cancelled: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.canCommit(requestID: UUID(), currentID: current, cancelled: false))
+        XCTAssertFalse(ConnectionsRenderPolicy.canCommit(requestID: current, currentID: current, cancelled: true))
+    }
+
+    func testConnectionsWaitsForCurrentDataBeforeRebuilding() {
+        let current = UUID()
+        XCTAssertTrue(ConnectionsRenderPolicy.canRebuild(loadedID: current, currentLoadID: current))
+        XCTAssertFalse(ConnectionsRenderPolicy.canRebuild(loadedID: nil, currentLoadID: current))
+        XCTAssertFalse(ConnectionsRenderPolicy.canRebuild(loadedID: UUID(), currentLoadID: current))
     }
 
     func testCrossScreenBackRestoresReportOriginAndScope() {
@@ -52,7 +74,9 @@ final class VisualizeNavigationTests: XCTestCase {
 
         nav.showReport(filter: reportFilter, granularity: .hour, end: Date(timeIntervalSince1970: 42))
         nav.updateCurrentReportScope(filter: reportFilter, granularity: .hour,
-                                     endDate: Date(timeIntervalSince1970: 42), followNow: false)
+                                     startDate: Date(timeIntervalSince1970: 0),
+                                     endDate: Date(timeIntervalSince1970: 42), followNow: false,
+                                     preset: nil)
         nav.showInspect(app: ("claude", "Claude Code"), host: "api.anthropic.com")
 
         XCTAssertEqual(nav.backDestination, .reports)
@@ -61,10 +85,31 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(nav.reportRequest?.filter, reportFilter)
         XCTAssertEqual(nav.reportRequest?.granularity, .hour)
         XCTAssertEqual(nav.reportRequest?.end, Date(timeIntervalSince1970: 42))
+        XCTAssertEqual(nav.reportRequest?.duration, 42)
+        XCTAssertNil(nav.reportRequest?.preset)
         XCTAssertEqual(nav.backDestination, .visualize)
         nav.goBack()
         XCTAssertEqual(nav.selection, .visualize)
         XCTAssertNil(nav.backDestination)
+    }
+
+    func testCrossScreenBackPreservesAFollowingHistoryDurationAndPreset() {
+        let nav = AppNavigation()
+        nav.show(.reports)
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = start.addingTimeInterval(15 * 60)
+        nav.updateCurrentReportScope(filter: .none, granularity: .minute,
+                                     startDate: start, endDate: end, followNow: true,
+                                     preset: .fifteenMinutes)
+
+        nav.showInspect(host: "api.anthropic.com")
+        nav.goBack()
+
+        XCTAssertEqual(nav.selection, .reports)
+        XCTAssertNil(nav.reportRequest?.start)
+        XCTAssertNil(nav.reportRequest?.end)
+        XCTAssertEqual(nav.reportRequest?.duration, 15 * 60)
+        XCTAssertEqual(nav.reportRequest?.preset, .fifteenMinutes)
     }
 
     func testPackReviewNavigationClearsCrossScreenTrailAndOpensPacks() {

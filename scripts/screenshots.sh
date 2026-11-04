@@ -59,6 +59,31 @@ stop_exact_app() {
   fi
 }
 
+expected_window_title() {
+  case "$1" in
+    live) print -r -- "Live" ;;
+    agents) print -r -- "AI Agents" ;;
+    reports) print -r -- "History" ;;
+    alerts) print -r -- "Alerts" ;;
+    inspect) print -r -- "Inspect" ;;
+    visualize) print -r -- "Connections" ;;
+    *) echo "    no expected window title for screen $1" >&2; return 1 ;;
+  esac
+}
+
+window_title() {
+  osascript - "$1" <<'OSA'
+on run argv
+  tell application "System Events"
+    tell first application process whose unix id is (item 1 of argv as integer)
+      if (count of windows) is 0 then return ""
+      return name of first window
+    end tell
+  end tell
+end run
+OSA
+}
+
 capture() {
   local name="$1" screen="$2" tab="$3" size="${4:-$SIZE}"
   echo "  $name ($screen${tab:+ · $tab})"
@@ -71,8 +96,12 @@ capture() {
   local banner=() visualization=()
   [ "$name" = "always-monitor" ] && banner=(-FLDemoBanner YES)
   [ "$name" = "visualize" ] && visualization=(-visualize.mode ai -visualize.presentation map -visualize.granularity hour)
-  open -n "$APP" --args -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example "${banner[@]}" "${visualization[@]}"
+  # Ignore macOS scene state: this launch is a deterministic fixture, and restored sidebar selection can otherwise
+  # arrive after demo seeding and replace the requested screen. Pin English too, so the title check below is stable.
+  open -n "$APP" --args -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
+    -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -AppleInterfaceStyle Light \
+    "${banner[@]}" "${visualization[@]}"
   local pid=""
   for _ in {1..40}; do
     pid=$(exact_app_pids "$executable" | head -1)
@@ -89,6 +118,14 @@ on run argv
 end run
 OSA
   sleep 2
+  local expected actual
+  expected=$(expected_window_title "$screen")
+  actual=$(window_title "$pid" 2>/dev/null || true)
+  if [ "$actual" != "$expected" ]; then
+    echo "    refusing to capture $name: expected $expected, found ${actual:-no window}"
+    stop_exact_app "$pid" "$executable"
+    return 1
+  fi
   local id
   id=$(scripts/window-id.swift "$pid" 2>/dev/null || true)
   if [ -z "$id" ]; then
@@ -104,8 +141,13 @@ OSA
   sleep 2
 }
 
+captured=0
 for shot in "${SHOTS[@]}"; do
   IFS=":" read -r name screen tab size <<< "$shot"
+  if [ -n "${FL_ONLY:-}" ] && [[ ",${FL_ONLY}," != *",${name},"* ]]; then
+    continue
+  fi
   capture "$name" "$screen" "$tab" "$size"
+  captured=$((captured + 1))
 done
-echo "Wrote ${#SHOTS[@]} screenshots to $OUT"
+echo "Wrote $captured screenshots to $OUT"

@@ -1083,12 +1083,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Dominio › IP, Destinazione › App › IP oppure IP › App";
 "Choose a longer window or clear filters." = "Scegli un intervallo più ampio o azzera i filtri.";
 "Back" = "Indietro";
-"Return to the previous report scope" = "Torna all'ambito del report precedente";
-"Granularity" = "Granularità";
-"Earlier (⌘[)" = "Precedente (⌘[)";
-"Earlier" = "Precedente";
-"Later (⌘])" = "Successivo (⌘])";
-"Later" = "Successivo";
 "Now" = "Adesso";
 "Showing only:" = "Mostrati solo:";
 "App: %@" = "App: %@";
@@ -1112,7 +1106,6 @@
 "Peak year" = "Anno di punta";
 "Bytes" = "Byte";
 "Filtered traffic" = "Traffico filtrato";
-"Click a bar to zoom in" = "Fai clic su una barra per ingrandire";
 "Use the Left and Right Arrow keys to inspect time buckets." = "Usa i tasti freccia sinistra e destra per esaminare gli intervalli di tempo.";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Usa i tasti freccia sinistra e destra per esaminare gli intervalli di tempo, quindi premi Invio per ingrandire.";
 "1 new flow" = "1 nuovo flusso";
@@ -1799,7 +1792,6 @@
 "Could not prepare managed-pack review demo: %@" = "Impossibile preparare la demo di revisione dei pacchetti gestiti: %@";
 
 /* Visualizzazione traffico 0.16.0 */
-"Visualize" = "Visualizza";
 "Map" = "Mappa";
 "List" = "Elenco";
 "App, domain, or IP" = "App, dominio o IP";
@@ -1875,3 +1867,29 @@
 "%lld exact destinations" = "%lld destinazioni esatte";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ verso %@, %@ ricevuti, %@ inviati, %lld connessioni";
 "Show domain family in Reports" = "Mostra la famiglia di domini in Rapporti";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1 mese";
+"15 min" = "15 min";
+"1d" = "1 g";
+"1h" = "1 h";
+"1w" = "1 sett.";
+"1y" = "1 anno";
+"6 mo" = "6 mesi";
+"6h" = "6 h";
+"All" = "Tutto";
+"All history" = "Tutta la cronologia";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "Trascina la selezione per spostarti nella cronologia, trascina uno dei bordi per ridimensionarla oppure usa i tasti Freccia sinistra e Freccia destra.";
+"Flowlight network activity" = "Attività di rete di Flowlight";
+"Flowlight, restart required to finish updating the filter" = "Flowlight, riavvio necessario per completare l'aggiornamento del filtro";
+"Full history" = "Cronologia completa";
+"History" = "Cronologia";
+"History overview failed: %@" = "Impossibile mostrare la panoramica della cronologia: %@";
+"History range navigator" = "Navigatore dell'intervallo della cronologia";
+"Nearby" = "Vicino";
+"Nearby context" = "Contesto vicino";
+"Open the filter update notice in Flowlight" = "Apri l'avviso di aggiornamento del filtro in Flowlight";
+"Range" = "Intervallo";
+"Restart or reinstall the filter to finish the update" = "Riavvia o reinstalla il filtro per completare l'aggiornamento";
+"Return to the previous history scope" = "Torna all'ambito precedente della cronologia";
+"Selected" = "Selezionato";

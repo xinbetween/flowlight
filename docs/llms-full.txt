@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.16.11, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.0, macOS 15 or later.
 
  On this page
 
@@ -153,9 +153,9 @@ open build/Build/Products/Release/Flowlight.app
 
  AI Agents⌘2Which agents are active, which AI providers they use, and what else they contacted.
 
- Reports⌘3Where traffic went, from second to year. Group by App, Destination or IP; switch to Charts or Worth a look; export CSV.
+ History⌘3Where traffic went, from a 15-minute preset through all retained history. Group by App, Destination or IP; switch to Charts or Worth a look; export CSV.
 
- Visualize—A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.
+ Connections—A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.
 
  Alerts⌘4Everything that looked unusual, with the app, the destination and the number that tripped the rule.
 
@@ -174,17 +174,17 @@ open build/Build/Products/Release/Flowlight.app
  The shortcuts are the sidebar's order, so ⌘0 is the tenth item rather than a skipped position.
 
  Live, the screen Flowlight opens on.
- In Reports, hover a bar to see which apps drove it, click it to zoom in, and double-click any row to narrow the report to it.
+ In History, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with Nearby context and can switch to All history: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.
 
- Visualize traffic
+ Connections
 
- Visualize draws every app, exact destination, and observed relationship in the current time, Search, and Focus scope. Path width follows total bytes. Sparse rose and blue dashes travel in opposite sent and received directions; every edge has its own stable speed, and Reduce Motion keeps the same truthful static paths.
+ Connections draws every app, exact destination, and observed relationship in the current time, Search, and Focus scope. Path width follows total bytes. Sparse rose and blue dashes travel in opposite sent and received directions; every edge has its own stable speed, and Reduce Motion keeps the same truthful static paths.
 
  Choose Traffic for every observed application, or AI activity for proved agent clients, their attributed tools and MCP servers, launchers, gateways, Flowlight's inspection proxy, LLM services, and every other destination they reached. Process-lineage and configured-route relationships stay visually distinct from observed traffic and never invent byte totals or invocations.
 
- By default, Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic. Use the optional searchable source and destination selectors for any-to-any, one-to-any, any-to-one, or one-to-one investigation. Each choice limits the opposite selector to endpoints with observed or blocked evidence, while Any stays available; Reset returns both selectors to Any. A focused Map includes every connected launcher, agent, tool or MCP service, gateway, Flowlight proxy stage, destination, and observed or blocked relationship. Only an unusually large focused neighborhood groups progressively; each group retains every exact member ID. List and Reports remain complete and numerically identical.
+ By default, Traffic shows the ten busiest applications and AI activity shows the ten busiest proved agent roots, ranked by complete received-plus-sent traffic. Use the optional searchable source and destination selectors for any-to-any, one-to-any, any-to-one, or one-to-one investigation. Each choice limits the opposite selector to endpoints with observed or blocked evidence, while Any stays available; Reset returns both selectors to Any. A focused Map includes every connected launcher, agent, tool or MCP service, gateway, Flowlight proxy stage, destination, and observed or blocked relationship. Only an unusually large focused neighborhood groups progressively; each group retains every exact member ID. List and History remain complete and numerically identical.
 
- Select a node or connection for exact values, then continue to Reports, Inspect, or an unsaved blocking-rule editor with the same app and exact destination. List exposes the same complete graph 25 relationships at a time for keyboard, VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is not an allow verdict.
+ Select a node or connection for exact values, then continue to History, Inspect, or an unsaved blocking-rule editor with the same app and exact destination. List exposes the same complete graph 25 relationships at a time for keyboard, VoiceOver, and anyone who prefers no spatial view. “Connections” means network flows, not HTTP requests. “Observed” means traffic exists; it is not an allow verdict.
 
  AI agent rules
 
@@ -208,7 +208,7 @@ open build/Build/Products/Release/Flowlight.app
  Agents do much of their work through other processes: a shell tool runs curl, git or npm, and MCP
  servers run as their own processes. Flowlight follows each process's parents back to the agent that started it, so that traffic is
  counted as the agent's. In AI Agents, the agent's detail lists these under Tools & MCP servers, and
- destinations read via curl or via github MCP. In Reports, the process row reads via Claude Code.
+ destinations read via curl or via github MCP. In History, the process row reads via Claude Code.
 
  MCP servers are named by matching their command line to the MCP configuration of Claude Code (~/.claude.json), Claude Desktop,
  Cursor (~/.cursor/mcp.json), Windsurf, VS Code, Codex (~/.codex/config.toml), Zed and Gemini CLI. Remote MCP servers
@@ -258,7 +258,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Worth a look
 
- A third mode in Reports, beside the breakdown and the charts. It compares the apps in the report with each other
+ A third mode in History, beside the breakdown and the charts. It compares the apps in the report with each other
  and points at the ones whose destinations don't look like the rest: many more places than their peers, addresses that never
  resolved to a name, hostnames that look generated rather than chosen, far more sent than received, and protocols that are a
  sideline rather than the app's purpose. Each finding carries the evidence behind it, and clicking one narrows the report to that
@@ -277,7 +277,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Every flow now carries a channel: Network, Peer-to-peer Wi-Fi, This Mac (loopback,
  which never left the machine) or Tunnel (inside a VPN; where it went after that isn't visible here). Narrow a report to
- one of them from the Reports toolbar, and it travels with CSV exports and with anything sent to a collector.
+ one of them from the History toolbar, and it travels with CSV exports and with anything sent to a collector.
 
  Peer-to-peer rows are named by the feature that opened them — AirDrop and Handoff · nearby device,
  Continuity · nearby device — because a link-local address tells you nothing and the device in the room has no name
@@ -305,7 +305,7 @@ open build/Build/Products/Release/Flowlight.app
  Apple's own apps are left out by default. macOS contacts Apple constantly — Software Update, iCloud,
  push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
  line worth reading. Turn it off in Settings › Alerts if you want them. Either way the traffic is still
- recorded, still appears in Live, Reports and Ask, and is still subject to every rule, guardrail and allowlist: the setting
+ recorded, still appears in Live, History and Ask, and is still subject to every rule, guardrail and allowlist: the setting
  decides what is listed, never what is allowed.
 
  Ask
@@ -340,10 +340,10 @@ open build/Build/Products/Release/Flowlight.app
  whole as a pie. Flowlight draws them from the same rows the query returned, so the picture and the sentence cannot disagree,
  and the model can ask for a different shape or for none at all.
 
- Every query is listed under the answer, and clicking one opens Reports for traffic evidence or the relevant
+ Every query is listed under the answer, and clicking one opens History for traffic evidence or the relevant
  app screen for device and configuration answers. An answer you can't check is a guess with better grammar.
 
- Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and Reports
+ Flowlight holds itself to its own standard. Whatever this feature sends appears in Live and History
  like any other app's traffic — including when the model server is on this very Mac, which is the case it would have been
  easiest to quietly leave out.
 
@@ -378,7 +378,7 @@ open build/Build/Products/Release/Flowlight.app
  allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
 
- Local risk analysis is separate and off by default. In Reports or Settings › Detection, you can ask
+ Local risk analysis is separate and off by default. In History or Settings › Detection, you can ask
  Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
  bounded redacted description — never request or response bodies, header values, cookies, credentials or tool arguments —
  and nothing leaves the Mac. The result is a potential-harm hint, not proof of intent: Flowlight never blocks, changes,
@@ -431,7 +431,7 @@ open build/Build/Products/Release/Flowlight.app
  and it is unavoidable: the entire point is that what replaces it starts with a different environment. What it cannot do is
  reach the agents already running — their proxy settings were read at launch, and nothing can change them now.
 
- Getting here from a row. Right-click an app or a destination in Live, Reports or AI Agents and
+ Getting here from a row. Right-click an app or a destination in Live, History or AI Agents and
  choose Inspect …'s Traffic: Inspect opens showing only that app, or only that destination, with a chip
  saying so that you can remove in one click. It scopes rather than searches — an earlier version put the name in the search
  field, which also searches response bodies, so asking for one agent's traffic returned every page whose HTML happened to
@@ -470,14 +470,14 @@ open build/Build/Products/Release/Flowlight.app
 
  An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
  subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
- or allow. Right-click any row in Live, Reports, AI Agents or Inspect to write one about what you're looking at;
+ or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at;
  every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
  would be a rule you could never find again.
 
  Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
  model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
  HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
- what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, Reports, AI Agents or Inspect and
+ what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
  apply one to what you're looking at.
 
  Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
@@ -723,10 +723,10 @@ open build/Build/Products/Release/Flowlight.app
 
  Focus mode
 
- Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect, and the rates in
+ Pick a few apps and destinations and every screen shows only those — Live, History, Alerts, AI Agents and Inspect, and the rates in
  the menu bar. It's for watching one agent work without the rest of the Mac in the way.
 
- Right-click any row in Live, Reports or AI Agents and choose Focus on…, or use the Focus control at the bottom of
+ Right-click any row in Live, History or AI Agents and choose Focus on…, or use the Focus control at the bottom of
  the sidebar to pick from the apps that have been active and to type destinations.
 
  ⇧⌘F turns Focus on and off, and so does the menu bar, which also shows what's focused.
@@ -780,7 +780,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Auth headers are kept in your login Keychain, not in preferences. Only their names are ever displayed.
 
- What Flowlight sends shows up in Flowlight, in Live and Reports, like any other app's traffic — including
+ What Flowlight sends shows up in Flowlight, in Live and History, like any other app's traffic — including
  a collector on 127.0.0.1.
 
  Two things to expect: rollups are folded about two minutes behind, so an interval under a minute polls more often without data
@@ -920,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.16.11macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -963,9 +963,9 @@ Understand your AI agents.
 
  See every host it and its tools touched besides its model provider, and get an alert if it leaves its allowlist, sends email or uploads 100 MB somewhere new.
 
- ReportsYour upload spiked and you don't know why
+ HistoryYour upload spiked and you don't know why
 
- Hover the spike to see the app behind it, click to zoom from the hour to the minute, and follow it to the exact domain and IP.
+ Hover the spike for a scrollable contributor card, then use the range presets or navigator to move from hour to minute and follow it to the exact domain and IP.
 
  AlertsA new app started phoning home
 
@@ -975,11 +975,11 @@ Understand your AI agents.
 
  Top talkers updated every second, with the busiest destination for each app, and live rates in your menu bar.
 
- ReportsYour hotspot data vanished this month
+ HistoryYour hotspot data vanished this month
 
  Switch to the month view and group by app. The biggest consumer is the top row, with CSV export if you need receipts.
 
- Reports · DestinationYou need to audit where data goes
+ History · DestinationYou need to audit where data goes
 
  Group by destination to see every app that talks to a domain, or by IP to see what sits behind an address.
 
@@ -995,8 +995,8 @@ What's moving right now? Per-app rates, the last two minutes, the busiest destin
 What are my agents doing besides calling their model? Providers, other hosts, risk badges.
 ⌘2
 
- Reports
-Where did it all go? Second to year, grouped by app, destination or IP, with charts and CSV.
+ History
+Where did it all go? From 15 minutes through all history, grouped by app, destination or IP, with charts and CSV.
 ⌘3
 
  Alerts
@@ -1019,7 +1019,7 @@ Bluetooth, USB, and cameras: what's paired, what's attached or active, and when 
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
 ⌘7
 
- Visualize
+ Connections
 What is communicating? A zoomable Sankey map for app traffic and proved AI-agent paths, with exact list parity.
 
  Capture
@@ -1304,7 +1304,7 @@ e.g. Wireshark
  With HTTPS inspection on, the Tool calls tab shows what the model asked for, what came back, and the requests each tool made:
  the curl upload to paste.example, and the git push that failed.
 
- Reports. Second-to-year zoom, three groupings, charts that stay readable with hundreds of apps.
+ History. Preset ranges, a draggable navigator, three groupings, and charts that stay readable with hundreds of apps.
 
  Alerts. Each one names the app, the destination and the number that tripped it.
 
@@ -1663,8 +1663,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.17.0
+November 4, 2026Latest
+
+ Find past traffic in History. Reports is now History, with concise presets from 15 minutes to all retained evidence, an explicit date range, adaptive resolution, and a native overview navigator whose selection can be dragged, resized, or panned.
+
+ Keep short windows controllable. The navigator magnifies a nearby context when the full retained timeline would collapse the brush, preserves a minimum handle width, and can switch back to All history without changing the selected dates.
+
+ Inspect every contributor without disturbing the chart. Hover follows the active time line, flips the card away from chart edges, and keeps its fixed-height contributor list scrollable while clicks no longer replace the chosen range.
+
+ Read relationships in Connections. Visualize is now Connections; entering the screen or switching Traffic and AI activity commits data, topology, layout, and viewport as one generation instead of flashing stale or simplified geometry.
+
+ Keep filter remediation visible. When the authoritative extension state requires a restart or reinstall, a persistent menu-bar warning opens Flowlight directly to the existing Capture notice and remains until the condition is resolved.
+
  0.16.11
-November 3, 2026Latest
+November 3, 2026
 
  Keep every route in one visual language. Every connection is one smooth cubic curve; nearby obstacle corridors are preferred over deep canvas-edge U-turns, while card clearance, endpoint attachment, route separation, hit testing, and bounded layout remain intact.
 

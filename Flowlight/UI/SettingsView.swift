@@ -140,12 +140,25 @@ struct SettingsView: View {
 struct MenuBarContent: View {
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @EnvironmentObject var monitor: TrafficMonitor
+    @EnvironmentObject var extensionManager: ExtensionManager
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        if extensionManager.state.showsMenuBarNotice {
+            Button {
+                nav.show(.capture)
+                openWindow(id: "main")
+                NSApp.activate()
+            } label: {
+                Label(L("Restart or reinstall the filter to finish the update"),
+                      systemImage: "exclamationmark.triangle.fill")
+            }
+            .help(L("Open the filter update notice in Flowlight"))
+            Divider()
+        }
         Text("↓ \(ByteFormat.rate(monitor.currentIn))   ↑ \(ByteFormat.rate(monitor.currentOut))")
         if focus.isActive { Text(L("Focus: %@", focus.summary)) }
         Divider()

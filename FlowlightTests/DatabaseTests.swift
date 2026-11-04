@@ -44,6 +44,27 @@ final class DatabaseTests: XCTestCase {
         FlowKey(pid: 10, bundleID: app, appName: app, appPath: "", remoteIP: ip, domain: domain, port: port, transport: .tcp, appProtocol: "https")
     }
 
+    func testTrafficDateBoundsAreNilWhenEmptyAndCoverRetainedTraffic() throws {
+        XCTAssertNil(try db.trafficDateBounds())
+
+        let first: Int64 = 1_700_000_000
+        let last = first + 90
+        try db.insert([
+            TrafficBatch(timestamp: first, records: [
+                TrafficRecord(key: key("first", "first.example"),
+                              counters: FlowCounters(bytesIn: 10, flows: 1))
+            ]),
+            TrafficBatch(timestamp: last, records: [
+                TrafficRecord(key: key("last", "last.example"),
+                              counters: FlowCounters(bytesOut: 20, flows: 1))
+            ])
+        ])
+
+        let bounds = try XCTUnwrap(db.trafficDateBounds())
+        XCTAssertEqual(bounds.lowerBound, Date(timeIntervalSince1970: TimeInterval(first)))
+        XCTAssertEqual(bounds.upperBound, Date(timeIntervalSince1970: TimeInterval(last)))
+    }
+
     func testVersionedNameRepairMergesCollidingIdentityState() throws {
         let timestamp: Int64 = 1_700_000_000
         var versioned = key("2.1.260", "api.example.com")

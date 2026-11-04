@@ -1083,12 +1083,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Dominio › IP, Destino › App › IP o IP › App";
 "Choose a longer window or clear filters." = "Elegir un periodo más largo o borrar los filtros.";
 "Back" = "Atrás";
-"Return to the previous report scope" = "Volver al ámbito anterior del informe";
-"Granularity" = "Granularidad";
-"Earlier (⌘[)" = "Antes (⌘[)";
-"Earlier" = "Antes";
-"Later (⌘])" = "Después (⌘])";
-"Later" = "Después";
 "Now" = "Ahora";
 "Showing only:" = "Mostrando solo:";
 "App: %@" = "App: %@";
@@ -1112,7 +1106,6 @@
 "Peak year" = "Año máximo";
 "Bytes" = "Bytes";
 "Filtered traffic" = "Tráfico filtrado";
-"Click a bar to zoom in" = "Clic en una barra para ampliar";
 "Use the Left and Right Arrow keys to inspect time buckets." = "Usa las flechas izquierda y derecha para explorar los intervalos de tiempo.";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Usa las flechas izquierda y derecha para explorar los intervalos de tiempo y pulsa Retorno para ampliar.";
 "1 new flow" = "1 flujo nuevo";
@@ -1799,7 +1792,6 @@
 "Could not prepare managed-pack review demo: %@" = "No se pudo preparar la demostración de revisión de paquetes administrados: %@";
 
 /* Visualización del tráfico 0.16.0 */
-"Visualize" = "Visualizar";
 "Map" = "Mapa";
 "List" = "Lista";
 "App, domain, or IP" = "App, dominio o IP";
@@ -1875,3 +1867,29 @@
 "%lld exact destinations" = "%lld destinos exactos";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ a %@, recibió %@, envió %@, %lld conexiones";
 "Show domain family in Reports" = "Mostrar la familia de dominios en Informes";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1 mes";
+"15 min" = "15 min";
+"1d" = "1 d";
+"1h" = "1 h";
+"1w" = "1 sem";
+"1y" = "1 año";
+"6 mo" = "6 meses";
+"6h" = "6 h";
+"All" = "Todo";
+"All history" = "Todo el historial";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "Arrastra la selección para desplazarte por el historial, arrastra cualquiera de los bordes para cambiar su tamaño o usa las teclas de flecha izquierda y derecha.";
+"Flowlight network activity" = "Actividad de red de Flowlight";
+"Flowlight, restart required to finish updating the filter" = "Flowlight, se requiere reiniciar para terminar de actualizar el filtro";
+"Full history" = "Historial completo";
+"History" = "Historial";
+"History overview failed: %@" = "No se ha podido mostrar el resumen del historial: %@";
+"History range navigator" = "Navegador del intervalo del historial";
+"Nearby" = "Cercano";
+"Nearby context" = "Contexto cercano";
+"Open the filter update notice in Flowlight" = "Abrir el aviso de actualización del filtro en Flowlight";
+"Range" = "Intervalo";
+"Restart or reinstall the filter to finish the update" = "Reinicia o reinstala el filtro para terminar la actualización";
+"Return to the previous history scope" = "Volver al ámbito anterior del historial";
+"Selected" = "Seleccionado";

@@ -96,8 +96,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><th>Ansicht</th><th>Kurzbefehl</th><th>Was sie beantwortet</th></tr>
         <tr><td>Live</td><td>⌘1</td><td>Was sich gerade bewegt: Raten pro App über die letzten Sekunden und das meistgenutzte Ziel.</td></tr>
         <tr><td><a href="#agents">KI-Agenten</a></td><td>⌘2</td><td>Welche Agenten aktiv sind, welche KI-Anbieter sie nutzen und mit wem sie sonst gesprochen haben.</td></tr>
-        <tr><td>Berichte</td><td>⌘3</td><td>Wohin der Datenverkehr ging, von der Sekunde bis zum Jahr. Gruppiert nach App, Ziel oder IP; umschaltbar auf Diagramme oder <a href="#worth-a-look">Genauer hinsehen</a>; CSV-Export.</td></tr>
-        <tr><td><a href="#visualize">Visualisieren</a></td><td>—</td><td>Eine stabile Karte der Apps und ihrer genauen Ziele mit gewichteten Pfaden, bewegten Richtungsmarkern, Verbindungszahlen und einer gleichwertigen Liste.</td></tr>
+        <tr><td>Verlauf</td><td>⌘3</td><td>Wohin der Datenverkehr ging, von der Sekunde bis zum Jahr. Gruppiert nach App, Ziel oder IP; umschaltbar auf Diagramme oder <a href="#worth-a-look">Genauer hinsehen</a>; CSV-Export.</td></tr>
+        <tr><td><a href="#visualize">Verbindungen</a></td><td>—</td><td>Eine stabile Karte der Apps und ihrer genauen Ziele mit gewichteten Pfaden, bewegten Richtungsmarkern, Verbindungszahlen und einer gleichwertigen Liste.</td></tr>
         <tr><td><a href="#alerts">Warnungen</a></td><td>⌘4</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
         <tr><td><a href="#rules">Regeln</a></td><td>⌘5</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
         <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
@@ -110,12 +110,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
         <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
-      <p>Fahre in Berichte über einen Balken, um zu sehen, welche Apps ihn getrieben haben, klicke ihn an, um hineinzuzoomen, und doppelklicke eine Zeile, um den Bericht darauf einzugrenzen.</p>
+      <p>Bewege in Verlauf den Zeiger über einen Balken, um eine mitlaufende, scrollbare Karte mit den beteiligten Apps zu öffnen; die Balken zoomen beim Klicken nicht. Doppelklicke eine Zeile, um den Verlauf darauf einzugrenzen.</p>
 
-      <h2 id="visualize">Datenverkehr visualisieren</h2>
-      <p><strong>Visualisieren</strong> zeigt jede App, jedes genaue Ziel und jede beobachtete Beziehung im aktuellen Zeitraum sowie im Such- und Fokusbereich. Die Pfadbreite folgt den Bytes. Sparsame rosa und blaue Striche bewegen sich in entgegengesetzte Sende- und Empfangsrichtungen; jede Kante hat ihr eigenes stabiles Tempo, und „Bewegung reduzieren“ lässt dieselben wahrheitsgetreuen statischen Pfade stehen.</p>
-      <p>Standardmäßig zeigt Datenverkehr die zehn aktivsten Apps und KI-Aktivität die zehn aktivsten nachgewiesenen Agentenwurzeln, geordnet nach vollständig empfangenen plus gesendeten Bytes. Die beiden optionalen durchsuchbaren Auswahlfelder für Quelle und Ziel decken beliebig-zu-beliebig, eins-zu-beliebig, beliebig-zu-eins und eins-zu-eins ab. Jede Auswahl beschränkt das jeweils andere Auswahlfeld auf Endpunkte mit beobachteter oder blockierter Evidenz; „Beliebig“ bleibt verfügbar, und „Zurücksetzen“ setzt beide Auswahlfelder zurück. Eine fokussierte Karte enthält alle verbundenen Starter, Agenten, Tools oder MCP-Dienste, Gateways, Flowlight-Proxy-Stufen, Ziele sowie beobachteten oder blockierten Beziehungen. Nur ungewöhnlich große fokussierte Bereiche werden schrittweise gruppiert; jede Gruppe behält alle genauen Mitglieds-IDs. <strong>Liste</strong> und Berichte bleiben vollständig und zahlenmäßig identisch.</p>
-      <p>Wähle einen Knoten oder eine Verbindung für genaue Werte und öffne anschließend Berichte, Inspizieren oder einen ungespeicherten Regeleditor mit derselben App und demselben Ziel. <strong>Liste</strong> stellt denselben vollständigen Graphen für Tastatur und VoiceOver bereit. „Verbindungen“ sind Netzwerkflüsse, keine HTTP-Anfragen; „Beobachtet“ ist keine Erlaubnisentscheidung.</p>
+      <h2 id="visualize">Verbindungen</h2>
+      <p><strong>Verbindungen</strong> zeigt jede App, jedes genaue Ziel und jede beobachtete Beziehung im aktuellen Zeitraum sowie im Such- und Fokusbereich. Die Pfadbreite folgt den Bytes. Sparsame rosa und blaue Striche bewegen sich in entgegengesetzte Sende- und Empfangsrichtungen; jede Kante hat ihr eigenes stabiles Tempo, und „Bewegung reduzieren“ lässt dieselben wahrheitsgetreuen statischen Pfade stehen.</p>
+      <p>Standardmäßig zeigt Datenverkehr die zehn aktivsten Apps und KI-Aktivität die zehn aktivsten nachgewiesenen Agentenwurzeln, geordnet nach vollständig empfangenen plus gesendeten Bytes. Die beiden optionalen durchsuchbaren Auswahlfelder für Quelle und Ziel decken beliebig-zu-beliebig, eins-zu-beliebig, beliebig-zu-eins und eins-zu-eins ab. Jede Auswahl beschränkt das jeweils andere Auswahlfeld auf Endpunkte mit beobachteter oder blockierter Evidenz; „Beliebig“ bleibt verfügbar, und „Zurücksetzen“ setzt beide Auswahlfelder zurück. Eine fokussierte Karte enthält alle verbundenen Starter, Agenten, Tools oder MCP-Dienste, Gateways, Flowlight-Proxy-Stufen, Ziele sowie beobachteten oder blockierten Beziehungen. Nur ungewöhnlich große fokussierte Bereiche werden schrittweise gruppiert; jede Gruppe behält alle genauen Mitglieds-IDs. <strong>Liste</strong> und Verlauf bleiben vollständig und zahlenmäßig identisch.</p>
+      <p>Wähle einen Knoten oder eine Verbindung für genaue Werte und öffne anschließend Verlauf, Inspizieren oder einen ungespeicherten Regeleditor mit derselben App und demselben Ziel. <strong>Liste</strong> stellt denselben vollständigen Graphen für Tastatur und VoiceOver bereit. „Verbindungen“ sind Netzwerkflüsse, keine HTTP-Anfragen; „Beobachtet“ ist keine Erlaubnisentscheidung.</p>
 
       <h2 id="agents">Regeln für KI-Agenten</h2>
       <p>Eine App gilt als Agent, wenn Flowlight sie am Namen kennt (heute 16, darunter Claude Code, Codex, Cursor, GitHub Copilot,
@@ -133,7 +133,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Agenten erledigen viel durch andere Prozesse: ein Shell-Tool führt <code>curl</code>, <code>git</code> oder <code>npm</code> aus, und MCP-Server
         laufen als eigene Prozesse. Flowlight verfolgt die Elternprozesse zurück zu dem Agenten, der sie gestartet hat, sodass dieser Datenverkehr
         dem Agenten zugerechnet wird. In <strong>KI-Agenten</strong> listet das Detail des Agenten sie unter <strong>Tools &amp; MCP-Server</strong>, und bei
-        Zielen steht <em>über curl</em> oder <em>über github MCP</em>. In <strong>Berichte</strong> steht in der Prozesszeile <em>über Claude Code</em>.</p>
+        Zielen steht <em>über curl</em> oder <em>über github MCP</em>. In <strong>Verlauf</strong> steht in der Prozesszeile <em>über Claude Code</em>.</p>
       <p>MCP-Server werden benannt, indem ihre Befehlszeile mit der MCP-Konfiguration von Claude Code (<code>~/.claude.json</code>), Claude Desktop,
         Cursor (<code>~/.cursor/mcp.json</code>), Windsurf, VS Code, Codex (<code>~/.codex/config.toml</code>), Zed und Gemini CLI verglichen wird. Entfernte MCP-Server
         werden über den Hostnamen in ihrer URL erkannt und nicht konfigurierte Server über bekannte Paketnamen wie
@@ -175,7 +175,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
 
       <h2 id="worth-a-look">Genauer hinsehen</h2>
-      <p>Ein dritter Modus in <strong>Berichte</strong>, neben der Aufschlüsselung und den Diagrammen. Er vergleicht die Apps im Bericht miteinander
+      <p>Ein dritter Modus in <strong>Verlauf</strong>, neben der Aufschlüsselung und den Diagrammen. Er vergleicht die Apps im Bericht miteinander
         und zeigt auf die, deren Ziele nicht zum Rest passen: deutlich mehr Orte als bei ihresgleichen, Adressen, die nie
         zu einem Namen aufgelöst wurden, Hostnamen, die generiert statt gewählt aussehen, viel mehr gesendet als empfangen, und Protokolle, die eine
         Nebensache sind statt der Zweck der App. Jeder Befund führt die Belege mit, und ein Klick grenzt den Bericht auf diese
@@ -190,7 +190,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         immer schon gezählt; es hatte nur kein Wort dafür, weshalb ein AirDrop eines 4&nbsp;GB großen Ordners wie ein paar Megabyte an eine Adresse
         ohne Namen aussah.</p>
       <p>Jeder Flow trägt jetzt einen <strong>Kanal</strong>: <em>Netzwerk</em>, <em>Peer-to-Peer-WLAN</em>, <em>Dieser Mac</em> (Loopback,
-        hat den Rechner nie verlassen) oder <em>Tunnel</em> (in einem VPN; wohin es danach ging, ist hier nicht sichtbar). Aus der Symbolleiste von Berichte
+        hat den Rechner nie verlassen) oder <em>Tunnel</em> (in einem VPN; wohin es danach ging, ist hier nicht sichtbar). Aus der Symbolleiste von Verlauf
         grenzt du einen Bericht darauf ein, und der Kanal reist mit CSV-Exporten und mit allem, was an einen Collector geht.</p>
       <p><strong>Peer-to-Peer-Zeilen sind nach der Funktion benannt, die sie geöffnet hat</strong> – <code>AirDrop and Handoff · nearby device</code>,
         <code>Continuity · nearby device</code> –, denn eine Link-Local-Adresse sagt dir nichts und das Gerät im Raum hat keinen Namen,
@@ -212,7 +212,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Apples eigene Apps sind standardmäßig ausgenommen.</strong> macOS spricht ständig mit Apple – Softwareupdate, iCloud,
       Push, Zeit, Karten-Kacheln – auf Hosts und Ports, die beim ersten Auftauchen neu sind, und wenn das alles gelistet wird, verschwindet die eine
       Zeile, die zu lesen lohnt. Schalte es unter <strong>Einstellungen › Warnungen</strong> ab, wenn du sie haben willst. So oder so wird der Datenverkehr weiterhin
-      aufgezeichnet, erscheint weiter in Live, Berichte und Fragen und unterliegt weiter jeder Regel, Schutzregel und Erlaubnisliste: Die Einstellung
+      aufgezeichnet, erscheint weiter in Live, Verlauf und Fragen und unterliegt weiter jeder Regel, Schutzregel und Erlaubnisliste: Die Einstellung
       entscheidet, was gelistet wird, nie, was erlaubt ist.</p>
 
       <h2 id="ask">Fragen</h2>
@@ -240,9 +240,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Diagramme, wenn die Form zählt.</strong> Veränderung über Zeit kommt als Linie zurück, ein Vergleich als Balken, die Aufteilung eines
         Ganzen als Kreis. Flowlight zeichnet sie aus denselben Zeilen, die die Abfrage geliefert hat, also können Bild und Satz sich nicht widersprechen,
         und das Modell kann eine andere Form oder gar keine verlangen.</p>
-      <p><strong>Jede Abfrage steht unter der Antwort. Ein Klick öffnet Berichte für Verkehrsdaten oder den passenden
+      <p><strong>Jede Abfrage steht unter der Antwort. Ein Klick öffnet Verlauf für Verkehrsdaten oder den passenden
         App-Bildschirm für Geräte- und Konfigurationsantworten.</strong> Eine Antwort, die du nicht prüfen kannst, ist eine Vermutung mit besserer Grammatik.</p>
-      <p><strong>Flowlight hält sich an seinen eigenen Maßstab.</strong> Was diese Funktion sendet, erscheint in Live und Berichte
+      <p><strong>Flowlight hält sich an seinen eigenen Maßstab.</strong> Was diese Funktion sendet, erscheint in Live und Verlauf
         wie der Datenverkehr jeder anderen App – auch dann, wenn der Modellserver auf genau diesem Mac läuft, also in dem Fall, den man
         am leichtesten stillschweigend hätte weglassen können.</p>
 
@@ -314,7 +314,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         nicht kann, ist die bereits laufenden Agenten erreichen – deren Proxy-Einstellungen wurden beim Start gelesen, und nichts kann
         sie jetzt noch ändern.</p>
 
-      <p><strong>Wie du von einer Zeile aus hierherkommst.</strong> Klicke in Live, Berichten oder KI-Agenten mit der rechten Maustaste auf eine App
+      <p><strong>Wie du von einer Zeile aus hierherkommst.</strong> Klicke in Live, Verlauf oder KI-Agenten mit der rechten Maustaste auf eine App
         oder ein Ziel und wähle <strong>Datenverkehr von … inspizieren</strong>: Inspizieren öffnet sich und zeigt nur diese App oder nur dieses Ziel, mit
         einer Markierung, die das sagt und die du mit einem Klick entfernen kannst. Es schränkt ein, statt zu suchen – eine frühere Version setzte den
         Namen ins Suchfeld, das auch Antwort-Bodys durchsucht, sodass die Frage nach dem Datenverkehr eines Agenten jede Seite zurückgab, deren HTML ihn
@@ -343,13 +343,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="rules">Regeln</h2>
       <p>Eine Erlaubnisliste ist die Vorstellung eines Agenten davon, wohin er gehen darf. Eine <strong>Regel</strong> ist die allgemeine Fassung: Sie nennt ein
         <strong>Subjekt</strong> – eine App, einen Agenten, ein Ziel, eine URL oder ein Paar aus zwei davon – und sagt <strong>blockieren</strong>
-        oder <strong>erlauben</strong>. Rechtsklicke eine Zeile in Live, Berichte, KI-Agenten oder Inspizieren, um eine Regel über das zu schreiben, was du gerade ansiehst;
+        oder <strong>erlauben</strong>. Rechtsklicke eine Zeile in Live, Verlauf, KI-Agenten oder Inspizieren, um eine Regel über das zu schreiben, was du gerade ansiehst;
         jede davon landet im selben Editor auf dem Bildschirm <strong>Regeln</strong>, denn eine Regel, die im Verborgenen greift,
         wäre eine Regel, die du nie wiederfindest.</p>
       <p><strong>Vorlagen.</strong> Zweiundzwanzig, in fünf Gruppen – einen Agenten von Paketregistern oder anderen
         Modellanbietern fernhalten, die üblichen Wege schließen, auf denen Daten abfließen (Paste-Dienste, Webhook-Fänger, anonyme Datei-Ablagen, Tunnel, DNS over
         HTTPS), Produktanalyse und Crash-Berichte, Regeln für Arbeitszeiten und das einmalige „blockiere das eine Stunde lang, bis ich
-        herausgefunden habe, was es ist“. Durchsuche sie über die Symbolleiste von Regeln, oder rechtsklicke irgendwo in Live, Berichte, KI-Agenten oder Inspizieren eine Zeile und
+        herausgefunden habe, was es ist“. Durchsuche sie über die Symbolleiste von Regeln, oder rechtsklicke irgendwo in Live, Verlauf, KI-Agenten oder Inspizieren eine Zeile und
         wende eine auf das an, was du ansiehst.</p>
       <p>Jede Vorlage sagt, was sie tun wird, bevor sie es tut. Alles, was mehr als eine Regel schreibt, öffnet eine Karte mit jedem
         Host und jedem Zeitplan; alles Dauerhafte öffnet den vorausgefüllten Editor; und <strong>nur Regeln, die sich selbst aufheben</strong> – nach einer
@@ -508,10 +508,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Ereignis, das Menschen wirklich interessiert. Durchsatz gibt es hier auch nicht, aus demselben Grund wie bei Bluetooth.</p>
 
       <h2 id="focus">Fokusmodus</h2>
-      <p>Wähle ein paar Apps und Ziele, und jeder Bildschirm zeigt nur die – Live, Berichte, Warnungen, KI-Agenten und Inspizieren, dazu die Raten in
+      <p>Wähle ein paar Apps und Ziele, und jeder Bildschirm zeigt nur die – Live, Verlauf, Warnungen, KI-Agenten und Inspizieren, dazu die Raten in
         der Menüleiste. Er ist dafür da, einen Agenten bei der Arbeit zu beobachten, ohne den restlichen Mac im Weg.</p>
       <ul>
-        <li>Rechtsklicke eine Zeile in Live, Berichte oder KI-Agenten und wähle <strong>Fokussieren auf…</strong>, oder nimm das Fokus-Element unten in
+        <li>Rechtsklicke eine Zeile in Live, Verlauf oder KI-Agenten und wähle <strong>Fokussieren auf…</strong>, oder nimm das Fokus-Element unten in
           der Seitenleiste, um aus den aktiven Apps zu wählen und Ziele einzutippen.</li>
         <li><kbd>⇧⌘F</kbd> schaltet den Fokus ein und aus, und die Menüleiste tut es auch – sie zeigt zudem, was fokussiert ist.</li>
         <li>Ein Ziel nimmt seine Subdomains mit: <code>example.com</code> deckt <code>api.example.com</code> ab. IP-Adressen funktionieren,
@@ -552,7 +552,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li><strong>Nie etwas aus der HTTPS-Inspektion.</strong> Keine Header, keine Bodys, keine Tool-Aufrufe – der Export kann nur
           Rollups und Warnungen tragen, es gibt also nicht einmal versehentlich einen Weg dorthin.</li>
         <li>Auth-Header liegen in deinem Anmelde-Schlüsselbund, nicht in den Einstellungen. Angezeigt werden immer nur ihre Namen.</li>
-        <li><strong>Was Flowlight sendet, erscheint in Flowlight</strong>, in Live und Berichte, wie der Datenverkehr jeder anderen App – auch
+        <li><strong>Was Flowlight sendet, erscheint in Flowlight</strong>, in Live und Verlauf, wie der Datenverkehr jeder anderen App – auch
           bei einem Collector auf <code>127.0.0.1</code>.</li>
       </ul>
       <p>Zwei Dinge sind zu erwarten: Rollups werden etwa zwei Minuten verzögert zusammengefasst, ein Intervall unter einer Minute fragt also öfter, ohne dass Daten

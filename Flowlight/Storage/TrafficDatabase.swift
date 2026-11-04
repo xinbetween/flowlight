@@ -1038,6 +1038,22 @@ final class TrafficDatabase: @unchecked Sendable {
         return ("(" + parts.joined(separator: " OR ") + ")", values)
     }
 
+    /// The complete retained traffic interval across every rollup tier. The tiers overlap by design; only their
+    /// extrema matter here, so the navigator can cover old history without materialising raw rows.
+    func trafficDateBounds() throws -> ClosedRange<Date>? {
+        let rows = try conn.query("""
+            SELECT MIN(first_ts), MAX(last_ts) FROM (
+                SELECT MIN(ts) AS first_ts, MAX(ts) AS last_ts FROM flows_1s
+                UNION ALL SELECT MIN(ts), MAX(ts) FROM agg_1m
+                UNION ALL SELECT MIN(ts), MAX(ts) FROM agg_1h
+                UNION ALL SELECT MIN(ts), MAX(ts) FROM agg_1d
+            )
+            """, []) { row in (row.int(0), row.int(1)) }
+        guard let (first, last) = rows.first, last > 0 else { return nil }
+        return (Date(timeIntervalSince1970: TimeInterval(first))
+                ... Date(timeIntervalSince1970: TimeInterval(max(first, last))))
+    }
+
     /// Time series at the requested granularity; empty buckets are filled with zeros.
     func series(_ granularity: Granularity, from: Date, to: Date, filter: TrafficFilter = .none,
                 calendar: Calendar = .current) throws -> [SeriesPoint] {

@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ko", "url": "https://flowlight.xinbetween.com/ko/", "name": "Flowlight", "inLanguage": "ko", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ko/docs/#webpage", "url": "https://flowlight.xinbetween.com/ko/docs/", "name": "Flowlight 문서", "description": "Flowlight 설치와 트래픽에 이름 붙이기, 각 뷰 읽는 법, AI 에이전트 규칙 조정, 그리고 깔끔한 삭제까지.", "inLanguage": "ko", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ko"}, "dateModified": "2026-11-03"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ko/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 문서", "item": "https://flowlight.xinbetween.com/ko/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/ko/docs/#faq", "mainEntity": [{"@type": "Question", "name": "왜 macOS가 Flowlight에 데스크탑이나 서류 접근 권한을 물었나요?", "acceptedAnswer": {"@type": "Answer", "text": "그 안에 있는 프로젝트 폴더를 지정했기 때문입니다. 기본 상태에서 Flowlight는 홈 폴더 안의 폴더들에서 에이전트 설정을 읽고, 그 세 폴더는 건드리지 않습니다."}}, {"@type": "Question", "name": "Flowlight가 내 트래픽을 전부 보나요, 아니면 놓치는 것이 있나요?", "acceptedAnswer": {"@type": "Answer", "text": "어떤 캡처 엔진을 쓰는지에 따라 다르고, 그 차이는 작지 않습니다. 기본 샘플러는 macOS의 누적 바이트 카운터를 1초에 한 번 읽어 변화를 기록하므로 긴 전송은 정확히 집계되지만, 두 번의 읽기 사이에 열리고 닫힌 연결은 아예 나타나지 않습니다. 네트워크 확장은 연결이 만들어질 때마다 macOS가 호출하므로 5밀리초짜리 요청도 기록됩니다. 짧은 요청을 많이 내는 AI 에이전트를 지켜본다면 캡처에서 확장을 설치하세요. 전체 비교는 위에 있습니다."}}, {"@type": "Question", "name": "네트워크 확장을 켰는데 아무것도 나오지 않습니다. 샘플러는 잘 됩니다.", "acceptedAnswer": {"@type": "Answer", "text": "거의 항상 다른 콘텐츠 필터가 이미 그 자리를 차지했기 때문입니다. macOS는 콘텐츠 필터를 한 번에 하나만 실행합니다. 보통 기업용 보안 소프트웨어가 그 자리를 가져갑니다. Palo Alto Networks GlobalProtect, CrowdStrike Falcon 같은 것들이죠. Flowlight의 필터는 설치되고 활성화되고 연결까지 되므로 캡처에는 Connected to filter extension이라고 나오지만, macOS가 연결을 단 하나도 건네주지 않아 화면이 비어 있습니다. 캡처는 찾아낸 필터를 나열하고 필터를 쓰지 않으며 그것들과 나란히 동작하는 샘플러로 되돌려 주겠다고 제안합니다. 이때 잃는 것은 아주 짧은 연결뿐이며(비교 표), 나머지는 똑같이 기록됩니다."}}, {"@type": "Question", "name": "Flowlight를 업데이트한 뒤 확장이 동작하지 않습니다.", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 이전 버전에 있던 문제입니다. macOS는 마지막으로 활성화된 확장 빌드를 계속 실행하므로, 업데이트 뒤에는 확장이 예전 버전이 되고 macOS는 짝이 맞지 않는 둘 사이의 연결을 거부합니다. 0.2.5부터는 Flowlight가 실행할 때 확인해 필터를 스스로 다시 활성화합니다. 그보다 낮은 버전이라면 캡처에서 필터 설치 및 활성화를 한 번 누르세요."}}, {"@type": "Question", "name": "캡처에 다른 문제가 있는데 무엇인지 모르겠습니다.", "acceptedAnswer": {"@type": "Answer", "text": "이것을 실행하고 출력을 읽어 보세요. 상태와 개수만 보고하며, Flowlight가 트래픽에 대해 기록한 내용은 전혀 담기지 않습니다: curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh복사 어떤 확장이 설치되어 있는지, macOS가 Flowlight의 필터를 실제로 시작했는지, 그리고 가장 최근 기록이 언제인지 보여줍니다. 결과를 이슈에 붙여 주세요."}}, {"@type": "Question", "name": "Flowlight가 내 정보를 어딘가로 보내나요?", "acceptedAnswer": {"@type": "Answer", "text": "계정도, 텔레메트리도, 분석도 없고 트래픽 데이터베이스도 업로드되지 않습니다. 개인정보 페이지에 모든 요청이 나열됩니다. 릴리스와 서명된 규칙 팩 확인, 선택 사항인 네트워크 소유자 조회에는 끄기 스위치가 있습니다. 역방향 DNS는 샘플러에서만 실행되며, 없으면 대부분의 연결에 이름을 붙일 수 없어 스위치가 없습니다."}}, {"@type": "Question", "name": "Mac이 느려지거나 배터리가 빨리 닳지 않나요?", "acceptedAnswer": {"@type": "Answer", "text": "창을 닫아 두면 Flowlight는 거의 아무 일도 하지 않습니다. 메뉴 막대의 속도를 유지하고 1초에 한 행을 씁니다. 네트워크 확장은 1초마다 짧게 사는 nettop 프로세스를 실행하는 대체 샘플러보다 비용이 적습니다."}}, {"@type": "Question", "name": "연결을 차단할 수 있나요?", "acceptedAnswer": {"@type": "Answer", "text": "네, 네트워크 확장이 있으면 됩니다. 에이전트의 허용 목록은 경고뿐 아니라 거부도 할 수 있고, 규칙은 앱이나 목적지, URL을 원하는 기간만큼 막을 수 있으며, 가드레일은 모델에 제공되기 전에 에이전트에서 도구를 걷어낼 수 있습니다. 요청하기 전까지 차단되는 것은 없고, 모든 거부에는 빠져나갈 길이 함께 있습니다."}}, {"@type": "Question", "name": "네트워크 확장이 꼭 필요한가요?", "acceptedAnswer": {"@type": "Answer", "text": "아니요. 샘플러는 별도 권한이 필요 없고 대부분의 트래픽을 다룹니다. 확장은 1초보다 짧은 흐름, 코드 서명 기반 귀속, 패킷 캡처 설정 없이도 얻는 호스트 이름을 더해 주며, 연결을 거부할 수 있는 유일한 엔진입니다."}}, {"@type": "Question", "name": "삭제하면 내 데이터는 어떻게 되나요?", "acceptedAnswer": {"@type": "Answer", "text": "모든 것은 ~/Library/Application Support/Flowlight에 있습니다. 그 폴더를 삭제하면 사라집니다. 패킷 캡처 도우미와 검사 인증서는 삭제를 보세요."}}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ko", "url": "https://flowlight.xinbetween.com/ko/", "name": "Flowlight", "inLanguage": "ko", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ko/docs/#webpage", "url": "https://flowlight.xinbetween.com/ko/docs/", "name": "Flowlight 문서", "description": "Flowlight 설치와 트래픽에 이름 붙이기, 각 뷰 읽는 법, AI 에이전트 규칙 조정, 그리고 깔끔한 삭제까지.", "inLanguage": "ko", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ko"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ko/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 문서", "item": "https://flowlight.xinbetween.com/ko/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/ko/docs/#faq", "mainEntity": [{"@type": "Question", "name": "왜 macOS가 Flowlight에 데스크탑이나 서류 접근 권한을 물었나요?", "acceptedAnswer": {"@type": "Answer", "text": "그 안에 있는 프로젝트 폴더를 지정했기 때문입니다. 기본 상태에서 Flowlight는 홈 폴더 안의 폴더들에서 에이전트 설정을 읽고, 그 세 폴더는 건드리지 않습니다."}}, {"@type": "Question", "name": "Flowlight가 내 트래픽을 전부 보나요, 아니면 놓치는 것이 있나요?", "acceptedAnswer": {"@type": "Answer", "text": "어떤 캡처 엔진을 쓰는지에 따라 다르고, 그 차이는 작지 않습니다. 기본 샘플러는 macOS의 누적 바이트 카운터를 1초에 한 번 읽어 변화를 기록하므로 긴 전송은 정확히 집계되지만, 두 번의 읽기 사이에 열리고 닫힌 연결은 아예 나타나지 않습니다. 네트워크 확장은 연결이 만들어질 때마다 macOS가 호출하므로 5밀리초짜리 요청도 기록됩니다. 짧은 요청을 많이 내는 AI 에이전트를 지켜본다면 캡처에서 확장을 설치하세요. 전체 비교는 위에 있습니다."}}, {"@type": "Question", "name": "네트워크 확장을 켰는데 아무것도 나오지 않습니다. 샘플러는 잘 됩니다.", "acceptedAnswer": {"@type": "Answer", "text": "거의 항상 다른 콘텐츠 필터가 이미 그 자리를 차지했기 때문입니다. macOS는 콘텐츠 필터를 한 번에 하나만 실행합니다. 보통 기업용 보안 소프트웨어가 그 자리를 가져갑니다. Palo Alto Networks GlobalProtect, CrowdStrike Falcon 같은 것들이죠. Flowlight의 필터는 설치되고 활성화되고 연결까지 되므로 캡처에는 Connected to filter extension이라고 나오지만, macOS가 연결을 단 하나도 건네주지 않아 화면이 비어 있습니다. 캡처는 찾아낸 필터를 나열하고 필터를 쓰지 않으며 그것들과 나란히 동작하는 샘플러로 되돌려 주겠다고 제안합니다. 이때 잃는 것은 아주 짧은 연결뿐이며(비교 표), 나머지는 똑같이 기록됩니다."}}, {"@type": "Question", "name": "Flowlight를 업데이트한 뒤 확장이 동작하지 않습니다.", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 이전 버전에 있던 문제입니다. macOS는 마지막으로 활성화된 확장 빌드를 계속 실행하므로, 업데이트 뒤에는 확장이 예전 버전이 되고 macOS는 짝이 맞지 않는 둘 사이의 연결을 거부합니다. 0.2.5부터는 Flowlight가 실행할 때 확인해 필터를 스스로 다시 활성화합니다. 그보다 낮은 버전이라면 캡처에서 필터 설치 및 활성화를 한 번 누르세요."}}, {"@type": "Question", "name": "캡처에 다른 문제가 있는데 무엇인지 모르겠습니다.", "acceptedAnswer": {"@type": "Answer", "text": "이것을 실행하고 출력을 읽어 보세요. 상태와 개수만 보고하며, Flowlight가 트래픽에 대해 기록한 내용은 전혀 담기지 않습니다: curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh복사 어떤 확장이 설치되어 있는지, macOS가 Flowlight의 필터를 실제로 시작했는지, 그리고 가장 최근 기록이 언제인지 보여줍니다. 결과를 이슈에 붙여 주세요."}}, {"@type": "Question", "name": "Flowlight가 내 정보를 어딘가로 보내나요?", "acceptedAnswer": {"@type": "Answer", "text": "계정도, 텔레메트리도, 분석도 없고 트래픽 데이터베이스도 업로드되지 않습니다. 개인정보 페이지에 모든 요청이 나열됩니다. 릴리스와 서명된 규칙 팩 확인, 선택 사항인 네트워크 소유자 조회에는 끄기 스위치가 있습니다. 역방향 DNS는 샘플러에서만 실행되며, 없으면 대부분의 연결에 이름을 붙일 수 없어 스위치가 없습니다."}}, {"@type": "Question", "name": "Mac이 느려지거나 배터리가 빨리 닳지 않나요?", "acceptedAnswer": {"@type": "Answer", "text": "창을 닫아 두면 Flowlight는 거의 아무 일도 하지 않습니다. 메뉴 막대의 속도를 유지하고 1초에 한 행을 씁니다. 네트워크 확장은 1초마다 짧게 사는 nettop 프로세스를 실행하는 대체 샘플러보다 비용이 적습니다."}}, {"@type": "Question", "name": "연결을 차단할 수 있나요?", "acceptedAnswer": {"@type": "Answer", "text": "네, 네트워크 확장이 있으면 됩니다. 에이전트의 허용 목록은 경고뿐 아니라 거부도 할 수 있고, 규칙은 앱이나 목적지, URL을 원하는 기간만큼 막을 수 있으며, 가드레일은 모델에 제공되기 전에 에이전트에서 도구를 걷어낼 수 있습니다. 요청하기 전까지 차단되는 것은 없고, 모든 거부에는 빠져나갈 길이 함께 있습니다."}}, {"@type": "Question", "name": "네트워크 확장이 꼭 필요한가요?", "acceptedAnswer": {"@type": "Answer", "text": "아니요. 샘플러는 별도 권한이 필요 없고 대부분의 트래픽을 다룹니다. 확장은 1초보다 짧은 흐름, 코드 서명 기반 귀속, 패킷 캡처 설정 없이도 얻는 호스트 이름을 더해 주며, 연결을 거부할 수 있는 유일한 엔진입니다."}}, {"@type": "Question", "name": "삭제하면 내 데이터는 어떻게 되나요?", "acceptedAnswer": {"@type": "Answer", "text": "모든 것은 ~/Library/Application Support/Flowlight에 있습니다. 그 폴더를 삭제하면 사라집니다. 패킷 캡처 도우미와 검사 인증서는 삭제를 보세요."}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">본문으로 이동</a>
@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">문서</p>
     <h1>Flowlight 사용하기</h1>
-    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.16.11, macOS 15 이상.</p>
+    <p class="lede">첫 실행부터 에이전트 규칙 조정까지 전부. Flowlight 0.17.0, macOS 15 이상.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="이 페이지 안에서">
@@ -164,8 +164,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><th>뷰</th><th>단축키</th><th>답해 주는 질문</th></tr>
         <tr><td>실시간</td><td>⌘1</td><td>지금 무엇이 움직이나. 지난 몇 초 동안의 앱별 속도와 가장 바쁜 목적지.</td></tr>
         <tr><td><a href="#agents">AI 에이전트</a></td><td>⌘2</td><td>어떤 에이전트가 활동 중이고, 어떤 AI 제공업체를 쓰며, 그 밖에 어디에 접속했나.</td></tr>
-        <tr><td>보고서</td><td>⌘3</td><td>트래픽이 어디로 갔나. 초에서 연까지. 앱, 목적지, IP로 묶고, 차트나 <a href="#worth-a-look">눈여겨볼 것</a>으로 바꾸고, CSV로 내보냅니다.</td></tr>
-        <tr><td><a href="#visualize">시각화</a></td><td>—</td><td>앱과 정확한 목적지를 가중 경로, 움직이는 방향 표시, 연결 수, 동등한 목록으로 보여 주는 안정적인 지도입니다.</td></tr>
+        <tr><td>기록</td><td>⌘3</td><td>트래픽이 어디로 갔나. 초에서 연까지. 앱, 목적지, IP로 묶고, 차트나 <a href="#worth-a-look">눈여겨볼 것</a>으로 바꾸고, CSV로 내보냅니다.</td></tr>
+        <tr><td><a href="#visualize">연결</a></td><td>—</td><td>앱과 정확한 목적지를 가중 경로, 움직이는 방향 표시, 연결 수, 동등한 목록으로 보여 주는 안정적인 지도입니다.</td></tr>
         <tr><td><a href="#alerts">알림</a></td><td>⌘4</td><td>이상해 보인 모든 것. 앱과 목적지, 그리고 규칙의 기준을 넘긴 수치와 함께.</td></tr>
         <tr><td><a href="#rules">규칙</a></td><td>⌘5</td><td>설정해 둔 모든 허용 목록과 거부, 각각이 무엇을 포괄하는지, 그리고 실제로 무엇을 막았는지.</td></tr>
         <tr><td><a href="#ask">질문</a></td><td>⌘6</td><td>내 트래픽에 대한 평범한 말로 된 질문. 기록된 이력에서 로컬 모델이나 호스팅 모델이 답합니다.</td></tr>
@@ -178,11 +178,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <figure><div class="frame"><img height="1001" width="1600" src="../../assets/screenshots/live.png?v=8328f231" loading="lazy"
         alt="실시간 뷰: 앱 목록에 각각의 현재 보내기·받기 속도와 가장 바쁜 목적지가 함께 나열되어 있습니다."></div>
         <figcaption class="caption">실시간, Flowlight가 처음 여는 화면.</figcaption></figure>
-      <p>보고서에서는 막대에 포인터를 올려 어떤 앱이 만든 것인지 보고, 클릭해 확대하고, 아무 행이나 두 번 클릭해 보고서를 그 항목으로 좁힐 수 있습니다.</p>
-      <h2 id="visualize">트래픽 시각화</h2>
-      <p><strong>시각화</strong>는 현재 기간·검색·포커스 범위의 모든 앱, 정확한 목적지, 관찰된 관계를 표시합니다. 경로 너비는 바이트 수를 나타냅니다. 드문 분홍색과 파란색 대시가 보내기와 받기의 반대 방향으로 움직이고, 각 에지는 고유하면서 안정적인 속도를 가집니다. 동작 줄이기에서는 같은 정확한 정적 경로가 유지됩니다.</p>
-      <p>기본적으로 트래픽은 전체 받은 바이트와 보낸 바이트 합계가 가장 큰 앱 10개를, AI 활동은 입증된 에이전트 루트 10개를 표시합니다. 검색 가능한 선택적 출발지·목적지 선택기로 임의 대 임의, 하나 대 임의, 임의 대 하나, 하나 대 하나를 조사할 수 있습니다. 한쪽을 선택하면 반대쪽 선택기에는 관찰되거나 차단된 증거로 연결된 엔드포인트만 남습니다. ‘임의’는 항상 사용할 수 있고 ‘재설정’으로 두 선택기를 모두 되돌릴 수 있습니다. 포커스된 맵에는 연결된 모든 런처, 에이전트, 도구 또는 MCP 서비스, 게이트웨이, Flowlight 프록시 단계, 목적지, 관찰되거나 차단된 관계가 포함됩니다. 유난히 큰 포커스 범위만 점진적으로 그룹화하며 각 그룹은 모든 정확한 구성원 ID를 유지합니다. <strong>목록</strong>과 보고서는 완전하고 수치도 동일하게 유지됩니다.</p>
-      <p>노드나 연결을 선택해 정확한 값을 확인한 뒤 같은 앱과 목적지로 보고서, 검사 또는 저장하지 않은 규칙을 열 수 있습니다. <strong>목록</strong>은 키보드와 VoiceOver에 같은 전체 그래프를 제공합니다. 연결은 네트워크 흐름이며 HTTP 요청 수가 아니고, 관찰됨은 허용 결정이 아닙니다.</p>
+      <p>기록에서 막대에 포인터를 올리면 포인터를 따라다니는 스크롤 가능한 카드에 기여한 앱이 표시됩니다. 막대를 클릭해 확대하지는 않습니다. 행을 두 번 클릭하면 기록을 그 항목으로 좁힐 수 있습니다.</p>
+      <h2 id="visualize">연결</h2>
+      <p><strong>연결</strong>는 현재 기간·검색·포커스 범위의 모든 앱, 정확한 목적지, 관찰된 관계를 표시합니다. 경로 너비는 바이트 수를 나타냅니다. 드문 분홍색과 파란색 대시가 보내기와 받기의 반대 방향으로 움직이고, 각 에지는 고유하면서 안정적인 속도를 가집니다. 동작 줄이기에서는 같은 정확한 정적 경로가 유지됩니다.</p>
+      <p>기본적으로 트래픽은 전체 받은 바이트와 보낸 바이트 합계가 가장 큰 앱 10개를, AI 활동은 입증된 에이전트 루트 10개를 표시합니다. 검색 가능한 선택적 출발지·목적지 선택기로 임의 대 임의, 하나 대 임의, 임의 대 하나, 하나 대 하나를 조사할 수 있습니다. 한쪽을 선택하면 반대쪽 선택기에는 관찰되거나 차단된 증거로 연결된 엔드포인트만 남습니다. ‘임의’는 항상 사용할 수 있고 ‘재설정’으로 두 선택기를 모두 되돌릴 수 있습니다. 포커스된 맵에는 연결된 모든 런처, 에이전트, 도구 또는 MCP 서비스, 게이트웨이, Flowlight 프록시 단계, 목적지, 관찰되거나 차단된 관계가 포함됩니다. 유난히 큰 포커스 범위만 점진적으로 그룹화하며 각 그룹은 모든 정확한 구성원 ID를 유지합니다. <strong>목록</strong>과 기록은 완전하고 수치도 동일하게 유지됩니다.</p>
+      <p>노드나 연결을 선택해 정확한 값을 확인한 뒤 같은 앱과 목적지로 기록, 검사 또는 저장하지 않은 규칙을 열 수 있습니다. <strong>목록</strong>은 키보드와 VoiceOver에 같은 전체 그래프를 제공합니다. 연결은 네트워크 흐름이며 HTTP 요청 수가 아니고, 관찰됨은 허용 결정이 아닙니다.</p>
 
       <h2 id="agents">AI 에이전트 규칙</h2>
       <p>Flowlight가 이름으로 아는 앱(현재 16종, Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, Ollama, ZCode 등)이거나
@@ -200,7 +200,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>에이전트는 일의 상당 부분을 다른 프로세스로 처리합니다. 셸 도구가 <code>curl</code>이나 <code>git</code>, <code>npm</code>을 실행하고,
         MCP 서버는 자기 프로세스로 돕니다. Flowlight는 각 프로세스의 부모를 거슬러 올라가 그것을 시작한 에이전트를 찾고, 그 트래픽을
         에이전트의 것으로 집계합니다. <strong>AI 에이전트</strong>에서는 에이전트 상세의 <strong>도구와 MCP 서버</strong>에 이들이 나열되고,
-        목적지에는 <em>curl 경유</em>나 <em>github MCP 경유</em>라고 표시됩니다. <strong>보고서</strong>에서는 프로세스 행에 <em>Claude Code 경유</em>라고 나옵니다.</p>
+        목적지에는 <em>curl 경유</em>나 <em>github MCP 경유</em>라고 표시됩니다. <strong>기록</strong>에서는 프로세스 행에 <em>Claude Code 경유</em>라고 나옵니다.</p>
       <p>MCP 서버의 이름은 명령줄을 Claude Code(<code>~/.claude.json</code>), Claude Desktop,
         Cursor(<code>~/.cursor/mcp.json</code>), Windsurf, VS Code, Codex(<code>~/.codex/config.toml</code>), Zed, Gemini CLI의 MCP 설정과
         맞춰 알아냅니다. 원격 MCP 서버는 URL의 호스트 이름으로, 설정에 없는 서버는
@@ -242,11 +242,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
 
       <h2 id="worth-a-look">눈여겨볼 것</h2>
-      <p><strong>보고서</strong>의 세 번째 모드로, 세부 내역과 차트 옆에 있습니다. 보고서에 있는 앱들을 서로 비교해, 목적지가 나머지와
+      <p><strong>기록</strong>의 세 번째 모드로, 세부 내역과 차트 옆에 있습니다. 기록에 있는 앱들을 서로 비교해, 목적지가 나머지와
         닮지 않은 앱을 짚어 줍니다. 비슷한 앱들보다 훨씬 많은 곳, 끝내 이름으로 확인되지 않은 주소, 고른 것이 아니라 생성된 듯한
         호스트 이름, 받은 것보다 훨씬 많이 보낸 경우, 그리고 그 앱의 목적이라기보다 부업 같은 프로토콜입니다. 발견마다 근거가 함께
-        붙고, 하나를 클릭하면 보고서가 그 앱으로 좁혀집니다.</p>
-      <p>이름이 <em>의심스러움</em>이 아니라 <em>눈여겨볼 것</em>인 것은 일부러입니다. 데이터가 뒷받침하는 말은 “이 보고서의 다른 앱들에
+        붙고, 하나를 클릭하면 기록이 그 앱으로 좁혀집니다.</p>
+      <p>이름이 <em>의심스러움</em>이 아니라 <em>눈여겨볼 것</em>인 것은 일부러입니다. 데이터가 뒷받침하는 말은 “이 기록의 다른 앱들에
         비해 특이하다”까지입니다. 백업 도구는 이유가 있어서 여러 곳과 통신하고, 조용한 Mac에서는 아무 발견도 나오지 않습니다. 모든 앱이
         공통으로 내는 트래픽에 대해서는 아무 말도 하지 않습니다.</p>
 
@@ -256,8 +256,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         늘 집계하고 있었지만 부를 말이 없었기에, 4&nbsp;GB 폴더를 AirDrop으로 보내면 이름 없는 주소로 몇 메가바이트가 간 것처럼
         보였습니다.</p>
       <p>이제 모든 흐름에는 <strong>채널</strong>이 붙습니다. <em>네트워크</em>, <em>피어 투 피어 Wi-Fi</em>, <em>이 Mac</em>(루프백,
-        기기를 떠나지 않은 트래픽), <em>터널</em>(VPN 안. 그 뒤로 어디로 갔는지는 여기서 보이지 않습니다) 중 하나입니다. 보고서 툴바에서
-        채널로 보고서를 좁힐 수 있고, 이 값은 CSV 내보내기와 수집기로 보내는 데이터에도 함께 실립니다.</p>
+        기기를 떠나지 않은 트래픽), <em>터널</em>(VPN 안. 그 뒤로 어디로 갔는지는 여기서 보이지 않습니다) 중 하나입니다. 기록 툴바에서
+        채널로 기록을 좁힐 수 있고, 이 값은 CSV 내보내기와 수집기로 보내는 데이터에도 함께 실립니다.</p>
       <p><strong>피어 투 피어 행의 이름은 그 연결을 연 기능에서 옵니다.</strong> <code>AirDrop and Handoff · nearby device</code>,
         <code>Continuity · nearby device</code>처럼 말이죠. 링크 로컬 주소는 아무것도 알려주지 않고, 같은 공간의 기기는 이 Mac이 알아낼
         수 있는 이름을 갖고 있지 않기 때문입니다. 무선을 직접 쓰는 앱은 자기 이름을 그대로 유지하는데, 그것이 그 앱에 대한 정직한 답입니다.</p>
@@ -277,7 +277,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
       <p><strong>Apple 기본 앱은 기본적으로 제외합니다.</strong> macOS는 소프트웨어 업데이트, iCloud, 푸시, 시간, 지도 타일처럼
       끊임없이 Apple과 통신하고, 그 호스트와 포트는 처음 나타날 때마다 새 것입니다. 그것을 다 나열하면 정작 읽을 만한 한 줄이
-      묻힙니다. 보고 싶다면 <strong>설정 › 알림</strong>에서 끄세요. 어느 쪽이든 트래픽은 그대로 기록되고, 실시간과 보고서, 질문에
+      묻힙니다. 보고 싶다면 <strong>설정 › 알림</strong>에서 끄세요. 어느 쪽이든 트래픽은 그대로 기록되고, 실시간과 기록, 질문에
       그대로 나타나며, 모든 규칙과 가드레일, 허용 목록의 적용도 그대로 받습니다. 이 설정이 정하는 것은 무엇이 목록에 오르는지일
       뿐, 무엇이 허용되는지가 아닙니다.</p>
 
@@ -305,10 +305,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>모양이 중요할 때는 차트로.</strong> 시간에 따른 변화는 선으로, 비교는 막대로, 하나의 전체를 나눈 것은 원으로
         돌아옵니다. Flowlight는 질의가 돌려준 바로 그 행으로 차트를 그리므로 그림과 문장이 어긋날 수 없고, 모델은 다른 모양을
         요청하거나 차트를 그리지 말라고 할 수도 있습니다.</p>
-      <p><strong>모든 질의가 답 아래에 나열되고, 클릭하면 트래픽 근거는 보고서에서, 기기와 설정 답변은 관련 화면에서 열립니다.</strong>
+      <p><strong>모든 질의가 답 아래에 나열되고, 클릭하면 트래픽 근거는 기록에서, 기기와 설정 답변은 관련 화면에서 열립니다.</strong>
         확인할 수 없는 답은 문법만 좋은 추측입니다.</p>
       <p><strong>Flowlight는 자신에게도 같은 기준을 적용합니다.</strong> 이 기능이 보내는 것은 무엇이든 다른 앱의 트래픽과 똑같이
-        실시간과 보고서에 나타납니다. 모델 서버가 바로 이 Mac에 있는 경우까지 포함해서요. 조용히 빼기가 가장 쉬웠을 경우입니다.</p>
+        실시간과 기록에 나타납니다. 모델 서버가 바로 이 Mac에 있는 경우까지 포함해서요. 조용히 빼기가 가장 쉬웠을 경우입니다.</p>
 
       <h2 id="inspection">HTTPS 검사(선택 사항)</h2>
       <p>기본값은 끔입니다. <strong>검사</strong>에서 켜면 Flowlight는 Mac 안에서 만든 자체 인증 기관을 가지고 <code>127.0.0.1:8877</code>에
@@ -377,7 +377,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         피할 수 없습니다. 그 자리를 대신하는 것이 다른 환경으로 시작한다는 점이 이 기능의 전부이기 때문입니다. 할 수 없는 일도 있습니다. 이미 실행
         중인 에이전트에는 닿지 못합니다. 그 프록시 설정은 시작할 때 읽혔고, 이제는 무엇으로도 바꿀 수 없습니다.</p>
 
-      <p><strong>행에서 곧바로 오는 길.</strong> 실시간이나 보고서, AI 에이전트에서 앱이나 목적지를 오른쪽 클릭하고
+      <p><strong>행에서 곧바로 오는 길.</strong> 실시간이나 기록, AI 에이전트에서 앱이나 목적지를 오른쪽 클릭하고
         <strong>…의 트래픽 검사</strong>를 고르면, 그 앱만 또는 그 목적지만 보이는 채로 검사 화면이 열립니다. 그렇다고 알려 주는
         칩이 붙고, 한 번 눌러 없앨 수 있습니다. 검색하는 것이 아니라 범위를 좁히는 것입니다. 이전 버전은 그 이름을 검색란에 넣었는데,
         검색란은 응답 본문까지 찾기 때문에 한 에이전트의 트래픽을 보자고 했을 뿐인데 HTML에 그 이름이 언급되었을 뿐인 페이지까지 모두
@@ -407,13 +407,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="rules">규칙</h2>
       <p>허용 목록은 에이전트 하나가 어디까지 갈 수 있는지에 대한 이야기입니다. <strong>규칙</strong>은 그것의 일반형입니다.
         <strong>대상</strong>, 즉 앱이나 에이전트, 목적지, URL, 또는 그 둘의 조합을 지목하고 <strong>차단</strong>인지
-        <strong>허용</strong>인지 정합니다. 실시간이나 보고서, AI 에이전트, 검사에서 아무 행이나 오른쪽 클릭하면 지금 보고 있는 것에
+        <strong>허용</strong>인지 정합니다. 실시간이나 기록, AI 에이전트, 검사에서 아무 행이나 오른쪽 클릭하면 지금 보고 있는 것에
         대한 규칙을 쓸 수 있습니다. 어느 경로로 만들어도 모두 <strong>규칙</strong> 화면의 같은 편집기로 모입니다. 보이지 않는 곳에서
         효력을 갖는 규칙은 다시는 찾을 수 없는 규칙이 되기 때문입니다.</p>
       <p><strong>템플릿.</strong> 스물두 개가 다섯 묶음으로 있습니다. 에이전트가 패키지 레지스트리나 다른 모델 제공업체에 닿지 못하게
         막는 것, 데이터가 나가는 흔한 경로를 닫는 것(붙여넣기 사이트, 웹훅 수집기, 익명 파일 업로드, 터널, DNS over HTTPS), 제품 분석과
         크래시 보고, 업무 시간 정책, 그리고 “이게 뭔지 알아내는 동안 한 시간만 막아 두기” 같은 일회성 규칙입니다. 규칙 툴바에서
-        둘러보거나, 실시간·보고서·AI 에이전트·검사의 아무 행에서 오른쪽 클릭해 지금 보고 있는 것에 적용하세요.</p>
+        둘러보거나, 실시간·기록·AI 에이전트·검사의 아무 행에서 오른쪽 클릭해 지금 보고 있는 것에 적용하세요.</p>
       <p>각 템플릿은 무엇을 할지 먼저 알려줍니다. 규칙을 두 개 이상 쓰는 템플릿은 모든 호스트와 일정을 나열한 카드를 열고, 영구적인
         것은 미리 채워진 편집기를 열며, <strong>스스로 사라지는 규칙</strong>, 즉 한 시간짜리나 이번 Flowlight 실행 동안만 유효한
         규칙만 먼저 보여주지 않고 바로 적용됩니다. 각 템플릿에는 주의 사항과 필요한 엔진도 함께 적혀 있습니다. HTTPS 검사가 있어야만
@@ -566,10 +566,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         때문입니다. 처리량은 여기에도 없는데, 이유는 Bluetooth와 같습니다.</p>
 
       <h2 id="focus">집중 모드</h2>
-      <p>앱과 목적지 몇 개를 고르면 모든 화면이 그것만 보여줍니다. 실시간과 보고서, 알림, AI 에이전트, 검사, 그리고 메뉴 막대의
+      <p>앱과 목적지 몇 개를 고르면 모든 화면이 그것만 보여줍니다. 실시간과 기록, 알림, AI 에이전트, 검사, 그리고 메뉴 막대의
         속도까지요. Mac의 나머지에 방해받지 않고 에이전트 하나가 일하는 모습을 지켜보기 위한 기능입니다.</p>
       <ul>
-        <li>실시간이나 보고서, AI 에이전트에서 아무 행이나 오른쪽 클릭해 <strong>집중하기…</strong>를 고르거나, 사이드바 아래의 집중
+        <li>실시간이나 기록, AI 에이전트에서 아무 행이나 오른쪽 클릭해 <strong>집중하기…</strong>를 고르거나, 사이드바 아래의 집중
           컨트롤에서 활동한 앱을 고르고 목적지를 입력하세요.</li>
         <li><kbd>⇧⌘F</kbd>로 집중을 켜고 끌 수 있고, 메뉴 막대에서도 됩니다. 메뉴 막대에는 무엇에 집중 중인지도 표시됩니다.</li>
         <li>목적지는 서브도메인을 함께 데려갑니다. <code>example.com</code>은 <code>api.example.com</code>까지 포함합니다. IP 주소는
@@ -611,7 +611,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li><strong>HTTPS 검사에서 나온 것은 절대 보내지 않습니다.</strong> 헤더도, 본문도, 도구 호출도 없습니다. 내보내기가 실을 수
           있는 것은 집계와 알림뿐이므로, 실수로라도 그것들이 갈 자리가 없습니다.</li>
         <li>인증 헤더는 설정이 아니라 로그인 키체인에 보관합니다. 화면에는 이름만 표시됩니다.</li>
-        <li><strong>Flowlight가 보내는 것은 Flowlight에 나타납니다.</strong> 다른 앱의 트래픽과 똑같이 실시간과 보고서에요.
+        <li><strong>Flowlight가 보내는 것은 Flowlight에 나타납니다.</strong> 다른 앱의 트래픽과 똑같이 실시간과 기록에요.
           <code>127.0.0.1</code>에 있는 수집기까지 포함합니다.</li>
       </ul>
       <p>예상해 둘 것이 두 가지 있습니다. 집계는 약 2분 뒤처져 접히므로, 간격을 1분 미만으로 잡으면 더 자주 물어보기만 하고 데이터가
@@ -750,7 +750,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.16.11 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.17.0 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>
