@@ -1032,12 +1032,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP, Destination › App › IP, or IP › App";
 "Choose a longer window or clear filters." = "Choose a longer window or clear filters.";
 "Back" = "Back";
-"Return to the previous report scope" = "Return to the previous report scope";
-"Granularity" = "Granularity";
-"Earlier (⌘[)" = "Earlier (⌘[)";
-"Earlier" = "Earlier";
-"Later (⌘])" = "Later (⌘])";
-"Later" = "Later";
 "Now" = "Now";
 "Showing only:" = "Showing only:";
 "App: %@" = "App: %@";
@@ -1061,7 +1055,6 @@
 "Peak year" = "Peak year";
 "Bytes" = "Bytes";
 "Filtered traffic" = "Filtered traffic";
-"Click a bar to zoom in" = "Click a bar to zoom in";
 "Use the Left and Right Arrow keys to inspect time buckets." = "Use the Left and Right Arrow keys to inspect time buckets.";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in.";
 "1 new flow" = "1 new flow";
@@ -1798,7 +1791,6 @@
 "Could not prepare managed-pack review demo: %@" = "Could not prepare managed-pack review demo: %@";
 
 /* 0.16.0 traffic visualization */
-"Visualize" = "Visualize";
 "Map" = "Map";
 "List" = "List";
 "App, domain, or IP" = "App, domain, or IP";

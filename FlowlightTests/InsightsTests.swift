@@ -216,6 +216,11 @@ final class InsightsTests: XCTestCase {
         XCTAssertEqual(resized.duration, 60, accuracy: 0.5)
         XCTAssertGreaterThanOrEqual(resized.start, available.lowerBound)
         XCTAssertLessThanOrEqual(resized.end, available.upperBound)
+
+        let returnedToNow = window.returningToNow(within: available)
+        XCTAssertEqual(returnedToNow.end, available.upperBound)
+        XCTAssertEqual(returnedToNow.duration, window.duration, accuracy: 0.5)
+        XCTAssertTrue(returnedToNow.followNow)
     }
 
     func testReportNavigationHistoryRestoresTheCompleteFilter() {
@@ -231,7 +236,8 @@ final class InsightsTests: XCTestCase {
             granularity: .hour,
             endDate: Date(timeIntervalSince1970: 42),
             followNow: false,
-            filter: filter
+            filter: filter,
+            preset: .oneDay
         )
         var history = ReportNavigationHistory()
 

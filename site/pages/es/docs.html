@@ -96,8 +96,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><th>Vista</th><th>Atajo</th><th>Qué responde</th></tr>
         <tr><td>En vivo</td><td>⌘1</td><td>Qué se mueve ahora mismo: tasas por app en los últimos segundos y el destino más activo.</td></tr>
         <tr><td><a href="#agents">Agentes de IA</a></td><td>⌘2</td><td>Qué agentes están activos, qué proveedores de IA usan y con qué más han contactado.</td></tr>
-        <tr><td>Informes</td><td>⌘3</td><td>Adónde fue el tráfico, del segundo al año. Agrupa por App, Destino o IP; cambia a Gráficos o a <a href="#worth-a-look">Merece un vistazo</a>; exporta a CSV.</td></tr>
-        <tr><td><a href="#visualize">Visualizar</a></td><td>—</td><td>Un mapa estable de apps y sus destinos exactos, con rutas ponderadas, marcadores de dirección en movimiento, recuentos de conexiones y una lista equivalente.</td></tr>
+        <tr><td>Historial</td><td>⌘3</td><td>Adónde fue el tráfico, del segundo al año. Agrupa por App, Destino o IP; cambia a Gráficos o a <a href="#worth-a-look">Merece un vistazo</a>; exporta a CSV.</td></tr>
+        <tr><td><a href="#visualize">Conexiones</a></td><td>—</td><td>Un mapa estable de apps y sus destinos exactos, con rutas ponderadas, marcadores de dirección en movimiento, recuentos de conexiones y una lista equivalente.</td></tr>
         <tr><td><a href="#alerts">Alertas</a></td><td>⌘4</td><td>Todo lo que ha resultado inusual, con la app, el destino y la cifra que activó la regla.</td></tr>
         <tr><td><a href="#rules">Reglas</a></td><td>⌘5</td><td>Cada lista de permitidos y cada rechazo que hayas puesto, qué abarca cada uno y qué ha detenido realmente.</td></tr>
         <tr><td><a href="#ask">Preguntar</a></td><td>⌘6</td><td>Preguntas sobre tu propio tráfico en lenguaje corriente, respondidas a partir del historial registrado por un modelo local o alojado.</td></tr>
@@ -110,11 +110,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="La pantalla En vivo: una lista de aplicaciones con sus tasas actuales de envío y recepción y su destino más activo."></div>
         <figcaption class="caption">En vivo, la pantalla con la que se abre Flowlight.</figcaption></figure>
-      <p>En Informes, pasa el cursor por una barra para ver qué apps la generaron, haz clic para ampliar y haz doble clic en cualquier fila para limitar el informe a ella.</p>
-      <h2 id="visualize">Visualizar el tráfico</h2>
-      <p><strong>Visualizar</strong> muestra cada app, destino exacto y relación observada del intervalo, la búsqueda y el enfoque actuales. El ancho representa bytes. Unos trazos rosa y azules se mueven en sentidos opuestos para envío y recepción; cada arista tiene su propia velocidad estable y Reducir movimiento conserva los mismos trazados estáticos.</p>
-      <p>Por defecto, Tráfico muestra las diez apps con más actividad y Actividad de IA las diez raíces de agentes demostradas con más actividad, ordenadas por el total completo de bytes recibidos y enviados. Los dos selectores opcionales con búsqueda, origen y destino, cubren cualquiera-a-cualquiera, uno-a-cualquiera, cualquiera-a-uno y uno-a-uno. Cada selección limita el selector opuesto a extremos con evidencia observada o bloqueada; «Cualquiera» siempre sigue disponible y «Restablecer» devuelve ambos selectores a su estado inicial. Un mapa enfocado incluye cada lanzador, agente, herramienta o servicio MCP, pasarela, etapa del proxy de Flowlight, destino y relación observada o bloqueada conectados. Solo los ámbitos enfocados excepcionalmente grandes se agrupan de forma progresiva; cada grupo conserva todos los ID exactos de sus miembros. <strong>Lista</strong> e Informes siguen completos y numéricamente idénticos.</p>
-      <p>Selecciona un nodo o conexión para ver sus valores exactos y continuar a Informes, Inspeccionar o una regla sin guardar con la misma app y destino. <strong>Lista</strong> ofrece el mismo grafo completo para teclado y VoiceOver. Conexiones significa flujos de red, no peticiones HTTP; Observado no es una decisión de permiso.</p>
+      <p>En Historial, pasa el cursor sobre una barra para abrir una tarjeta desplazable que sigue al puntero y muestra las apps que contribuyeron; las barras no amplían al hacer clic. Haz doble clic en cualquier fila para limitar el historial a ella.</p>
+      <h2 id="visualize">Conexiones</h2>
+      <p><strong>Conexiones</strong> muestra cada app, destino exacto y relación observada del intervalo, la búsqueda y el enfoque actuales. El ancho representa bytes. Unos trazos rosa y azules se mueven en sentidos opuestos para envío y recepción; cada arista tiene su propia velocidad estable y Reducir movimiento conserva los mismos trazados estáticos.</p>
+      <p>Por defecto, Tráfico muestra las diez apps con más actividad y Actividad de IA las diez raíces de agentes demostradas con más actividad, ordenadas por el total completo de bytes recibidos y enviados. Los dos selectores opcionales con búsqueda, origen y destino, cubren cualquiera-a-cualquiera, uno-a-cualquiera, cualquiera-a-uno y uno-a-uno. Cada selección limita el selector opuesto a extremos con evidencia observada o bloqueada; «Cualquiera» siempre sigue disponible y «Restablecer» devuelve ambos selectores a su estado inicial. Un mapa enfocado incluye cada lanzador, agente, herramienta o servicio MCP, pasarela, etapa del proxy de Flowlight, destino y relación observada o bloqueada conectados. Solo los ámbitos enfocados excepcionalmente grandes se agrupan de forma progresiva; cada grupo conserva todos los ID exactos de sus miembros. <strong>Lista</strong> e Historial siguen completos y numéricamente idénticos.</p>
+      <p>Selecciona un nodo o conexión para ver sus valores exactos y continuar a Historial, Inspeccionar o una regla sin guardar con la misma app y destino. <strong>Lista</strong> ofrece el mismo grafo completo para teclado y VoiceOver. Conexiones significa flujos de red, no peticiones HTTP; Observado no es una decisión de permiso.</p>
 
       <h2 id="agents">Reglas de los agentes de IA</h2>
       <p>Una app cuenta como agente si Flowlight la conoce por su nombre (16 hoy, entre ellas Claude Code, Codex, Cursor, GitHub Copilot,
@@ -132,7 +132,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p>Los agentes hacen gran parte de su trabajo a través de otros procesos: una herramienta de shell ejecuta <code>curl</code>, <code>git</code> o <code>npm</code>, y los servidores
         MCP se ejecutan como procesos propios. Flowlight sigue los procesos padre de cada proceso hasta el agente que lo arrancó, así que ese tráfico
         cuenta como del agente. En <strong>Agentes de IA</strong>, el detalle del agente los lista en <strong>Herramientas y servidores MCP</strong>, y
-        los destinos indican <em>vía curl</em> o <em>vía MCP github</em>. En <strong>Informes</strong>, la fila del proceso indica <em>vía Claude Code</em>.</p>
+        los destinos indican <em>vía curl</em> o <em>vía MCP github</em>. En <strong>Historial</strong>, la fila del proceso indica <em>vía Claude Code</em>.</p>
       <p>Los servidores MCP reciben su nombre cotejando su línea de comandos con la configuración MCP de Claude Code (<code>~/.claude.json</code>), Claude Desktop,
         Cursor (<code>~/.cursor/mcp.json</code>), Windsurf, VS Code, Codex (<code>~/.codex/config.toml</code>), Zed y Gemini CLI. Los servidores MCP remotos
         se identifican por el nombre de host de su URL, y los que no están configurados, por nombres de paquete reconocibles como
@@ -175,7 +175,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
 
       <h2 id="worth-a-look">Merece un vistazo</h2>
-      <p>Un tercer modo en <strong>Informes</strong>, junto al desglose y los gráficos. Compara entre sí las apps del informe
+      <p>Un tercer modo en <strong>Historial</strong>, junto al desglose y los gráficos. Compara entre sí las apps del informe
         y señala aquellas cuyos destinos no se parecen al resto: muchos más sitios que sus pares, direcciones que nunca
         resolvieron a un nombre, nombres de host que parecen generados en vez de elegidos, mucho más enviado que recibido y protocolos que son un
         añadido y no el propósito de la app. Cada hallazgo lleva consigo las pruebas en las que se basa, y al hacer clic en uno el informe se limita a esa
@@ -191,7 +191,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         sin nombre.</p>
       <p>Ahora cada flujo lleva un <strong>canal</strong>: <em>Red</em>, <em>Wi-Fi entre dispositivos</em>, <em>Este Mac</em> (loopback,
         que nunca salió de la máquina) o <em>Túnel</em> (dentro de una VPN; adónde fue después no se ve aquí). Puedes limitar un informe a
-        uno de ellos desde la barra de herramientas de Informes, y el canal viaja con las exportaciones a CSV y con todo lo que se envía a un colector.</p>
+        uno de ellos desde la barra de herramientas de Historial, y el canal viaja con las exportaciones a CSV y con todo lo que se envía a un colector.</p>
       <p><strong>Las filas entre dispositivos reciben el nombre de la función que las abrió</strong> —<code>AirDrop and Handoff · nearby device</code>,
         <code>Continuity · nearby device</code>— porque una dirección de enlace local no dice nada y el dispositivo que está en la habitación no tiene un nombre
         que este Mac pueda aprender. Una app que usa la radio directamente conserva su propio nombre, que es la respuesta veraz en su caso.</p>
@@ -212,7 +212,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Las apps de Apple quedan fuera por defecto.</strong> macOS contacta con Apple constantemente —Actualización de software, iCloud,
       push, hora, teselas de Mapas— en hosts y puertos que son nuevos la primera vez que aparecen, y listarlo todo entierra la única
       línea que merece leerse. Desactívalo en <strong>Ajustes › Alertas</strong> si las quieres. En cualquier caso, el tráfico se sigue
-      registrando, sigue apareciendo en En vivo, Informes y Preguntar, y sigue sujeto a todas las reglas, salvaguardas y listas de permitidos: el ajuste
+      registrando, sigue apareciendo en En vivo, Historial y Preguntar, y sigue sujeto a todas las reglas, salvaguardas y listas de permitidos: el ajuste
       decide qué se lista, nunca qué se permite.</p>
 
       <h2 id="ask">Preguntar</h2>
@@ -240,9 +240,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Gráficos cuando la forma importa.</strong> La evolución en el tiempo vuelve como una línea, una comparación como barras y el reparto de un
         total como un gráfico de sectores. Flowlight los dibuja con las mismas filas que devolvió la consulta, así que la imagen y la frase no pueden contradecirse,
         y el modelo puede pedir otra forma o ninguna.</p>
-      <p><strong>Cada consulta aparece debajo de la respuesta y, al hacer clic, se abre Informes para las pruebas de tráfico o
+      <p><strong>Cada consulta aparece debajo de la respuesta y, al hacer clic, se abre Historial para las pruebas de tráfico o
         la pantalla correspondiente para las respuestas sobre dispositivos y configuración.</strong> Una respuesta que no puedes comprobar es una conjetura con mejor gramática.</p>
-      <p><strong>Flowlight se aplica su propio criterio.</strong> Lo que esta función envíe aparece en En vivo y en Informes
+      <p><strong>Flowlight se aplica su propio criterio.</strong> Lo que esta función envíe aparece en En vivo y en Historial
         como el tráfico de cualquier otra app, también cuando el servidor de modelos está en este mismo Mac, que era justo el caso más
         fácil de omitir sin decir nada.</p>
 
@@ -312,7 +312,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         inevitable: todo el sentido está en que lo que lo sustituye arranque con un entorno distinto. Lo que no puede hacer es llegar a
         los agentes que ya están en marcha — sus ajustes de proxy se leyeron al arrancar, y ya nada puede cambiarlos.</p>
 
-      <p><strong>Cómo llegar aquí desde una fila.</strong> Haz clic derecho en una app o en un destino en En vivo, Informes o Agentes de IA y elige
+      <p><strong>Cómo llegar aquí desde una fila.</strong> Haz clic derecho en una app o en un destino en En vivo, Historial o Agentes de IA y elige
         <strong>Inspeccionar el tráfico de …</strong>: Inspeccionar se abre mostrando solo esa app, o solo ese destino, con una etiqueta que lo indica y
         que puedes quitar con un clic. Delimita en lugar de buscar — una versión anterior ponía el nombre en el campo de búsqueda, que también busca en los
         cuerpos de las respuestas, así que pedir el tráfico de un agente devolvía todas las páginas cuyo HTML se limitaba a mencionarlo. Solo puede aparecer
@@ -340,13 +340,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="rules">Reglas</h2>
       <p>Una lista de permitidos es la idea que tiene un agente de adónde puede ir. Una <strong>regla</strong> es la versión general: nombra un
         <strong>sujeto</strong> —una app, un agente, un destino, una URL o una pareja de dos de ellos— y dice <strong>bloquear</strong>
-        o <strong>permitir</strong>. Haz clic derecho en cualquier fila de En vivo, Informes, Agentes de IA o Inspeccionar para escribir una sobre lo que estás mirando;
+        o <strong>permitir</strong>. Haz clic derecho en cualquier fila de En vivo, Historial, Agentes de IA o Inspeccionar para escribir una sobre lo que estás mirando;
         todas acaban en el mismo editor de la pantalla <strong>Reglas</strong>, porque una regla que surtiera efecto fuera de la vista
         sería una regla que ya nunca podrías encontrar.</p>
       <p><strong>Plantillas.</strong> Veintidós, en cinco grupos: impedir que un agente llegue a registros de paquetes o a otros
         proveedores de modelos, cerrar las vías habituales por las que salen los datos (sitios de pegado, receptores de webhooks, servicios anónimos de subida de archivos, túneles, DNS over
         HTTPS), analítica de producto e informes de errores, políticas de horario laboral, y el «bloquea esto una hora mientras averiguo
-        qué es» puntual. Explóralas desde la barra de herramientas de Reglas, o haz clic derecho en una fila de En vivo, Informes, Agentes de IA o Inspeccionar y
+        qué es» puntual. Explóralas desde la barra de herramientas de Reglas, o haz clic derecho en una fila de En vivo, Historial, Agentes de IA o Inspeccionar y
         aplica una a lo que estés mirando.</p>
       <p>Cada plantilla dice qué va a hacer antes de hacerlo. Todo lo que escriba más de una regla abre una tarjeta con la lista de cada
         host y cada horario; todo lo permanente abre el editor ya rellenado; y <strong>solo las reglas que se deshacen solas</strong> —una
@@ -502,10 +502,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         evento que de verdad importa a la gente. El rendimiento tampoco está aquí, por la misma razón que no está en Bluetooth.</p>
 
       <h2 id="focus">Modo Enfoque</h2>
-      <p>Elige unas cuantas apps y destinos y todas las pantallas mostrarán solo eso: En vivo, Informes, Alertas, Agentes de IA e Inspeccionar, y también las tasas de
+      <p>Elige unas cuantas apps y destinos y todas las pantallas mostrarán solo eso: En vivo, Historial, Alertas, Agentes de IA e Inspeccionar, y también las tasas de
         la barra de menús. Sirve para ver trabajar a un agente sin el resto del Mac por medio.</p>
       <ul>
-        <li>Haz clic derecho en cualquier fila de En vivo, Informes o Agentes de IA y elige <strong>Enfocar en…</strong>, o usa el control Enfoque al final de
+        <li>Haz clic derecho en cualquier fila de En vivo, Historial o Agentes de IA y elige <strong>Enfocar en…</strong>, o usa el control Enfoque al final de
           la barra lateral para elegir entre las apps que han estado activas y escribir destinos.</li>
         <li><kbd>⇧⌘F</kbd> activa y desactiva el Enfoque, igual que la barra de menús, que además muestra qué está enfocado.</li>
         <li>Un destino se lleva sus subdominios: <code>example.com</code> cubre <code>api.example.com</code>. Las direcciones IP funcionan;
@@ -546,7 +546,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li><strong>Nunca nada de la inspección HTTPS.</strong> Ni cabeceras, ni cuerpos, ni llamadas de herramientas: la exportación solo puede llevar
           agregados y alertas, así que no hay por dónde se escapen ni por accidente.</li>
         <li>Las cabeceras de autenticación se guardan en tu llavero de inicio de sesión, no en las preferencias. Solo se muestran sus nombres.</li>
-        <li><strong>Lo que Flowlight envía aparece en Flowlight</strong>, en En vivo y en Informes, como el tráfico de cualquier otra app, incluido
+        <li><strong>Lo que Flowlight envía aparece en Flowlight</strong>, en En vivo y en Historial, como el tráfico de cualquier otra app, incluido
           un colector en <code>127.0.0.1</code>.</li>
       </ul>
       <p>Dos cosas que esperar: los agregados se consolidan con unos dos minutos de retraso, así que un intervalo de menos de un minuto consulta más a menudo sin que los datos

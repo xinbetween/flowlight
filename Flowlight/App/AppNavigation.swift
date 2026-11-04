@@ -159,6 +159,8 @@ struct ReportRequest: Equatable {
     var granularity: Granularity?
     var start: Date? = nil
     var end: Date?
+    var duration: TimeInterval? = nil
+    var preset: HistoryRangePreset? = nil
     var id = UUID()
 }
 
@@ -193,10 +195,13 @@ final class AppNavigation: ObservableObject {
     }
 
     func updateCurrentReportScope(filter: TrafficFilter, granularity: Granularity,
-                                  startDate: Date, endDate: Date, followNow: Bool) {
+                                  startDate: Date, endDate: Date, followNow: Bool,
+                                  preset: HistoryRangePreset?) {
         currentReportScope = ReportRequest(filter: filter, granularity: granularity,
                                            start: followNow ? nil : startDate,
-                                           end: followNow ? nil : endDate)
+                                           end: followNow ? nil : endDate,
+                                           duration: endDate.timeIntervalSince(startDate),
+                                           preset: preset)
     }
 
     func goBack() {

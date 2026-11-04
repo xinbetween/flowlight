@@ -117,11 +117,12 @@ The request is never sent. Mocked exchanges are recorded and clearly marked, so 
 was real. Needs HTTPS inspection, since only decrypted traffic can be answered — and a mock changes the reply, not
 whether the connection can be made.
 
-### Reports at any zoom
-- Second, minute, hour, day, week, month and year views. Click a bar to zoom in.
+### History at any zoom
+- Range presets: **15 min**, **1h**, **6h**, **1d**, **1w**, **1 mo**, **6 mo**, **1y** and **All**.
+- Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range.
+- Switch the navigator between **Nearby context** and **All history**. Drag the brush to pan the selected window or either edge to resize it.
 - Group the breakdown by **App › Domain › IP**, **Destination › App › IP**, or **IP › App**.
-- Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps.
-- Hover any bucket to see which apps drove it. Export to CSV.
+- Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps. Export to CSV.
 
 ### Blocking what an agent shouldn't reach
 An allowlist warns by default. Turn on **Refuse connections outside the list** for an agent and Flowlight drops those
@@ -135,7 +136,7 @@ original app before Flowlight opens the origin connection; agent allowlists stil
 ### Rules
 An allowlist is one agent's idea of where it may go. A **rule** is the general version: it names a subject — an app,
 an agent, a destination, a URL, or a pairing of two of those — and says block or allow. Right-click any row in Live,
-Reports, AI Agents or Inspect to write one about what you're looking at; all of them land in the same editor on the
+History, AI Agents or Inspect to write one about what you're looking at; all of them land in the same editor on the
 **Rules** screen.
 
 - **The most specific match decides**, and a tie goes to the block. An exception written underneath a broad block
@@ -259,12 +260,12 @@ llama.cpp). Both send nothing. **Or bring your own key** for Anthropic, OpenAI, 
 endpoint — the key lives in your login Keychain, the screen says when a question will leave the Mac, and every
 request is shown in full under the answer.
 
-Every query is listed under the answer. Clicking one opens Reports for traffic evidence, or the relevant app screen
+Every query is listed under the answer. Clicking one opens History for traffic evidence, or the relevant app screen
 for device and configuration answers. And Ask's own traffic shows up in Live like any other app's — including when
 the model is a server on this same Mac.
 
 ### Worth a look
-A third mode in Reports, beside the breakdown and the charts. It compares the apps in a report with each other and
+A third mode in History, beside the breakdown and the charts. It compares the apps in a report with each other and
 points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
 never resolved to a name, hostnames that look generated, far more sent than received, protocols that are a sideline
 rather than the app's purpose. Each finding shows its evidence; clicking one narrows the report to that app.
@@ -284,7 +285,7 @@ launch and only while a window is open, rather than meeting a first run with a p
 launch until taken or dismissed.
 
 ### Focus mode
-Pick a few apps and destinations and every screen shows only those — Live, Reports, Alerts, AI Agents and Inspect,
+Pick a few apps and destinations and every screen shows only those — Live, History, Alerts, AI Agents and Inspect,
 plus the menu bar rates. It's for watching one agent work without the rest of the Mac in the way.
 
 - Add an app by name or bundle identifier — every application on the Mac is searchable, so one that has been quiet
@@ -307,7 +308,7 @@ Off until you configure it, with no Flowlight-operated endpoint to send to — y
 HTTP (rollups as metrics, alerts as logs) or newline-delimited JSON. The Settings panel lists every field that
 leaves and previews a real payload built from your own data first. Auth headers live in the Keychain. Nothing from
 HTTPS inspection can be exported — the payload types have nowhere to put a header or a body. What Flowlight sends
-appears in Live and Reports like any other app's traffic, including a collector on localhost.
+appears in Live and History like any other app's traffic, including a collector on localhost.
 
 ### Private by design
 No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
@@ -321,11 +322,11 @@ same local database.
 
 <table>
 <tr>
-<td><img src="docs/assets/screenshots/reports.png" alt="Reports view with hourly traffic bars and donut charts for apps, destinations and protocols"></td>
+<td><img src="docs/assets/screenshots/reports.png" alt="History view with hourly traffic bars and donut charts for apps, destinations and protocols"></td>
 <td><img src="docs/assets/screenshots/alerts.png" alt="Alerts view listing agent exfiltration, SMTP, FTP and traffic spike alerts"></td>
 </tr>
 <tr>
-<td align="center"><sub>Reports: every granularity, every grouping</sub></td>
+<td align="center"><sub>History: every range, every grouping</sub></td>
 <td align="center"><sub>Alerts: explainable, per app</sub></td>
 </tr>
 <tr>
@@ -550,7 +551,7 @@ Flowlight/
   Storage/           SQLite store, rollups, queries
   Analysis/          anomaly engine, AI agent catalog + rules
   Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
-  UI/                Live · AI Agents · Reports · Alerts · Inspect · Capture
+  UI/                Live · AI Agents · History · Alerts · Inspect · Connections · Capture
 FlowlightTests/      105 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
 docs/                website (GitHub Pages) and developer guide
 ```

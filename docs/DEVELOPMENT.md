@@ -27,7 +27,7 @@ Flowlight/                  SwiftUI host app
   Analysis/                   EWMA/z-score baselines, rule engine, AI agent catalog + rules, UI-activity tracker
   Inspection/                 HTTPS inspection: local CA, decrypting proxy, HTTP parser, recorder, mock rules
   Export/                     opt-in export to a collector the user chooses: OTLP/NDJSON payloads, queue, Keychain
-  UI/                         Live, AI Agents, Reports (charts + three breakdown groupings + CSV), Alerts, Capture
+  UI/                         Live, AI Agents, History (charts + three breakdown groupings + CSV), Alerts, Connections, Capture
   Channels/                   Opt-in Bluetooth, USB/storage and CoreMediaIO camera-activity monitors
 Shared/Classification/ProtocolCatalog.swift   108 protocols in 13 families, used by both capture engines
 FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent and anomaly tests
@@ -63,7 +63,7 @@ nettop only reports IP addresses, so Flowlight fills in names from several sourc
    interface. This lookup is on by default and sends only public IPs; turn it off during setup or in Capture.
    Public IPs are sent to that service, while local and reserved addresses stay on the Mac.
 
-Reports group any traffic still without a hostname under its network owner.
+History groups any traffic still without a hostname under its network owner.
 
 ## Building
 
@@ -144,7 +144,7 @@ snapshot without rewriting prior history.
   multicast are ignored.
 - **Upload above 99th percentile**: an hour's upload exceeds the app's 30-day hourly p99 (needs 48 hours of history).
 - **Traffic without UI activity**: a GUI app not frontmost for 10 min or more uploads over 5 MB/min.
-- The Reports chart also marks buckets that are at least Nσ above the visible series.
+- The History chart also marks buckets that are at least Nσ above the visible series.
 
 ## AI agent rules
 
@@ -245,7 +245,7 @@ endpoint to fall back to — the user names one or nothing is sent.
   retried as-is, with a capped exponential delay and no jitter — there is one Flowlight talking to one collector,
   so there is no herd to spread out — and is dropped after five attempts rather than blocking everything behind it.
   One OTLP batch is two requests, so only the half that failed is retried.
-- **Timing.** Rollups come from `breakdown(.minute, …)`, the same query Reports uses, over the window since the
+- **Timing.** Rollups come from `breakdown(.minute, …)`, the same query History uses, over the window since the
   last export; it stops two minutes short of now because a minute only lands in `agg_1m` once maintenance has
   folded it, and reaches back at most an hour, so a Mac that slept for a week resumes instead of replaying it.
   Alerts are enqueued as `AnomalyEngine` raises them. Switching export on sets the watermark to that moment:
@@ -253,7 +253,7 @@ endpoint to fall back to — the user names one or nothing is sent.
 - **The token lives in the Keychain** (`ExportSecrets`, a generic password under `com.flowlight.app.export`), not
   UserDefaults, and the whole header set goes in rather than a guess at which header is the secret one.
 - **It has to be visible.** The requests leave as the app's own traffic and are never routed through the
-  inspection proxy, even when the system proxy points at it, so they appear in Live and Reports and raise a
+  inspection proxy, even when the system proxy points at it, so they appear in Live and History and raise a
   first-contact alert the first time they go somewhere new. One gap to know about: with HTTPS inspection running,
   `ProxyAttribution.rewrite` discards Flowlight's own loopback records, so an export to a collector on
   `127.0.0.1` isn't counted while inspection is on. A remote collector is unaffected either way.

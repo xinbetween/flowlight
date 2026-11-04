@@ -1106,12 +1106,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › 網域 › IP、目標 › App › IP，或 IP › App";
 "Choose a longer window or clear filters." = "請選擇較長的時間範圍，或清除篩選條件。";
 "Back" = "返回";
-"Return to the previous report scope" = "返回上一個報告範圍";
-"Granularity" = "精細度";
-"Earlier (⌘[)" = "較早（⌘[）";
-"Earlier" = "較早";
-"Later (⌘])" = "較晚（⌘]）";
-"Later" = "較晚";
 "Now" = "現在";
 "Showing only:" = "僅顯示：";
 "App: %@" = "App：%@";
@@ -1135,7 +1129,6 @@
 "Peak year" = "尖峰年";
 "Bytes" = "位元組";
 "Filtered traffic" = "篩選後的流量";
-"Click a bar to zoom in" = "點按長條可放大檢視";
 "Use the Left and Right Arrow keys to inspect time buckets." = "使用左右方向鍵檢視各時間區段。";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "使用左右方向鍵檢視各時間區段，然後按 Return 鍵放大。";
 "1 new flow" = "1 條新資料流";
@@ -1798,7 +1791,6 @@
 "Could not prepare managed-pack review demo: %@" = "無法準備受管理套件審查示範：%@";
 
 /* 0.16.0 流量視覺化 */
-"Visualize" = "視覺化";
 "Map" = "地圖";
 "List" = "列表";
 "App, domain, or IP" = "應用程式、網域或 IP";
@@ -1874,3 +1866,29 @@
 "%lld exact destinations" = "%lld 個精確目的地";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@ 到 %@，接收 %@，傳送 %@，%lld 個連線";
 "Show domain family in Reports" = "在報告中顯示網域族";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1 個月";
+"15 min" = "15 分鐘";
+"1d" = "1 天";
+"1h" = "1 小時";
+"1w" = "1 週";
+"1y" = "1 年";
+"6 mo" = "6 個月";
+"6h" = "6 小時";
+"All" = "全部";
+"All history" = "所有歷史記錄";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "拖移所選範圍以瀏覽歷史記錄，拖移任一邊緣以調整範圍大小，或使用向左鍵和向右鍵。";
+"Flowlight network activity" = "Flowlight 網路活動";
+"Flowlight, restart required to finish updating the filter" = "Flowlight，需要重新啟動才能完成過濾器更新";
+"Full history" = "完整歷史記錄";
+"History" = "歷史記錄";
+"History overview failed: %@" = "無法顯示歷史記錄概覽：%@";
+"History range navigator" = "歷史記錄範圍導覽器";
+"Nearby" = "附近";
+"Nearby context" = "附近記錄";
+"Open the filter update notice in Flowlight" = "在 Flowlight 中開啟過濾器更新通知";
+"Range" = "範圍";
+"Restart or reinstall the filter to finish the update" = "重新啟動或重新安裝過濾器以完成更新";
+"Return to the previous history scope" = "返回上一個歷史記錄範圍";
+"Selected" = "已選取";

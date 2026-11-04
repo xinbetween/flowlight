@@ -211,12 +211,16 @@ enum VisualizeActionScope {
 }
 
 enum ConnectionsRenderPolicy {
-    static func showsLoading(isLoading: Bool, hasSnapshot: Bool) -> Bool {
-        isLoading || !hasSnapshot
+    static func showsLoading(isLoading: Bool, hasSnapshot _: Bool) -> Bool {
+        isLoading
     }
 
     static func canCommit(requestID: UUID, currentID: UUID, cancelled: Bool) -> Bool {
         !cancelled && requestID == currentID
+    }
+
+    static func canRebuild(loadedID: UUID?, currentLoadID: UUID) -> Bool {
+        loadedID == currentLoadID
     }
 }
 
@@ -259,6 +263,7 @@ struct VisualizeView: View {
     @State private var query = ""
     @State private var loading = true
     @State private var loadID = UUID()
+    @State private var loadedID: UUID?
     @State private var rebuildID = UUID()
 
     private var endDate: Date { Date() }
@@ -330,10 +335,6 @@ struct VisualizeView: View {
                              expandedGroupIDs: expandedGroupIDs,
                              expandedEdgeGroupIDs: expandedEdgeGroupIDs)) { await rebuild() }
         .onChange(of: mode) { _, _ in
-            loading = true
-            rows = []
-            completeSnapshot = .empty
-            mapSnapshot = .empty
             expandedGroupIDs = []
             expandedEdgeGroupIDs = []
             listVisibleCount = TrafficGraphListPager.pageSize
@@ -343,13 +344,8 @@ struct VisualizeView: View {
             destinationOptions = []
             selectedSources = []
             selectedDestinations = []
-            loadID = UUID()
-            rebuildID = UUID()
         }
         .onChange(of: granularity) { _, _ in
-            loading = true
-            completeSnapshot = .empty
-            mapSnapshot = .empty
             listVisibleCount = TrafficGraphListPager.pageSize
         }
         .onChange(of: focus.scope) { _, _ in
@@ -562,6 +558,7 @@ struct VisualizeView: View {
     private func beginDataTransition() {
         loading = true
         loadID = UUID()
+        loadedID = nil
         rebuildID = UUID()
         rows = []
         blockedAttempts = []
@@ -604,6 +601,7 @@ struct VisualizeView: View {
             ) else { return }
             rows = loaded.0
             blockedAttempts = loaded.1
+            loadedID = requestID
             rebuildID = UUID()
         } catch {
             guard ConnectionsRenderPolicy.canCommit(
@@ -613,6 +611,7 @@ struct VisualizeView: View {
             ) else { return }
             rows = []
             blockedAttempts = []
+            loadedID = requestID
             completeSnapshot = .empty
             mapSnapshot = .empty
             loading = false
@@ -622,6 +621,10 @@ struct VisualizeView: View {
 
     @MainActor
     private func rebuild() async {
+        guard ConnectionsRenderPolicy.canRebuild(
+            loadedID: loadedID,
+            currentLoadID: loadID
+        ) else { return }
         let requestID = rebuildID
         let source = rows
         let enforcement = blockedAttempts

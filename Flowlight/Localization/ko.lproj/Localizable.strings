@@ -1106,12 +1106,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "앱 › 도메인 › IP, 목적지 › 앱 › IP 또는 IP › 앱";
 "Choose a longer window or clear filters." = "기간을 늘리거나 필터를 지우세요.";
 "Back" = "뒤로";
-"Return to the previous report scope" = "이전 보고서 범위로 돌아갑니다";
-"Granularity" = "단위";
-"Earlier (⌘[)" = "이전 (⌘[)";
-"Earlier" = "이전";
-"Later (⌘])" = "다음 (⌘])";
-"Later" = "다음";
 "Now" = "지금";
 "Showing only:" = "다음만 표시:";
 "App: %@" = "앱: %@";
@@ -1135,7 +1129,6 @@
 "Peak year" = "최대 연";
 "Bytes" = "바이트";
 "Filtered traffic" = "필터된 트래픽";
-"Click a bar to zoom in" = "막대를 클릭하면 확대됩니다";
 "Use the Left and Right Arrow keys to inspect time buckets." = "왼쪽 및 오른쪽 화살표 키로 시간 구간을 살펴보세요.";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "왼쪽 및 오른쪽 화살표 키로 시간 구간을 살펴본 다음 Return 키를 눌러 확대하세요.";
 "1 new flow" = "새 흐름 1개";
@@ -1798,7 +1791,6 @@
 "Could not prepare managed-pack review demo: %@" = "관리형 팩 검토 데모를 준비할 수 없습니다: %@";
 
 /* 0.16.0 트래픽 시각화 */
-"Visualize" = "시각화";
 "Map" = "지도";
 "List" = "목록";
 "App, domain, or IP" = "앱, 도메인 또는 IP";
@@ -1874,3 +1866,29 @@
 "%lld exact destinations" = "정확한 대상 %lld개";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@에서 %@, 수신 %@, 송신 %@, 연결 %lld개";
 "Show domain family in Reports" = "보고서에서 도메인 계열 보기";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1개월";
+"15 min" = "15분";
+"1d" = "1일";
+"1h" = "1시간";
+"1w" = "1주";
+"1y" = "1년";
+"6 mo" = "6개월";
+"6h" = "6시간";
+"All" = "전체";
+"All history" = "전체 기록";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "선택 영역을 드래그하여 기록을 이동하고, 양쪽 가장자리를 드래그하여 크기를 조절하거나 왼쪽 및 오른쪽 화살표 키를 사용하세요.";
+"Flowlight network activity" = "Flowlight 네트워크 활동";
+"Flowlight, restart required to finish updating the filter" = "Flowlight, 필터 업데이트를 완료하려면 재시작 필요";
+"Full history" = "전체 기록";
+"History" = "기록";
+"History overview failed: %@" = "기록 개요를 불러오지 못했습니다: %@";
+"History range navigator" = "기록 범위 탐색기";
+"Nearby" = "인접 구간";
+"Nearby context" = "인접 기록";
+"Open the filter update notice in Flowlight" = "Flowlight에서 필터 업데이트 알림 열기";
+"Range" = "범위";
+"Restart or reinstall the filter to finish the update" = "업데이트를 완료하려면 필터를 재시작하거나 다시 설치하세요";
+"Return to the previous history scope" = "이전 기록 범위로 돌아가기";
+"Selected" = "선택됨";

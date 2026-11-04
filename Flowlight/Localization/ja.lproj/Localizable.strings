@@ -1083,12 +1083,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domain › IP、Destination › App › IP、または IP › App";
 "Choose a longer window or clear filters." = "より長い期間を選ぶか、絞り込みを解除してください。";
 "Back" = "戻る";
-"Return to the previous report scope" = "前のレポート範囲に戻ります";
-"Granularity" = "粒度";
-"Earlier (⌘[)" = "前へ（⌘[）";
-"Earlier" = "前へ";
-"Later (⌘])" = "次へ（⌘]）";
-"Later" = "次へ";
 "Now" = "現在";
 "Showing only:" = "絞り込み中:";
 "App: %@" = "アプリ: %@";
@@ -1112,7 +1106,6 @@
 "Peak year" = "ピークの年";
 "Bytes" = "バイト";
 "Filtered traffic" = "絞り込んだトラフィック";
-"Click a bar to zoom in" = "バーをクリックすると拡大します";
 "Use the Left and Right Arrow keys to inspect time buckets." = "左右の矢印キーで時間区間を確認します。";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "左右の矢印キーで時間区間を確認し、Return キーを押して拡大します。";
 "1 new flow" = "新しいフロー 1 件";
@@ -1799,7 +1792,6 @@
 "Could not prepare managed-pack review demo: %@" = "管理対象パックのレビューデモを準備できませんでした：%@";
 
 /* 0.16.0 トラフィック可視化 */
-"Visualize" = "可視化";
 "Map" = "マップ";
 "List" = "リスト";
 "App, domain, or IP" = "アプリ、ドメイン、またはIP";
@@ -1875,3 +1867,29 @@
 "%lld exact destinations" = "%lld件の正確な宛先";
 "%@ to %@, received %@, sent %@, %lld connections" = "%@から%@、受信%@、送信%@、%lld件の接続";
 "Show domain family in Reports" = "ドメインファミリーをレポートに表示";
+
+/* 0.17.0 History and Connections */
+"1 mo" = "1か月";
+"15 min" = "15分";
+"1d" = "1日";
+"1h" = "1時間";
+"1w" = "1週間";
+"1y" = "1年";
+"6 mo" = "6か月";
+"6h" = "6時間";
+"All" = "すべて";
+"All history" = "全履歴";
+"Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "選択範囲をドラッグして履歴内を移動します。いずれかの端をドラッグしてサイズを変更するか、左右の矢印キーを使用します。";
+"Flowlight network activity" = "Flowlightのネットワークアクティビティ";
+"Flowlight, restart required to finish updating the filter" = "Flowlight、フィルタのアップデートを完了するには再起動が必要";
+"Full history" = "全履歴";
+"History" = "履歴";
+"History overview failed: %@" = "履歴の概要を読み込めませんでした：%@";
+"History range navigator" = "履歴範囲ナビゲータ";
+"Nearby" = "前後";
+"Nearby context" = "前後の履歴";
+"Open the filter update notice in Flowlight" = "Flowlightでフィルタのアップデート通知を開く";
+"Range" = "範囲";
+"Restart or reinstall the filter to finish the update" = "フィルタのアップデートを完了するには再起動または再インストールしてください";
+"Return to the previous history scope" = "前の履歴範囲に戻る";
+"Selected" = "選択中";

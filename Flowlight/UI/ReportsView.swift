@@ -94,6 +94,12 @@ struct HistoryWindow: Equatable {
                       followNow: false).clamped(to: available)
     }
 
+    func returningToNow(within available: ClosedRange<Date>) -> HistoryWindow {
+        HistoryWindow(start: available.upperBound.addingTimeInterval(-duration),
+                      end: available.upperBound,
+                      followNow: true).clamped(to: available)
+    }
+
     func resized(start requestedStart: Date, end requestedEnd: Date,
                  within available: ClosedRange<Date>, minimumDuration: TimeInterval) -> HistoryWindow {
         let lower = min(max(requestedStart, available.lowerBound), available.upperBound)
@@ -163,6 +169,7 @@ struct ReportNavigationState: Equatable {
     var endDate: Date
     var followNow: Bool
     var filter: TrafficFilter
+    var preset: HistoryRangePreset? = nil
 }
 
 struct ReportNavigationHistory: Equatable {
@@ -318,10 +325,10 @@ struct ReportsView: View {
         .onChange(of: nav.reportRequest, initial: true) { apply(nav.reportRequest) }
         .onChange(of: ReportNavigationState(granularity: granularity, startDate: startDate,
                                             endDate: endDate, followNow: followNow,
-                                            filter: filter), initial: true) { _, scope in
+                                            filter: filter, preset: selectedPreset), initial: true) { _, scope in
             nav.updateCurrentReportScope(filter: scope.filter, granularity: scope.granularity,
-                                         startDate: startDate, endDate: scope.endDate,
-                                         followNow: scope.followNow)
+                                         startDate: scope.startDate ?? startDate, endDate: scope.endDate,
+                                         followNow: scope.followNow, preset: scope.preset)
         }
         .task(id: highlightedPoint?.date) { await loadContributors(for: highlightedPoint) }
     }
@@ -558,7 +565,7 @@ struct ReportsView: View {
                 .fixedSize()
                 .help("\(startDate.formatted(date: .complete, time: .shortened)) – \(endDate.formatted(date: .complete, time: .shortened))")
             if !followNow {
-                Button(L("Now")) { apply(selectedPreset ?? .sixHours) }
+                Button(L("Now")) { returnToNow() }
             }
         }
     }
@@ -991,11 +998,19 @@ struct ReportsView: View {
         filter = request.filter
         if let g = request.granularity { granularity = g }
         let requestedEnd = request.end.map { min($0, Date()) } ?? Date()
+        let requestedDuration = request.duration ?? granularity.defaultWindow
         endDate = requestedEnd
-        startDate = request.start ?? requestedEnd.addingTimeInterval(-granularity.defaultWindow)
+        startDate = request.start ?? requestedEnd.addingTimeInterval(-requestedDuration)
         followNow = request.end == nil
-        selectedPreset = nil
+        selectedPreset = request.preset
         nav.reportRequest = nil
+    }
+
+    private func returnToNow() {
+        pushHistory()
+        let preset = selectedPreset
+        apply(window.returningToNow(within: availableRange))
+        selectedPreset = preset
     }
 
     private func apply(_ preset: HistoryRangePreset) {
@@ -1039,7 +1054,8 @@ struct ReportsView: View {
             startDate: startDate,
             endDate: endDate,
             followNow: followNow,
-            filter: filter
+            filter: filter,
+            preset: selectedPreset
         ))
     }
 
@@ -1050,6 +1066,7 @@ struct ReportsView: View {
         endDate = scope.endDate
         followNow = scope.followNow
         filter = scope.filter
+        selectedPreset = scope.preset
     }
 
     private func applyFilter(_ node: TrafficNode) {

@@ -1083,12 +1083,6 @@
 "App › Domain › IP, Destination › App › IP, or IP › App" = "App › Domaine › IP, Destination › App › IP ou IP › App";
 "Choose a longer window or clear filters." = "Choisir une période plus longue ou effacer les filtres.";
 "Back" = "Retour";
-"Return to the previous report scope" = "Revenir au périmètre de rapport précédent";
-"Granularity" = "Granularité";
-"Earlier (⌘[)" = "Plus tôt (⌘[)";
-"Earlier" = "Plus tôt";
-"Later (⌘])" = "Plus tard (⌘])";
-"Later" = "Plus tard";
 "Now" = "Maintenant";
 "Showing only:" = "Affichage limité à :";
 "App: %@" = "App : %@";
@@ -1112,7 +1106,6 @@
 "Peak year" = "Année de pointe";
 "Bytes" = "Octets";
 "Filtered traffic" = "Trafic filtré";
-"Click a bar to zoom in" = "Cliquer sur une barre pour zoomer";
 "Use the Left and Right Arrow keys to inspect time buckets." = "Utilisez les flèches gauche et droite pour parcourir les intervalles de temps.";
 "Use the Left and Right Arrow keys to inspect time buckets, then press Return to zoom in." = "Utilisez les flèches gauche et droite pour parcourir les intervalles de temps, puis appuyez sur Retour pour zoomer.";
 "1 new flow" = "1 nouveau flux";
@@ -1799,7 +1792,6 @@
 "Could not prepare managed-pack review demo: %@" = "Impossible de préparer la démonstration de vérification des packs gérés : %@";
 
 /* Visualisation du trafic 0.16.0 */
-"Visualize" = "Visualiser";
 "Map" = "Carte";
 "List" = "Liste";
 "App, domain, or IP" = "App, domaine ou IP";
