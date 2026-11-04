@@ -2638,7 +2638,8 @@ final class TrafficDatabase: @unchecked Sendable {
     func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
                    app: String? = nil, apps: [String] = [], host: String? = nil,
                    hostIncludesSubdomains: Bool = true, includeAttributedChildren: Bool = false,
-                   agentParent: String? = nil, mcpServer: String? = nil) throws -> [HTTPExchange] {
+                   agentParent: String? = nil, mcpServer: String? = nil,
+                   potentialHarmOnly: Bool = false) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -2690,12 +2691,20 @@ final class TrafficDatabase: @unchecked Sendable {
             }
             focusClause = parts.isEmpty ? " AND 0" : " AND (" + parts.joined(separator: " OR ") + ")"
         }
+        let riskClause = potentialHarmOnly ? """
+             AND EXISTS (
+                 SELECT 1 FROM local_risk_assessments r
+                 WHERE r.exchange_id = http_exchanges.id
+                   AND r.state = 'scored'
+                   AND r.severity IN ('medium', 'high')
+             )
+            """ : ""
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm, mock_rule, guardrail, response_transform
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)
             ORDER BY ts DESC LIMIT ?
             """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
                   .text(like), .text(like)]

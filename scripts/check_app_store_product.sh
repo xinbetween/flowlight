@@ -21,6 +21,15 @@ extract_entitlements() {
   plutil -lint "$destination" >/dev/null || fail "Store $label has no readable signed entitlements"
 }
 
+check_user_selected_write_access() {
+  local entitlements=$1
+  plist_true "$entitlements" com.apple.security.files.user-selected.read-write ||
+    fail "signed Store app cannot write reports or plugin packages to a user-selected location"
+  if plist_true "$entitlements" com.apple.security.files.user-selected.read-only; then
+    fail "signed Store app declares redundant read-only user-selected access"
+  fi
+}
+
 check_forbidden_linkage() {
   local executable=$1 libraries=$2 symbols=$3
 
@@ -34,6 +43,14 @@ check_forbidden_linkage() {
     fail "references OSSystemExtension symbols"
   fi
 }
+
+if [ "${1:-}" = --self-test-read-only ]; then
+  read_only="$temporary/read-only-entitlements.plist"
+  plutil -create xml1 "$read_only"
+  /usr/libexec/PlistBuddy -c 'Add :com.apple.security.files.user-selected.read-only bool true' "$read_only"
+  check_user_selected_write_access "$read_only"
+  fail "read-only file-access self-test was not rejected"
+fi
 
 if [ "${1:-}" = --self-test-forbidden-symbol ]; then
   fake_tool="$temporary/fake-tool"
@@ -68,6 +85,7 @@ extension_info="$extension/Contents/Info.plist"
 [ -x "$extension_binary" ] || fail "missing embedded content-filter executable"
 extract_entitlements "$app_binary" "$temporary/app-entitlements.plist" app
 extract_entitlements "$extension_binary" "$temporary/extension-entitlements.plist" extension
+check_user_selected_write_access "$temporary/app-entitlements.plist"
 
 # The Store build disables HTTPS inspection: it neither installs a root certificate nor starts the local proxy.
 # Nothing in this product listens for inbound connections, so a server entitlement on either signed executable is a

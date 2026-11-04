@@ -222,11 +222,21 @@
   .hero h1 { font-size: clamp(40px, 4.8vw, 58px); font-weight: 800; }
   .hero h1 .flow { color: var(--accent); }
   .hero .lede { margin-top: 20px; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
-  /* Official Apple artwork stays unmodified at its 40 px minimum screen height. The block margin supplies the
-     required quarter-height clear space without turning the badge into a restyled Flowlight button. */
-  .app-store-badge { display: inline-flex; flex: none; margin-block: 10px; }
+  .cta { display: grid; gap: 12px; margin-top: 28px; align-items: start; max-width: 520px; }
+  .install-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
+  .install-choice { box-sizing: border-box; justify-content: center; width: 100%; min-height: 64px; height: 64px; }
+  .direct-download { box-shadow: none; }
+  /* Apple artwork stays unmodified at its 40 px minimum screen height. Its peer card supplies the required clear
+     space while giving direct download and the Store equal visual weight. */
+  .app-store-badge { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 11px 14px;
+                     border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
   .app-store-badge img { display: block; width: auto; height: 40px; }
+  .install-utility { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .github-link { display: inline-flex; align-items: center; gap: 7px; flex: none; color: var(--muted);
+                 font-size: 13px; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .github-link:hover { color: var(--ink); }
+  .github-link svg { width: 16px; height: 16px; }
+  .cta .meta-row { margin-top: 2px; }
   .cta-note { font-size: 13px; color: var(--faint); width: 100%; }
 
   .log { background: var(--log-bg); color: var(--log-ink); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden;
@@ -397,10 +407,12 @@
     .wrap { padding-inline: 16px; }
     .hero h1 { font-size: clamp(32px, 9vw, 46px); }
     .lede { font-size: 16.5px; }
-    .cta { gap: 10px; margin-top: 24px; }
-    .cta .app-store-badge { flex-basis: 100%; margin-bottom: 0; }
-    .cta .btn { flex: 1 1 100%; justify-content: center; min-height: 44px; }
-    .brew { width: 100%; }
+    .cta { gap: 10px; margin-top: 24px; max-width: none; }
+    .install-choices { grid-template-columns: minmax(0, 1fr); }
+    .install-choice { min-height: 56px; }
+    .install-utility { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+    .brew { width: 100%; order: 1; flex: none; }
+    .github-link { order: 2; align-self: flex-start; }
     /* A table this wide can only scroll; say so rather than letting it look cut off. */
     .table-wrap { position: relative; }
     .table-wrap::after {
@@ -464,17 +476,21 @@
     .meta-row::-webkit-scrollbar { display: none; }
   }
 
-  /* Install command, offered beside the download button */
-  .brew { display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; padding: 9px 10px 9px 14px;
-          border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-width: 100%; }
-  /* min-width:0 lets the command scroll inside the box instead of widening the page on a phone. */
-  .brew code { color: var(--ink); white-space: nowrap; overflow-x: auto; min-width: 0; }
+  /* Compact Homebrew access: the visible command may truncate, while Copy always retains the complete command. */
+  .brew { display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 9px 8px 12px;
+          border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0;
+          max-width: 100%; flex: 1 1 300px; }
+  .brew code { display: block; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+               min-width: 0; max-width: 100%; }
   .brew code::before { content: "$ "; color: var(--faint); }
   .brew button { flex: none; font: 500 12px/1 var(--mono); color: var(--muted); background: var(--surface-2);
                  border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; cursor: pointer; }
   .brew button:hover { color: var(--ink); }
   .brew button[data-copied] { color: var(--accent); border-color: var(--accent); }
-  @media (max-width: 520px) { .brew { width: 100%; } }
+  @media (max-width: 640px) {
+    .brew { width: 100%; flex: none; }
+    .github-link { align-self: flex-start; }
+  }
 
   /* Use cases */
   .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }

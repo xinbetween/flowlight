@@ -412,10 +412,29 @@ def problems():
             found.append(f"{label}: Mac App Store badge or exact listing URL is missing")
         if "{{dmg}}" not in source_text:
             found.append(f"{label}: direct DMG download was removed while adding the Store badge")
+        if source_text.count('class="install-choices"') != 1:
+            found.append(f"{label}: peer installation-choice group is missing or duplicated")
+        if 'install-choice direct-download' not in source_text or 'install-choice store-download' not in source_text:
+            found.append(f"{label}: direct download and Mac App Store are not peer installation choices")
+        if source_text.count('class="install-utility"') != 1:
+            found.append(f"{label}: compact installation utility row is missing or duplicated")
+        if 'class="github-link"' not in source_text:
+            found.append(f"{label}: GitHub is not presented as a secondary link")
+        if 'data-copy="brew install --cask xinbetween/tap/flowlight"' not in source_text:
+            found.append(f"{label}: Homebrew Copy action does not retain the full command")
 
         # The home is intentionally static/lightweight. A loop here has previously caused real-machine jank.
         if re.search(r"\b(setInterval|setTimeout|requestAnimationFrame)\s*\(", source_text):
             found.append(f"{label}: home page has recurring JavaScript animation")
+
+    site_css = (ROOT / "site/site.css").read_text()
+    brew_rule = re.search(r"\.brew code\s*\{([^}]*)\}", site_css, re.DOTALL)
+    if brew_rule is None or "overflow: hidden" not in brew_rule.group(1):
+        found.append("site/site.css: Homebrew command is not compactly clipped")
+    if brew_rule is not None and re.search(r"overflow-x\s*:\s*(auto|scroll)", brew_rule.group(1)):
+        found.append("site/site.css: Homebrew command can still scroll horizontally")
+    if ".install-choices" not in site_css or ".github-link" not in site_css:
+        found.append("site/site.css: installation-choice or secondary GitHub styling is missing")
 
     # 16. Pages occasionally needs redeploying without changing public bytes. A manual dispatch has no `before`
     # SHA, so it must compare with the signed catalog already being served rather than a guessed commit. Keep these

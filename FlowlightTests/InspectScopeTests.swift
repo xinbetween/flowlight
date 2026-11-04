@@ -143,10 +143,12 @@ final class InspectScopeTests: XCTestCase {
         ))
     }
 
-    func testScopeSummaryDisclosesBothAppAndHost() {
+    func testScopeSummaryDisclosesEveryActiveRestriction() {
         XCTAssertEqual(
-            InspectScopeSummary.text(appName: "Node", host: "api.github.com", potentialHarmOnly: false),
-            L("Showing only traffic from %@", "Node") + " · " + L("Showing only traffic to %@", "api.github.com")
+            InspectScopeSummary.text(appName: "Node", host: "api.github.com", potentialHarmOnly: true),
+            L("Showing only traffic from %@", "Node") + " · "
+                + L("Showing only traffic to %@", "api.github.com") + " · "
+                + L("Showing only requests with medium or high potential harm")
         )
     }
 

@@ -55,12 +55,11 @@ enum InspectLinkQuery {
 
 enum InspectScopeSummary {
     static func text(appName: String?, host: String?, potentialHarmOnly: Bool) -> String {
-        if potentialHarmOnly { return L("Showing only requests with medium or high potential harm") }
-        if let appName, let host {
-            return L("Showing only traffic from %@", appName) + " · " + L("Showing only traffic to %@", host)
-        }
-        if let appName { return L("Showing only traffic from %@", appName) }
-        return L("Showing only traffic to %@", host ?? "")
+        var parts: [String] = []
+        if let appName { parts.append(L("Showing only traffic from %@", appName)) }
+        if let host { parts.append(L("Showing only traffic to %@", host)) }
+        if potentialHarmOnly { parts.append(L("Showing only requests with medium or high potential harm")) }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -282,10 +281,12 @@ private struct InspectContent: View {
         let host = scopeHost, hostIncludesSubdomains = scopeHostIncludesSubdomains
         let includeChildren = scopeIncludesChildren
         let parent = scopeAgentParent, mcp = scopeMCPServer
+        let harmOnly = potentialHarmOnly
         let loaded = (try? await monitor.read {
             try $0.exchanges(since: since, search: term, focus: scope, app: app, apps: apps, host: host,
                              hostIncludesSubdomains: hostIncludesSubdomains,
-                             includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp)
+                             includeAttributedChildren: includeChildren, agentParent: parent, mcpServer: mcp,
+                             potentialHarmOnly: harmOnly)
         }) ?? []
         let ids = loaded.compactMap(\.id)
         let risk = (try? await monitor.read {
@@ -296,7 +297,7 @@ private struct InspectContent: View {
         }) ?? [:]
         assessments = risk
         pluginFindings = findings
-        exchanges = potentialHarmOnly ? loaded.filter { $0.id.flatMap { risk[$0] }?.isPotentialHarm == true } : loaded
+        exchanges = loaded
         // `-FLInspectSelect paste.example`, so the published screenshot always shows the same request rather
         // than whichever one a click happened to land on.
         if selection == nil, let wanted = UserDefaults.standard.string(forKey: "FLInspectSelect"), !wanted.isEmpty {

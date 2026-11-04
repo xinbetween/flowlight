@@ -1805,6 +1805,15 @@
 "Traffic map" = "流量地图";
 "All applications" = "所有应用";
 "Observed connections during %@" = "%@期间观察到的连接";
+"Any application" = "任何应用";
+"Any AI agent" = "任何 AI 智能体";
+"Search applications" = "搜索应用";
+"Search AI agents" = "搜索 AI 智能体";
+"Any destination" = "任何目标";
+"Search destinations" = "搜索目标";
+"Map shows the top 10 sources by traffic. List keeps every exact relationship." = "地图按流量显示前 10 个来源。列表保留每个精确关系。";
+"Focused scope shows every connected relationship; large neighborhoods group progressively." = "聚焦范围显示每个相连关系；大型邻域会逐步分组。";
+"Clear scope" = "清除范围";
 "%lld exact items" = "%lld 个精确项目";
 "Agents" = "智能体";
 "Services" = "服务";

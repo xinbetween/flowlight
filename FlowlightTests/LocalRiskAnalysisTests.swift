@@ -217,6 +217,36 @@ final class LocalRiskAnalysisTests: XCTestCase {
         XCTAssertEqual(exact.unassessed, 1, "an exact traffic hostname must not include subdomain assessments")
     }
 
+    func testPotentialHarmFilterRunsBeforeExchangeLimit() throws {
+        let db = try database()
+        let oldest = Date().addingTimeInterval(-1_000)
+        let harmfulID = try db.insertExchange(
+            exchange(tools: [ToolCall(source: .anthropic, callID: "risk", name: "Bash",
+                                      mcpServer: nil, input: "", summary: nil)], started: oldest),
+            enqueueLocalRisk: true
+        )
+        let claimed = try XCTUnwrap(db.claimNextLocalRiskAssessment())
+        XCTAssertEqual(claimed.exchangeID, harmfulID)
+        try db.completeLocalRiskAssessment(
+            exchangeID: harmfulID,
+            result: .scored(.init(severity: "high", confidence: 0.9, summary: "Review this request.",
+                                  evidenceIDs: claimed.evidence.map(\.id)))
+        )
+
+        for offset in 1...500 {
+            _ = try db.insertExchange(
+                exchange(host: "ordinary.example", path: "/api", requestBytes: 1_000,
+                         responseBytes: 2_000, tools: [], started: oldest.addingTimeInterval(Double(offset)))
+            )
+        }
+
+        XCTAssertFalse(try db.exchanges(since: .distantPast).contains { $0.id == harmfulID },
+                       "precondition: the ordinary 500-row query truncates the older request")
+        let harmful = try db.exchanges(since: .distantPast, potentialHarmOnly: true)
+        XCTAssertEqual(harmful.map(\.id), [harmfulID],
+                       "risk filtering must happen before LIMIT so an older harmful request remains visible")
+    }
+
     func testCoordinatorDoesNotClaimWhenAvailabilityGateIsOff() async throws {
         let db = try database()
         let id = try db.insertExchange(exchange(tools: [ToolCall(source: .anthropic, callID: "1", name: "Bash", mcpServer: nil, input: "", summary: nil)]),
