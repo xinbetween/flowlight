@@ -4,8 +4,11 @@ import Foundation
 final class PluginScriptRunner: @unchecked Sendable {
     static let shared = PluginScriptRunner()
     static let maxScriptBytes = 128 * 1024
-    static let maxInputBytes = 512 * 1024
-    static let maxOutputBytes = 512 * 1024
+    // Match the helper's bounded transport envelope. Provider profiles are validated individually, but a legitimate
+    // plugin may be assigned several of them; the old 512 KB client-side cap could silently skip evaluation before
+    // the helper saw an otherwise valid request.
+    static let maxInputBytes = 4 * 1024 * 1024
+    static let maxOutputBytes = 4 * 1024 * 1024
     static let timeout: TimeInterval = 0.25
 
     private final class OutputCapture: @unchecked Sendable {
@@ -18,15 +21,25 @@ final class PluginScriptRunner: @unchecked Sendable {
 
     private init() {}
 
-    func evaluate(exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {
+    func evaluate(
+        exchange: HTTPExchange,
+        manifests: [PluginManifest],
+        providerProfiles: [ProviderRuntimeProfile] = []
+    ) -> [PluginFindingDraft] {
         #if APP_STORE
         return []
         #else
-        return manifests.flatMap { evaluate(exchange: exchange, manifest: $0) }
+        return manifests.flatMap {
+            evaluate(exchange: exchange, manifest: $0, providerProfiles: providerProfiles)
+        }
         #endif
     }
 
-    func evaluate(exchange: HTTPExchange, manifest: PluginManifest) -> [PluginFindingDraft] {
+    func evaluate(
+        exchange: HTTPExchange,
+        manifest: PluginManifest,
+        providerProfiles: [ProviderRuntimeProfile] = []
+    ) -> [PluginFindingDraft] {
         #if APP_STORE
         return []
         #else
@@ -35,7 +48,7 @@ final class PluginScriptRunner: @unchecked Sendable {
         let input: [String: Any] = [
             "mode": "plugin",
             "script": manifest.script,
-            "manifest": manifestPayload(manifest),
+            "manifest": manifestPayload(manifest, providerProfiles: providerProfiles),
             "context": contextPayload(exchange, permissions: Set(manifest.permissions)),
         ]
         guard JSONSerialization.isValidJSONObject(input),
@@ -259,8 +272,20 @@ final class PluginScriptRunner: @unchecked Sendable {
         String(((value as? String) ?? fallback).trimmingCharacters(in: .whitespacesAndNewlines).prefix(count))
     }
 
-    private func manifestPayload(_ manifest: PluginManifest) -> [String: Any] {
-        [
+    private func manifestPayload(
+        _ manifest: PluginManifest,
+        providerProfiles: [ProviderRuntimeProfile]
+    ) -> [String: Any] {
+        let activeProfiles: [[String: Any]] = providerProfiles.filter { $0.applies(to: manifest) }
+            .sorted { $0.id.uuidString < $1.id.uuidString }.map { profile in
+            [
+                "id": profile.id.uuidString.lowercased(),
+                "provider": profile.provider.rawValue,
+                "endpoint": profile.endpoint ?? NSNull(),
+                "configuration": profile.configuration,
+            ]
+        }
+        return [
             "id": manifest.id,
             "name": manifest.name,
             "version": manifest.version,
@@ -274,6 +299,7 @@ final class PluginScriptRunner: @unchecked Sendable {
                 "summary": manifest.privacy.summary,
             ],
             "configuration": manifest.configuration,
+            "providerProfiles": activeProfiles,
         ]
     }
 

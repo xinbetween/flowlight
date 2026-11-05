@@ -2,6 +2,18 @@ import Foundation
 
 /// Local routing metadata for an inspection provider. A profile may point at a
 /// Keychain item, but it never owns or serializes that item's value.
+struct ProviderRuntimeProfile: Equatable, Sendable {
+    var id: UUID
+    var provider: PluginManifest.GuardrailProvider
+    var endpoint: String?
+    var configuration: [String: String]
+    var pluginIDs: [String]
+
+    func applies(to manifest: PluginManifest) -> Bool {
+        provider == manifest.guardrailProvider && pluginIDs.contains(manifest.id)
+    }
+}
+
 struct ProviderProfile: Codable, Equatable, Identifiable, Sendable {
     static let schemaVersion = 1
 
@@ -173,6 +185,7 @@ final class ProviderProfileStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let key: String
+    private var runtimeSink: (([ProviderRuntimeProfile]) -> Void)?
 
     init(defaults: UserDefaults = .standard, key: String = "inspectionProviderProfiles") {
         self.defaults = defaults
@@ -180,10 +193,18 @@ final class ProviderProfileStore: ObservableObject {
         reload()
     }
 
+    /// Publishes only validated, enabled, credential-free settings. The sink is explicit rather than a Combine
+    /// subscription because `@Published` announces a mutation before the new value is installed.
+    func installRuntimeSink(_ sink: @escaping ([ProviderRuntimeProfile]) -> Void) {
+        runtimeSink = sink
+        sink(runtimeSnapshot)
+    }
+
     func reload() {
         guard let data = defaults.data(forKey: key) else {
             profiles = []
             loadIssue = nil
+            publishRuntimeSnapshot()
             return
         }
         do {
@@ -195,29 +216,48 @@ final class ProviderProfileStore: ObservableObject {
             profiles = []
             loadIssue = L("Provider profiles could not be loaded. Create them again in Inspect.")
         }
+        publishRuntimeSnapshot()
     }
 
     func save(_ profile: ProviderProfile) throws {
         let normalized = try ProviderProfileValidator.normalized(profile)
-        if let index = profiles.firstIndex(where: { $0.id == normalized.id }) {
-            profiles[index] = normalized
+        var next = profiles
+        if let index = next.firstIndex(where: { $0.id == normalized.id }) {
+            next[index] = normalized
         } else {
-            profiles.append(normalized)
+            next.append(normalized)
         }
-        profiles.sort(by: Self.order)
-        try persist()
+        next.sort(by: Self.order)
+        try persist(next)
+        profiles = next
+        loadIssue = nil
+        publishRuntimeSnapshot()
     }
 
     func remove(id: ProviderProfile.ID) throws {
-        profiles.removeAll { $0.id == id }
-        try persist()
+        var next = profiles
+        next.removeAll { $0.id == id }
+        try persist(next)
+        profiles = next
+        loadIssue = nil
+        publishRuntimeSnapshot()
     }
 
-    private func persist() throws {
+    private var runtimeSnapshot: [ProviderRuntimeProfile] {
+        profiles.filter(\.enabled).map {
+            ProviderRuntimeProfile(id: $0.id, provider: $0.provider, endpoint: $0.endpoint,
+                                   configuration: $0.configuration, pluginIDs: $0.pluginIDs)
+        }.sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    private func publishRuntimeSnapshot() {
+        runtimeSink?(runtimeSnapshot)
+    }
+
+    private func persist(_ profiles: [ProviderProfile]) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         defaults.set(try encoder.encode(Document(schemaVersion: ProviderProfile.schemaVersion, profiles: profiles)), forKey: key)
-        loadIssue = nil
     }
 
     private static func order(_ lhs: ProviderProfile, _ rhs: ProviderProfile) -> Bool {

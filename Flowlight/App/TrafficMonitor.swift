@@ -17,12 +17,33 @@ struct LiveTalker: Identifiable, Equatable {
 /// Everything the one-second timer publishes to the Live screen. Replacing one snapshot gives SwiftUI one coherent
 /// update; publishing the chart, table, rates, and source state separately can reload NSTableView while its delegate
 /// is still reconciling the previous publication.
-private struct LiveSnapshot: Equatable {
+struct LiveSnapshot: Equatable {
     var talkers: [LiveTalker] = []
     var series: [SeriesPoint] = []
     var currentIn: Double = 0
     var currentOut: Double = 0
+    var sessionIn: Int64 = 0
+    var sessionOut: Int64 = 0
     var isReceiving = false
+}
+
+/// Isolates the one-second live feed from the slower application state. Views that show rates or the live chart
+/// observe this object directly; publishing a new sample must not invalidate every screen that uses TrafficMonitor.
+@MainActor
+final class TrafficLiveState: ObservableObject {
+    @Published private(set) var snapshot = LiveSnapshot()
+
+    var talkers: [LiveTalker] { snapshot.talkers }
+    var series: [SeriesPoint] { snapshot.series }
+    var currentIn: Double { snapshot.currentIn }
+    var currentOut: Double { snapshot.currentOut }
+    var sessionIn: Int64 { snapshot.sessionIn }
+    var sessionOut: Int64 { snapshot.sessionOut }
+    var isReceiving: Bool { snapshot.isReceiving }
+
+    func publish(_ next: LiveSnapshot) {
+        if next != snapshot { snapshot = next }
+    }
 }
 
 /// Owns the capture source, database, anomaly engine and live state.
@@ -30,14 +51,16 @@ private struct LiveSnapshot: Equatable {
 final class TrafficMonitor: ObservableObject {
     @Published private(set) var status = L("Starting…")
     @Published private(set) var mode: CaptureMode
-    @Published private var live = LiveSnapshot()
-    var talkers: [LiveTalker] { live.talkers }
-    var liveSeries: [SeriesPoint] { live.series }
-    var currentIn: Double { live.currentIn }
-    var currentOut: Double { live.currentOut }
-    var isReceiving: Bool { live.isReceiving }
-    @Published private(set) var sessionIn: Int64 = 0
-    @Published private(set) var sessionOut: Int64 = 0
+    let liveState = TrafficLiveState()
+    var talkers: [LiveTalker] { liveState.talkers }
+    var liveSeries: [SeriesPoint] { liveState.series }
+    var currentIn: Double { liveState.currentIn }
+    var currentOut: Double { liveState.currentOut }
+    var sessionIn: Int64 { liveState.sessionIn }
+    var sessionOut: Int64 { liveState.sessionOut }
+    var isReceiving: Bool { liveState.isReceiving }
+    private var sessionInTotal: Int64 = 0
+    private var sessionOutTotal: Int64 = 0
     /// Sidebar badge count. The compatibility name is retained, but this is explicitly the number in `new` state.
     @Published private(set) var unacknowledgedAlerts = 0
     @Published private(set) var captureState: PacketSniffer.State = .stopped
@@ -81,6 +104,8 @@ final class TrafficMonitor: ObservableObject {
     let guardrails = GuardrailStore()
     /// Advisory inspection plugins: official built-ins first, installed third-party packs later.
     let plugins = PluginStore()
+    /// Local non-secret provider metadata shared by Settings, live plugin execution, and backfill.
+    let providerProfiles = ProviderProfileStore()
     /// Channels that aren't the network: Bluetooth, USB. Both off until switched on.
     let devices = DeviceStore()
     /// Questions in plain language, answered from the recorded history.
@@ -121,10 +146,10 @@ final class TrafficMonitor: ObservableObject {
     func windowVisibility(_ window: AnyObject, isVisible: Bool) {
         guard windows.update(window, isVisible: isVisible) == .becameHidden else { return }
         // Nothing can see them, and they are rebuilt on the next tick once something can.
-        var next = live
+        var next = liveState.snapshot
         next.series = []
         next.talkers = []
-        if next != live { live = next }
+        liveState.publish(next)
     }
 
     private let liveWindow = 120
@@ -169,6 +194,9 @@ final class TrafficMonitor: ObservableObject {
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
+        providerProfiles.installRuntimeSink { [weak db] profiles in
+            db?.async { $0.replaceProviderProfiles(profiles) }
+        }
         proxyRulePackEvents = RulePackEventDelivery { [weak rulePacks] batch, claim, completion in
             Task { @MainActor in
                 rulePacks?.record(
@@ -290,6 +318,9 @@ final class TrafficMonitor: ObservableObject {
                 self?.guardrails.record([event])
                 self?.rules.record([event])
             }
+        }
+        inspection.onGuardrailHit = { [weak self] event in
+            Task { @MainActor in self?.guardrails.record([event]) }
         }
         // Export reads ordinary traffic from the same minute rollups as Reports, but lineage metadata crosses an
         // external trust boundary and therefore comes from the provenance-aware projection.
@@ -784,12 +815,14 @@ final class TrafficMonitor: ObservableObject {
         focus = scope
         perSecond.removeAll()
         sessionPerApp.removeAll()
-        sessionIn = 0
-        sessionOut = 0
-        var next = live
+        sessionInTotal = 0
+        sessionOutTotal = 0
+        var next = liveState.snapshot
         next.talkers = []
         next.series = []
-        if next != live { live = next }
+        next.sessionIn = 0
+        next.sessionOut = 0
+        liveState.publish(next)
         refreshAlertCount()
     }
 
@@ -817,8 +850,8 @@ final class TrafficMonitor: ObservableObject {
                 }
                 bucket[k.bundleID] = entry
                 sessionPerApp[k.bundleID, default: FlowCounters()] += r.counters
-                sessionIn += r.counters.bytesIn
-                sessionOut += r.counters.bytesOut
+                sessionInTotal += r.counters.bytesIn
+                sessionOutTotal += r.counters.bytesOut
             }
             perSecond[batch.timestamp] = bucket
         }
@@ -826,7 +859,9 @@ final class TrafficMonitor: ObservableObject {
 
     private func tickLive() {
         let now = Int64(Date().timeIntervalSince1970)
-        var next = live
+        var next = liveState.snapshot
+        next.sessionIn = sessionInTotal
+        next.sessionOut = sessionOutTotal
         next.isReceiving = lastDataAt.map { Date().timeIntervalSince($0) < 5 } ?? false
         // Without a window, only the last few seconds are needed for the menu bar rates.
         let keep = Int64(uiVisible ? liveWindow : rateWindow + 3)
@@ -880,7 +915,7 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private func publishLive(_ snapshot: LiveSnapshot) {
-        if snapshot != live { live = snapshot }
+        liveState.publish(snapshot)
     }
 
     // MARK: Maintenance
@@ -953,8 +988,16 @@ final class TrafficMonitor: ObservableObject {
                     try await db.asyncResult { try $0.clearAll() }
                     self.sessionPerApp.removeAll()
                     self.perSecond.removeAll()
-                    self.sessionIn = 0
-                    self.sessionOut = 0
+                    self.sessionInTotal = 0
+                    self.sessionOutTotal = 0
+                    var next = self.liveState.snapshot
+                    next.talkers = []
+                    next.series = []
+                    next.currentIn = 0
+                    next.currentOut = 0
+                    next.sessionIn = 0
+                    next.sessionOut = 0
+                    self.liveState.publish(next)
                     self.rulePacks.finishActivityClear(succeeded: true)
                     self.rules.clearPublishedEventsAfterDurableDeletion()
                     self.devices.finishHistoryClear(succeeded: true)
@@ -1040,7 +1083,8 @@ final class TrafficMonitor: ObservableObject {
     /// "Allow from now on", from the alert about a connection that was refused.
     func allowFromNowOn(pattern: String, agentID: String) {
         db.async { [engine, weak self] db in
-            var policy = try db.loadPolicies()[agentID] ?? AgentPolicy(agentID: agentID)
+            let loaded = try db.loadPolicies()
+            var policy = AgentPolicy.resolve(loaded.values, identities: [agentID]) ?? AgentPolicy(agentID: agentID)
             guard !policy.patterns.contains(pattern) else { return }
             policy.patterns.append(pattern)
             try db.savePolicy(policy)

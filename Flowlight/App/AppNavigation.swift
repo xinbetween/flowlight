@@ -211,6 +211,7 @@ enum AgentPolicySection: Equatable, Sendable { case allowlist, guardrails }
 struct AgentPolicyRequest: Equatable, Sendable {
     var agentID: String
     var section: AgentPolicySection
+    var guardrailID: UUID? = nil
     var id = UUID()
 }
 
@@ -358,14 +359,14 @@ final class AppNavigation: ObservableObject {
         policyRequest = PolicyRequest(destination: destination)
     }
 
-    func showAgentPolicy(agentID: String, section: AgentPolicySection) {
-        agentPolicyRequest = AgentPolicyRequest(agentID: agentID, section: section)
+    func showAgentPolicy(agentID: String, section: AgentPolicySection, guardrailID: UUID? = nil) {
+        agentPolicyRequest = AgentPolicyRequest(agentID: agentID, section: section, guardrailID: guardrailID)
         followLink(to: .agents)
     }
 
-    func showInspectionPolicy(_ section: InspectPolicySection) {
+    func showInspectionPolicy(_ section: InspectPolicySection, policyID: UUID? = nil) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
-        inspectRequest = InspectRequest(search: "", policySection: section)
+        inspectRequest = InspectRequest(search: "", policySection: section, policyID: policyID)
         followLink(to: .inspect)
     }
 
@@ -452,5 +453,7 @@ struct InspectRequest: Equatable {
     var potentialHarmOnly = false
     /// Opens setup on the contextual editor that owns this kind of policy.
     var policySection: InspectPolicySection? = nil
+    /// The exact retained policy to edit. Nil keeps section-level navigation for generic setup links.
+    var policyID: UUID? = nil
     var id = UUID()
 }

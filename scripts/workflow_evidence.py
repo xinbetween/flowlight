@@ -49,6 +49,7 @@ class ReuseExpectation:
     current_run_id: int
     workflow: str = CI_WORKFLOW
     schema: str = REVIEW_SCHEMA
+    base_branch: str = "main"
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:
@@ -119,7 +120,26 @@ def trusted_pr_run(run: Any, expected: ReuseExpectation) -> dict[str, Any]:
             raise EvidenceError(f"workflow run {label} is {actual!r}, expected {wanted!r}")
     _positive_int(run.get("id"), "workflow run ID")
     _positive_int(run.get("run_attempt"), "workflow run attempt")
-    _exact_sha(run.get("head_sha"), "workflow run source SHA")
+    head_sha = _exact_sha(run.get("head_sha"), "workflow run source SHA")
+
+    pull_requests = run.get("pull_requests")
+    if not isinstance(pull_requests, list) or len(pull_requests) != 1:
+        raise EvidenceError("workflow run is not bound to exactly one pull request")
+    pull_request = _object(pull_requests[0], "workflow run pull request")
+    _positive_int(pull_request.get("number"), "workflow run pull request number")
+    head = _object(pull_request.get("head"), "workflow run pull request head")
+    base = _object(pull_request.get("base"), "workflow run pull request base")
+    if _exact_sha(head.get("sha"), "workflow run pull request head SHA") != head_sha:
+        raise EvidenceError("workflow run pull request head does not match the run source SHA")
+    if _object(head.get("repo"), "workflow run pull request head repository").get("full_name") != expected.repository:
+        raise EvidenceError("workflow run pull request head repository is not trusted")
+    if base.get("ref") != expected.base_branch:
+        raise EvidenceError(
+            f"workflow run pull request base is {base.get('ref')!r}, expected {expected.base_branch!r}"
+        )
+    _exact_sha(base.get("sha"), "workflow run pull request base SHA")
+    if _object(base.get("repo"), "workflow run pull request base repository").get("full_name") != expected.repository:
+        raise EvidenceError("workflow run pull request base repository is not trusted")
     return run
 
 

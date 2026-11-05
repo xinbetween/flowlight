@@ -78,8 +78,13 @@ final class ResponseTransformRuleTests: XCTestCase {
 
         let textRule = ResponseTransformRule(host: "api.example.com", script: "function modifyResponse(args) { return args.responseText.toUpperCase(); }")
         let textHead = HTTPHead(startLine: "HTTP/1.1 200 OK", headers: [HTTPHeader(name: "Content-Type", value: "text/plain")])
-        let text = ResponseScriptRunner.shared.transform(rules: [textRule], request: request, responseHead: textHead, responseBody: Data("ready".utf8))
-        XCTAssertEqual(String(decoding: try! XCTUnwrap(text).body, as: UTF8.self), "READY")
+        let unchanged = ResponseTransformRule(host: "api.example.com",
+                                              script: "function modifyResponse(args) { return args.responseText; }")
+        let text = ResponseScriptRunner.shared.transform(rules: [unchanged, textRule], request: request,
+                                                         responseHead: textHead, responseBody: Data("ready".utf8))
+        let transformed = try! XCTUnwrap(text)
+        XCTAssertEqual(String(decoding: transformed.body, as: UTF8.self), "READY")
+        XCTAssertEqual(transformed.rules.map(\.id), [textRule.id])
     }
 
     func testRunnerWithholdsCredentialsAndFailsOpenForBrokenOrSlowScripts() {

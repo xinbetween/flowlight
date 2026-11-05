@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum AlertRuleSelection {
+    static func retained(_ rule: String, in alerts: [AlertRecord]) -> String {
+        rule.isEmpty || alerts.contains(where: { $0.kind == rule }) ? rule : ""
+    }
+}
+
 struct AlertsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
@@ -13,6 +19,14 @@ struct AlertsView: View {
     @State private var noteDraft = ""
 
     private var rules: [String] { Array(Set(alerts.map(\.kind))).sorted() }
+
+    private struct LoadKey: Equatable {
+        var version: Int
+        var newAlerts: Int
+        var focus: FocusScope
+        var tab: AlertsTab
+        var filter: AlertTriageFilter
+    }
 
     private var visible: [AlertRecord] {
         alerts.filter { rule.isEmpty || $0.kind == rule }.sorted(using: sortOrder)
@@ -46,11 +60,10 @@ struct AlertsView: View {
         .navigationTitle(L("Alerts"))
         .navigationSubtitle(nav.alertsTab == .detection ? L("Detection") : alertSubtitle)
         .toolbar { toolbar }
-        .task(id: monitor.dataVersion) { await load() }
-        .task(id: monitor.unacknowledgedAlerts) { await load() }
-        .task(id: focus.scope) { await load() }
-        .task(id: nav.alertsTab) { await load() }
-        .task(id: triageFilter) { await load() }
+        .task(id: LoadKey(version: monitor.dataVersion, newAlerts: monitor.unacknowledgedAlerts,
+                          focus: focus.scope, tab: nav.alertsTab, filter: triageFilter)) {
+            await load()
+        }
         .sheet(item: $noteAlert) { alert in noteEditor(alert) }
     }
 
@@ -169,7 +182,6 @@ struct AlertsView: View {
                     Label(L("Triage"), systemImage: "checkmark.circle")
                 }
                 .labelStyle(.titleAndIcon)
-                .disabled(alerts.isEmpty)
                 .help(L("Update the selected alerts"))
             }
         }
@@ -283,7 +295,11 @@ struct AlertsView: View {
         guard nav.alertsTab == .alerts else { return }
         let scope = focus.scope
         let filter = triageFilter
-        alerts = (try? await monitor.read { try $0.alerts(focus: scope, triageFilter: filter) }) ?? []
+        let loaded = (try? await monitor.read { try $0.alerts(focus: scope, triageFilter: filter) }) ?? []
+        guard !Task.isCancelled, nav.alertsTab == .alerts,
+              focus.scope == scope, triageFilter == filter else { return }
+        rule = AlertRuleSelection.retained(rule, in: loaded)
+        alerts = loaded
         selection.formIntersection(alerts.map(\.id))
     }
 }

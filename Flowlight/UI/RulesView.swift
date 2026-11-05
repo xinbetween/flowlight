@@ -256,35 +256,78 @@ struct PolicyActivityItem: Identifiable, Equatable, Sendable {
 }
 
 enum PolicyActivityBuilder {
+    private struct RefusalKey: Hashable {
+        var bundleID: String
+        var destination: String
+        var port: Int
+        var path: String
+        var method: String
+    }
+
+    private struct GuardrailRefusalKey: Hashable {
+        var bundleID: String
+        var destination: String
+        var port: Int
+        var method: String
+    }
+
     static func build(ruleEvents: [RuleEventRecord], packEvents: [RulePackEventRecord], alerts: [AlertRecord],
                       exchanges: [HTTPExchange], rules: [Rule], guardrails: [Guardrail], packs: [RulePackDefinition],
                       mocks: [MockRule], rewrites: [RewriteRule], transforms: [ResponseTransformRule],
+                      policies: [AgentPolicy] = [],
                       capabilities: PolicyInventoryCapabilities = .current) -> [PolicyActivityItem] {
+        let ruleIDs = Set(rules.map(\.id))
         let guardrailIDs = Set(guardrails.map(\.id))
+        let packIDs = Set(packs.map(\.id))
+        let mockIDs = Set(mocks.map(\.id))
+        let rewriteIDs = Set(rewrites.map(\.id))
+        let transformIDs = Set(transforms.map(\.id))
+        let refusalTimes = Dictionary(grouping: ruleEvents.filter {
+            $0.action == .block && $0.engine != .guardrail
+        }) { event in
+            RefusalKey(bundleID: event.bundleID, destination: event.destination, port: Int(event.port),
+                       path: event.path, method: event.method)
+        }.mapValues { $0.map(\.timestamp) }
+        let guardrailRefusalTimes = Dictionary(grouping: ruleEvents.filter {
+            $0.action == .block && $0.engine == .guardrail
+        }) { event in
+            GuardrailRefusalKey(bundleID: event.bundleID, destination: event.destination,
+                                port: Int(event.port), method: event.method)
+        }.mapValues { $0.map(\.timestamp) }
         var activity = ruleEvents.map { event -> PolicyActivityItem in
             let isGuardrail = event.engine == .guardrail || guardrailIDs.contains(event.ruleID)
             let title = rules.first(where: { $0.id == event.ruleID }).map(RuleWords.title)
                 ?? guardrails.first(where: { $0.id == event.ruleID })?.localizedTitle ?? L("A policy since deleted")
+            let exists = isGuardrail ? guardrailIDs.contains(event.ruleID) : ruleIDs.contains(event.ruleID)
             return PolicyActivityItem(
                 id: "rule-event:\(event.id)", timestamp: event.timestamp,
                 kind: isGuardrail ? .guardrail : .networkRule,
                 effect: isGuardrail ? .guardrailApplied : (event.action == .block ? .blocked : .allowed),
                 title: title, detail: event.path.isEmpty ? "\(event.destination):\(event.port)" : "\(event.method) \(event.destination)\(event.path)",
-                policyID: PolicyInventoryID.make(isGuardrail ? .guardrail : .networkRule,
-                                                 sourceID: event.ruleID.uuidString.lowercased()))
+                policyID: exists ? PolicyInventoryID.make(isGuardrail ? .guardrail : .networkRule,
+                                                          sourceID: event.ruleID.uuidString.lowercased()) : nil)
         }
         activity += packEvents.map { event in
             let title = packs.first(where: { $0.id == event.packID }).map { L($0.manifest.titleKey) } ?? event.packID
             return PolicyActivityItem(id: "pack-event:\(event.id)", timestamp: event.lastAt, kind: .managedPack,
                                       effect: .packBlocked,
                                       title: title, detail: L("%@ · %lld connections", event.host, event.count),
-                                      policyID: PolicyInventoryID.make(.managedPack, sourceID: event.packID))
+                                      policyID: packIDs.contains(event.packID)
+                                          ? PolicyInventoryID.make(.managedPack, sourceID: event.packID) : nil)
         }
         activity += alerts.filter { $0.kind == AnomalyEngine.Kind.allowlistViolation.rawValue }.map { alert in
-            PolicyActivityItem(id: "alert:\(alert.id)", timestamp: alert.timestamp, kind: .agentAllowlist,
-                               effect: .allowlistViolation,
-                               title: alert.appName, detail: alert.detail,
-                               policyID: PolicyInventoryID.make(.agentAllowlist, sourceID: alert.bundleID))
+            let policy = AgentPolicy.resolve(
+                policies,
+                identities: [alert.bundleID, alert.appName]
+            )
+            return PolicyActivityItem(
+                id: "alert:\(alert.id)", timestamp: alert.timestamp, kind: .agentAllowlist,
+                effect: .allowlistViolation,
+                title: alert.appName, detail: alert.detail,
+                policyID: policy.map {
+                    PolicyInventoryID.make(.agentAllowlist, sourceID: $0.agentID)
+                }
+            )
         }
         for exchange in exchanges {
             let source = exchange.id.map(String.init) ?? "\(exchange.started.timeIntervalSince1970)"
@@ -296,7 +339,8 @@ enum PolicyActivityBuilder {
                             id: "exchange:\(source):guardrail:\(reference.id.uuidString.lowercased())",
                             timestamp: exchange.started, kind: .guardrail, effect: .guardrailApplied,
                             title: reference.title, detail: detail,
-                            policyID: PolicyInventoryID.make(.guardrail, sourceID: reference.id.uuidString.lowercased())
+                            policyID: guardrailIDs.contains(reference.id)
+                                ? PolicyInventoryID.make(.guardrail, sourceID: reference.id.uuidString.lowercased()) : nil
                         ))
                     }
                 } else {
@@ -306,12 +350,40 @@ enum PolicyActivityBuilder {
                                                        policyID: policy.map { PolicyInventoryID.make(.guardrail, sourceID: $0.id.uuidString.lowercased()) }))
                 }
             }
-            if let value = exchange.mockRule, let policy = mocks.first(where: { $0.title == value }) {
-                // Request-level network blocks use the same answer machinery but already have a RuleEvent. Only a
-                // saved mock belongs in this adapter, otherwise one refusal would appear twice with two effects.
-                activity.append(PolicyActivityItem(id: "exchange:\(source):mock", timestamp: exchange.started,
-                                                   kind: .mock, effect: .mocked, title: value, detail: detail,
-                                                   policyID: PolicyInventoryID.make(.mock, sourceID: policy.id.uuidString.lowercased())))
+            if let value = exchange.mockRule {
+                if let references = InspectionPolicyReference.decode(value) {
+                    for reference in references {
+                        activity.append(PolicyActivityItem(
+                            id: "exchange:\(source):mock:\(reference.id.uuidString.lowercased())",
+                            timestamp: exchange.started, kind: .mock, effect: .mocked,
+                            title: reference.title, detail: detail,
+                            policyID: mockIDs.contains(reference.id)
+                                ? PolicyInventoryID.make(.mock, sourceID: reference.id.uuidString.lowercased()) : nil
+                        ))
+                    }
+                } else {
+                    let policy = mocks.first(where: { $0.title == value })
+                    let exchangePath = exchange.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? exchange.path
+                    let refusalKey = RefusalKey(bundleID: exchange.bundleID, destination: exchange.host,
+                                                port: exchange.port, path: exchangePath, method: exchange.method)
+                    let guardrailKey = GuardrailRefusalKey(bundleID: exchange.bundleID,
+                                                            destination: exchange.host, port: exchange.port,
+                                                            method: exchange.method)
+                    let hasRefusalEvent = (refusalTimes[refusalKey] ?? [])
+                        .contains { abs($0.timeIntervalSince(exchange.started)) <= 1 }
+                        || (guardrailRefusalTimes[guardrailKey] ?? [])
+                        .contains { abs($0.timeIntervalSince(exchange.started)) <= 1 }
+                    // Before stable mock references, request-level blocks and guardrail refusals used the same answer
+                    // machinery. Their correlated RuleEvent is already in Activity; an uncorrelated value is retained
+                    // as mock history even after its current configuration is renamed or deleted.
+                    if policy != nil || !hasRefusalEvent {
+                        activity.append(PolicyActivityItem(
+                            id: "exchange:\(source):mock", timestamp: exchange.started,
+                            kind: .mock, effect: .mocked, title: value, detail: detail,
+                            policyID: policy.map { PolicyInventoryID.make(.mock, sourceID: $0.id.uuidString.lowercased()) }
+                        ))
+                    }
+                }
             }
             if let value = exchange.requestRewrite {
                 if let references = InspectionPolicyReference.decode(value) {
@@ -320,7 +392,8 @@ enum PolicyActivityBuilder {
                             id: "exchange:\(source):request-rewrite:\(reference.id.uuidString.lowercased())",
                             timestamp: exchange.started, kind: .requestRewrite, effect: .requestRewritten,
                             title: reference.title, detail: detail,
-                            policyID: PolicyInventoryID.make(.requestRewrite, sourceID: reference.id.uuidString.lowercased())
+                            policyID: rewriteIDs.contains(reference.id)
+                                ? PolicyInventoryID.make(.requestRewrite, sourceID: reference.id.uuidString.lowercased()) : nil
                         ))
                     }
                 } else {
@@ -337,7 +410,8 @@ enum PolicyActivityBuilder {
                             id: "exchange:\(source):response-transform:\(reference.id.uuidString.lowercased())",
                             timestamp: exchange.started, kind: .responseTransform, effect: .responseTransformed,
                             title: reference.title, detail: detail,
-                            policyID: PolicyInventoryID.make(.responseTransform, sourceID: reference.id.uuidString.lowercased())
+                            policyID: transformIDs.contains(reference.id)
+                                ? PolicyInventoryID.make(.responseTransform, sourceID: reference.id.uuidString.lowercased()) : nil
                         ))
                     }
                 } else {
@@ -368,8 +442,13 @@ struct RulesView: View {
     @State private var allowlists: [String: AgentPolicy] = [:]
     @State private var alerts: [AlertRecord] = []
     @State private var exchanges: [HTTPExchange] = []
+    @State private var hasMorePolicyEffects = false
+    @State private var loadingMorePolicyEffects = false
+    @State private var policyEffectSince = Date.distantPast
     @State private var focusPolicyID: String?
     @State private var packSaveErrors: [String: String] = [:]
+
+    private static let policyEffectPageSize = 500
 
     /// One sheet at a time, named rather than implied by two booleans — the editor and the library are alternatives
     /// and the type should say so.
@@ -377,12 +456,14 @@ struct RulesView: View {
         case editor(Rule, isNew: Bool)
         case library(RuleTemplate.ID?, RuleTemplate.Subject)
         case pack(RulePackDefinition, RulePackEditorDraft.Intent)
+        case globalGuardrails(UUID?)
 
         var id: String {
             switch self {
             case .editor(let rule, _): return "editor-\(rule.id)"
             case .library(let focus, _): return "library-\(focus ?? "all")"
             case .pack(let pack, let intent): return "pack-\(pack.id)-\(intent)"
+            case .globalGuardrails(let focus): return "global-guardrails-\(focus?.uuidString ?? "all")"
             }
         }
     }
@@ -416,6 +497,8 @@ struct RulesView: View {
                 RulePackEditor(pack: pack, receipt: monitor.rulePacks.reviewReceipt(for: pack),
                                saved: monitor.rulePacks.configuration(for: pack.id), intent: intent,
                                packs: monitor.rulePacks, rules: store)
+            case .globalGuardrails(let focus):
+                GlobalGuardrailsSheet(store: monitor.guardrails, focus: focus)
             }
         }
         .onChange(of: nav.ruleRequest) { _, request in
@@ -462,29 +545,60 @@ struct RulesView: View {
             nav.showAgentPolicy(agentID: agentID, section: .allowlist)
         case .guardrail(let id, let agentID):
             if agentID.isEmpty {
-                focusPolicyID = PolicyInventoryID.make(.guardrail, sourceID: id.uuidString.lowercased())
+                sheet = .globalGuardrails(id)
             } else {
-                nav.showAgentPolicy(agentID: agentID, section: .guardrails)
+                nav.showAgentPolicy(agentID: agentID, section: .guardrails, guardrailID: id)
             }
-        case .mock:
-            nav.showInspectionPolicy(.mocks)
-        case .requestRewrite:
-            nav.showInspectionPolicy(.requestRewrites)
-        case .responseTransform:
-            nav.showInspectionPolicy(.responseTransforms)
+        case .mock(let id):
+            nav.showInspectionPolicy(.mocks, policyID: id)
+        case .requestRewrite(let id):
+            nav.showInspectionPolicy(.requestRewrites, policyID: id)
+        case .responseTransform(let id):
+            nav.showInspectionPolicy(.responseTransforms, policyID: id)
         }
     }
 
     private func loadPolicySources() async {
+        let since = Date().addingTimeInterval(-30 * 86_400)
+        let pageSize = Self.policyEffectPageSize
         let loaded = try? await monitor.read { db in
             (try db.loadPolicies(),
              try db.alerts(limit: 2_000, kind: AnomalyEngine.Kind.allowlistViolation.rawValue),
-             try db.exchanges(since: Date().addingTimeInterval(-30 * 86_400), limit: 2_000))
+             try db.exchanges(since: since, limit: pageSize + 1, policyEffectsOnly: true))
         }
         guard let loaded else { return }
         allowlists = loaded.0
         alerts = loaded.1
-        exchanges = loaded.2
+        exchanges = Array(loaded.2.prefix(pageSize))
+        hasMorePolicyEffects = loaded.2.count > pageSize
+        policyEffectSince = since
+        loadingMorePolicyEffects = false
+    }
+
+    private func loadMorePolicyEffects() async {
+        guard hasMorePolicyEffects, !loadingMorePolicyEffects else { return }
+        loadingMorePolicyEffects = true
+        let pageSize = Self.policyEffectPageSize
+        let since = policyEffectSince
+        guard let cursor = exchanges.last, let cursorID = cursor.id else {
+            hasMorePolicyEffects = false
+            loadingMorePolicyEffects = false
+            return
+        }
+        guard let page = try? await monitor.read({ db in
+            try db.exchanges(since: since, limit: pageSize + 1,
+                             before: cursor.started, beforeID: cursorID, policyEffectsOnly: true)
+        }) else {
+            loadingMorePolicyEffects = false
+            return
+        }
+        let known = Set(exchanges.compactMap(\.id))
+        exchanges.append(contentsOf: page.prefix(pageSize).filter { exchange in
+            guard let id = exchange.id else { return true }
+            return !known.contains(id)
+        })
+        hasMorePolicyEffects = page.count > pageSize
+        loadingMorePolicyEffects = false
     }
 
     private var inventoryItems: [PolicyInventoryItem] {
@@ -963,6 +1077,12 @@ struct RulesView: View {
                         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
+                if hasMorePolicyEffects {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .onAppear { Task { await loadMorePolicyEffects() } }
+                }
             }
             .padding(Measure.gutter)
         }
@@ -979,7 +1099,8 @@ struct RulesView: View {
                                     alerts: alerts, exchanges: exchanges, rules: store.rules,
                                     guardrails: monitor.guardrails.guardrails, packs: monitor.rulePacks.definitions,
                                     mocks: monitor.inspection.mockRules, rewrites: monitor.inspection.rewriteRules,
-                                    transforms: monitor.inspection.responseTransformRules)
+                                    transforms: monitor.inspection.responseTransformRules,
+                                    policies: Array(allowlists.values))
     }
 
     private var activityDays: [ActivityDay] {
@@ -991,6 +1112,29 @@ struct RulesView: View {
                 : day.formatted(date: .abbreviated, time: .omitted)
             return ActivityDay(id: day, title: title, events: byDay[day] ?? [])
         }
+    }
+}
+
+private struct GlobalGuardrailsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var store: GuardrailStore
+    let focus: UUID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L("Agent guardrails")).font(.title2.bold())
+                    Text(L("Every agent")).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(L("Done")) { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            GuardrailsPane(store: store, agentKey: "", agentName: L("Every agent"), declared: [], servers: [],
+                           focus: focus)
+        }
+        .padding(20)
+        .frame(width: 680, height: 640)
     }
 }
 

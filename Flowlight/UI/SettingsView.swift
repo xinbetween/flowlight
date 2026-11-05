@@ -227,6 +227,7 @@ private struct NotificationSettingsRow: View {
 }
 
 struct MenuBarContent: View {
+    @ObservedObject var liveState: TrafficLiveState
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var extensionManager: ExtensionManager
@@ -248,10 +249,10 @@ struct MenuBarContent: View {
             .help(L("Open the filter update notice in Flowlight"))
             Divider()
         }
-        Text("↓ \(ByteFormat.rate(monitor.currentIn))   ↑ \(ByteFormat.rate(monitor.currentOut))")
+        Text("↓ \(ByteFormat.rate(liveState.currentIn))   ↑ \(ByteFormat.rate(liveState.currentOut))")
         if focus.isActive { Text(L("Focus: %@", focus.summary)) }
         Divider()
-        ForEach(monitor.talkers.prefix(5)) { t in
+        ForEach(liveState.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
         }
         if monitor.unacknowledgedAlerts > 0 {

@@ -11,29 +11,37 @@ struct GuardrailsPane: View {
     let declared: [DeclaredTool]
     /// MCP servers it reached over the network.
     let servers: [String]
+    /// Optional policy deep-link target. The row keeps its normal controls and is scrolled into view on open.
+    var focus: UUID? = nil
     @State private var typed = ""
 
     private var mine: [Guardrail] { store.guardrails(for: agentKey) }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                explanation
-                if !monitor.inspection.enabled {
-                    Label(L("HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet."),
-                          systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
-                }
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    explanation
+                    if !monitor.inspection.enabled {
+                        Label(L("HTTPS inspection is off, so Flowlight can't read the tool list — nothing here is being carried out yet."),
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
+                    }
 
-                presets
-                if !declared.isEmpty { tools }
-                if !servers.isEmpty { serverList }
-                if !mine.isEmpty { existing }
-                custom
-                Divider().padding(.vertical, 2)
-                limits
+                    presets
+                    if !declared.isEmpty { tools }
+                    if !servers.isEmpty { serverList }
+                    if !mine.isEmpty { existing }
+                    custom
+                    Divider().padding(.vertical, 2)
+                    limits
+                }
+                .padding(.trailing, 6)
             }
-            .padding(.trailing, 6)
+            .onChange(of: focus, initial: true) { _, target in
+                guard let target else { return }
+                DispatchQueue.main.async { scroll.scrollTo(target, anchor: .center) }
+            }
         }
     }
 
@@ -123,6 +131,11 @@ struct GuardrailsPane: View {
                     Button(role: .destructive) { store.delete(guardrail) } label: { Image(systemName: "trash") }
                         .buttonStyle(.borderless)
                 }
+                .padding(.vertical, 3)
+                .padding(.horizontal, 5)
+                .background(guardrail.id == focus ? Color.accentColor.opacity(0.16) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+                .id(guardrail.id)
             }
         }
     }

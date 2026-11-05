@@ -1469,6 +1469,8 @@ Plugins
 
  A JavaScript plugin defines a synchronous evaluate(context) function. Flowlight passes context.manifest and a sanitized context.exchange containing only the metadata families declared in permissions. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.
 
+ context.manifest.configuration contains that plugin's local string settings. context.manifest.providerProfiles is a separate array of enabled local profiles assigned to the plugin with the same guardrail provider; each entry contains only id, provider, optional endpoint, and non-secret configuration. Flowlight never gives a plugin credential values or Keychain references, and a profile does not initiate a provider request.
+
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
  When a manifest declares the suggestAction capability and permission, a finding can also include suggestedActions. Flowlight stores those as inert suggestions; Inspect opens the matching editor and saves only when the user reviews and clicks Save.

@@ -4,8 +4,23 @@ struct AgentPolicyDeepLinkState: Equatable {
     var request: AgentPolicyRequest?
 
     func section(for agentID: String) -> AgentPolicySection? {
-        guard request?.agentID == agentID else { return nil }
-        return request?.section
+        section(for: [agentID])
+    }
+
+    func section(for identities: [String]) -> AgentPolicySection? {
+        guard let request,
+              identities.contains(where: { AgentCatalog.sameAgentIdentity($0, request.agentID) }) else {
+            return nil
+        }
+        return request.section
+    }
+
+    func guardrailID(for identities: [String]) -> UUID? {
+        guard let request, request.section == .guardrails,
+              identities.contains(where: { AgentCatalog.sameAgentIdentity($0, request.agentID) }) else {
+            return nil
+        }
+        return request.guardrailID
     }
 
     mutating func consume() {
@@ -36,7 +51,7 @@ struct AgentsView: View {
     @State private var trafficAgents: [AgentSummary] = []
     @State private var inventory: [AgentInventoryItem] = []
     @State private var installedApps: [InstalledApps.App] = []
-    @State private var alerts: [AlertRecord] = []
+    @State private var openAlertCounts: [AgentOpenAlertCount] = []
     @State private var policies: [String: AgentPolicy] = [:]
     @State private var toolUsage: [String: [ToolUsage]] = [:]
     @State private var toolActivity: [String: [ToolActivity]] = [:]
@@ -55,6 +70,7 @@ struct AgentsView: View {
     @State private var loaded = false
     @State private var inventoryRebuildTask: Task<Void, Never>?
     @State private var lastInspectionInventoryState: InspectionInventoryState?
+    @State private var lastInstalledAppScan = Date.distantPast
 
     private var selectedItem: AgentInventoryItem? { inventory.first { $0.id == selection } ?? inventory.first }
 
@@ -103,21 +119,21 @@ struct AgentsView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 table.frame(minHeight: 180, maxHeight: max(180, CGFloat(inventory.count) * 42 + 44))
-                if let item = selectedItem, let selected = item.summary {
-                    AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
-                                activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
-                                profile: profiles[selected.bundleID], inspected: inspectedAgents.contains(selected.bundleID),
-                                workspaces: workspaceStore.workspaces(bundleID: selected.bundleID, name: selected.name),
-                                policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false),
-                                requestedPolicySection: policyDeepLink.section(for: selected.bundleID),
+                if let item = selectedItem {
+                    let selected = detailSummary(for: item)
+                    AgentDetail(agent: selected, window: window, toolCalls: toolUsage[item.id] ?? [],
+                                activity: toolActivity[item.id] ?? [], servers: mcpServers[item.id] ?? [],
+                                profile: profiles[item.id], inspected: isInspected(item.identities),
+                                workspaces: workspaceStore.workspaces(bundleID: item.id, name: item.name),
+                                policy: policy(for: item), historyFilter: historyFilter(for: item),
+                                requestedPolicySection: policyDeepLink.section(for: item.identities),
+                                requestedGuardrailID: policyDeepLink.guardrailID(for: item.identities),
                                 consumeRequestedPolicySection: { policyDeepLink.consume() }) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
                         rebuildInventory()
                     }
-                    .id(selected.id)
-                } else if let item = selectedItem {
-                    AgentInventoryStatusDetail(item: item)
+                    .id(item.id)
                 }
             }
         }
@@ -125,8 +141,8 @@ struct AgentsView: View {
         .navigationTitle(L("AI Agents"))
         .onChange(of: nav.agentPolicyRequest, initial: true) { _, request in
             guard let request else { return }
-            selection = request.agentID
             policyDeepLink.request = request
+            resolvePolicyDeepLink()
             nav.agentPolicyRequest = nil
         }
         .onChange(of: workspaceStore.workspaces) { _, _ in rebuildInventory() }
@@ -170,40 +186,41 @@ struct AgentsView: View {
                 }
                 .help(item.name)
             }
-            .width(min: 150, ideal: 190)
+            .width(125)
             TableColumn(L("Health"), value: \.healthRank) { AgentHealthBadge(state: $0.health) }
-                .width(min: 110, ideal: 135)
+                .width(95)
             TableColumn(L("Why")) { item in
                 Text(item.reasons.first ?? "").lineLimit(2).foregroundStyle(.secondary)
                     .help(item.reasons.joined(separator: "\n"))
             }
-            .width(min: 180, ideal: 280)
+            .width(130)
             TableColumn(L("AI providers")) { item in
                 Text(item.providerNames.isEmpty ? "–" : item.providerNames).lineLimit(1).foregroundStyle(.secondary)
+                    .help(item.providerNames)
             }
-            .width(min: 80, ideal: 130)
+            .width(65)
             TableColumn(L("Traffic"), value: \.trafficTotal) { item in
                 Text(item.observed ? ByteFormat.string(item.trafficTotal) : "–").monospacedDigit()
             }
-            .width(80)
+            .width(65)
             TableColumn(L("Policy")) { item in
                 Text(policyLabel(item.policy)).font(.caption).foregroundStyle(item.policy.uncoveredDestinations > 0
                     ? TrafficColors.anomaly : .secondary)
             }
-            .width(min: 80, ideal: 100)
+            .width(60)
             TableColumn(L("Alerts"), value: \.unresolvedAlerts) { item in
                 Text(item.unresolvedAlerts == 0 ? "–" : "\(item.unresolvedAlerts)").monospacedDigit()
                     .foregroundStyle(item.unresolvedAlerts > 0 ? TrafficColors.anomaly : .secondary)
             }
-            .width(50)
+            .width(40)
         }
         .contextMenu(forSelectionType: AgentInventoryItem.ID.self) { ids in
             if let id = ids.first, let item = inventory.first(where: { $0.id == id }) {
                 Button(L("Show Traffic in History")) {
-                    nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity)
+                    nav.showReport(filter: historyFilter(for: item), granularity: window.granularity)
                 }
-                InspectMenuItems(app: (id, item.name))
-                FocusMenuItems(app: (id, item.name))
+                InspectMenuItems(filter: historyFilter(for: item), app: (id, item.name))
+                focusMenu(for: item)
                 Divider()
                 RuleMenuItems(app: (id, item.name))
                 if let known = AgentCatalog.knownAgent(bundleID: id, appName: item.name), known.configRecipe != nil {
@@ -222,7 +239,23 @@ struct AgentsView: View {
                 }
             }
         } primaryAction: { ids in
-            if let id = ids.first { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
+            if let id = ids.first, let item = inventory.first(where: { $0.id == id }) {
+                nav.showReport(filter: historyFilter(for: item), granularity: window.granularity)
+            }
+        }
+    }
+
+    @ViewBuilder private func focusMenu(for item: AgentInventoryItem) -> some View {
+        let targets = item.trafficIdentities.compactMap { FocusTarget.app($0, name: item.name) }
+        if !targets.isEmpty {
+            let allFocused = targets.allSatisfy(focus.contains)
+            Button(allFocused ? L("Remove %@ from Focus", item.name) : L("Focus on %@", item.name)) {
+                if allFocused {
+                    targets.forEach(focus.remove)
+                } else {
+                    targets.forEach(focus.add)
+                }
+            }
         }
     }
 
@@ -248,28 +281,39 @@ struct AgentsView: View {
         #endif
     }
 
+    private func isInspected(_ identities: [String]) -> Bool {
+        inspectedAgents.contains { observed in
+            identities.contains { AgentCatalog.sameAgentIdentity($0, observed) }
+        }
+    }
+
     private func routeStates() -> [String: AgentRouteState] {
         var routes: [String: AgentRouteState] = [:]
         let inspection = monitor.inspection
+        let requestedButUnobserved: AgentRouteState
+        if inspection.enabled && (inspection.lastError != nil
+            || inspection.diagnosis != nil && !inspection.diagnosisIsGood) {
+            requestedButUnobserved = .failed
+        } else if inspection.enabled && inspection.running {
+            requestedButUnobserved = .stale
+        } else {
+            requestedButUnobserved = .configured
+        }
         for agent in trafficAgents {
             guard let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: agent.name) else {
-                if inspectedAgents.contains(agent.bundleID) { routes[agent.bundleID] = .observed }
+                if isInspected([agent.bundleID, agent.name]) { routes[agent.bundleID] = .observed }
                 continue
             }
-            if inspectedAgents.contains(agent.bundleID) {
-                routes[agent.bundleID] = .observed
+            let identities = [agent.bundleID, agent.name, known.name] + known.bundleIDs + known.processNames
+            if isInspected(identities) {
+                routes[known.name] = .observed
             } else if inspection.monitoredAgents.contains(known.name) {
-                if inspection.enabled && (inspection.lastError != nil
-                    || inspection.diagnosis != nil && !inspection.diagnosisIsGood) {
-                    routes[known.name] = .failed
-                } else if inspection.enabled && inspection.running {
-                    routes[known.name] = .stale
-                } else {
-                    routes[known.name] = .configured
-                }
+                routes[known.name] = requestedButUnobserved
             }
         }
-        for name in inspection.monitoredAgents where routes[name] == nil { routes[name] = .configured }
+        for name in inspection.monitoredAgents where routes[name] == nil {
+            routes[name] = requestedButUnobserved
+        }
         return routes
     }
 
@@ -312,8 +356,8 @@ struct AgentsView: View {
         }
     }
 
-    private func rebuildInventory() {
-        inventory = AgentInventoryBuilder.build(AgentInventoryInput(
+    private func inventorySnapshot() -> [AgentInventoryItem] {
+        AgentInventoryBuilder.build(AgentInventoryInput(
             installedApps: installedApps,
             traffic: trafficAgents,
             workspaces: workspaceStore.workspaces,
@@ -321,39 +365,104 @@ struct AgentsView: View {
             routes: routeStates(),
             inspection: inspectionDiagnostics(),
             policies: policies,
-            alerts: alerts
+            guardrailAgentIDs: monitor.guardrails.guardrails.map(\.agent),
+            openAlertCounts: openAlertCounts
         ))
-        let ids = Set(inventory.map(\.id))
-        if selection == nil || !ids.contains(selection!) { selection = inventory.first?.id }
+    }
+
+    private func rebuildInventory() {
+        publishInventory(inventorySnapshot())
+    }
+
+    private func publishInventory(_ snapshot: [AgentInventoryItem]) {
+        inventory = snapshot
+        let ids = Set(snapshot.map(\.id))
+        if selection == nil || !ids.contains(selection!) { selection = snapshot.first?.id }
+        resolvePolicyDeepLink()
+    }
+
+    private func resolvePolicyDeepLink() {
+        guard policyDeepLink.request != nil,
+              let item = inventory.first(where: { policyDeepLink.section(for: $0.identities) != nil }) else { return }
+        selection = item.id
+    }
+
+    private func detailSummary(for item: AgentInventoryItem) -> AgentSummary {
+        item.summary ?? AgentSummary(
+            bundleID: item.id, name: item.name, vendor: item.vendor, isKnown: !item.autoDiscovered,
+            appPath: item.appPath, ai: FlowCounters(), egress: FlowCounters(), providers: [],
+            destinations: [], tools: [], alerts: item.unresolvedAlerts
+        )
+    }
+
+    private func policy(for item: AgentInventoryItem) -> AgentPolicy {
+        AgentPolicy.resolve(policies.values, identities: item.identities)
+            ?? AgentPolicy(agentID: item.id, enabled: false)
+    }
+
+    private func historyFilter(for item: AgentInventoryItem) -> TrafficFilter {
+        TrafficFilter(bundleIDs: item.trafficIdentities, includeAttributedChildren: true)
+    }
+
+    private func loadInstalledApps() async {
+        workspaceStore.refresh()
+        let apps = await Task.detached(priority: .utility) { InstalledApps.all() }.value
+        guard !Task.isCancelled else { return }
+        installedApps = apps
+        lastInstalledAppScan = Date()
     }
 
     private func load() async {
-        let installedTask = Task.detached(priority: .utility) { InstalledApps.all() }
-        workspaceStore.refresh()
+        if Date().timeIntervalSince(lastInstalledAppScan) >= 300 {
+            await loadInstalledApps()
+        }
+        guard !Task.isCancelled else { return }
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
         let scope = focus.scope
         let result = try? await monitor.read {
-            db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange], Set<String>) in
+            db -> ([BreakdownRow], [AgentOpenAlertCount], [String: AgentPolicy], [HTTPExchange], Set<String>) in
             (try AgentsModel.rows(from: db, granularity: g, from: from, to: to, focus: scope),
-             try db.alerts(limit: 2000, focus: scope).filter { $0.timestamp >= from }, try db.loadPolicies(),
+             try db.openAlertCounts(since: from, focus: scope),
+             try db.loadPolicies(),
              try db.exchanges(since: from, limit: 5000, focus: scope),
              try db.inspectedAgentIDs(since: from, focus: scope))
         }
-        guard let (rows, loadedAlerts, loadedPolicies, exchanges, loadedInspectedAgents) = result else { return }
-        installedApps = await installedTask.value
-        alerts = loadedAlerts
+        guard let (rows, loadedAlertCounts, loadedPolicies, exchanges, loadedInspectedAgents) = result else { return }
+        openAlertCounts = loadedAlertCounts
         policies = loadedPolicies
-        let activity = ToolActivityBuilder.activities(exchanges)
+        trafficAgents = AgentsModel.build(rows: rows, alerts: [])
+        inspectedAgents = loadedInspectedAgents
+        lastInspectionInventoryState = inspectionInventoryState
+        let snapshot = inventorySnapshot()
+
+        var canonicalByIdentity: [String: String] = [:]
+        for item in snapshot {
+            for identity in item.identities {
+                let key = AgentCatalog.identityComparisonKey(identity)
+                if canonicalByIdentity[key] == nil { canonicalByIdentity[key] = item.id }
+            }
+        }
+        let canonicalExchanges = exchanges.map { exchange -> HTTPExchange in
+            var exchange = exchange
+            if let agent = exchange.agent,
+               let canonical = canonicalByIdentity[AgentCatalog.identityComparisonKey(agent)] {
+                exchange.agent = canonical
+            }
+            return exchange
+        }
+        let activity = ToolActivityBuilder.activities(canonicalExchanges)
         toolActivity = activity
         toolUsage = ToolUsage.build(activity)
-        let configured = Dictionary(grouping: rows.filter { !$0.mcpServer.isEmpty && !$0.parentAgent.isEmpty }) { $0.parentAgent }
-            .mapValues { Array(Set($0.map(\.mcpServer))) }
-        mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
-        profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
-        inspectedAgents = loadedInspectedAgents
-        trafficAgents = AgentsModel.build(rows: rows, alerts: loadedAlerts)
-        lastInspectionInventoryState = inspectionInventoryState
-        rebuildInventory()
+        let configured = Dictionary(
+            grouping: rows.filter { !$0.mcpServer.isEmpty && !$0.parentAgent.isEmpty },
+            by: { canonicalByIdentity[AgentCatalog.identityComparisonKey($0.parentAgent)] ?? $0.parentAgent }
+        ).mapValues { Array(Set($0.map(\.mcpServer))) }
+        mcpServers = ToolActivityBuilder.servers(canonicalExchanges, activities: activity, configured: configured)
+        profiles = ToolActivityBuilder.profiles(canonicalExchanges, activities: activity)
+        inspectedAgents.formUnion(loadedInspectedAgents.compactMap {
+            canonicalByIdentity[AgentCatalog.identityComparisonKey($0)]
+        })
+        publishInventory(snapshot)
         loaded = true
     }
 }
@@ -729,10 +838,13 @@ struct AgentDetail: View {
     var inspected = false
     var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
+    var historyFilter: TrafficFilter
     var requestedPolicySection: AgentPolicySection?
+    var requestedGuardrailID: UUID? = nil
     var consumeRequestedPolicySection: () -> Void = {}
     var save: (AgentPolicy) -> Void
     @State private var tab = Tab.fromLaunchArgument
+    @State private var focusedGuardrailID: UUID?
 
     enum Tab: Hashable {
         case destinations, calls, tools, servers, guardrails
@@ -809,33 +921,31 @@ struct AgentDetail: View {
                     Divider().padding(.vertical, 2)
                     AllowlistEditor(agentName: agent.name, policy: policy, save: save)
                 }
-                .frame(width: 280, alignment: .leading)
+                .frame(width: 220, alignment: .leading)
 
                 Divider()
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        do {
-                            Picker(L("Show"), selection: $tab) {
-                                Text(L("Destinations (%lld)", agent.otherDestinations.count)).tag(Tab.destinations)
-                                Text(activity.isEmpty ? L("Tool calls") : L("Tool calls (%lld)", activity.count)).tag(Tab.calls)
-                                Text(toolCount > 0 ? L("Tools (%lld)", toolCount) : L("Tools")).tag(Tab.tools)
-                                let mcpCount = servers.count + unusedServers.count
-                                Text(mcpCount > 0 ? L("MCP servers (%lld)", mcpCount) : L("MCP servers")).tag(Tab.servers)
-                                Text(L("Guardrails")).tag(Tab.guardrails)
-                            }
-                            .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+                        ViewThatFits(in: .horizontal) {
+                            segmentedDetailPicker
+                                .fixedSize()
+                            compactDetailPicker
+                                .frame(maxWidth: 180, alignment: .leading)
                         }
                         Spacer()
                         Button(L("Open in History")) {
-                            nav.showReport(filter: TrafficFilter(bundleID: agent.bundleID), granularity: window.granularity)
+                            nav.showReport(filter: historyFilter, granularity: window.granularity)
                         }
                         .controlSize(.small)
                     }
                     switch tab {
                     case .destinations:
                         if agent.otherDestinations.isEmpty {
-                            Text(L("Only AI providers. Nothing else was contacted.")).font(.caption).foregroundStyle(.secondary)
+                            Text(agent.providers.isEmpty
+                                 ? L("No traffic was observed in the selected window.")
+                                 : L("Only AI providers. Nothing else was contacted."))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         ScrollView {
                             VStack(spacing: 3) {
@@ -923,7 +1033,8 @@ struct AgentDetail: View {
                     case .guardrails:
                         GuardrailsPane(store: monitor.guardrails, agentKey: agent.bundleID, agentName: agent.name,
                                        declared: profile?.tools.map(\.tool) ?? [],
-                                       servers: Array(Set(servers.map(\.name) + unusedServers.map(\.server.name))).sorted())
+                                       servers: Array(Set(servers.map(\.name) + unusedServers.map(\.server.name))).sorted(),
+                                       focus: focusedGuardrailID)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -948,9 +1059,33 @@ struct AgentDetail: View {
             guard let section else { return }
             // The allowlist is always visible in the left column; returning the right column to Destinations keeps
             // it in the normal overview instead of preserving a Guardrails tab from a previous deep link.
+            focusedGuardrailID = section == .guardrails ? requestedGuardrailID : nil
             tab = Tab.policyLanding(section)
             consumeRequestedPolicySection()
         }
+    }
+
+    private var segmentedDetailPicker: some View {
+        Picker(L("Show"), selection: $tab) { detailTabOptions }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+    }
+
+    private var compactDetailPicker: some View {
+        Picker(L("Show"), selection: $tab) { detailTabOptions }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .controlSize(.small)
+    }
+
+    @ViewBuilder private var detailTabOptions: some View {
+        Text(L("Destinations (%lld)", agent.otherDestinations.count)).tag(Tab.destinations)
+        Text(activity.isEmpty ? L("Tool calls") : L("Tool calls (%lld)", activity.count)).tag(Tab.calls)
+        Text(toolCount > 0 ? L("Tools (%lld)", toolCount) : L("Tools")).tag(Tab.tools)
+        let mcpCount = servers.count + unusedServers.count
+        Text(mcpCount > 0 ? L("MCP servers (%lld)", mcpCount) : L("MCP servers")).tag(Tab.servers)
+        Text(L("Guardrails")).tag(Tab.guardrails)
     }
 
     /// Tools declared to the model, plus everything configured on disk.

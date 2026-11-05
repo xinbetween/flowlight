@@ -65,15 +65,12 @@ class ScreenshotProvenanceTests(unittest.TestCase):
         }
         self.assertEqual(check_site.capture_version_problems(entries, "0.17.5", "screenshots"), [])
 
-    def test_mixed_capture_versions_fail(self):
+    def test_mixed_truthful_capture_versions_are_allowed(self):
         entries = {
             "agents.png": {"version": "0.17.4"},
             "alerts.png": {"version": "0.17.5"},
         }
-        self.assertEqual(
-            check_site.capture_version_problems(entries, "0.17.5", "screenshots"),
-            ["screenshots: screenshots mix capture versions 0.17.4, 0.17.5"],
-        )
+        self.assertEqual(check_site.capture_version_problems(entries, "0.17.5", "screenshots"), [])
 
     def test_future_and_missing_capture_versions_fail(self):
         self.assertEqual(

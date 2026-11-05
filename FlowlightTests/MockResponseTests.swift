@@ -144,6 +144,14 @@ final class MockResponseBytesTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("\r\n\r\n" + #"{"error":"busy"}"#))
     }
 
+    func testStableRecordingReferenceDoesNotReplaceClientFacingTitle() {
+        let reference = "flowlight-policy-v1:opaque"
+        let rule = MockRule(name: "Service unavailable", host: "a.test", recordingReference: reference)
+        let text = String(decoding: rule.responseBytes(), as: UTF8.self)
+        XCTAssertTrue(text.contains("X-Flowlight-Mock: Service unavailable\r\n"))
+        XCTAssertFalse(text.contains(reference))
+    }
+
     func testStatusesWithoutABodyGetNone() {
         let text = String(decoding: MockRule(host: "a.test", status: 304, body: "ignored").responseBytes(), as: UTF8.self)
         XCTAssertTrue(text.hasPrefix("HTTP/1.1 304 Not Modified\r\n"))

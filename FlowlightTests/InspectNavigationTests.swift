@@ -146,28 +146,38 @@ final class InspectNavigationTests: XCTestCase {
 
     func testPolicyDeepLinksKeepContextualEditorsAsOwners() {
         let nav = AppNavigation()
+        let guardrailID = UUID()
         nav.show(.rules)
-        nav.showAgentPolicy(agentID: "claude", section: .guardrails)
+        nav.showAgentPolicy(agentID: "claude", section: .guardrails, guardrailID: guardrailID)
         XCTAssertEqual(nav.selection, .agents)
         XCTAssertEqual(nav.agentPolicyRequest?.agentID, "claude")
         XCTAssertEqual(nav.agentPolicyRequest?.section, .guardrails)
+        XCTAssertEqual(nav.agentPolicyRequest?.guardrailID, guardrailID)
 
-        nav.showInspectionPolicy(.requestRewrites)
+        let rewriteID = UUID()
+        nav.showInspectionPolicy(.requestRewrites, policyID: rewriteID)
         XCTAssertEqual(nav.selection, .inspect)
         XCTAssertEqual(nav.inspectRequest?.policySection, .requestRewrites)
+        XCTAssertEqual(nav.inspectRequest?.policyID, rewriteID)
     }
 
     func testAgentPolicyDeepLinkIsScopedAndConsumedOnce() {
-        let request = AgentPolicyRequest(agentID: "claude", section: .guardrails)
+        let guardrailID = UUID()
+        let request = AgentPolicyRequest(agentID: "claude", section: .guardrails, guardrailID: guardrailID)
         var state = AgentPolicyDeepLinkState(request: request)
 
         XCTAssertEqual(state.section(for: "claude"), .guardrails)
-        XCTAssertNil(state.section(for: "codex"))
+        XCTAssertEqual(state.section(for: ["claude-code", "Claude Code"]), .guardrails)
+        XCTAssertEqual(state.guardrailID(for: ["claude-code", "Claude Code"]), guardrailID)
+        XCTAssertNil(state.section(for: ["CLAUDE"]), "ambiguous case-folded identities must not pick a product")
+        XCTAssertNil(state.section(for: ["codex", "com.example.Codex"]))
+        XCTAssertNil(state.guardrailID(for: ["codex", "com.example.Codex"]))
         XCTAssertEqual(AgentDetail.Tab.policyLanding(.guardrails), .guardrails)
         XCTAssertEqual(AgentDetail.Tab.policyLanding(.allowlist), .destinations)
 
         state.consume()
         XCTAssertNil(state.section(for: "claude"))
+        XCTAssertNil(state.guardrailID(for: ["claude"]))
     }
 
     func testUnifiedActivityUsesStableInspectionPolicyIdentities() throws {
@@ -194,8 +204,13 @@ final class InspectNavigationTests: XCTestCase {
             responseTransform: transform)
 
         let activity = PolicyActivityBuilder.build(ruleEvents: [], packEvents: [], alerts: [], exchanges: [exchange],
-                                                   rules: [], guardrails: [], packs: [], mocks: [], rewrites: [],
-                                                   transforms: [])
+                                                   rules: [],
+                                                   guardrails: [Guardrail(id: guardrailID, tool: "bash",
+                                                                          name: "Renamed guardrail")],
+                                                   packs: [], mocks: [],
+                                                   rewrites: [RewriteRule(id: rewriteID, name: "Renamed rewrite")],
+                                                   transforms: [ResponseTransformRule(id: transformID,
+                                                                                      name: "Renamed transform")])
 
         XCTAssertEqual(Set(activity.compactMap(\.policyID)), [
             PolicyInventoryID.make(.guardrail, sourceID: guardrailID.uuidString.lowercased()),
@@ -204,6 +219,109 @@ final class InspectNavigationTests: XCTestCase {
         ])
         XCTAssertEqual(Set(activity.map(\.title)), ["Shell guardrail", "Scrub request", "Shape response"])
         XCTAssertEqual(InspectionPolicyReference.display(transform), "Shape response")
+    }
+
+    func testDeletedInspectionPolicyActivityKeepsHistoryWithoutNavigation() throws {
+        let guardrailID = UUID()
+        let reference = try XCTUnwrap(InspectionPolicyReference.encode([
+            .init(id: guardrailID, title: "Deleted shell guardrail"),
+        ]))
+        let exchange = HTTPExchange(
+            id: 44, started: Date(timeIntervalSince1970: 100), duration: 0.2, scheme: "https",
+            host: "api.example.com", port: 443, method: "POST", path: "/v1/run", status: 200,
+            requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+            responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+            contentType: "application/json", pid: 1, bundleID: "agent", appName: "Agent",
+            agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil,
+            note: nil, mockRule: nil, guardrail: reference, requestRewrite: nil,
+            responseTransform: nil)
+
+        let activity = PolicyActivityBuilder.build(ruleEvents: [], packEvents: [], alerts: [], exchanges: [exchange],
+                                                   rules: [], guardrails: [], packs: [], mocks: [], rewrites: [],
+                                                   transforms: [])
+
+        XCTAssertEqual(activity.first?.title, "Deleted shell guardrail")
+        XCTAssertNil(activity.first?.policyID)
+    }
+
+    func testMockActivityKeepsStableAndUncorrelatedLegacyHistory() throws {
+        let mockID = UUID()
+        let stableReference = try XCTUnwrap(InspectionPolicyReference.encode([
+            .init(id: mockID, title: "Original mock title"),
+        ]))
+        func exchange(id: Int64, mockRule: String, offset: TimeInterval = 0) -> HTTPExchange {
+            HTTPExchange(
+                id: id, started: Date(timeIntervalSince1970: 100 + offset), duration: 0.2, scheme: "https",
+                host: "api.example.com", port: 443, method: "POST", path: "/v1/run", status: 500,
+                requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+                responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+                contentType: "application/json", pid: 1, bundleID: "agent", appName: "Agent",
+                agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil,
+                note: nil, mockRule: mockRule, guardrail: nil, requestRewrite: nil, responseTransform: nil)
+        }
+
+        let current = PolicyActivityBuilder.build(
+            ruleEvents: [], packEvents: [], alerts: [], exchanges: [exchange(id: 45, mockRule: stableReference)],
+            rules: [], guardrails: [], packs: [],
+            mocks: [MockRule(id: mockID, name: "Renamed mock")], rewrites: [], transforms: [])
+        XCTAssertEqual(current.first?.title, "Original mock title")
+        XCTAssertEqual(current.first?.policyID,
+                       PolicyInventoryID.make(.mock, sourceID: mockID.uuidString.lowercased()))
+
+        let deleted = PolicyActivityBuilder.build(
+            ruleEvents: [], packEvents: [], alerts: [],
+            exchanges: [exchange(id: 46, mockRule: stableReference),
+                        exchange(id: 47, mockRule: "Legacy deleted mock", offset: 10)],
+            rules: [], guardrails: [], packs: [], mocks: [], rewrites: [], transforms: [])
+        XCTAssertEqual(Set(deleted.map(\.title)), ["Original mock title", "Legacy deleted mock"])
+        XCTAssertTrue(deleted.allSatisfy { $0.policyID == nil })
+    }
+
+    func testAllowlistActivityUsesThePersistedPolicyIdentity() throws {
+        let policy = AgentPolicy(agentID: "claude", patterns: ["api.example"])
+        let alert = AlertRecord(
+            id: 49,
+            timestamp: Date(timeIntervalSince1970: 100),
+            kind: AnomalyEngine.Kind.allowlistViolation.rawValue,
+            bundleID: "claude-code",
+            appName: "Claude Code",
+            detail: "Claude Code contacted uploads.example",
+            severity: 2,
+            state: .new
+        )
+
+        let activity = PolicyActivityBuilder.build(
+            ruleEvents: [], packEvents: [], alerts: [alert], exchanges: [], rules: [],
+            guardrails: [], packs: [], mocks: [], rewrites: [], transforms: [], policies: [policy]
+        )
+
+        XCTAssertEqual(
+            try XCTUnwrap(activity.first).policyID,
+            PolicyInventoryID.make(.agentAllowlist, sourceID: "claude")
+        )
+    }
+
+    func testLegacyRefusalAnswerDoesNotAppearAsMockActivity() {
+        let exchange = HTTPExchange(
+            id: 48, started: Date(timeIntervalSince1970: 100), duration: 0.2, scheme: "https",
+            host: "api.example.com", port: 443, method: "POST", path: "/v1/run", status: 200,
+            requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+            responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+            contentType: "application/json", pid: 1, bundleID: "agent", appName: "Agent",
+            agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil,
+            note: nil, mockRule: "Flowlight blocked this request", guardrail: nil,
+            requestRewrite: nil, responseTransform: nil)
+        let event = RuleEventRecord(
+            id: 8, timestamp: exchange.started, ruleID: UUID(), action: .block, engine: .guardrail,
+            bundleID: "agent", appName: "Agent", agentKey: "agent", agentName: "Agent",
+            host: exchange.host, ip: "", port: 443, path: "shell", method: exchange.method)
+
+        let activity = PolicyActivityBuilder.build(
+            ruleEvents: [event], packEvents: [], alerts: [], exchanges: [exchange], rules: [],
+            guardrails: [], packs: [], mocks: [], rewrites: [], transforms: [])
+
+        XCTAssertEqual(activity.count, 1)
+        XCTAssertEqual(activity.first?.kind, .guardrail)
     }
 
     func testDeletedGuardrailEventRetainsItsKind() {

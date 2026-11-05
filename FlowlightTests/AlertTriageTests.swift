@@ -25,6 +25,14 @@ final class AlertTriageTests: XCTestCase {
                         at: Date(timeIntervalSince1970: at), allowPattern: allowPattern)
     }
 
+    func testRuleSelectionClearsWhenTheNewStatusHasNoMatchingKind() throws {
+        let alert = try add()
+
+        XCTAssertEqual(AlertRuleSelection.retained("New destination", in: [alert]), "New destination")
+        XCTAssertEqual(AlertRuleSelection.retained("Another kind", in: [alert]), "")
+        XCTAssertEqual(AlertRuleSelection.retained("", in: [alert]), "")
+    }
+
     func testLegacyAcknowledgedMigrationPreservesMeaning() throws {
         db = nil
         for suffix in ["", "-wal", "-shm"] {

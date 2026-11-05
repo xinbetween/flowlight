@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import Flowlight
 
@@ -30,6 +31,24 @@ final class WindowVisibilityTests: XCTestCase {
         XCTAssertFalse(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: true, forceRender: false),
                        "demo mode alone must not disable hidden-window savings")
         XCTAssertTrue(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: true, forceRender: true))
+    }
+
+    @MainActor
+    func testLiveTicksDoNotInvalidateTheWholeTrafficMonitor() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-live-state-\(UUID()).sqlite")
+        let monitor = TrafficMonitor(databaseURL: url)
+        var monitorChanges = 0
+        var liveChanges = 0
+        let monitorObservation = monitor.objectWillChange.sink { monitorChanges += 1 }
+        let liveObservation = monitor.liveState.objectWillChange.sink { liveChanges += 1 }
+
+        monitor.liveState.publish(LiveSnapshot(currentIn: 128, isReceiving: true))
+
+        XCTAssertEqual(liveChanges, 1)
+        XCTAssertEqual(monitorChanges, 0,
+                       "one-second rate updates must not rebuild every screen that observes TrafficMonitor")
+        withExtendedLifetime((monitorObservation, liveObservation)) {}
     }
 
     /// AppKit posts occlusion changes freely, including ones that repeat the current state. A counter drifted

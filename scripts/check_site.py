@@ -105,10 +105,7 @@ def capture_version_problems(entries, current_version, label):
         except (TypeError, ValueError):
             return [f"{label}: {name} has invalid capture version {version!r}"]
         versions.append((version, parsed))
-    distinct = sorted({version for version, _ in versions}, key=version_key)
     found = []
-    if len(distinct) > 1:
-        found.append(f"{label}: screenshots mix capture versions {', '.join(distinct)}")
     future = sorted({version for version, parsed in versions if parsed > version_key(current_version)}, key=version_key)
     if future:
         found.append(f"{label}: capture version is newer than app {current_version}: {', '.join(future)}")

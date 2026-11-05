@@ -113,8 +113,49 @@ enum AgentCatalog {
     ]
 
     static func knownAgent(bundleID: String, appName: String) -> KnownAgent? {
-        let name = appName.lowercased()
-        return agents.first { $0.bundleIDs.contains(bundleID) || $0.processNames.contains(name) || $0.processNames.contains(bundleID.lowercased()) }
+        knownAgent(identity: bundleID) ?? knownAgent(identity: appName)
+    }
+
+    /// Resolves every stable spelling Flowlight uses for a catalogued agent: display name, bundle identifier, or
+    /// process name. Keeping this in the shared catalog lets policy, rule, guardrail, and UI scopes agree that, for
+    /// example, `claude` and `claude-code` are the same agent without flattening unrelated discovered clients.
+    static func knownAgent(identity value: String) -> KnownAgent? {
+        comparisonAgent(identity: value)
+    }
+
+    static func sameAgentIdentity(_ lhs: String, _ rhs: String) -> Bool {
+        lhs == rhs || identityComparisonKey(lhs) == identityComparisonKey(rhs)
+    }
+
+    /// One matching key for policy, inventory, routing, and alert joins. Exact catalog identifiers and display labels
+    /// retain their case-sensitive meaning (`Claude` desktop versus the `claude` CLI). A case-insensitive spelling is
+    /// accepted only when it identifies one catalog product; uncatalogued identities retain their historic
+    /// case-insensitive behavior.
+    static func identityComparisonKey(_ value: String) -> String {
+        if let agent = comparisonAgent(identity: value) { return "known:\(agent.name)" }
+        let matches = caseInsensitiveAgents(identity: value)
+        if !matches.isEmpty { return "ambiguous:\(value)" }
+        return "custom:\(value.lowercased())"
+    }
+
+    private static func comparisonAgent(identity value: String) -> KnownAgent? {
+        if let identified = agents.first(where: { agent in
+            agent.bundleIDs.contains(value) || agent.processNames.contains(value)
+        }) {
+            return identified
+        }
+        if let named = agents.first(where: { $0.name == value }) { return named }
+        let matches = caseInsensitiveAgents(identity: value)
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    private static func caseInsensitiveAgents(identity value: String) -> [KnownAgent] {
+        let identity = value.lowercased()
+        return agents.filter { agent in
+            agent.name.lowercased() == identity
+                || agent.bundleIDs.contains(where: { $0.lowercased() == identity })
+                || agent.processNames.contains(where: { $0.lowercased() == identity })
+        }
     }
 
     /// The LLM provider behind a destination, if any.

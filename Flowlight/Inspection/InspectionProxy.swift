@@ -425,7 +425,7 @@ final class InspectionProxy: @unchecked Sendable {
             case .answer(let rule, let bytes, let head):
                 // Mark before the bytes that complete the request, so the recorder can label the exchange it is
                 // about to parse rather than having to match it up afterwards.
-                observer?.flow(flow, mockedBy: rule.title)
+                observer?.flow(flow, mockedBy: rule.recordingReference ?? rule.title)
                 observer?.flow(flow, clientSent: bytes)
                 onAnswered(rule, flow, head)
                 answer(rule, to: client, flow: flow)

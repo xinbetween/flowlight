@@ -45,6 +45,11 @@ def run_fixture(**changes):
         "head_sha": SHA,
         "status": "completed",
         "conclusion": "success",
+        "pull_requests": [{
+            "number": 17,
+            "head": {"ref": "release/0.17.5", "sha": SHA, "repo": {"full_name": REPO}},
+            "base": {"ref": "main", "sha": OTHER_SHA, "repo": {"full_name": REPO}},
+        }],
     }
     run.update(changes)
     return run
@@ -126,6 +131,27 @@ class ReuseEvidenceTests(unittest.TestCase):
             "source SHA": run_fixture(head_sha="not-a-sha"),
             "run ID": run_fixture(id=0),
             "run attempt": run_fixture(run_attempt=0),
+            "no associated PR": run_fixture(pull_requests=[]),
+            "ambiguous associated PRs": run_fixture(
+                pull_requests=run_fixture()["pull_requests"] * 2
+            ),
+            "alternate base": run_fixture(pull_requests=[{
+                "number": 17,
+                "head": {"ref": "release/0.17.5", "sha": SHA, "repo": {"full_name": REPO}},
+                "base": {"ref": "attacker-base", "sha": OTHER_SHA, "repo": {"full_name": REPO}},
+            }]),
+            "foreign base repository": run_fixture(pull_requests=[{
+                "number": 17,
+                "head": {"ref": "release/0.17.5", "sha": SHA, "repo": {"full_name": REPO}},
+                "base": {"ref": "main", "sha": OTHER_SHA,
+                         "repo": {"full_name": "collaborator/flowlight"}},
+            }]),
+            "mismatched PR head": run_fixture(pull_requests=[{
+                "number": 17,
+                "head": {"ref": "release/0.17.5", "sha": OTHER_SHA,
+                         "repo": {"full_name": REPO}},
+                "base": {"ref": "main", "sha": OTHER_SHA, "repo": {"full_name": REPO}},
+            }]),
         }
         for label, run in cases.items():
             with self.subTest(label=label), self.assertRaises(workflow_evidence.EvidenceError):

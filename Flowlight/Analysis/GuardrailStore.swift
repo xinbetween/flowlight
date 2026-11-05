@@ -63,7 +63,7 @@ final class GuardrailStore: ObservableObject {
     }
 
     func guardrails(for agent: String) -> [Guardrail] {
-        guardrails.filter { $0.agent.isEmpty || $0.agent.caseInsensitiveCompare(agent) == .orderedSame }
+        guardrails.filter { $0.agent.isEmpty || AgentCatalog.sameAgentIdentity($0.agent, agent) }
     }
 
     /// Counted from what the guardrails themselves record, so the tab can say whether any of this is doing

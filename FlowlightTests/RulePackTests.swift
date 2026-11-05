@@ -223,6 +223,15 @@ final class RulePackTests: XCTestCase {
                                                          policies: ["claude": policy], flows: [ad])
         XCTAssertTrue(policyAlreadyBlocks.isEmpty)
 
+        var aliasAd = ad
+        aliasAd.agentKey = "claude-code"
+        let aliasPolicyAlreadyBlocks = RulePackSimulation.run(
+            candidate: candidate, definitions: [definition], configurations: [], overrides: [], rules: [],
+            policies: ["claude": policy], flows: [aliasAd]
+        )
+        XCTAssertTrue(aliasPolicyAlreadyBlocks.isEmpty,
+                      "simulation must use the same catalog aliases as live policy enforcement")
+
         let explicitAllow = Rule(action: .allow, app: "curl", destination: "ads.example")
         let userAllowWins = RulePackSimulation.run(candidate: candidate, definitions: [definition],
                                                    configurations: [], overrides: [], rules: [explicitAllow],

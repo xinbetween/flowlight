@@ -70,6 +70,9 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     /// activity to a later definition of the same rule. Ordinary saved mocks leave both values empty.
     var ruleSession: String?
     var ruleGeneration: UInt64?
+    /// Stable policy metadata recorded on the exchange. Kept separate from `name`, which is sent to the client in
+    /// `X-Flowlight-Mock` and must remain the human-readable title the configured mock promised.
+    var recordingReference: String?
 
     /// Methods offered in the editor. `ANY` is the empty method.
     static let methods = ["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
@@ -93,11 +96,12 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     init(id: UUID = UUID(), enabled: Bool = true, name: String = "", host: String = "", path: String = "*",
          method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "",
          bodyEncoding: MockBodyEncoding = .text, delay: Double = 0, blocked: Bool = false,
-         ruleSession: String? = nil, ruleGeneration: UInt64? = nil) {
+         ruleSession: String? = nil, ruleGeneration: UInt64? = nil, recordingReference: String? = nil) {
         self.id = id; self.enabled = enabled; self.name = name; self.host = host; self.path = path
         self.method = method; self.status = status; self.headers = headers; self.body = body
         self.bodyEncoding = bodyEncoding; self.delay = delay; self.blocked = blocked
         self.ruleSession = ruleSession; self.ruleGeneration = ruleGeneration
+        self.recordingReference = recordingReference
     }
 }
 
@@ -120,6 +124,7 @@ extension MockRule {
         blocked = try c.decodeIfPresent(Bool.self, forKey: .blocked) ?? false
         ruleSession = try c.decodeIfPresent(String.self, forKey: .ruleSession)
         ruleGeneration = try c.decodeIfPresent(UInt64.self, forKey: .ruleGeneration)
+        recordingReference = try c.decodeIfPresent(String.self, forKey: .recordingReference)
     }
 }
 

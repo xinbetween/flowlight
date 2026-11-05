@@ -255,7 +255,7 @@ final class BlockEnforcer: @unchecked Sendable {
 
     private func policy(for key: String) -> AgentPolicy? {
         lock.lock(); defer { lock.unlock() }
-        return policies[key]
+        return AgentPolicy.resolve(policies.values, identities: [key])
     }
 
     // MARK: Agent identity
@@ -289,10 +289,7 @@ final class BlockEnforcer: @unchecked Sendable {
 
     private func match(_ identity: (bundleID: String, name: String)) -> AgentPolicy? {
         lock.lock(); defer { lock.unlock() }
-        if let hit = policies[identity.bundleID] { return hit }
-        if let hit = policies[identity.name] { return hit }
-        let name = identity.name.lowercased()
-        return policies.values.first { $0.agentID.lowercased() == name }
+        return AgentPolicy.resolve(policies.values, identities: [identity.bundleID, identity.name])
     }
 
     /// Parent pid from the kernel process table.

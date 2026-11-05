@@ -46,6 +46,37 @@ final class ProviderProfileTests: XCTestCase {
         XCTAssertFalse(text.localizedCaseInsensitiveContains("password"))
     }
 
+    func testRuntimeSnapshotPublishesEnabledCredentialFreeProfilesAfterPersistence() throws {
+        let store = ProviderProfileStore(defaults: defaults)
+        var snapshots: [[ProviderRuntimeProfile]] = []
+        store.installRuntimeSink { snapshots.append($0) }
+        XCTAssertEqual(snapshots, [[]])
+
+        let id = UUID()
+        var profile = ProviderProfile(
+            id: id, name: "Local provider", provider: .presidio,
+            endpoint: "http://localhost:3000/analyze", configuration: ["policy": "strict"],
+            pluginIDs: ["official.presidio"], credentialReference: "keychain:flowlight/presidio"
+        )
+        try store.save(profile)
+
+        let published = try XCTUnwrap(snapshots.last?.first)
+        XCTAssertEqual(published.id, id)
+        XCTAssertEqual(published.provider, .presidio)
+        XCTAssertEqual(published.endpoint, "http://localhost:3000/analyze")
+        XCTAssertEqual(published.configuration, ["policy": "strict"])
+        XCTAssertEqual(published.pluginIDs, ["official.presidio"])
+
+        profile.enabled = false
+        try store.save(profile)
+        XCTAssertEqual(snapshots.last, [])
+
+        profile.enabled = true
+        try store.save(profile)
+        try store.remove(id: id)
+        XCTAssertEqual(snapshots.last, [])
+    }
+
     func testValidationRejectsRemotePlaintextAndEmbeddedCredentials() {
         XCTAssertThrowsError(try ProviderProfileValidator.normalized(ProviderProfile(
             name: "Remote", provider: .custom, endpoint: "http://provider.example.test/analyze"

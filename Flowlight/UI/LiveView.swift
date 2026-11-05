@@ -28,6 +28,7 @@ enum LiveChartSelection {
 }
 
 struct LiveView: View {
+    @ObservedObject var liveState: TrafficLiveState
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @State private var sortOrder = [KeyPathComparator(\LiveTalker.totalRate, order: .reverse)]
@@ -38,22 +39,22 @@ struct LiveView: View {
 
     private var highlightedPoint: SeriesPoint? {
         let date = LiveChartSelection.date(hovered: hoveredDate, keyboard: keyboardDate, chartFocused: chartFocused)
-        return monitor.liveSeries.first { $0.date == date }
+        return liveState.series.first { $0.date == date }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                StatTile(title: L("Download"), value: ByteFormat.rate(monitor.currentIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
-                StatTile(title: L("Upload"), value: ByteFormat.rate(monitor.currentOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
-                StatTile(title: L("Received this session"), value: ByteFormat.string(monitor.sessionIn), systemImage: "tray.and.arrow.down", tint: TrafficColors.inbound)
-                StatTile(title: L("Sent this session"), value: ByteFormat.string(monitor.sessionOut), systemImage: "tray.and.arrow.up", tint: TrafficColors.outbound)
+                StatTile(title: L("Download"), value: ByteFormat.rate(liveState.currentIn), systemImage: "arrow.down", tint: TrafficColors.inbound)
+                StatTile(title: L("Upload"), value: ByteFormat.rate(liveState.currentOut), systemImage: "arrow.up", tint: TrafficColors.outbound)
+                StatTile(title: L("Received this session"), value: ByteFormat.string(liveState.sessionIn), systemImage: "tray.and.arrow.down", tint: TrafficColors.inbound)
+                StatTile(title: L("Sent this session"), value: ByteFormat.string(liveState.sessionOut), systemImage: "tray.and.arrow.up", tint: TrafficColors.outbound)
             }
 
             liveChart
 
             GroupBox {
-                Table(monitor.talkers.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
+                Table(liveState.talkers.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
                     TableColumn(L("Application"), value: \.name) { t in
                         HStack { AppIconView(path: t.path); Text(t.name) }.help(L("%@\nDouble-click to open in History", t.bundleID))
                     }
@@ -74,12 +75,12 @@ struct LiveView: View {
                 .contextMenu(forSelectionType: LiveTalker.ID.self) { ids in
                     if let id = ids.first {
                         Button(L("Show in History")) { openReport(id) }
-                        InspectMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
-                                         host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
-                        FocusMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id))
+                        InspectMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id),
+                                         host: liveState.talkers.first { $0.bundleID == id }?.topDestination)
+                        FocusMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id))
                         Divider()
-                        RuleMenuItems(app: (id, monitor.talkers.first { $0.bundleID == id }?.name ?? id),
-                                      host: monitor.talkers.first { $0.bundleID == id }?.topDestination)
+                        RuleMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id),
+                                      host: liveState.talkers.first { $0.bundleID == id }?.topDestination)
                         Button(L("Copy Bundle ID")) {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(id, forType: .string)
@@ -101,7 +102,7 @@ struct LiveView: View {
         let highlighted = highlightedPoint
         return GroupBox {
             Chart {
-                ForEach(monitor.liveSeries) { point in
+                ForEach(liveState.series) { point in
                     AreaMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), point.bytesIn), series: .value(L("Direction"), L("Download")))
                         .foregroundStyle(TrafficColors.inbound.opacity(0.12))
                     LineMark(x: .value(L("Time"), point.date), y: .value(L("Bytes/s"), point.bytesIn), series: .value(L("Direction"), L("Download")))
@@ -171,17 +172,17 @@ struct LiveView: View {
                 keyboardDate = LiveChartSelection.move(
                     from: keyboardDate,
                     direction: move,
-                    dates: monitor.liveSeries.map(\.date)
+                    dates: liveState.series.map(\.date)
                 )
             }
-            .onChange(of: monitor.liveSeries.map(\.date)) { _, dates in
+            .onChange(of: liveState.series.map(\.date)) { _, dates in
                 keyboardDate = LiveChartSelection.reconcile(keyboardDate, dates: dates)
             }
             .accessibilityLabel(L("Live network traffic"))
             .accessibilityValue(highlighted.map(liveAccessibilityValue) ?? L("No time selected"))
             .accessibilityHint(L("Solid circles are downloads; dashed diamonds are uploads. Use the Left and Right Arrow keys to inspect each second."))
             .accessibilityChildren {
-                ForEach(monitor.liveSeries) { point in
+                ForEach(liveState.series) { point in
                     Text(liveAccessibilityValue(point))
                         .accessibilityLabel(point.date.formatted(date: .omitted, time: .standard))
                         .accessibilityValue(liveAccessibilityValue(point))
@@ -207,7 +208,7 @@ struct LiveView: View {
         let frame = geometry[plot]
         guard ReportChartHoverLayout.contains(location, in: frame),
               let date: Date = proxy.value(atX: location.x - frame.origin.x) else { return nil }
-        return monitor.liveSeries.min {
+        return liveState.series.min {
             abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
         }
     }
@@ -235,8 +236,8 @@ struct LiveView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if monitor.talkers.isEmpty {
-            if monitor.isReceiving {
+        if liveState.talkers.isEmpty {
+            if liveState.isReceiving {
                 ContentUnavailableView(L("The network is quiet"), systemImage: "network",
                                        description: Text(L("No app has sent or received data in the last few seconds.")))
             } else {

@@ -3,6 +3,7 @@ import SwiftUI
 /// Collector setup, device channels and coverage form one operational document. A requested section is a scroll
 /// target, not a visibility filter: links and restored windows establish context while the full workflow remains.
 struct SourcesView: View {
+    @EnvironmentObject var monitor: TrafficMonitor
     @Binding var selection: SourcesTab
     var requestID: UUID
     @AccessibilityFocusState private var accessibilityFocus: SourcesTab?
@@ -16,7 +17,7 @@ struct SourcesView: View {
                     sourcesSection(.collector,
                                    icon: "antenna.radiowaves.left.and.right",
                                    detail: L("Choose the traffic source and verify that data is arriving.")) {
-                        CaptureView(embedded: true)
+                        CaptureView(embedded: true, liveState: monitor.liveState)
                     }
                     sourcesSection(.devices,
                                    icon: "dot.radiowaves.left.and.right",
@@ -87,6 +88,7 @@ struct SourcesView: View {
 /// sit behind a summary row instead of in front of the controls.
 struct CaptureView: View {
     var embedded = false
+    @ObservedObject var liveState: TrafficLiveState
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var extensionManager: ExtensionManager
     @State private var showExtensionSetup = false
@@ -96,7 +98,7 @@ struct CaptureView: View {
     /// source that was chosen, and arriving from the one that stepped in when that source gave up.
     private var statusColor: Color {
         if monitor.extensionFellBack { return .yellow }
-        return monitor.isReceiving ? FL.good : FL.warning
+        return liveState.isReceiving ? FL.good : FL.warning
     }
 
     private var extensionDetailsVisible: Bool {
@@ -210,7 +212,7 @@ struct CaptureView: View {
             // Green means "data is arriving from the source you chose". After a fallback the sampler is genuinely
             // receiving, so a plain green dot beside a line explaining that the extension failed would contradict
             // itself. Yellow is that third state: working, but not as asked.
-            LiveDot(color: statusColor, active: monitor.isReceiving, size: 10)
+            LiveDot(color: statusColor, active: liveState.isReceiving, size: 10)
                 .frame(width: 26, height: 26)
                 .background(statusColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
             VStack(alignment: .leading, spacing: 3) {
@@ -232,7 +234,7 @@ struct CaptureView: View {
             return L("Arriving from nettop, not the extension")
             #endif
         }
-        return monitor.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
+        return liveState.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
     }
 
     // MARK: Network Extension

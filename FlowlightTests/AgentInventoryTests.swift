@@ -73,6 +73,15 @@ final class AgentInventoryTests: XCTestCase {
         XCTAssertEqual(item?.reasons, ["Installed on this Mac, with no traffic in the selected window."])
     }
 
+    func testUppercaseStableIdentifierStillResolvesKnownAgent() throws {
+        let cursor = InstalledApps.App(
+            name: "Cursor", bundleID: "COM.TODESKTOP.230313MZL4W4U92", path: "/Applications/Cursor.app"
+        )
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(installedApps: [cursor])).first)
+        XCTAssertEqual(item.name, "Cursor")
+        XCTAssertEqual(item.health, .inactive)
+    }
+
     func testActiveInstalledAgentMergesWithTrafficAndCanBeHealthy() throws {
         let cursor = InstalledApps.App(
             name: "Cursor", bundleID: "com.todesktop.230313mzl4w4u92", path: "/Applications/Cursor.app"
@@ -121,6 +130,12 @@ final class AgentInventoryTests: XCTestCase {
         )).first)
 
         XCTAssertEqual(item.id, "claude")
+        XCTAssertEqual(item.identities.first, "claude")
+        XCTAssertTrue(item.identities.contains("claude-code"))
+        XCTAssertTrue(item.identities.contains("Claude Code"))
+        XCTAssertEqual(Set(item.trafficIdentities), ["claude", "claude-code"])
+        XCTAssertFalse(item.trafficIdentities.contains("Claude Code"),
+                       "display labels must not become exact traffic filters")
         XCTAssertEqual(item.summary?.total.total, primary.total.total + alias.total.total)
         XCTAssertEqual(Set(item.summary?.providers.map(\.name) ?? []), ["Anthropic", "OpenAI"])
         XCTAssertEqual(Set(item.summary?.destinations.map(\.label) ?? []),
@@ -181,6 +196,46 @@ final class AgentInventoryTests: XCTestCase {
         XCTAssertEqual(item.id, "python3")
         XCTAssertTrue(item.autoDiscovered)
         XCTAssertEqual(item.health, .limitedVisibility)
+    }
+
+    func testSavedPolicyKeepsQuietAgentVisibleWithStableCatalogID() throws {
+        let policy = AgentPolicy(agentID: "claude-code", patterns: ["github.com"])
+        let quiet = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(
+            policies: [policy.agentID: policy]
+        )).first)
+        XCTAssertEqual(quiet.id, "claude")
+        XCTAssertEqual(quiet.name, "Claude Code")
+        XCTAssertTrue(quiet.policy.enabled)
+
+        let observed = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(
+            traffic: [summary(id: "claude-code", name: "Claude Code")],
+            policies: [policy.agentID: policy]
+        )).first)
+        XCTAssertEqual(observed.id, quiet.id, "catalog row identity must not change with the observed alias")
+    }
+
+    func testAgentScopedGuardrailKeepsQuietAgentVisibleForDeepLinks() throws {
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(
+            guardrailAgentIDs: ["quiet-worker"]
+        )).first)
+
+        XCTAssertEqual(item.id, "quiet-worker")
+        XCTAssertTrue(item.identities.contains("quiet-worker"))
+        XCTAssertEqual(item.trafficIdentities, ["quiet-worker"])
+        XCTAssertFalse(item.observed)
+    }
+
+    func testUnknownObservedAgentAndSavedPolicyMergeIntoOneRow() throws {
+        let policy = AgentPolicy(agentID: "custom-worker", enabled: true, patterns: ["api.example"])
+        let items = AgentInventoryBuilder.build(AgentInventoryInput(
+            traffic: [summary(id: "custom-worker", name: "Custom worker", known: false)],
+            policies: [policy.agentID: policy]
+        ))
+
+        let item = try XCTUnwrap(items.first)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(item.id, "custom-worker")
+        XCTAssertTrue(item.policy.enabled)
     }
 
     func testBrowserProviderTrafficIsExcluded() {
@@ -245,6 +300,55 @@ final class AgentInventoryTests: XCTestCase {
         XCTAssertEqual(item.health, .attention)
         XCTAssertTrue(item.reasons.contains("One observed destination is outside its policy."))
         XCTAssertTrue(item.reasons.contains("2 unresolved alerts need review."))
+    }
+
+    func testGroupedAlertCountsMatchAliasesWithoutDoubleCounting() throws {
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(
+            traffic: [summary(id: "claude", name: "Claude Code")],
+            routes: ["claude": .observed],
+            inspection: healthyInspection,
+            openAlertCounts: [
+                AgentOpenAlertCount(bundleID: "claude", appName: "Claude Code", count: 3),
+            ]
+        )).first)
+
+        XCTAssertEqual(item.unresolvedAlerts, 3,
+                       "one grouped row matching both process and display aliases must only be counted once")
+    }
+
+    func testClaudeDesktopAndCodeKeepDistinctInventoryEvidence() throws {
+        let items = AgentInventoryBuilder.build(AgentInventoryInput(
+            traffic: [
+                summary(id: "com.anthropic.claudefordesktop", name: "Claude"),
+                summary(id: "claude", name: "Claude Code"),
+            ],
+            routes: ["Claude": .stale, "claude": .observed],
+            openAlertCounts: [
+                AgentOpenAlertCount(bundleID: "com.anthropic.claudefordesktop", appName: "Claude", count: 2),
+            ]
+        ))
+
+        let desktop = try XCTUnwrap(items.first { $0.name == "Claude" })
+        let code = try XCTUnwrap(items.first { $0.name == "Claude Code" })
+        XCTAssertEqual(desktop.unresolvedAlerts, 2)
+        XCTAssertEqual(desktop.route, .stale)
+        XCTAssertEqual(code.unresolvedAlerts, 0)
+        XCTAssertEqual(code.route, .observed)
+        XCTAssertNotEqual(AgentCatalog.identityComparisonKey("Claude"),
+                          AgentCatalog.identityComparisonKey("claude"))
+    }
+
+    func testDisabledProviderExemptionCountsProviderOutsidePolicy() throws {
+        let traffic = summary(id: "claude", name: "Claude Code")
+        let policy = AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: false,
+                                 patterns: [], enforce: true)
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(AgentInventoryInput(
+            traffic: [traffic], routes: ["claude": .observed], inspection: healthyInspection,
+            policies: ["claude": policy]
+        )).first)
+
+        XCTAssertEqual(item.policy.uncoveredDestinations, 1)
+        XCTAssertEqual(item.health, .attention)
     }
 
     func testReasonsHaveStableEvidenceRouteInspectionPolicyAlertOrder() throws {

@@ -61,6 +61,11 @@ struct AgentInventoryPolicyCoverage: Sendable, Equatable {
 
 struct AgentInventoryItem: Identifiable, Sendable, Equatable {
     var id: String
+    /// Canonical identifier first, followed by every stable bundle/process/name alias used to merge this row.
+    var identities: [String]
+    /// Exact identifiers that can occur in stored traffic. Display names stay out so a same-named unrelated process
+    /// cannot enter History, Inspect, or Focus when this inventory row is selected.
+    var trafficIdentities: [String]
     var name: String
     var vendor: String?
     var appPath: String
@@ -94,7 +99,9 @@ struct AgentInventoryInput: Sendable {
     var routes: [String: AgentRouteState] = [:]
     var inspection: AgentInspectionDiagnostics = .unavailable
     var policies: [String: AgentPolicy] = [:]
+    var guardrailAgentIDs: [String] = []
     var alerts: [AlertRecord] = []
+    var openAlertCounts: [AgentOpenAlertCount] = []
 }
 
 /// Builds the complete agent inventory from injected snapshots. It performs no disk, database, process, defaults, or
@@ -102,6 +109,7 @@ struct AgentInventoryInput: Sendable {
 enum AgentInventoryBuilder {
     private struct Evidence {
         var known: KnownAgent?
+        var durableAgentIDs: Set<String> = []
         var installed: [InstalledApps.App] = []
         var workspaces: [AgentWorkspace] = []
         var summaries: [AgentSummary] = []
@@ -109,6 +117,20 @@ enum AgentInventoryBuilder {
 
     static func build(_ input: AgentInventoryInput) -> [AgentInventoryItem] {
         var evidence: [String: Evidence] = [:]
+        let individualAlertCounts = input.alerts.filter { !$0.state.isClosed }.map {
+            AgentOpenAlertCount(bundleID: $0.bundleID, appName: $0.appName, count: 1)
+        }
+        let alertGroups = input.openAlertCounts + individualAlertCounts
+        var openAlertGroupIDsByIdentity: [String: Set<Int>] = [:]
+        for (index, group) in alertGroups.enumerated() {
+            openAlertGroupIDsByIdentity[AgentCatalog.identityComparisonKey(group.bundleID), default: []].insert(index)
+            openAlertGroupIDsByIdentity[AgentCatalog.identityComparisonKey(group.appName), default: []].insert(index)
+        }
+        let monitoredIdentityKeys = Set(input.monitoredAgentNames.map(AgentCatalog.identityComparisonKey))
+        var routeStatesByIdentity: [String: [AgentRouteState]] = [:]
+        for (identity, state) in input.routes {
+            routeStatesByIdentity[AgentCatalog.identityComparisonKey(identity), default: []].append(state)
+        }
 
         for app in input.installedApps {
             guard !AgentCatalog.isBrowser(app.bundleID),
@@ -132,22 +154,43 @@ enum AgentInventoryBuilder {
             evidence[catalogKey(known), default: Evidence()].known = known
         }
 
+        // Saved policies and agent-scoped guardrails are durable inventory evidence. Keep their agents visible outside
+        // the traffic window so deep links and editors never disappear just because an agent is quiet or no longer
+        // installed. Preserve every stored spelling so legacy aliases resolve deterministically.
+        let durableAgentIDs = input.policies.values.map(\.agentID) + input.guardrailAgentIDs
+        for agentID in durableAgentIDs {
+            guard !agentID.isEmpty else { continue }
+            let known = catalogAgent(matching: agentID, preferDisplayName: false)
+            let key = known.map(catalogKey) ?? "identity:\(AgentCatalog.identityComparisonKey(agentID))"
+            evidence[key, default: Evidence()].known = known
+            evidence[key, default: Evidence()].durableAgentIDs.insert(agentID)
+        }
+
         for summary in input.traffic {
             guard !AgentCatalog.isBrowser(summary.bundleID), summary.isKnown || !summary.providers.isEmpty else {
                 continue
             }
             let known = AgentCatalog.knownAgent(bundleID: summary.bundleID, appName: summary.name)
-            let key = known.map(catalogKey) ?? "observed:\(summary.bundleID.lowercased())"
+            let key = known.map(catalogKey) ?? "identity:\(AgentCatalog.identityComparisonKey(summary.bundleID))"
             evidence[key, default: Evidence()].known = known
             evidence[key, default: Evidence()].summaries.append(summary)
         }
 
-        return evidence.values.map { item(from: $0, input: input) }
+        return evidence.values.map {
+            item(from: $0, input: input, alertGroups: alertGroups,
+                 openAlertGroupIDsByIdentity: openAlertGroupIDsByIdentity,
+                 monitoredIdentityKeys: monitoredIdentityKeys,
+                 routeStatesByIdentity: routeStatesByIdentity)
+        }
             .sorted {
                 if $0.healthRank != $1.healthRank { return $0.healthRank < $1.healthRank }
                 let byName = $0.name.localizedCaseInsensitiveCompare($1.name)
                 return byName == .orderedSame ? $0.id < $1.id : byName == .orderedAscending
             }
+    }
+
+    private static func canonicalID(_ agent: KnownAgent) -> String {
+        agent.bundleIDs.sorted().first ?? agent.processNames.sorted().first ?? agent.name.lowercased()
     }
 
     private static func mergedSummary(from evidence: Evidence) -> AgentSummary? {
@@ -208,7 +251,7 @@ enum AgentInventoryBuilder {
             return $0.id < $1.id
         }
         return AgentSummary(
-            bundleID: canonical.bundleID,
+            bundleID: known.map(canonicalID) ?? canonical.bundleID,
             name: known?.name ?? canonical.name,
             vendor: known?.vendor ?? ordered.compactMap(\.vendor).sorted().first,
             isKnown: known != nil || ordered.contains(where: \.isKnown),
@@ -234,29 +277,37 @@ enum AgentInventoryBuilder {
             .joined(separator: ", ")
     }
 
-    private static func item(from evidence: Evidence, input: AgentInventoryInput) -> AgentInventoryItem {
+    private static func item(from evidence: Evidence, input: AgentInventoryInput,
+                             alertGroups: [AgentOpenAlertCount],
+                             openAlertGroupIDsByIdentity: [String: Set<Int>],
+                             monitoredIdentityKeys: Set<String>,
+                             routeStatesByIdentity: [String: [AgentRouteState]]) -> AgentInventoryItem {
         let known = evidence.known
         let summary = mergedSummary(from: evidence)
         let installed = evidence.installed.sorted { $0.bundleID < $1.bundleID }.first
         let configured = !evidence.workspaces.isEmpty
         let observed = summary.map { !$0.total.isEmpty } ?? false
-        let rawName = known?.name ?? summary?.name ?? installed?.name
-        let id = summary?.bundleID ?? installed?.bundleID
-            ?? known?.processNames.sorted().first ?? rawName?.lowercased() ?? "detected-agent"
+        let durableAgentIDs = evidence.durableAgentIDs.sorted()
+        let rawName = known?.name ?? summary?.name ?? installed?.name ?? durableAgentIDs.first
+        let id = known.map(canonicalID) ?? summary?.bundleID ?? installed?.bundleID
+            ?? durableAgentIDs.first ?? rawName?.lowercased() ?? "detected-agent"
         let name = rawName.map { safeDisplayName($0, fallback: id) } ?? L("Detected agent")
-        let aliases = identityAliases(id: id, name: name, known: known, installed: evidence.installed,
-                                      summaries: evidence.summaries)
-        let identityPriority = identityPriority(id: id, name: name, known: known, installed: evidence.installed,
-                                                summaries: evidence.summaries)
-        let monitored = input.monitoredAgentNames.contains { monitoredName in
-            aliases.contains(monitoredName.lowercased())
-        }
-        let route = routeState(aliases: aliases, routes: input.routes, monitored: monitored)
+        let aliases = identityAliases(id: id, name: name, known: known, durableAgentIDs: durableAgentIDs,
+                                      installed: evidence.installed, summaries: evidence.summaries)
+        let identityPriority = identityPriority(id: id, name: name, known: known,
+                                                durableAgentIDs: durableAgentIDs,
+                                                installed: evidence.installed, summaries: evidence.summaries)
+        let trafficIdentities = trafficIdentityPriority(
+            id: id, known: known, durableAgentIDs: durableAgentIDs,
+            installed: evidence.installed, summaries: evidence.summaries
+        )
+        let monitored = !aliases.isDisjoint(with: monitoredIdentityKeys)
+        let route = routeState(aliases: aliases, routes: routeStatesByIdentity, monitored: monitored)
         let policy = policyCoverage(identityPriority: identityPriority, summary: summary, policies: input.policies)
-        let unresolved = input.alerts.filter { alert in
-            !alert.state.isClosed && (aliases.contains(alert.bundleID.lowercased())
-                || aliases.contains(alert.appName.lowercased()))
-        }.count
+        let matchingAlertGroups = aliases.reduce(into: Set<Int>()) { groupIDs, identity in
+            groupIDs.formUnion(openAlertGroupIDsByIdentity[identity] ?? [])
+        }
+        let unresolved = matchingAlertGroups.reduce(0) { $0 + alertGroups[$1].count }
         let health = health(
             observed: observed,
             installed: installed != nil,
@@ -279,6 +330,8 @@ enum AgentInventoryBuilder {
         )
         return AgentInventoryItem(
             id: id,
+            identities: identityPriority,
+            trafficIdentities: trafficIdentities,
             name: name,
             vendor: known?.vendor ?? summary?.vendor,
             appPath: summary?.appPath.nilIfEmpty ?? installed?.path ?? "",
@@ -301,11 +354,14 @@ enum AgentInventoryBuilder {
     }
 
     private static func catalogAgent(matching value: String, preferDisplayName: Bool) -> KnownAgent? {
-        let named = AgentCatalog.agents.first { $0.name.caseInsensitiveCompare(value) == .orderedSame }
-        let identifier = AgentCatalog.agents.first {
-            $0.bundleIDs.contains(value) || $0.processNames.contains(value.lowercased())
+        let exactName = AgentCatalog.agents.first { $0.name == value }
+        let exactIdentifier = AgentCatalog.agents.first { agent in
+            agent.bundleIDs.contains(value) || agent.processNames.contains(value)
         }
-        return preferDisplayName ? named ?? identifier : identifier ?? named
+        let unambiguous = AgentCatalog.knownAgent(identity: value)
+        return preferDisplayName
+            ? exactName ?? exactIdentifier ?? unambiguous
+            : exactIdentifier ?? exactName ?? unambiguous
     }
 
     private static func safeDisplayName(_ candidate: String, fallback: String) -> String {
@@ -320,20 +376,22 @@ enum AgentInventoryBuilder {
     }
 
     private static func identityAliases(id: String, name: String, known: KnownAgent?,
-                                        installed: [InstalledApps.App], summaries: [AgentSummary]) -> Set<String> {
-        var aliases = Set([id.lowercased(), name.lowercased()])
-        aliases.formUnion(known?.bundleIDs.map { $0.lowercased() } ?? [])
-        aliases.formUnion(known?.processNames.map { $0.lowercased() } ?? [])
-        aliases.formUnion(installed.map { $0.bundleID.lowercased() })
-        aliases.formUnion(installed.map { $0.name.lowercased() })
-        aliases.formUnion(summaries.map { $0.bundleID.lowercased() })
-        aliases.formUnion(summaries.map { $0.name.lowercased() })
-        return aliases
+                                        durableAgentIDs: [String], installed: [InstalledApps.App],
+                                        summaries: [AgentSummary]) -> Set<String> {
+        let values = [id, name]
+            + durableAgentIDs
+            + (known?.bundleIDs.sorted() ?? [])
+            + (known?.processNames.sorted() ?? [])
+            + installed.flatMap { [$0.bundleID, $0.name] }
+            + summaries.flatMap { [$0.bundleID, $0.name] }
+        return Set(values.map(AgentCatalog.identityComparisonKey))
     }
 
     private static func identityPriority(id: String, name: String, known: KnownAgent?,
-                                         installed: [InstalledApps.App], summaries: [AgentSummary]) -> [String] {
+                                         durableAgentIDs: [String], installed: [InstalledApps.App],
+                                         summaries: [AgentSummary]) -> [String] {
         let candidates = [id]
+            + durableAgentIDs
             + (known?.bundleIDs.sorted() ?? [])
             + (known?.processNames.sorted() ?? [])
             + summaries.map(\.bundleID).sorted()
@@ -342,12 +400,29 @@ enum AgentInventoryBuilder {
             + installed.map(\.name).sorted()
             + summaries.map(\.name).sorted()
         var seen = Set<String>()
-        return candidates.filter { seen.insert($0.lowercased()).inserted }
+        return candidates.filter { seen.insert($0).inserted }
     }
 
-    private static func routeState(aliases: Set<String>, routes: [String: AgentRouteState],
+    private static func trafficIdentityPriority(
+        id: String,
+        known: KnownAgent?,
+        durableAgentIDs: [String],
+        installed: [InstalledApps.App],
+        summaries: [AgentSummary]
+    ) -> [String] {
+        let candidates = [id]
+            + (known?.bundleIDs.sorted() ?? [])
+            + (known?.processNames.sorted() ?? [])
+            + (known == nil ? durableAgentIDs : [])
+            + installed.map(\.bundleID).sorted()
+            + summaries.map(\.bundleID).sorted()
+        var seen = Set<String>()
+        return candidates.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    private static func routeState(aliases: Set<String>, routes: [String: [AgentRouteState]],
                                    monitored: Bool) -> AgentRouteState {
-        let matches = routes.compactMap { aliases.contains($0.key.lowercased()) ? $0.value : nil }
+        let matches = aliases.flatMap { routes[$0] ?? [] }
         if matches.contains(.failed) { return .failed }
         if matches.contains(.stale) { return .stale }
         if matches.contains(.observed) { return .observed }
@@ -357,16 +432,12 @@ enum AgentInventoryBuilder {
 
     private static func policyCoverage(identityPriority: [String], summary: AgentSummary?,
                                        policies: [String: AgentPolicy]) -> AgentInventoryPolicyCoverage {
-        var byIdentity: [String: AgentPolicy] = [:]
-        for key in policies.keys.sorted() where byIdentity[key.lowercased()] == nil {
-            byIdentity[key.lowercased()] = policies[key]
-        }
-        guard let policy = identityPriority.lazy.compactMap({ byIdentity[$0.lowercased()] }).first,
+        guard let policy = AgentPolicy.resolve(policies.values, identities: identityPriority),
               policy.enabled else {
             return AgentInventoryPolicyCoverage(enabled: false, enforcing: false, uncoveredDestinations: 0)
         }
-        let uncovered = summary?.otherDestinations.filter {
-            !policy.allows(host: $0.hasHostname ? $0.label : "", ip: $0.ip, isAIProvider: false)
+        let uncovered = summary?.destinations.filter {
+            !policy.allows(host: $0.hasHostname ? $0.label : "", ip: $0.ip, isAIProvider: $0.provider != nil)
         }.count ?? 0
         return AgentInventoryPolicyCoverage(enabled: true, enforcing: policy.enforce,
                                             uncoveredDestinations: uncovered)

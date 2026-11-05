@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 struct PluginSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var monitor: TrafficMonitor
-    @StateObject private var providerProfiles = ProviderProfileStore()
+    @ObservedObject var providerProfiles: ProviderProfileStore
     @State private var showClearConfirmation = false
     @State private var message: String?
     @State private var configuring: PluginManifest?

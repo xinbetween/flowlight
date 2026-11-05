@@ -148,6 +148,8 @@ final class InspectionController: ObservableObject {
     nonisolated(unsafe) var guardrails: @Sendable () -> [Guardrail] = { [] }
     /// Called with every tool a guardrail took away, and every call it refused.
     nonisolated(unsafe) var onGuardrail: @Sendable (RuleEvent) -> Void = { _ in }
+    /// Updates a guardrail's hit count when the exchange itself carries the durable activity record.
+    nonisolated(unsafe) var onGuardrailHit: @Sendable (RuleEvent) -> Void = { _ in }
 
     init() {
         UserDefaults.standard.register(defaults: [
@@ -204,9 +206,16 @@ final class InspectionController: ObservableObject {
                         || Rule.appMatches($0.app, bundleID: owner.appName, agentKey: owner.agentName ?? "")
                 }
             }
+            let mocks = MockRules.mocks(mockRules(), host: host).map { rule -> MockRule in
+                var recorded = rule
+                recorded.recordingReference = InspectionPolicyReference.encode([
+                    InspectionPolicyReference.Entry(id: rule.id, title: rule.title),
+                ]) ?? rule.title
+                return recorded
+            }
             return refusals.map {
                 $0.asRefusal(host: host, ruleSession: RuleStore.session, ruleGeneration: generation)
-            } + MockRules.mocks(mockRules(), host: host)
+            } + mocks
         }
         proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
         proxy.authorizeConnection = { [weak self, recorder, proxy] host, port, clientPort, answer in
@@ -250,8 +259,14 @@ final class InspectionController: ObservableObject {
                     let applied = guardrails.filter { guardrail in
                         filtered.removed.contains { guardrail.refuses(agent: agent, server: server, tool: $0) }
                     }
-                    self.report(applied.first, subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
-                                port: UInt16(clamping: 443), method: head.method, engine: .guardrail)
+                    // A filtered request is durably represented by the exchange's stable guardrail references below.
+                    // Refused calls still use RuleEvent because no upstream exchange is emitted for them; recording both
+                    // sources here would make one filter application appear twice in Policies › Activity. Hit counters
+                    // are updated independently so the Guardrails pane remains truthful without duplicating activity.
+                    for guardrail in applied {
+                        self.reportHit(guardrail, subject: filtered.removed.joined(separator: ", "), owner: owner,
+                                       host: host, port: UInt16(clamping: 443), method: head.method)
+                    }
                     guardrailReference = InspectionPolicyReference.encode(applied.map {
                         InspectionPolicyReference.Entry(id: $0.id, title: $0.localizedTitle)
                     })
@@ -322,7 +337,10 @@ final class InspectionController: ObservableObject {
             // Plain-HTTP requests reach the recorder regardless of scope; keep only what the scope allows.
             let (scope, _) = scopeAndList()
             // A mocked exchange is always kept: an answer Flowlight invented has to be visible wherever it lands.
-            guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil || exchange.responseTransform != nil else { return }
+            guard scope == .all || exchange.agent != nil || exchange.note != nil || exchange.mockRule != nil
+                    || exchange.guardrail != nil || exchange.requestRewrite != nil || exchange.responseTransform != nil else {
+                return
+            }
             Task { @MainActor [weak self] in
                 // Capture is committed first. The database transaction optionally creates a tiny derived candidate;
                 // the wake below schedules later work and never waits for model inference on the recorder path.
@@ -346,10 +364,23 @@ final class InspectionController: ObservableObject {
     nonisolated private func report(_ guardrail: Guardrail?, subject: String, owner: InspectionRecorder.Owner,
                                     host: String, port: UInt16, method: String, engine: Rule.Engine) {
         guard let guardrail else { return }
-        onGuardrail(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: guardrail.id, action: .block,
-                              engine: engine, agentKey: owner.agent ?? owner.bundleID,
-                              agentName: owner.agentName ?? owner.appName, appName: owner.appName,
-                              bundleID: owner.bundleID, host: host, ip: "", port: port, path: subject, method: method))
+        onGuardrail(guardrailEvent(guardrail, subject: subject, owner: owner, host: host, port: port,
+                                   method: method, engine: engine))
+    }
+
+    nonisolated private func reportHit(_ guardrail: Guardrail, subject: String, owner: InspectionRecorder.Owner,
+                                       host: String, port: UInt16, method: String) {
+        onGuardrailHit(guardrailEvent(guardrail, subject: subject, owner: owner, host: host, port: port,
+                                      method: method, engine: .guardrail))
+    }
+
+    nonisolated private func guardrailEvent(_ guardrail: Guardrail, subject: String,
+                                            owner: InspectionRecorder.Owner, host: String, port: UInt16,
+                                            method: String, engine: Rule.Engine) -> RuleEvent {
+        RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: guardrail.id, action: .block,
+                  engine: engine, agentKey: owner.agent ?? owner.bundleID,
+                  agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                  bundleID: owner.bundleID, host: host, ip: "", port: port, path: subject, method: method)
     }
 
     /// The body of a framed request, or nil when there isn't one to read.

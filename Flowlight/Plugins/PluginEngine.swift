@@ -34,8 +34,17 @@ enum PluginEngine {
 
     static var builtInManifests: [PluginManifest] { builtInRules.map(\.manifest) }
 
-    static func evaluate(_ exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {
-        evaluateBuiltIns(exchange, manifests: manifests) + PluginScriptRunner.shared.evaluate(exchange: exchange, manifests: manifests)
+    static func evaluate(
+        _ exchange: HTTPExchange,
+        manifests: [PluginManifest],
+        providerProfiles: [ProviderRuntimeProfile] = []
+    ) -> [PluginFindingDraft] {
+        evaluateBuiltIns(exchange, manifests: manifests)
+            + PluginScriptRunner.shared.evaluate(
+                exchange: exchange,
+                manifests: manifests,
+                providerProfiles: providerProfiles
+            )
     }
 
     static func evaluateBuiltIns(_ exchange: HTTPExchange, manifests: [PluginManifest]) -> [PluginFindingDraft] {

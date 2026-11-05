@@ -250,6 +250,14 @@ enum AlertTriageError: Error, Equatable {
     case noteTooLong(maximum: Int)
 }
 
+/// Database-side rollup used by the agent inventory. Each row represents distinct alerts sharing the same
+/// recorded app identity, so callers never need to materialize an unbounded alert history just to show counts.
+struct AgentOpenAlertCount: Sendable, Equatable {
+    var bundleID: String
+    var appName: String
+    var count: Int
+}
+
 struct AlertRecord: Identifiable, Sendable, Hashable {
     static let maximumNoteLength = 2_000
 
@@ -363,6 +371,8 @@ final class TrafficDatabase: @unchecked Sendable {
     let queue = DispatchQueue(label: "flowlight.db", qos: .userInitiated)
     private let conn: SQLiteConnection
     let url: URL
+    /// App-lifetime, credential-free provider settings. The writer queue replaces this whole value atomically.
+    private var runtimeProviderProfiles: [ProviderRuntimeProfile] = []
 
     /// Always Application Support, so history survives a build gaining (or losing) the App Group entitlement and
     /// a change of Team ID. The extension never opens the database; it only shares the group for its XPC service.
@@ -766,10 +776,15 @@ final class TrafficDatabase: @unchecked Sendable {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN guardrail TEXT NOT NULL DEFAULT ''")
         }
         // Request rewrites used the guardrail column before central policy activity needed to distinguish their
-        // effects. Keep old rows readable as they were and give new recordings truthful metadata.
-        if !exchangeColumns.contains("request_rewrite") {
-            try conn.execute("ALTER TABLE http_exchanges ADD COLUMN request_rewrite TEXT NOT NULL DEFAULT ''")
-        }
+        // effects. The durable marker, rather than column presence, completes the migration: a prerelease launch may
+        // have added the column and stopped before finishing the schema transaction. Every legacy value is inherently
+        // ambiguous once its short-lived RuleEvent has expired — even the old join delimiter may appear inside a
+        // user-entered JSON path — so history stays untouched rather than fabricating an effect.
+        let needsRequestRewriteColumn = !exchangeColumns.contains("request_rewrite")
+        let inspectionEffectSplitVersion = try conn.query(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.inspectionEffectSplit'",
+            map: { $0.int(0) }
+        ).first ?? 0
         // Unlike a mock, this names a response the origin really sent before Flowlight changed it for the client.
         if !exchangeColumns.contains("response_transform") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN response_transform TEXT NOT NULL DEFAULT ''")
@@ -842,6 +857,28 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE INDEX IF NOT EXISTS rule_pack_events_time ON rule_pack_event_rollups(bucket DESC);
         CREATE INDEX IF NOT EXISTS rule_pack_events_pack ON rule_pack_event_rollups(pack_id, bucket DESC);
         """)
+        if needsRequestRewriteColumn || inspectionEffectSplitVersion < 1 {
+            // The schema change, conservative data split, and marker are one transaction. On interruption SQLite
+            // rolls all three back; if an earlier prerelease added only the column, the missing marker still runs this.
+            try conn.transaction {
+                if needsRequestRewriteColumn {
+                    try conn.execute("ALTER TABLE http_exchanges ADD COLUMN request_rewrite TEXT NOT NULL DEFAULT ''")
+                }
+                // A current guardrail row proves the event's policy kind without correlating unrelated requests by
+                // timestamp. Deleted historical policies cannot be identified safely and retain their original event
+                // engine; their exchange metadata below still preserves the guardrail effect.
+                try conn.execute("""
+                    UPDATE rule_events SET engine = 'guardrail'
+                    WHERE engine = 'request' AND rule_id IN (SELECT id FROM guardrails)
+                    """)
+                // Legacy exchange text is not rewritten. A middle dot is valid user data as well as the old join
+                // delimiter, and there is no durable per-effect identity that can distinguish those cases safely.
+                try conn.execute("""
+                    INSERT OR REPLACE INTO rollup_state (tier, watermark)
+                    VALUES ('schema.inspectionEffectSplit', 1)
+                    """)
+            }
+        }
         let packEventKeyVersion = try conn.query(
             "SELECT watermark FROM rollup_state WHERE tier = 'schema.rulePackEventKey'",
             map: { $0.int(0) }
@@ -1540,17 +1577,36 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Agent allowlists
 
     func loadPolicies() throws -> [String: AgentPolicy] {
-        let rows = try conn.query("SELECT policy FROM agent_policies") { $0.text(0) }
-        let policies = rows.compactMap { try? JSONDecoder().decode(AgentPolicy.self, from: Data($0.utf8)) }
-        return Dictionary(policies.map { ($0.agentID, $0) }, uniquingKeysWith: { a, _ in a })
+        let rows = try conn.query("""
+            SELECT agent_id, policy, updated FROM agent_policies
+            ORDER BY updated DESC, agent_id COLLATE NOCASE ASC, agent_id ASC
+            """) { ($0.text(0), $0.text(1), $0.int(2)) }
+        var selected: [AgentPolicy] = []
+        for row in rows {
+            guard var policy = try? JSONDecoder().decode(AgentPolicy.self, from: Data(row.1.utf8)) else { continue }
+            policy.agentID = row.0
+            guard AgentPolicy.resolve(selected, identities: [policy.agentID]) == nil else { continue }
+            selected.append(policy)
+        }
+        return Dictionary(uniqueKeysWithValues: selected.map { ($0.agentID, $0) })
     }
 
     func savePolicy(_ policy: AgentPolicy) throws {
         let json = String(decoding: try JSONEncoder().encode(policy), as: UTF8.self)
-        try conn.run("""
-            INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
-            ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
-            """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        try conn.transaction {
+            // One catalog agent has one policy. Remove obsolete alias-keyed copies so every reporter and enforcer
+            // receives the same decision even when older builds saved the agent under another stable identifier.
+            let aliases = try conn.query("SELECT agent_id FROM agent_policies") { $0.text(0) }.filter {
+                $0 != policy.agentID && AgentCatalog.sameAgentIdentity($0, policy.agentID)
+            }
+            for alias in aliases {
+                try conn.run("DELETE FROM agent_policies WHERE agent_id = ?", [.text(alias)])
+            }
+            try conn.run("""
+                INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
+                ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
+                """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        }
     }
 
     // MARK: Rules
@@ -1781,15 +1837,18 @@ final class TrafficDatabase: @unchecked Sendable {
         var attempts = try conn.query("""
             SELECT bundle_id, app_name, agent, agent_name,
                    CASE WHEN host <> '' THEN host ELSE ip END, port, COUNT(*), rule_id,
-                   CASE WHEN engine = 'flow' THEN 'Flow rule' ELSE 'Request rule' END
+                   CASE engine WHEN 'flow' THEN 'Flow rule' WHEN 'guardrail' THEN 'Guardrail' ELSE 'Request rule' END,
+                   engine
             FROM rule_events
-            WHERE action = 'block' AND engine != 'guardrail' AND ts >= ? AND ts < ?
+            WHERE action = 'block' AND ts >= ? AND ts < ?
             GROUP BY bundle_id, app_name, agent, agent_name, host, ip, port, rule_id, engine
             """, [.int(lower), .int(upper)]) { row in
                 BlockedAttemptRow(
                     bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
                     destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
-                    category: "rule", source: "ordinary-rule", detail: "\(row.text(8)) · \(row.text(7))"
+                    category: row.text(9) == "guardrail" ? "guardrail" : "rule",
+                    source: row.text(9) == "guardrail" ? "guardrail" : "ordinary-rule",
+                    detail: "\(row.text(8)) · \(row.text(7))"
                 )
             }
         attempts += try conn.query("""
@@ -2388,6 +2447,11 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: Plugins
 
+    /// Replaces one immutable runtime generation. Callers enqueue this on `queue`, alongside inserts and backfills.
+    func replaceProviderProfiles(_ profiles: [ProviderRuntimeProfile]) {
+        runtimeProviderProfiles = profiles
+    }
+
     func loadPluginManifests() throws -> [PluginManifest] {
         let rows = try conn.query("SELECT manifest, enabled FROM plugins ORDER BY updated") { ($0.text(0), $0.int(1) != 0) }
         return rows.compactMap { text, enabled in
@@ -2436,6 +2500,7 @@ final class TrafficDatabase: @unchecked Sendable {
         let evaluable = active.filter { $0.source == .builtIn || (!$0.script.isEmpty && $0.source == .installed) }
         guard !evaluable.isEmpty else { return 0 }
         let exchanges = try exchanges(since: since, limit: limit)
+        let profileSnapshot = runtimeProviderProfiles
         var inserted = 0
         try conn.transaction {
             if let pluginID { try conn.run("DELETE FROM plugin_findings WHERE plugin_id = ?", [.text(pluginID)]) }
@@ -2444,7 +2509,10 @@ final class TrafficDatabase: @unchecked Sendable {
             }
             for exchange in exchanges {
                 let before = conn.changes
-                try insertPluginFindings(PluginEngine.evaluate(exchange, manifests: evaluable), forExchangeID: exchange.id ?? 0)
+                try insertPluginFindings(
+                    PluginEngine.evaluate(exchange, manifests: evaluable, providerProfiles: profileSnapshot),
+                    forExchangeID: exchange.id ?? 0
+                )
                 inserted += max(0, conn.changes - before)
             }
         }
@@ -2593,7 +2661,14 @@ final class TrafficDatabase: @unchecked Sendable {
             guard !manifests.isEmpty else { return }
             var stored = exchange
             stored.id = exchangeID
-            try insertPluginFindings(PluginScriptRunner.shared.evaluate(exchange: stored, manifests: manifests), forExchangeID: exchangeID)
+            try insertPluginFindings(
+                PluginScriptRunner.shared.evaluate(
+                    exchange: stored,
+                    manifests: manifests,
+                    providerProfiles: runtimeProviderProfiles
+                ),
+                forExchangeID: exchangeID
+            )
         } catch {
             appLog.error("installed plugin evaluation skipped: \(String(describing: error), privacy: .public)")
         }
@@ -2803,11 +2878,12 @@ final class TrafficDatabase: @unchecked Sendable {
     ///   is a different question from "find this text", and answering the first with the second matches any
     ///   response body that merely mentions the app's name — which is how asking for Claude Code's traffic
     ///   returned every GitHub page whose HTML says "Claude Code".
-    func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
-                   app: String? = nil, apps: [String] = [], host: String? = nil,
+    func exchanges(since: Date, search: String = "", limit: Int? = 500,
+                   before: Date? = nil, beforeID: Int64? = nil,
+                   focus: FocusScope = .none, app: String? = nil, apps: [String] = [], host: String? = nil,
                    hostIncludesSubdomains: Bool = true, includeAttributedChildren: Bool = false,
                    agentParent: String? = nil, mcpServer: String? = nil,
-                   potentialHarmOnly: Bool = false) throws -> [HTTPExchange] {
+                   potentialHarmOnly: Bool = false, policyEffectsOnly: Bool = false) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -2867,16 +2943,31 @@ final class TrafficDatabase: @unchecked Sendable {
                    AND r.severity IN ('medium', 'high')
              )
             """ : ""
+        let policyClause = policyEffectsOnly
+            ? " AND (mock_rule <> '' OR guardrail <> '' OR request_rewrite <> '' OR response_transform <> '')"
+            : ""
+        let cursorClause: String
+        let cursorValues: [SQLValue]
+        if let before, let beforeID {
+            cursorClause = " AND (ts < ? OR (ts = ? AND id < ?))"
+            cursorValues = [.double(before.timeIntervalSince1970), .double(before.timeIntervalSince1970), .int(beforeID)]
+        } else {
+            cursorClause = ""
+            cursorValues = []
+        }
+        let limitClause = limit == nil ? "" : " LIMIT ?"
+        var bindings: [SQLValue] = [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like),
+                                    .text(like), .text(like), .text(like), .text(like), .text(like), .text(like)]
+            + focusValues + scopeValues + cursorValues
+        if let limit { bindings.append(.int(Int64(limit))) }
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm, mock_rule, guardrail, request_rewrite, response_transform
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)
-            ORDER BY ts DESC LIMIT ?
-            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
-                  .text(like), .text(like)]
-                  + focusValues + scopeValues + [.int(Int64(limit))]) { row in
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)\(policyClause)\(cursorClause)
+            ORDER BY ts DESC, id DESC\(limitClause)
+            """, bindings) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
             let tools = row.text(22), results = row.text(24), mcp = row.text(25), llm = row.text(26)
@@ -2905,7 +2996,8 @@ final class TrafficDatabase: @unchecked Sendable {
             var parts: [String] = []
             if !focus.bundleIDs.isEmpty {
                 let marks = Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")
-                parts.append("bundle_id IN (\(marks))")
+                parts.append("(bundle_id IN (\(marks)) OR agent IN (\(marks)))")
+                values += focus.bundleIDs.map { .text($0) }
                 values += focus.bundleIDs.map { .text($0) }
             }
             for host in focus.hosts where !AgentPolicy.isIPAddress(host) {
@@ -3044,6 +3136,25 @@ final class TrafficDatabase: @unchecked Sendable {
                 triageUpdatedAt: r.isNull(11) ? timestamp : Date(timeIntervalSince1970: r.double(11)),
                 allowPattern: r.text(7)
             )
+        }
+    }
+
+    /// Open-alert counts grouped by their recorded app identity. The AI-agent inventory can join these compact rows
+    /// against catalog aliases without loading every alert in the selected window.
+    func openAlertCounts(since: Date, focus: FocusScope = .none) throws -> [AgentOpenAlertCount] {
+        var conditions = ["ts >= ?", "triage_state IN ('new','acknowledged','investigating')"]
+        var values: [SQLValue] = [.int(Int64(since.timeIntervalSince1970))]
+        if !focus.bundleIDs.isEmpty {
+            conditions.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+            values += focus.bundleIDs.map { .text($0) }
+        }
+        return try conn.query("""
+            SELECT bundle_id, app_name, COUNT(*) FROM alerts
+            WHERE \(conditions.joined(separator: " AND "))
+            GROUP BY bundle_id, app_name
+            ORDER BY bundle_id COLLATE NOCASE, app_name COLLATE NOCASE
+            """, values) {
+            AgentOpenAlertCount(bundleID: $0.text(0), appName: $0.text(1), count: Int($0.int(2)))
         }
     }
 

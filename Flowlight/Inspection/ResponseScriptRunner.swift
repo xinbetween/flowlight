@@ -31,7 +31,8 @@ final class ResponseScriptRunner: @unchecked Sendable {
         for rule in rules {
             guard rule.script.lengthOfBytes(using: .utf8) <= Self.maxScriptBytes,
                   let transformed = run(rule: rule, request: request, representation: representation, body: body),
-                  transformed.count <= Self.maxPayloadBytes else { continue }
+                  transformed.count <= Self.maxPayloadBytes,
+                  transformed != body else { continue }
             body = transformed
             applied.append(rule)
         }

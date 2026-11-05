@@ -180,6 +180,19 @@ final class RewriteRuleTests: XCTestCase {
         XCTAssertEqual(bodyForm(out)["a"], "2")
     }
 
+    func testOnlyRulesThatActuallyChangeTheRequestAreAttributed() throws {
+        let noChange = RewriteRule(name: "Missing header", host: "api.example.com",
+                                   headers: [HeaderEdit(op: .remove, name: "X-Missing", value: "")])
+        let changed = RewriteRule(name: "Add trace", host: "api.example.com",
+                                  headers: [HeaderEdit(op: .add, name: "X-Trace", value: "1")])
+        let result = try XCTUnwrap(RewriteRules.apply(
+            [noChange, changed], to: request("POST", "/v1/messages"), host: "api.example.com",
+            method: "POST", path: "/v1/messages"
+        ))
+        XCTAssertEqual(result.rules.map(\.id), [changed.id])
+        XCTAssertFalse(result.note.contains("X-Missing"))
+    }
+
     // MARK: Matching
 
     /// A rule for another host, method or path doesn't touch the request.

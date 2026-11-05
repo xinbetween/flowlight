@@ -305,6 +305,8 @@ extension Rule {
         let p = pattern.lowercased()
         guard !p.isEmpty else { return true }
         return p == bundleID.lowercased() || p == agentKey.lowercased()
+            || AgentCatalog.sameAgentIdentity(pattern, bundleID)
+            || AgentCatalog.sameAgentIdentity(pattern, agentKey)
     }
 }
 

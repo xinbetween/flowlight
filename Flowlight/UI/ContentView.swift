@@ -56,30 +56,13 @@ struct ContentView: View {
                 }
                 #endif
                 FocusBar()
-                Button { nav.showSources(.collector) } label: {
-                    HStack(alignment: .top, spacing: 8) {
-                        LiveDot(color: monitor.isReceiving ? FL.good : FL.warning, active: monitor.isReceiving)
-                            .padding(.top, 4)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(DemoData.isEnabled ? L("Demo data")
-                                 : monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler"))
-                                .font(.caption.bold())
-                            Text(monitor.status).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(10)
-                .help(L("Capture source status — click to configure"))
-                .accessibilityLabel(L("Capture status: %@", monitor.status))
+                CaptureSourceStatus(liveState: monitor.liveState)
               }
             }
         } detail: {
             Group {
                 switch nav.selection {
-                case .live: LiveView()
+                case .live: LiveView(liveState: monitor.liveState)
                 case .agents: AgentsView()
                 case .reports: ReportsView()
                 case .visualize: VisualizeView()
@@ -87,7 +70,7 @@ struct ContentView: View {
                 case .rules: RulesView()
                 case .inspect:
                     #if APP_STORE
-                    LiveView()
+                    LiveView(liveState: monitor.liveState)
                     #else
                     InspectView()
                     #endif
@@ -190,5 +173,35 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .help(L("Review…"))
+    }
+}
+
+/// The one-second capture indicator owns the live-state observation so it can update without rebuilding ContentView
+/// and whichever full-screen destination is currently retained in its navigation hierarchy.
+private struct CaptureSourceStatus: View {
+    @ObservedObject var liveState: TrafficLiveState
+    @EnvironmentObject var monitor: TrafficMonitor
+    @EnvironmentObject var nav: AppNavigation
+
+    var body: some View {
+        Button { nav.showSources(.collector) } label: {
+            HStack(alignment: .top, spacing: 8) {
+                LiveDot(color: liveState.isReceiving ? FL.good : FL.warning,
+                        active: liveState.isReceiving)
+                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(DemoData.isEnabled ? L("Demo data")
+                         : monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler"))
+                        .font(.caption.bold())
+                    Text(monitor.status).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(10)
+        .help(L("Capture source status — click to configure"))
+        .accessibilityLabel(L("Capture status: %@", monitor.status))
     }
 }
