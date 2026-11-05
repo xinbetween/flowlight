@@ -505,6 +505,8 @@
 "via %@" = "%@ 経由";
 "Opened by %@" = "%@ が開きました";
 "Not allowed" = "許可されていません";
+"Not requested" = "未要求";
+"Open System Settings" = "システム設定を開く";
 "Allow" = "許可";
 "Add %@ to %@'s allowlist" = "%2$@ の許可リストに %1$@ を追加";
 "Click to collapse" = "クリックすると折りたたみます";

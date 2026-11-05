@@ -3230,7 +3230,12 @@ final class TrafficGraphTests: XCTestCase {
             )
         }
         let build = TrafficGraphBuilder.buildForPresentation(rows: rows)
-        let size = CGSize(width: 1_200, height: 900)
+        // TrafficGraphCanvas applies these minimums before requesting geometry. An undersized synthetic canvas can
+        // make padded cards form an unbroken wall, forcing the router to exhaust candidates no real view requests.
+        let size = CGSize(
+            width: max(1_200, TrafficGraphLayout.minimumCanvasWidth(for: build.map)),
+            height: max(900, TrafficGraphLayout.minimumCanvasHeight(for: build.map))
+        )
         let firstPage = TrafficGraphListPager.page(in: build.complete, visibleCount: 25)
         let beforeKey = TrafficGraphLayoutKey(snapshot: build.map, size: size)
         let beforeLayout = TrafficGraphLayout.layout(

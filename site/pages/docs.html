@@ -98,16 +98,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Live</td><td>⌘1</td><td>What's moving right now: per-app rates over the last few seconds and the busiest destination.</td></tr>
         <tr><td><a href="#agents">AI Agents</a></td><td>⌘2</td><td>Which agents are active, which AI providers they use, and what else they contacted.</td></tr>
         <tr><td>History</td><td>⌘3</td><td>Where traffic went, from a 15-minute preset through all retained history. Group by App, Destination or IP; switch to Charts or <a href="#worth-a-look">Worth a look</a>; export CSV.</td></tr>
-        <tr><td><a href="#visualize">Connections</a></td><td>—</td><td>A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.</td></tr>
-        <tr><td><a href="#alerts">Alerts</a></td><td>⌘4</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
-        <tr><td><a href="#rules">Rules</a></td><td>⌘5</td><td>Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.</td></tr>
+        <tr><td><a href="#visualize">Connections</a></td><td>⌘4</td><td>A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.</td></tr>
+        <tr><td><a href="#alerts">Alerts</a></td><td>⌘5</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
         <tr><td><a href="#ask">Ask</a></td><td>⌘6</td><td>Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.</td></tr>
         <tr><td><a href="#inspection">Inspect</a></td><td>⌘7</td><td>Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.</td></tr>
-        <tr><td><a href="#devices">Devices</a></td><td>⌘8</td><td>Off until you turn it on: camera activity, Bluetooth, USB and external storage.</td></tr>
-        <tr><td><a href="#coverage">Coverage</a></td><td>⌘9</td><td>What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.</td></tr>
-        <tr><td><a href="#capture">Capture</a></td><td>⌘0</td><td>Which engine is recording, the extension's state, hostname learning, and where the database lives.</td></tr>
+        <tr><td><a href="#rules">Rules</a></td><td>⌘8</td><td>Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.</td></tr>
+        <tr><td><a href="#devices">Devices</a></td><td>⌘9</td><td>Off until you turn it on: camera activity, Bluetooth, USB and external storage.</td></tr>
+        <tr><td><a href="#coverage">Coverage</a></td><td>⌘0</td><td>What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.</td></tr>
+        <tr><td><a href="#capture">Capture</a></td><td>—</td><td>Which engine is recording, the extension's state, hostname learning, and where the database lives.</td></tr>
       </table>
-      <p>The shortcuts are the sidebar's order, so ⌘0 is the tenth item rather than a skipped position.</p>
+      <p>The shortcuts follow the sidebar's visible order: ⌘0 is the tenth item, and an eleventh remains available without an invented key.</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="The Live screen: a list of applications with their current send and receive rates and busiest destination."></div>
         <figcaption class="caption">Live, the screen Flowlight opens on.</figcaption></figure>
@@ -213,7 +213,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       </ul>
       <p><strong>Apple's own apps are left out by default.</strong> macOS contacts Apple constantly — Software Update, iCloud,
       push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
-      line worth reading. Turn it off in <strong>Settings › Alerts</strong> if you want them. Either way the traffic is still
+      line worth reading. Turn it off in <strong>Settings › Detection › Rules</strong> if you want them. Either way the traffic is still
       recorded, still appears in Live, History and Ask, and is still subject to every rule, guardrail and allowlist: the setting
       decides what is listed, never what is allowed.</p>
 

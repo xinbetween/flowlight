@@ -528,6 +528,8 @@
 "via %@" = "%@ 경유";
 "Opened by %@" = "%@에서 연결함";
 "Not allowed" = "허용되지 않음";
+"Not requested" = "요청하지 않음";
+"Open System Settings" = "시스템 설정 열기";
 "Allow" = "허용";
 "Add %@ to %@'s allowlist" = "%2$@의 허용 목록에 %1$@ 추가";
 "Click to collapse" = "클릭하면 접힙니다";

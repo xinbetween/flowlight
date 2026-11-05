@@ -21,6 +21,17 @@ final class WindowVisibilityTests: XCTestCase {
         XCTAssertFalse(windows.isVisible)
     }
 
+    @MainActor
+    func testHeadlessCaptureRendersLiveOnlyForTheExplicitDemoFixture() {
+        XCTAssertTrue(TrafficMonitor.needsLiveUI(windowVisible: true, demoEnabled: false, forceRender: false))
+        XCTAssertFalse(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: false, forceRender: false))
+        XCTAssertFalse(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: false, forceRender: true),
+                       "the fixture must not disable hidden-window savings in a normal run")
+        XCTAssertFalse(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: true, forceRender: false),
+                       "demo mode alone must not disable hidden-window savings")
+        XCTAssertTrue(TrafficMonitor.needsLiveUI(windowVisible: false, demoEnabled: true, forceRender: true))
+    }
+
     /// AppKit posts occlusion changes freely, including ones that repeat the current state. A counter drifted
     /// here; identity cannot.
     func testRepeatedUpdatesForOneWindowDoNotDrift() {

@@ -6,13 +6,23 @@ struct ContentView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
+    @EnvironmentObject var focus: FocusStore
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var demoPluginReview: PluginPackageReview?
 
     var body: some View {
         NavigationSplitView {
-            List(selection: Binding(get: { nav.selection }, set: { if let value = $0 { nav.show(value) } })) {
+            List(selection: Binding(get: { nav.selection }, set: { value in
+                guard let value, value != nav.selection else { return }
+                // AppKit reports selection from inside NSTableView's delegate callback. A main-actor Task can begin
+                // before that callback unwinds, so dispatch explicitly to the next run-loop turn before publishing
+                // navigation. AppKit warns about the reentrant reload today and will assert on it in the future.
+                DispatchQueue.main.async {
+                    guard value != nav.selection else { return }
+                    nav.show(value)
+                }
+            })) {
                 ForEach(SidebarSection.allCases) { section in
                     Section(section.title) {
                         ForEach(section.items) { item in
@@ -86,7 +96,12 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .top, spacing: 0) {
-                if rulePacks.pendingReviewCount > 0 { packReviewBanner }
+                VStack(spacing: 0) {
+                    if focus.isActive {
+                        FocusScopeNotice(isFiltering: nav.selection.fullyAppliesFocus(focus.scope))
+                    }
+                    if rulePacks.pendingReviewCount > 0 { packReviewBanner }
+                }
             }
             // One help button for every screen, because the documentation is grouped the way this sidebar
             // is: whatever is on screen, the button opens the section about it rather than the top of the page.

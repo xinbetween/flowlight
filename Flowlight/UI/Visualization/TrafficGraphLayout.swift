@@ -810,38 +810,52 @@ enum TrafficGraphLayout {
     }
 
     private static func intersects(_ curve: TrafficGraphCurve, obstacles: [CGRect]) -> Bool {
-        func segment(_ start: CGPoint, _ end: CGPoint, intersects rect: CGRect) -> Bool {
-            if rect.contains(start) || rect.contains(end) { return true }
-
-            let deltaX = end.x - start.x
-            let deltaY = end.y - start.y
-            var lower: CGFloat = 0
-            var upper: CGFloat = 1
-            func clip(direction: CGFloat, distance: CGFloat) -> Bool {
-                if abs(direction) < 0.000_001 { return distance >= 0 }
-                let ratio = distance / direction
-                if direction < 0 {
-                    lower = max(lower, ratio)
-                } else {
-                    upper = min(upper, ratio)
-                }
-                return lower <= upper
-            }
-            return clip(direction: -deltaX, distance: start.x - rect.minX)
-                && clip(direction: deltaX, distance: rect.maxX - start.x)
-                && clip(direction: -deltaY, distance: start.y - rect.minY)
-                && clip(direction: deltaY, distance: rect.maxY - start.y)
-        }
-
         let bounds = controlBounds(curve)
         let relevant = obstacles.filter { bounds.intersects($0) }
         guard !relevant.isEmpty else { return false }
-        let points = (0...160).map { curve.point(at: CGFloat($0) / 160) }
-        return relevant.contains { obstacle in
-            zip(points, points.dropFirst()).contains { start, end in
-                segment(start, end, intersects: obstacle)
+
+        // This runs for every routing candidate. Building a 161-point array and nested Zip2Sequence closures here
+        // made one ordinary 18-edge map take tens of seconds in Debug builds and time out under Xcode 16. Walk the
+        // same 160 line segments directly: collision precision and resulting geometry stay identical, while the hot
+        // path allocates nothing and can return as soon as any relevant card is hit.
+        var previous = curve.start
+        for step in 1...160 {
+            let current = curve.point(at: CGFloat(step) / 160)
+            for obstacle in relevant where segment(previous, current, intersects: obstacle) {
+                return true
             }
+            previous = current
         }
+        return false
+    }
+
+    private static func segment(_ start: CGPoint, _ end: CGPoint, intersects rect: CGRect) -> Bool {
+        if rect.contains(start) || rect.contains(end) { return true }
+
+        let deltaX = end.x - start.x
+        let deltaY = end.y - start.y
+        var lower: CGFloat = 0
+        var upper: CGFloat = 1
+        return clip(direction: -deltaX, distance: start.x - rect.minX, lower: &lower, upper: &upper)
+            && clip(direction: deltaX, distance: rect.maxX - start.x, lower: &lower, upper: &upper)
+            && clip(direction: -deltaY, distance: start.y - rect.minY, lower: &lower, upper: &upper)
+            && clip(direction: deltaY, distance: rect.maxY - start.y, lower: &lower, upper: &upper)
+    }
+
+    private static func clip(
+        direction: CGFloat,
+        distance: CGFloat,
+        lower: inout CGFloat,
+        upper: inout CGFloat
+    ) -> Bool {
+        if abs(direction) < 0.000_001 { return distance >= 0 }
+        let ratio = distance / direction
+        if direction < 0 {
+            lower = max(lower, ratio)
+        } else {
+            upper = min(upper, ratio)
+        }
+        return lower <= upper
     }
 
     private static func corridorOverlap(

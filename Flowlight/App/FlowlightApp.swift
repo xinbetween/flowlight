@@ -150,7 +150,7 @@ struct FlowlightApp: App {
                 Button(L("Report an Issue")) { NSWorkspace.shared.open(Help.issues) }
             }
             CommandGroup(before: .sidebar) {
-                ForEach(SidebarItem.availableCases) { item in
+                ForEach(SidebarItem.sidebarOrder) { item in
                     if let shortcut = item.shortcut {
                         Button(item.title) { nav.show(item) }
                             .keyboardShortcut(shortcut, modifiers: .command)

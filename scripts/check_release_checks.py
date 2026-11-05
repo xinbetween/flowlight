@@ -12,6 +12,7 @@ REQUIRED_CHECKS = (
     ("github-actions", "site"),
     ("github-actions", "test (oldest Xcode)"),
     ("github-actions", "test (newest Xcode)"),
+    ("github-actions", "Review / gate"),
     ("github-actions", "analyze (swift)"),
     ("github-actions", "analyze (python)"),
     ("github-actions", "analyze (actions)"),

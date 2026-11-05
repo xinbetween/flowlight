@@ -528,6 +528,8 @@
 "via %@" = "透過 %@";
 "Opened by %@" = "由 %@ 開啟";
 "Not allowed" = "未允許";
+"Not requested" = "尚未要求";
+"Open System Settings" = "打開「系統設定」";
 "Allow" = "允許";
 "Add %@ to %@'s allowlist" = "將 %@ 加入 %@ 的允許清單";
 "Click to collapse" = "點按以收合";

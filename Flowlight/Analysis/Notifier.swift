@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -19,6 +20,19 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+enum NotificationAuthorizationState: Equatable {
+    case unknown, notRequested, denied, active
+
+    init(_ status: UNAuthorizationStatus) {
+        switch status {
+        case .notDetermined: self = .notRequested
+        case .denied: self = .denied
+        case .authorized, .provisional, .ephemeral: self = .active
+        @unknown default: self = .unknown
+        }
+    }
+}
+
 enum Notifier {
     static let updateCategory = "flowlight.update"
 
@@ -30,6 +44,28 @@ enum Notifier {
     static func requestAuthorization() {
         configure()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// The live macOS permission state, rather than an inference from Flowlight's preference.
+    static func authorizationState() async -> NotificationAuthorizationState {
+        NotificationAuthorizationState(await UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
+    }
+
+    /// Used when someone switches warnings on while Flowlight is already running. Startup requests alone made the
+    /// toggle appear ineffective until the next launch.
+    static func requestAuthorizationAndWait() async -> NotificationAuthorizationState {
+        configure()
+        do {
+            _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        } catch {
+            // The settings query below remains authoritative and represents denial or an unavailable service.
+        }
+        return await authorizationState()
+    }
+
+    static func openSystemNotificationSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// Tells the person a new version is out. Clicking it opens the update window.

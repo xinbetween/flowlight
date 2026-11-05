@@ -31,6 +31,40 @@ struct FocusBar: View {
     }
 }
 
+/// A persistent in-content scope notice. The sidebar footer is easy to miss once attention is in a dense table;
+/// this keeps every filtered screen honest about what is currently hidden.
+struct FocusScopeNotice: View {
+    @EnvironmentObject var focus: FocusStore
+    var isFiltering: Bool
+    @State private var editing = false
+
+    var body: some View {
+        Button { editing = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "scope")
+                    .foregroundStyle(FL.accent)
+                Text(L("Focus on: %@", focus.summary))
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(FL.accent.opacity(0.08))
+            .overlay(alignment: .bottom) { Divider() }
+        }
+        .buttonStyle(.plain)
+        .help(isFiltering ? L("Showing only %@ — click to change", focus.summary)
+                          : L("Focus on: %@", focus.summary))
+        .accessibilityLabel(L("Focus on: %@", focus.summary))
+        .popover(isPresented: $editing) { FocusEditor() }
+    }
+}
+
 /// Picks what Focus watches. Apps come from what's actually been talking; destinations are typed.
 struct FocusEditor: View {
     @EnvironmentObject var monitor: TrafficMonitor

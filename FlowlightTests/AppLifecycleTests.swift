@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 import XCTest
 @testable import Flowlight
 
@@ -36,5 +37,12 @@ final class AppLifecycleTests: XCTestCase {
         )
 
         XCTAssertEqual(starts, 1)
+    }
+
+    func testNotificationAuthorizationStatesKeepDenialDistinctFromNoRequest() {
+        XCTAssertEqual(NotificationAuthorizationState(.notDetermined), .notRequested)
+        XCTAssertEqual(NotificationAuthorizationState(.denied), .denied)
+        XCTAssertEqual(NotificationAuthorizationState(.authorized), .active)
+        XCTAssertEqual(NotificationAuthorizationState(.provisional), .active)
     }
 }

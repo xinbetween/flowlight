@@ -528,6 +528,8 @@
 "via %@" = "经由 %@";
 "Opened by %@" = "由 %@ 打开";
 "Not allowed" = "不允许";
+"Not requested" = "未请求";
+"Open System Settings" = "打开“系统设置”";
 "Allow" = "允许";
 "Add %@ to %@'s allowlist" = "将 %@ 添加到 %@ 的允许列表";
 "Click to collapse" = "点按可收起";

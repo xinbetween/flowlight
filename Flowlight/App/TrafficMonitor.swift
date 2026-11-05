@@ -14,19 +14,31 @@ struct LiveTalker: Identifiable, Equatable {
     var id: String { bundleID }
 }
 
+/// Everything the one-second timer publishes to the Live screen. Replacing one snapshot gives SwiftUI one coherent
+/// update; publishing the chart, table, rates, and source state separately can reload NSTableView while its delegate
+/// is still reconciling the previous publication.
+private struct LiveSnapshot: Equatable {
+    var talkers: [LiveTalker] = []
+    var series: [SeriesPoint] = []
+    var currentIn: Double = 0
+    var currentOut: Double = 0
+    var isReceiving = false
+}
+
 /// Owns the capture source, database, anomaly engine and live state.
 @MainActor
 final class TrafficMonitor: ObservableObject {
     @Published private(set) var status = L("Starting…")
     @Published private(set) var mode: CaptureMode
-    @Published private(set) var talkers: [LiveTalker] = []
-    @Published private(set) var liveSeries: [SeriesPoint] = []
-    @Published private(set) var currentIn: Double = 0
-    @Published private(set) var currentOut: Double = 0
+    @Published private var live = LiveSnapshot()
+    var talkers: [LiveTalker] { live.talkers }
+    var liveSeries: [SeriesPoint] { live.series }
+    var currentIn: Double { live.currentIn }
+    var currentOut: Double { live.currentOut }
+    var isReceiving: Bool { live.isReceiving }
     @Published private(set) var sessionIn: Int64 = 0
     @Published private(set) var sessionOut: Int64 = 0
     @Published private(set) var unacknowledgedAlerts = 0
-    @Published private(set) var isReceiving = false
     @Published private(set) var captureState: PacketSniffer.State = .stopped
     @Published private(set) var hostnamesLearned = 0
     /// Share of traffic in the last hour with a hostname / with at least a network owner.
@@ -91,14 +103,27 @@ final class TrafficMonitor: ObservableObject {
     private var windows = WindowVisibility()
 
     /// Whether anything on screen needs the live chart series and the per-app list. With nothing visible the menu
-    /// bar only needs the current rates, so neither is built at all.
-    var uiVisible: Bool { windows.isVisible }
+    /// bar only needs the current rates, so neither is built at all. The launch-only screenshot fixture forces the
+    /// complete snapshot because headless capture can see an offscreen window that AppKit correctly calls occluded.
+    var uiVisible: Bool {
+        Self.needsLiveUI(
+            windowVisible: windows.isVisible,
+            demoEnabled: DemoData.isEnabled,
+            forceRender: UserDefaults.standard.bool(forKey: "FLRenderLive")
+        )
+    }
+
+    static func needsLiveUI(windowVisible: Bool, demoEnabled: Bool, forceRender: Bool) -> Bool {
+        windowVisible || (demoEnabled && forceRender)
+    }
 
     func windowVisibility(_ window: AnyObject, isVisible: Bool) {
         guard windows.update(window, isVisible: isVisible) == .becameHidden else { return }
         // Nothing can see them, and they are rebuilt on the next tick once something can.
-        liveSeries = []
-        talkers = []
+        var next = live
+        next.series = []
+        next.talkers = []
+        if next != live { live = next }
     }
 
     private let liveWindow = 120
@@ -760,8 +785,10 @@ final class TrafficMonitor: ObservableObject {
         sessionPerApp.removeAll()
         sessionIn = 0
         sessionOut = 0
-        talkers = []
-        liveSeries = []
+        var next = live
+        next.talkers = []
+        next.series = []
+        if next != live { live = next }
         refreshAlertCount()
     }
 
@@ -798,14 +825,14 @@ final class TrafficMonitor: ObservableObject {
 
     private func tickLive() {
         let now = Int64(Date().timeIntervalSince1970)
-        let receiving = lastDataAt.map { Date().timeIntervalSince($0) < 5 } ?? false
-        if receiving != isReceiving { isReceiving = receiving }
+        var next = live
+        next.isReceiving = lastDataAt.map { Date().timeIntervalSince($0) < 5 } ?? false
         // Without a window, only the last few seconds are needed for the menu bar rates.
         let keep = Int64(uiVisible ? liveWindow : rateWindow + 3)
         perSecond = perSecond.filter { $0.key > now - keep }
 
         if uiVisible {
-            liveSeries = ((now - Int64(liveWindow))..<now).map { ts in
+            next.series = ((now - Int64(liveWindow))..<now).map { ts in
                 let values = perSecond[ts]?.values.map(\.counters) ?? []
                 return SeriesPoint(date: Date(timeIntervalSince1970: TimeInterval(ts)),
                                    bytesIn: values.reduce(0) { $0 + $1.bytesIn },
@@ -829,23 +856,30 @@ final class TrafficMonitor: ObservableObject {
         guard uiVisible else {
             // Menu bar only: the totals, without building or publishing the per-app list.
             setRates(inRate: rates.values.reduce(0.0) { $0 + Double($1.counters.bytesIn) / seconds },
-                     outRate: rates.values.reduce(0.0) { $0 + Double($1.counters.bytesOut) / seconds })
+                     outRate: rates.values.reduce(0.0) { $0 + Double($1.counters.bytesOut) / seconds }, in: &next)
+            publishLive(next)
             return
         }
-        talkers = rates.map { bundle, v in
+        next.talkers = rates.map { bundle, v in
             LiveTalker(bundleID: bundle, name: v.name, path: v.path, rateIn: Double(v.counters.bytesIn) / seconds,
                        rateOut: Double(v.counters.bytesOut) / seconds, sessionIn: sessionPerApp[bundle]?.bytesIn ?? 0,
                        sessionOut: sessionPerApp[bundle]?.bytesOut ?? 0, topDestination: v.topDest)
         }
         .filter { $0.rateIn + $0.rateOut > 0 }
         .sorted { $0.rateIn + $0.rateOut > $1.rateIn + $1.rateOut }
-        setRates(inRate: talkers.reduce(0) { $0 + $1.rateIn }, outRate: talkers.reduce(0) { $0 + $1.rateOut })
+        setRates(inRate: next.talkers.reduce(0) { $0 + $1.rateIn },
+                 outRate: next.talkers.reduce(0) { $0 + $1.rateOut }, in: &next)
+        publishLive(next)
     }
 
     /// Publishes rates only when they actually move, so an idle Mac doesn't redraw the menu bar every second.
-    private func setRates(inRate: Double, outRate: Double) {
-        if abs(inRate - currentIn) > max(64, currentIn * 0.02) { currentIn = inRate }
-        if abs(outRate - currentOut) > max(64, currentOut * 0.02) { currentOut = outRate }
+    private func setRates(inRate: Double, outRate: Double, in snapshot: inout LiveSnapshot) {
+        if abs(inRate - snapshot.currentIn) > max(64, snapshot.currentIn * 0.02) { snapshot.currentIn = inRate }
+        if abs(outRate - snapshot.currentOut) > max(64, snapshot.currentOut * 0.02) { snapshot.currentOut = outRate }
+    }
+
+    private func publishLive(_ snapshot: LiveSnapshot) {
+        if snapshot != live { live = snapshot }
     }
 
     // MARK: Maintenance

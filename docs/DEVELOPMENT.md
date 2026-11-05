@@ -471,8 +471,18 @@ GitHub release page and downloaded DMG, PKG and `SHA256SUMS.txt` checksums befor
 
 `.github/workflows/release.yml` checks the tag matches `MARKETING_VERSION`, verifies the exact commit already passed
 the required PR CI and CodeQL checks, then signs, notarizes and verifies with `spctl`. A tag push always stops there;
-an explicit dispatch for that tag publishes the release and updates the Homebrew cask. `.github/workflows/ci.yml`
-builds and tests every push and pull request, and fails if `docs/` is out of date with `site/`.
+an explicit dispatch for that tag publishes the release and updates the Homebrew cask.
+
+Pull-request verification jobs explicitly check out the PR head SHA associated with their checks, not GitHub's
+synthetic merge ref. App-changing PRs also receive one required prospective-merge build of the synthetic tree, so exact
+release evidence cannot hide an incompatibility with the current base branch. `scripts/classify_changes.py` consumes the
+full NUL-delimited Git diff, including both names of a rename, and permits the
+website-only route only when every changed path is explicitly allowlisted. Project files, Swift/shared/test sources,
+packaging, screenshots and manifests, signed catalogs, release scripts, workflows, classifier policy, and unknown paths
+all take the full application route; a missing or unreadable base fails closed the same way. A website-only commit needs
+no application version bump. CI still rebuilds and checks the generated site on every commit, then `Review / gate`
+requires every applicable job and preserves an immutable shadow receipt containing the tested source SHA, tree, app-input
+fingerprint, workflow schema, and conclusions. A cache is never release evidence.
 
 ```sh
 scripts/ci-secrets.sh                                  # upload the secrets once

@@ -51,6 +51,9 @@ jobs:
             build-mode: none
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Code scanning reports against the PR head, so compile that exact commit rather than the merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # Everything that is not the compilation happens before init, and deliberately so. Once init has run,
       # CodeQL traces the job by preloading an x86_64 libtrace.dylib through DYLD_INSERT_LIBRARIES, which puts

@@ -41,7 +41,7 @@ TAG = re.compile(r'<span class="tag">(\d+\.\d+(?:\.\d+)?)</span>')
 IMG = re.compile(r'<img[^>]*src="([^"]*assets/screenshots/[^"]+)"([^>]*)>')
 WH = re.compile(r'\b(width|height)="(\d+)"')
 HELP_ANCHOR = re.compile(r'case \.(\w+): return "([\w-]+)"')
-SIDEBAR = re.compile(r"enum SidebarItem[^{]*\{\s*case ([\w, ]+)")
+SIDEBAR_GROUP = re.compile(r"case \.\w+: order = \[([^\]]*)\]")
 ROW = re.compile(r"<tr><td>(?:<a[^>]*>)?([^<]+)(?:</a>)?</td><td>\u2318(.)</td>")
 HOME_CARD = re.compile(r'<div class="view-card"><span class="glyph ([\w-]+)".*?<span class="keys">\u2318(.)</span></div>', re.S)
 H1 = re.compile(r"<h1[ >]")
@@ -54,6 +54,18 @@ JSON_LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S
 
 def version_key(text):
     return tuple(int(part) for part in text.split("."))
+
+
+def sidebar_order(source):
+    """Extract the authoritative grouped order used by SidebarItem.sidebarOrder."""
+    start = source.find("var items: [SidebarItem]")
+    end = source.find("return order.filter", start)
+    if start < 0 or end < 0:
+        raise ValueError("could not find SidebarSection.items")
+    groups = SIDEBAR_GROUP.findall(source[start:end])
+    if not groups:
+        raise ValueError("could not find the grouped sidebar order")
+    return [item for group in groups for item in re.findall(r"\.(\w+)", group)]
 
 
 def problems():
@@ -248,7 +260,7 @@ def problems():
     # 12. A shortcut the documentation gets wrong. The sidebar's order *is* the shortcut — ⌘1 to ⌘0 by
     #     position — so inserting a screen silently renumbers every screen after it. The table said Inspect was
     #     ⌘5 long after it had become ⌘7, and four screens had been added without ever reaching the table.
-    order = [c.strip() for c in SIDEBAR.search(nav).group(1).split(",") if c.strip()]
+    order = sidebar_order(nav)
     titles = dict(HELP_ANCHOR.findall(nav[nav.find("var englishTitle"):nav.find("var title")]))
     docs_text = (OUT / "docs/index.html").read_text()
     rows = {name.strip(): key for name, key in ROW.findall(docs_text)}
