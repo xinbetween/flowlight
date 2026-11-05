@@ -378,27 +378,34 @@ enum AgentInventoryBuilder {
     private static func identityAliases(id: String, name: String, known: KnownAgent?,
                                         durableAgentIDs: [String], installed: [InstalledApps.App],
                                         summaries: [AgentSummary]) -> Set<String> {
-        let values = [id, name]
-            + durableAgentIDs
-            + (known?.bundleIDs.sorted() ?? [])
-            + (known?.processNames.sorted() ?? [])
-            + installed.flatMap { [$0.bundleID, $0.name] }
-            + summaries.flatMap { [$0.bundleID, $0.name] }
+        var values = [id, name]
+        values.append(contentsOf: durableAgentIDs)
+        values.append(contentsOf: known?.bundleIDs.sorted() ?? [])
+        values.append(contentsOf: known?.processNames.sorted() ?? [])
+        for app in installed {
+            values.append(app.bundleID)
+            values.append(app.name)
+        }
+        for summary in summaries {
+            values.append(summary.bundleID)
+            values.append(summary.name)
+        }
         return Set(values.map(AgentCatalog.identityComparisonKey))
     }
 
     private static func identityPriority(id: String, name: String, known: KnownAgent?,
                                          durableAgentIDs: [String], installed: [InstalledApps.App],
                                          summaries: [AgentSummary]) -> [String] {
-        let candidates = [id]
-            + durableAgentIDs
-            + (known?.bundleIDs.sorted() ?? [])
-            + (known?.processNames.sorted() ?? [])
-            + summaries.map(\.bundleID).sorted()
-            + [known?.name, name].compactMap { $0 }
-            + installed.map(\.bundleID).sorted()
-            + installed.map(\.name).sorted()
-            + summaries.map(\.name).sorted()
+        var candidates = [id]
+        candidates.append(contentsOf: durableAgentIDs)
+        candidates.append(contentsOf: known?.bundleIDs.sorted() ?? [])
+        candidates.append(contentsOf: known?.processNames.sorted() ?? [])
+        candidates.append(contentsOf: summaries.map(\.bundleID).sorted())
+        if let knownName = known?.name { candidates.append(knownName) }
+        candidates.append(name)
+        candidates.append(contentsOf: installed.map(\.bundleID).sorted())
+        candidates.append(contentsOf: installed.map(\.name).sorted())
+        candidates.append(contentsOf: summaries.map(\.name).sorted())
         var seen = Set<String>()
         return candidates.filter { seen.insert($0).inserted }
     }
@@ -410,12 +417,12 @@ enum AgentInventoryBuilder {
         installed: [InstalledApps.App],
         summaries: [AgentSummary]
     ) -> [String] {
-        let candidates = [id]
-            + (known?.bundleIDs.sorted() ?? [])
-            + (known?.processNames.sorted() ?? [])
-            + (known == nil ? durableAgentIDs : [])
-            + installed.map(\.bundleID).sorted()
-            + summaries.map(\.bundleID).sorted()
+        var candidates = [id]
+        candidates.append(contentsOf: known?.bundleIDs.sorted() ?? [])
+        candidates.append(contentsOf: known?.processNames.sorted() ?? [])
+        if known == nil { candidates.append(contentsOf: durableAgentIDs) }
+        candidates.append(contentsOf: installed.map(\.bundleID).sorted())
+        candidates.append(contentsOf: summaries.map(\.bundleID).sorted())
         var seen = Set<String>()
         return candidates.filter { !$0.isEmpty && seen.insert($0).inserted }
     }
