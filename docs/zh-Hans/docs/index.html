@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/docs/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/docs/", "name": "Flowlight 文档", "description": "安装 Flowlight、给流量配上名字、读懂各个视图、调整 AI 代理规则，以及干净地卸载。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 文档", "item": "https://flowlight.xinbetween.com/zh-Hans/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/docs/#faq", "mainEntity": [{"@type": "Question", "name": "macOS 为什么向 Flowlight 请求访问我的“桌面”或“文档”？", "acceptedAnswer": {"@type": "Answer", "text": "只因为你把它指向了其中某个里面的项目文件夹。默认情况下，Flowlight 从你个人文件夹里的代理文件夹读取代理配置， 绝不碰这三个位置。"}}, {"@type": "Question", "name": "Flowlight 会看到我所有的流量，还是会漏掉一些？", "acceptedAnswer": {"@type": "Answer", "text": "这取决于你用哪个捕获引擎，而差别并不细微。默认的采样器每秒读取一次 macOS 的累计 字节计数器并记录变化量，所以一次长传输会被精确计数——但在两次读取之间打开又 关闭的连接根本不会出现。网络扩展在每条连接建立时由 macOS 调用，所以 哪怕是五毫秒的请求也会被记录。如果你要盯的是一个发出大量短请求的 AI 代理，请在捕获里 安装扩展。上文有完整对比。"}}, {"@type": "Question", "name": "我打开了网络扩展，却什么都没出现。采样器倒是正常。", "acceptedAnswer": {"@type": "Answer", "text": "几乎总是因为另一个内容过滤器已经占了那个位置。macOS 一次只运行一个内容过滤器，而 企业安全软件通常会占用它——Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之类。Flowlight 的 过滤器仍然会安装、激活并连接，所以捕获界面会说已连接到过滤器扩展，但 macOS 从不交给它 任何一条连接，界面也就一直空着。捕获会列出它找到的过滤器，并提议把你切回 采样器，后者不使用过滤器，可以和它们并存。你只会失去那些极短的连接 （见对比），其余一切照旧记录。"}}, {"@type": "Question", "name": "Flowlight 更新之后，扩展就不工作了。", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 之前的版本有这个问题：macOS 会一直运行最后一次被激活的那个扩展构建版本，所以更新之后 扩展还是旧版本，而 macOS 会拒绝这对不匹配的组件之间的连接。从 0.2.5 起，Flowlight 会在启动时检查， 并自行重新激活过滤器。如果用的是更旧的版本，在捕获里按一次安装并启用过滤器。"}}, {"@type": "Question", "name": "捕获还有别的问题，我不知道是什么。", "acceptedAnswer": {"@type": "Answer", "text": "运行下面这条命令，读一读它打印的内容——它只报告状态和计数，绝不包含 Flowlight 记录的任何流量内容： curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh拷贝 它会显示安装了哪些扩展、macOS 是否真的启动了 Flowlight 的过滤器，以及最近一次记录是什么时候。 把它粘贴到一个 issue 里。"}}, {"@type": "Question", "name": "Flowlight 会把关于我的任何信息发到什么地方吗？", "acceptedAnswer": {"@type": "Answer", "text": "没有账号，没有遥测，也没有分析，而且你的流量数据库从不上传。隐私页面列出了每项请求：版本和签名规则包检查以及可选的网络所有者查询都有关闭开关；反向 DNS 只在采样器模式运行且没有开关，因为没有它，大多数连接将无法命名。"}}, {"@type": "Question", "name": "它会让我的 Mac 变慢，或者更耗电吗？", "acceptedAnswer": {"@type": "Answer", "text": "窗口关闭时 Flowlight 几乎什么都不做：它保留菜单栏速率，每秒写入一行。网络扩展 比作为后备的采样器更省，后者每秒都要启动一个短命的 nettop 进程。"}}, {"@type": "Question", "name": "它能阻止连接吗？", "acceptedAnswer": {"@type": "Answer", "text": "能，配合网络扩展。代理的允许列表除了警告也可以拒绝，一条规则可以按你指定的时长阻止一个应用、 一个目标或一个 URL，而一条护栏可以在模型看到某个工具之前，把它从代理手里 拿走。在你要求之前不会阻止任何东西，而且每次拒绝都带着它的出口。"}}, {"@type": "Question", "name": "我需要网络扩展吗？", "acceptedAnswer": {"@type": "Answer", "text": "不需要。采样器不需要任何授权，覆盖大多数流量。扩展额外带来短于一秒的流、按代码 签名的归属、无需数据包捕获设置的主机名，而且它是唯一能拒绝连接的引擎。"}}, {"@type": "Question", "name": "如果我卸载了，我的数据会怎样？", "acceptedAnswer": {"@type": "Answer", "text": "所有内容都在 ~/Library/Application Support/Flowlight 里。删掉那个文件夹就没了；数据包捕获助手和检查证书 见卸载。"}}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/docs/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/docs/", "name": "Flowlight 文档", "description": "安装 Flowlight、给流量配上名字、读懂各个视图、调整 AI 代理规则，以及干净地卸载。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 文档", "item": "https://flowlight.xinbetween.com/zh-Hans/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/docs/#faq", "mainEntity": [{"@type": "Question", "name": "macOS 为什么向 Flowlight 请求访问我的“桌面”或“文档”？", "acceptedAnswer": {"@type": "Answer", "text": "只因为你把它指向了其中某个里面的项目文件夹。默认情况下，Flowlight 从你个人文件夹里的代理文件夹读取代理配置， 绝不碰这三个位置。"}}, {"@type": "Question", "name": "Flowlight 会看到我所有的流量，还是会漏掉一些？", "acceptedAnswer": {"@type": "Answer", "text": "这取决于你用哪个捕获引擎，而差别并不细微。默认的采样器每秒读取一次 macOS 的累计 字节计数器并记录变化量，所以一次长传输会被精确计数——但在两次读取之间打开又 关闭的连接根本不会出现。网络扩展在每条连接建立时由 macOS 调用，所以 哪怕是五毫秒的请求也会被记录。如果你要盯的是一个发出大量短请求的 AI 代理，请在来源 › 收集器里 安装扩展。上文有完整对比。"}}, {"@type": "Question", "name": "我打开了网络扩展，却什么都没出现。采样器倒是正常。", "acceptedAnswer": {"@type": "Answer", "text": "几乎总是因为另一个内容过滤器已经占了那个位置。macOS 一次只运行一个内容过滤器，而 企业安全软件通常会占用它——Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之类。Flowlight 的 过滤器仍然会安装、激活并连接，所以来源 › 收集器界面会说已连接到过滤器扩展，但 macOS 从不交给它 任何一条连接，界面也就一直空着。来源 › 收集器会列出它找到的过滤器，并提议把你切回 采样器，后者不使用过滤器，可以和它们并存。你只会失去那些极短的连接 （见对比），其余一切照旧记录。"}}, {"@type": "Question", "name": "Flowlight 更新之后，扩展就不工作了。", "acceptedAnswer": {"@type": "Answer", "text": "0.2.5 之前的版本有这个问题：macOS 会一直运行最后一次被激活的那个扩展构建版本，所以更新之后 扩展还是旧版本，而 macOS 会拒绝这对不匹配的组件之间的连接。从 0.2.5 起，Flowlight 会在启动时检查， 并自行重新激活过滤器。如果用的是更旧的版本，在来源 › 收集器里按一次安装并启用过滤器。"}}, {"@type": "Question", "name": "来源 › 收集器还有别的问题，我不知道是什么。", "acceptedAnswer": {"@type": "Answer", "text": "运行下面这条命令，读一读它打印的内容——它只报告状态和计数，绝不包含 Flowlight 记录的任何流量内容： curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh拷贝 它会显示安装了哪些扩展、macOS 是否真的启动了 Flowlight 的过滤器，以及最近一次记录是什么时候。 把它粘贴到一个 issue 里。"}}, {"@type": "Question", "name": "Flowlight 会把关于我的任何信息发到什么地方吗？", "acceptedAnswer": {"@type": "Answer", "text": "没有账号，没有遥测，也没有分析，而且你的流量数据库从不上传。隐私页面列出了每项请求：版本和签名规则包检查以及可选的网络所有者查询都有关闭开关；反向 DNS 只在采样器模式运行且没有开关，因为没有它，大多数连接将无法命名。"}}, {"@type": "Question", "name": "它会让我的 Mac 变慢，或者更耗电吗？", "acceptedAnswer": {"@type": "Answer", "text": "窗口关闭时 Flowlight 几乎什么都不做：它保留菜单栏速率，每秒写入一行。网络扩展 比作为后备的采样器更省，后者每秒都要启动一个短命的 nettop 进程。"}}, {"@type": "Question", "name": "它能阻止连接吗？", "acceptedAnswer": {"@type": "Answer", "text": "能，配合网络扩展。代理的允许列表除了警告也可以拒绝，一条规则可以按你指定的时长阻止一个应用、 一个目标或一个 URL，而一条护栏可以在模型看到某个工具之前，把它从代理手里 拿走。在你要求之前不会阻止任何东西，而且每次拒绝都带着它的出口。"}}, {"@type": "Question", "name": "我需要网络扩展吗？", "acceptedAnswer": {"@type": "Answer", "text": "不需要。采样器不需要任何授权，覆盖大多数流量。扩展额外带来短于一秒的流、按代码 签名的归属、无需数据包捕获设置的主机名，而且它是唯一能拒绝连接的引擎。"}}, {"@type": "Question", "name": "如果我卸载了，我的数据会怎样？", "acceptedAnswer": {"@type": "Answer", "text": "所有内容都在 ~/Library/Application Support/Flowlight 里。删掉那个文件夹就没了；数据包捕获助手和检查证书 见卸载。"}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">文档</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">从第一次启动到调整代理规则，需要的都在这里。Flowlight 0.17.2，macOS 15 或更高版本。</p>
+    <p class="lede">从第一次启动到调整代理规则，需要的都在这里。Flowlight 0.17.3，macOS 15 或更高版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本页内容">
@@ -104,7 +104,7 @@
         </div>
         <div class="toc-group">
           <strong>来源</strong>
-          <a href="#capture">捕获</a><a href="#coverage">覆盖范围</a><a href="#devices">设备</a>
+          <a href="#sources">来源</a><a href="#coverage">覆盖范围</a><a href="#devices">设备</a>
         </div>
         <div class="toc-group">
           <strong>设置与数据</strong>
@@ -142,10 +142,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         以及客户端建立 HTTPS 连接时请求的服务器名（TLS SNI）。内核里的过滤器会在 Flowlight 看到之前丢掉其他所有数据包，数据包内容从不保存。</p>
       <p>macOS 只允许管理员读取数据包，所以<strong>给流量配上名字</strong>窗口会请你输入一次密码。它会安装
         <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>，在每次开机时让 <code>access_bpf</code> 组获得对
-        <code>/dev/bpf*</code> 的读取权限，和 Wireshark 的做法一样。你随时可以在<strong>捕获 › 移除数据包捕获访问权限</strong>里移除它。</p>
+        <code>/dev/bpf*</code> 的读取权限，和 Wireshark 的做法一样。你随时可以在<strong>来源 › 收集器 › 移除数据包捕获访问权限</strong>里移除它。</p>
       <p><strong>识别网络所有者</strong>会用运营该地址的机构来标注没有主机名的流量
         （<em>Cloudflare, Inc. · AS13335</em>）。它默认开启，只会把这些公网 IP 地址（绝不包括私有地址）发送到 Team Cymru 的
-        DNS 服务。在<strong>捕获</strong>里可以关掉。</p>
+        DNS 服务。在<strong>来源 › 收集器</strong>里可以关掉。</p>
 
       <h2 id="language">语言</h2>
       <p>Flowlight 已翻译成 English、简体中文、繁體中文、日本語、한국어、Français、Deutsch、Italiano、Español 和
@@ -164,15 +164,13 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>历史</td><td>⌘3</td><td>流量去了哪里，从秒到年。按应用、目标或 IP 分组；切到图表或<a href="#worth-a-look">值得一看</a>；导出 CSV。</td></tr>
         <tr><td><a href="#visualize">连接</a></td><td>⌘4</td><td>应用与其精确目标的稳定地图，带有按流量加权的路径、移动的方向标记、连接数以及等价列表。</td></tr>
         <tr><td><a href="#alerts">警报</a></td><td>⌘5</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
-        <tr><td><a href="#rules">规则</a></td><td>⌘8</td><td>你设过的每一条允许列表和拒绝，各自管到哪里，以及实际拦下了什么。</td></tr>
         <tr><td><a href="#ask">提问</a></td><td>⌘6</td><td>用平常的话问你自己的流量，由本地模型或托管模型从记录下来的历史里作答。</td></tr>
-        <tr><td><a href="#inspection">检查</a></td><td>⌘7</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
-        <tr><td><a href="#devices">设备</a></td><td>⌘9</td><td>你打开之前一直是关的：蓝牙、USB 与外置存储，一台 Mac 用它们跟用网络一样多。</td></tr>
-        <tr><td><a href="#coverage">覆盖范围</a></td><td>⌘0</td><td>Flowlight 说不清的部分——按应用，它的流量有没有被看到、被命名、被读懂。</td></tr>
-        <tr><td><a href="#capture">捕获</a></td><td>—</td><td>哪个引擎在记录、扩展的状态、主机名学习，以及数据库放在哪里。</td></tr>
+        <tr><td><a href="#inspection">检查</a></td><td>⌘7 · Developer ID</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
+        <tr><td><a href="#rules">规则</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>你设过的每一条允许列表和拒绝，各自管到哪里，以及实际拦下了什么。</td></tr>
+        <tr><td><a href="#sources">来源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>在三个标签页中显示收集器状态、设备通道和命名覆盖范围。</td></tr>
       </table>
-      <p>快捷键遵循侧边栏顺序：⌘0 是第十项，第十一项仍然可用，不会虚构一个按键。</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=05c875eb" loading="lazy"
+      <p>快捷键遵循可见的侧边栏顺序。Developer ID 版本在 ⌘7 包含检查；App Store 版本省略检查，因此规则和来源会移到 ⌘7 和 ⌘8。</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=023b487c" loading="lazy"
         alt="实时视图：一列应用，各自带着当前的发送与接收速率，以及最忙的目标。"></div>
         <figcaption class="caption">实时，Flowlight 打开时进入的那个视图。</figcaption></figure>
       <p>在历史里，把指针停在柱子上，就会打开一张跟随指针、可滚动的卡片，列出贡献流量的应用；点击柱子不会放大。双击任意一行可把历史收窄到那一项。</p>
@@ -441,7 +439,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         拒绝：连接被丢弃，并有一条警报记录下被拒绝的内容，带<strong>从现在起允许……</strong>一键把它加入
         列表。代理的下一次尝试就会通过。</p>
       <p><strong>它需要网络扩展。</strong>拒绝一条连接意味着站在它的路径上，而 nettop 采样器
-        做不到——捕获界面会明说这一点，而不是给你一个什么都不做的开关。</p>
+        做不到——来源 › 收集器界面会明说这一点，而不是给你一个什么都不做的开关。</p>
       <p>有些东西无论列表怎么写都绝不会被拒绝：你的本地网络、DNS、Apple 自家的服务，以及 Flowlight 自己的
         流量。一台被封住的 Mac 比一个被封住的代理更糟，所以有疑问时，连接会被允许并记录下来。
         Flowlight 停止运行几秒之后，强制执行也会失效——没人能看见的拒绝比没有拒绝更糟，而撤销它的
@@ -473,8 +471,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>这不是沙盒。</strong>被拒绝的工具不再提供给模型，也不再被响应。而仍然拥有
         shell 的代理，可以手动做到那个工具本来要做的事。Flowlight 会把它记录下来；它不会假装能阻止。</p>
 
-      <h2 id="capture"><span id="engines"></span>捕获：引擎与来源</h2>
-      <p>Flowlight 用两种方式之一记录流量，在<strong>捕获</strong>里选择。它们会漏掉的东西不同，在依赖任何
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>来源：收集器与引擎</h2>
+      <p>Flowlight 用两种方式之一记录流量，在<strong>来源 › 收集器</strong>里选择。它们会漏掉的东西不同，在依赖任何
         一种之前，值得先了解清楚。</p>
       <table>
         <tr><th></th><th>nettop 采样器（默认）</th><th>网络扩展</th></tr>
@@ -500,7 +498,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         并且不改动你选择的来源。网络扩展下的<em>重试网络扩展</em>会重新来一遍。</p>
       <p><strong>它在某些 Mac 上也完全跑不起来。</strong>macOS 一次只允许一个内容过滤器，而企业安全软件
         通常占着它——Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之类。Flowlight 的过滤器在那些
-        机器上能安装、也能连接，然后永远不会被交给任何一条连接。捕获会列出它找到的这类软件，并提议把你切回采样器，后者
+        机器上能安装、也能连接，然后永远不会被交给任何一条连接。来源 › 收集器会列出它找到的这类软件，并提议把你切回采样器，后者
         不需要过滤器，可以和它们并存。
         关于它是如何构建的，见<a href="https://github.com/xinbetween/flowlight/blob/main/docs/DEVELOPMENT.md">开发者指南</a>。</p>
 
@@ -565,7 +563,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         现有的屏幕上。主机名设置会在启动后稍晚、且只在有窗口打开时才提出，而不是一上来就向首次运行的你
         索要密码；在你接受或忽略它之前，这个提议下次启动还会出现。</p>
       <p>退出 Flowlight 会停止采样器，但不会停止网络扩展：系统扩展独立运行，所以过滤器
-        会继续检查连接，直到你在<strong>捕获</strong>里停用或卸载它。</p>
+        会继续检查连接，直到你在<strong>来源 › 收集器</strong>里停用或卸载它。</p>
 
       <h2 id="export">导出到 OpenTelemetry 或 SIEM</h2>
       <p><strong>在你配置之前一直关闭，而且没有什么 Flowlight 服务可供发送。</strong>端点由你指定——你自己的
@@ -598,7 +596,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="data">你的数据</h2>
       <p>所有内容都放在 <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>。每秒数据保留 6 小时
         （可调），分钟数据 14 天，小时数据 400 天，每日数据无限期保留，警报 90 天。
-        <strong>捕获 › 清除所有数据</strong>会删除它们。</p>
+        <strong>设置 › 数据与隐私 › 清除所有数据</strong>会删除它们。</p>
 
       <h2 id="updates">更新</h2>
       <p>有新版本时，Flowlight 会用一条通知和边栏里的标记告诉你，而不是打断你正在做的
@@ -617,7 +615,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="uninstall">卸载</h2>
       <ol>
-        <li>在<strong>捕获</strong>里，如果你启用过，就选择<strong>移除数据包捕获访问权限</strong>（会要求输入密码）；
+        <li>在<strong>来源 › 收集器</strong>里，如果你启用过，就选择<strong>移除数据包捕获访问权限</strong>（会要求输入密码）；
           如果你安装过内容过滤器，就把它卸载；并在<strong>检查</strong>里关闭 HTTPS 检查，让它的证书
           离开你的钥匙串。只有 Flowlight 自己能撤销这三样。</li>
         <li>退出 Flowlight，并把它从“应用程序”移到废纸篓——或者，如果你是用 Homebrew 安装的，执行
@@ -635,20 +633,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>这取决于你用哪个捕获引擎，而差别并不细微。默认的采样器每秒读取一次 macOS 的累计
           字节计数器并记录变化量，所以一次长传输会被精确计数——但在两次读取之间打开又
           关闭的连接根本不会出现。网络扩展在每条连接建立时由 macOS 调用，所以
-          哪怕是五毫秒的请求也会被记录。如果你要盯的是一个发出大量短请求的 AI 代理，请在<strong>捕获</strong>里
+          哪怕是五毫秒的请求也会被记录。如果你要盯的是一个发出大量短请求的 AI 代理，请在<strong>来源 › 收集器</strong>里
           安装扩展。<a href="#engines">上文有完整对比。</a></dd>
         <dt><strong>我打开了网络扩展，却什么都没出现。采样器倒是正常。</strong></dt>
         <dd>几乎总是因为另一个内容过滤器已经占了那个位置。<strong>macOS 一次只运行一个内容过滤器</strong>，而
           企业安全软件通常会占用它——Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之类。Flowlight 的
-          过滤器仍然会安装、激活并连接，所以捕获界面会说<em>已连接到过滤器扩展</em>，但 macOS 从不交给它
-          任何一条连接，界面也就一直空着。<strong>捕获会列出它找到的过滤器</strong>，并提议把你切回
+          过滤器仍然会安装、激活并连接，所以来源 › 收集器界面会说<em>已连接到过滤器扩展</em>，但 macOS 从不交给它
+          任何一条连接，界面也就一直空着。<strong>来源 › 收集器会列出它找到的过滤器</strong>，并提议把你切回
           采样器，后者不使用过滤器，可以和它们并存。你只会失去那些极短的连接
           （<a href="#engines">见对比</a>），其余一切照旧记录。</dd>
         <dt><strong>Flowlight 更新之后，扩展就不工作了。</strong></dt>
         <dd>0.2.5 之前的版本有这个问题：macOS 会一直运行最后一次被激活的那个扩展构建版本，所以更新之后
           扩展还是旧版本，而 macOS 会拒绝这对不匹配的组件之间的连接。从 0.2.5 起，Flowlight 会在启动时检查，
-          并自行重新激活过滤器。如果用的是更旧的版本，在捕获里按一次<strong>安装并启用过滤器</strong>。</dd>
-        <dt><strong>捕获还有别的问题，我不知道是什么。</strong></dt>
+          并自行重新激活过滤器。如果用的是更旧的版本，在来源 › 收集器里按一次<strong>安装并启用过滤器</strong>。</dd>
+        <dt><strong>来源 › 收集器还有别的问题，我不知道是什么。</strong></dt>
         <dd>运行下面这条命令，读一读它打印的内容——它只报告状态和计数，绝不包含 Flowlight 记录的任何流量内容：
           <p class="brew"><code>curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh</code><button type="button" class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh">拷贝</button></p>
           它会显示安装了哪些扩展、macOS 是否真的启动了 Flowlight 的过滤器，以及最近一次记录是什么时候。
@@ -714,7 +712,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
-      <span>版本 0.17.2 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+      <span>版本 0.17.3 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
     </div>
   </div>
 </footer>

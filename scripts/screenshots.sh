@@ -123,7 +123,7 @@ capture() {
   "$executable" -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
     -FLDemo YES -FLRenderLive YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
     -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
-    -AppleInterfaceStyle Light \
+    -FLForceLightAppearance YES -FLPinScreenshotScreen YES \
     "${banner[@]}" "${visualization[@]}" "${rules[@]}" >/dev/null 2>&1 &
   local pid=$!
   local command=""

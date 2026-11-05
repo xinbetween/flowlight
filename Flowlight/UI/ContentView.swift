@@ -15,6 +15,9 @@ struct ContentView: View {
         NavigationSplitView {
             List(selection: Binding(get: { nav.selection }, set: { value in
                 guard let value, value != nav.selection else { return }
+                // AppKit can replay a restored sidebar row after screenshot launch arguments have selected a screen.
+                // Pin only deterministic demo captures; ordinary demo sessions remain navigable.
+                guard !(DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLPinScreenshotScreen")) else { return }
                 // AppKit reports selection from inside NSTableView's delegate callback. A main-actor Task can begin
                 // before that callback unwinds, so dispatch explicitly to the next run-loop turn before publishing
                 // navigation. AppKit warns about the reentrant reload today and will assert on it in the future.
@@ -53,7 +56,7 @@ struct ContentView: View {
                 }
                 #endif
                 FocusBar()
-                Button { nav.show(.capture) } label: {
+                Button { nav.showSources(.collector) } label: {
                     HStack(alignment: .top, spacing: 8) {
                         LiveDot(color: monitor.isReceiving ? FL.good : FL.warning, active: monitor.isReceiving)
                             .padding(.top, 4)
@@ -89,9 +92,7 @@ struct ContentView: View {
                     InspectView()
                     #endif
                 case .ask: AskView()
-                case .devices: DevicesView()
-                case .coverage: CoverageView()
-                case .capture: CaptureView()
+                case .sources: SourcesView(selection: $nav.sourcesTab)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

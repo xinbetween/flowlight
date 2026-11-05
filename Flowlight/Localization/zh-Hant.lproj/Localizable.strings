@@ -71,7 +71,6 @@
 "Devices" = "裝置";
 "Coverage" = "涵蓋範圍";
 "Inspect" = "檢查";
-"Capture" = "擷取";
 "Traffic" = "流量";
 "Investigate" = "調查";
 "Control" = "管控";
@@ -87,6 +86,7 @@
 "Questions & Answers" = "常見問答";
 "What Flowlight Reads on This Mac" = "Flowlight 在這台 Mac 上讀取哪些資料";
 "Privacy" = "隱私權";
+"Data & Privacy" = "資料與隱私權";
 "Report an Issue" = "回報問題";
 "Turn Focus Off" = "關閉焦點";
 "Turn Focus On" = "開啟焦點";
@@ -657,8 +657,6 @@
 /* UI/CaptureView.swift */
 "Delete all recorded traffic, baselines and alerts?" = "要刪除所有已記錄的流量、基線和警示嗎？";
 "Delete everything" = "全部刪除";
-"nettop sampler · the extension didn't answer" = "nettop 取樣器 · 延伸功能沒有回應";
-"Network Extension · unavailable" = "網路延伸功能 · 無法使用";
 "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "無法連接過濾器延伸功能。請在「內容過濾器」中啟用，然後按一下「重新整理」。";
 "%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — 請在「內容過濾器」中啟用 Flowlight，然後按一下「重新整理」。";
 "%@ — the content filter is unavailable" = "%@ — 內容過濾器無法使用";
@@ -667,8 +665,6 @@
 "Reconnect to the content filter" = "重新連接內容過濾器";
 "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "如果 VPN 或安全代理程式已佔用該位置（Palo Alto Networks GlobalProtect、CrowdStrike Falcon 等都會使用），則停用該過濾器之前，Flowlight 的過濾器無法接收流量。";
 "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "過濾器沒有回應，因此 Flowlight 未收到流量。請在「內容過濾器」中啟用，然後按一下「重新整理」。";
-"%@ · receiving" = "%@ · 正在接收";
-"%@ · nothing arriving yet" = "%@ · 還沒有資料傳入";
 "Source" = "來源";
 "Content filter" = "內容過濾器";
 "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval." = "在符合條件的 TCP 和 UDP 流量建立時就觀察它們。需要網路延伸功能的權利，以及你的允許。";
@@ -725,7 +721,7 @@
 "Without this, most traffic shows only an IP address or network owner." = "沒有這項功能，大部分流量只會顯示 IP 位址或網路擁有者。";
 "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections." = "Flowlight 會讀取你主要網路介面上的 DNS 回應和 TLS 伺服器名稱，用來為連線命名。";
 "Packet contents are never stored or sent anywhere. Only hostnames are kept." = "封包內容一律不會儲存，也不會送到任何地方。只保留主機名稱。";
-"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture." = "macOS 只允許管理者讀取封包，所以這會要求輸入一次密碼。你隨時可以在「擷取」中移除它。";
+"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector." = "macOS 只允許管理者讀取封包，所以這會要求輸入一次密碼。你隨時可以在「來源 › 收集器」中移除它。";
 "Identify network owners when no hostname is available" = "沒有主機名稱時，辨識網路擁有者";
 "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "預設開啟。會把公開的目標 IP 傳送到 Team Cymru 的 DNS 服務。關閉後，這些查詢只會在你的 Mac 上進行。";
 "Not Now" = "現在不要";
@@ -756,8 +752,8 @@
 
 /* UI/CoverageView.swift */
 "Nothing recorded yet" = "還沒有記錄到任何東西";
+"Nothing recorded in the last hour" = "最近一小時內沒有記錄";
 "Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "涵蓋範圍是從 Flowlight 已經記錄的流量算出來的。請讓它再執行一會兒。";
-"%@ of traffic fully accounted for" = "%@ 的流量完全有據可查";
 "How much of this Mac is covered" = "這台 Mac 涵蓋了多少";
 "HTTPS inspection is on" = "HTTPS 檢查已開啟";
 "HTTPS inspection is off" = "HTTPS 檢查已關閉";
@@ -805,8 +801,6 @@
 "Camera" = "相機";
 "Started" = "已啟動";
 "Unknown camera" = "未知相機";
-"%@ · nothing active" = "%@ · 沒有活動項目";
-"%@ · %lld active" = "%@ · %lld 個活動項目";
 "Watch camera activity" = "監看相機活動";
 "Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "藍牙、USB 和相機活動要等你開啟才會作用。它們不需要新的權限 — 預設關閉是因為監看它們會擴大 Flowlight 觀察的範圍，而這應該由你決定，不該是某次更新替你決定的。\n\n藍牙和 USB 會顯示連接的裝置。相機活動會顯示每部相機是否正在使用，但不會顯示是哪個 App 在使用它。Flowlight 絕不會開啟相機或讀取畫面。";
 "No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "不讀取內容，也不捏造歸屬。藍牙和 USB 顯示連接狀態，相機監看只讀取各裝置是否正在使用。macOS 不會在這裡公開使用相機的 App，因此 Flowlight 只標示相機，絕不猜測 App，也不讀取畫面。";
@@ -1058,7 +1052,6 @@
 "The network is quiet" = "網路很安靜";
 "No app has sent or received data in the last few seconds." = "最近幾秒內沒有 App 傳送或接收資料。";
 "Waiting for traffic data" = "正在等待流量資料";
-"Open Capture Settings" = "開啟擷取設定";
 
 /* UI/MockRulesView.swift */
 "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "由你自己回應選定的端點，而不讓請求送到伺服器 — 一個 500、一次速率限制、一段格式錯誤的內文，或是長時間的等待 — 然後看代理會怎麼處理。";
@@ -1280,8 +1273,8 @@
 "Until I resume" = "直到我手動恢復";
 "Pause Blocking" = "暫停封鎖";
 "Stand every rule down for a while, without deleting anything" = "讓所有規則暫時停止作用，不刪除任何東西";
-"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "有 1 條規則只被監看，沒有實際執行。只有網路延伸功能位在資料路徑上，能夠拒絕連線；nettop 取樣器是事後計數流量的。請在「擷取」中選擇網路延伸功能來實際執行這些規則。";
-"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "有 %lld 條規則只被監看，沒有實際執行。只有網路延伸功能位在資料路徑上，能夠拒絕連線；nettop 取樣器是事後計數流量的。請在「擷取」中選擇網路延伸功能來實際執行這些規則。";
+"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "有 1 條規則只被監看，沒有實際執行。只有網路延伸功能位在資料路徑上，能夠拒絕連線；nettop 取樣器是事後計數流量的。請在「來源 › 收集器」中選擇網路延伸功能來實際執行這些規則。";
+"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "有 %lld 條規則只被監看，沒有實際執行。只有網路延伸功能位在資料路徑上，能夠拒絕連線；nettop 取樣器是事後計數流量的。請在「來源 › 收集器」中選擇網路延伸功能來實際執行這些規則。";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "有 1 條規則只被監看，沒有實際執行 — 指名路徑的規則只有 HTTPS 檢查才比對得到，而它已關閉。";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "有 %lld 條規則只被監看，沒有實際執行 — 指名路徑的規則只有 HTTPS 檢查才比對得到，而它已關閉。";
 "In force" = "生效中";
@@ -1331,7 +1324,7 @@
 "Apply a Template" = "套用範本";
 "%@ · in force at once" = "%@ · 立即生效";
 "%@ · shown first" = "%@ · 優先顯示";
-"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "每個範本都會把一般的規則寫進列表，你可以像對待其他規則一樣閱讀、關閉或刪除它們。拒絕連線是網路延伸功能的工作，所以當「擷取」中選用 nettop 取樣器時，這些規則只會被監看，不會實際執行。";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out." = "每個範本都會把一般的規則寫進列表，你可以像對待其他規則一樣閱讀、關閉或刪除它們。拒絕連線是網路延伸功能的工作，所以在「來源 › 收集器」中選用 nettop 取樣器時，這些規則只會被監看，不會實際執行。";
 "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "選填。留空表示套用到這台 Mac 上的所有項目；指名某個 App 則會縮小到該 App 以及它啟動的工具。";
 "A domain, an IP address, or a range" = "網域、IP 位址或範圍";
 "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching." = "這些規則指名了 HTTP 方法，所以只有 HTTPS 檢查能執行它們。在它關閉時，這些規則只會留在列表中監看。";

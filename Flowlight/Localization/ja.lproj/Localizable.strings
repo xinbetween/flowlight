@@ -71,7 +71,6 @@
 "Devices" = "デバイス";
 "Coverage" = "カバー範囲";
 "Inspect" = "インスペクト";
-"Capture" = "キャプチャ";
 "Traffic" = "トラフィック";
 "Investigate" = "調査";
 "Control" = "制御";
@@ -87,6 +86,7 @@
 "Questions & Answers" = "よくある質問";
 "What Flowlight Reads on This Mac" = "Flowlight がこの Mac で読み取るもの";
 "Privacy" = "プライバシー";
+"Data & Privacy" = "データとプライバシー";
 "Report an Issue" = "問題を報告";
 "Turn Focus Off" = "フォーカスをオフにする";
 "Turn Focus On" = "フォーカスをオンにする";
@@ -634,8 +634,6 @@
 /* UI/CaptureView.swift */
 "Delete all recorded traffic, baselines and alerts?" = "記録したトラフィック・基準値・アラートをすべて削除しますか？";
 "Delete everything" = "すべて削除";
-"nettop sampler · the extension didn't answer" = "nettop サンプラー · 機能拡張が応答しませんでした";
-"Network Extension · unavailable" = "ネットワーク機能拡張 · 利用不可";
 "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "フィルター機能拡張に接続できませんでした。コンテンツフィルターで有効にしてから、更新を押してください。";
 "%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — コンテンツフィルターで Flowlight を有効にしてから、更新を押してください。";
 "%@ — the content filter is unavailable" = "%@ — コンテンツフィルターを利用できません";
@@ -644,8 +642,6 @@
 "Reconnect to the content filter" = "コンテンツフィルターに再接続";
 "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "VPN やセキュリティエージェントがそのスロットを使用している場合（Palo Alto Networks GlobalProtect、CrowdStrike Falcon など）、そのフィルターを無効にするまで Flowlight のフィルターはトラフィックを受信できません。";
 "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "フィルターが応答していないため、Flowlight はトラフィックを受信していません。コンテンツフィルターで有効にしてから、更新を押してください。";
-"%@ · receiving" = "%@ · 受信中";
-"%@ · nothing arriving yet" = "%@ · まだ届いていません";
 "Source" = "ソース";
 "Content filter" = "コンテンツフィルタ";
 "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval." = "対象となる TCP と UDP のフローを、開かれた時点で観測します。ネットワーク機能拡張の entitlement と、あなたの承認が必要です。";
@@ -702,7 +698,7 @@
 "Without this, most traffic shows only an IP address or network owner." = "これがないと、ほとんどのトラフィックは IP アドレスかネットワーク所有者しか表示されません。";
 "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections." = "Flowlight は接続に名前を付けるため、主ネットワークインターフェイスで DNS の応答と TLS のサーバ名を読み取ります。";
 "Packet contents are never stored or sent anywhere. Only hostnames are kept." = "パケットの内容は保存も送信もされません。保持するのはホスト名だけです。";
-"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture." = "macOS はパケットの読み取りを管理者にしか許可しないため、パスワードを 1 回確認します。キャプチャでいつでも解除できます。";
+"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector." = "macOS はパケットの読み取りを管理者にしか許可しないため、パスワードを 1 回確認します。「ソース › コレクタ」でいつでも解除できます。";
 "Identify network owners when no hostname is available" = "ホスト名がない場合にネットワーク所有者を特定";
 "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "デフォルトでオンです。パブリックな接続先 IP を Team Cymru の DNS サービスに送信します。オフにすると、この照会はこの Mac 内だけで行われます。";
 "Not Now" = "今はしない";
@@ -733,8 +729,8 @@
 
 /* UI/CoverageView.swift */
 "Nothing recorded yet" = "まだ何も記録されていません";
+"Nothing recorded in the last hour" = "過去 1 時間には何も記録されていません";
 "Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "カバー範囲は、Flowlight がすでに記録したトラフィックから算出します。しばらく動かしたままにしてください。";
-"%@ of traffic fully accounted for" = "トラフィックの %@ を完全に把握";
 "How much of this Mac is covered" = "この Mac をどこまでカバーできているか";
 "HTTPS inspection is on" = "HTTPS インスペクションはオンです";
 "HTTPS inspection is off" = "HTTPS インスペクションはオフです";
@@ -782,8 +778,6 @@
 "Camera" = "カメラ";
 "Started" = "開始";
 "Unknown camera" = "不明なカメラ";
-"%@ · nothing active" = "%@ · アクティブなし";
-"%@ · %lld active" = "%@ · %lld 台がアクティブ";
 "Watch camera activity" = "カメラの動作を監視";
 "Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Bluetooth、USB、カメラの動作は、オンにするまで監視されません。新しい権限は必要ありません。オフになっているのは、監視すると Flowlight が見る範囲が広がるためであり、それはアップデートではなく、あなたが決めることです。\n\nBluetooth と USB では接続中のものを表示します。カメラの動作では各カメラがアクティブかどうかを表示しますが、使用中のアプリは表示しません。Flowlight がカメラを開いたり、フレームを読み取ったりすることはありません。";
 "No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "内容を読み取ることも、根拠のないアプリへの関連付けをすることもありません。Bluetooth と USB では接続を表示し、カメラの監視では各デバイスがアクティブかどうかだけを読み取ります。macOS はここでカメラを使用中のアプリを公開していないため、Flowlight はカメラ名のみを示し、アプリを推測せず、フレームも読み取りません。";
@@ -1035,7 +1029,6 @@
 "The network is quiet" = "ネットワークは静かです";
 "No app has sent or received data in the last few seconds." = "この数秒間にデータを送受信したアプリはありません。";
 "Waiting for traffic data" = "トラフィックデータを待っています";
-"Open Capture Settings" = "キャプチャの設定を開く";
 
 /* UI/MockRulesView.swift */
 "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "リクエストをサーバに届けず、選んだエンドポイントに自分で応答します。500、レート制限、壊れた本文、長い待ち時間などを返して、エージェントがどう振る舞うかを確かめられます。";
@@ -1257,8 +1250,8 @@
 "Until I resume" = "再開するまで";
 "Pause Blocking" = "ブロックを一時停止";
 "Stand every rule down for a while, without deleting anything" = "何も削除せずに、すべてのルールをしばらく止めます";
-"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "1 件のルールは監視されているだけで、実行されていません。データ経路に入って接続を拒否できるのはネットワーク機能拡張だけで、nettop サンプラーは事後にトラフィックを数えます。これらのルールを実行するには、キャプチャでネットワーク機能拡張を選んでください。";
-"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "%lld 件のルールは監視されているだけで、実行されていません。データ経路に入って接続を拒否できるのはネットワーク機能拡張だけで、nettop サンプラーは事後にトラフィックを数えます。これらのルールを実行するには、キャプチャでネットワーク機能拡張を選んでください。";
+"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "1 件のルールは監視されているだけで、実行されていません。データ経路に入って接続を拒否できるのはネットワーク機能拡張だけで、nettop サンプラーは事後にトラフィックを数えます。これらのルールを実行するには、ソース › コレクターでネットワーク機能拡張を選んでください。";
+"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld 件のルールは監視されているだけで、実行されていません。データ経路に入って接続を拒否できるのはネットワーク機能拡張だけで、nettop サンプラーは事後にトラフィックを数えます。これらのルールを実行するには、ソース › コレクターでネットワーク機能拡張を選んでください。";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "1 件のルールは監視されているだけで、実行されていません。パスを指定したルールを照合できるのは HTTPS インスペクションだけで、それがオフになっています。";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld 件のルールは監視されているだけで、実行されていません。パスを指定したルールを照合できるのは HTTPS インスペクションだけで、それがオフになっています。";
 "In force" = "有効";
@@ -1308,7 +1301,7 @@
 "Apply a Template" = "テンプレートを適用";
 "%@ · in force at once" = "%@ · すぐに有効";
 "%@ · shown first" = "%@ · 適用前に確認";
-"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "どのテンプレートも、ふつうのルールをリストに書き込みます。ほかのルールと同じように、内容を読み、オフにし、削除できます。接続を拒否するのはネットワーク機能拡張の役目のため、キャプチャで nettop サンプラーを選んでいる場合は、実行ではなく監視にとどまります。";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out." = "どのテンプレートも、ふつうのルールをリストに書き込みます。ほかのルールと同じように、内容を読み、オフにし、削除できます。接続を拒否するのはネットワーク機能拡張の役目のため、ソース › コレクターで nettop サンプラーを選んでいる場合は、実行ではなく監視にとどまります。";
 "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "省略できます。空のままにするとこの Mac 全体に適用され、アプリを指定すると、そのアプリとそれが起動したツールだけに絞られます。";
 "A domain, an IP address, or a range" = "ドメイン、IP アドレス、または範囲";
 "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching." = "これらは HTTP メソッドを指定するため、実行できるのは HTTPS インスペクションだけです。オフの場合は、リストの中で監視するだけになります。";

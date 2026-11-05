@@ -17,26 +17,43 @@ struct AlertsView: View {
     }
 
     var body: some View {
-        Group {
-            if visible.isEmpty {
-                ContentUnavailableView(alerts.isEmpty ? L("No alerts") : L("Nothing to review"), systemImage: "checkmark.shield",
-                                       description: Text(alerts.isEmpty
-                                                         ? L("Each app has a learning period (24 h by default) before first-contact and spike rules fire.")
-                                                         : L("All matching alerts have been acknowledged.")))
-            } else {
-                table
+        VStack(spacing: 0) {
+            Picker(L("Alerts"), selection: $nav.alertsTab) {
+                ForEach(AlertsTab.allCases) { item in Text(item.title).tag(item) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 320)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Group {
+                if nav.alertsTab == .detection {
+                    DetectionSettingsView()
+                } else if visible.isEmpty {
+                    ContentUnavailableView(alerts.isEmpty ? L("No alerts") : L("Nothing to review"), systemImage: "checkmark.shield",
+                                           description: Text(alerts.isEmpty
+                                                             ? L("Each app has a learning period (24 h by default) before first-contact and spike rules fire.")
+                                                             : L("All matching alerts have been acknowledged.")))
+                } else {
+                    table
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle(L("Alerts"))
         // The sidebar badge counts what is unread; this says how much there is to read at all, which is the
         // difference between "quiet" and "already dealt with".
-        .navigationSubtitle(alerts.isEmpty ? ""
+        .navigationSubtitle(nav.alertsTab == .detection ? L("Detection")
+                            : alerts.isEmpty ? ""
                             : monitor.unacknowledgedAlerts == 0 ? L("%lld alerts, all acknowledged", alerts.count)
                             : L("%lld to review of %lld", monitor.unacknowledgedAlerts, alerts.count))
         .toolbar { toolbar }
         .task(id: monitor.dataVersion) { await load() }
         .task(id: monitor.unacknowledgedAlerts) { await load() }
         .task(id: focus.scope) { await load() }
+        .task(id: nav.alertsTab) { await load() }
     }
 
     private var table: some View {
@@ -112,34 +129,36 @@ struct AlertsView: View {
     private var toolbar: some ToolbarContent {
         // Two menus rather than four controls of four different shapes. The filter gathers everything that
         // narrows the list; acknowledging is one verb with two objects, so it reads better as one button.
-        ToolbarItemGroup {
-            Menu {
-                Picker(L("Rule"), selection: $rule) {
-                    Text(L("All rules")).tag("")
-                    ForEach(rules, id: \.self) { Text(AnomalyEngine.Kind.localizedName($0)).tag($0) }
+        if nav.alertsTab == .alerts {
+            ToolbarItemGroup {
+                Menu {
+                    Picker(L("Rule"), selection: $rule) {
+                        Text(L("All rules")).tag("")
+                        ForEach(rules, id: \.self) { Text(AnomalyEngine.Kind.localizedName($0)).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    Divider()
+                    Toggle(L("Show acknowledged"), isOn: $showAcknowledged)
+                } label: {
+                    Label(filterLabel, systemImage: isFiltered ? "line.3.horizontal.decrease.circle.fill"
+                                                               : "line.3.horizontal.decrease.circle")
                 }
-                .pickerStyle(.inline)
-                Divider()
-                Toggle(L("Show acknowledged"), isOn: $showAcknowledged)
-            } label: {
-                Label(filterLabel, systemImage: isFiltered ? "line.3.horizontal.decrease.circle.fill"
-                                                           : "line.3.horizontal.decrease.circle")
-            }
-            .labelStyle(.titleAndIcon)   // icon-only reads as two mystery buttons in the corner
-            .disabled(alerts.isEmpty)
-            .help(L("Filter which alerts are listed"))
+                .labelStyle(.titleAndIcon)   // icon-only reads as two mystery buttons in the corner
+                .disabled(alerts.isEmpty)
+                .help(L("Filter which alerts are listed"))
 
-            Menu {
-                Button(L("Selected (%lld)", selection.count)) { monitor.acknowledgeAlerts(ids: Array(selection)) }
-                    .disabled(selection.isEmpty)
-                Button(L("All unacknowledged (%lld)", monitor.unacknowledgedAlerts)) { monitor.acknowledgeAlerts(ids: nil) }
-                    .disabled(monitor.unacknowledgedAlerts == 0)
-            } label: {
-                Label(L("Acknowledge"), systemImage: "checkmark.circle")
+                Menu {
+                    Button(L("Selected (%lld)", selection.count)) { monitor.acknowledgeAlerts(ids: Array(selection)) }
+                        .disabled(selection.isEmpty)
+                    Button(L("All unacknowledged (%lld)", monitor.unacknowledgedAlerts)) { monitor.acknowledgeAlerts(ids: nil) }
+                        .disabled(monitor.unacknowledgedAlerts == 0)
+                } label: {
+                    Label(L("Acknowledge"), systemImage: "checkmark.circle")
+                }
+                .labelStyle(.titleAndIcon)
+                .disabled(alerts.isEmpty)
+                .help(L("Mark alerts as seen"))
             }
-            .labelStyle(.titleAndIcon)
-            .disabled(alerts.isEmpty)
-            .help(L("Mark alerts as seen"))
         }
     }
 
@@ -166,6 +185,7 @@ struct AlertsView: View {
     }
 
     private func load() async {
+        guard nav.alertsTab == .alerts else { return }
         let scope = focus.scope
         alerts = (try? await monitor.read { try $0.alerts(focus: scope) }) ?? []
     }

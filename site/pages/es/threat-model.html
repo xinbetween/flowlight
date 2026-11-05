@@ -59,8 +59,8 @@ nav: threat-model
         cualquier cosa cuyo instalador apruebes— puede descargar esa extensión, detener la app o borrar su base de datos. Nada en el diseño lo impide,
         y ninguna herramienta de monitorización en macOS puede impedirlo y seguir siendo una herramienta que también puedas apagar tú.</p>
       <p>La afirmación honesta es más estrecha y sigue siendo útil: el software que se porta mal pero no elude activamente un monitor se verá. El
-        software que sí lo elude activamente puede no verse, y al menos dejará un hueco —una extensión que se detuvo, un periodo sin datos— que la
-        pantalla <a href="{{link:docs}}#coverage">Cobertura</a> está ahí para mostrar.</p>
+        software que sí lo elude activamente puede no verse, y al menos dejará un hueco —una extensión que se detuvo, un periodo sin datos— que
+        <a href="{{link:docs}}#coverage">Fuentes › Cobertura</a> está ahí para mostrar.</p>
 
       <h2 id="capture">Lo que la captura se pierde</h2>
       <ul>
@@ -69,7 +69,7 @@ nav: threat-model
         <li><strong>Los servicios del sistema exentos de los filtros de contenido.</strong> macOS no le muestra todo a un filtro de contenido; parte
           de su propio tráfico no llega nunca al nuestro.</li>
         <li><strong>Otro filtro de contenido que ocupa el sitio.</strong> macOS ejecuta uno a la vez. Si lo tiene una VPN o un agente de seguridad, el
-          filtro de Flowlight se instala, se conecta y nunca se le pide filtrar nada: Captura lo dice en vez de mostrar una pantalla vacía.</li>
+          filtro de Flowlight se instala, se conecta y nunca se le pide filtrar nada: Fuentes › Colector lo dice en vez de mostrar una pantalla vacía.</li>
         <li><strong>Las conexiones cortas, con el muestreador.</strong> Sin la extensión, Flowlight lee contadores una vez por segundo: una conexión
           que se abre y se cierra entre dos lecturas no se registra nunca.</li>
         <li><strong>Los canales que no son TCP ni UDP.</strong> Bluetooth y USB se ven como dispositivos, no como bytes. El servidor MCP local de un
@@ -80,7 +80,7 @@ nav: threat-model
       <p>La inspección HTTPS lee solo lo que se encamina por el proxy local de Flowlight, y eso lo decide un programa cuando arranca. Una app que
         ignora los ajustes de proxy, una que se arrancó antes de activar la inspección, o una que fija sus certificados pasa intacta: a propósito,
         porque romper una conexión con certificado fijado rompería la app. QUIC tampoco se le ofrece al proxy.</p>
-      <p>Así que una pantalla Inspeccionar vacía significa «aquí no se ha encaminado nada», no «no ha pasado nada». Cobertura dice cuál de las dos
+      <p>Así que una pantalla Inspeccionar vacía significa «aquí no se ha encaminado nada», no «no ha pasado nada». Fuentes › Cobertura dice cuál de las dos
         cosas se aplica, app por app.</p>
 
       <h2 id="blocking">Qué es bloquear, y qué no</h2>

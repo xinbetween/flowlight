@@ -35,14 +35,39 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarSection.traffic.items, [.live, .agents, .reports, .visualize, .alerts])
         XCTAssertEqual(SidebarItem.sidebarOrder,
                        [.live, .agents, .reports, .visualize, .alerts,
-                        .ask, .inspect, .rules, .devices, .coverage, .capture])
+                        .ask, .inspect, .rules, .sources])
         XCTAssertEqual(SidebarItem.visualize.shortcut, "4")
         XCTAssertEqual(SidebarItem.alerts.shortcut, "5")
         XCTAssertEqual(SidebarItem.rules.shortcut, "8")
-        XCTAssertEqual(SidebarItem.coverage.shortcut, "0")
-        XCTAssertNil(SidebarItem.capture.shortcut,
-                     "the eleventh destination remains reachable without inventing a shortcut")
-        XCTAssertEqual(SidebarItem.sidebarOrder.filter { $0.shortcut == nil }, [.capture])
+        XCTAssertEqual(SidebarItem.sources.shortcut, "9")
+        XCTAssertTrue(SidebarItem.sidebarOrder.allSatisfy { $0.shortcut != nil })
+    }
+
+    func testSourcesCoverageDistinguishesNoEvidenceFromZeroPercentNamed() {
+        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0, hasTraffic: false), .empty)
+        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0, hasTraffic: true), .warning)
+        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0.8, hasTraffic: true), .warning)
+        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0.81, hasTraffic: true), .good)
+    }
+
+    func testSourcesRecoveryChecklistRequiresAConfiguredCollectorAndArrivingData() {
+        XCTAssertTrue(SourceSetupPolicy.collectorConfigured(mode: .nettop, extensionState: .notInstalled,
+                                                            extensionFellBack: false),
+                      "the sampler needs no separate filter setup")
+        XCTAssertFalse(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
+                                                             extensionState: .notInstalled,
+                                                             extensionFellBack: false))
+        XCTAssertTrue(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
+                                                            extensionState: .enabled,
+                                                            extensionFellBack: false))
+        XCTAssertFalse(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
+                                                             extensionState: .enabled,
+                                                             extensionFellBack: true),
+                       "fallback is working but is not the configured collector")
+        XCTAssertFalse(SourceSetupPolicy.setupComplete(mode: .nettop, extensionState: .unknown,
+                                                       extensionFellBack: false, isReceiving: false))
+        XCTAssertTrue(SourceSetupPolicy.setupComplete(mode: .nettop, extensionState: .unknown,
+                                                      extensionFellBack: false, isReceiving: true))
     }
 
     func testFocusNoticeClaimsFilteringOnlyWhereTheWholeScopeApplies() {
@@ -60,9 +85,7 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertFalse(SidebarItem.alerts.fullyAppliesFocus(mixed))
         XCTAssertFalse(SidebarItem.ask.fullyAppliesFocus(mixed))
         XCTAssertFalse(SidebarItem.rules.fullyAppliesFocus(mixed))
-        XCTAssertFalse(SidebarItem.devices.fullyAppliesFocus(mixed))
-        XCTAssertFalse(SidebarItem.coverage.fullyAppliesFocus(mixed))
-        XCTAssertFalse(SidebarItem.capture.fullyAppliesFocus(mixed))
+        XCTAssertFalse(SidebarItem.sources.fullyAppliesFocus(mixed))
     }
 
     func testConnectionsKeepsTheCompatibleVisualizeRouteAndHelpAnchor() {
@@ -152,6 +175,17 @@ final class VisualizeNavigationTests: XCTestCase {
             nav.backDestination,
             "pack review navigation starts a new task and must not retain an unrelated investigation trail"
         )
+    }
+
+    func testReviewAlertsNavigationReturnsToTheAlertList() {
+        let nav = AppNavigation()
+        nav.show(.alerts)
+        nav.alertsTab = .detection
+
+        nav.showAlerts()
+
+        XCTAssertEqual(nav.selection, .alerts)
+        XCTAssertEqual(nav.alertsTab, .alerts)
     }
 
     func testExactInspectNavigationCarriesExactMemberScope() {

@@ -35,8 +35,6 @@ private struct CoverageContent: View {
             }
             .padding(Measure.gutter)
         }
-        .navigationTitle(L("Coverage"))
-        .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Picker(L("Window"), selection: $window) {
@@ -49,12 +47,6 @@ private struct CoverageContent: View {
     }
 
     private struct LoadKey: Equatable { var window: AgentWindow; var version: Int; var inspecting: Bool }
-
-    private var subtitle: String {
-        guard !rows.isEmpty else { return L("Nothing recorded yet") }
-        return L("%@ of traffic fully accounted for",
-                 CoverageReport.overall(rows).formatted(.percent.precision(.fractionLength(0))))
-    }
 
     /// The two engine-wide facts first, because they explain most of the rows underneath and are fixed in one
     /// place rather than per app.

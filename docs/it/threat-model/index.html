@@ -129,7 +129,7 @@
         strumento di monitoraggio su macOS può impedirlo e restare al tempo stesso uno strumento che puoi spegnere anche tu.</p>
       <p>L'affermazione onesta è più stretta e resta utile: il software che si comporta male ma non sta attivamente sfuggendo a un monitoraggio viene
         visto. Il software che vi sta attivamente sfuggendo può non essere visto, e lascerà almeno un buco — un'estensione che si è fermata, un periodo
-        senza dati — che la schermata <a href="../../it/docs/#coverage">Copertura</a> è lì per mostrare.</p>
+        senza dati — che <a href="../../it/docs/#coverage">Origini › Copertura</a> è lì per mostrare.</p>
 
       <h2 id="capture">Cosa sfugge all'acquisizione</h2>
       <ul>
@@ -138,7 +138,7 @@
         <li><strong>I servizi di sistema esenti dai filtri di contenuto.</strong> macOS non mostra tutto a un filtro di contenuto; una parte del suo
           traffico non arriva mai al nostro.</li>
         <li><strong>Un altro filtro di contenuto che occupa il posto.</strong> macOS ne esegue uno alla volta. Se ce l'ha una VPN o un agente di
-          sicurezza, il filtro di Flowlight si installa, si connette e non gli viene mai chiesto di filtrare nulla: Acquisizione lo dice, invece di
+          sicurezza, il filtro di Flowlight si installa, si connette e non gli viene mai chiesto di filtrare nulla: Origini › Collector lo dice, invece di
           mostrare una schermata vuota.</li>
         <li><strong>Le connessioni brevi, con il campionatore.</strong> Senza l'estensione, Flowlight legge i contatori una volta al secondo: una
           connessione che si apre e si chiude tra due letture non viene mai registrata.</li>
@@ -150,7 +150,7 @@
       <p>L'ispezione HTTPS legge solo ciò che viene instradato attraverso il proxy locale di Flowlight, e questo lo decide un programma quando parte.
         Un'app che ignora le impostazioni proxy, una avviata prima che l'ispezione fosse attivata, o una che applica il pinning dei certificati passa
         intatta — deliberatamente, perché rompere una connessione con pinning romperebbe l'app. Nemmeno QUIC viene offerto al proxy.</p>
-      <p>Quindi una schermata Ispeziona vuota significa «qui non è stato instradato nulla», non «non è successo nulla». Copertura dice quale delle due
+      <p>Quindi una schermata Ispeziona vuota significa «qui non è stato instradato nulla», non «non è successo nulla». Origini › Copertura dice quale delle due
         cose valga, app per app.</p>
 
       <h2 id="blocking">Cosa è, e cosa non è, il blocco</h2>
@@ -223,7 +223,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versione 0.17.2 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+      <span>Versione 0.17.3 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
     </div>
   </div>
 </footer>

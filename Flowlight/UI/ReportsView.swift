@@ -420,11 +420,15 @@ struct ReportsView: View {
     private var coverageNotice: some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
-            Text(L("Hostname coverage, last hour: %@ of bytes",
-                   monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))))
-            Text("·")
-            Text(L("including network owners: %@",
-                   monitor.coverage.owned.formatted(.percent.precision(.fractionLength(0)))))
+            if monitor.coverage.hasTraffic {
+                Text(L("Hostname coverage, last hour: %@ of bytes",
+                       monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))))
+                Text("·")
+                Text(L("including network owners: %@",
+                       monitor.coverage.owned.formatted(.percent.precision(.fractionLength(0)))))
+            } else {
+                Text(L("Nothing recorded in the last hour"))
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)

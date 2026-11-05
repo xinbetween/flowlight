@@ -19,7 +19,7 @@ import sys
 from dataclasses import asdict, dataclass
 
 
-SCHEMA = "flowlight-review-v1"
+SCHEMA = "flowlight-review-v2"
 
 SITE_ONLY_EXACT = frozenset(
     {
@@ -192,17 +192,20 @@ def classify(repo: pathlib.Path, base: str | None, head: str) -> Classification:
     tree = git(repo, "rev-parse", f"{resolved_head}^{{tree}}").decode().strip()
     fingerprint = app_fingerprint(repo, resolved_head)
 
+    fail_closed = False
     if not base or base == "0" * 40:
         paths: tuple[str, ...] = ()
         app = True
-        reason = "No trustworthy base commit was supplied; using the full application route."
+        fail_closed = True
+        reason = "No trustworthy base commit was supplied; using every verification route."
     else:
         try:
             paths = changed_paths(repo, base, resolved_head)
         except (OSError, subprocess.CalledProcessError, ValueError) as error:
             paths = ()
             app = True
-            reason = f"Comparison failed closed to the full application route: {error}"
+            fail_closed = True
+            reason = f"Comparison failed closed to every verification route: {error}"
         else:
             app = not paths or any(not is_site_only_path(path) for path in paths)
             reason = (
@@ -214,8 +217,8 @@ def classify(repo: pathlib.Path, base: str | None, head: str) -> Classification:
     return Classification(
         app=app,
         site=True,
-        python=any(path.endswith(".py") for path in paths),
-        actions=any(path.startswith(".github/") for path in paths),
+        python=fail_closed or any(path.endswith(".py") for path in paths),
+        actions=fail_closed or any(path.startswith(".github/") for path in paths),
         pages=any(path.startswith(("docs/", "site/")) for path in paths),
         site_only=not app,
         reason=reason,

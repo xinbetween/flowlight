@@ -61,7 +61,7 @@ nav: threat-model
         monitoring tool on macOS can prevent it while remaining a tool you can also turn off yourself.</p>
       <p>The honest claim is narrower and still useful: software that is misbehaving but not actively evading a monitor will be seen.
         Software that is actively evading one may not be, and will at least leave a gap — an extension that stopped, a period with no
-        data — which the <a href="{{link:docs}}#coverage">Coverage</a> screen is there to show.</p>
+        data — which <a href="{{link:docs}}#coverage">Sources › Coverage</a> is there to show.</p>
 
       <h2 id="capture">What capture misses</h2>
       <ul>
@@ -70,7 +70,7 @@ nav: threat-model
         <li><strong>System services exempt from content filters.</strong> macOS does not show a content filter everything; some of its
           own traffic never reaches ours.</li>
         <li><strong>Another content filter holding the slot.</strong> macOS runs one at a time. If a VPN or a security agent has it,
-          Flowlight's filter installs, connects, and is never asked to filter anything — Capture says so rather than showing an empty
+          Flowlight's filter installs, connects, and is never asked to filter anything — Sources › Collector says so rather than showing an empty
           screen.</li>
         <li><strong>Short connections, on the sampler.</strong> Without the extension, Flowlight reads counters once a second: a
           connection that opens and closes between two readings is never recorded.</li>
@@ -82,7 +82,7 @@ nav: threat-model
       <p>HTTPS inspection reads only what is routed through Flowlight's local proxy, and a program decides that when it starts. An app
         that ignores proxy settings, one started before inspection was switched on, or one that pins its certificates is passed through
         untouched — deliberately, because breaking a pinned connection would break the app. QUIC is not offered to the proxy either.</p>
-      <p>So an empty Inspect screen means "nothing was routed here", not "nothing happened". Coverage says which of the two applies,
+      <p>So an empty Inspect screen means "nothing was routed here", not "nothing happened". Sources › Coverage says which of the two applies,
         per app.</p>
 
       <h2 id="blocking">What blocking is, and isn't</h2>

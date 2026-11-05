@@ -10,12 +10,10 @@ import sys
 REQUIRED_CHECKS = (
     ("github-actions", "changes"),
     ("github-actions", "site"),
-    ("github-actions", "test (oldest Xcode)"),
-    ("github-actions", "test (newest Xcode)"),
+    ("github-actions", "unit (oldest Xcode)"),
+    ("github-actions", "unit (newest Xcode)"),
     ("github-actions", "Review / gate"),
-    ("github-actions", "analyze (swift)"),
-    ("github-actions", "analyze (python)"),
-    ("github-actions", "analyze (actions)"),
+    ("github-actions", "CodeQL / gate"),
     ("github-advanced-security", "CodeQL"),
 )
 

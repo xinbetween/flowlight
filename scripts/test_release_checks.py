@@ -54,6 +54,26 @@ class ReleaseCheckTests(unittest.TestCase):
         errors, _ = verify(REPO, SHA, checks, reviewed_pull())
         self.assertTrue(any("missing required check" in error for error in errors))
 
+    def test_requires_stable_codeql_gate_instead_of_optional_analyzers(self):
+        self.assertIn(("github-actions", "CodeQL / gate"), REQUIRED_CHECKS)
+        for language in ("swift", "python", "actions"):
+            self.assertNotIn(("github-actions", f"analyze ({language})"), REQUIRED_CHECKS)
+
+        checks = successful_checks()
+        runs = checks[0]["check_runs"]
+        runs[:] = [run for run in runs if run["name"] != "CodeQL / gate"]
+        for language in ("swift", "python", "actions"):
+            runs.append({
+                "id": 100 + len(runs),
+                "name": f"analyze ({language})",
+                "status": "completed",
+                "conclusion": "success",
+                "details_url": f"https://github.com/{REPO}/actions/runs/1/job/{language}",
+                "app": {"slug": "github-actions"},
+            })
+        errors, _ = verify(REPO, SHA, checks, reviewed_pull())
+        self.assertTrue(any("missing required check: CodeQL / gate" in error for error in errors))
+
     def test_newer_failure_cannot_hide_behind_older_success(self):
         checks = successful_checks()
         failed = copy.deepcopy(checks[0]["check_runs"][0])

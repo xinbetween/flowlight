@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>ソース</strong>
-          <a href="#capture">キャプチャ</a><a href="#coverage">カバー範囲</a><a href="#devices">デバイス</a>
+          <a href="#sources">ソース</a><a href="#coverage">カバー範囲</a><a href="#devices">デバイス</a>
         </div>
         <div class="toc-group">
           <strong>設定とデータ</strong>
@@ -75,10 +75,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         カーネルのフィルタが、それ以外のパケットを Flowlight が見る前にすべて捨てるので、パケットの中身が保存されることはありません。</p>
       <p>macOS では管理者だけがパケットを読めるため、<strong>トラフィックに名前を付ける</strong>ウインドウでパスワードを 1 回尋ねます。これにより
         <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code> がインストールされ、起動のたびに <code>access_bpf</code> グループに
-        <code>/dev/bpf*</code> への読み取り権限が与えられます。Wireshark と同じやり方です。<strong>キャプチャ › パケットキャプチャのアクセスを削除</strong>から、いつでも取り消せます。</p>
+        <code>/dev/bpf*</code> への読み取り権限が与えられます。Wireshark と同じやり方です。<strong>ソース › コレクター › パケットキャプチャのアクセスを削除</strong>から、いつでも取り消せます。</p>
       <p><strong>ネットワーク所有者を特定</strong>をオンにすると、ホスト名のないトラフィックにアドレスの運用者名が付きます
         （<em>Cloudflare, Inc. · AS13335</em>）。デフォルトでオンで、そうしたパブリックな IP アドレス（プライベートなものは決して送りません）を
-        Team Cymru の DNS サービスに送信します。<strong>キャプチャ</strong>でオフにできます。</p>
+        Team Cymru の DNS サービスに送信します。<strong>ソース › コレクター</strong>でオフにできます。</p>
 
       <h2 id="language">言語</h2>
       <p>Flowlight は English、简体中文、繁體中文、日本語、한국어、Français、Deutsch、Italiano、Español、Português に翻訳されています。
@@ -97,14 +97,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>履歴</td><td>⌘3</td><td>トラフィックがどこへ行ったか。秒から年まで。アプリ・接続先・IP でグループ化し、グラフや<a href="#worth-a-look">気になるもの</a>に切り替え、CSV に書き出せます。</td></tr>
         <tr><td><a href="#visualize">接続</a></td><td>⌘4</td><td>アプリと正確な接続先を、重み付き経路、動く方向マーカー、接続数、同等のリストで示す安定したマップ。</td></tr>
         <tr><td><a href="#alerts">アラート</a></td><td>⌘5</td><td>いつもと違って見えたものすべて。アプリ、接続先、そしてルールのしきい値を超えた数値とともに。</td></tr>
-        <tr><td><a href="#rules">ルール</a></td><td>⌘8</td><td>設定したすべての許可リストと拒否。それぞれが何を対象にし、実際に何を止めたか。</td></tr>
         <tr><td><a href="#ask">質問</a></td><td>⌘6</td><td>自分のトラフィックについての、ふつうの言葉での質問。記録された履歴から、ローカルまたはホスト型のモデルが答えます。</td></tr>
-        <tr><td><a href="#inspection">インスペクト</a></td><td>⌘7</td><td>任意。Flowlight を経由させたエージェントの復号済みリクエストと、その裏にあるツール呼び出し。検索はリクエストとレスポンスの本文にも届きます。</td></tr>
-        <tr><td><a href="#devices">デバイス</a></td><td>⌘9</td><td>オンにするまではオフ。Bluetooth、USB、外部ストレージ。Mac はネットワークと同じくらいこれらを使います。</td></tr>
-        <tr><td><a href="#coverage">カバー範囲</a></td><td>⌘0</td><td>Flowlight が把握できないもの。アプリごとに、その通信が見えたか、名前が付いたか、読めたか。</td></tr>
-        <tr><td><a href="#capture">キャプチャ</a></td><td>—</td><td>どのエンジンで記録しているか、機能拡張の状態、ホスト名の学習、そしてデータベースの場所。</td></tr>
+        <tr><td><a href="#inspection">インスペクト</a></td><td>⌘7 · Developer ID</td><td>任意。Flowlight を経由させたエージェントの復号済みリクエストと、その裏にあるツール呼び出し。検索はリクエストとレスポンスの本文にも届きます。</td></tr>
+        <tr><td><a href="#rules">ルール</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>設定したすべての許可リストと拒否。それぞれが何を対象にし、実際に何を止めたか。</td></tr>
+        <tr><td><a href="#sources">ソース</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>コレクターの状態、デバイスのチャンネル、名前付けのカバー範囲を 3 つのタブで表示。</td></tr>
       </table>
-      <p>ショートカットはサイドバーの並び順です。⌘0 は 10 番目で、11 番目の項目には架空のキーを割り当てず、そのまま利用できます。</p>
+      <p>ショートカットは表示中のサイドバー順です。Developer ID 版は ⌘7 にインスペクトがあります。App Store 版では省かれるため、ルールとソースは ⌘7 と ⌘8 になります。</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="ライブビュー。アプリの一覧に、現在の送信と受信の速度、そして最も忙しい接続先が並んでいます。"></div>
         <figcaption class="caption">ライブ。Flowlight が最初に開く画面です。</figcaption></figure>
@@ -375,7 +373,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="blocking">接続を拒否する</h2>
       <p>許可リストはデフォルトでは警告します。エージェントに対して<strong>許可されていない接続をブロック</strong>をオンにすると、実際に拒否もするようになります。接続は切られ、
         何が拒否されたかをアラートが記録し、<strong>これ以降 … を許可</strong>でワンクリックでリストに追加できます。エージェントの次の試行は通ります。</p>
-      <p><strong>ネットワーク機能拡張が必要です。</strong>接続を拒否するとは、その経路に入ることであり、nettop サンプラーにはできません。キャプチャは、
+      <p><strong>ネットワーク機能拡張が必要です。</strong>接続を拒否するとは、その経路に入ることであり、nettop サンプラーにはできません。ソース › コレクターは、
         何もしないスイッチを見せるのではなく、そう伝えます。</p>
       <p>リストが何と言っていても決して拒否されないものがあります。ローカルネットワーク、DNS、Apple 純正のサービス、そして Flowlight 自身のトラフィックです。
         ブロックされたエージェントより、ブロックされた Mac のほうが悪い結果なので、迷いがある場合は接続を許可して記録します。強制は Flowlight が動作を止めた数秒後に
@@ -403,8 +401,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>これはサンドボックスではありません。</strong>拒否したツールは提示されなくなり、呼び出しにも応答しなくなります。しかしシェルを使えるエージェントは、
         そのツールがしていたことを手作業で行えます。Flowlight はそれを記録しますが、防げるふりはしません。</p>
 
-      <h2 id="capture"><span id="engines"></span>キャプチャ：エンジンとソース</h2>
-      <p>Flowlight がトラフィックを記録する方法は 2 つあり、<strong>キャプチャ</strong>で選びます。何を取りこぼしうるかが違うので、どちらかに頼る前に
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>ソース：コレクターとエンジン</h2>
+      <p>Flowlight がトラフィックを記録する方法は 2 つあり、<strong>ソース › コレクター</strong>で選びます。何を取りこぼしうるかが違うので、どちらかに頼る前に
         知っておく価値があります。</p>
       <table>
         <tr><th></th><th>nettop サンプラー（デフォルト）</th><th>ネットワーク機能拡張</th></tr>
@@ -427,7 +425,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         ネットワーク機能拡張の下にある<em>機能拡張を再試行</em>で、やり直せます。</p>
       <p><strong>そもそも動かない Mac もあります。</strong>macOS が許すコンテンツフィルタは同時に 1 つだけで、ふつうは企業のセキュリティソフトがそれを握っています。
         Palo Alto Networks GlobalProtect や CrowdStrike Falcon などです。そうしたマシンでも Flowlight のフィルタはインストールされ、接続もしますが、
-        接続を 1 件も渡されません。キャプチャは見つけたものを一覧にし、フィルタを必要とせずそれらと並んで動くサンプラーへ戻すことを申し出ます。
+        接続を 1 件も渡されません。ソース › コレクターは見つけたものを一覧にし、フィルタを必要とせずそれらと並んで動くサンプラーへ戻すことを申し出ます。
         どう作られているかは<a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">開発者向けガイド</a>をご覧ください。</p>
 
       <h2 id="coverage">カバー範囲：Flowlight が把握できないもの</h2>
@@ -489,7 +487,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         保存された位置が画面の外にあるウインドウ（ディスプレイを外した場合など）は、いま手元にある画面に戻ってきます。ホスト名のセットアップは、起動の少し後、
         ウインドウが開いているときにだけ案内されます。初回起動のあいさつがパスワードの要求になるのを避けるためです。この案内は、実行するか閉じるまで、
         次回の起動時にも出ます。</p>
-      <p>Flowlight を終了するとサンプラーは止まります。ネットワーク機能拡張は止まりません。システム機能拡張はそれ自身で動くので、<strong>キャプチャ</strong>で
+      <p>Flowlight を終了するとサンプラーは止まります。ネットワーク機能拡張は止まりません。システム機能拡張はそれ自身で動くので、<strong>ソース › コレクター</strong>で
         無効化するかアンインストールするまで、フィルタは接続を検査し続けます。</p>
 
       <h2 id="export">OpenTelemetry や SIEM への書き出し</h2>
@@ -527,7 +525,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="data">データの保存先</h2>
       <p>すべては <code>~/Library/Application Support/Flowlight/traffic.sqlite</code> にあります。秒単位の行は 6 時間（変更可能）、分単位は 14 日、
         時間単位は 400 日、日単位は無期限、アラートは 90 日保持されます。
-        <strong>キャプチャ › すべてのデータを消去</strong>で削除できます。</p>
+        <strong>設定 › データとプライバシー › すべてのデータを消去</strong>で削除できます。</p>
 
       <h2 id="updates">アップデート</h2>
       <p>新しいバージョンが出ると、Flowlight は作業を中断させるのではなく、通知とサイドバーのバッジで知らせます。どちらをクリックしてもアップデートのウインドウが
@@ -546,7 +544,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="uninstall">アンインストール</h2>
       <ol>
-        <li><strong>キャプチャ</strong>で、有効にしていた場合は<strong>パケットキャプチャのアクセスを削除</strong>を選び（パスワードを尋ねられます）、
+        <li><strong>ソース › コレクター</strong>で、有効にしていた場合は<strong>パケットキャプチャのアクセスを削除</strong>を選び（パスワードを尋ねられます）、
           インストールしていた場合はコンテンツフィルタをアンインストールし、<strong>インスペクト</strong>で HTTPS インスペクションをオフにして、証明書を
           キーチェーンから取り除きます。この 3 つを取り下げられるのは Flowlight 自身だけです。</li>
         <li>Flowlight を終了し、「アプリケーション」からゴミ箱に移します。Homebrew でインストールした場合は
@@ -564,18 +562,18 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>どのキャプチャエンジンを使うかによりますし、その差はささいなものではありません。デフォルトのサンプラーは macOS の累計バイトカウンタを 1 秒ごとに読み、
           その変化を記録するので、長い転送は正確に計上されます。しかし、2 回の読み取りのあいだに開いて閉じた接続は、まったく現れません。ネットワーク機能拡張は
           接続が行われるたびに macOS から呼ばれるので、5 ミリ秒のリクエストでも記録されます。短いリクエストを何度も出す AI エージェントを見張るなら、
-          <strong>キャプチャ</strong>から機能拡張をインストールしてください。<a href="#engines">詳しい比較は上にあります。</a></dd>
+          <strong>ソース › コレクター</strong>から機能拡張をインストールしてください。<a href="#engines">詳しい比較は上にあります。</a></dd>
         <dt><strong>ネットワーク機能拡張をオンにしたのに何も表示されません。サンプラーは問題なく動きます。</strong></dt>
         <dd>ほとんどの場合、別のコンテンツフィルタがすでにその枠を取っているからです。<strong>macOS が許すコンテンツフィルタは同時に 1 つだけ</strong>で、
           企業のセキュリティソフトがふつうそれを取っています。Palo Alto Networks GlobalProtect、CrowdStrike Falcon などです。Flowlight のフィルタは
-          インストールも有効化も接続もされるので、キャプチャは<em>フィルタ機能拡張に接続しました</em>と表示しますが、macOS は接続を 1 件も渡さず、画面は空のままです。
-          <strong>キャプチャは見つけたフィルタを一覧にし</strong>、フィルタを使わずそれらと並んで動くサンプラーへ戻すことを申し出ます。失われるのはごく短い接続だけで
+          インストールも有効化も接続もされるので、ソース › コレクターは<em>フィルタ機能拡張に接続しました</em>と表示しますが、macOS は接続を 1 件も渡さず、画面は空のままです。
+          <strong>ソース › コレクターは見つけたフィルタを一覧にし</strong>、フィルタを使わずそれらと並んで動くサンプラーへ戻すことを申し出ます。失われるのはごく短い接続だけで
           （<a href="#engines">比較</a>）、ほかはすべて同じように記録されます。</dd>
         <dt><strong>Flowlight をアップデートしたら機能拡張が動かなくなりました。</strong></dt>
         <dd>0.2.5 より前のバージョンにはこの問題がありました。macOS は最後に有効化されたビルドの機能拡張を動かし続けるため、アップデート後は機能拡張が古いバージョンのままで、
           macOS は食い違った両者のあいだの接続を拒否します。0.2.5 以降は、Flowlight が起動時に確認して、自分でフィルタを再有効化します。それより古いバージョンでは、
-          キャプチャで<strong>フィルタをインストールして有効にする</strong>を 1 回押してください。</dd>
-        <dt><strong>キャプチャがほかの理由でおかしいのですが、原因がわかりません。</strong></dt>
+          ソース › コレクターで<strong>フィルタをインストールして有効にする</strong>を 1 回押してください。</dd>
+        <dt><strong>ソース › コレクターがほかの理由でおかしいのですが、原因がわかりません。</strong></dt>
         <dd>これを実行して、出力を読んでください。報告するのは状態と件数だけで、Flowlight が記録したトラフィックの内容は決して含みません。
           <p class="brew"><code>curl -fsSL https://raw.githubusercontent.com/{{repo}}/main/scripts/diagnose.sh | zsh</code><button type="button" class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh">コピー</button></p>
           どの機能拡張がインストールされているか、macOS が本当に Flowlight のフィルタを起動したか、最後に何かが記録されたのはいつかがわかります。
@@ -604,7 +602,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <li>HTTPS インスペクションをオンにしない限り、Flowlight はメタデータだけを読み、トラフィックを復号することはありません。QUIC のサーバ名は、
           暗号化されたハンドシェイクではなく DNS から取ります。</li>
         <li>インスペクションが見られるのはプロキシを使うアプリだけで、証明書をピン留めするアプリは決して見られません。</li>
-        <li>ホスト名のキャプチャは、主要なネットワークインターフェイスに従います。</li>
+        <li>ホスト名のソース › コレクターは、主要なネットワークインターフェイスに従います。</li>
       </ul>
 
     </article>

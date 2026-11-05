@@ -15,6 +15,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runStartupIfReady()
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Screenshot runs need a deterministic appearance even when the reviewing Mac itself uses Dark Mode.
+        // Keep the override demo-only so no launch argument can change the appearance of a real user's app.
+        guard DemoData.isEnabled,
+              UserDefaults.standard.bool(forKey: "FLForceLightAppearance") else { return }
+        NSApp.appearance = NSAppearance(named: .aqua)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.didFinishLaunching = true
         Self.runStartupIfReady()

@@ -82,7 +82,8 @@ final class AskSettingsQueryTests: XCTestCase {
         XCTAssertEqual(json["httpsInspection"] as? String, "off")
         XCTAssertEqual(json["canRefuseConnections"] as? String, "yes")
         XCTAssertEqual(json["watchingCameraActivity"] as? String, "yes")
-        XCTAssertEqual(result.screen, .capture)
+        XCTAssertEqual(result.screen, .sources)
+        XCTAssertEqual(result.sourcesTab, .collector)
     }
 
     func testSettingsCarryNoSecrets() throws {
@@ -98,6 +99,20 @@ final class AskSettingsQueryTests: XCTestCase {
                                             db: db, environment: environment)
         XCTAssertTrue(result.json.contains("HTTPS inspection"))
         XCTAssertEqual(result.screen, .inspect, "the answer should be able to offer to take you there")
+    }
+
+    func testHowToSourcesSelectTheExactOperationalTab() throws {
+        let collector = try AskQueryRunner.run(
+            AskCall(query: .howTo, arguments: ["topic": "capture source"]), db: db, environment: environment
+        )
+        XCTAssertEqual(collector.screen, .sources)
+        XCTAssertEqual(collector.sourcesTab, .collector)
+
+        let devices = try AskQueryRunner.run(
+            AskCall(query: .howTo, arguments: ["topic": "camera and bluetooth"]), db: db, environment: environment
+        )
+        XCTAssertEqual(devices.screen, .sources)
+        XCTAssertEqual(devices.sourcesTab, .devices)
     }
 
     func testHowToWithNoMatchListsWhatThereIsInsteadOfGuessing() throws {

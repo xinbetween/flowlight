@@ -58,7 +58,7 @@ nav: privacy
         <tr><td>Téléchargement de mise à jour</td><td><code>github.com</code></td><td>L’image disque et son fichier de somme de contrôle</td><td>Seulement quand vous cliquez sur Télécharger &amp; ouvrir</td></tr>
         <tr><td>Mise à jour du pack de règles officiel</td><td><code>flowlight.xinbetween.com</code></td><td>Une requête HTTPS standard vers le flux officiel fixe. Le serveur voit votre adresse IP, l’agent utilisateur <code>Flowlight/&lt;version&gt;</code> et les validateurs conditionnels du cache ; il ne reçoit ni trafic, ni réglages des packs, ni identifiant d’appareil</td><td>Après le démarrage, lorsqu’une vérification est due, puis au maximum une fois par jour tant que le service fonctionne normalement. Activée par défaut ; interrupteur de désactivation et option manuelle Rechercher maintenant dans Règles › Packs</td></tr>
         <tr><td>DNS inverse</td><td>Le résolveur DNS que vous avez configuré</td><td>Une recherche du nom enregistré d’une adresse IP, quand aucun nom d’hôte n’a été observé</td><td>Au besoin, dans le mode de capture par échantillonnage, qui est celui par défaut jusqu’à ce que l’extension réseau tourne. Pas d’interrupteur d’arrêt&nbsp;: sans elle, l’échantillonneur ne peut pas nommer la plupart des connexions. L’extension réseau les nomme à partir du trafic lui-même et ne fait pas cette recherche</td></tr>
-        <tr><td>Recherche du propriétaire de réseau</td><td>Team Cymru, par DNS</td><td>Des adresses IP publiques sans nom d’hôte connu. Les adresses privées et réservées ne quittent jamais votre Mac</td><td>Activé par défaut. Interrupteur d’arrêt dans Capture › Identifier les propriétaires de réseau</td></tr>
+        <tr><td>Recherche du propriétaire de réseau</td><td>Team Cymru, par DNS</td><td>Des adresses IP publiques sans nom d’hôte connu. Les adresses privées et réservées ne quittent jamais votre Mac</td><td>Activé par défaut. Interrupteur d’arrêt dans Sources › Collecteur › Identifier les propriétaires de réseau</td></tr>
         <tr><td>Demander avec un modèle hébergé</td><td>Le fournisseur que vous choisissez&nbsp;: Anthropic, OpenAI, Google Gemini ou un point de terminaison compatible</td><td>Votre question et les résultats renvoyés par les requêtes Flowlight en lecture seule choisies par le modèle. La base de données de trafic elle-même n’est pas envoyée</td><td>Seulement quand vous choisissez un fournisseur hébergé et soumettez une question. L’écran Demander montre les requêtes transmises</td></tr>
         <tr><td>Exportation vers un collecteur</td><td>Le point de terminaison OpenTelemetry ou HTTP que vous configurez</td><td>Les champs indiqués dans Réglages › Exportation, comme les agrégats de trafic et les alertes. Les en-têtes d’authentification sont stockés dans le trousseau</td><td>Seulement après que vous avez configuré un point de terminaison et activé l’exportation</td></tr>
         <tr><td>Trafic d’une application inspectée</td><td>La destination d’origine demandée par l’application inspectée</td><td>La requête de l’application, transmise par le proxy local de Flowlight après déchiffrement</td><td>Seulement tant que l’inspection HTTPS est activée et que l’application est acheminée par le proxy</td></tr>
@@ -66,14 +66,14 @@ nav: privacy
 
       <h2 id="permissions">Autorisations</h2>
       <ul>
-        <li><strong>Mot de passe administrateur, une fois,</strong> pour l’accès à la capture de paquets. Retirable depuis l’écran Capture.</li>
+        <li><strong>Mot de passe administrateur, une fois,</strong> pour l’accès à la capture de paquets. Retirable depuis Sources › Collecteur.</li>
         <li><strong>Notifications,</strong> pour les avertissements. Facultatif.</li>
         <li><strong>Élément d’ouverture,</strong> seulement si vous activez Lancer à l’ouverture de session.</li>
       </ul>
 
       <h2 id="retention">Conservation</h2>
       <p>Les données par seconde 6 heures (réglable), les données à la minute 14 jours, les données horaires 400 jours, les totaux quotidiens indéfiniment, les alertes 90 jours.
-        <strong>Capture › Effacer toutes les données</strong> supprime tout, et retirer <code>~/Library/Application Support/Flowlight</code> fait de même.</p>
+        <strong>Réglages › Données et confidentialité › Effacer toutes les données</strong> supprime tout, et retirer <code>~/Library/Application Support/Flowlight</code> fait de même.</p>
 
       <h2 id="website">Ce site</h2>
       <p>Ce site est une page statique hébergée sur GitHub Pages et servie via Cloudflare. Il ne dépose aucun cookie et n’exécute aucune analytique. GitHub

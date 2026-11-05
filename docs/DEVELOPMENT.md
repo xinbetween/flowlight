@@ -27,7 +27,7 @@ Flowlight/                  SwiftUI host app
   Analysis/                   EWMA/z-score baselines, rule engine, AI agent catalog + rules, UI-activity tracker
   Inspection/                 HTTPS inspection: local CA, decrypting proxy, HTTP parser, recorder, mock rules
   Export/                     opt-in export to a collector the user chooses: OTLP/NDJSON payloads, queue, Keychain
-  UI/                         Live, AI Agents, History (charts + three breakdown groupings + CSV), Alerts, Connections, Capture
+  UI/                         Live, AI Agents, History (charts + three breakdown groupings + CSV), Alerts, Connections, Sources
   Channels/                   Opt-in Bluetooth, USB/storage and CoreMediaIO camera-activity monitors
 Shared/Classification/ProtocolCatalog.swift   108 protocols in 13 families, used by both capture engines
 FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent and anomaly tests
@@ -43,16 +43,16 @@ FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent
 | Protocols | First bytes + ports | Ports only |
 | Short-lived flows | Every flow | Flows shorter than ~1 s are missed |
 
-Choose the source in **Capture**. Both produce the same per-second batches, so storage, reports and
+Choose the source in **Sources › Collector**. Both produce the same per-second batches, so storage, reports and
 anomaly detection work the same way with either one.
 
 ### Hostnames in nettop mode
 
 nettop only reports IP addresses, so Flowlight fills in names from several sources, in order:
 
-1. **Packet capture** (Capture › Hostnames › *Enable Packet Capture…*). A one-time admin prompt installs
+1. **Packet capture** (Sources › Collector › Hostnames › *Enable Packet Capture…*). A one-time admin prompt installs
    `/Library/LaunchDaemons/com.flowlight.bpf-access.plist`, which gives the `access_bpf` group read access to
-   `/dev/bpf*` at boot. This is the same approach as Wireshark's ChmodBPF. Capture follows the primary interface,
+   `/dev/bpf*` at boot. This is the same approach as Wireshark's ChmodBPF. The collector follows the primary interface,
    so traffic confined to another interface or tunnel may lack names. A kernel BPF filter passes only DNS
    responses and TLS ClientHellos, so the cost doesn't grow with traffic. Packet contents are never stored.
    *Remove Packet Capture Access…* undoes the setup. On first launch, Flowlight offers the setup once
@@ -60,7 +60,7 @@ nettop only reports IP addresses, so Flowlight fills in names from several sourc
    granting BPF access. Launch with `-FLForceCaptureOnboarding YES` to show the offer again.
 2. **Reverse DNS**, as a last resort.
 3. **Network owner**: the IP's autonomous system (e.g. "Cloudflare, Inc. · AS13335"), from Team Cymru's DNS
-   interface. This lookup is on by default and sends only public IPs; turn it off during setup or in Capture.
+   interface. This lookup is on by default and sends only public IPs; turn it off during setup or in Sources › Collector.
    Public IPs are sent to that service, while local and reserved addresses stay on the Mac.
 
 History groups any traffic still without a hostname under its network owner.
@@ -100,7 +100,7 @@ without a test host, so it is the quicker way to check that particular thing any
    (https://developer.apple.com/contact/request/network-extension). A free Personal Team can't sign it.
 2. For development, before the entitlement is granted: disable SIP on a test Mac and run
    `systemextensionsctl developer on`.
-3. Copy the app to `/Applications`, open **Capture**, and click **Install & enable filter**.
+3. Copy the app to `/Applications`, open **Sources › Collector**, and click **Install & enable filter**.
    Then approve it in System Settings › General › Login Items & Extensions, and allow the content filter.
 4. Switch the source to **Network Extension**.
 5. Check the extension's logs:
@@ -110,7 +110,7 @@ The App Group and Mach service names come from `$(TeamIdentifierPrefix)com.flowl
 
 ## Device activity
 
-The **Devices** screen is opt-in per channel. Bluetooth and USB/storage report attachment, while camera monitoring
+**Sources › Devices** is opt-in per channel. Bluetooth and USB/storage report attachment, while camera monitoring
 uses public CoreMediaIO device metadata only: `kCMIOHardwarePropertyDevices` for enumeration and
 `kCMIODevicePropertyDeviceIsRunningSomewhere` for active state. A property listener reports transitions without
 opening an `AVCaptureSession`, requesting TCC capture access, or reading frames. The public signal is per camera and

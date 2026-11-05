@@ -41,8 +41,8 @@ final class TrafficMonitor: ObservableObject {
     @Published private(set) var unacknowledgedAlerts = 0
     @Published private(set) var captureState: PacketSniffer.State = .stopped
     @Published private(set) var hostnamesLearned = 0
-    /// Share of traffic in the last hour with a hostname / with at least a network owner.
-    @Published private(set) var coverage: (named: Double, owned: Double) = (0, 0)
+    /// Share of traffic in the last hour with a hostname / with at least a network owner, plus whether the window has evidence.
+    @Published private(set) var coverage: (named: Double, owned: Double, hasTraffic: Bool) = (0, 0, false)
     let sniffer = PacketSniffer()
     /// First-launch offer to enable packet capture.
     @Published var showCaptureOnboarding = false

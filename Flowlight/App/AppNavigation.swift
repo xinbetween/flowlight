@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, ask, inspect, devices, coverage, capture, visualize
+    case live, agents, reports, alerts, rules, ask, inspect, sources, visualize
     var id: String { rawValue }
 
     static var availableCases: [SidebarItem] {
@@ -27,9 +27,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .rules: return "rules"
         case .ask: return "ask"
         case .inspect: return "inspection"
-        case .devices: return "devices"
-        case .coverage: return "coverage"
-        case .capture: return "capture"
+        case .sources: return "sources"
         }
     }
 
@@ -45,9 +43,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .rules: return "Rules"
         case .ask: return "Ask"
         case .inspect: return "Inspect"
-        case .devices: return "Devices"
-        case .coverage: return "Coverage"
-        case .capture: return "Capture"
+        case .sources: return "Sources"
         }
     }
 
@@ -60,10 +56,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .alerts: return L("Alerts")
         case .rules: return L("Rules")
         case .ask: return L("Ask")
-        case .devices: return L("Devices")
-        case .coverage: return L("Coverage")
         case .inspect: return L("Inspect")
-        case .capture: return L("Capture")
+        case .sources: return L("Sources")
         }
     }
     var icon: String {
@@ -75,10 +69,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .alerts: return "exclamationmark.triangle"
         case .rules: return "hand.raised"
         case .ask: return "text.bubble"
-        case .devices: return "dot.radiowaves.left.and.right"
-        case .coverage: return "circle.dashed.inset.filled"
         case .inspect: return "lock.open.display"
-        case .capture: return "antenna.radiowaves.left.and.right"
+        case .sources: return "antenna.radiowaves.left.and.right"
         }
     }
     /// The exact visual order of the sidebar. Enum declaration order is an implementation detail and used to
@@ -101,7 +93,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .live, .agents, .reports, .visualize, .alerts: return .traffic
         case .ask, .inspect: return .investigate
         case .rules: return .control
-        case .devices, .coverage, .capture: return .sources
+        case .sources: return .sources
         }
     }
 
@@ -114,7 +106,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return true
         case .alerts:
             return scope.hosts.isEmpty
-        case .ask, .rules, .devices, .coverage, .capture:
+        case .ask, .rules, .sources:
             return false
         }
     }
@@ -145,10 +137,35 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .traffic: order = [.live, .agents, .reports, .visualize, .alerts]
         case .investigate: order = [.ask, .inspect]
         case .control: order = [.rules]
-        case .sources: order = [.devices, .coverage, .capture]
+        case .sources: order = [.sources]
         }
         return order.filter { SidebarItem.availableCases.contains($0) }
     }
+}
+
+/// The three operational views behind the single Sources destination. Keeping this in shared navigation lets a
+/// status notice open the exact recovery surface without putting three configuration screens back in the sidebar.
+enum SourcesTab: String, CaseIterable, Identifiable, Sendable {
+    case collector, devices, coverage
+
+    var id: String { rawValue }
+
+    @MainActor var title: String {
+        switch self {
+        case .collector: return L("Collector")
+        case .devices: return L("Devices")
+        case .coverage: return L("Coverage")
+        }
+    }
+}
+
+/// Alert review and its detection tuning share a destination, but app-wide alert links must still be able to select
+/// the review list explicitly instead of inheriting whichever tab happened to be visible.
+enum AlertsTab: String, CaseIterable, Identifiable {
+    case alerts, detection
+
+    var id: String { rawValue }
+    @MainActor var title: String { self == .alerts ? L("Alerts") : L("Detection") }
 }
 
 /// The three views inside Rules. This lives with the shared navigation state so an app-wide notice can take someone
@@ -189,9 +206,25 @@ struct ReportRequest: Equatable {
 @MainActor
 final class AppNavigation: ObservableObject {
     @Published private(set) var selection: SidebarItem = {
-        let restored = SidebarItem(rawValue: UserDefaults.standard.string(forKey: "FLScreen") ?? "") ?? .live
+        let raw = UserDefaults.standard.string(forKey: "FLScreen") ?? ""
+        // Preserve restored windows and screenshot arguments from before Devices, Coverage and Capture became tabs.
+        let restored = ["devices", "coverage", "capture"].contains(raw)
+            ? SidebarItem.sources
+            : SidebarItem(rawValue: raw) ?? .live
         return SidebarItem.availableCases.contains(restored) ? restored : .live
     }()
+    @Published var sourcesTab: SourcesTab = {
+        let defaults = UserDefaults.standard
+        if let explicit = SourcesTab(rawValue: defaults.string(forKey: "FLSourcesTab") ?? "") {
+            return explicit
+        }
+        switch defaults.string(forKey: "FLScreen") {
+        case "devices": return .devices
+        case "coverage": return .coverage
+        default: return .collector
+        }
+    }()
+    @Published var alertsTab: AlertsTab = .alerts
     @Published var rulesTab: RulesTab = {
         RulesTab(rawValue: UserDefaults.standard.string(forKey: "FLRulesTab") ?? "") ?? .rules
     }()
@@ -213,6 +246,7 @@ final class AppNavigation: ObservableObject {
     func show(_ item: SidebarItem) {
         guard SidebarItem.availableCases.contains(item) else { return }
         trail.removeAll()
+        if item == .alerts { alertsTab = .alerts }
         if item == .rules { rulesTab = .rules }
         selection = item
     }
@@ -245,8 +279,17 @@ final class AppNavigation: ObservableObject {
         showRules()
     }
 
+    func showAlerts() {
+        show(.alerts)
+    }
+
     func showRules() {
         show(.rules)
+    }
+
+    func showSources(_ tab: SourcesTab = .collector) {
+        sourcesTab = tab
+        show(.sources)
     }
 
     func showPackReviews() {

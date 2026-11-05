@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>來源</strong>
-          <a href="#capture">擷取</a><a href="#coverage">涵蓋範圍</a><a href="#devices">裝置</a>
+          <a href="#sources">來源</a><a href="#coverage">涵蓋範圍</a><a href="#devices">裝置</a>
         </div>
         <div class="toc-group">
           <strong>設定與資料</strong>
@@ -75,10 +75,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         核心層的過濾器會在 Flowlight 看到之前丟掉其他所有封包，而封包內容一律不會儲存。</p>
       <p>macOS 只允許管理者讀取封包，所以<strong>「讓流量有名字」</strong>視窗會要求輸入你的密碼一次。它會安裝
         <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>，在每次開機時讓 <code>access_bpf</code> 群組能讀取
-        <code>/dev/bpf*</code>，和 Wireshark 的做法相同。你隨時可以到<strong>「擷取」› 「移除封包擷取存取權」</strong>移除它。</p>
+        <code>/dev/bpf*</code>，和 Wireshark 的做法相同。你隨時可以到<strong>「來源 › 收集器」› 「移除封包擷取存取權」</strong>移除它。</p>
       <p><strong>「辨識網路擁有者」</strong>會為沒有主機名稱的流量標上這個位址的營運者
         （<em>Cloudflare, Inc. · AS13335</em>）。它預設開啟，並會把這些公開 IP 位址（絕不包含私有位址）傳送到 Team Cymru 的
-        DNS 服務。可以在<strong>「擷取」</strong>中關閉。</p>
+        DNS 服務。可以在<strong>「來源 › 收集器」</strong>中關閉。</p>
 
       <h2 id="language">語言</h2>
       <p>Flowlight 已翻譯成 English、简体中文、繁體中文、日本語、한국어、Français、Deutsch、Italiano、Español 和
@@ -98,14 +98,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>歷史</td><td>⌘3</td><td>流量去了哪裡，從秒到年。依 App、目標或 IP 分組；切換到「圖表」或<a href="#worth-a-look">「值得一看」</a>；匯出 CSV。</td></tr>
         <tr><td><a href="#visualize">連線</a></td><td>⌘4</td><td>應用程式與精確目的地的穩定地圖，包含加權路徑、移動方向標記、連線數與等價列表。</td></tr>
         <tr><td><a href="#alerts">警示</a></td><td>⌘5</td><td>所有看起來不尋常的事，附上 App、目標，以及觸發規則的那個數字。</td></tr>
-        <tr><td><a href="#rules">規則</a></td><td>⌘8</td><td>你設過的每一條允許清單和拒絕，各自管到哪裡，以及實際攔下了什麼。</td></tr>
         <tr><td><a href="#ask">提問</a></td><td>⌘6</td><td>用平常的話問你自己的流量，由本機模型或託管模型從記錄下來的歷史裡作答。</td></tr>
-        <tr><td><a href="#inspection">檢查</a></td><td>⌘7</td><td>選用：你轉送經過 Flowlight 的代理，其解密後的請求，以及背後的工具呼叫。搜尋也會查進請求與回應的內文。</td></tr>
-        <tr><td><a href="#devices">裝置</a></td><td>⌘9</td><td>在你開啟之前都是關的：藍牙、USB 與外接儲存裝置，一台 Mac 用它們跟用網路一樣多。</td></tr>
-        <tr><td><a href="#coverage">涵蓋範圍</a></td><td>⌘0</td><td>Flowlight 說不清的部分 — 依 App 逐一列出，它的流量有沒有被看到、被命名、被讀懂。</td></tr>
-        <tr><td><a href="#capture">擷取</a></td><td>—</td><td>目前由哪個引擎記錄、延伸功能的狀態、主機名稱學習，以及資料庫存放的位置。</td></tr>
+        <tr><td><a href="#inspection">檢查</a></td><td>⌘7 · Developer ID</td><td>選用：你轉送經過 Flowlight 的代理，其解密後的請求，以及背後的工具呼叫。搜尋也會查進請求與回應的內文。</td></tr>
+        <tr><td><a href="#rules">規則</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>你設過的每一條允許清單和拒絕，各自管到哪裡，以及實際攔下了什麼。</td></tr>
+        <tr><td><a href="#sources">來源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>在三個分頁中顯示收集器狀態、裝置頻道與命名涵蓋範圍。</td></tr>
       </table>
-      <p>快速鍵遵循側邊欄順序：⌘0 是第十項，第十一項仍然可用，不會虛構一個按鍵。</p>
+      <p>快速鍵遵循可見的側邊欄順序。Developer ID 版本在 ⌘7 包含「檢查」；App Store 版本省略它，因此「規則」與「來源」會移到 ⌘7 和 ⌘8。</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="即時畫面：一列 App，各自帶著目前的傳送與接收速率，以及最忙的目標。"></div>
         <figcaption class="caption">即時，Flowlight 開啟時的那個畫面。</figcaption></figure>
@@ -377,7 +375,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         拒絕這些連線：連線會被丟棄，警示會記下拒絕了什麼，並提供<strong>「從現在起允許…」</strong>，一鍵就能把它加進
         清單。代理下一次嘗試就會通過。</p>
       <p><strong>這需要網路延伸功能。</strong>拒絕一條連線意味著要待在它的路徑上，而 nettop 取樣器
-        做不到 — 「擷取」畫面會直接說明，而不是給你一個沒有作用的開關。</p>
+        做不到 — 「來源 › 收集器」畫面會直接說明，而不是給你一個沒有作用的開關。</p>
       <p>有些東西無論清單怎麼寫都不會被拒絕：你的本機網路、DNS、Apple 自己的服務，以及 Flowlight 自己的
         流量。一台被封死的 Mac 比一個被封住的代理更糟，所以有疑慮時，連線會被允許並記錄下來。
         Flowlight 停止執行後幾秒，強制執行也會失效 — 沒人看得到的拒絕比不拒絕更糟，而解除它的
@@ -409,8 +407,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>這不是沙箱。</strong>被拒絕的工具不會再被提供，也不會再得到回應。但仍然有
         shell 的代理，可以自己動手做那個工具原本要做的事。Flowlight 會把那件事記錄下來；它不會假裝自己能阻止。</p>
 
-      <h2 id="capture"><span id="engines"></span>擷取：引擎與來源</h2>
-      <p>Flowlight 用兩種方式之一記錄流量，在<strong>「擷取」</strong>中選擇。兩者會漏掉的東西不同，在你倚賴
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>來源：收集器與引擎</h2>
+      <p>Flowlight 用兩種方式之一記錄流量，在<strong>「來源 › 收集器」</strong>中選擇。兩者會漏掉的東西不同，在你倚賴
         任何一種之前，值得先了解。</p>
       <table>
         <tr><th></th><th>nettop 取樣器（預設）</th><th>網路延伸功能</th></tr>
@@ -435,7 +433,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         同時保留你選擇的來源不動。「網路延伸功能」下的<em>「再試一次延伸功能」</em>可以重新來一遍。</p>
       <p><strong>在某些 Mac 上它也完全跑不起來。</strong>macOS 一次只允許一個內容過濾器，而那個位置通常被
         企業安全軟體佔著 — Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之類。在那些機器上，Flowlight
-        的過濾器會安裝也會連接，然後永遠拿不到任何一條連線。「擷取」會列出它找到的那些過濾器，並提議
+        的過濾器會安裝也會連接，然後永遠拿不到任何一條連線。「來源 › 收集器」會列出它找到的那些過濾器，並提議
         把你切回取樣器：取樣器不需要過濾器，也能和它們並存。
         想知道它是怎麼做出來的，請看<a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">開發者指南</a>。</p>
 
@@ -500,7 +498,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         螢幕上。主機名稱設定會在啟動後稍晚、且只在有視窗打開時才提出，而不是一開始就用一個
         密碼要求迎接你；在你接受或關掉它之前，下次啟動還會再問一次。</p>
       <p>結束 Flowlight 會停止取樣器，但不會停止網路延伸功能：系統延伸功能是獨立運作的，所以在你到
-        <strong>「擷取」</strong>停用或解除安裝它之前，過濾器會繼續檢查連線。</p>
+        <strong>「來源 › 收集器」</strong>停用或解除安裝它之前，過濾器會繼續檢查連線。</p>
 
       <h2 id="export">匯出到 OpenTelemetry 或 SIEM</h2>
       <p><strong>在你設定之前都是關閉的，而且沒有什麼 Flowlight 服務可以傳送。</strong>端點由你指定 — 你自己的
@@ -534,7 +532,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="data">你的資料</h2>
       <p>所有資料都在 <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>。每秒的資料列保留 6 小時
         （可調整）、分鐘資料列 14 天、小時資料列 400 天、每日資料列永久保留，警示 90 天。
-        <strong>「擷取」› 「清除所有資料」</strong>可以刪除它們。</p>
+        <strong>「設定」› 「資料與隱私權」› 「清除所有資料」</strong>可以刪除它們。</p>
 
       <h2 id="updates">更新</h2>
       <p>有新版本時，Flowlight 會用一則通知和側邊欄上的標記告訴你，而不是打斷你正在做的事；
@@ -553,7 +551,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="uninstall">解除安裝</h2>
       <ol>
-        <li>在<strong>「擷取」</strong>中，如果你啟用過，就選擇<strong>「移除封包擷取存取權」</strong>（會要求你的密碼）；
+        <li>在<strong>「來源 › 收集器」</strong>中，如果你啟用過，就選擇<strong>「移除封包擷取存取權」</strong>（會要求你的密碼）；
           如果你安裝過內容過濾器，就把它解除安裝；並在<strong>「檢查」</strong>中關閉 HTTPS 檢查，讓它的憑證
           離開你的鑰匙串。這三項只有 Flowlight 自己收得回來。</li>
         <li>結束 Flowlight，把它從「應用程式」移到「垃圾桶」 — 或者，如果你是用 Homebrew 安裝的，執行
@@ -571,20 +569,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>這取決於你用哪個擷取引擎，而差別並不細微。預設的取樣器每秒讀取一次 macOS 的位元組
           累計計數器並記錄變化量，所以長時間的傳輸計得很精確 — 但在兩次讀取之間開啟又關閉的連線，
           完全不會出現。網路延伸功能則是每建立一條連線 macOS 就會呼叫它，所以連五毫秒的請求也會被記錄。
-          如果你要監看一個會發出大量短請求的 AI 代理，請從<strong>「擷取」</strong>安裝
+          如果你要監看一個會發出大量短請求的 AI 代理，請從<strong>「來源 › 收集器」</strong>安裝
           延伸功能。<a href="#engines">完整的比較就在上面。</a></dd>
         <dt><strong>我開啟了網路延伸功能，卻什麼都沒出現。取樣器倒是很正常。</strong></dt>
         <dd>幾乎都是因為那個位置已經被另一個內容過濾器佔住了。<strong>macOS 一次只執行一個內容過濾器</strong>，而
           企業安全軟體通常會把它拿下 — Palo Alto Networks GlobalProtect、CrowdStrike Falcon 之類。Flowlight 的
-          過濾器照樣會安裝、啟用並連接，所以「擷取」會說<em>已連接過濾器延伸功能</em>，但 macOS 從來不會交給它
-          任何一條連線，畫面也就一直空著。<strong>「擷取」會列出它找到的過濾器</strong>，並提議把你切回
+          過濾器照樣會安裝、啟用並連接，所以「來源 › 收集器」會說<em>已連接過濾器延伸功能</em>，但 macOS 從來不會交給它
+          任何一條連線，畫面也就一直空著。<strong>「來源 › 收集器」會列出它找到的過濾器</strong>，並提議把你切回
           取樣器：取樣器不使用過濾器，也能和它們並存。你只會損失非常短的連線
           （<a href="#engines">見比較表</a>），其他一切的記錄方式都相同。</dd>
         <dt><strong>Flowlight 更新之後，延伸功能就不動了。</strong></dt>
         <dd>0.2.5 之前的版本有這個問題：macOS 會一直執行最後一次啟用的那個延伸功能建置版本，所以更新之後
           延伸功能還是舊版，而 macOS 會拒絕版本不一致的兩者之間的連接。從 0.2.5 起，Flowlight 會在啟動時檢查
-          並自行重新啟用過濾器。如果你用的是更舊的版本，請在「擷取」中按一次<strong>「安裝並啟用過濾器」</strong>。</dd>
-        <dt><strong>擷取還有別的問題，而我不知道是什麼。</strong></dt>
+          並自行重新啟用過濾器。如果你用的是更舊的版本，請在「來源 › 收集器」中按一次<strong>「安裝並啟用過濾器」</strong>。</dd>
+        <dt><strong>「來源 › 收集器」還有別的問題，而我不知道是什麼。</strong></dt>
         <dd>執行這個指令，然後讀它印出的內容 — 它只回報狀態和計數，絕不包含 Flowlight 記錄下來的任何流量內容：
           <p class="brew"><code>curl -fsSL https://raw.githubusercontent.com/{{repo}}/main/scripts/diagnose.sh | zsh</code><button type="button" class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh">拷貝</button></p>
           它會顯示安裝了哪些延伸功能、macOS 是否真的啟動了 Flowlight 的過濾器，以及最近一次記錄是多久以前。

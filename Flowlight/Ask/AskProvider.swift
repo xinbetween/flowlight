@@ -103,6 +103,8 @@ struct AskRecordedCall: Identifiable, Equatable, Sendable {
     var chart: AskChart?
     /// Which app screen clicking should open when Reports cannot represent this result.
     var screen: SidebarItem?
+    /// The exact operational tab when that destination is Sources.
+    var sourcesTab: SourcesTab? = nil
 }
 
 /// What a provider needs to answer. The conversation is only ever the question and the results of queries
