@@ -273,7 +273,7 @@ def verify_review_evidence(evidence, repository, source_sha):
         # configured reviewer login allowlist when this evidence was collected;
         # retain a valid GitHub association only as audit metadata.
         association = receipt["author_association"]
-        if association not in GITHUB_AUTHOR_ASSOCIATIONS:
+        if not isinstance(association, str) or association not in GITHUB_AUTHOR_ASSOCIATIONS:
             raise ReleaseArtifactError("review receipt author association is malformed")
         if receipt["reviewed_commit"] != source_sha:
             raise ReleaseArtifactError("review receipt does not bind the exact release commit")

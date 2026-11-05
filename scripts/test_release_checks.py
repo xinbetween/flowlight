@@ -149,6 +149,8 @@ class ReleaseCheckTests(unittest.TestCase):
             "missing association metadata": review_comment(author_association=None),
             "whitespace association metadata": review_comment(author_association="  "),
             "unknown association metadata": review_comment(author_association="FORGED"),
+            "array association metadata": review_comment(author_association=[]),
+            "object association metadata": review_comment(author_association={}),
             "marker not on its own line": review_comment(body=f"Approved Reviewed-Commit: {SHA}"),
             "comment URL wrong pull": review_comment(
                 html_url=f"https://github.com/{REPO}/pull/77#issuecomment-9001"

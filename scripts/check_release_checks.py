@@ -165,7 +165,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         association = comment.get("author_association")
         comment_id = comment.get("id")
         html_url = comment.get("html_url")
-        if association not in GITHUB_AUTHOR_ASSOCIATIONS:
+        if not isinstance(association, str) or association not in GITHUB_AUTHOR_ASSOCIATIONS:
             continue
         if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
             continue

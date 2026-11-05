@@ -378,7 +378,9 @@ class PreparedBundleTests(unittest.TestCase):
             "manifest receipt missing association": lambda: self._review_receipt_field(0, "author_association", ""),
             "manifest receipt whitespace association": lambda: self._review_receipt_field(0, "author_association", "  "),
             "manifest receipt unknown association": lambda: self._review_receipt_field(0, "author_association", "FORGED"),
-            "manifest receipt non-string association": lambda: self._review_receipt_field(0, "author_association", 1),
+            "manifest receipt numeric association": lambda: self._review_receipt_field(0, "author_association", 1),
+            "manifest receipt array association": lambda: self._review_receipt_field(0, "author_association", []),
+            "manifest receipt object association": lambda: self._review_receipt_field(0, "author_association", {}),
             "manifest receipt wrong SHA": lambda: self._review_receipt_field(0, "reviewed_commit", "d" * 40),
             "manifest receipt wrong URL": lambda: self._review_receipt_field(
                 0, "url", f"https://github.com/{REPOSITORY}/pull/82#issuecomment-9002"
