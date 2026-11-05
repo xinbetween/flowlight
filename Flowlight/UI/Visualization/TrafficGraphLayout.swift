@@ -821,8 +821,17 @@ enum TrafficGraphLayout {
         var previous = curve.start
         for step in 1...160 {
             let current = curve.point(at: CGFloat(step) / 160)
-            for obstacle in relevant where segment(previous, current, intersects: obstacle) {
-                return true
+            let minimumX = min(previous.x, current.x)
+            let maximumX = max(previous.x, current.x)
+            let minimumY = min(previous.y, current.y)
+            let maximumY = max(previous.y, current.y)
+            for obstacle in relevant {
+                // The curve-wide bounds above are intentionally conservative. Reject cards that cannot overlap this
+                // individual segment before running the more expensive exact clipping test; boundary contact remains
+                // inclusive, matching `segment(_:_:intersects:)`.
+                guard maximumX >= obstacle.minX, minimumX <= obstacle.maxX,
+                      maximumY >= obstacle.minY, minimumY <= obstacle.maxY else { continue }
+                if segment(previous, current, intersects: obstacle) { return true }
             }
             previous = current
         }
@@ -1199,6 +1208,10 @@ enum TrafficGraphLayout {
         frames: inout [TrafficGraphNodeID: CGRect],
         placementObserver: (@Sendable () -> Void)?
     ) -> Bool {
+        // Keep one ordered collision list for the whole placement pass. Rebuilding Array(frames.values) for every
+        // node turns a large graph into hundreds of successively larger allocations even though only one frame was
+        // added since the previous iteration.
+        var placedFrames = Array(frames.values)
         for lane in activeLanes {
             if Task<Never, Never>.isCancelled { return false }
             let nodes = ordered[lane] ?? []
@@ -1216,14 +1229,16 @@ enum TrafficGraphLayout {
                 if Task<Never, Never>.isCancelled { return false }
                 let preferredY = startY + size.height / 2 + CGFloat(index) * step
                 let preferred = CGPoint(x: column, y: preferredY)
-                frames[node.id] = place(
+                let frame = place(
                     size: size,
                     near: preferred,
                     laneX: column,
                     within: insetBounds,
-                    avoiding: Array(frames.values),
+                    avoiding: placedFrames,
                     gap: gap
                 )
+                frames[node.id] = frame
+                placedFrames.append(frame)
                 placementObserver?()
             }
         }
