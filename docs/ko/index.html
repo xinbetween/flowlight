@@ -127,7 +127,7 @@
 
   <section class="shot" aria-label="스크린샷">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/visualize.png?v=a0c8f2c9" width="1600" height="994"
+      <div class="frame"><img src="../assets/screenshots/visualize.png?v=d83ca9a0" width="1600" height="994"
         alt="Flowlight의 AI 활동 지도. 에이전트 카드는 귀속된 도구와 구성된 게이트웨이를 거치며, 관측된 magpie에서 Flowlight로의 경로가 LLM 서비스와 도메인으로 분기됩니다. 리본 너비는 기간 내 트래픽 양을 나타냅니다."></div>
       <p class="caption">실제 AI 경로를 확인하세요. 에이전트, 귀속된 도구, 구성된 게이트웨이, Flowlight가 관측한 프록시 단계와 정확한 목적지를 표시합니다. 리본 너비는 선택한 기간의 수신량과 송신량 합계입니다. 데모 데이터로 표시했습니다.</p>
     </div>
@@ -135,7 +135,7 @@
 
   <section class="shot" aria-label="스크린샷">
     <div class="wrap">
-      <div class="frame"><img src="../assets/screenshots/agents.png?v=920f131b" width="1600" height="994"
+      <div class="frame"><img src="../assets/screenshots/agents.png?v=f5a1a9a8" width="1600" height="994"
         alt="Flowlight의 AI 에이전트 뷰. Claude Code, Cursor, Codex, Python 스크립트가 각자의 AI 제공업체, 다른 곳으로 보낸 트래픽, 그리고 SMTP, SSH, FTP, 대용량 업로드, 원시 IP에 대한 위험 배지와 함께 나열되어 있습니다."></div>
       <p class="caption">AI 에이전트 뷰: 각 에이전트의 모델 제공업체, 그리고 그 밖에 통신한 모든 곳. 데모 데이터로 표시했습니다.</p>
     </div>
@@ -405,16 +405,16 @@
           검사 대상인 터미널에서 에이전트를 실행하면 에이전트와 그 도구의 지원되는 HTTP 트래픽이 복호화되고, 모델이 요청한
           도구 호출과 되돌아간 결과가 함께 보입니다.</p>
       </div>
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=11b4907d" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/inspect.png?v=f4153bc8" width="1600" height="994" loading="lazy"
         alt="Flowlight의 검사 뷰: 복호화된 Claude Code 요청과 각 요청의 도구 호출 목록, 그리고 curl이 paste.example로 올린 업로드의 상세 내용. 그 업로드를 실행한 Bash 도구 호출과 요청 본문에 담긴 메모가 함께 보입니다"></div>
         <figcaption><b>내 메모는 어디로 갔나?</b> curl이 paste.example로 올린 업로드를, 모델이 요청한 Bash 명령까지 거슬러
           올라가 보낸 본문과 함께.</figcaption></figure>
       <div class="screens" style="margin-top:32px">
-        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=80ae9952" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/agent-tools.png?v=169e7dcc" width="1600" height="712" loading="lazy"
           alt="Claude Code의 도구 탭: Bash, Read와 MCP 도구 두 개가 설명, 그리고 모델이 각각을 몇 번 호출했는지와 함께 나열되어 있습니다"></div>
           <figcaption><b>에이전트가 모델에게 내주는 모든 도구.</b> 에이전트는 매 턴마다 도구를 선언하므로 Flowlight는 그것을 전부
             나열하고, 모델이 실제로 쓴 것과 한 번도 건드리지 않은 것을 구분해 보여줍니다.</figcaption></figure>
-        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=49de67e1" width="1600" height="712" loading="lazy"
+        <figure><div class="frame"><img src="../assets/screenshots/mcp-servers.png?v=3d796ef6" width="1600" height="712" loading="lazy"
           alt="Codex의 MCP 서버 탭: 제공업체 경유로 표시된 sentry 서버, 그 URL, 승인은 사용 안 함, 허용된 도구, 그리고 서버가 제공하는 도구들"></div>
           <figcaption><b>회선에서는 보이지 않는 것까지.</b> 에이전트가 제공업체에게 MCP 서버로 연결해 달라고 하면 그 트래픽은
             내 Mac을 거치지 않습니다. 하지만 요청은 거치므로 서버와 URL, 승인 설정, 제공하는 도구는 그대로 드러납니다.</figcaption></figure>
@@ -460,7 +460,7 @@
 
   <section class="band" id="agent-detail" aria-label="에이전트 상세 스크린샷">
     <div class="wrap">
-      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=a7cc498f" width="1600" height="994" loading="lazy"
+      <figure class="detail-shot"><div class="frame"><img src="../assets/screenshots/agent-detail.png?v=f6c14a98" width="1600" height="994" loading="lazy"
         alt="Flowlight에 표시된 Claude Code 상세: 호출 횟수와 실패 하나가 붙은 도구와 MCP 서버, 허용 목록, 그리고 실패한 git push, 응답과 요청이 함께 있는 paste.example로의 curl 업로드, npm install, GitHub 이슈, 문서 검색, 파일 읽기가 각각 결과와 함께 나열된 도구 호출 탭"></div>
         <figcaption><b>에이전트 하나, 도구 호출 전부.</b> Claude Code가 띄운 git과 curl, MCP 서버의 트래픽은 Claude Code의 것으로
           집계됩니다. HTTPS 검사를 켜면 <em>도구 호출</em> 탭에서 모델이 무엇을 요청했고 무엇이 돌아왔으며 각 도구가 어떤 요청을
@@ -470,10 +470,10 @@
 
   <section class="band" aria-label="스크린샷 더 보기">
     <div class="wrap screens">
-      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=70df32bd" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/reports.png?v=bb421d7a" width="1600" height="994" loading="lazy"
         alt="시간별 수신·송신 막대와 앱, 목적지, 프로토콜 도넛 차트가 있는 기록 뷰"></div>
         <figcaption><b>기록.</b> 초에서 연까지의 확대·축소, 세 가지 묶음, 앱이 수백 개여도 읽히는 차트.</figcaption></figure>
-      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=a21369fa" width="1600" height="994" loading="lazy"
+      <figure><div class="frame"><img src="../assets/screenshots/alerts.png?v=47c0ce19" width="1600" height="994" loading="lazy"
         alt="에이전트 유출, 이메일, FTP, 자리 비움, 트래픽 급증 알림이 나열된 알림 뷰"></div>
         <figcaption><b>알림.</b> 하나하나가 앱과 목적지, 그리고 기준을 넘긴 수치를 밝힙니다.</figcaption></figure>
     </div>

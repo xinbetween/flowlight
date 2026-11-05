@@ -103,8 +103,19 @@ final class TrafficMonitor: ObservableObject {
     private var windows = WindowVisibility()
 
     /// Whether anything on screen needs the live chart series and the per-app list. With nothing visible the menu
-    /// bar only needs the current rates, so neither is built at all.
-    var uiVisible: Bool { windows.isVisible }
+    /// bar only needs the current rates, so neither is built at all. The launch-only screenshot fixture forces the
+    /// complete snapshot because headless capture can see an offscreen window that AppKit correctly calls occluded.
+    var uiVisible: Bool {
+        Self.needsLiveUI(
+            windowVisible: windows.isVisible,
+            demoEnabled: DemoData.isEnabled,
+            forceRender: UserDefaults.standard.bool(forKey: "FLRenderLive")
+        )
+    }
+
+    static func needsLiveUI(windowVisible: Bool, demoEnabled: Bool, forceRender: Bool) -> Bool {
+        windowVisible || (demoEnabled && forceRender)
+    }
 
     func windowVisibility(_ window: AnyObject, isVisible: Bool) {
         guard windows.update(window, isVisible: isVisible) == .becameHidden else { return }

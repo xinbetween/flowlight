@@ -121,7 +121,7 @@ capture() {
   # Launch the exact executable directly. Launch Services may route arguments between simultaneous installations
   # with the same bundle identifier, producing a real candidate window on the wrong screen.
   "$executable" -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
-    -FLDemo YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
+    -FLDemo YES -FLRenderLive YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
     -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
     -AppleInterfaceStyle Light \
     "${banner[@]}" "${visualization[@]}" "${rules[@]}" >/dev/null 2>&1 &
