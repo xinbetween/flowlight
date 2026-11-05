@@ -135,7 +135,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         if head_sha == sha and base_ref == "main" and (state == "open" or merged):
             associated_pulls.append(pull)
     if not associated_pulls:
-        errors.append(f"commit {sha} has no open or merged pull request targeting main at that exact head")
+        errors.append("exact source commit has no open or merged pull request targeting main at that exact head")
 
     associated_numbers = {int(pull["number"]) for pull in associated_pulls}
     receipts = []
@@ -176,10 +176,8 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
     if len({receipt["comment_id"] for receipt in receipts}) != len(receipts):
         errors.append("authenticated review comments contain duplicate comment IDs")
     if associated_pulls and not receipts:
-        reviewers = ", ".join(sorted(trusted_reviewers)) or "(none)"
         errors.append(
-            f"commit {sha} has no authenticated exact-head review comment; a trusted reviewer "
-            f"({reviewers}) must comment '{review_marker}' after review"
+            "no authenticated exact-head review comment from a configured trusted reviewer"
         )
 
     reviewed_pull_numbers = {receipt["pull_request"] for receipt in receipts}

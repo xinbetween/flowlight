@@ -119,6 +119,10 @@ class ReleaseCheckTests(unittest.TestCase):
     def test_pr_author_body_marker_is_not_review_evidence(self):
         errors, _, _ = run_verify(comments=[])
         self.assertTrue(any("no authenticated exact-head review comment" in error for error in errors))
+        self.assertFalse(any(TRUSTED_REVIEWER in error for error in errors),
+                         "trusted reviewer configuration must not be written to logs")
+        self.assertFalse(any(SHA in error for error in errors),
+                         "the exact review marker must not be written to logs")
 
     def test_rejects_spoofed_or_malformed_review_comments(self):
         cases = {
