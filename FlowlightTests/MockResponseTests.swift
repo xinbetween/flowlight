@@ -197,11 +197,28 @@ final class MockGateTests: XCTestCase {
                 case .forward(let d): forwarded.append(d); recorded.append(d)
                 case .hold(let d): recorded.append(d)
                 case .answer(let rule, let d, _): answered.append(rule.title); recorded.append(d)
-                case .rewritten(let d, _): recorded.append(d)
+                case .rewritten(let d, _, _): recorded.append(d)
                 }
             }
         }
         return (String(decoding: forwarded, as: UTF8.self), answered, String(decoding: recorded, as: UTF8.self))
+    }
+
+    func testInterventionPreservesGuardrailAndRewriteMetadataSeparately() {
+        let subject = gate([])
+        subject.intervene = { _, bytes in
+            .replace(bytes, guardrail: "guardrail-id", rewrite: "rewrite-id")
+        }
+        let request = Data("GET /v1/items HTTP/1.1\r\nHost: api.example.com\r\n\r\n".utf8)
+
+        let actions = subject.clientSent(request)
+
+        guard case .rewritten(let bytes, let guardrail, let rewrite) = actions.first else {
+            return XCTFail("expected rewritten action")
+        }
+        XCTAssertEqual(bytes, request)
+        XCTAssertEqual(guardrail, "guardrail-id")
+        XCTAssertEqual(rewrite, "rewrite-id")
     }
 
     func testNonMatchingRequestIsUntouched() {

@@ -415,9 +415,11 @@ final class InspectionProxy: @unchecked Sendable {
             case .hold(let bytes):
                 // Recorded like any other request byte: what the agent sent is exactly what it would have sent.
                 observer?.flow(flow, clientSent: bytes)
-            case .rewritten(let bytes, let note):
-                // Recorded as what left, not as what arrived: Inspect shows the request the server was sent.
-                observer?.flow(flow, rewrittenBy: note)
+            case .rewritten(let bytes, let guardrail, let rewrite):
+                // Recorded as what left, not as what arrived: Inspect shows the request the server was sent. Guardrail
+                // capability removal and configured request rewriting retain independent activity identities.
+                if let guardrail { observer?.flow(flow, guardedBy: guardrail) }
+                if let rewrite { observer?.flow(flow, rewrittenBy: rewrite) }
                 observer?.flow(flow, clientSent: bytes)
                 onward.append(bytes)
             case .answer(let rule, let bytes, let head):

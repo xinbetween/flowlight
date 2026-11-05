@@ -18,13 +18,13 @@ final class MockGate {
         case answer(MockRule, Data, ProxyRequestHead?)
         /// A whole request, changed on its way out: the bytes to send and record, and what to call the change.
         /// The original is not recorded, because it is not what the server was sent.
-        case rewritten(Data, String)
+        case rewritten(Data, guardrail: String?, rewrite: String?)
     }
 
     /// What to do with a whole request once its body has arrived.
     enum Intervention: Equatable {
         /// Send and record these bytes instead.
-        case replace(Data, note: String)
+        case replace(Data, guardrail: String?, rewrite: String?)
         /// Answer it here; nothing goes upstream.
         case answer(MockRule)
     }
@@ -145,8 +145,8 @@ final class MockGate {
         guard let held = holding else { return }
         holding = nil
         switch intervene?(held.head, held.bytes) {
-        case .replace(let bytes, let note):
-            actions.append(.rewritten(bytes, note))
+        case .replace(let bytes, let guardrail, let rewrite):
+            actions.append(.rewritten(bytes, guardrail: guardrail, rewrite: rewrite))
         case .answer(let rule):
             actions.append(.answer(rule, held.bytes, held.head))
         case nil:

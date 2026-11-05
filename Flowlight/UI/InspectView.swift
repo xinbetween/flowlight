@@ -102,6 +102,9 @@ private struct InspectContent: View {
     @State private var openMocks = false
     @State private var openRewrites = false
     @State private var openResponseTransforms = false
+    #if !APP_STORE
+    @State private var showPlugins = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -151,6 +154,20 @@ private struct InspectContent: View {
                                                                     : L("Starting…"))
                                                : L("Off"))
         .searchable(text: $search, placement: .toolbar, prompt: Text(L("Host, path, app, tool or anything in a body")))
+        #if !APP_STORE
+        .toolbar {
+            ToolbarItem {
+                Button { showPlugins = true } label: {
+                    Label(L("Plugins & Providers"), systemImage: "puzzlepiece.extension")
+                }
+                .help(L("Manage inspection plugins and local provider profiles"))
+            }
+        }
+        .sheet(isPresented: $showPlugins) {
+            PluginSettingsView()
+                .environmentObject(monitor)
+        }
+        #endif
         // Arriving from a row somewhere else: the subject lands in the search field rather than in a hidden
         // filter, so it is visible, editable and removable like anything else typed there.
         .onChange(of: nav.inspectRequest, initial: true) {
@@ -438,12 +455,14 @@ private struct InspectContent: View {
                             if let guardrail = e.guardrail {
                                 Label(L("Guarded"), systemImage: "shield.lefthalf.filled").font(.caption2.bold())
                                     .foregroundStyle(.teal).labelStyle(.titleAndIcon)
-                                    .help(L("A guardrail changed this request before it left: %@", guardrail))
+                                    .help(L("A guardrail changed this request before it left: %@",
+                                            InspectionPolicyReference.display(guardrail)))
                             }
                             if let transform = e.responseTransform {
                                 Label(L("Response modified"), systemImage: "arrow.left.arrow.right").font(.caption2.bold())
                                     .foregroundStyle(.purple).labelStyle(.titleAndIcon)
-                                    .help(L("%@ answered, then Flowlight changed the response using %@ before the app received it", e.host, transform))
+                                    .help(L("%@ answered, then Flowlight changed the response using %@ before the app received it",
+                                            e.host, InspectionPolicyReference.display(transform)))
                             }
                         }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)

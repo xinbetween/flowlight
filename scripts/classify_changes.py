@@ -19,7 +19,7 @@ import sys
 from dataclasses import asdict, dataclass
 
 
-SCHEMA = "flowlight-review-v2"
+SCHEMA = "flowlight-review-v3"
 
 SITE_ONLY_EXACT = frozenset(
     {

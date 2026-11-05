@@ -20,6 +20,17 @@ enum Motion {
     /// Something that repeats while a state lasts — a pulse while capture is live.
     static let breathing = Animation.easeInOut(duration: 1.6).repeatForever(autoreverses: true)
 
+    /// Runs an explicit state change with the shared motion policy. Views pass the system preference they read from
+    /// the environment so imperative scroll and disclosure changes follow the same Reduce Motion behavior as modifiers.
+    @MainActor
+    static func perform(_ animation: Animation? = control, reduceMotion: Bool, updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
+
     /// How a new turn, row or card enters. Opacity plus a small rise, never a slide across, because a horizontal
     /// slide reads as navigation and nothing has navigated.
     static var entrance: AnyTransition {

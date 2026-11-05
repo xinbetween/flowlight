@@ -42,11 +42,6 @@ struct SettingsView: View {
             DataPrivacySettingsTab()
                 .tabItem { Label(L("Data & Privacy"), systemImage: "hand.raised.square") }
 
-            #if !APP_STORE
-            PluginSettingsView()
-                .tabItem { Label(L("Plugins"), systemImage: "puzzlepiece.extension") }
-            #endif
-
             ExportSettingsTab()
                 .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
         }

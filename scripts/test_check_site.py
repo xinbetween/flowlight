@@ -57,5 +57,69 @@ class SidebarOrderTests(unittest.TestCase):
             "⌘9 · Developer ID<br>⌘8 · App Store", required), [])
 
 
+class ScreenshotProvenanceTests(unittest.TestCase):
+    def test_truthful_prior_capture_version_is_allowed(self):
+        entries = {
+            "agents.png": {"version": "0.17.4"},
+            "alerts.png": {"version": "0.17.4"},
+        }
+        self.assertEqual(check_site.capture_version_problems(entries, "0.17.5", "screenshots"), [])
+
+    def test_mixed_capture_versions_fail(self):
+        entries = {
+            "agents.png": {"version": "0.17.4"},
+            "alerts.png": {"version": "0.17.5"},
+        }
+        self.assertEqual(
+            check_site.capture_version_problems(entries, "0.17.5", "screenshots"),
+            ["screenshots: screenshots mix capture versions 0.17.4, 0.17.5"],
+        )
+
+    def test_future_and_missing_capture_versions_fail(self):
+        self.assertEqual(
+            check_site.capture_version_problems(
+                {"agents.png": {"version": "0.18.0"}}, "0.17.5", "screenshots"
+            ),
+            ["screenshots: capture version is newer than app 0.17.5: 0.18.0"],
+        )
+        self.assertEqual(
+            check_site.capture_version_problems(
+                {"agents.png": {}}, "0.17.5", "screenshots"
+            ),
+            ["screenshots: agents.png has no capture version"],
+        )
+
+
+class PagesProvenanceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = check_site.PAGES_WORKFLOW.read_text()
+
+    def test_committed_workflow_uses_verified_ci_artifact(self):
+        self.assertEqual(check_site.pages_workflow_problems(self.source), [])
+
+    def test_source_bypassing_trigger_fails(self):
+        unsafe = self.source.replace("  workflow_run:\n", "  workflow_dispatch:\n  workflow_run:\n", 1)
+        self.assertIn("Pages has a source-bypassing trigger", check_site.pages_workflow_problems(unsafe))
+
+    def test_checkout_or_rebuild_fails(self):
+        unsafe = self.source.replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", 1)
+        self.assertIn("Pages checks out or rebuilds source", check_site.pages_workflow_problems(unsafe))
+
+    def test_missing_exact_artifact_consumption_fails(self):
+        unsafe = self.source.replace("consume-pages", "consume-unverified-pages", 1)
+        self.assertIn(
+            "Pages does not consume and upload the verified CI artifact",
+            check_site.pages_workflow_problems(unsafe),
+        )
+
+    def test_extra_deploy_permission_fails(self):
+        unsafe = self.source.replace("      pages: write\n", "      pages: write\n      contents: write\n", 1)
+        self.assertIn(
+            "Pages deploy permissions are not limited to pages and id-token write",
+            check_site.pages_workflow_problems(unsafe),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

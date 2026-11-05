@@ -56,7 +56,7 @@ def run_fixture():
     }
     artifact = {
         "id": 789,
-        "name": f"flowlight-release-{TAG}-{RUN_ID}",
+        "name": f"flowlight-release-{TAG}-{RUN_ID}-1",
         "expired": False,
         "expires_at": "2030-01-01T00:00:00Z",
         "workflow_run": {"id": RUN_ID},
@@ -151,6 +151,22 @@ class PreparationRunTests(unittest.TestCase):
             now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
         )
         self.assertEqual(result["artifact_id"], 789)
+
+    def test_accepts_current_attempt_alongside_failed_previous_attempt_artifact(self):
+        run, artifacts = run_fixture()
+        run["run_attempt"] = 2
+        previous = dict(artifacts["artifacts"][0])
+        current = dict(previous, id=790, name=f"flowlight-release-{TAG}-{RUN_ID}-2")
+        artifacts = {"total_count": 2, "artifacts": [previous, current]}
+
+        result = verify_run(
+            run, artifacts, repository=REPOSITORY, workflow_id=WORKFLOW_ID,
+            run_id=str(RUN_ID), tag=TAG, source_sha=SHA,
+            now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
+        )
+
+        self.assertEqual(result["artifact_id"], 790)
+        self.assertEqual(result["run_attempt"], 2)
 
     def test_rejects_wrong_run_metadata_and_artifacts(self):
         mutations = {

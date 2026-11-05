@@ -1,5 +1,35 @@
 import Foundation
 
+/// Stable policy identity stored with inspected exchange activity. Titles remain useful after a policy is renamed or
+/// deleted, while IDs keep Activity navigation independent of mutable display text. Legacy plain strings still decode
+/// as nil and are handled by their existing title-based fallback.
+struct InspectionPolicyReference: Equatable, Sendable {
+    struct Entry: Codable, Equatable, Sendable {
+        var id: UUID
+        var title: String
+    }
+
+    private static let prefix = "flowlight-policy-v1:"
+
+    static func encode(_ entries: [Entry]) -> String? {
+        var seen = Set<UUID>()
+        let unique = entries.filter { seen.insert($0.id).inserted }
+        guard !unique.isEmpty, let data = try? JSONEncoder().encode(unique) else { return nil }
+        return prefix + data.base64EncodedString()
+    }
+
+    static func decode(_ value: String) -> [Entry]? {
+        guard value.hasPrefix(prefix),
+              let data = Data(base64Encoded: String(value.dropFirst(prefix.count))),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data), !entries.isEmpty else { return nil }
+        return entries
+    }
+
+    static func display(_ value: String) -> String {
+        decode(value)?.map(\.title).joined(separator: " · ") ?? value
+    }
+}
+
 /// An edit to one outgoing header: replace it (`set`), append another copy (`add`), or drop it (`remove`).
 struct HeaderEdit: Codable, Equatable, Identifiable, Sendable {
     enum Op: String, Codable, Sendable, CaseIterable { case set, add, remove }
@@ -123,7 +153,7 @@ enum RewriteRules {
     /// Apply every rule that matches this request to the framed bytes (full head + body). Returns the rewritten
     /// request and a short note of what changed, or nil when nothing matched or nothing changed.
     static func apply(_ rules: [RewriteRule], to request: Data, host: String, method: String, path: String)
-        -> (data: Data, note: String)? {
+        -> (data: Data, note: String, rules: [RewriteRule])? {
         let applicable = rules.filter {
             $0.enabled && GlobMatch.host($0.host, host) && GlobMatch.method($0.method, method) && GlobMatch.path($0.path, path)
         }
@@ -199,7 +229,7 @@ enum RewriteRules {
         var out = Data(([requestLine] + headerLines).joined(separator: "\r\n").utf8)
         out.append(Data("\r\n\r\n".utf8))
         out.append(bodyData)
-        return (out, notes.joined(separator: ", "))
+        return (out, notes.joined(separator: ", "), applicable)
     }
 
     /// Parse a value cell as JSON when it can be (number, bool, null, object, array, quoted string); otherwise take

@@ -163,6 +163,7 @@ struct JSONNodeView: View {
     let value: JSONValue
     let depth: Int
     var keyStyle: KeyStyle = .key
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expanded: Bool
     @State private var shown = 200
     @State private var fullString = false
@@ -231,7 +232,7 @@ struct JSONNodeView: View {
         .padding(.vertical, 1.5)
         .contentShape(Rectangle())
         .onTapGesture {
-            if value.isContainer { withAnimation(.easeOut(duration: 0.12)) { expanded.toggle() } }
+            if value.isContainer { Motion.perform(Motion.control, reduceMotion: reduceMotion) { expanded.toggle() } }
             else if case .string = value { fullString.toggle() }
         }
         .contextMenu {

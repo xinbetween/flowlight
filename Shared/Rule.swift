@@ -66,6 +66,9 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
         case flow
         /// The HTTPS inspection proxy, which refuses one request and answers with a status.
         case request
+        /// A guardrail changed or refused one inspected agent request. Persisted separately so deleting the guardrail
+        /// cannot relabel its historical activity as an ordinary network rule.
+        case guardrail
     }
 
     var engine: Engine { path.isEmpty && method.isEmpty ? .flow : .request }
@@ -385,7 +388,7 @@ extension Rule {
         switch engine {
         case .flow:
             return extensionRunning ? nil : "Watching only — the Network Extension refuses connections, and it isn't running."
-        case .request:
+        case .request, .guardrail:
             return inspecting ? nil : "Watching only — a path can only be matched by HTTPS inspection, and it is off."
         }
     }

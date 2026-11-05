@@ -213,6 +213,27 @@ final class InsightsTests: XCTestCase {
         )
     }
 
+    func testLiveChartKeyboardAndPointerSelectionStayIndependent() {
+        let dates = [10.0, 20.0, 30.0].map(Date.init(timeIntervalSince1970:))
+
+        XCTAssertEqual(LiveChartSelection.move(from: nil, direction: .right, dates: dates), dates.first)
+        XCTAssertEqual(LiveChartSelection.move(from: nil, direction: .left, dates: dates), dates.last)
+        XCTAssertEqual(LiveChartSelection.move(from: dates[1], direction: .left, dates: dates), dates[0])
+        XCTAssertEqual(LiveChartSelection.move(from: dates[1], direction: .right, dates: dates), dates[2])
+        XCTAssertEqual(LiveChartSelection.date(hovered: dates[2], keyboard: dates[0], chartFocused: true), dates[2])
+        XCTAssertEqual(LiveChartSelection.date(hovered: nil, keyboard: dates[0], chartFocused: true), dates[0])
+        XCTAssertNil(LiveChartSelection.date(hovered: nil, keyboard: dates[0], chartFocused: false))
+    }
+
+    func testLiveChartSelectionReconcilesToTheNearestRetainedSecond() {
+        let current = Date(timeIntervalSince1970: 20)
+        let dates = [21.0, 22.0, 23.0].map(Date.init(timeIntervalSince1970:))
+
+        XCTAssertEqual(LiveChartSelection.reconcile(current, dates: dates), dates[0])
+        XCTAssertNil(LiveChartSelection.reconcile(nil, dates: dates))
+        XCTAssertNil(LiveChartSelection.reconcile(current, dates: []))
+    }
+
     func testHistoryPresetUsesAnIndependentVisibleWindowAndResolution() {
         let end = Date(timeIntervalSince1970: 2_000_000)
         let available = Date(timeIntervalSince1970: 0)...end

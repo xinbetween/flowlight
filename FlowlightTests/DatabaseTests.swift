@@ -44,6 +44,36 @@ final class DatabaseTests: XCTestCase {
         FlowKey(pid: 10, bundleID: app, appName: app, appPath: "", remoteIP: ip, domain: domain, port: port, transport: .tcp, appProtocol: "https")
     }
 
+    func testInspectedAgentIDsCoverRowsOlderThanBoundedExchangeDetails() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func exchange(index: Int, agent: String) -> HTTPExchange {
+            HTTPExchange(
+                id: nil, started: start.addingTimeInterval(TimeInterval(index)), duration: 0.01,
+                scheme: "https", host: "api.example", port: 443, method: "GET", path: "/", status: 200,
+                requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+                responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+                contentType: "application/json", pid: 10, bundleID: "agent.app", appName: "Agent",
+                agent: agent, agentName: agent, mcpServer: nil, toolCalls: [], note: nil,
+                mockRule: nil, guardrail: nil
+            )
+        }
+
+        _ = try db.insertExchange(exchange(index: 0, agent: "older-agent"))
+        for index in 1...5_000 {
+            _ = try db.insertExchange(exchange(index: index, agent: "newer-agent"))
+        }
+
+        let details = try db.exchanges(since: start, limit: 5_000)
+        XCTAssertEqual(Set(details.compactMap(\.agent)), ["newer-agent"])
+        XCTAssertEqual(try db.inspectedAgentIDs(since: start), ["older-agent", "newer-agent"])
+        XCTAssertEqual(try db.inspectedAgentIDs(
+            since: start, focus: FocusScope(bundleIDs: ["agent.app"])
+        ), ["older-agent", "newer-agent"])
+        XCTAssertTrue(try db.inspectedAgentIDs(
+            since: start, focus: FocusScope(bundleIDs: ["other.app"])
+        ).isEmpty)
+    }
+
     func testTrafficDateBoundsAreNilWhenEmptyAndCoverRetainedTraffic() throws {
         XCTAssertNil(try db.trafficDateBounds())
 

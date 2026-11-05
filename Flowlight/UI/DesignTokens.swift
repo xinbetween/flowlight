@@ -23,7 +23,7 @@ enum FL {
     // Semantic.
     static let accent   = Color(light: 0x4a3aa7, dark: 0x9085e9)
     static let received = Color(light: 0x2a78d6, dark: 0x4a93ea)
-    static let sent     = Color(light: 0xd95926, dark: 0xe5723f)
+    static let sent     = Color(light: 0xd95926, dark: 0xdf6c39)
     static let critical = Color(light: 0xc93b33, dark: 0xec6a62)
     static let warning  = Color(light: 0xb86e00, dark: 0xe0a13a)
     static let good     = Color(light: 0x1f9d6b, dark: 0x4fb98a)

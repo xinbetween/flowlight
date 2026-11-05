@@ -1,115 +1,121 @@
-# Publishes docs/ to GitHub Pages.
-#
-# Pages can deploy a branch folder on its own, and did until now. That path runs a workflow GitHub generates
-# and we cannot edit, built on actions that are a major version behind — which is where the "Node.js 20 is
-# deprecated" warning on every push came from. Doing it here instead means the actions are ours to keep
-# current, and the site is only rebuilt when something it serves has changed.
+# Deploys only the exact docs/ payload validated by a successful canonical CI push to main.
 name: Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
-    paths: ["docs/**", ".github/workflows/pages.yml"]
-  workflow_dispatch:
+    types: [completed]
 
-permissions:
-  contents: read
-  deployments: read
-  pages: write
-  id-token: write
+permissions: {}
 
-# One deployment at a time, and a newer push wins — but never cancel one midway, because a half-finished
-# deployment is a half-updated site.
+# Serialize the source-is-current check with deployment. An older queued run fails stale after main advances;
+# deployments are never cancelled halfway through.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    # A manual run is recovery for the deployed site, never a way to publish an arbitrary branch.
-    if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
-    # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
-    # been carrying an annotation saying so. A named image means the move happens when we make it, with a
-    # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
+  prepare:
+    name: verify Pages provenance
+    if: >-
+      github.repository == 'xinbetween/flowlight' &&
+      github.event.workflow_run.repository.full_name == 'xinbetween/flowlight' &&
+      github.event.workflow_run.head_repository.full_name == 'xinbetween/flowlight' &&
+      github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.status == 'completed' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      source_sha: ${{ steps.payload.outputs.source_sha }}
+      source_tree: ${{ steps.payload.outputs.source_tree }}
+      source_run_id: ${{ steps.payload.outputs.source_run_id }}
+      source_artifact_id: ${{ steps.payload.outputs.source_artifact_id }}
+      source_artifact_digest: ${{ steps.payload.outputs.source_artifact_digest }}
+    steps:
+      # No checkout: Pages consumes bytes CI already validated. Fetching the verifier from the source SHA happens
+      # only after a small independent gate proves that SHA is the canonical main tip and the event is its CI push.
+      - name: Fetch the verifier from the still-current canonical source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_REPOSITORY: ${{ github.event.workflow_run.repository.full_name }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          SOURCE_WORKFLOW: ${{ github.event.workflow_run.path }}
+          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+          SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SOURCE_STATUS: ${{ github.event.workflow_run.status }}
+          SOURCE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REPOSITORY" == xinbetween/flowlight ]]
+          [[ "$SOURCE_REPOSITORY" == "$REPOSITORY" ]]
+          [[ "$HEAD_REPOSITORY" == "$REPOSITORY" ]]
+          [[ "$SOURCE_WORKFLOW" == .github/workflows/ci.yml ]]
+          [[ "$SOURCE_EVENT" == push ]]
+          [[ "$SOURCE_BRANCH" == main ]]
+          [[ "$SOURCE_STATUS" == completed ]]
+          [[ "$SOURCE_CONCLUSION" == success ]]
+          CURRENT_MAIN=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          [[ "$SOURCE_SHA" == "$CURRENT_MAIN" ]] || {
+            echo "::error::CI source $SOURCE_SHA is stale; main is now $CURRENT_MAIN."
+            exit 1
+          }
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            "repos/$REPOSITORY/contents/scripts/workflow_evidence.py?ref=$SOURCE_SHA" \
+            > "$RUNNER_TEMP/workflow_evidence.py"
+
+      - id: payload
+        name: Download and verify the exact CI artifact and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 -I "$RUNNER_TEMP/workflow_evidence.py" consume-pages \
+            --event-json "$GITHUB_EVENT_PATH" \
+            --repository "$REPOSITORY" \
+            --output "$RUNNER_TEMP/verified-site" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Upload the verified site for Pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/verified-site
+
+  deploy:
+    name: deploy Pages
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          # The rollback gate compares a push with the commit that was on main before the entire push, which may
-          # be more than one commit behind HEAD. A two-commit checkout silently compares inside a multi-commit push.
-          fetch-depth: 0
+      # Recheck after the queued verification job. The repository is public, so this needs no contents permission
+      # and the deployment job keeps only the two permissions required by Pages itself.
+      - name: Reject a source that became stale before deployment
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN=$(curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            https://api.github.com/repos/xinbetween/flowlight/git/ref/heads/main | jq -r .object.sha)
+          [[ "$SOURCE_SHA" == "$CURRENT_MAIN" ]] || {
+            echo "::error::Verified source $SOURCE_SHA is stale; main is now $CURRENT_MAIN."
+            exit 1
+          }
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
-      # CI checks this on every pull request, but this workflow is the one that actually puts the site in front
-      # of people, and a deploy is not something you can take back from a cache. Seconds of Python for the
-      # guarantee that nothing broken is ever served.
-      - name: Verify the official rule-pack catalog
-        env:
-          # gh does not implicitly read github.token; authenticate deployment-history lookups explicitly.
-          GH_TOKEN: ${{ github.token }}
-          # Pushes compare with the exact ref main held before the whole push. A manual recovery run instead compares
-          # with the signed catalog currently served by Pages, so rewritten history cannot roll the public feed back.
-          PREVIOUS_CATALOG_REF: ${{ github.event.before }}
-          LIVE_CATALOG_URL: https://flowlight.xinbetween.com/packs/v1/official.json
-        run: |
-          python3 -I scripts/rule_pack_catalog.py compare \
-            rule-packs/official-source.json site/packs/v1/official.json
-          if [ "${{ github.event_name }}" = "push" ]; then
-            if git cat-file -e "$PREVIOUS_CATALOG_REF:site/packs/v1/official.json" 2>/dev/null; then
-              python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
-                --previous-ref "$PREVIOUS_CATALOG_REF"
-            fi
-          else
-            PREVIOUS_CATALOG=$(mktemp)
-            DEPLOYED_CATALOG_FOUND=false
-            if DEPLOYMENT_IDS=$(gh api \
-              'repos/${{ github.repository }}/deployments?environment=github-pages&per_page=20' \
-              --jq '.[].id'); then
-              for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
-                if ! DEPLOYMENT_STATE=$(gh api \
-                  "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
-                  --jq '.[0].state // empty'); then
-                  continue
-                fi
-                if [ "$DEPLOYMENT_STATE" = "success" ] && \
-                   DEPLOYED_REF=$(gh api \
-                     "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID" --jq '.sha') && \
-                   gh api -H 'Accept: application/vnd.github.raw+json' \
-                     "repos/${{ github.repository }}/contents/site/packs/v1/official.json?ref=$DEPLOYED_REF" \
-                     > "$PREVIOUS_CATALOG"; then
-                  DEPLOYED_CATALOG_FOUND=true
-                  break
-                fi
-              done
-            fi
-            if [ "$DEPLOYED_CATALOG_FOUND" != "true" ]; then
-              curl --fail --silent --show-error --connect-timeout 10 --max-time 30 --max-filesize 8388608 \
-                --output "$PREVIOUS_CATALOG" "$LIVE_CATALOG_URL"
-            fi
-            python3 -I scripts/rule_pack_catalog.py verify "$PREVIOUS_CATALOG" --historical \
-              --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
-              --expected-key-id flowlight-rule-packs-2026-01
-            python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
-              --previous "$PREVIOUS_CATALOG"
-          fi
-          APP_VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
-          test -n "$APP_VERSION"
-          python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
-            --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
-            --expected-key-id flowlight-rule-packs-2026-01 --current-app-version "$APP_VERSION" \
-            --extension-protocol 1 --now "$(date +%s)"
-
-      - name: Check the site before serving it
-        run: python3 scripts/check_site.py --ci
-
-      # docs/ is committed and CI already checks it matches a fresh build, so there is nothing to build here.
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: docs
 
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

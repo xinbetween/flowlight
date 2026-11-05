@@ -6,6 +6,7 @@ import re
 import unittest
 
 WORKFLOW = pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
+CI_WORKFLOW = pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml"
 FORBIDDEN_PUBLICATION = (
     "APP_CERTIFICATE_P12", "INSTALLER_CERTIFICATE_P12", "CERTIFICATE_PASSWORD",
     "APP_PROVISIONING_PROFILE", "EXT_PROVISIONING_PROFILE", "APP_PROFILE", "EXT_PROFILE",
@@ -58,8 +59,10 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.workflow = WORKFLOW.read_text()
+        cls.ci_workflow = CI_WORKFLOW.read_text()
         cls.prepare = job_block(cls.workflow, "prepare", "publish")
         cls.publish = job_block(cls.workflow, "publish")
+        cls.merge_compatibility = job_block(cls.ci_workflow, "merge-compatibility", "gate")
 
     def test_manual_publication_requires_preparation_run(self):
         self.assertRegex(self.workflow, r"(?m)^      prepare_run_id:\n")
@@ -78,10 +81,34 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
 
     def test_preparation_requires_authenticated_review_comments(self):
         self.assertIn("RELEASE_REVIEWERS", self.prepare)
-        self.assertIn("issues/comments?per_page=100", self.prepare)
+        self.assertIn('issues/$pull_number/comments?per_page=100', self.prepare)
+        self.assertNotIn('issues/comments?per_page=100', self.prepare)
+        self.assertIn('for attempt in 1 2 3 4 5 6', self.prepare)
+        self.assertIn('select(.head.sha == $sha and .base.ref == "main")', self.prepare)
         self.assertIn('--comments "$COMMENTS"', self.prepare)
         self.assertIn('--reviewers "$RELEASE_REVIEWERS"', self.prepare)
         self.assertNotIn("pull request whose body", self.prepare)
+
+    def test_review_lookup_contract_rejects_repository_wide_comment_scan(self):
+        tampered = self.prepare.replace(
+            'issues/$pull_number/comments?per_page=100',
+            'issues/comments?per_page=100',
+        )
+        self.assertNotIn('issues/$pull_number/comments?per_page=100', tampered)
+        self.assertIn('issues/comments?per_page=100', tampered)
+
+    def test_merge_compatibility_uses_pull_request_default_merge_ref(self):
+        self.assertIn("actions/checkout@", self.merge_compatibility)
+        self.assertNotIn("refs/pull/", self.merge_compatibility)
+        self.assertNotRegex(self.merge_compatibility, r"(?m)^          ref:")
+
+    def test_untrusted_checkout_detector_rejects_deliberate_ref_fixture(self):
+        unsafe = self.merge_compatibility.replace(
+            "      - uses: actions/checkout@",
+            "      - uses: actions/checkout@",
+        ) + "\n        with:\n          ref: refs/pull/${{ github.event.number }}/merge\n"
+        self.assertIn("refs/pull/", unsafe)
+        self.assertRegex(unsafe, r"(?m)^          ref:")
 
     def test_publication_has_only_distribution_permissions(self):
         self.assertEqual(permissions(self.publish), {

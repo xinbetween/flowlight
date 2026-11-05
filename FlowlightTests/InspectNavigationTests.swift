@@ -170,6 +170,57 @@ final class InspectNavigationTests: XCTestCase {
         XCTAssertNil(state.section(for: "claude"))
     }
 
+    func testUnifiedActivityUsesStableInspectionPolicyIdentities() throws {
+        let guardrailID = UUID()
+        let rewriteID = UUID()
+        let transformID = UUID()
+        let guardrail = try XCTUnwrap(InspectionPolicyReference.encode([
+            .init(id: guardrailID, title: "Shell guardrail"),
+        ]))
+        let rewrite = try XCTUnwrap(InspectionPolicyReference.encode([
+            .init(id: rewriteID, title: "Scrub request"),
+        ]))
+        let transform = try XCTUnwrap(InspectionPolicyReference.encode([
+            .init(id: transformID, title: "Shape response"),
+        ]))
+        let exchange = HTTPExchange(
+            id: 43, started: Date(timeIntervalSince1970: 100), duration: 0.2, scheme: "https",
+            host: "api.example.com", port: 443, method: "POST", path: "/v1/run", status: 200,
+            requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+            responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+            contentType: "application/json", pid: 1, bundleID: "agent", appName: "Agent",
+            agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [], toolResults: [], mcp: [], llm: nil,
+            note: nil, mockRule: nil, guardrail: guardrail, requestRewrite: rewrite,
+            responseTransform: transform)
+
+        let activity = PolicyActivityBuilder.build(ruleEvents: [], packEvents: [], alerts: [], exchanges: [exchange],
+                                                   rules: [], guardrails: [], packs: [], mocks: [], rewrites: [],
+                                                   transforms: [])
+
+        XCTAssertEqual(Set(activity.compactMap(\.policyID)), [
+            PolicyInventoryID.make(.guardrail, sourceID: guardrailID.uuidString.lowercased()),
+            PolicyInventoryID.make(.requestRewrite, sourceID: rewriteID.uuidString.lowercased()),
+            PolicyInventoryID.make(.responseTransform, sourceID: transformID.uuidString.lowercased()),
+        ])
+        XCTAssertEqual(Set(activity.map(\.title)), ["Shell guardrail", "Scrub request", "Shape response"])
+        XCTAssertEqual(InspectionPolicyReference.display(transform), "Shape response")
+    }
+
+    func testDeletedGuardrailEventRetainsItsKind() {
+        let event = RuleEventRecord(
+            id: 7, timestamp: Date(timeIntervalSince1970: 100), ruleID: UUID(), action: .block,
+            engine: .guardrail, bundleID: "agent", appName: "Agent", agentKey: "agent", agentName: "Agent",
+            host: "api.example.com", ip: "", port: 443, path: "shell", method: "POST"
+        )
+
+        let activity = PolicyActivityBuilder.build(ruleEvents: [event], packEvents: [], alerts: [], exchanges: [],
+                                                   rules: [], guardrails: [], packs: [], mocks: [], rewrites: [],
+                                                   transforms: [])
+
+        XCTAssertEqual(activity.first?.kind, .guardrail)
+        XCTAssertEqual(activity.first?.effect, .guardrailApplied)
+    }
+
     func testUnifiedActivityKeepsGuardrailAndRewriteEffectsDistinct() {
         let exchange = HTTPExchange(
             id: 42, started: Date(timeIntervalSince1970: 100), duration: 0.2, scheme: "https",

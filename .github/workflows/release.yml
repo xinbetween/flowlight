@@ -91,19 +91,52 @@ jobs:
           PULLS="$RUNNER_TEMP/release-pulls.json"
           RUNS="$RUNNER_TEMP/release-workflow-runs.json"
           COMMENTS="$RUNNER_TEMP/release-review-comments.json"
+          COMMENTS_DIR="$RUNNER_TEMP/release-review-comment-pages"
           EVIDENCE="$RUNNER_TEMP/review-evidence.json"
-          gh api --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?per_page=100" > "$CHECKS"
-          gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls?per_page=100" > "$PULLS"
-          gh api --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&event=pull_request&per_page=100" > "$RUNS"
-          gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
-            "repos/$GITHUB_REPOSITORY/issues/comments?per_page=100" > "$COMMENTS"
-          python3 -I scripts/check_release_checks.py \
-            --repo "$GITHUB_REPOSITORY" --sha "$RELEASE_SHA" \
-            --checks "$CHECKS" --pulls "$PULLS" --runs "$RUNS" --comments "$COMMENTS" \
-            --reviewers "$RELEASE_REVIEWERS" --evidence-output "$EVIDENCE"
+          mkdir -p "$COMMENTS_DIR"
+          verified=false
+          for attempt in 1 2 3 4 5 6; do
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?per_page=100" > "$CHECKS"
+            gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls?per_page=100" > "$PULLS"
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&event=pull_request&per_page=100" > "$RUNS"
+
+            pull_numbers=$(jq -r --arg sha "$RELEASE_SHA" '
+              .[][]
+              | select(.head.sha == $sha and .base.ref == "main")
+              | select(.state == "open" or .merged_at != null)
+              | .number
+            ' "$PULLS")
+            comment_pages=()
+            for pull_number in $pull_numbers; do
+              [[ "$pull_number" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number."; exit 1; }
+              page="$COMMENTS_DIR/$pull_number.json"
+              gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/issues/$pull_number/comments?per_page=100" > "$page"
+              comment_pages+=("$page")
+            done
+            if (( ${#comment_pages[@]} == 0 )); then
+              jq -n '[]' > "$COMMENTS"
+            else
+              jq -s '[.[][]]' "${comment_pages[@]}" > "$COMMENTS"
+            fi
+
+            if python3 -I scripts/check_release_checks.py \
+              --repo "$GITHUB_REPOSITORY" --sha "$RELEASE_SHA" \
+              --checks "$CHECKS" --pulls "$PULLS" --runs "$RUNS" --comments "$COMMENTS" \
+              --reviewers "$RELEASE_REVIEWERS" --evidence-output "$EVIDENCE"; then
+              verified=true
+              break
+            fi
+            if [[ "$attempt" -lt 6 ]]; then
+              delay=$((attempt * 10))
+              echo "Release evidence is not complete yet; retrying in ${delay}s (attempt $attempt/6)."
+              sleep "$delay"
+            fi
+          done
+          [[ "$verified" == true ]] || { echo "::error::Release evidence did not become complete."; exit 1; }
 
       - name: Select Xcode
         run: |
@@ -293,7 +326,7 @@ jobs:
         id: artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: flowlight-release-${{ steps.version.outputs.tag }}-${{ github.run_id }}
+          name: flowlight-release-${{ steps.version.outputs.tag }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/Flowlight.dmg
             build/Flowlight-${{ steps.version.outputs.version }}.pkg

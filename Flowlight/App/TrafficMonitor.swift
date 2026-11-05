@@ -38,6 +38,7 @@ final class TrafficMonitor: ObservableObject {
     var isReceiving: Bool { live.isReceiving }
     @Published private(set) var sessionIn: Int64 = 0
     @Published private(set) var sessionOut: Int64 = 0
+    /// Sidebar badge count. The compatibility name is retained, but this is explicitly the number in `new` state.
     @Published private(set) var unacknowledgedAlerts = 0
     @Published private(set) var captureState: PacketSniffer.State = .stopped
     @Published private(set) var hostnamesLearned = 0
@@ -909,7 +910,7 @@ final class TrafficMonitor: ObservableObject {
     func refreshAlertCount() {
         let scope = focus
         db.async { [weak self] db in
-            let count = try db.unacknowledgedAlertCount(focus: scope)
+            let count = try db.newAlertCount(focus: scope)
             Task { @MainActor in self?.unacknowledgedAlerts = count }
         }
     }
@@ -1051,13 +1052,49 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
-    func acknowledgeAlerts(ids: [Int64]?) {
-        db.async { [weak self] db in
-            try db.acknowledgeAlerts(ids: ids)
-            Task { @MainActor in
-                self?.refreshAlertCount()
-                self?.dataVersion += 1
-            }
+    @discardableResult
+    func acknowledgeAlerts(ids: [Int64]?, focus: FocusScope = .none) async -> Bool {
+        await updateAlertTriage { database in
+            try database.acknowledgeAlerts(ids: ids, focus: focus)
         }
+    }
+
+    @discardableResult
+    func setAlertTriageState(_ state: AlertTriageState, ids: [Int64]) async -> Bool {
+        await updateAlertTriage { database in
+            try database.setAlertTriageState(state, ids: ids)
+        }
+    }
+
+    @discardableResult
+    func setAlertDisposition(_ disposition: AlertDisposition, ids: [Int64]) async -> Bool {
+        await updateAlertTriage { database in
+            try database.setAlertDisposition(disposition, ids: ids)
+        }
+    }
+
+    @discardableResult
+    func setAlertNote(_ note: String, id: Int64) async -> Bool {
+        await updateAlertTriage { database in
+            try database.setAlertNote(note, id: id)
+        }
+    }
+
+    private func updateAlertTriage(
+        _ mutation: @escaping @Sendable (TrafficDatabase) throws -> Void
+    ) async -> Bool {
+        do {
+            try await db.asyncResult(mutation)
+            alertTriageDidChange()
+            return true
+        } catch {
+            lastError = L("Couldn't update alerts: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    private func alertTriageDidChange() {
+        refreshAlertCount()
+        dataVersion += 1
     }
 }

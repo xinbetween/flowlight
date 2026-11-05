@@ -27,37 +27,42 @@ enum AgentWindow: String, CaseIterable, Identifiable {
     var granularity: Granularity { self == .week ? .hour : .minute }
 }
 
-/// AI agents on this Mac: what they talk to besides their model provider, and how risky that looks.
+/// Every AI agent Flowlight can account for on this Mac, whether installed, configured, or observed.
 struct AgentsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var focus: FocusStore
     @AppStorage("agents.window") private var window: AgentWindow = .day
-    @State private var agents: [AgentSummary] = []
-    @State private var agentAlerts = 0
+    @State private var trafficAgents: [AgentSummary] = []
+    @State private var inventory: [AgentInventoryItem] = []
+    @State private var installedApps: [InstalledApps.App] = []
+    @State private var alerts: [AlertRecord] = []
     @State private var policies: [String: AgentPolicy] = [:]
     @State private var toolUsage: [String: [ToolUsage]] = [:]
     @State private var toolActivity: [String: [ToolActivity]] = [:]
     @State private var mcpServers: [String: [MCPServerSummary]] = [:]
     @State private var profiles: [String: AgentProfile] = [:]
-    /// Agents Flowlight actually decrypted something from in this window — not the same question as
-    /// whether inspection is on, since an agent has to be routed through the proxy to be seen at all.
+    /// Agents Flowlight actually decrypted something from in this window — not the same question as whether
+    /// inspection is on, since an agent has to be routed through the proxy to be seen at all.
     @State private var inspectedAgents: Set<String> = []
     @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
-    @State private var selection: AgentSummary.ID?
+    @State private var selection: AgentInventoryItem.ID?
     @State private var policyDeepLink = AgentPolicyDeepLinkState()
-    @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
+    @State private var sortOrder = [
+        KeyPathComparator(\AgentInventoryItem.healthRank),
+        KeyPathComparator(\AgentInventoryItem.name),
+    ]
     @State private var loaded = false
+    @State private var inventoryRebuildTask: Task<Void, Never>?
+    @State private var lastInspectionInventoryState: InspectionInventoryState?
 
-    private var selected: AgentSummary? { agents.first { $0.id == selection } ?? agents.first }
+    private var selectedItem: AgentInventoryItem? { inventory.first { $0.id == selection } ?? inventory.first }
 
     /// The agents "always monitor" could offer to keep routed: known agents Flowlight can edit safely (they have a
-    /// `configRecipe`) that are talking to an LLM provider, each paired with whether any of their traffic is actually
-    /// being decrypted this window. The banner turns this into a suggestion or a "still not routed" note by comparing
-    /// it against which agents are already monitored.
+    /// `configRecipe`) that are talking to an LLM provider, each paired with whether any traffic was decrypted.
     private var monitorCandidates: [AlwaysMonitorBanner.Candidate] {
         var routedByName: [String: Bool] = [:]
-        for agent in agents {
+        for agent in trafficAgents {
             guard let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: agent.name),
                   known.configRecipe != nil, !agent.providers.isEmpty else { continue }
             routedByName[known.name] = (routedByName[known.name] ?? false) || inspectedAgents.contains(agent.bundleID)
@@ -67,13 +72,10 @@ struct AgentsView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            content(height: geometry.size.height)
-        }
+        GeometryReader { geometry in content(height: geometry.size.height) }
     }
 
-    /// In a short window the summary tiles and the description give way to the table and the agent's detail, which
-    /// are what the view is for. Without this the header is squeezed behind the title bar.
+    /// In a short window the summary tiles and description give way to the inventory and selected agent detail.
     private func content(height: CGFloat) -> some View {
         let roomy = height > 680
         return VStack(alignment: .leading, spacing: 12) {
@@ -81,7 +83,7 @@ struct AgentsView: View {
                                 demo: DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLDemoBanner"))
             HStack {
                 if roomy {
-                    Text(L("Observed AI agent activity, including destinations outside each agent's model provider."))
+                    Text(L("Installed, configured, and observed AI agents, with explainable setup and visibility health."))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -92,17 +94,16 @@ struct AgentsView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             if roomy { tiles.fixedSize(horizontal: false, vertical: true) }
-            if agents.isEmpty && loaded {
+            if inventory.isEmpty && loaded {
                 ContentUnavailableView {
-                    Label(L("No AI agents seen"), systemImage: "sparkles")
+                    Label(L("No AI agents found"), systemImage: "sparkles")
                 } description: {
-                    Text(L("Flowlight recognizes supported agents such as Claude Code, Codex, Cursor and Ollama. It also classifies non-browser apps that contact a known LLM API provider."))
+                    Text(L("Flowlight inventories supported apps and configured command-line agents, and discovers non-browser clients that contact a known AI provider."))
                 }
                 .frame(maxHeight: .infinity)
             } else {
-                // Fit the table to its rows so the selected agent's detail gets the rest of the window.
-                table.frame(minHeight: 180, maxHeight: max(180, CGFloat(agents.count) * 38 + 44))
-                if let selected {
+                table.frame(minHeight: 180, maxHeight: max(180, CGFloat(inventory.count) * 42 + 44))
+                if let item = selectedItem, let selected = item.summary {
                     AgentDetail(agent: selected, window: window, toolCalls: toolUsage[selected.bundleID] ?? [],
                                 activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
                                 profile: profiles[selected.bundleID], inspected: inspectedAgents.contains(selected.bundleID),
@@ -112,8 +113,11 @@ struct AgentsView: View {
                                 consumeRequestedPolicySection: { policyDeepLink.consume() }) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
+                        rebuildInventory()
                     }
                     .id(selected.id)
+                } else if let item = selectedItem {
+                    AgentInventoryStatusDetail(item: item)
                 }
             }
         }
@@ -125,85 +129,95 @@ struct AgentsView: View {
             policyDeepLink.request = request
             nav.agentPolicyRequest = nil
         }
+        .onChange(of: workspaceStore.workspaces) { _, _ in rebuildInventory() }
+        .onReceive(monitor.inspection.objectWillChange) { _ in scheduleInventoryRebuildIfNeeded() }
+        .onDisappear {
+            inventoryRebuildTask?.cancel()
+            inventoryRebuildTask = nil
+        }
         .task(id: LoadKey(window: window, version: monitor.dataVersion, focus: focus.scope)) { await load() }
     }
 
     private struct LoadKey: Equatable { var window: AgentWindow; var version: Int; var focus: FocusScope }
 
     private var tiles: some View {
-        let ai = agents.reduce(FlowCounters()) { var c = $0; c += $1.ai; return c }
-        let egress = agents.reduce(Int64(0)) { $0 + $1.egress.bytesOut }
-        let risky = agents.filter { !$0.sensitiveProtocols.isEmpty }.count
+        let active = inventory.filter(\.observed).count
+        let healthy = inventory.filter { $0.health == .healthy }.count
+        let attention = inventory.filter { $0.health == .attention || $0.health == .needsSetup }.count
+        let limited = inventory.filter { $0.health == .limitedVisibility }.count
         return HStack(spacing: 12) {
-            StatTile(title: L("Agents active"), value: "\(agents.count)", systemImage: "sparkles")
-            StatTile(title: L("AI API traffic"), value: ByteFormat.string(ai.total), systemImage: "brain")
-            StatTile(title: L("Uploaded to other hosts"), value: ByteFormat.string(egress), systemImage: "arrow.up.forward.app",
-                     tint: TrafficColors.outbound)
-            StatTile(title: L("Using sensitive channels"), value: "\(risky)", systemImage: "exclamationmark.shield",
-                     tint: risky > 0 ? TrafficColors.anomaly : .secondary)
-            StatTile(title: L("Agent alerts"), value: "\(agentAlerts)", systemImage: "bell.badge",
-                     tint: agentAlerts > 0 ? TrafficColors.anomaly : .secondary)
+            StatTile(title: L("Agents inventoried"), value: "\(inventory.count)", systemImage: "sparkles")
+            StatTile(title: L("Active in window"), value: "\(active)", systemImage: "waveform.path.ecg")
+            StatTile(title: L("Healthy"), value: "\(healthy)", systemImage: "checkmark.circle",
+                     tint: healthy > 0 ? FL.good : .secondary)
+            StatTile(title: L("Needs attention"), value: "\(attention)", systemImage: "exclamationmark.triangle",
+                     tint: attention > 0 ? TrafficColors.anomaly : .secondary)
+            StatTile(title: L("Limited visibility"), value: "\(limited)", systemImage: "eye.slash",
+                     tint: limited > 0 ? FL.warning : .secondary)
         }
     }
 
     private var table: some View {
-        let maxAI = agents.map(\.ai.total).max() ?? 1
-        return Table(agents.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
-            TableColumn(L("Agent"), value: \.name) { agent in
+        Table(inventory.sorted(using: sortOrder), selection: $selection, sortOrder: $sortOrder) {
+            TableColumn(L("Agent"), value: \.name) { item in
                 HStack(spacing: 8) {
-                    AppIconView(path: agent.appPath, size: 20)
+                    AppIconView(path: item.appPath, size: 20)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(agent.name).lineLimit(1)
-                        Text(agent.vendor ?? L("Detected: calls an AI API")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(item.name).lineLimit(1)
+                        Text(item.vendor ?? L("Detected: calls an AI API"))
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-                .help(agent.bundleID)
+                .help(item.name)
             }
             .width(min: 150, ideal: 190)
-            TableColumn(L("AI providers")) { agent in
-                Text(agent.providers.map(\.name).joined(separator: ", ")).lineLimit(1).foregroundStyle(.secondary)
+            TableColumn(L("Health"), value: \.healthRank) { AgentHealthBadge(state: $0.health) }
+                .width(min: 110, ideal: 135)
+            TableColumn(L("Why")) { item in
+                Text(item.reasons.first ?? "").lineLimit(2).foregroundStyle(.secondary)
+                    .help(item.reasons.joined(separator: "\n"))
+            }
+            .width(min: 180, ideal: 280)
+            TableColumn(L("AI providers")) { item in
+                Text(item.providerNames.isEmpty ? "–" : item.providerNames).lineLimit(1).foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 130)
-            TableColumn(L("AI traffic"), value: \.aiTotal) { agent in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ByteFormat.string(agent.ai.total)).monospacedDigit()
-                    if agent.ai.total > 0 {
-                        TrafficBar(fraction: Double(agent.ai.total) / Double(max(maxAI, 1)), color: FL.received)
-                    }
-                }
+            TableColumn(L("Traffic"), value: \.trafficTotal) { item in
+                Text(item.observed ? ByteFormat.string(item.trafficTotal) : "–").monospacedDigit()
             }
-            .width(min: 96, ideal: 120)
-            TableColumn(L("Other hosts"), value: \.otherCount) { Text("\($0.otherCount)").monospacedDigit() }.width(70)
-            TableColumn(L("Sent elsewhere"), value: \.egressOut) { agent in
-                Text(ByteFormat.string(agent.egress.bytesOut)).monospacedDigit()
-                    .foregroundStyle(agent.egressShare > 0.5 && agent.egress.bytesOut > 1_000_000 ? TrafficColors.outbound : .primary)
-                    .help(L("%@ of this agent's uploads went to non-AI hosts", ShareFormat.string(agent.egressShare)))
+            .width(80)
+            TableColumn(L("Policy")) { item in
+                Text(policyLabel(item.policy)).font(.caption).foregroundStyle(item.policy.uncoveredDestinations > 0
+                    ? TrafficColors.anomaly : .secondary)
             }
-            .width(90)
-            TableColumn(L("Allowlist")) { agent in AllowlistStatus(agent: agent, policy: policies[agent.bundleID]) }
-                .width(min: 80, ideal: 110)
-            TableColumn(L("Risk"), value: \.riskScore) { agent in RiskBadges(agent: agent) }
-                .width(min: 90, ideal: 160)
-            TableColumn(L("Alerts"), value: \.alerts) { agent in
-                Text(agent.alerts == 0 ? "–" : "\(agent.alerts)").monospacedDigit()
-                    .foregroundStyle(agent.alerts > 0 ? TrafficColors.anomaly : .secondary)
+            .width(min: 80, ideal: 100)
+            TableColumn(L("Alerts"), value: \.unresolvedAlerts) { item in
+                Text(item.unresolvedAlerts == 0 ? "–" : "\(item.unresolvedAlerts)").monospacedDigit()
+                    .foregroundStyle(item.unresolvedAlerts > 0 ? TrafficColors.anomaly : .secondary)
             }
             .width(50)
         }
-        .contextMenu(forSelectionType: AgentSummary.ID.self) { ids in
-            if let id = ids.first {
-                Button(L("Show Traffic in History")) { nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity) }
-                InspectMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
-                FocusMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
+        .contextMenu(forSelectionType: AgentInventoryItem.ID.self) { ids in
+            if let id = ids.first, let item = inventory.first(where: { $0.id == id }) {
+                Button(L("Show Traffic in History")) {
+                    nav.showReport(filter: TrafficFilter(bundleID: id), granularity: window.granularity)
+                }
+                InspectMenuItems(app: (id, item.name))
+                FocusMenuItems(app: (id, item.name))
                 Divider()
-                RuleMenuItems(app: (id, agents.first { $0.bundleID == id }?.name ?? id))
-                if let known = AgentCatalog.knownAgent(bundleID: id, appName: agents.first { $0.bundleID == id }?.name ?? id),
-                   known.configRecipe != nil {
+                RuleMenuItems(app: (id, item.name))
+                if let known = AgentCatalog.knownAgent(bundleID: id, appName: item.name), known.configRecipe != nil {
                     Divider()
                     if monitor.inspection.monitoredAgents.contains(known.name) {
-                        Button(L("Stop Monitoring %@", known.name)) { monitor.inspection.setAlwaysMonitor(false, agent: known.name) }
+                        Button(L("Stop Monitoring %@", known.name)) {
+                            monitor.inspection.setAlwaysMonitor(false, agent: known.name)
+                            rebuildInventory()
+                        }
                     } else {
-                        Button(L("Always Monitor %@", known.name)) { monitor.inspection.setAlwaysMonitor(true, agent: known.name) }
+                        Button(L("Always Monitor %@", known.name)) {
+                            monitor.inspection.setAlwaysMonitor(true, agent: known.name)
+                            rebuildInventory()
+                        }
                     }
                 }
             }
@@ -212,15 +226,122 @@ struct AgentsView: View {
         }
     }
 
+    private func policyLabel(_ coverage: AgentInventoryPolicyCoverage) -> String {
+        guard coverage.enabled else { return L("Not set") }
+        if coverage.uncoveredDestinations > 0 { return L("Review") }
+        return coverage.enforcing ? L("Enforcing") : L("Reporting")
+    }
+
+    private func inspectionDiagnostics() -> AgentInspectionDiagnostics {
+        #if APP_STORE
+        return .unavailable
+        #else
+        let inspection = monitor.inspection
+        return AgentInspectionDiagnostics(
+            available: true,
+            enabled: inspection.enabled,
+            running: inspection.running,
+            certificateTrusted: inspection.trusted,
+            setupFailed: inspection.enabled && (inspection.lastError != nil
+                || inspection.diagnosis != nil && !inspection.diagnosisIsGood)
+        )
+        #endif
+    }
+
+    private func routeStates() -> [String: AgentRouteState] {
+        var routes: [String: AgentRouteState] = [:]
+        let inspection = monitor.inspection
+        for agent in trafficAgents {
+            guard let known = AgentCatalog.knownAgent(bundleID: agent.bundleID, appName: agent.name) else {
+                if inspectedAgents.contains(agent.bundleID) { routes[agent.bundleID] = .observed }
+                continue
+            }
+            if inspectedAgents.contains(agent.bundleID) {
+                routes[agent.bundleID] = .observed
+            } else if inspection.monitoredAgents.contains(known.name) {
+                if inspection.enabled && (inspection.lastError != nil
+                    || inspection.diagnosis != nil && !inspection.diagnosisIsGood) {
+                    routes[known.name] = .failed
+                } else if inspection.enabled && inspection.running {
+                    routes[known.name] = .stale
+                } else {
+                    routes[known.name] = .configured
+                }
+            }
+        }
+        for name in inspection.monitoredAgents where routes[name] == nil { routes[name] = .configured }
+        return routes
+    }
+
+    private struct InspectionInventoryState: Equatable {
+        var enabled: Bool
+        var running: Bool
+        var trusted: Bool
+        var lastError: String?
+        var diagnosis: String?
+        var diagnosisIsGood: Bool
+        var monitoredAgents: [String]
+    }
+
+    private var inspectionInventoryState: InspectionInventoryState {
+        let inspection = monitor.inspection
+        return InspectionInventoryState(
+            enabled: inspection.enabled,
+            running: inspection.running,
+            trusted: inspection.trusted,
+            lastError: inspection.lastError,
+            diagnosis: inspection.diagnosis,
+            diagnosisIsGood: inspection.diagnosisIsGood,
+            monitoredAgents: inspection.monitoredAgents.sorted()
+        )
+    }
+
+    private func scheduleInventoryRebuildIfNeeded() {
+        inventoryRebuildTask?.cancel()
+        inventoryRebuildTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            let state = inspectionInventoryState
+            guard state != lastInspectionInventoryState else {
+                inventoryRebuildTask = nil
+                return
+            }
+            lastInspectionInventoryState = state
+            rebuildInventory()
+            inventoryRebuildTask = nil
+        }
+    }
+
+    private func rebuildInventory() {
+        inventory = AgentInventoryBuilder.build(AgentInventoryInput(
+            installedApps: installedApps,
+            traffic: trafficAgents,
+            workspaces: workspaceStore.workspaces,
+            monitoredAgentNames: monitor.inspection.monitoredAgents,
+            routes: routeStates(),
+            inspection: inspectionDiagnostics(),
+            policies: policies,
+            alerts: alerts
+        ))
+        let ids = Set(inventory.map(\.id))
+        if selection == nil || !ids.contains(selection!) { selection = inventory.first?.id }
+    }
+
     private func load() async {
+        let installedTask = Task.detached(priority: .utility) { InstalledApps.all() }
+        workspaceStore.refresh()
         let (g, from, to) = (window.granularity, Date().addingTimeInterval(-window.interval), Date())
         let scope = focus.scope
-        let result = try? await monitor.read { db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange]) in
+        let result = try? await monitor.read {
+            db -> ([BreakdownRow], [AlertRecord], [String: AgentPolicy], [HTTPExchange], Set<String>) in
             (try AgentsModel.rows(from: db, granularity: g, from: from, to: to, focus: scope),
              try db.alerts(limit: 2000, focus: scope).filter { $0.timestamp >= from }, try db.loadPolicies(),
-             try db.exchanges(since: from, limit: 5000, focus: scope))
+             try db.exchanges(since: from, limit: 5000, focus: scope),
+             try db.inspectedAgentIDs(since: from, focus: scope))
         }
-        guard let (rows, alerts, loadedPolicies, exchanges) = result else { return }
+        guard let (rows, loadedAlerts, loadedPolicies, exchanges, loadedInspectedAgents) = result else { return }
+        installedApps = await installedTask.value
+        alerts = loadedAlerts
         policies = loadedPolicies
         let activity = ToolActivityBuilder.activities(exchanges)
         toolActivity = activity
@@ -229,13 +350,68 @@ struct AgentsView: View {
             .mapValues { Array(Set($0.map(\.mcpServer))) }
         mcpServers = ToolActivityBuilder.servers(exchanges, activities: activity, configured: configured)
         profiles = ToolActivityBuilder.profiles(exchanges, activities: activity)
-        inspectedAgents = Set(exchanges.compactMap(\.agent))
-        let built = AgentsModel.build(rows: rows, alerts: alerts)
-        agents = built
-        let ids = Set(built.map(\.bundleID))
-        agentAlerts = alerts.filter { AnomalyEngine.Kind.agentKinds.contains($0.kind) || ids.contains($0.bundleID) && $0.severity >= 2 }.count
-        if selection == nil || !ids.contains(selection!) { selection = built.first?.id }
+        inspectedAgents = loadedInspectedAgents
+        trafficAgents = AgentsModel.build(rows: rows, alerts: loadedAlerts)
+        lastInspectionInventoryState = inspectionInventoryState
+        rebuildInventory()
         loaded = true
+    }
+}
+
+private struct AgentHealthBadge: View {
+    var state: AgentHealthState
+
+    var body: some View {
+        Label(state.title, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(tint)
+    }
+
+    private var icon: String {
+        switch state {
+        case .healthy: return "checkmark.circle.fill"
+        case .needsSetup: return "wrench.and.screwdriver.fill"
+        case .limitedVisibility: return "eye.slash.fill"
+        case .attention: return "exclamationmark.triangle.fill"
+        case .inactive: return "pause.circle"
+        case .notObserved: return "questionmark.circle"
+        }
+    }
+
+    private var tint: Color {
+        switch state {
+        case .healthy: return FL.good
+        case .attention: return TrafficColors.anomaly
+        case .needsSetup, .limitedVisibility: return FL.warning
+        case .inactive, .notObserved: return .secondary
+        }
+    }
+}
+
+private struct AgentInventoryStatusDetail: View {
+    var item: AgentInventoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                AppIconView(path: item.appPath, size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name).font(.title3.weight(.semibold))
+                    AgentHealthBadge(state: item.health)
+                }
+            }
+            Text(L("No traffic detail is available for this agent in the selected window."))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(item.reasons, id: \.self) { reason in
+                    Label(reason, systemImage: "info.circle").fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .flCard()
     }
 }
 

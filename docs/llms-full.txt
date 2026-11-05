@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.5, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1527,7 +1527,7 @@ Plugins
 
  Template package
 
- The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins and Flowlight will show the review sheet before installation.
+ The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. In the Developer edition, open Inspect › Plugins & Providers and import the manifest JSON; Flowlight shows the review sheet before installation.
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
@@ -1672,18 +1672,28 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.4
-November 4, 2026Latest
+ 0.17.5
+November 5, 2026Latest
 
- See every control in Policies. Rules is now a unified Policies inventory for ordinary rules, agent allowlists, managed packs, and Developer-only inspection policies, with truthful effective states rather than treating every enabled item as active.
+ Account for every AI agent. Agents now combines installed apps, configured workspaces, known launchers and observed traffic into one inventory, with explainable health reasons for evidence, routing, inspection, policy coverage and unresolved alerts instead of an opaque score.
 
- Keep each policy's real editor and evidence. Selecting an item opens the contextual editor that owns it; Managed packs retain compact provenance and consent, while Activity adapts the existing authoritative records without conflating policy types.
+ Take alerts from new to resolved. Alerts now supports new, acknowledged, investigating, resolved and dismissed states; dispositions, notes and bulk actions stay separate from policy Allow actions, while the sidebar badge counts only new alerts.
 
- Read Sources as one operational page. Collector, Devices and Coverage now flow in that order without a segmented control, while status links, Ask answers, restored windows and screenshot arguments still focus the requested section.
+ Manage inspection extensions where they work. The Developer edition moves plugin packages into Inspect › Plugins & Providers and adds versioned local provider profiles with compatible plugin assignment, endpoint validation and Keychain references without persisting raw credentials.
 
- Dismiss chart details when the pointer leaves. History no longer leaves a zero-value tooltip floating at the upper-left after the cursor exits the All traffic plot; keyboard bucket inspection remains unchanged.
+ Inspect Live traffic without relying on color or a pointer. The Live chart adds keyboard traversal, VoiceOver details, strict plot hit testing, a solid/circle download series and dashed/diamond upload series, with an executable light/dark palette gate.
 
- Sign each release once. The immutable tag run builds, signs, notarizes, Gatekeeper-verifies, attests and retains one artifact; publication has no signing credentials and can only verify and publish those exact prepared bytes.
+ Keep redesigned paths within measured limits. Fail-capable numeric budgets cover startup, a 600-edge graph, a 10,001-row History query, a 10,000-alert query, a 1,000-agent inventory and 30,000 built-in plugin evaluations, with complete diagnostics on failure.
+
+ See every control in Policies and every source in order. The completed 0.17.4 work rolls forward here: Policies preserves each policy type's authoritative editor and evidence, Sources is one Collector–Devices–Coverage document, and History clears pointer details without inventing a keyboard selection.
+
+ Reuse CI only when the evidence is exact. Pull-request app jobs may reuse a successful canonical run only when its full Git tree, app fingerprint, check conclusions, receipt schema and immutable artifact identity match; every invalid or forked case executes the current jobs.
+
+ Deploy only the site CI verified. Pages consumes the exact manifested site artifact from successful canonical main CI, with no source checkout or rebuild, while weekly full CodeQL remains in place.
+
+ Keep untrusted pull-request refs out of checkouts. Merge compatibility uses GitHub's trusted pull-request event merge commit rather than constructing a checkout ref from pull-request input, resolving code-scanning alert 4 without granting privileged workflow access.
+
+ Sign each release once. The immutable tag run builds, signs, notarizes, Gatekeeper-verifies, attests and retains one artifact; credential-free publication can only verify and publish those exact prepared bytes.
 
  0.17.3
 November 4, 2026

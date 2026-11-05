@@ -262,7 +262,7 @@ enum PolicyActivityBuilder {
                       capabilities: PolicyInventoryCapabilities = .current) -> [PolicyActivityItem] {
         let guardrailIDs = Set(guardrails.map(\.id))
         var activity = ruleEvents.map { event -> PolicyActivityItem in
-            let isGuardrail = guardrailIDs.contains(event.ruleID)
+            let isGuardrail = event.engine == .guardrail || guardrailIDs.contains(event.ruleID)
             let title = rules.first(where: { $0.id == event.ruleID }).map(RuleWords.title)
                 ?? guardrails.first(where: { $0.id == event.ruleID })?.localizedTitle ?? L("A policy since deleted")
             return PolicyActivityItem(
@@ -290,10 +290,21 @@ enum PolicyActivityBuilder {
             let source = exchange.id.map(String.init) ?? "\(exchange.started.timeIntervalSince1970)"
             let detail = "\(exchange.method) \(exchange.host)\(exchange.path)"
             if let value = exchange.guardrail {
-                let policy = guardrails.first { $0.localizedTitle == value || $0.title == value }
-                activity.append(PolicyActivityItem(id: "exchange:\(source):guardrail", timestamp: exchange.started,
-                                                   kind: .guardrail, effect: .guardrailApplied, title: value, detail: detail,
-                                                   policyID: policy.map { PolicyInventoryID.make(.guardrail, sourceID: $0.id.uuidString.lowercased()) }))
+                if let references = InspectionPolicyReference.decode(value) {
+                    for reference in references {
+                        activity.append(PolicyActivityItem(
+                            id: "exchange:\(source):guardrail:\(reference.id.uuidString.lowercased())",
+                            timestamp: exchange.started, kind: .guardrail, effect: .guardrailApplied,
+                            title: reference.title, detail: detail,
+                            policyID: PolicyInventoryID.make(.guardrail, sourceID: reference.id.uuidString.lowercased())
+                        ))
+                    }
+                } else {
+                    let policy = guardrails.first { $0.localizedTitle == value || $0.title == value }
+                    activity.append(PolicyActivityItem(id: "exchange:\(source):guardrail", timestamp: exchange.started,
+                                                       kind: .guardrail, effect: .guardrailApplied, title: value, detail: detail,
+                                                       policyID: policy.map { PolicyInventoryID.make(.guardrail, sourceID: $0.id.uuidString.lowercased()) }))
+                }
             }
             if let value = exchange.mockRule, let policy = mocks.first(where: { $0.title == value }) {
                 // Request-level network blocks use the same answer machinery but already have a RuleEvent. Only a
@@ -303,16 +314,38 @@ enum PolicyActivityBuilder {
                                                    policyID: PolicyInventoryID.make(.mock, sourceID: policy.id.uuidString.lowercased())))
             }
             if let value = exchange.requestRewrite {
-                let policy = rewrites.first { $0.title == value }
-                activity.append(PolicyActivityItem(id: "exchange:\(source):request-rewrite", timestamp: exchange.started,
-                                                   kind: .requestRewrite, effect: .requestRewritten, title: value, detail: detail,
-                                                   policyID: policy.map { PolicyInventoryID.make(.requestRewrite, sourceID: $0.id.uuidString.lowercased()) }))
+                if let references = InspectionPolicyReference.decode(value) {
+                    for reference in references {
+                        activity.append(PolicyActivityItem(
+                            id: "exchange:\(source):request-rewrite:\(reference.id.uuidString.lowercased())",
+                            timestamp: exchange.started, kind: .requestRewrite, effect: .requestRewritten,
+                            title: reference.title, detail: detail,
+                            policyID: PolicyInventoryID.make(.requestRewrite, sourceID: reference.id.uuidString.lowercased())
+                        ))
+                    }
+                } else {
+                    let policy = rewrites.first { $0.title == value }
+                    activity.append(PolicyActivityItem(id: "exchange:\(source):request-rewrite", timestamp: exchange.started,
+                                                       kind: .requestRewrite, effect: .requestRewritten, title: value, detail: detail,
+                                                       policyID: policy.map { PolicyInventoryID.make(.requestRewrite, sourceID: $0.id.uuidString.lowercased()) }))
+                }
             }
             if let value = exchange.responseTransform {
-                let policy = transforms.first { $0.title == value }
-                activity.append(PolicyActivityItem(id: "exchange:\(source):response-transform", timestamp: exchange.started,
-                                                   kind: .responseTransform, effect: .responseTransformed, title: value, detail: detail,
-                                                   policyID: policy.map { PolicyInventoryID.make(.responseTransform, sourceID: $0.id.uuidString.lowercased()) }))
+                if let references = InspectionPolicyReference.decode(value) {
+                    for reference in references {
+                        activity.append(PolicyActivityItem(
+                            id: "exchange:\(source):response-transform:\(reference.id.uuidString.lowercased())",
+                            timestamp: exchange.started, kind: .responseTransform, effect: .responseTransformed,
+                            title: reference.title, detail: detail,
+                            policyID: PolicyInventoryID.make(.responseTransform, sourceID: reference.id.uuidString.lowercased())
+                        ))
+                    }
+                } else {
+                    let policy = transforms.first { $0.title == value }
+                    activity.append(PolicyActivityItem(id: "exchange:\(source):response-transform", timestamp: exchange.started,
+                                                       kind: .responseTransform, effect: .responseTransformed, title: value, detail: detail,
+                                                       policyID: policy.map { PolicyInventoryID.make(.responseTransform, sourceID: $0.id.uuidString.lowercased()) }))
+                }
             }
         }
         return activity.filter { capabilities.inspectionPolicies || !$0.kind.requiresInspection }
@@ -328,6 +361,7 @@ enum PolicyActivityBuilder {
 struct RulesView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var templates = RuleTemplateRequests.shared
     @State private var sheet: Sheet?
     @State private var now = Date()
@@ -426,9 +460,12 @@ struct RulesView: View {
             }
         case .allowlist(let agentID):
             nav.showAgentPolicy(agentID: agentID, section: .allowlist)
-        case .guardrail(_, let agentID):
-            guard !agentID.isEmpty else { return }
-            nav.showAgentPolicy(agentID: agentID, section: .guardrails)
+        case .guardrail(let id, let agentID):
+            if agentID.isEmpty {
+                focusPolicyID = PolicyInventoryID.make(.guardrail, sourceID: id.uuidString.lowercased())
+            } else {
+                nav.showAgentPolicy(agentID: agentID, section: .guardrails)
+            }
         case .mock:
             nav.showInspectionPolicy(.mocks)
         case .requestRewrite:
@@ -441,7 +478,7 @@ struct RulesView: View {
     private func loadPolicySources() async {
         let loaded = try? await monitor.read { db in
             (try db.loadPolicies(),
-             try db.alerts(limit: 2_000).filter { $0.kind == AnomalyEngine.Kind.allowlistViolation.rawValue },
+             try db.alerts(limit: 2_000, kind: AnomalyEngine.Kind.allowlistViolation.rawValue),
              try db.exchanges(since: Date().addingTimeInterval(-30 * 86_400), limit: 2_000))
         }
         guard let loaded else { return }
@@ -580,7 +617,9 @@ struct RulesView: View {
             }
             .onChange(of: focusPolicyID) { _, target in
                 guard let target else { return }
-                withAnimation { scroll.scrollTo(target, anchor: .center) }
+                Motion.perform(Motion.control, reduceMotion: reduceMotion) {
+                    scroll.scrollTo(target, anchor: .center)
+                }
                 focusPolicyID = nil
             }
             .onAppear {
@@ -1635,7 +1674,7 @@ enum RuleWords {
         switch rule.engine {
         case .flow:
             return L("Watching only — the Network Extension refuses connections, and it isn't running.")
-        case .request:
+        case .request, .guardrail:
             return L("Watching only — a path can only be matched by HTTPS inspection, and it is off.")
         }
     }

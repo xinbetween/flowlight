@@ -125,12 +125,16 @@ def verify_run(document, artifacts_document, *, repository, workflow_id, run_id,
     artifacts = artifacts_document["artifacts"]
     if artifacts_document.get("total_count") != len(artifacts):
         raise ReleaseArtifactError("artifact response count does not match its artifact list")
-    if len(artifacts) != 1:
-        raise ReleaseArtifactError(f"preparation run must have exactly one artifact, found {len(artifacts)}")
-    artifact = artifacts[0]
-    expected_name = f"flowlight-release-{tag}-{run_id}"
-    if artifact.get("name") != expected_name:
-        raise ReleaseArtifactError(f"artifact is {artifact.get('name')!r}, expected {expected_name!r}")
+    run_attempt = document.get("run_attempt")
+    if not isinstance(run_attempt, int) or run_attempt <= 0:
+        raise ReleaseArtifactError("preparation run attempt is missing or malformed")
+    expected_name = f"flowlight-release-{tag}-{run_id}-{run_attempt}"
+    matching = [artifact for artifact in artifacts if artifact.get("name") == expected_name]
+    if len(matching) != 1:
+        raise ReleaseArtifactError(
+            f"preparation attempt must have exactly one {expected_name!r} artifact, found {len(matching)}"
+        )
+    artifact = matching[0]
     if artifact.get("expired") is not False:
         raise ReleaseArtifactError("prepared artifact is expired")
     now = now or dt.datetime.now(dt.timezone.utc)
@@ -145,9 +149,6 @@ def verify_run(document, artifacts_document, *, repository, workflow_id, run_id,
         raise ReleaseArtifactError("artifact ID is missing or malformed")
     if not isinstance(artifact.get("size_in_bytes"), int) or artifact["size_in_bytes"] <= 0:
         raise ReleaseArtifactError("artifact size is missing or empty")
-    run_attempt = document.get("run_attempt")
-    if not isinstance(run_attempt, int) or run_attempt <= 0:
-        raise ReleaseArtifactError("preparation run attempt is missing or malformed")
     return {
         "artifact_id": artifact["id"],
         "artifact_name": expected_name,

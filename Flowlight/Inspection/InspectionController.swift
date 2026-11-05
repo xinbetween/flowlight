@@ -236,30 +236,37 @@ final class InspectionController: ObservableObject {
                 if guardsApply, let body = Self.body(of: bytes),
                    let refusal = GuardrailEngine.refuse(jsonrpc: body, guardrails: guardrails, agent: agent, server: server) {
                     self.report(refusal.guardrail, subject: refusal.subject, owner: owner, host: host,
-                                port: UInt16(clamping: 443), method: head.method, engine: .request)
+                                port: UInt16(clamping: 443), method: head.method, engine: .guardrail)
                     return .answer(MockRule(id: refusal.guardrail.id, name: refusal.guardrail.title, host: host,
                                             path: "*", status: 200, body: refusal.body, blocked: true))
                 }
                 var current = bytes
-                var notes: [String] = []
+                var guardrailReference: String?
+                var rewriteReference: String?
                 // Guardrails first — strip refused tools from the declaration — so a rewrite acts on the filtered body.
                 if guardsApply, let body = Self.body(of: current),
                    let filtered = GuardrailEngine.filter(request: body, guardrails: guardrails, agent: agent) {
                     current = Self.reframe(current, body: filtered.body)
-                    self.report(guardrails.first { g in filtered.removed.contains { g.refuses(agent: agent, server: server, tool: $0) } },
-                                subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
-                                port: UInt16(clamping: 443), method: head.method, engine: .request)
-                    notes.append(L("Removed %@", filtered.removed.joined(separator: ", ")))
+                    let applied = guardrails.filter { guardrail in
+                        filtered.removed.contains { guardrail.refuses(agent: agent, server: server, tool: $0) }
+                    }
+                    self.report(applied.first, subject: filtered.removed.joined(separator: ", "), owner: owner, host: host,
+                                port: UInt16(clamping: 443), method: head.method, engine: .guardrail)
+                    guardrailReference = InspectionPolicyReference.encode(applied.map {
+                        InspectionPolicyReference.Entry(id: $0.id, title: $0.localizedTitle)
+                    })
                 }
                 // Then the user's rewrite rules — header and JSON-body edits.
                 let path = head.target.split(separator: "?").first.map(String.init) ?? "/"
                 if !rewrites.isEmpty,
                    let edited = RewriteRules.apply(rewrites, to: current, host: host, method: head.method, path: path) {
                     current = edited.data
-                    notes.append(edited.note)
+                    rewriteReference = InspectionPolicyReference.encode(edited.rules.map {
+                        InspectionPolicyReference.Entry(id: $0.id, title: $0.title)
+                    })
                 }
-                guard !notes.isEmpty else { return nil }
-                return .replace(current, note: notes.joined(separator: " · "))
+                guard guardrailReference != nil || rewriteReference != nil else { return nil }
+                return .replace(current, guardrail: guardrailReference, rewrite: rewriteReference)
             }
         }
         proxy.responseInterventions = { flow in
@@ -274,7 +281,10 @@ final class InspectionController: ObservableObject {
                     guard let replacement = ResponseScriptRunner.shared.transform(rules: applicable,
                                                                                    request: ResponseTransformRequest(head: context.head, host: flow.host, scheme: flow.scheme, port: flow.port),
                                                                                    responseHead: responseHead, responseBody: responseBody) else { return nil }
-                    return ResponseGate.Replacement(body: replacement.body, note: replacement.note)
+                    let reference = InspectionPolicyReference.encode(replacement.rules.map {
+                        InspectionPolicyReference.Entry(id: $0.id, title: $0.title)
+                    }) ?? replacement.note
+                    return ResponseGate.Replacement(body: replacement.body, note: reference)
                 },
                 shouldTransform: { context in
                     !ResponseTransformRules.applicable(rules, host: flow.host, method: context.head.method, path: context.head.target).isEmpty

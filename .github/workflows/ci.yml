@@ -45,16 +45,91 @@ jobs:
           fetch-depth: 0
 
       - id: what
-        name: Classify the exact change
+        name: Classify the exact change with trusted policy
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          TRUSTED_POLICY_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
         run: |
           set -euo pipefail
-          python3 -I scripts/classify_changes.py \
-            --repo . --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT" \
+          # The checked-out head is the input being classified, never the authority that decides which checks it
+          # needs. Load that policy from the immutable base commit (or the current main push) so a pull request
+          # cannot edit its own classifier to skip application work.
+          git show "$TRUSTED_POLICY_SHA:scripts/classify_changes.py" > "$RUNNER_TEMP/classify_changes.py"
+          python3 -I "$RUNNER_TEMP/classify_changes.py" \
+            --repo . --base "$BASE_SHA" --head "$HEAD_SHA" \
             > "$RUNNER_TEMP/change-classification.json"
-          cat "$RUNNER_TEMP/change-classification.json"
+          jq -r '
+            "app=\(.app)",
+            "site=\(.site)",
+            "python=\(.python)",
+            "actions=\(.actions)",
+            "pages=\(.pages)",
+            "head_sha=\(.head_sha)",
+            "tree=\(.tree)",
+            "fingerprint=\(.app_fingerprint)",
+            "schema=flowlight-review-v3"
+          ' "$RUNNER_TEMP/change-classification.json" >> "$GITHUB_OUTPUT"
+          jq . "$RUNNER_TEMP/change-classification.json"
+
+  evidence:
+    name: reusable app evidence
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.repository == 'xinbetween/flowlight' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reuse: ${{ steps.reuse.outputs.reuse }}
+      source_run_id: ${{ steps.reuse.outputs.source_run_id }}
+      source_run_attempt: ${{ steps.reuse.outputs.source_run_attempt }}
+      source_artifact_id: ${{ steps.reuse.outputs.source_artifact_id }}
+      source_artifact_name: ${{ steps.reuse.outputs.source_artifact_name }}
+      source_artifact_digest: ${{ steps.reuse.outputs.source_artifact_digest }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      # The verifier treats every lookup, metadata, archive, and receipt error as a cache miss. A cache miss only
+      # costs macOS time; it can never turn missing or malformed evidence into a passing app review.
+      - id: reuse
+        name: Find direct executed evidence for the exact full tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ needs.changes.outputs.head_sha }}
+          SOURCE_TREE: ${{ needs.changes.outputs.tree }}
+          APP_FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          TRUSTED_VERIFIER_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA=$(git rev-parse 'HEAD^{commit}')
+          ACTUAL_TREE=$(git rev-parse 'HEAD^{tree}')
+          [[ "$SOURCE_SHA" == "$ACTUAL_SHA" ]]
+          [[ "$SOURCE_TREE" == "$ACTUAL_TREE" ]]
+          # Reuse is an optimization, so the first release that introduces this verifier simply executes every
+          # current job. Once the verifier exists on main, only those immutable base-commit bytes may authorize a
+          # cache hit; the pull request's own copy is never executed as evidence policy.
+          if ! git show "$TRUSTED_VERIFIER_SHA:scripts/workflow_evidence.py" \
+              > "$RUNNER_TEMP/workflow_evidence.py" 2>/dev/null; then
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 -I "$RUNNER_TEMP/workflow_evidence.py" find-reuse \
+            --repository "$REPOSITORY" \
+            --source-sha "$ACTUAL_SHA" \
+            --source-tree "$ACTUAL_TREE" \
+            --app-fingerprint "$APP_FINGERPRINT" \
+            --current-run-id "$CURRENT_RUN_ID" \
+            --github-output "$GITHUB_OUTPUT"
 
   # Seconds of Python, so it runs on everything: the site is generated from Swift sources and project.yml as well
   # as from site/, and "docs/ is out of date" should be caught whichever of those moved.
@@ -142,10 +217,45 @@ jobs:
           done <<< "$(sed -n '/^Shipped:/,/^Planned/p' README.md | grep -o '([0-9]\+\.[0-9]\+\.[0-9]\+)' | tr -d '()')"
           [ "$bad" -eq 0 ] || exit 1
 
-  project-drift:
-    name: project drift
-    needs: changes
-    if: needs.changes.outputs.app == 'true'
+      - name: Create the exact validated Pages payload
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'xinbetween/flowlight'
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ needs.changes.outputs.head_sha }}
+          SOURCE_TREE: ${{ needs.changes.outputs.tree }}
+        run: |
+          set -euo pipefail
+          python3 -I scripts/workflow_evidence.py create-pages \
+            --root docs \
+            --output "$RUNNER_TEMP/pages-payload.tar" \
+            --repository "$REPOSITORY" \
+            --source-sha "$SOURCE_SHA" \
+            --source-tree "$SOURCE_TREE"
+
+      - name: Preserve the validated Pages payload
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'xinbetween/flowlight'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pages-site-${{ needs.changes.outputs.head_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pages-payload.tar
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  project-drift-execute:
+    name: project drift execution
+    needs: [changes, evidence]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.app == 'true' &&
+      needs.evidence.outputs.reuse != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -158,10 +268,14 @@ jobs:
       - name: Generate the project and reject drift
         run: scripts/check_xcode_project.sh
 
-  unit-oldest:
-    name: unit (oldest Xcode)
-    needs: changes
-    if: needs.changes.outputs.app == 'true'
+  unit-oldest-execute:
+    name: unit oldest execution
+    needs: [changes, evidence]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.app == 'true' &&
+      needs.evidence.outputs.reuse != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -179,10 +293,14 @@ jobs:
         timeout-minutes: 40
         run: scripts/run-ci-tests.sh
 
-  unit-newest:
-    name: unit (newest Xcode)
-    needs: changes
-    if: needs.changes.outputs.app == 'true'
+  unit-newest-execute:
+    name: unit newest execution
+    needs: [changes, evidence]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.app == 'true' &&
+      needs.evidence.outputs.reuse != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -203,6 +321,9 @@ jobs:
           scripts/test-codeql-gate.sh
           scripts/test-update-cask.sh
           python3 -I scripts/test_classify_changes.py
+          python3 -I scripts/test_workflow_evidence.py
+          python3 -I scripts/check_chart_palette.py
+          python3 -I scripts/test_chart_palette.py
           python3 -I scripts/test_check_site.py
           python3 -I scripts/test_release_checks.py
           python3 -I scripts/test_release_artifact.py
@@ -213,10 +334,14 @@ jobs:
         timeout-minutes: 40
         run: scripts/run-ci-tests.sh
 
-  store:
-    name: store
-    needs: changes
-    if: needs.changes.outputs.app == 'true'
+  store-execute:
+    name: store execution
+    needs: [changes, evidence]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.app == 'true' &&
+      needs.evidence.outputs.reuse != 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -256,6 +381,108 @@ jobs:
           codesign --force --sign - --entitlements Flowlight/Flowlight-AppStore.entitlements "$APP"
           scripts/check_app_store_product.sh "$APP"
 
+  # These current-run gates preserve the required check names even when the expensive implementation was reused.
+  # A missing or invalid receipt leaves REUSE false and therefore requires the corresponding execution job.
+  project-drift:
+    name: project drift
+    if: always()
+    needs: [changes, evidence, project-drift-execute]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require executed or reusable project drift evidence
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          APP_ROUTE: ${{ needs.changes.outputs.app }}
+          REUSE: ${{ needs.evidence.outputs.reuse }}
+          EXECUTION_RESULT: ${{ needs.project-drift-execute.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES_RESULT" == success ]]
+          if [[ "$APP_ROUTE" == true ]]; then
+            if [[ "$REUSE" == true ]]; then
+              [[ "$EXECUTION_RESULT" == skipped ]]
+            else
+              [[ "$EXECUTION_RESULT" == success ]]
+            fi
+          else
+            [[ "$EXECUTION_RESULT" == skipped ]]
+          fi
+
+  unit-oldest:
+    name: unit (oldest Xcode)
+    if: always()
+    needs: [changes, evidence, unit-oldest-execute]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require executed or reusable oldest-Xcode evidence
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          APP_ROUTE: ${{ needs.changes.outputs.app }}
+          REUSE: ${{ needs.evidence.outputs.reuse }}
+          EXECUTION_RESULT: ${{ needs.unit-oldest-execute.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES_RESULT" == success ]]
+          if [[ "$APP_ROUTE" == true ]]; then
+            if [[ "$REUSE" == true ]]; then
+              [[ "$EXECUTION_RESULT" == skipped ]]
+            else
+              [[ "$EXECUTION_RESULT" == success ]]
+            fi
+          else
+            [[ "$EXECUTION_RESULT" == skipped ]]
+          fi
+
+  unit-newest:
+    name: unit (newest Xcode)
+    if: always()
+    needs: [changes, evidence, unit-newest-execute]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require executed or reusable newest-Xcode evidence
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          APP_ROUTE: ${{ needs.changes.outputs.app }}
+          REUSE: ${{ needs.evidence.outputs.reuse }}
+          EXECUTION_RESULT: ${{ needs.unit-newest-execute.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES_RESULT" == success ]]
+          if [[ "$APP_ROUTE" == true ]]; then
+            if [[ "$REUSE" == true ]]; then
+              [[ "$EXECUTION_RESULT" == skipped ]]
+            else
+              [[ "$EXECUTION_RESULT" == success ]]
+            fi
+          else
+            [[ "$EXECUTION_RESULT" == skipped ]]
+          fi
+
+  store:
+    name: store
+    if: always()
+    needs: [changes, evidence, store-execute]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require executed or reusable Store evidence
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          APP_ROUTE: ${{ needs.changes.outputs.app }}
+          REUSE: ${{ needs.evidence.outputs.reuse }}
+          EXECUTION_RESULT: ${{ needs.store-execute.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES_RESULT" == success ]]
+          if [[ "$APP_ROUTE" == true ]]; then
+            if [[ "$REUSE" == true ]]; then
+              [[ "$EXECUTION_RESULT" == skipped ]]
+            else
+              [[ "$EXECUTION_RESULT" == success ]]
+            fi
+          else
+            [[ "$EXECUTION_RESULT" == skipped ]]
+          fi
+
   # Exact-head evidence proves what was reviewed; this separate PR-only build proves that same head still compiles
   # when combined with the current base. The trees are intentionally different, so this is not duplicate work.
   merge-compatibility:
@@ -264,9 +491,9 @@ jobs:
     if: github.event_name == 'pull_request' && needs.changes.outputs.app == 'true'
     runs-on: macos-15
     steps:
+      # On pull_request, checkout's event default is GitHub's prospective merge commit. Do not construct a ref from
+      # event data here: CodeQL correctly treats explicit untrusted-ref checkout as a separate attack surface.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          ref: refs/pull/${{ github.event.number }}/merge
 
       - name: Build the prospective merge
         run: |
@@ -279,7 +506,19 @@ jobs:
   gate:
     name: Review / gate
     if: always()
-    needs: [changes, site, project-drift, unit-oldest, unit-newest, store, merge-compatibility]
+    needs:
+      - changes
+      - evidence
+      - site
+      - project-drift-execute
+      - unit-oldest-execute
+      - unit-newest-execute
+      - store-execute
+      - project-drift
+      - unit-oldest
+      - unit-newest
+      - store
+      - merge-compatibility
     runs-on: ubuntu-24.04
     steps:
       - name: Require every applicable review job
@@ -297,6 +536,19 @@ jobs:
           TREE: ${{ needs.changes.outputs.tree }}
           FINGERPRINT: ${{ needs.changes.outputs.fingerprint }}
           SCHEMA: ${{ needs.changes.outputs.schema }}
+          REUSE: ${{ needs.evidence.outputs.reuse }}
+          SOURCE_RUN_ID: ${{ needs.evidence.outputs.source_run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ needs.evidence.outputs.source_run_attempt }}
+          SOURCE_ARTIFACT_ID: ${{ needs.evidence.outputs.source_artifact_id }}
+          SOURCE_ARTIFACT_NAME: ${{ needs.evidence.outputs.source_artifact_name }}
+          SOURCE_ARTIFACT_DIGEST: ${{ needs.evidence.outputs.source_artifact_digest }}
+          PROJECT_DRIFT_EXECUTION: ${{ needs.project-drift-execute.result }}
+          UNIT_OLDEST_EXECUTION: ${{ needs.unit-oldest-execute.result }}
+          UNIT_NEWEST_EXECUTION: ${{ needs.unit-newest-execute.result }}
+          STORE_EXECUTION: ${{ needs.store-execute.result }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           [[ "$CHANGES_RESULT" == success ]] || {
@@ -314,13 +566,10 @@ jobs:
             "store:$STORE_RESULT"; do
             name=${result%%:*}
             conclusion=${result#*:}
-            case "$APP_ROUTE:$conclusion" in
-              true:success|false:skipped) ;;
-              *)
-                echo "::error::Application route $APP_ROUTE produced $name result $conclusion."
-                exit 1
-                ;;
-            esac
+            [[ "$conclusion" == success ]] || {
+              echo "::error::Application route $APP_ROUTE produced $name gate result $conclusion."
+              exit 1
+            }
           done
           if [[ "$EVENT_NAME" == pull_request && "$APP_ROUTE" == true ]]; then
             [[ "$MERGE_RESULT" == success ]] || {
@@ -333,7 +582,7 @@ jobs:
               exit 1
             }
           fi
-          [[ "$SCHEMA" == flowlight-review-v2 ]] || {
+          [[ "$SCHEMA" == flowlight-review-v3 ]] || {
             echo "::error::Unexpected review receipt schema: $SCHEMA"
             exit 1
           }
@@ -341,15 +590,28 @@ jobs:
             echo "::error::The review receipt identity is incomplete."
             exit 1
           }
+          mode=not_applicable
+          if [[ "$APP_ROUTE" == true ]]; then
+            mode=executed
+            if [[ "$REUSE" == true ]]; then
+              mode=reused
+              [[ -n "$SOURCE_RUN_ID" && -n "$SOURCE_RUN_ATTEMPT" && \
+                 -n "$SOURCE_ARTIFACT_ID" && -n "$SOURCE_ARTIFACT_NAME" && \
+                 -n "$SOURCE_ARTIFACT_DIGEST" ]] || {
+                echo "::error::Reusable evidence identity is incomplete."
+                exit 1
+              }
+            fi
+          fi
           jq -n \
             --arg schema "$SCHEMA" \
-            --arg repository "${{ github.repository }}" \
+            --arg repository "$REPOSITORY" \
             --arg workflow ".github/workflows/ci.yml" \
-            --arg event "${{ github.event_name }}" \
+            --arg event "$EVENT_NAME" \
             --arg source_sha "$HEAD_SHA" \
             --arg source_tree "$TREE" \
             --arg app_fingerprint "$FINGERPRINT" \
-            --arg app_route "$APP_ROUTE" \
+            --argjson app_route "$APP_ROUTE" \
             --arg changes "$CHANGES_RESULT" \
             --arg site "$SITE_RESULT" \
             --arg project_drift "$PROJECT_DRIFT_RESULT" \
@@ -357,15 +619,27 @@ jobs:
             --arg unit_newest "$UNIT_NEWEST_RESULT" \
             --arg store "$STORE_RESULT" \
             --arg merge_compatibility "$MERGE_RESULT" \
-            --arg run_id "${{ github.run_id }}" \
-            --arg run_attempt "${{ github.run_attempt }}" \
+            --argjson run_id "$RUN_ID" \
+            --argjson run_attempt "$RUN_ATTEMPT" \
+            --arg mode "$mode" \
+            --arg source_run_id "$SOURCE_RUN_ID" \
+            --arg source_run_attempt "$SOURCE_RUN_ATTEMPT" \
+            --arg source_artifact_id "$SOURCE_ARTIFACT_ID" \
+            --arg source_artifact_name "$SOURCE_ARTIFACT_NAME" \
+            --arg source_artifact_digest "$SOURCE_ARTIFACT_DIGEST" \
             '{schema: $schema, repository: $repository, workflow: $workflow, event: $event,
               source_sha: $source_sha, source_tree: $source_tree, app_fingerprint: $app_fingerprint,
               app_route: $app_route,
               conclusions: {changes: $changes, site: $site, project_drift: $project_drift,
                             unit_oldest: $unit_oldest, unit_newest: $unit_newest, store: $store,
                             merge_compatibility: $merge_compatibility},
-              run_id: $run_id, run_attempt: $run_attempt}' \
+              run_id: $run_id, run_attempt: $run_attempt,
+              app_evidence: {mode: $mode,
+                source: (if $mode == "reused" then
+                  {run_id: ($source_run_id | tonumber), run_attempt: ($source_run_attempt | tonumber),
+                   artifact_id: ($source_artifact_id | tonumber), artifact_name: $source_artifact_name,
+                   artifact_digest: $source_artifact_digest}
+                 else null end)}}' \
             > "$RUNNER_TEMP/review-receipt.json"
           {
             echo "### Review gate passed"
