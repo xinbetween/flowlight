@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.8, macOS 15 or later.
 
  On this page
 
@@ -928,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1674,7 +1674,7 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.7
+ 0.17.8
 November 5, 2026Latest
 
  Account for every AI agent. Agents now combines installed apps, configured workspaces, known launchers and observed traffic into one inventory, with explainable health reasons for evidence, routing, inspection, policy coverage and unresolved alerts instead of an opaque score.
@@ -1687,7 +1687,7 @@ November 5, 2026Latest
 
  Keep redesigned paths within measured limits. Fail-capable numeric budgets cover startup, a 600-edge graph, a 10,001-row History query, a 10,000-alert query, a 1,000-agent inventory and 30,000 built-in plugin evaluations, with complete diagnostics on failure.
 
- Carry every completed change forward safely. The unpublished 0.17.4, 0.17.5 and 0.17.6 work ships here: Policies preserves each policy type's authoritative editor and evidence, Sources is one Collector–Devices–Coverage document, History clears pointer details without inventing a keyboard selection, and release review receipts remain valid when GitHub hides a trusted reviewer's private organization membership from the workflow token.
+ Carry every completed change forward safely. The unpublished 0.17.4, 0.17.5, 0.17.6 and 0.17.7 work ships here: Policies preserves each policy type's authoritative editor and evidence, Sources is one Collector–Devices–Coverage document, History clears pointer details without inventing a keyboard selection, and release review receipts remain valid when GitHub hides a trusted reviewer's private organization membership from the workflow token.
 
  Reuse CI only when the evidence is exact. Pull-request app jobs may reuse a successful canonical run only when its full Git tree, app fingerprint, check conclusions, receipt schema and immutable artifact identity match; every invalid or forked case executes the current jobs.
 
@@ -1695,7 +1695,7 @@ November 5, 2026Latest
 
  Keep untrusted pull-request refs out of checkouts. Merge compatibility uses GitHub's trusted pull-request event merge commit rather than constructing a checkout ref from pull-request input, resolving code-scanning alert 4 without granting privileged workflow access.
 
- Sign each release once. The immutable tag run builds, signs, notarizes, Gatekeeper-verifies, attests and retains one artifact; credential-free publication can only verify and publish those exact prepared bytes, while accepted Apple tickets survive a bounded multi-minute CloudKit delivery outage without resubmission.
+ Sign each release once. The immutable tag run builds, signs, notarizes and Gatekeeper-verifies once, then stages only the exact DMG, PKG, checksums, notes and manifest into a clean bundle before attestation and retention; credential-free publication can only verify and publish those bytes.
 
  0.17.3
 November 4, 2026

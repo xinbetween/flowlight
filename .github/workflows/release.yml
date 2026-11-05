@@ -270,6 +270,15 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$RELEASE_VERSION"
+          BUNDLE="$RUNNER_TEMP/prepared-release"
+          mkdir "$BUNDLE"
+          for source in build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt; do
+            [[ -f "$source" && ! -L "$source" ]] || {
+              echo "::error::Missing regular release file: $source"
+              exit 1
+            }
+          done
+          cp build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt "$BUNDLE/"
           NOTES="packaging/release-notes/$VERSION.md"
           if [[ -f "$NOTES" ]]; then
             cp "$NOTES" "$RUNNER_TEMP/base-notes.md"
@@ -285,12 +294,12 @@ jobs:
             echo '### Checksums'
             echo
             echo '```'
-            cat build/SHA256SUMS.txt
+            cat "$BUNDLE/SHA256SUMS.txt"
             echo '```'
-          } > build/RELEASE-NOTES.md
+          } > "$BUNDLE/RELEASE-NOTES.md"
           WORKFLOW_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml" --jq .id)
           python3 -I scripts/release_artifact.py create-manifest \
-            --bundle build \
+            --bundle "$BUNDLE" \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$RELEASE_TAG" \
             --source-sha "$GITHUB_SHA" \
@@ -302,7 +311,7 @@ jobs:
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --evidence "$RUNNER_TEMP/review-evidence.json"
           python3 -I scripts/release_artifact.py verify-bundle \
-            --bundle build \
+            --bundle "$BUNDLE" \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$RELEASE_TAG" \
             --source-sha "$GITHUB_SHA" \
@@ -316,11 +325,11 @@ jobs:
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
         with:
           subject-path: |
-            build/Flowlight.dmg
-            build/Flowlight-${{ steps.version.outputs.version }}.pkg
-            build/SHA256SUMS.txt
-            build/RELEASE-NOTES.md
-            build/RELEASE-MANIFEST.json
+            ${{ runner.temp }}/prepared-release/Flowlight.dmg
+            ${{ runner.temp }}/prepared-release/Flowlight-${{ steps.version.outputs.version }}.pkg
+            ${{ runner.temp }}/prepared-release/SHA256SUMS.txt
+            ${{ runner.temp }}/prepared-release/RELEASE-NOTES.md
+            ${{ runner.temp }}/prepared-release/RELEASE-MANIFEST.json
 
       - name: Preserve the immutable prepared release
         id: artifact
@@ -328,11 +337,11 @@ jobs:
         with:
           name: flowlight-release-${{ steps.version.outputs.tag }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            build/Flowlight.dmg
-            build/Flowlight-${{ steps.version.outputs.version }}.pkg
-            build/SHA256SUMS.txt
-            build/RELEASE-NOTES.md
-            build/RELEASE-MANIFEST.json
+            ${{ runner.temp }}/prepared-release/Flowlight.dmg
+            ${{ runner.temp }}/prepared-release/Flowlight-${{ steps.version.outputs.version }}.pkg
+            ${{ runner.temp }}/prepared-release/SHA256SUMS.txt
+            ${{ runner.temp }}/prepared-release/RELEASE-NOTES.md
+            ${{ runner.temp }}/prepared-release/RELEASE-MANIFEST.json
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
@@ -357,7 +366,7 @@ jobs:
             echo "gh workflow run Release --ref $RELEASE_TAG -f prepare_run_id=$GITHUB_RUN_ID"
             echo '```'
             echo
-            cat build/SHA256SUMS.txt
+            cat "$RUNNER_TEMP/prepared-release/SHA256SUMS.txt"
           } >> "$GITHUB_STEP_SUMMARY"
 
   publish:

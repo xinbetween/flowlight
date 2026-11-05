@@ -79,6 +79,21 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("if-no-files-found: error", self.prepare)
         self.assertIn("retention-days: 90", self.prepare)
 
+    def test_preparation_stages_only_release_files(self):
+        self.assertIn('BUNDLE="$RUNNER_TEMP/prepared-release"', self.prepare)
+        self.assertIn('mkdir "$BUNDLE"', self.prepare)
+        self.assertIn(
+            'cp build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt "$BUNDLE/"',
+            self.prepare,
+        )
+        self.assertEqual(self.prepare.count('--bundle "$BUNDLE"'), 2)
+        self.assertNotIn("--bundle build", self.prepare)
+        for name in (
+            "Flowlight.dmg", "Flowlight-${{ steps.version.outputs.version }}.pkg",
+            "SHA256SUMS.txt", "RELEASE-NOTES.md", "RELEASE-MANIFEST.json",
+        ):
+            self.assertIn(f"${{{{ runner.temp }}}}/prepared-release/{name}", self.prepare)
+
     def test_preparation_requires_authenticated_review_comments(self):
         self.assertIn("RELEASE_REVIEWERS", self.prepare)
         self.assertIn('issues/$pull_number/comments?per_page=100', self.prepare)
