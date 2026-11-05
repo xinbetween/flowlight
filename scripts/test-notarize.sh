@@ -101,10 +101,10 @@ set -e
   print -u2 -- "expected persistent -1005 failures to exit 65, got $fixture_status"
   exit 1
 }
-[[ "$(< "$temporary/exhaust/count")" == 4 ]]
+[[ "$(< "$temporary/exhaust/count")" == 8 ]]
 [[ "$(wc -l < "$temporary/exhaust/notary.log" | tr -d ' ')" == 1 ]]
-[[ "$(< "$temporary/exhaust/sleep.log")" == $'2\n4\n8' ]]
-grep -q 'Stapling failed after 4 attempts' "$temporary/exhaust.out"
+[[ "$(< "$temporary/exhaust/sleep.log")" == $'2\n4\n8\n16\n32\n60\n60' ]]
+grep -q 'Stapling failed after 8 attempts' "$temporary/exhaust.out"
 
 set +e
 run_fixture permanent > "$temporary/permanent.out" 2>&1
@@ -190,4 +190,4 @@ second_upload=$(awk '{print $3}' "$concurrent_case/second/notary.log")
 [[ ! -e "${first_upload:h}" ]]
 [[ ! -e "${second_upload:h}" ]]
 
-print -- 'Notarization fixtures passed: immediate success, recovery at 3, exhaustion at 4, permanent and mixed-code failure at 1, submit failure at 0 staples, failed-app cleanup, and isolated concurrent uploads.'
+print -- 'Notarization fixtures passed: immediate success, recovery at 3, capped exhaustion at 8, permanent and mixed-code failure at 1, submit failure at 0 staples, failed-app cleanup, and isolated concurrent uploads.'

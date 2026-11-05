@@ -43,10 +43,12 @@ xcrun notarytool submit "$UPLOAD" "${CREDENTIALS[@]}" --wait
 
 # Apple's stapler occasionally loses its CloudKit connection after the notary service has already accepted the
 # upload (NSURLErrorDomain -1005). Re-submitting would create a second notarization request, so retry only the
-# idempotent staple operation, only for that known transport failure, and with a short bounded backoff.
+# idempotent staple operation, only for that known transport failure, and with a bounded capped backoff long
+# enough to outlast a transient ticket-delivery outage.
 staple_attempt=1
 staple_delay=2
-staple_max_attempts=4
+staple_max_delay=60
+staple_max_attempts=8
 while true; do
   staple_log="$CLEANUP/stapler-$staple_attempt.log"
   set +e
@@ -69,6 +71,9 @@ while true; do
   sleep "$staple_delay"
   (( staple_attempt += 1 ))
   (( staple_delay *= 2 ))
+  if (( staple_delay > staple_max_delay )); then
+    staple_delay=$staple_max_delay
+  fi
 done
 
 echo "Notarized and stapled: $TARGET"
