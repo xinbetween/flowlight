@@ -111,6 +111,14 @@ class ReleaseCheckTests(unittest.TestCase):
             "url": f"https://github.com/{REPO}/pull/76#issuecomment-9001",
         }])
 
+    def test_accepts_private_membership_reported_as_contributor(self):
+        errors, _, receipts = run_verify(
+            comments=review_comment(author_association="CONTRIBUTOR")
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(receipts[0]["reviewer"], TRUSTED_REVIEWER)
+        self.assertEqual(receipts[0]["author_association"], "CONTRIBUTOR")
+
     def test_accepts_merged_pull(self):
         pulls = reviewed_pull(state="closed", merged_at="2026-11-04T00:00:00Z")
         errors, _, _ = run_verify(pulls=pulls)
@@ -136,7 +144,7 @@ class ReleaseCheckTests(unittest.TestCase):
                 issue_url="https://api.github.com/repos/other/repo/issues/76",
                 html_url="https://github.com/other/repo/pull/76#issuecomment-9001",
             ),
-            "invalid association": review_comment(author_association="NONE"),
+            "missing association metadata": review_comment(author_association=None),
             "marker not on its own line": review_comment(body=f"Approved Reviewed-Commit: {SHA}"),
             "comment URL wrong pull": review_comment(
                 html_url=f"https://github.com/{REPO}/pull/77#issuecomment-9001"

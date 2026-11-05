@@ -139,7 +139,6 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
 
     associated_numbers = {int(pull["number"]) for pull in associated_pulls}
     receipts = []
-    trusted_associations = {"OWNER", "MEMBER", "COLLABORATOR"}
     issue_url = re.compile(rf"^https://api\.github\.com/repos/{re.escape(repo)}/issues/([0-9]+)$")
     for comment in issue_comments(comments_document):
         if not isinstance(comment, dict):
@@ -154,10 +153,15 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         reviewer = user.get("login") if isinstance(user, dict) else None
         if review_marker not in body_lines or not isinstance(reviewer, str) or reviewer.lower() not in trusted_reviewers:
             continue
+        # `author_association` is viewer-dependent when organization membership is
+        # private: the release GITHUB_TOKEN can report CONTRIBUTOR for the same
+        # comment an organization member sees as MEMBER. The configured reviewer
+        # allowlist is the authorization boundary; GitHub's comment identity, URL,
+        # numeric ID, exact PR, and exact commit marker authenticate the receipt.
         association = comment.get("author_association")
         comment_id = comment.get("id")
         html_url = comment.get("html_url")
-        if association not in trusted_associations:
+        if not isinstance(association, str) or not association:
             continue
         if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
             continue
