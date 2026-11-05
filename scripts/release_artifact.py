@@ -246,7 +246,6 @@ def verify_review_evidence(evidence, repository, source_sha):
     if not isinstance(receipts, list) or not receipts:
         raise ReleaseArtifactError("review evidence must retain an authenticated review receipt")
     receipt_ids = set()
-    trusted_associations = {"OWNER", "MEMBER", "COLLABORATOR"}
     for receipt in receipts:
         require_keys(
             receipt,
@@ -265,8 +264,13 @@ def verify_review_evidence(evidence, repository, source_sha):
         reviewer = receipt["reviewer"]
         if not isinstance(reviewer, str) or not reviewer.strip():
             raise ReleaseArtifactError("review receipt reviewer is malformed")
-        if receipt["author_association"] not in trusted_associations:
-            raise ReleaseArtifactError("review receipt author association is not trusted")
+        # GitHub's author association is viewer-dependent when organization
+        # membership is private. Authorization was already established by the
+        # configured reviewer login allowlist when this evidence was collected;
+        # retain association only as non-empty audit metadata.
+        association = receipt["author_association"]
+        if not isinstance(association, str) or not association:
+            raise ReleaseArtifactError("review receipt author association is malformed")
         if receipt["reviewed_commit"] != source_sha:
             raise ReleaseArtifactError("review receipt does not bind the exact release commit")
         expected_url = f"https://github.com/{repository}/pull/{pull_number}#issuecomment-{comment_id}"

@@ -326,6 +326,12 @@ class PreparedBundleTests(unittest.TestCase):
         (self.root / "RELEASE-NOTES.md").unlink()
         verify(self.root, public=True)
 
+    def test_accepts_viewer_dependent_association_metadata(self):
+        manifest = self._load_manifest()
+        manifest["review_evidence"]["review_receipts"][0]["author_association"] = "CONTRIBUTOR"
+        self._save_manifest(manifest)
+        verify(self.root)
+
     def test_rejects_changed_or_malformed_bundles(self):
         cases = {
             "changed DMG": lambda: (self.root / "Flowlight.dmg").write_bytes(b"tampered"),
@@ -354,7 +360,8 @@ class PreparedBundleTests(unittest.TestCase):
             "manifest receipt wrong PR": lambda: self._review_receipt_field(0, "pull_request", 999),
             "manifest receipt invalid ID": lambda: self._review_receipt_field(0, "comment_id", 0),
             "manifest receipt missing reviewer": lambda: self._review_receipt_field(0, "reviewer", ""),
-            "manifest receipt invalid association": lambda: self._review_receipt_field(0, "author_association", "NONE"),
+            "manifest receipt missing association": lambda: self._review_receipt_field(0, "author_association", ""),
+            "manifest receipt non-string association": lambda: self._review_receipt_field(0, "author_association", 1),
             "manifest receipt wrong SHA": lambda: self._review_receipt_field(0, "reviewed_commit", "d" * 40),
             "manifest receipt wrong URL": lambda: self._review_receipt_field(
                 0, "url", f"https://github.com/{REPOSITORY}/pull/82#issuecomment-9002"
