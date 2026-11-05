@@ -1,5 +1,180 @@
 import SwiftUI
 
+/// Pure recovery-state decisions keep the Sources checklist honest and easy to exercise without constructing views.
+enum SourceSetupPolicy {
+    enum CoverageHealth: Equatable { case empty, good, warning }
+
+    static func coverageHealth(named: Double, hasTraffic: Bool) -> CoverageHealth {
+        guard hasTraffic else { return .empty }
+        return named > 0.8 ? .good : .warning
+    }
+
+    static func collectorConfigured(mode: CaptureMode, extensionState: ExtensionManager.State,
+                                    extensionFellBack: Bool) -> Bool {
+        if mode == .nettop { return true }
+        return extensionState == .enabled && !extensionFellBack
+    }
+
+    static func setupComplete(mode: CaptureMode, extensionState: ExtensionManager.State,
+                              extensionFellBack: Bool, isReceiving: Bool) -> Bool {
+        collectorConfigured(mode: mode, extensionState: extensionState,
+                            extensionFellBack: extensionFellBack) && isReceiving
+    }
+}
+
+/// Collector setup, device channels and coverage belong to one operational destination. The compact health strip
+/// answers "is Flowlight working?" before someone has to know which of the three tabs contains the recovery action.
+struct SourcesView: View {
+    @Binding var selection: SourcesTab
+    @EnvironmentObject var monitor: TrafficMonitor
+    @EnvironmentObject var extensionManager: ExtensionManager
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker(L("Sources"), selection: $selection) {
+                    ForEach(SourcesTab.allCases) { tab in Text(tab.title).tag(tab) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 420)
+
+                HStack(spacing: 10) {
+                    healthCard(.collector, icon: "antenna.radiowaves.left.and.right",
+                               title: L("Collector"), detail: collectorDetail,
+                               tint: monitor.isReceiving ? FL.good : FL.warning)
+                    healthCard(.coverage, icon: "circle.dashed.inset.filled",
+                               title: L("Coverage"), detail: coverageDetail,
+                               tint: coverageTint)
+                    healthCard(.devices, icon: "dot.radiowaves.left.and.right",
+                               title: L("Devices"), detail: deviceDetail,
+                               tint: monitor.devices.isWatchingAnything ? FL.good : .secondary)
+                }
+
+                if !sourceSetupComplete { sourceRecoveryChecklist }
+            }
+            .padding(.horizontal, Measure.gutter)
+            .padding(.vertical, 12)
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
+
+            Group {
+                switch selection {
+                case .collector: CaptureView()
+                case .devices: DevicesView()
+                case .coverage: CoverageView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .navigationTitle(L("Sources"))
+        .navigationSubtitle(selection.title)
+    }
+
+    private var collectorDetail: String {
+        if monitor.extensionFellBack {
+            #if APP_STORE
+            // The Store product has no sampler fallback; its fail-closed source is unavailable, not nettop.
+            return L("Nothing is arriving")
+            #else
+            return L("nettop sampler")
+            #endif
+        }
+        return monitor.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
+    }
+
+    private var coverageHealth: SourceSetupPolicy.CoverageHealth {
+        SourceSetupPolicy.coverageHealth(named: monitor.coverage.named,
+                                         hasTraffic: monitor.coverage.hasTraffic)
+    }
+
+    private var coverageDetail: String {
+        guard coverageHealth != .empty else { return L("Nothing recorded in the last hour") }
+        return "\(monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))) \(L("Named"))"
+    }
+
+    private var coverageTint: Color {
+        switch coverageHealth {
+        case .empty: return .secondary
+        case .good: return FL.good
+        case .warning: return FL.warning
+        }
+    }
+
+    private var deviceDetail: String {
+        guard monitor.devices.isWatchingAnything else { return L("Not watching") }
+        var channels: [String] = []
+        if monitor.devices.watchingBluetooth { channels.append(L("Bluetooth")) }
+        if monitor.devices.watchingUSB { channels.append(L("USB")) }
+        if monitor.devices.watchingCamera { channels.append(L("Camera")) }
+        return channels.joined(separator: " · ")
+    }
+
+    private var collectorConfigured: Bool {
+        SourceSetupPolicy.collectorConfigured(mode: monitor.mode, extensionState: extensionManager.state,
+                                              extensionFellBack: monitor.extensionFellBack)
+    }
+
+    private var sourceSetupComplete: Bool {
+        SourceSetupPolicy.setupComplete(mode: monitor.mode, extensionState: extensionManager.state,
+                                        extensionFellBack: monitor.extensionFellBack,
+                                        isReceiving: monitor.isReceiving)
+    }
+
+    /// A short recovery path stays beside the source status. It reports completed steps instead of presenting one
+    /// generic error, and the action opens the one place where every unfinished step can be repaired.
+    private var sourceRecoveryChecklist: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text(monitor.isReceiving ? L("Collector") : L("Nothing is arriving"))
+                    .font(.caption.weight(.semibold))
+                checklistRow(monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler"),
+                             complete: collectorConfigured)
+                checklistRow(L("Data is arriving"), complete: monitor.isReceiving)
+            }
+            Spacer(minLength: 8)
+            Button { selection = .collector } label: {
+                Label(L("Collector"), systemImage: "chevron.right")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(FL.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(FL.warning.opacity(0.25)))
+    }
+
+    private func checklistRow(_ title: String, complete: Bool) -> some View {
+        Label(title, systemImage: complete ? "checkmark.circle.fill" : "circle")
+            .font(.caption)
+            .foregroundStyle(complete ? FL.good : .secondary)
+    }
+
+    private func healthCard(_ tab: SourcesTab, icon: String, title: String,
+                            detail: String, tint: Color) -> some View {
+        Button { selection = tab } label: {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.caption.weight(.semibold))
+                    Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selection == tab ? FL.accent.opacity(0.10) : Color.secondary.opacity(0.07),
+                        in: RoundedRectangle(cornerRadius: 9))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selection == tab ? .isSelected : [])
+    }
+}
+
 /// Where Flowlight's data comes from, and everything that decides whether it can come from there.
 ///
 /// The screen is read top down, in the order the questions are asked: which source is chosen, whether anything is
@@ -9,7 +184,6 @@ import SwiftUI
 struct CaptureView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var extensionManager: ExtensionManager
-    @State private var confirmClear = false
     @State private var showExtensionSetup = false
     @State private var otherFilters: [InstalledSystemExtension] = []
 
@@ -35,36 +209,16 @@ struct CaptureView: View {
                 #if !APP_STORE
                 if monitor.mode == .nettop { HostnameSection() }
                 #endif
-                storageSection
             }
             // A settings panel is read, not scanned, and a line of prose stretched across a maximised window is
             // unreadable. The column stops at a comfortable measure and stays against the sidebar rather than
             // floating in the middle of the window.
             .padding(Measure.gutter)
         }
-        .navigationTitle(L("Capture"))
-        // The one thing worth a trip to this screen to find out — what is feeding the app right now — said in the
-        // title bar, so it can be read from any other screen's neighbour.
-        .navigationSubtitle(subtitle)
         #if !APP_STORE
         // Which other content filters exist decides whether ours can work at all, so it's read when the screen opens.
         .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
         #endif
-        .confirmationDialog(L("Delete all recorded traffic, baselines and alerts?"), isPresented: $confirmClear) {
-            Button(L("Delete everything"), role: .destructive) { monitor.clearAllData() }
-        }
-    }
-
-    private var subtitle: String {
-        if monitor.extensionFellBack {
-            #if APP_STORE
-            return L("Network Extension · unavailable")
-            #else
-            return L("nettop sampler · the extension didn't answer")
-            #endif
-        }
-        let source = monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler")
-        return monitor.isReceiving ? L("%@ · receiving", source) : L("%@ · nothing arriving yet", source)
     }
 
     // MARK: Source
@@ -350,33 +504,6 @@ struct CaptureView: View {
         }
         .padding(.horizontal, 12).padding(.bottom, 14).padding(.leading, 38)
     }
-
-    // MARK: Storage
-
-    private var storageSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            CaptureHeading(L("Storage"))
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 12) {
-                    CaptureGlyph(symbol: "internaldrive", tint: .secondary)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(L("Database")).font(.body.weight(.medium))
-                        Text(monitor.db.url.path)
-                            .font(.caption.monospaced()).foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                HStack(spacing: 8) {
-                    Button(L("Reveal in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([monitor.db.url]) }
-                    Spacer(minLength: 8)
-                    Button(L("Clear All Data…"), role: .destructive) { confirmClear = true }
-                }
-                .controlSize(.small)
-            }
-            .captureCard()
-        }
-    }
 }
 
 /// Where hostnames come from in nettop mode, with the one-time packet-capture setup.
@@ -551,7 +678,7 @@ struct CaptureOnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 point("text.magnifyingglass", L("Flowlight reads DNS answers and TLS server names on your primary network interface to name connections."))
                 point("lock.shield", L("Packet contents are never stored or sent anywhere. Only hostnames are kept."))
-                point("key", L("macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture."))
+                point("key", L("macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector."))
             }
 
             Toggle(isOn: $ownerLookup) {

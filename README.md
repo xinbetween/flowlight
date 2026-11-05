@@ -220,8 +220,10 @@ there is still data. It says which rung it is on and how long until the next one
 rewritten, blocking is switched off while the sampler stands in (the sampler can't refuse anything, and Rules
 shouldn't claim otherwise), and **Try the extension again** starts over.
 
-### Devices: channels that aren't the network
-A Mac sends and receives over more than TCP and UDP. The **Devices** screen covers the rest, with every channel off
+### Sources: collector, coverage and devices
+**Sources** keeps collector health and recovery, hostname coverage, and opt-in device channels in one destination. Its health summary shows whether traffic is arriving, how much is named, and which device channels are active.
+
+A Mac sends and receives over more than TCP and UDP. **Sources › Devices** covers the non-network channels, with every channel off
 until you turn it on because watching more of your Mac should be a decision rather than something an update did.
 
 **Camera activity**: whether each camera is active and when it started or stopped. Flowlight reads the public
@@ -277,7 +279,7 @@ talks to a lot of places for good reasons.
 Flowlight keeps recording with its window closed and costs almost nothing while idle. **Settings › General › Run in
 the background** drops the Dock icon and the Cmd-Tab entry; the menu bar keeps the rates and offers **Show Dock
 Icon** to undo it. Quitting stops the sampler — it does not stop the Network Extension, which runs on its own until
-you disable it in Capture.
+you disable it in Sources › Collector.
 
 ### Running in the background, quietly
 The window reopens where and how you left it; a first run fills the screen. Hostname setup is offered a little after
@@ -314,7 +316,7 @@ appears in Live and History like any other app's traffic, including a collector 
 No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
 Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
-Team Cymru's DNS service, and you can turn it off in Capture. Release and official rule-pack checks make standard HTTPS
+Team Cymru's DNS service, and you can turn it off in Sources › Collector. Release and official rule-pack checks make standard HTTPS
 requests with no traffic or pack settings; each has its own off switch in Settings or Rules › Packs. To attribute tools
 and MCP servers, Flowlight reads process command lines and your agents' MCP config files
 on your Mac; none of it leaves your Mac. HTTPS inspection is off unless you turn it on, and what it records stays in the
@@ -354,7 +356,7 @@ same local database.
    asks to quit and install it (Flowlight › Check for Updates…). Updating by hand? Quit Flowlight before dragging the
    new version in.
 3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
-   for your password once). Network-owner lookups are on by default and can be turned off there or in Capture.
+   for your password once). Network-owner lookups are on by default and can be turned off there or in Sources › Collector.
 
 > **Try it without your own data:** `open /Applications/Flowlight.app --args -FLDemo YES` launches with 90 days
 > of synthetic traffic, including an inspected Claude Code session. That's what the screenshots show.
@@ -438,7 +440,7 @@ The [threat model](https://flowlight.xinbetween.com/threat-model/) says what is 
   to confirm the filter. Flowlight works without it on the nettop sampler.
 - **Only one content filter runs at a time on macOS.** On a Mac where security software already holds that slot —
   Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar — Flowlight's filter installs and connects but is never handed
-  any traffic. Capture lists the filters it finds and offers the sampler instead, which needs no filter.
+  any traffic. Sources › Collector lists the filters it finds and offers the sampler instead, which needs no filter.
 
 ## Roadmap
 
@@ -551,7 +553,7 @@ Flowlight/
   Storage/           SQLite store, rollups, queries
   Analysis/          anomaly engine, AI agent catalog + rules
   Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
-  UI/                Live · AI Agents · History · Alerts · Inspect · Connections · Capture
+  UI/                Live · AI Agents · History · Alerts · Inspect · Connections · Sources
 FlowlightTests/      105 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
 docs/                website (GitHub Pages) and developer guide
 ```

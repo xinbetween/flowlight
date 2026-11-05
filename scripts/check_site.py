@@ -42,8 +42,8 @@ IMG = re.compile(r'<img[^>]*src="([^"]*assets/screenshots/[^"]+)"([^>]*)>')
 WH = re.compile(r'\b(width|height)="(\d+)"')
 HELP_ANCHOR = re.compile(r'case \.(\w+): return "([\w-]+)"')
 SIDEBAR_GROUP = re.compile(r"case \.\w+: order = \[([^\]]*)\]")
-ROW = re.compile(r"<tr><td>(?:<a[^>]*>)?([^<]+)(?:</a>)?</td><td>\u2318(.)</td>")
-HOME_CARD = re.compile(r'<div class="view-card"><span class="glyph ([\w-]+)".*?<span class="keys">\u2318(.)</span></div>', re.S)
+ROW = re.compile(r"<tr><td>(?:<a[^>]*>)?([^<]+)(?:</a>)?</td><td>⌘(.)")
+HOME_CARD = re.compile(r'<div class="view-card"><span class="glyph ([\w-]+)".*?<span class="keys">⌘(.)', re.S)
 H1 = re.compile(r"<h1[ >]")
 TITLE = re.compile(r"<title>([^<]+)</title>", re.I)
 META = re.compile(r'<meta\s+(?:name|property)="([^"]+)"\s+content="([^"]*)"', re.I)
@@ -66,6 +66,31 @@ def sidebar_order(source):
     if not groups:
         raise ValueError("could not find the grouped sidebar order")
     return [item for group in groups for item in re.findall(r"\.(\w+)", group)]
+
+
+def shortcut_requirements(order):
+    """Required labels for Developer ID and Store products, whose visible sidebars differ."""
+    def key(index):
+        return "0" if index == 9 else str(index + 1)
+
+    store_order = [screen for screen in order if screen != "inspect"]
+    requirements = {}
+    for index, screen in enumerate(order):
+        developer_key = key(index)
+        store_key = key(store_order.index(screen)) if screen in store_order else None
+        if store_key == developer_key:
+            requirements[screen] = [f"⌘{developer_key}"]
+        else:
+            requirements[screen] = [f"⌘{developer_key} · Developer ID"]
+            if store_key is not None:
+                requirements[screen].append(f"⌘{store_key} · App Store")
+    return requirements
+
+
+def missing_shortcuts(cell, required):
+    text = re.sub(r"<[^>]+>", " ", cell)
+    text = " ".join(text.split())
+    return [label for label in required if label not in text]
 
 
 def problems():
@@ -257,10 +282,10 @@ def problems():
             found.append(f"docs/docs/index.html: no #{anchor} section, but the {screen} screen's Help "
                          f"button opens it — a new screen the documentation never got")
 
-    # 12. A shortcut the documentation gets wrong. The sidebar's order *is* the shortcut — ⌘1 to ⌘0 by
-    #     position — so inserting a screen silently renumbers every screen after it. The table said Inspect was
-    #     ⌘5 long after it had become ⌘7, and four screens had been added without ever reaching the table.
+    # 12. A shortcut the documentation gets wrong. Shortcuts follow each product's visible sidebar. Developer ID
+    #     includes Inspect; the Store product does not, so Rules and Sources move up by one there.
     order = sidebar_order(nav)
+    requirements = shortcut_requirements(order)
     titles = dict(HELP_ANCHOR.findall(nav[nav.find("var englishTitle"):nav.find("var title")]))
     docs_text = (OUT / "docs/index.html").read_text()
     rows = {name.strip(): key for name, key in ROW.findall(docs_text)}
@@ -274,21 +299,41 @@ def problems():
             found.append(f"docs/docs/index.html: the views table gives {title} \u2318{rows[title]}, "
                          f"but the sidebar puts it at \u2318{key}")
 
-    # 14. The homepage repeats the same shortcut badges and a compact Devices promise. Both drifted in 0.15.12:
-    #     Ask and Inspect were swapped, and camera activity shipped without ever reaching the landing-page card.
+    docs_pages = [OUT / "docs/index.html"] + [OUT / lang / "docs/index.html" for lang in LANGS]
+    shortcut_anchors = {
+        "inspect": ("inspection",),
+        "rules": ("rules",),
+        "sources": ("capture", "sources"),
+    }
+    for docs_page in docs_pages:
+        page_text = docs_page.read_text()
+        for screen, anchors in shortcut_anchors.items():
+            anchor_pattern = "|".join(re.escape(anchor) for anchor in anchors)
+            cell_match = re.search(
+                rf'<tr><td><a href="#(?:{anchor_pattern})">.*?</a></td><td>(.*?)</td>',
+                page_text, re.S)
+            label = str(docs_page.relative_to(ROOT))
+            if cell_match is None:
+                found.append(f"{label}: the views table has no {screen} shortcut row")
+                continue
+            for missing in missing_shortcuts(cell_match.group(1), requirements[screen]):
+                found.append(f"{label}: the {screen} row never lists {missing}")
+
+    # 14. The homepage repeats the same shortcut badges and a compact Sources promise. Keep Collector, Devices,
+    #     and Coverage together, and keep both product-specific shortcut maps truthful.
     glyphs = {"ai-agents": "agents"}
     home_paths = [OUT / "index.html"] + [OUT / lang / "index.html" for lang in LANGS]
-    channel_terms = {
-        "en": ["Bluetooth", "USB", "camera"],
-        "de": ["Bluetooth", "USB", "Kamera"],
-        "es": ["Bluetooth", "USB", "c\u00e1mara"],
-        "fr": ["Bluetooth", "USB", "cam\u00e9ra"],
-        "it": ["Bluetooth", "USB", "fotocamer"],
-        "ja": ["Bluetooth", "USB", "\u30ab\u30e1\u30e9"],
-        "ko": ["Bluetooth", "USB", "\uce74\uba54\ub77c"],
-        "pt-PT": ["Bluetooth", "USB", "c\u00e2mara"],
-        "zh-Hans": ["\u84dd\u7259", "USB", "\u6444\u50cf\u5934"],
-        "zh-Hant": ["\u85cd\u7259", "USB", "\u651d\u5f71\u6a5f"],
+    source_terms = {
+        "en": ["Collector", "Devices", "Coverage"],
+        "de": ["Collector", "Ger\u00e4te", "Abdeckung"],
+        "es": ["Colector", "Dispositivos", "Cobertura"],
+        "fr": ["Collecteur", "Appareils", "Couverture"],
+        "it": ["Collector", "Dispositivi", "Copertura"],
+        "ja": ["\u30b3\u30ec\u30af\u30bf\u30fc", "\u30c7\u30d0\u30a4\u30b9", "\u30ab\u30d0\u30fc\u7bc4\u56f2"],
+        "ko": ["\uceec\ub809\ud130", "\uae30\uae30", "\ud3ec\ucc29 \ubc94\uc704"],
+        "pt-PT": ["Coletor", "Dispositivos", "Cobertura"],
+        "zh-Hans": ["\u6536\u96c6\u5668", "\u8bbe\u5907", "\u8986\u76d6\u8303\u56f4"],
+        "zh-Hant": ["\u6536\u96c6\u5668", "\u88dd\u7f6e", "\u6db5\u84cb\u7bc4\u570d"],
     }
     expected_glyphs = {
         next((name for name, mapped in glyphs.items() if mapped == screen), screen): (screen, index)
@@ -305,14 +350,20 @@ def problems():
             elif cards[glyph] != key:
                 found.append(f"{label}: the {screen} card gives \u2318{cards[glyph]}, "
                              f"but the sidebar puts it at \u2318{key}")
-        device_card = re.search(r'<span class="glyph devices".*?</div>', home_text, re.S)
-        if device_card is None:
-            found.append(f"{label}: the Devices card is missing")
-            continue
         lang = home_path.parent.name if home_path.parent != OUT else "en"
-        for channel in channel_terms[lang]:
-            if channel.casefold() not in device_card.group(0).casefold():
-                found.append(f"{label}: the Devices card never mentions {channel}")
+        source_card = re.search(r'<span class="glyph sources".*?</div>', home_text, re.S)
+        if source_card is None:
+            found.append(f"{label}: the Sources card is missing")
+            continue
+        for term in source_terms[lang]:
+            if term.casefold() not in source_card.group(0).casefold():
+                found.append(f"{label}: the Sources card never mentions {term}")
+        for glyph, screen in (("inspect", "inspect"), ("rules", "rules"), ("sources", "sources")):
+            card = re.search(rf'<span class="glyph {glyph}".*?</div>', home_text, re.S)
+            if card is None:
+                continue
+            for missing in missing_shortcuts(card.group(0), requirements[screen]):
+                found.append(f"{label}: the {screen} card never lists {missing}")
 
     # 10. A screenshot nothing shows, or a screenshot that isn't there. Both happen while rearranging a page:
     #     the file outlives the <img> that referenced it, and nobody notices a megabyte being served for nothing.

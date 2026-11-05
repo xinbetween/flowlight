@@ -257,7 +257,8 @@ final class AskTests: XCTestCase {
         XCTAssertEqual(rows.first?["device"] as? String, "Desk Camera")
         XCTAssertEqual(rows.first?["started"] as? Int, 1)
         XCTAssertEqual(rows.first?["stopped"] as? Int, 1)
-        XCTAssertEqual(result.screen, .devices)
+        XCTAssertEqual(result.screen, .sources)
+        XCTAssertEqual(result.sourcesTab, .devices)
         XCTAssertFalse(result.json.contains("private-camera-uid"), "stable hardware identifiers never leave the Mac")
         XCTAssertFalse(result.json.contains("private-usb-serial"))
     }

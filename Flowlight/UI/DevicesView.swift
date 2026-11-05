@@ -25,23 +25,7 @@ private struct DevicesContent: View {
                 offer
             }
         }
-        .navigationTitle(L("Devices"))
-        .navigationSubtitle(subtitle)
         .toolbar { toolbar }
-    }
-
-    /// Which channels are on, and how much of it is live. Both channels are off by default, so "nothing here" and
-    /// "not watching" look the same on the screen — the title bar is where that difference can be stated once.
-    private var subtitle: String {
-        var on: [String] = []
-        if store.watchingBluetooth { on.append(L("Bluetooth")) }
-        if store.watchingUSB { on.append(L("USB")) }
-        if store.watchingCamera { on.append(L("Camera")) }
-        guard !on.isEmpty else { return L("Not watching") }
-        let active = store.bluetooth.filter(\.connected).count + store.usb.count
-            + store.cameras.filter { $0.state == .active }.count
-        let channels = on.joined(separator: " · ")
-        return active == 0 ? L("%@ · nothing active", channels) : L("%@ · %lld active", channels, active)
     }
 
     @ToolbarContentBuilder

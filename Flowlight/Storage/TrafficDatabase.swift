@@ -2837,7 +2837,8 @@ final class TrafficDatabase: @unchecked Sendable {
     }
 
     /// Share of bytes in the window that carry a hostname, and that have at least an owner.
-    func coverage(since: Date) throws -> (named: Double, owned: Double) {
+    /// `hasTraffic` distinguishes an honest 0% from a window with no evidence at all.
+    func coverage(since: Date) throws -> (named: Double, owned: Double, hasTraffic: Bool) {
         let row = try conn.query("""
             SELECT SUM(bytes_in + bytes_out),
                    SUM(CASE WHEN domain != '' THEN bytes_in + bytes_out ELSE 0 END),
@@ -2845,8 +2846,8 @@ final class TrafficDatabase: @unchecked Sendable {
             FROM agg_1m LEFT JOIN ip_owners o ON o.ip = agg_1m.remote_ip
             WHERE ts >= ? AND remote_ip != '(unconnected)'
             """, [.int(Int64(since.timeIntervalSince1970))]) { ($0.double(0), $0.double(1), $0.double(2)) }.first
-        guard let row, row.0 > 0 else { return (0, 0) }
-        return (row.1 / row.0, row.2 / row.0)
+        guard let row, row.0 > 0 else { return (0, 0, false) }
+        return (row.1 / row.0, row.2 / row.0, true)
     }
 
     // MARK: Alerts

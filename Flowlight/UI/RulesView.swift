@@ -159,8 +159,8 @@ struct RulesView: View {
         // sentence is a sentence no translator can shape.
         if monitor.mode != .networkExtension && blind.contains(where: { $0.engine == .flow }) {
             return blind.count == 1
-                ? L("One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.")
-                : L("%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.", blind.count)
+                ? L("One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules.")
+                : L("%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules.", blind.count)
         }
         return blind.count == 1
             ? L("One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.")
@@ -732,7 +732,7 @@ struct RuleTemplateLibrary: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(L("Templates")).font(.title3.weight(.semibold))
-            Text(L("Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out."))
+            Text(L("Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out."))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(Measure.gutter)

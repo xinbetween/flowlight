@@ -133,7 +133,7 @@
         <tr><td>Update download</td><td><code>github.com</code></td><td>The disk image and its checksum file</td><td>Only when you click Download &amp; Open</td></tr>
         <tr><td>Official rule-pack update</td><td><code>flowlight.xinbetween.com</code></td><td>A standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the <code>Flowlight/&lt;version&gt;</code> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifier</td><td>After startup when due and then at most daily while healthy. On by default; off switch and manual Check Now in Rules › Packs</td></tr>
         <tr><td>Reverse DNS</td><td>Your configured DNS resolver</td><td>A lookup of an IP address's registered name, when no hostname was seen</td><td>As needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this</td></tr>
-        <tr><td>Network owner lookup</td><td>Team Cymru, over DNS</td><td>Public IP addresses with no known hostname. Private and reserved addresses never leave your Mac</td><td>On by default. Off switch in Capture › Identify network owners</td></tr>
+        <tr><td>Network owner lookup</td><td>Team Cymru, over DNS</td><td>Public IP addresses with no known hostname. Private and reserved addresses never leave your Mac</td><td>On by default. Off switch in Sources › Collector › Identify network owners</td></tr>
         <tr><td>Ask with a hosted model</td><td>The provider you select: Anthropic, OpenAI, Google Gemini or a compatible endpoint</td><td>Your question and the results returned by the read-only Flowlight queries selected by the model. The traffic database itself is not uploaded</td><td>Only when you select a hosted provider and submit a question. The Ask screen shows the transmitted requests</td></tr>
         <tr><td>Collector export</td><td>The OpenTelemetry or HTTP endpoint you configure</td><td>The fields shown in Settings › Export, such as traffic rollups and alerts. Authentication headers are stored in Keychain</td><td>Only after you configure an endpoint and enable export</td></tr>
         <tr><td>Inspected application traffic</td><td>The original destination requested by the inspected application</td><td>The application's request, forwarded through Flowlight's local proxy after decryption</td><td>Only while HTTPS inspection is enabled and the application is routed through the proxy</td></tr>
@@ -141,14 +141,14 @@
 
       <h2 id="permissions">Permissions</h2>
       <ul>
-        <li><strong>Administrator password, once,</strong> for packet-capture access. Removable from the Capture screen.</li>
+        <li><strong>Administrator password, once,</strong> for packet-capture access. Removable from Sources › Collector.</li>
         <li><strong>Notifications,</strong> for warnings. Optional.</li>
         <li><strong>Login item,</strong> only if you turn on Launch at login.</li>
       </ul>
 
       <h2 id="retention">Retention</h2>
       <p>Per-second data 6 hours (adjustable), minute data 14 days, hourly data 400 days, daily totals indefinitely, alerts 90 days.
-        <strong>Capture › Clear all data</strong> deletes everything, and removing <code>~/Library/Application Support/Flowlight</code> does the same.</p>
+        <strong>Settings › Data &amp; Privacy › Clear All Data</strong> deletes everything, and removing <code>~/Library/Application Support/Flowlight</code> does the same.</p>
 
       <h2 id="website">This website</h2>
       <p>This site is a static page hosted on GitHub Pages and served through Cloudflare. It sets no cookies and runs no analytics. GitHub
@@ -196,7 +196,7 @@
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.2 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.17.3 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

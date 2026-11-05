@@ -73,7 +73,6 @@
 "Devices" = "Devices";
 "Coverage" = "Coverage";
 "Inspect" = "Inspect";
-"Capture" = "Capture";
 "Traffic" = "Traffic";
 "Investigate" = "Investigate";
 "Control" = "Control";
@@ -89,6 +88,7 @@
 "Questions & Answers" = "Questions & Answers";
 "What Flowlight Reads on This Mac" = "What Flowlight Reads on This Mac";
 "Privacy" = "Privacy";
+"Data & Privacy" = "Data & Privacy";
 "Report an Issue" = "Report an Issue";
 "Turn Focus Off" = "Turn Focus Off";
 "Turn Focus On" = "Turn Focus On";
@@ -606,8 +606,6 @@
 /* UI/CaptureView.swift */
 "Delete all recorded traffic, baselines and alerts?" = "Delete all recorded traffic, baselines and alerts?";
 "Delete everything" = "Delete everything";
-"nettop sampler · the extension didn't answer" = "nettop sampler · the extension didn't answer";
-"Network Extension · unavailable" = "Network Extension · unavailable";
 "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh.";
 "%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — enable Flowlight under Content filter, then press Refresh.";
 "%@ — the content filter is unavailable" = "%@ — the content filter is unavailable";
@@ -616,8 +614,6 @@
 "Reconnect to the content filter" = "Reconnect to the content filter";
 "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled.";
 "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh.";
-"%@ · receiving" = "%@ · receiving";
-"%@ · nothing arriving yet" = "%@ · nothing arriving yet";
 "Source" = "Source";
 "Content filter" = "Content filter";
 "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval." = "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval.";
@@ -674,7 +670,7 @@
 "Without this, most traffic shows only an IP address or network owner." = "Without this, most traffic shows only an IP address or network owner.";
 "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections." = "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections.";
 "Packet contents are never stored or sent anywhere. Only hostnames are kept." = "Packet contents are never stored or sent anywhere. Only hostnames are kept.";
-"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture." = "macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture.";
+"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector." = "macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector.";
 "Identify network owners when no hostname is available" = "Identify network owners when no hostname is available";
 "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac.";
 "Not Now" = "Not Now";
@@ -705,8 +701,8 @@
 
 /* UI/CoverageView.swift */
 "Nothing recorded yet" = "Nothing recorded yet";
+"Nothing recorded in the last hour" = "Nothing recorded in the last hour";
 "Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment.";
-"%@ of traffic fully accounted for" = "%@ of traffic fully accounted for";
 "How much of this Mac is covered" = "How much of this Mac is covered";
 "HTTPS inspection is on" = "HTTPS inspection is on";
 "HTTPS inspection is off" = "HTTPS inspection is off";
@@ -754,8 +750,6 @@
 "Camera" = "Camera";
 "Started" = "Started";
 "Unknown camera" = "Unknown camera";
-"%@ · nothing active" = "%@ · nothing active";
-"%@ · %lld active" = "%@ · %lld active";
 "Watch camera activity" = "Watch camera activity";
 "Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames.";
 "No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames.";
@@ -984,7 +978,6 @@
 "The network is quiet" = "The network is quiet";
 "No app has sent or received data in the last few seconds." = "No app has sent or received data in the last few seconds.";
 "Waiting for traffic data" = "Waiting for traffic data";
-"Open Capture Settings" = "Open Capture Settings";
 
 /* UI/MockRulesView.swift */
 "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it.";
@@ -1189,8 +1182,8 @@
 "Until I resume" = "Until I resume";
 "Pause Blocking" = "Pause Blocking";
 "Stand every rule down for a while, without deleting anything" = "Stand every rule down for a while, without deleting anything";
-"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.";
-"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules.";
+"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules.";
+"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.";
 "In force" = "In force";
@@ -1240,7 +1233,7 @@
 "Apply a Template" = "Apply a Template";
 "%@ · in force at once" = "%@ · in force at once";
 "%@ · shown first" = "%@ · shown first";
-"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out.";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out." = "Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out.";
 "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started.";
 "A domain, an IP address, or a range" = "A domain, an IP address, or a range";
 "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching." = "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching.";

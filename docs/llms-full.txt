@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.3, macOS 15 or later.
 
  On this page
 
@@ -83,7 +83,7 @@ Documentation
  Refusing connectionsGuardrails
 
  Sources
- CaptureCoverageDevices
+ CollectorCoverageDevices
 
  Settings and data
  Focus modeBackgroundExport
@@ -125,11 +125,11 @@ open build/Build/Products/Release/Flowlight.app
 
  macOS only lets administrators read packets, so the Name Your Traffic window asks for your password once. It installs
  /Library/LaunchDaemons/com.flowlight.bpf-access.plist, which gives the access_bpf group read access to
- /dev/bpf* at each boot, the same approach Wireshark uses. Remove it any time from Capture › Remove Packet Capture Access.
+ /dev/bpf* at each boot, the same approach Wireshark uses. Remove it any time from Sources › Collector › Remove Packet Capture Access.
 
  Identify network owners labels traffic with no hostname by who operates the address
  (Cloudflare, Inc. · AS13335). It's on by default and sends those public IP addresses (never private ones) to Team Cymru's
- DNS service. Turn it off in Capture.
+ DNS service. Turn it off in Sources › Collector.
 
  Language
 
@@ -161,17 +161,15 @@ open build/Build/Products/Release/Flowlight.app
 
  Ask⌘6Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.
 
- Inspect⌘7Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
+ Inspect⌘7 · Developer IDOptional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
 
- Rules⌘8Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.
+ Rules⌘8 · Developer ID
+⌘7 · App StoreEvery allowlist and refusal you have set, what each one covers, and what it has actually stopped.
 
- Devices⌘9Off until you turn it on: camera activity, Bluetooth, USB and external storage.
+ Sources⌘9 · Developer ID
+⌘8 · App StoreCollector health and recovery, hostname coverage, and opt-in camera, Bluetooth, USB and storage activity in three tabs.
 
- Coverage⌘0What Flowlight cannot account for — per app, whether its traffic was seen, named, and readable.
-
- Capture—Which engine is recording, the extension's state, hostname learning, and where the database lives.
-
- The shortcuts follow the sidebar's visible order: ⌘0 is the tenth item, and an eleventh remains available without an invented key.
+ The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Rules and Sources move to ⌘7 and ⌘8.
 
  Live, the screen Flowlight opens on.
  In History, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with Nearby context and can switch to All history: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.
@@ -201,7 +199,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Active while you're awaymoves 1 MB or more in a minute after you stop using the keyboard and mouse15 minutes
 
- Agents get a 1-hour learning period before new-destination alerts start. Change any of this in Settings › Detection.
+ Agents get a 1-hour learning period before new-destination alerts start. Change any of this in Alerts › Detection.
 
  Tools & MCP servers
 
@@ -304,7 +302,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Apple's own apps are left out by default. macOS contacts Apple constantly — Software Update, iCloud,
  push, time, Maps tiles — on hosts and ports that are new the first time they appear, and listing all of it buries the one
- line worth reading. Turn it off in Settings › Detection › Rules if you want them. Either way the traffic is still
+ line worth reading. Turn it off in Alerts › Detection › Rules if you want them. Either way the traffic is still
  recorded, still appears in Live, History and Ask, and is still subject to every rule, guardrail and allowlist: the setting
  decides what is listed, never what is allowed.
 
@@ -378,7 +376,7 @@ open build/Build/Products/Release/Flowlight.app
  allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and Remove Certificate & Recorded Data deletes the certificate, its trust
  setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
 
- Local risk analysis is separate and off by default. In History or Settings › Detection, you can ask
+ Local risk analysis is separate and off by default. In History or Alerts › Detection, you can ask
  Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
  bounded redacted description — never request or response bodies, header values, cookies, credentials or tool arguments —
  and nothing leaves the Mac. The result is a potential-harm hint, not proof of intent: Flowlight never blocks, changes,
@@ -591,7 +589,7 @@ open build/Build/Products/Release/Flowlight.app
  to the list in one click. The agent's next attempt goes through.
 
  It needs the Network Extension. Refusing a connection means sitting in its path, which the nettop sampler
- cannot do — Capture will say so rather than offer a switch that does nothing.
+ cannot do — Sources › Collector will say so rather than offer a switch that does nothing.
 
  Some things are never refused, whatever a list says: your local network, DNS, essential Apple system services, and Flowlight's own
  traffic. A blocked Mac is a worse outcome than a blocked agent, so where there is doubt the connection is allowed and recorded.
@@ -633,9 +631,11 @@ open build/Build/Products/Release/Flowlight.app
  This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
  shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
 
- Capture: engines and sources
+ Sources: collector, coverage and devices
 
- Flowlight records traffic one of two ways, chosen in Capture. They differ in what they can miss, which is worth
+ Sources keeps operational setup in one place. Its health summary shows whether traffic is arriving, how much is named, and which optional device channels are active; any unfinished collector step links directly to Sources › Collector.
+
+ Flowlight records traffic one of two ways, chosen under Sources › Collector. They differ in what they can miss, which is worth
  understanding before you rely on either.
 
  nettop sampler (default)Network Extension
@@ -669,13 +669,13 @@ open build/Build/Products/Release/Flowlight.app
 
  It also can't run at all on some Macs. macOS allows one content filter at a time, and corporate security software
  normally holds it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and the like. Flowlight's filter will install and connect on those
- machines and then never be handed a connection. Capture lists any it finds and offers to switch you back to the sampler, which
+ machines and then never be handed a connection. Sources › Collector lists any it finds and offers to switch you back to the sampler, which
  needs no filter and works alongside them.
  See the developer guide for how it's built.
 
  Coverage: what Flowlight can't account for
 
- Every other screen answers what happened. Coverage answers what you would not have been told, which is what
+ Sources › Coverage answers what you would not have been told, which is what
  decides how much the other screens are worth. It asks three questions per app, because they fail independently.
 
  Was it seen? The Network Extension sees each flow as it opens. The nettop sampler reads counters once a
@@ -698,7 +698,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Devices: camera activity, Bluetooth, USB and external storage
 
- A Mac sends and receives over more than TCP and UDP. The Devices screen covers the rest, with every channel
+ A Mac sends and receives over more than TCP and UDP. Sources › Devices covers the rest, with every channel
  off until you turn it on because watching more of your Mac should be your decision rather than something an update did.
 
  Camera activity shows whether each camera is active and records confirmed start and stop transitions.
@@ -761,7 +761,7 @@ open build/Build/Products/Release/Flowlight.app
  request for your password; the offer returns next launch until you take or dismiss it.
 
  Quitting Flowlight stops the sampler. It does not stop the Network Extension: a system extension runs on its own, so the filter
- carries on inspecting connections until you disable or uninstall it in Capture.
+ carries on inspecting connections until you disable or uninstall it in Sources › Collector.
 
  Export to OpenTelemetry or a SIEM
 
@@ -808,7 +808,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Everything lives in ~/Library/Application Support/Flowlight/traffic.sqlite. Per-second rows are kept 6 hours
  (adjustable), minute rows 14 days, hourly rows 400 days, daily rows indefinitely, and alerts 90 days.
- Capture › Clear all data deletes it.
+ Settings › Data & Privacy › Clear All Data deletes it.
 
  Updates
 
@@ -832,7 +832,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Uninstall
 
- In Capture, choose Remove Packet Capture Access (asks for your password) if you enabled it,
+ In Sources › Collector, choose Remove Packet Capture Access (asks for your password) if you enabled it,
  uninstall the content filter if you installed it, and turn HTTPS inspection off in Inspect so its certificate
  leaves your keychain. Only Flowlight itself can withdraw those three.
 
@@ -852,18 +852,18 @@ open build/Build/Products/Release/Flowlight.app
  byte counters once a second and records the change, so a long transfer is counted exactly — but a connection that opens and
  closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so
  even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the
- extension from Capture. The full comparison is above.
+ extension from Sources › Collector. The full comparison is above.
  I turned on the Network Extension and nothing appears. The sampler works fine.
  Almost always because another content filter already has the slot. macOS runs one content filter at a time, and
  corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar. Flowlight's
- filter still installs, activates and connects, so Capture says Connected to filter extension, but macOS never hands it a
- single connection and the screens stay empty. Capture lists the filters it finds and offers to switch you back to
+ filter still installs, activates and connects, so Sources › Collector says Connected to filter extension, but macOS never hands it a
+ single connection and the screens stay empty. Sources › Collector lists the filters it finds and offers to switch you back to
  the sampler, which doesn't use a filter and works alongside them. You lose only the very short connections
  (the comparison); everything else is recorded the same way.
  The extension stopped working after Flowlight updated.
  Versions before 0.2.5 had this: macOS keeps running whichever build of the extension was last activated, so after an update the
  extension was the old version and macOS refuses the connection between a mismatched pair. From 0.2.5 Flowlight checks at launch
- and re-activates the filter itself. On an older version, press Install & enable filter in Capture once.
+ and re-activates the filter itself. On an older version, press Install & enable filter in Sources › Collector once.
  Something else is wrong with capture and I don't know what.
  Run this and read what it prints — it reports state and counts only, never anything Flowlight recorded about your traffic:
  curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zshCopy
@@ -920,7 +920,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1005,19 +1005,19 @@ What looked wrong? Explainable, per-app alerts with the destination and the thre
 
  Rules
 What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
-⌘8
+⌘8 · Developer ID / ⌘7 · App Store
 
  Ask
 Questions in plain language, answered from the history — with every query it ran listed underneath.
 ⌘6
 
- Devices
-Bluetooth, USB, and cameras: what's paired, what's attached or active, and when that changed. Off until you turn it on.
-⌘9
+ Sources
+Is data arriving, how much is named, and which device channels are active? Collector, Devices and Coverage in one place.
+⌘9 · Developer ID / ⌘8 · App Store
 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
-⌘7
+⌘7 · Developer ID
 
  Connections
 What is communicating? A zoomable Sankey map for app traffic and proved AI-agent paths, with exact list parity.
@@ -1355,7 +1355,7 @@ Questions
  Why does it ask for my password?
 
  macOS only lets administrators read network packets. The one-time setup gives your account read access, the
- same way Wireshark does. You can remove it any time from the Capture screen.
+ same way Wireshark does. You can remove it any time from Sources › Collector.
 
  Can it tell which MCP server or tool made a request?
 
@@ -1618,7 +1618,7 @@ Privacy
 
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this
 
- Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Capture › Identify network owners
+ Network owner lookupTeam Cymru, over DNSPublic IP addresses with no known hostname. Private and reserved addresses never leave your MacOn by default. Off switch in Sources › Collector › Identify network owners
 
  Ask with a hosted modelThe provider you select: Anthropic, OpenAI, Google Gemini or a compatible endpointYour question and the results returned by the read-only Flowlight queries selected by the model. The traffic database itself is not uploadedOnly when you select a hosted provider and submit a question. The Ask screen shows the transmitted requests
 
@@ -1628,7 +1628,7 @@ Privacy
 
  Permissions
 
- Administrator password, once, for packet-capture access. Removable from the Capture screen.
+ Administrator password, once, for packet-capture access. Removable from Sources › Collector.
 
  Notifications, for warnings. Optional.
 
@@ -1637,7 +1637,7 @@ Privacy
  Retention
 
  Per-second data 6 hours (adjustable), minute data 14 days, hourly data 400 days, daily totals indefinitely, alerts 90 days.
- Capture › Clear all data deletes everything, and removing ~/Library/Application Support/Flowlight does the same.
+ Settings › Data & Privacy › Clear All Data deletes everything, and removing ~/Library/Application Support/Flowlight does the same.
 
  This website
 
@@ -1664,8 +1664,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.2
+ 0.17.3
 November 4, 2026Latest
+
+ Keep every input in one operational home. Capture, Devices and Coverage are now Collector, Devices and Coverage tabs inside Sources, with a shared health summary and a step-by-step recovery card when traffic is not arriving.
+
+ Tune alerts where their results appear. Detection controls now live beside the alert list under Alerts › Detection, while database retention, location and deletion live in Settings › Data & Privacy.
+
+ Make independent verification genuinely parallel. Project drift, oldest and newest unit suites, the Store product, the site and prospective-merge compatibility are separate jobs; project generation is checked once and Store validation runs once.
+
+ Skip app work for website-only commits. The deny-first classifier routes Swift, Python and workflow CodeQL independently, and stable Review and CodeQL gates preserve one required status even when an analyzer is intentionally skipped.
+
+ 0.17.2
+November 4, 2026
 
  Keep filtered evidence unmistakable. An active Focus now stays visible above every destination with its exact scope and one-click editing, while sidebar shortcuts follow the order shown on screen.
 
@@ -3324,7 +3335,7 @@ Threat model
 
  The honest claim is narrower and still useful: software that is misbehaving but not actively evading a monitor will be seen.
  Software that is actively evading one may not be, and will at least leave a gap — an extension that stopped, a period with no
- data — which the Coverage screen is there to show.
+ data — which Sources › Coverage is there to show.
 
  What capture misses
 
@@ -3335,7 +3346,7 @@ Threat model
  own traffic never reaches ours.
 
  Another content filter holding the slot. macOS runs one at a time. If a VPN or a security agent has it,
- Flowlight's filter installs, connects, and is never asked to filter anything — Capture says so rather than showing an empty
+ Flowlight's filter installs, connects, and is never asked to filter anything — Sources › Collector says so rather than showing an empty
  screen.
 
  Short connections, on the sampler. Without the extension, Flowlight reads counters once a second: a
@@ -3350,7 +3361,7 @@ Threat model
  that ignores proxy settings, one started before inspection was switched on, or one that pins its certificates is passed through
  untouched — deliberately, because breaking a pinned connection would break the app. QUIC is not offered to the proxy either.
 
- So an empty Inspect screen means "nothing was routed here", not "nothing happened". Coverage says which of the two applies,
+ So an empty Inspect screen means "nothing was routed here", not "nothing happened". Sources › Coverage says which of the two applies,
  per app.
 
  What blocking is, and isn't

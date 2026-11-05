@@ -103,7 +103,30 @@ class RepositoryTests(unittest.TestCase):
         result = classifier.classify(self.repo, self.base, "HEAD")
         self.assertTrue(result.site_only)
         self.assertFalse(result.app)
+        self.assertFalse(result.python)
+        self.assertFalse(result.actions)
+        self.assertEqual(result.schema, "flowlight-review-v2")
         self.assertEqual(result.app_fingerprint, before)
+
+    def test_site_python_change_routes_python_without_app_or_actions(self):
+        scripts = self.repo / "scripts"
+        scripts.mkdir()
+        (scripts / "build_site.py").write_text("print('one')\n")
+        self.commit("site script")
+        result = classifier.classify(self.repo, self.base, "HEAD")
+        self.assertFalse(result.app)
+        self.assertTrue(result.python)
+        self.assertFalse(result.actions)
+
+    def test_workflow_change_routes_app_and_actions(self):
+        workflows = self.repo / ".github/workflows"
+        workflows.mkdir(parents=True)
+        (workflows / "ci.yml").write_text("name: CI\n")
+        self.commit("workflow")
+        result = classifier.classify(self.repo, self.base, "HEAD")
+        self.assertTrue(result.app)
+        self.assertFalse(result.python)
+        self.assertTrue(result.actions)
 
     def test_app_change_updates_fingerprint_and_requires_app(self):
         before = classifier.app_fingerprint(self.repo, self.base)
@@ -114,12 +137,20 @@ class RepositoryTests(unittest.TestCase):
         self.assertFalse(result.site_only)
         self.assertNotEqual(result.app_fingerprint, before)
 
-    def test_missing_base_fails_closed_but_still_emits_identity(self):
+    def test_missing_base_fails_closed_to_every_codeql_route_and_emits_identity(self):
         result = classifier.classify(self.repo, None, "HEAD")
         self.assertTrue(result.app)
+        self.assertTrue(result.python)
+        self.assertTrue(result.actions)
         self.assertEqual(result.head_sha, self.rev("HEAD"))
         self.assertEqual(result.tree, self.rev("HEAD^{tree}"))
         self.assertEqual(len(result.app_fingerprint), 64)
+
+    def test_invalid_base_fails_closed_to_every_codeql_route(self):
+        result = classifier.classify(self.repo, "f" * 40, "HEAD")
+        self.assertTrue(result.app)
+        self.assertTrue(result.python)
+        self.assertTrue(result.actions)
 
 
 if __name__ == "__main__":

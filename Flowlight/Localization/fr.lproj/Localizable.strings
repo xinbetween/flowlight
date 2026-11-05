@@ -71,7 +71,6 @@
 "Devices" = "Appareils";
 "Coverage" = "Couverture";
 "Inspect" = "Inspecter";
-"Capture" = "Capture";
 "Traffic" = "Trafic";
 "Investigate" = "Analyser";
 "Control" = "Contrôle";
@@ -87,6 +86,7 @@
 "Questions & Answers" = "Questions et réponses";
 "What Flowlight Reads on This Mac" = "Ce que Flowlight lit sur ce Mac";
 "Privacy" = "Confidentialité";
+"Data & Privacy" = "Données et confidentialité";
 "Report an Issue" = "Signaler un problème";
 "Turn Focus Off" = "Désactiver Focus";
 "Turn Focus On" = "Activer Focus";
@@ -634,8 +634,6 @@
 /* UI/CaptureView.swift */
 "Delete all recorded traffic, baselines and alerts?" = "Supprimer tout le trafic enregistré, les références et les alertes ?";
 "Delete everything" = "Tout supprimer";
-"nettop sampler · the extension didn't answer" = "Échantillonneur nettop · l'extension n'a pas répondu";
-"Network Extension · unavailable" = "Extension réseau · indisponible";
 "Couldn't reach the filter extension. Enable it under Content filter, then press Refresh." = "Impossible de joindre l’extension de filtrage. Activez-la dans Filtre de contenu, puis cliquez sur Actualiser.";
 "%@ — enable Flowlight under Content filter, then press Refresh." = "%@ — activez Flowlight dans Filtre de contenu, puis cliquez sur Actualiser.";
 "%@ — the content filter is unavailable" = "%@ — le filtre de contenu est indisponible";
@@ -644,8 +642,6 @@
 "Reconnect to the content filter" = "Se reconnecter au filtre de contenu";
 "If a VPN or security agent already has that slot — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar all use it — Flowlight's filter cannot receive traffic until that filter is disabled." = "Si un VPN ou un agent de sécurité occupe déjà cet emplacement — Palo Alto Networks GlobalProtect, CrowdStrike Falcon et autres l’utilisent — le filtre Flowlight ne peut recevoir aucun trafic tant que cet autre filtre n’est pas désactivé.";
 "The filter isn't answering, so Flowlight is not receiving traffic. Enable it under Content filter, then press Refresh." = "Le filtre ne répond pas, Flowlight ne reçoit donc aucun trafic. Activez-le dans Filtre de contenu, puis cliquez sur Actualiser.";
-"%@ · receiving" = "%@ · réception en cours";
-"%@ · nothing arriving yet" = "%@ · rien ne parvient encore";
 "Source" = "Source";
 "Content filter" = "Filtre de contenu";
 "Observes eligible TCP and UDP flows as they open. Requires the Network Extension entitlement and your approval." = "Observe les flux TCP et UDP éligibles à leur ouverture. Nécessite le droit d'accès Extension réseau et votre autorisation.";
@@ -702,7 +698,7 @@
 "Without this, most traffic shows only an IP address or network owner." = "Sans cela, la plupart du trafic n'affiche qu'une adresse IP ou un propriétaire de réseau.";
 "Flowlight reads DNS answers and TLS server names on your primary network interface to name connections." = "Flowlight lit les réponses DNS et les noms de serveur TLS sur votre interface réseau principale pour nommer les connexions.";
 "Packet contents are never stored or sent anywhere. Only hostnames are kept." = "Le contenu des paquets n'est jamais conservé ni envoyé où que ce soit. Seuls les noms d'hôte sont conservés.";
-"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Capture." = "macOS ne permet qu'aux administrateurs de lire les paquets : votre mot de passe est donc demandé une fois. Vous pouvez le retirer à tout moment dans Capture.";
+"macOS only lets administrators read packets, so this asks for your password once. You can remove it any time in Sources › Collector." = "macOS ne permet qu'aux administrateurs de lire les paquets : votre mot de passe est donc demandé une fois. Vous pouvez le retirer à tout moment dans Sources › Collecteur.";
 "Identify network owners when no hostname is available" = "Identifier les propriétaires de réseau quand aucun nom d'hôte n'est disponible";
 "On by default. Sends public destination IPs to Team Cymru's DNS service. Turn off to keep these lookups on your Mac." = "Activé par défaut. Envoie les IP de destination publiques au service DNS de Team Cymru. À désactiver pour que ces recherches restent sur ce Mac.";
 "Not Now" = "Pas maintenant";
@@ -733,8 +729,8 @@
 
 /* UI/CoverageView.swift */
 "Nothing recorded yet" = "Rien d'enregistré pour l'instant";
+"Nothing recorded in the last hour" = "Rien n'a été enregistré durant la dernière heure";
 "Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment." = "La couverture est calculée à partir du trafic que Flowlight a déjà enregistré. Le laisser tourner un moment.";
-"%@ of traffic fully accounted for" = "%@ du trafic entièrement pris en compte";
 "How much of this Mac is covered" = "Quelle part de ce Mac est couverte";
 "HTTPS inspection is on" = "L'inspection HTTPS est activée";
 "HTTPS inspection is off" = "L'inspection HTTPS est désactivée";
@@ -782,8 +778,6 @@
 "Camera" = "Caméra";
 "Started" = "Démarrée";
 "Unknown camera" = "Caméra inconnue";
-"%@ · nothing active" = "%@ · rien d'actif";
-"%@ · %lld active" = "%@ · %lld actifs";
 "Watch camera activity" = "Surveiller l'activité de la caméra";
 "Bluetooth, USB and camera activity are off until you turn them on. They need no new permission — they're off because watching them widens what Flowlight looks at, and that should be your decision rather than something an update did.\n\nBluetooth and USB show what is connected. Camera activity shows whether each camera is active, not which app is using it. Flowlight never opens the camera or reads frames." = "Le Bluetooth, l'USB et l'activité de la caméra restent désactivés tant que vous ne les activez pas. Ils ne demandent aucune nouvelle autorisation : ils sont désactivés parce que leur surveillance élargit ce que Flowlight observe, et cette décision doit vous appartenir, plutôt qu'à une mise à jour.\n\nLe Bluetooth et l'USB indiquent ce qui est connecté. L'activité de la caméra indique si chaque caméra est active, pas quelle app l'utilise. Flowlight n'ouvre jamais la caméra et ne lit aucune image.";
 "No payloads or invented attribution. Bluetooth and USB show attachment, while camera monitoring reads only each device's active state. macOS exposes no public camera-owner identity here, so Flowlight names the camera, never guesses the app, and never reads frames." = "Aucun contenu ni attribution inventée. Le Bluetooth et l'USB indiquent les connexions, tandis que la surveillance de la caméra lit uniquement l'état actif de chaque appareil. macOS ne révèle ici publiquement aucune identité de l'app qui utilise la caméra : Flowlight nomme donc la caméra, ne devine jamais l'app et ne lit aucune image.";
@@ -1035,7 +1029,6 @@
 "The network is quiet" = "Le réseau est calme";
 "No app has sent or received data in the last few seconds." = "Aucune app n'a envoyé ou reçu de données ces dernières secondes.";
 "Waiting for traffic data" = "En attente de données de trafic";
-"Open Capture Settings" = "Ouvrir les réglages de capture";
 
 /* UI/MockRulesView.swift */
 "Answer a chosen endpoint yourself instead of letting the request reach the server — a 500, a rate limit, a malformed body, or a long wait — and watch what the agent does about it." = "Répondre soi-même à un point de terminaison choisi au lieu de laisser la requête atteindre le serveur — un 500, une limite de débit, un corps mal formé ou une longue attente — et observer ce que l'agent en fait.";
@@ -1257,8 +1250,8 @@
 "Until I resume" = "Jusqu'à la reprise";
 "Pause Blocking" = "Suspendre le blocage";
 "Stand every rule down for a while, without deleting anything" = "Mettre toutes les règles en veille un moment, sans rien supprimer";
-"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "Une règle est surveillée mais pas appliquée. Seule l'extension réseau se trouve sur le trajet des données et peut refuser une connexion ; l'échantillonneur nettop compte le trafic après coup. Sélectionner l'extension réseau dans Capture pour appliquer ces règles.";
-"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Capture to enforce these rules." = "%lld règles sont surveillées mais pas appliquées. Seule l'extension réseau se trouve sur le trajet des données et peut refuser une connexion ; l'échantillonneur nettop compte le trafic après coup. Sélectionner l'extension réseau dans Capture pour appliquer ces règles.";
+"One rule is being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "Une règle est surveillée mais pas appliquée. Seule l'extension réseau se trouve sur le trajet des données et peut refuser une connexion ; l'échantillonneur nettop compte le trafic après coup. Sélectionner l'extension réseau dans Sources › Collecteur pour appliquer ces règles.";
+"%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld règles sont surveillées mais pas appliquées. Seule l'extension réseau se trouve sur le trajet des données et peut refuser une connexion ; l'échantillonneur nettop compte le trafic après coup. Sélectionner l'extension réseau dans Sources › Collecteur pour appliquer ces règles.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "Une règle est surveillée mais pas appliquée — une règle qui nomme un chemin ne peut être mise en correspondance que par l'inspection HTTPS, et celle-ci est désactivée.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld règles sont surveillées mais pas appliquées — une règle qui nomme un chemin ne peut être mise en correspondance que par l'inspection HTTPS, et celle-ci est désactivée.";
 "In force" = "En vigueur";
@@ -1308,7 +1301,7 @@
 "Apply a Template" = "Appliquer un modèle";
 "%@ · in force at once" = "%@ · en vigueur immédiatement";
 "%@ · shown first" = "%@ · à examiner d'abord";
-"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Capture these are watched rather than carried out." = "Chacun écrit des règles ordinaires dans la liste, où elles peuvent être lues, désactivées ou supprimées comme les autres. Refuser une connexion est le travail de l'extension réseau : avec l'échantillonneur nettop sélectionné dans Capture, ces règles sont surveillées plutôt qu'appliquées.";
+"Each one writes ordinary rules into the list, where they can be read, switched off or deleted like anything else. Refusing a connection is the Network Extension's job, so with the nettop sampler selected in Sources › Collector these are watched rather than carried out." = "Chacun écrit des règles ordinaires dans la liste, où elles peuvent être lues, désactivées ou supprimées comme les autres. Refuser une connexion est le travail de l'extension réseau : avec l'échantillonneur nettop sélectionné dans Sources › Collecteur, ces règles sont surveillées plutôt qu'appliquées.";
 "Optional. Left empty this applies to everything on the Mac; naming an app narrows it to that app and the tools it started." = "Facultatif. Laissé vide, cela s'applique à tout ce qui se passe sur le Mac ; nommer une app restreint la règle à cette app et aux outils qu'elle a lancés.";
 "A domain, an IP address, or a range" = "Un domaine, une adresse IP ou une plage";
 "These name an HTTP method, so only HTTPS inspection can carry them out. With it off they sit in the list watching." = "Celles-ci nomment une méthode HTTP : seule l'inspection HTTPS peut les appliquer. Quand elle est désactivée, elles restent dans la liste à surveiller.";

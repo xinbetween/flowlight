@@ -76,10 +76,10 @@ private struct AskContent: View {
                         if let filter = call.filter {
                             nav.showReport(filter: filter, end: call.to)
                         } else if let screen = call.screen {
-                            nav.show(screen)
+                            open(screen, sourcesTab: call.sourcesTab)
                         }
-                    } go: { screen in
-                        nav.show(screen)
+                    } go: { call in
+                        if let screen = call.screen { open(screen, sourcesTab: call.sourcesTab) }
                     }
                     .entrance()
                     if turn.id != ask.turns.last?.id { Divider() }
@@ -88,6 +88,14 @@ private struct AskContent: View {
             .measured(Measure.prose)
             .padding(.horizontal, Measure.gutter)
             .padding(.vertical, 24)
+        }
+    }
+
+    private func open(_ screen: SidebarItem, sourcesTab: SourcesTab?) {
+        if screen == .sources {
+            nav.showSources(sourcesTab ?? .collector)
+        } else {
+            nav.show(screen)
         }
     }
 
@@ -192,7 +200,7 @@ private struct AskTurnView: View {
     let turn: AskTurn
     let thinking: Bool
     let open: (AskRecordedCall) -> Void
-    let go: (SidebarItem) -> Void
+    let go: (AskRecordedCall) -> Void
     @State private var showingSent = false
     @State private var showingCalls = false
 
@@ -223,12 +231,12 @@ private struct AskTurnView: View {
             if let charted = turn.calls.first(where: { $0.chart != nil }), let chart = charted.chart {
                 AskChartView(chart: chart).entrance()
             }
-            if let screen = turn.calls.compactMap(\.screen).first {
+            if let destination = turn.calls.first(where: { $0.screen != nil }), let screen = destination.screen {
                 // An answer about the app should end somewhere you can act on it — but the app moves when you
                 // click, not when the model decides to. The documentation sits beside it for the longer version,
                 // opened at the section about that same screen.
                 HStack(spacing: 14) {
-                    Button(L("Open %@", screen.title)) { go(screen) }
+                    Button(L("Open %@", screen.title)) { go(destination) }
                     Button(L("Documentation")) { NSWorkspace.shared.open(Help.forScreen(screen)) }
                 }
                 .buttonStyle(.link)

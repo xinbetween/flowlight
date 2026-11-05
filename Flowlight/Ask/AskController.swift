@@ -150,7 +150,8 @@ final class AskController: ObservableObject {
                 do {
                     let result = try await Self.run(call, db: db, environment: snapshot)
                     await recorder.finish(call, summary: result.summary, filter: result.filter, from: result.from,
-                                          to: result.to, chart: result.chart, screen: result.screen)
+                                          to: result.to, chart: result.chart, screen: result.screen,
+                                          sourcesTab: result.sourcesTab)
                     return result.json
                 } catch {
                     let message = (error as? AskQueryRunner.Failure)?.description ?? error.localizedDescription
@@ -216,7 +217,8 @@ private actor CallRecorder {
     }
 
     func finish(_ call: AskCall, summary: String, failed: Bool = false, filter: TrafficFilter? = nil,
-                from: Date? = nil, to: Date? = nil, chart: AskChart? = nil, screen: SidebarItem? = nil) {
+                from: Date? = nil, to: Date? = nil, chart: AskChart? = nil, screen: SidebarItem? = nil,
+                sourcesTab: SourcesTab? = nil) {
         guard let index = calls.lastIndex(where: { $0.call.id == call.id }) else { return }
         calls[index].summary = summary
         calls[index].failed = failed
@@ -225,6 +227,7 @@ private actor CallRecorder {
         calls[index].to = to
         calls[index].chart = chart.flatMap { $0.isEmpty ? nil : $0 }
         calls[index].screen = screen
+        calls[index].sourcesTab = sourcesTab
     }
 
     func sent(_ body: String) { bodies.append(body) }

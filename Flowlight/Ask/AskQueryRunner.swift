@@ -22,6 +22,8 @@ enum AskQueryRunner {
         var chart: AskChart?
         /// Where the answer points for a question about the app rather than about traffic.
         var screen: SidebarItem?
+        /// The exact operational tab when that screen is Sources.
+        var sourcesTab: SourcesTab? = nil
     }
 
     enum Failure: Error, CustomStringConvertible {
@@ -114,7 +116,7 @@ enum AskQueryRunner {
                       summary: environment.inspecting
                           ? L("%@, inspection on, %lld rules", environment.captureSource, environment.rules.count)
                           : L("%@, inspection off, %lld rules", environment.captureSource, environment.rules.count),
-                      screen: .capture)
+                      screen: .sources, sourcesTab: .collector)
     }
 
     private static func howTo(_ topic: String) -> Result {
@@ -125,7 +127,8 @@ enum AskQueryRunner {
         }
         return Result(json: encode(matches.map(\.asDictionary)),
                       summary: matches.map(\.title).joined(separator: ", "),
-                      screen: matches.first?.screen)
+                      screen: matches.first?.screen,
+                      sourcesTab: matches.first?.sourcesTab)
     }
 
     /// `what` names the JSON field the model reads, so it stays English; the summary is what the panel shows and
@@ -308,7 +311,7 @@ enum AskQueryRunner {
         return Result(json: encode(payload),
                       summary: rows.isEmpty ? L("no device changes")
                         : rows.prefix(3).map { L("%@ · %lld changes", $0.name, $0.total) }.joined(separator: ", "),
-                      from: window.from, to: window.to, screen: .devices)
+                      from: window.from, to: window.to, screen: .sources, sourcesTab: .devices)
     }
 
     private static func overTime(db: TrafficDatabase, window: (from: Date, to: Date), app: String?,

@@ -110,13 +110,13 @@ nav: home
         <div class="view-card"><span class="glyph alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
           <h3>警报</h3><p>哪里不对？逐应用、讲得清道理的警报，带上目标和阈值。</p><span class="keys">⌘5</span></div>
         <div class="view-card"><span class="glyph rules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V6a2 2 0 0 1 4 0v5M9 11V4a2 2 0 0 1 4 0v7M13 11V6a2 2 0 0 1 4 0v8"/><path d="M17 11v3a5 5 0 0 1-5 5h-1a6 6 0 0 1-6-6v-2"/></svg></span>
-          <h3>规则</h3><p>我拒绝过什么，真的生效了吗？每条规则、各自阻止了什么，以及每次判定的流水。</p><span class="keys">⌘8</span></div>
+          <h3>规则</h3><p>我拒绝过什么，真的生效了吗？每条规则、各自阻止了什么，以及每次判定的流水。</p><span class="keys">⌘8 · Developer ID / ⌘7 · App Store</span></div>
         <div class="view-card"><span class="glyph ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12z"/></svg></span>
           <h3>提问</h3><p>用日常语言提问，从历史数据里作答——下方列出它执行过的每一条查询。</p><span class="keys">⌘6</span></div>
-        <div class="view-card"><span class="glyph devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
-          <h3>设备</h3><p>蓝牙、USB 和摄像头：配对了什么、接入或启用了什么、什么时候变的。默认关闭，你开了才记录。</p><span class="keys">⌘9</span></div>
+        <div class="view-card"><span class="glyph sources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9a10 10 0 0 1 14 0M8 12.5a6 6 0 0 1 8 0M11 16h2"/></svg></span>
+          <h3>来源</h3><p>数据是否正在到达、多少已有名称、哪些设备通道处于活动状态？把收集器、设备和覆盖范围放在一处。</p><span class="keys">⌘9 · Developer ID / ⌘8 · App Store</span></div>
         <div class="view-card"><span class="glyph inspect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 10a2 2 0 1 1 4 0v1"/></svg></span>
-          <h3>检查</h3><p>可选。代理究竟发出了什么，是哪次工具调用引起的？解密后的请求、工具调用和结果。</p><span class="keys">⌘7</span></div>
+          <h3>检查</h3><p>可选。代理究竟发出了什么，是哪次工具调用引起的？解密后的请求、工具调用和结果。</p><span class="keys">⌘7 · Developer ID</span></div>
         <div class="view-card"><span class="glyph visualize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6c5 0 6-1 10-1M7 7c5 1 6 9 10 11"/></svg></span>
           <h3>连接</h3><p>谁在通信？用可缩放的 Sankey 图展示应用流量和已证实的 AI 代理路径，并提供内容完全一致的列表。</p><span class="keys">⌘4</span></div>
       </div>
@@ -451,7 +451,7 @@ open Flowlight.app --args -FLDemo YES</pre>
             异常基线，以及为 AI 代理而做的规则。两者并用效果很好。</p></details>
         <details><summary>它为什么要我的密码？</summary>
           <p>macOS 只允许管理员读取网络数据包。一次性设置会给你的账户读取权限，
-            和 Wireshark 的做法一样。你随时可以在“捕获”界面里把它移除。</p></details>
+            和 Wireshark 的做法一样。你随时可以在“来源 › 收集器”里把它移除。</p></details>
         <details><summary>它能分辨是哪个 MCP 服务器或工具发出的请求吗？</summary>
           <p>能，到进程这一层。Flowlight 会沿着每个进程追回启动它的那个代理，所以 shell 工具的
             curl 或某个 MCP 服务器的连接都会归到那个代理名下；MCP 服务器的名字取自 Claude Code、Claude

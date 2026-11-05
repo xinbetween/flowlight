@@ -3,56 +3,56 @@
   "screenshots": {
     "01-connections.png": {
       "height": 1800,
-      "sha256": "ba93c8fc487d13f5acfb61d132696a49a68cdc339b982ece11fe4b564aae1bf3",
-      "version": "0.17.2",
+      "sha256": "a395b95c0672a0a6c65348132f2c644b7f6452cb359848c9080f59f9bdaba3f1",
+      "version": "0.17.3",
       "width": 2880
     },
     "02-ai-agents.png": {
       "height": 1800,
-      "sha256": "ae52b119de45ebe862d92d9688f6b50f908ebcf8373abd97215d47e9477c346a",
-      "version": "0.17.2",
+      "sha256": "df042863dadbd8230774cdd6d6fa806e14be5e3fe2476dfa6f1fe2ea16af60e9",
+      "version": "0.17.3",
       "width": 2880
     },
     "03-history.png": {
       "height": 1800,
-      "sha256": "236460a16782b634d6ef1cdefa97d2ab2167c6013ac487269da063693133aadc",
-      "version": "0.17.2",
+      "sha256": "1d8786f1e00766c5ec8cdbeabb51b72d25dcf76363170cbd7e88f8d91c0d4250",
+      "version": "0.17.3",
       "width": 2880
     },
     "04-rules.png": {
       "height": 1800,
-      "sha256": "268993cf96e2c7335e0762bb964ac9794e1875d0ac239ac57c493207176a0e7c",
-      "version": "0.17.2",
+      "sha256": "c6702955fb72c6f5953f3fb102c0f184199f7418cc4984a90f1791ccfd880f14",
+      "version": "0.17.3",
       "width": 2880
     },
     "05-live.png": {
       "height": 1800,
-      "sha256": "e4bfee31bd0aff7cdd16bf39dfaf15bf55873a6bcf6f36db50700be44533bc33",
-      "version": "0.17.2",
+      "sha256": "5f556d28d8fe5cefd0c51419c18b0d34a93bd6eb771ab433d810dd62f46cee55",
+      "version": "0.17.3",
       "width": 2880
     },
     "06-alerts.png": {
       "height": 1800,
-      "sha256": "bb39827916cf5f014e4dbecb0309a4aa52eaec1471bfd70e1791ec80a9643cac",
-      "version": "0.17.2",
+      "sha256": "bf4fe86ebc5e996837537ff9baed8a43cd4f332807f18c3493424b563f1f5372",
+      "version": "0.17.3",
       "width": 2880
     },
     "07-agent-detail.png": {
       "height": 1800,
-      "sha256": "03811822d64151a900e58917fa563f6f1b18e231ed48c48e65d036e7cb61fb9b",
-      "version": "0.17.2",
+      "sha256": "7090f56a0716a4de06831c7f43bc1bde0c7e2d13d521155ad671c7bc8b95cece",
+      "version": "0.17.3",
       "width": 2880
     },
     "08-agent-tools.png": {
       "height": 1800,
-      "sha256": "74ad996c6426169003019fe46fa9ac9100173cc49b6556b182c389cc7634928c",
-      "version": "0.17.2",
+      "sha256": "4447d3c1ff5e12f04fe6d7a9c6a2d0572f160253645e32937e4aa50b1fa9e918",
+      "version": "0.17.3",
       "width": 2880
     },
     "09-mcp-servers.png": {
       "height": 1800,
-      "sha256": "33845e39815afb2a29c82b59f7a0b1f7662e438b727a3786ab2d83d419a01734",
-      "version": "0.17.2",
+      "sha256": "8822aa24b48a793701caf4ad1378edb2233dfc0ca545a6553fd91bd2f353def3",
+      "version": "0.17.3",
       "width": 2880
     }
   }

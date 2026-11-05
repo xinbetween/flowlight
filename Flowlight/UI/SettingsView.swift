@@ -2,25 +2,10 @@ import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var monitor: TrafficMonitor
     typealias K = AnomalySettings.Keys
-    @AppStorage(K.sigma) private var sigma = 3.0
-    @AppStorage(K.learningHours) private var learningHours = 24.0
-    @AppStorage(K.minAlertMB) private var minAlertMB = 1.0
-    @AppStorage(K.idleMinutes) private var idleMinutes = 10.0
-    @AppStorage(K.idleUploadMB) private var idleUploadMB = 5.0
-    @AppStorage(K.firstContact) private var firstContact = true
-    @AppStorage(K.nonStandardPorts) private var nonStandardPorts = true
-    @AppStorage(K.ignoreAppleApps) private var ignoreAppleApps = true
     @AppStorage(K.notifications) private var notifications = true
-    @AppStorage(K.retentionHours) private var retentionHours = 6.0
     @AppStorage(K.menuBarRates) private var menuBarRates = true
-    @AppStorage(K.agentSensitive) private var agentSensitive = true
-    @AppStorage(K.agentUnnamed) private var agentUnnamed = true
-    @AppStorage(K.agentEgressMB) private var agentEgressMB = 100.0
-    @AppStorage(K.agentAway) private var agentAway = true
-    @AppStorage(K.agentAwayMinutes) private var agentAwayMinutes = 15.0
-    @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
+    @AppStorage(K.backgroundOnly) private var backgroundOnly = false
     // Read once the pane is on screen, never in the property's default expression: that
     // expression re-runs every time this struct is constructed, and `Settings { }` is
     // rebuilt whenever the App body is invalidated — which TrafficMonitor does every
@@ -28,7 +13,6 @@ struct SettingsView: View {
     // form put blocking IPC on the main thread at 1 Hz for the life of the process.
     @State private var launchAtLogin = false
     @State private var loginItemError: String?
-    @State private var showClearLocalRiskConfirmation = false
 
     var body: some View {
         TabView {
@@ -55,60 +39,8 @@ struct SettingsView: View {
             .frame(height: 340)
             .tabItem { Label(L("General"), systemImage: "gearshape") }
 
-            Form {
-                Section {
-                    Stepper(value: $sigma, in: 1.5...10, step: 0.5) { LabeledContent(L("Z-score threshold"), value: "\(sigma.formatted())σ") }
-                    Stepper(value: $learningHours, in: 0...336, step: 6) { LabeledContent(L("Learning period per app"), value: L("%lld h", Int(learningHours))) }
-                    Stepper(value: $minAlertMB, in: 0...1000, step: 1) { LabeledContent(L("Ignore hours below"), value: L("%@ MB", minAlertMB.formatted())) }
-                } footer: {
-                    Text(L("Hourly traffic and daily destination counts are compared with each app's rolling baseline."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section(L("Rules")) {
-                    Toggle(L("First contact with a new domain"), isOn: $firstContact)
-                    Toggle(L("Connections to non-standard ports"), isOn: $nonStandardPorts)
-                    Toggle(L("Ignore Apple's own apps"), isOn: $ignoreAppleApps)
-                    Text(L("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section {
-                    Toggle(L("Agent uses email, file transfer, SSH, tunnels or databases"), isOn: $agentSensitive)
-                    Toggle(L("Agent connects to a raw IP on an unusual port"), isOn: $agentUnnamed)
-                    Stepper(value: $agentEgressMB, in: 1...10_000, step: 10) {
-                        LabeledContent(L("Uploads to non-AI hosts above"), value: L("%lld MB/h", Int(agentEgressMB)))
-                    }
-                    Toggle(L("Agent active while you're away"), isOn: $agentAway)
-                    Stepper(value: $agentAwayMinutes, in: 1...240, step: 1) {
-                        LabeledContent(L("Away after"), value: L("%lld min without input", Int(agentAwayMinutes)))
-                    }
-                    .disabled(!agentAway)
-                } header: {
-                    Text(L("AI agents"))
-                } footer: {
-                    Text(L("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section(L("Traffic without UI activity")) {
-                    Stepper(value: $idleMinutes, in: 1...240, step: 1) { LabeledContent(L("App idle for at least"), value: L("%lld min", Int(idleMinutes))) }
-                    Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) { LabeledContent(L("Uploading more than"), value: L("%@ MB/min", idleUploadMB.formatted())) }
-                }
-                LocalRiskSettingsSection(showClearConfirmation: $showClearLocalRiskConfirmation)
-            }
-            .formStyle(.grouped)
-            .frame(height: 640)
-            .tabItem { Label(L("Detection"), systemImage: "waveform.badge.exclamationmark") }
-
-            Form {
-                Section {
-                    Stepper(value: $retentionHours, in: 1...72, step: 1) { LabeledContent(L("Keep per-second data"), value: L("%lld h", Int(retentionHours))) }
-                } footer: {
-                    Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .formStyle(.grouped)
-            .frame(height: 150)
-            .tabItem { Label(L("Storage"), systemImage: "internaldrive") }
+            DataPrivacySettingsTab()
+                .tabItem { Label(L("Data & Privacy"), systemImage: "hand.raised.square") }
 
             #if !APP_STORE
             PluginSettingsView()
@@ -118,12 +50,7 @@ struct SettingsView: View {
             ExportSettingsTab()
                 .tabItem { Label(L("Export"), systemImage: "arrow.up.forward.square") }
         }
-        .frame(width: 500)
-        .confirmationDialog(L("Clear local analyses?"), isPresented: $showClearLocalRiskConfirmation, titleVisibility: .visible) {
-            Button(L("Clear analyses"), role: .destructive) { monitor.clearLocalRiskAnalyses() }
-        } message: {
-            Text(L("This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place."))
-        }
+        .frame(width: 540)
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
@@ -133,6 +60,137 @@ struct SettingsView: View {
         } catch {
             loginItemError = error.localizedDescription
             launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+    }
+}
+
+/// Durable local-data choices stay in Settings; source operation and alert tuning live where their effects appear.
+struct DataPrivacySettingsTab: View {
+    @EnvironmentObject var monitor: TrafficMonitor
+    @AppStorage(AnomalySettings.Keys.retentionHours) private var retentionHours = 6.0
+    @State private var confirmClear = false
+
+    var body: some View {
+        Form {
+            Section {
+                Stepper(value: $retentionHours, in: 1...72, step: 1) {
+                    LabeledContent(L("Keep per-second data"), value: L("%lld h", Int(retentionHours)))
+                }
+            } header: {
+                Text(L("Storage"))
+            } footer: {
+                Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent(L("Database")) {
+                    Text(monitor.db.url.path)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                }
+                Button(L("Reveal in Finder")) {
+                    NSWorkspace.shared.activateFileViewerSelecting([monitor.db.url])
+                }
+                Button(L("Clear All Data…"), role: .destructive) { confirmClear = true }
+            } header: {
+                Text(L("Data & Privacy"))
+            }
+        }
+        .formStyle(.grouped)
+        .frame(height: 300)
+        .confirmationDialog(L("Delete all recorded traffic, baselines and alerts?"), isPresented: $confirmClear) {
+            Button(L("Delete everything"), role: .destructive) { monitor.clearAllData() }
+        }
+        // Settings is a separate scene. A database-clear failure must be visible here even when the main window,
+        // which has its own monitor error alert, is closed or behind this one.
+        .alert(L("Error"), isPresented: Binding(
+            get: { monitor.lastError != nil },
+            set: { if !$0 { monitor.lastError = nil } }
+        )) {
+            Button(L("OK")) { monitor.lastError = nil }
+        } message: {
+            Text(monitor.lastError ?? "")
+        }
+    }
+}
+
+/// Alert sensitivity is edited beside the alerts it produces instead of in a remote Settings tab.
+struct DetectionSettingsView: View {
+    @EnvironmentObject var monitor: TrafficMonitor
+    typealias K = AnomalySettings.Keys
+    @AppStorage(K.sigma) private var sigma = 3.0
+    @AppStorage(K.learningHours) private var learningHours = 24.0
+    @AppStorage(K.minAlertMB) private var minAlertMB = 1.0
+    @AppStorage(K.idleMinutes) private var idleMinutes = 10.0
+    @AppStorage(K.idleUploadMB) private var idleUploadMB = 5.0
+    @AppStorage(K.firstContact) private var firstContact = true
+    @AppStorage(K.nonStandardPorts) private var nonStandardPorts = true
+    @AppStorage(K.ignoreAppleApps) private var ignoreAppleApps = true
+    @AppStorage(K.agentSensitive) private var agentSensitive = true
+    @AppStorage(K.agentUnnamed) private var agentUnnamed = true
+    @AppStorage(K.agentEgressMB) private var agentEgressMB = 100.0
+    @AppStorage(K.agentAway) private var agentAway = true
+    @AppStorage(K.agentAwayMinutes) private var agentAwayMinutes = 15.0
+    @State private var showClearLocalRiskConfirmation = false
+
+    var body: some View {
+        Form {
+            Section {
+                Stepper(value: $sigma, in: 1.5...10, step: 0.5) {
+                    LabeledContent(L("Z-score threshold"), value: "\(sigma.formatted())σ")
+                }
+                Stepper(value: $learningHours, in: 0...336, step: 6) {
+                    LabeledContent(L("Learning period per app"), value: L("%lld h", Int(learningHours)))
+                }
+                Stepper(value: $minAlertMB, in: 0...1000, step: 1) {
+                    LabeledContent(L("Ignore hours below"), value: L("%@ MB", minAlertMB.formatted()))
+                }
+            } footer: {
+                Text(L("Hourly traffic and daily destination counts are compared with each app's rolling baseline."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L("Rules")) {
+                Toggle(L("First contact with a new domain"), isOn: $firstContact)
+                Toggle(L("Connections to non-standard ports"), isOn: $nonStandardPorts)
+                Toggle(L("Ignore Apple's own apps"), isOn: $ignoreAppleApps)
+                Text(L("macOS talks to Apple constantly — updates, iCloud, push, time — and reporting all of it buries the one line that matters. Their traffic is still recorded, still shown in Live and History, and still subject to every rule and guardrail."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle(L("Agent uses email, file transfer, SSH, tunnels or databases"), isOn: $agentSensitive)
+                Toggle(L("Agent connects to a raw IP on an unusual port"), isOn: $agentUnnamed)
+                Stepper(value: $agentEgressMB, in: 1...10_000, step: 10) {
+                    LabeledContent(L("Uploads to non-AI hosts above"), value: L("%lld MB/h", Int(agentEgressMB)))
+                }
+                Toggle(L("Agent active while you're away"), isOn: $agentAway)
+                Stepper(value: $agentAwayMinutes, in: 1...240, step: 1) {
+                    LabeledContent(L("Away after"), value: L("%lld min without input", Int(agentAwayMinutes)))
+                }
+                .disabled(!agentAway)
+            } header: {
+                Text(L("AI agents"))
+            } footer: {
+                Text(L("Agents include recognized tools such as Claude Code, Codex and Cursor, plus non-browser apps that contact a known LLM API provider. Their learning period is 1 hour instead of 24 hours."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L("Traffic without UI activity")) {
+                Stepper(value: $idleMinutes, in: 1...240, step: 1) {
+                    LabeledContent(L("App idle for at least"), value: L("%lld min", Int(idleMinutes)))
+                }
+                Stepper(value: $idleUploadMB, in: 0.5...1000, step: 0.5) {
+                    LabeledContent(L("Uploading more than"), value: L("%@ MB/min", idleUploadMB.formatted()))
+                }
+            }
+            LocalRiskSettingsSection(showClearConfirmation: $showClearLocalRiskConfirmation)
+        }
+        .formStyle(.grouped)
+        .confirmationDialog(L("Clear local analyses?"), isPresented: $showClearLocalRiskConfirmation,
+                            titleVisibility: .visible) {
+            Button(L("Clear analyses"), role: .destructive) { monitor.clearLocalRiskAnalyses() }
+        } message: {
+            Text(L("This removes only local potential-harm scores and explanations. Recorded requests, response bodies, alerts, rules, and inspection settings stay in place."))
         }
     }
 }
@@ -185,7 +243,7 @@ struct MenuBarContent: View {
     var body: some View {
         if extensionManager.state.showsMenuBarNotice {
             Button {
-                nav.show(.capture)
+                nav.showSources(.collector)
                 openWindow(id: "main")
                 NSApp.activate()
             } label: {
@@ -222,7 +280,7 @@ struct MenuBarContent: View {
         }
         if monitor.unacknowledgedAlerts > 0 {
             Button(L("Review Alerts…")) {
-                nav.show(.alerts)
+                nav.showAlerts()
                 openWindow(id: "main")
                 NSApp.activate()
             }

@@ -59,6 +59,7 @@ jobs:
   # Seconds of Python, so it runs on everything: the site is generated from Swift sources and project.yml as well
   # as from site/, and "docs/ is out of date" should be caught whichever of those moved.
   site:
+    needs: changes
     # Pinned rather than `ubuntu-latest`: that label moves to Ubuntu 26 in October 2026, and every run has
     # been carrying an annotation saying so. A named image means the move happens when we make it, with a
     # green run to prove it, rather than on a date somebody else chose. macOS is already pinned the same way.
@@ -141,17 +142,27 @@ jobs:
           done <<< "$(sed -n '/^Shipped:/,/^Planned/p' README.md | grep -o '([0-9]\+\.[0-9]\+\.[0-9]\+)' | tr -d '()')"
           [ "$bad" -eq 0 ] || exit 1
 
-  test:
+  project-drift:
+    name: project drift
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-15
-    strategy:
-      fail-fast: false
-      matrix:
-        # README says Xcode 16 or later, so both ends of that are built. The oldest one earns its place: it is
-        # stricter about expressions the type checker has to explore, and it caught two the newest compiler accepts.
-        xcode: [oldest, newest]
-    name: test (${{ matrix.xcode }} Xcode)
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project and reject drift
+        run: scripts/check_xcode_project.sh
+
+  unit-oldest:
+    name: unit (oldest Xcode)
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -160,28 +171,60 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.xcode }}" == "newest" ]]; then
-            sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-          else
-            sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | head -1)"
-          fi
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | head -1)"
           xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
+      - name: Test
+        timeout-minutes: 40
+        run: scripts/run-ci-tests.sh
 
-      - name: Generate the project and reject drift
-        run: scripts/check_xcode_project.sh
+  unit-newest:
+    name: unit (newest Xcode)
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
 
       - name: Check release helpers, catalog policy, and warning gate
-        if: matrix.xcode == 'newest'
         run: |
           scripts/test-notarize.sh
           scripts/test-rule-pack-policy.sh
           scripts/test-swift-warnings.sh
+          scripts/test-codeql-gate.sh
           python3 -I scripts/test_classify_changes.py
           python3 -I scripts/test_check_site.py
           python3 scripts/test_release_checks.py
+
+      # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
+      - name: Test
+        timeout-minutes: 40
+        run: scripts/run-ci-tests.sh
+
+  store:
+    name: store
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Select newest Xcode
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
 
       # This compiles a different product graph and activation path from the Developer ID build. The build clears
       # protected entitlements because CI has no Store profiles; the next step re-signs the isolated product with the
@@ -210,66 +253,6 @@ jobs:
           codesign --force --sign - --entitlements Flowlight/Flowlight-AppStore.entitlements "$APP"
           scripts/check_app_store_product.sh "$APP"
 
-      # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
-      - name: Test
-        timeout-minutes: 40
-        run: |
-          # GitHub runs this step under `bash -e`, so the first failing command ends it. That killed the whole
-          # point of the reporting below: a failing test exited 65 with no output at all, and the log saying
-          # which test failed was thrown away with the runner. `set +e` has to be explicit — the `set` line
-          # below can't clear a flag the shell was started with.
-          set +e
-          set -uo pipefail
-          # xcodebuild occasionally never returns here — the same suite passes locally and on most runs, and the
-          # per-test allowance below doesn't always catch it, so the whole invocation gets a watchdog. One retry:
-          # a hang that clears on a second attempt is a flake, and one that repeats is a real failure worth seeing.
-          run_tests() {
-            local log="$1" limit=900
-            xcodebuild test -project Flowlight.xcodeproj -scheme Flowlight -destination 'platform=macOS' \
-              -test-timeouts-enabled YES \
-              -default-test-execution-time-allowance 120 \
-              -maximum-test-execution-time-allowance 300 \
-              CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= > "$log" 2>&1 &
-            local pid=$!
-            local waited=0
-            while kill -0 "$pid" 2>/dev/null; do
-              if [ "$waited" -ge "$limit" ]; then
-                echo "::warning::xcodebuild still running after ${limit}s — killing it."
-                kill -9 "$pid" 2>/dev/null
-                pkill -9 -f "xcodebuild|XCTestCore|testmanagerd" 2>/dev/null
-                wait "$pid" 2>/dev/null
-                return 124
-              fi
-              sleep 5
-              waited=$((waited + 5))
-            done
-            wait "$pid"
-          }
-
-          LOG="$RUNNER_TEMP/test.log"
-          run_tests "$LOG"
-          status=$?
-          grep -E "Test Case .* (passed|failed)|Executed .* tests|\*\* TEST" "$LOG" | tail -25
-
-          if [ "$status" -eq 124 ]; then
-            echo "::group::Where it stopped (last 60 lines before the kill)"; tail -60 "$LOG"; echo "::endgroup::"
-            echo "Retrying once."
-            LOG="$RUNNER_TEMP/test-retry.log"
-            run_tests "$LOG"
-            status=$?
-            grep -E "Executed .* tests|\*\* TEST" "$LOG" | tail -10
-          fi
-
-          if [ "$status" -ne 0 ]; then
-            echo "::group::Last 300 lines"; tail -300 "$LOG"; echo "::endgroup::"
-            echo "Why it failed (status $status):"
-            # Outside the group, so it is the first thing visible on a failed run.
-            grep -E "error:|Testing failed:|XCTAssert.*failed|exceeded execution time allowance" "$LOG" | head -40
-            exit 1
-          fi
-          set -e
-          scripts/check-swift-warnings.sh "$LOG"
-
   # Exact-head evidence proves what was reviewed; this separate PR-only build proves that same head still compiles
   # when combined with the current base. The trees are intentionally different, so this is not duplicate work.
   merge-compatibility:
@@ -293,14 +276,17 @@ jobs:
   gate:
     name: Review / gate
     if: always()
-    needs: [changes, site, test, merge-compatibility]
+    needs: [changes, site, project-drift, unit-oldest, unit-newest, store, merge-compatibility]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every applicable review job
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           SITE_RESULT: ${{ needs.site.result }}
-          TEST_RESULT: ${{ needs.test.result }}
+          PROJECT_DRIFT_RESULT: ${{ needs.project-drift.result }}
+          UNIT_OLDEST_RESULT: ${{ needs.unit-oldest.result }}
+          UNIT_NEWEST_RESULT: ${{ needs.unit-newest.result }}
+          STORE_RESULT: ${{ needs.store.result }}
           MERGE_RESULT: ${{ needs.merge-compatibility.result }}
           EVENT_NAME: ${{ github.event_name }}
           APP_ROUTE: ${{ needs.changes.outputs.app }}
@@ -318,13 +304,21 @@ jobs:
             echo "::error::Site verification did not succeed: $SITE_RESULT"
             exit 1
           }
-          case "$APP_ROUTE:$TEST_RESULT" in
-            true:success|false:skipped) ;;
-            *)
-              echo "::error::Application route $APP_ROUTE produced test result $TEST_RESULT."
-              exit 1
-              ;;
-          esac
+          for result in \
+            "project drift:$PROJECT_DRIFT_RESULT" \
+            "oldest unit:$UNIT_OLDEST_RESULT" \
+            "newest unit:$UNIT_NEWEST_RESULT" \
+            "store:$STORE_RESULT"; do
+            name=${result%%:*}
+            conclusion=${result#*:}
+            case "$APP_ROUTE:$conclusion" in
+              true:success|false:skipped) ;;
+              *)
+                echo "::error::Application route $APP_ROUTE produced $name result $conclusion."
+                exit 1
+                ;;
+            esac
+          done
           if [[ "$EVENT_NAME" == pull_request && "$APP_ROUTE" == true ]]; then
             [[ "$MERGE_RESULT" == success ]] || {
               echo "::error::Prospective-merge compatibility did not succeed: $MERGE_RESULT"
@@ -336,7 +330,11 @@ jobs:
               exit 1
             }
           fi
-          [[ -n "$HEAD_SHA" && -n "$TREE" && -n "$FINGERPRINT" && -n "$SCHEMA" ]] || {
+          [[ "$SCHEMA" == flowlight-review-v2 ]] || {
+            echo "::error::Unexpected review receipt schema: $SCHEMA"
+            exit 1
+          }
+          [[ -n "$HEAD_SHA" && -n "$TREE" && -n "$FINGERPRINT" ]] || {
             echo "::error::The review receipt identity is incomplete."
             exit 1
           }
@@ -351,14 +349,18 @@ jobs:
             --arg app_route "$APP_ROUTE" \
             --arg changes "$CHANGES_RESULT" \
             --arg site "$SITE_RESULT" \
-            --arg tests "$TEST_RESULT" \
+            --arg project_drift "$PROJECT_DRIFT_RESULT" \
+            --arg unit_oldest "$UNIT_OLDEST_RESULT" \
+            --arg unit_newest "$UNIT_NEWEST_RESULT" \
+            --arg store "$STORE_RESULT" \
             --arg merge_compatibility "$MERGE_RESULT" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_attempt "${{ github.run_attempt }}" \
             '{schema: $schema, repository: $repository, workflow: $workflow, event: $event,
               source_sha: $source_sha, source_tree: $source_tree, app_fingerprint: $app_fingerprint,
               app_route: $app_route,
-              conclusions: {changes: $changes, site: $site, tests: $tests,
+              conclusions: {changes: $changes, site: $site, project_drift: $project_drift,
+                            unit_oldest: $unit_oldest, unit_newest: $unit_newest, store: $store,
                             merge_compatibility: $merge_compatibility},
               run_id: $run_id, run_attempt: $run_attempt}' \
             > "$RUNNER_TEMP/review-receipt.json"

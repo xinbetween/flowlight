@@ -35,7 +35,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Quellen</strong>
-          <a href="#capture">Erfassung</a><a href="#coverage">Abdeckung</a><a href="#devices">Geräte</a>
+          <a href="#sources">Quellen</a><a href="#coverage">Abdeckung</a><a href="#devices">Geräte</a>
         </div>
         <div class="toc-group">
           <strong>Einstellungen und Daten</strong>
@@ -75,10 +75,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Ein Filter im Kernel verwirft jedes andere Paket, bevor Flowlight es sieht, und Paketinhalte werden nie gespeichert.</p>
       <p>macOS lässt nur Administratoren Pakete lesen, deshalb fragt das Fenster <strong>Deinem Datenverkehr Namen geben</strong> einmal nach deinem Passwort. Es installiert
         <code>/Library/LaunchDaemons/com.flowlight.bpf-access.plist</code>, das der Gruppe <code>access_bpf</code> bei jedem Start Lesezugriff auf
-        <code>/dev/bpf*</code> gibt – derselbe Weg, den Wireshark geht. Jederzeit entfernbar über <strong>Erfassung › Paketmitschnitt-Zugriff entfernen</strong>.</p>
+        <code>/dev/bpf*</code> gibt – derselbe Weg, den Wireshark geht. Jederzeit entfernbar über <strong>Quellen › Collector › Paketmitschnitt-Zugriff entfernen</strong>.</p>
       <p><strong>Netzinhaber bestimmen</strong> beschriftet Datenverkehr ohne Hostnamen damit, wer die Adresse betreibt
         (<em>Cloudflare, Inc. · AS13335</em>). Es ist standardmäßig ein und sendet diese öffentlichen IP-Adressen (nie private) an den
-        DNS-Dienst von Team Cymru. Abschalten kannst du es unter <strong>Erfassung</strong>.</p>
+        DNS-Dienst von Team Cymru. Abschalten kannst du es unter <strong>Quellen › Collector</strong>.</p>
 
       <h2 id="language">Sprache</h2>
       <p>Flowlight ist übersetzt in English, 简体中文, 繁體中文, 日本語, 한국어, Français, Deutsch, Italiano, Español und
@@ -99,14 +99,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td>Verlauf</td><td>⌘3</td><td>Wohin der Datenverkehr ging, von der Sekunde bis zum Jahr. Gruppiert nach App, Ziel oder IP; umschaltbar auf Diagramme oder <a href="#worth-a-look">Genauer hinsehen</a>; CSV-Export.</td></tr>
         <tr><td><a href="#visualize">Verbindungen</a></td><td>⌘4</td><td>Eine stabile Karte der Apps und ihrer genauen Ziele mit gewichteten Pfaden, bewegten Richtungsmarkern, Verbindungszahlen und einer gleichwertigen Liste.</td></tr>
         <tr><td><a href="#alerts">Warnungen</a></td><td>⌘5</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
-        <tr><td><a href="#rules">Regeln</a></td><td>⌘8</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
         <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
-        <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
-        <tr><td><a href="#devices">Geräte</a></td><td>⌘9</td><td>Aus, bis du es einschaltest: Bluetooth, USB und externe Speicher, die ein Mac genauso nutzt wie das Netzwerk.</td></tr>
-        <tr><td><a href="#coverage">Abdeckung</a></td><td>⌘0</td><td>Was Flowlight nicht belegen kann – pro App, ob sein Datenverkehr gesehen, benannt und lesbar war.</td></tr>
-        <tr><td><a href="#capture">Erfassung</a></td><td>—</td><td>Welche Engine aufzeichnet, der Zustand der Erweiterung, das Lernen von Hostnamen und wo die Datenbank liegt.</td></tr>
+        <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7 · Developer ID</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
+        <tr><td><a href="#rules">Regeln</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
+        <tr><td><a href="#sources">Quellen</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Collector-Zustand, Gerätekanäle und Benennungsabdeckung in drei Tabs.</td></tr>
       </table>
-      <p>Die Kurzbefehle folgen der Reihenfolge der Seitenleiste: ⌘0 ist das zehnte Element, und das elfte bleibt ohne einen erfundenen Kurzbefehl erreichbar.</p>
+      <p>Die Kurzbefehle folgen der sichtbaren Reihenfolge der Seitenleiste. Developer-ID-Versionen enthalten Inspizieren auf ⌘7; App-Store-Versionen lassen es weg, daher rücken Regeln und Quellen auf ⌘7 und ⌘8.</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
         <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
@@ -410,7 +408,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         verweigert: Die Verbindung wird verworfen, und eine Warnung hält fest, was verweigert wurde – mit <strong>… ab jetzt erlauben</strong>, um es
         mit einem Klick in die Liste aufzunehmen. Der nächste Versuch des Agenten geht durch.</p>
       <p><strong>Es braucht die Netzwerkerweiterung.</strong> Eine Verbindung zu verweigern heißt, in ihrem Weg zu sitzen, und das kann der nettop-Sampler
-        nicht – Erfassung sagt das, statt einen Schalter anzubieten, der nichts tut.</p>
+        nicht – Quellen › Collector sagt das, statt einen Schalter anzubieten, der nichts tut.</p>
       <p>Manches wird nie verweigert, was auch in einer Liste steht: dein lokales Netzwerk, DNS, Apples eigene Dienste und Flowlights eigener
         Datenverkehr. Ein blockierter Mac ist schlimmer als ein blockierter Agent, im Zweifel wird die Verbindung also erlaubt und aufgezeichnet.
         Die Durchsetzung endet außerdem wenige Sekunden nachdem Flowlight nicht mehr läuft – eine Verweigerung, die niemand sehen kann, ist schlimmer als keine, und der Weg,
@@ -442,8 +440,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Das ist keine Sandbox.</strong> Ein verweigertes Tool wird nicht mehr angeboten und nicht mehr beantwortet. Ein Agent, der noch eine
         Shell hat, kann von Hand tun, was das Tool getan hätte. Flowlight zeichnet das auf; es tut nicht so, als würde es das verhindern.</p>
 
-      <h2 id="capture"><span id="engines"></span>Erfassung: Engines und Quellen</h2>
-      <p>Flowlight zeichnet Datenverkehr auf eine von zwei Weisen auf, wählbar unter <strong>Erfassung</strong>. Sie unterscheiden sich darin, was sie verpassen können, und das lohnt
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Quellen: Collector und Engines</h2>
+      <p>Flowlight zeichnet Datenverkehr auf eine von zwei Weisen auf, wählbar unter <strong>Quellen › Collector</strong>. Sie unterscheiden sich darin, was sie verpassen können, und das lohnt
         sich zu verstehen, bevor du dich auf eine verlässt.</p>
       <table>
         <tr><th></th><th>nettop-Sampler (Standard)</th><th>Netzwerkerweiterung</th></tr>
@@ -469,7 +467,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         ohne deine gewählte Quelle zu verändern. <em>Erweiterung erneut versuchen</em> unter Netzwerkerweiterung fängt von vorn an.</p>
       <p><strong>Auf manchen Macs kann sie gar nicht laufen.</strong> macOS erlaubt nur einen Inhaltsfilter zur Zeit, und normalerweise hält Sicherheitssoftware
         aus dem Unternehmen ihn – Palo Alto Networks GlobalProtect, CrowdStrike Falcon und dergleichen. Flowlights Filter installiert sich auf diesen
-        Rechnern und verbindet sich auch, bekommt dann aber nie eine Verbindung übergeben. Erfassung listet jeden Filter auf, den es findet, und bietet an, zurück auf den Sampler zu schalten, der
+        Rechnern und verbindet sich auch, bekommt dann aber nie eine Verbindung übergeben. Quellen › Collector listet jeden Filter auf, den es findet, und bietet an, zurück auf den Sampler zu schalten, der
         keinen Filter braucht und neben ihnen funktioniert.
         Wie es gebaut ist, steht im <a href="https://github.com/{{repo}}/blob/main/docs/DEVELOPMENT.md">Entwicklerhandbuch</a>.</p>
 
@@ -538,7 +536,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         hast. Die Hostnamen-Einrichtung wird etwas nach dem Start angeboten und nur, solange ein Fenster offen ist, statt einen ersten Start mit einer
         Passwortfrage zu begrüßen; das Angebot kommt beim nächsten Start wieder, bis du es annimmst oder wegklickst.</p>
       <p>Flowlight zu beenden stoppt den Sampler. Es stoppt nicht die Netzwerkerweiterung: Eine Systemerweiterung läuft für sich, der Filter
-        prüft Verbindungen also weiter, bis du ihn unter <strong>Erfassung</strong> deaktivierst oder deinstallierst.</p>
+        prüft Verbindungen also weiter, bis du ihn unter <strong>Quellen › Collector</strong> deaktivierst oder deinstallierst.</p>
 
       <h2 id="export">Export an OpenTelemetry oder ein SIEM</h2>
       <p><strong>Aus, bis du es einrichtest – und es gibt keinen Flowlight-Dienst, an den gesendet würde.</strong> Du nennst den Endpunkt – deinen eigenen
@@ -578,7 +576,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <h2 id="data">Deine Daten</h2>
       <p>Alles liegt in <code>~/Library/Application Support/Flowlight/traffic.sqlite</code>. Sekundenzeilen werden 6 Stunden aufbewahrt
         (einstellbar), Minutenzeilen 14 Tage, Stundenzeilen 400 Tage, Tageszeilen dauerhaft und Warnungen 90 Tage.
-        <strong>Erfassung › Alle Daten löschen</strong> löscht sie.</p>
+        <strong>Einstellungen › Daten & Datenschutz › Alle Daten löschen</strong> löscht sie.</p>
 
       <h2 id="updates">Updates</h2>
       <p>Erscheint eine neue Version, sagt Flowlight es mit einer Benachrichtigung und einem Zeichen in der Seitenleiste, statt dich zu unterbrechen;
@@ -597,7 +595,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="uninstall">Deinstallieren</h2>
       <ol>
-        <li>Wähle unter <strong>Erfassung</strong> den Punkt <strong>Paketmitschnitt-Zugriff entfernen</strong> (fragt nach deinem Passwort), falls du ihn eingerichtet hast,
+        <li>Wähle unter <strong>Quellen › Collector</strong> den Punkt <strong>Paketmitschnitt-Zugriff entfernen</strong> (fragt nach deinem Passwort), falls du ihn eingerichtet hast,
           deinstalliere den Inhaltsfilter, falls du ihn installiert hast, und schalte die HTTPS-Inspektion unter <strong>Inspizieren</strong> aus, damit ihr Zertifikat
           deinen Schlüsselbund verlässt. Nur Flowlight selbst kann diese drei zurücknehmen.</li>
         <li>Beende Flowlight und lege es aus dem Programme-Ordner in den Papierkorb – oder, wenn du es mit Homebrew installiert hast,
@@ -616,19 +614,19 @@ open build/Build/Products/Release/Flowlight.app</pre>
           Byte-Zähler von macOS einmal pro Sekunde und zeichnet die Veränderung auf – eine lange Übertragung wird also exakt gezählt, aber eine Verbindung, die zwischen
           zwei Messungen öffnet und schließt, erscheint überhaupt nicht. Die Netzwerkerweiterung wird von macOS bei jedem Verbindungsaufbau aufgerufen, sodass
           selbst eine Anfrage von fünf Millisekunden aufgezeichnet wird. Wenn du einen KI-Agenten beobachtest, der viele kurze Anfragen abfeuert, installiere die
-          Erweiterung unter <strong>Erfassung</strong>. <a href="#engines">Der vollständige Vergleich steht oben.</a></dd>
+          Erweiterung unter <strong>Quellen › Collector</strong>. <a href="#engines">Der vollständige Vergleich steht oben.</a></dd>
         <dt><strong>Ich habe die Netzwerkerweiterung eingeschaltet und es erscheint nichts. Der Sampler läuft gut.</strong></dt>
         <dd>Fast immer, weil ein anderer Inhaltsfilter den Platz schon hat. <strong>macOS führt einen Inhaltsfilter zur Zeit aus</strong>, und
           Sicherheitssoftware aus dem Unternehmen beansprucht ihn meist – Palo Alto Networks GlobalProtect, CrowdStrike Falcon und Ähnliches. Flowlights
-          Filter installiert, aktiviert und verbindet sich trotzdem, Erfassung sagt also <em>Mit Filtererweiterung verbunden</em>, aber macOS übergibt ihm nie eine
-          einzige Verbindung und die Bildschirme bleiben leer. <strong>Erfassung listet die Filter auf, die es findet</strong>, und bietet an, zurück auf den
+          Filter installiert, aktiviert und verbindet sich trotzdem, Quellen › Collector sagt also <em>Mit Filtererweiterung verbunden</em>, aber macOS übergibt ihm nie eine
+          einzige Verbindung und die Bildschirme bleiben leer. <strong>Quellen › Collector listet die Filter auf, die es findet</strong>, und bietet an, zurück auf den
           Sampler zu schalten, der keinen Filter nutzt und neben ihnen funktioniert. Du verlierst nur die ganz kurzen Verbindungen
           (<a href="#engines">der Vergleich</a>); alles andere wird genauso aufgezeichnet.</dd>
         <dt><strong>Die Erweiterung hat nach einem Flowlight-Update aufgehört zu arbeiten.</strong></dt>
         <dd>Versionen vor 0.2.5 hatten das: macOS führt weiter den Build der Erweiterung aus, der zuletzt aktiviert wurde, nach einem Update war die
           Erweiterung also die alte Version, und macOS verweigert die Verbindung zwischen einem nicht passenden Paar. Ab 0.2.5 prüft Flowlight beim Start
-          und aktiviert den Filter selbst neu. Drücke bei einer älteren Version einmal <strong>Filter installieren &amp; aktivieren</strong> unter Erfassung.</dd>
-        <dt><strong>Mit der Erfassung ist etwas anderes nicht in Ordnung und ich weiß nicht, was.</strong></dt>
+          und aktiviert den Filter selbst neu. Drücke bei einer älteren Version einmal <strong>Filter installieren &amp; aktivieren</strong> unter Quellen › Collector.</dd>
+        <dt><strong>Mit Quellen › Collector stimmt etwas anderes nicht und ich weiß nicht, was.</strong></dt>
         <dd>Führe das aus und lies, was es ausgibt – es meldet nur Zustände und Zähler, nie etwas, das Flowlight über deinen Datenverkehr aufgezeichnet hat:
           <p class="brew"><code>curl -fsSL https://raw.githubusercontent.com/{{repo}}/main/scripts/diagnose.sh | zsh</code><button type="button" class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zsh">Kopieren</button></p>
           Es zeigt, welche Erweiterungen installiert sind, ob macOS Flowlights Filter wirklich gestartet hat und wie kürzlich überhaupt etwas aufgezeichnet wurde.

@@ -19,6 +19,8 @@ struct FeatureGuide: Equatable, Sendable, Identifiable {
     var steps: [String]
     /// Where it lives, so an answer can offer to go there.
     var screen: SidebarItem?
+    /// The operational tab behind Sources, when the destination needs more precision than one sidebar item.
+    var sourcesTab: SourcesTab? = nil
     /// What it can't do. Left out of an answer, these are the things people discover the hard way.
     var caveats: [String] = []
     /// Extra words someone might use for it.
@@ -45,9 +47,10 @@ extension FeatureGuide {
         FeatureGuide(
             id: "capture", title: "Capture source",
             summary: "Where traffic comes from. The Network Extension is a content filter that sits in the data path and attributes every flow to its app; the nettop sampler needs no entitlement but samples once a second and misses flows shorter than that.",
-            steps: ["Open Capture.", "Under Capture source, pick Network Extension or nettop sampler.",
+            steps: ["Open Sources and choose Collector.", "Pick Network Extension or nettop sampler.",
                     "For the extension, press Install & enable filter and approve it in System Settings."],
-            screen: .capture,
+            screen: .sources,
+            sourcesTab: .collector,
             caveats: ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight's filter installs and connects but is never handed a flow.",
                       "Only the extension can refuse a connection. The sampler counts traffic after the fact."],
             keywords: ["nettop", "network extension", "content filter", "source", "no traffic", "nothing showing"]),
@@ -55,8 +58,9 @@ extension FeatureGuide {
         FeatureGuide(
             id: "hostnames", title: "Hostnames",
             summary: "Turning IP addresses into names. The extension reads TLS SNI and DNS answers itself. On the sampler, a one-time packet-capture setup is what lets Flowlight see those names.",
-            steps: ["Open Capture.", "Turn on Read hostnames from the network.", "Give the helper permission when macOS asks."],
-            screen: .capture,
+            steps: ["Open Sources and choose Collector.", "Turn on Read hostnames from the network.", "Give the helper permission when macOS asks."],
+            screen: .sources,
+            sourcesTab: .collector,
             caveats: ["Without it the sampler falls back to reverse DNS, which is often missing or wrong."],
             keywords: ["dns", "sni", "domain", "ip only", "no domain names", "bpf", "packet capture"]),
 
@@ -136,7 +140,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "alerts", title: "Alerts",
             summary: "Explainable, per-app alerts: traffic spikes, unusual numbers of destinations, first contact with a domain, sensitive channels, possible exfiltration, agents active while you are away, and refused connections.",
-            steps: ["Open Alerts to review them.", "Adjust the thresholds in Settings ⌘, under Detection."],
+            steps: ["Open Alerts to review them.", "Choose Detection there to adjust the thresholds."],
             screen: .alerts,
             caveats: ["Every app gets a learning period before first-contact and spike rules fire."],
             keywords: ["alert", "anomaly", "warning", "threshold", "notification", "exfiltration"]),
@@ -172,8 +176,9 @@ extension FeatureGuide {
         FeatureGuide(
             id: "devices", title: "Devices: camera, Bluetooth and USB",
             summary: "Whether each camera is active, which Bluetooth and USB devices are paired or attached, and when that changed. Every channel is off until you turn it on.",
-            steps: ["Open Devices.", "Turn on Watch camera activity, Watch Bluetooth, or Watch USB and external storage."],
-            screen: .devices,
+            steps: ["Open Sources and choose Devices.", "Turn on Watch camera activity, Watch Bluetooth, or Watch USB and external storage."],
+            screen: .sources,
+            sourcesTab: .devices,
             caveats: ["Camera activity names the camera, not the app using it; Flowlight never reads frames or requests camera access.",
                       "No Bluetooth or USB byte counts: macOS keeps no per-app accounting for those channels.",
                       "The Bluetooth app list is who asked for access, not who was granted it."],
@@ -200,9 +205,9 @@ extension FeatureGuide {
         FeatureGuide(
             id: "data", title: "Your data and retention",
             summary: "Everything is a SQLite database in Application Support. Seconds are kept briefly, minutes and hours longer, daily totals indefinitely, alerts for 90 days.",
-            steps: ["Open Capture and use Clear all data to delete everything.",
+            steps: ["Open Settings with ⌘, and choose Data & Privacy.", "Use Clear All Data to delete everything.",
                     "Or remove ~/Library/Application Support/Flowlight."],
-            screen: .capture,
+            screen: nil,
             keywords: ["delete", "database", "retention", "privacy", "clear", "storage", "disk"]),
 
         FeatureGuide(
@@ -218,7 +223,7 @@ extension FeatureGuide {
                 guard guide.id == "capture" else { return guide }
                 var storeGuide = guide
                 storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
-                storeGuide.steps = ["Open Capture.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                storeGuide.steps = ["Open Sources and choose Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
                 storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
                 storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
                 return storeGuide
