@@ -283,7 +283,7 @@ def problems():
                          f"button opens it — a new screen the documentation never got")
 
     # 12. A shortcut the documentation gets wrong. Shortcuts follow each product's visible sidebar. Developer ID
-    #     includes Inspect; the Store product does not, so Rules and Sources move up by one there.
+    #     includes Inspect; the Store product does not, so Policies and Sources move up by one there.
     order = sidebar_order(nav)
     requirements = shortcut_requirements(order)
     titles = dict(HELP_ANCHOR.findall(nav[nav.find("var englishTitle"):nav.find("var title")]))
@@ -300,24 +300,24 @@ def problems():
                          f"but the sidebar puts it at \u2318{key}")
 
     docs_pages = [OUT / "docs/index.html"] + [OUT / lang / "docs/index.html" for lang in LANGS]
-    shortcut_anchors = {
-        "inspect": ("inspection",),
-        "rules": ("rules",),
-        "sources": ("capture", "sources"),
+    shortcut_rows = {
+        "inspect": ("inspect", ("inspection",)),
+        "policies": ("rules", ("policies",)),
+        "sources": ("sources", ("capture", "sources")),
     }
     for docs_page in docs_pages:
         page_text = docs_page.read_text()
-        for screen, anchors in shortcut_anchors.items():
+        for label_name, (screen, anchors) in shortcut_rows.items():
             anchor_pattern = "|".join(re.escape(anchor) for anchor in anchors)
             cell_match = re.search(
                 rf'<tr><td><a href="#(?:{anchor_pattern})">.*?</a></td><td>(.*?)</td>',
                 page_text, re.S)
             label = str(docs_page.relative_to(ROOT))
             if cell_match is None:
-                found.append(f"{label}: the views table has no {screen} shortcut row")
+                found.append(f"{label}: the views table has no {label_name} shortcut row")
                 continue
             for missing in missing_shortcuts(cell_match.group(1), requirements[screen]):
-                found.append(f"{label}: the {screen} row never lists {missing}")
+                found.append(f"{label}: the {label_name} row never lists {missing}")
 
     # 14. The homepage repeats the same shortcut badges and a compact Sources promise. Keep Collector, Devices,
     #     and Coverage together, and keep both product-specific shortcut maps truthful.

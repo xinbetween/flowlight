@@ -400,7 +400,7 @@ TEAM_ID=ABCDE12345 \
 DMG_SIGN_IDENTITY="Developer ID Application: Your Name (ABCDE12345)" \
 NOTARY_PROFILE=flowlight-notary scripts/build-dmg.sh      # build/Flowlight.dmg, signed + notarized
 INSTALLER_IDENTITY="Developer ID Installer: Your Name (ABCDE12345)" \
-NOTARY_PROFILE=flowlight-notary TEAM_ID=ABCDE12345 scripts/build-pkg.sh
+NOTARY_PROFILE=flowlight-notary TEAM_ID=ABCDE12345 REUSE_EXPORT=1 scripts/build-pkg.sh
 gh release create v0.1.0 build/Flowlight.dmg build/Flowlight-0.1.0.pkg --title "Flowlight 0.1.0" --generate-notes
 scripts/update-cask.sh                                    # Homebrew cask → new version + checksum
 git -C "$(brew --repository xinbetween/tap)" push          # publishes it
@@ -408,8 +408,9 @@ git -C "$(brew --repository xinbetween/tap)" push          # publishes it
 
 - Keep the DMG asset named exactly `Flowlight.dmg`: the website and README link to
   `releases/latest/download/Flowlight.dmg`, and so does the Homebrew cask.
-- `scripts/update-cask.sh` runs after the release exists on GitHub: with no local build it checksums the published
-  DMG. It lints the cask with `brew style` and `brew audit` in the tap, since Homebrew won't lint one outside a tap.
+- `scripts/update-cask.sh` prefers the local `build/Flowlight.dmg`; with no local build it can checksum the published
+  DMG. CI sets `REQUIRE_LOCAL_DMG=1`, so publication cannot silently replace its verified prepared DMG with a download.
+  It lints the cask with `brew style` and `brew audit` in the tap, since Homebrew won't lint one outside a tap.
 - `INSTALLER_IDENTITY` is what signs the `.pkg`. Leave it out and `build-pkg.sh` produces an unsigned package that
   Gatekeeper refuses, without saying so.
 - Without `DMG_SIGN_IDENTITY` and `NOTARY_PROFILE` the DMG contains an ad-hoc signed app. That's fine for testing,
@@ -434,7 +435,7 @@ cannot be downloaded until signing and notarization finish. `docs/` also has to 
 commit (CI checks it) and `build_site.py` reads `MARKETING_VERSION`, so the version bump and the rebuilt site
 cannot be separated. Keeping both off `main` until the release exists is what the branch is for.
 
-Every release follows the mandatory sequence **feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main**:
+Every release follows the mandatory sequence **feature branch → release branch → reviewed green PR → immutable tag → signed preparation → publish exact bytes and verify → merge to main**:
 
 ```sh
 git switch -c feature/relaunch-through-proxy main
@@ -446,13 +447,15 @@ git merge --ff-only feature/relaunch-through-proxy
 
 git push -u origin release/0.13.4
 gh pr create --base main --title "Flowlight 0.13.4"
-# wait for review and every required PR check to pass
+# after reviewing the final head, a configured trusted reviewer posts this authenticated receipt:
+gh pr comment <number> --body "Reviewed-Commit: $(git rev-parse HEAD)"
+# wait for that receipt and every required PR check to pass
 
 git tag -a v0.13.4 -m "Flowlight 0.13.4"
-git push origin v0.13.4  # automatically runs the signed dry run; it cannot publish
-# inspect that successful signed/notarized/Gatekeeper run, then publish from the same tag:
-gh workflow run Release --ref v0.13.4 -f tag=v0.13.4
-# verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
+git push origin v0.13.4  # prepares, attests and retains the only bytes publication may use
+# inspect that successful preparation, then publish its exact artifact from the same tag:
+gh workflow run Release --ref v0.13.4 -f prepare_run_id=<successful-tag-push-run-id>
+# verify DMG, PKG, SHA256SUMS.txt and RELEASE-MANIFEST.json before the final merge
 gh pr merge --merge --delete-branch
 ```
 
@@ -461,17 +464,29 @@ comes after publication so the site can only ever describe something downloadabl
 force-push or move a pushed version. If a tag is wrong or a release needs another change, bump the patch version and
 begin a new release branch and tag.
 
-A tag push starts `release.yml` automatically in dry-run-only mode; push-triggered runs cannot publish. It first
-requires an open or merged `main` pull request and the latest successful CI and CodeQL checks at the exact tagged
-commit, rather than running the same test suite a second time. It must then build, sign, notarize and pass Gatekeeper
-verification before an explicit production dispatch for the immutable tag. After production succeeds, verify the
-GitHub release page and downloaded DMG, PKG and `SHA256SUMS.txt` checksums before merging the release PR.
+A tag push starts `release.yml` automatically in preparation-only mode; push-triggered runs cannot publish. It first
+requires an open or merged `main` pull request and an exact-SHA `Reviewed-Commit: <exact SHA>` comment posted by a
+login configured in the `RELEASE_REVIEWERS` repository variable. The commenter must be an owner, member, or
+collaborator; the editable PR body is never accepted as review evidence. The release manifest retains the authenticated
+comment ID, URL, reviewer, repository association, PR number, and reviewed SHA. Preparation also requires the latest
+successful CI and CodeQL checks from their trusted workflows at that exact tagged commit. Every Actions run must also
+identify the same authenticated, exact-head `main` PR; checks from another PR at the same commit are rejected. It then
+builds, signs, notarizes, passes Gatekeeper,
+records checksums and a source/review manifest, attests all five prepared files, and retains them for 90 days in one
+immutable Actions artifact. An explicit publication dispatch names that run ID. Its separate job has no certificates,
+provisioning profiles, Xcode, or notarization credentials: it verifies and publishes the retained bytes only. After
+publication succeeds, verify the GitHub release page and downloaded DMG, PKG, `SHA256SUMS.txt`, and
+`RELEASE-MANIFEST.json` before merging the release PR.
 
 ## Releasing from CI
 
 `.github/workflows/release.yml` checks the tag matches `MARKETING_VERSION`, verifies the exact commit already passed
-the required PR CI and CodeQL checks, then signs, notarizes and verifies with `spctl`. A tag push always stops there;
-an explicit dispatch for that tag publishes the release and updates the Homebrew cask.
+the required PR CI and CodeQL checks, then signs, notarizes, verifies with `spctl`, creates the release manifest and
+notes, attests every file, and uploads one immutable artifact. A tag push always stops there. An explicit dispatch for
+that tag and preparation run ID verifies the run metadata, archive digest, manifest, checksums, and attestations; creates
+or safely resumes a draft from those exact files; re-downloads and compares every release asset and the release body;
+then publishes. If `TAP_TOKEN` is configured, Homebrew is updated idempotently from the already verified DMG; otherwise
+GitHub publication succeeds and the cask is updated manually.
 
 Pull-request verification jobs explicitly check out the PR head SHA associated with their checks, not GitHub's
 synthetic merge ref. App-changing PRs also receive one required prospective-merge build of the synthetic tree, so exact
@@ -485,22 +500,26 @@ requires every applicable job and preserves an immutable shadow receipt containi
 fingerprint, workflow schema, and conclusions. A cache is never release evidence.
 
 ```sh
-scripts/ci-secrets.sh                                  # upload the secrets once
-git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0  # automatic dry run
-gh workflow run Release --ref v0.3.0 -f tag=v0.3.0     # after it passes: publish
+scripts/ci-secrets.sh                                  # upload preparation secrets once
+git tag -a v0.3.0 -m "Flowlight 0.3.0" && git push origin v0.3.0  # automatic preparation
+gh workflow run Release --ref v0.3.0 -f prepare_run_id=<successful-tag-push-run-id>
 ```
 
 `--ref` has to name a tag whose tree *contains* the workflow: `gh` reads the workflow file from the ref you give
 it, so tags older than `.github/workflows/release.yml` fail with "Workflow does not have 'workflow_dispatch'
-trigger". The environment only accepts `v*` tags, so dispatching from a branch is refused at the approval gate —
-which is the point of it.
+trigger". Both environments accept only `v*` tags, so branch dispatches cannot reach signing or publication credentials.
 
-A tag push—and an explicit dispatch with **dry_run=true**—builds, signs, notarizes and asks Gatekeeper for a verdict,
-then stops without creating a release or touching the cask. Production requires an explicit dispatch with the tag input
-and **dry_run=false**.
+A tag push performs the only build/sign/notarize pass and stops after preserving its attested preparation. Production
+requires an explicit dispatch with that successful push run's numeric ID. `scripts/release_artifact.py` rejects a run
+from another event, repository, workflow, tag, SHA, or conclusion; an expired, missing, or duplicate artifact; changed
+bytes; malformed checksums; manifest disagreement; and unexpected files. Its tested archive extractor also rejects
+unsafe paths, duplicate names, non-regular entries, substituted package names, corruption, and oversized expansion before
+writing prepared files. Publication verifies GitHub provenance for every file and publishes only after re-downloading and
+comparing the draft successfully. A rerun resumes a draft, or verifies an already
+public immutable release without mutating its assets, so a transient Homebrew failure does not require another signature.
 
 Release notes come from `packaging/release-notes/<version>.md` when that file exists (checksums are appended), and
-from generated notes when it doesn't.
+from the matching generated site release entry when it does not. A release with neither source fails preparation.
 
 `scripts/ci-secrets.sh` finds the two provisioning profiles by name in Xcode's folder, so the only things it asks
 for are the certificate exports and how to notarize. Prefer the App Store Connect key where you can: it can only
@@ -518,33 +537,47 @@ notarize, so revoking it breaks nothing else, whereas an app-specific password a
 | `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID` | *the other way:* an Apple ID and an app-specific password |
 | `TEAM_ID` | e.g. `38RJUJHKZS` |
 | `DMG_SIGN_IDENTITY`, `INSTALLER_IDENTITY` | the identity names, e.g. `Developer ID Application: Your Name (TEAMID)` |
-| `TAP_TOKEN` | *optional.* Fine-grained token with Contents: write on `xinbetween/homebrew-tap`, so the cask updates itself |
+
+All values above belong only to the `release` preparation environment. `TAP_TOKEN` is the sole secret in the separate
+`release-publish` environment: an optional fine-grained token with Contents: write on `xinbetween/homebrew-tap`. Never
+put certificates or notarization credentials in `release-publish`, and never put the tap token in `release`.
 
 ### What protects it
 
-A signing identity in GitHub Actions is a signing identity outside your Mac, so the release path is fenced in four
-ways. Each one is a setting on the repository; they aren't in this file, so this is also the record of what to
-check if the setup is ever rebuilt.
+A signing identity in GitHub Actions is a signing identity outside your Mac, so the release path is fenced in six
+ways. The repository settings among them are not stored in this file, so this is also the record of what to check if the
+setup is ever rebuilt.
 
-1. **The secrets live in the `release` environment, not the repository.** Only a job that declares
-   `environment: release` can read them. A workflow added to a branch cannot.
-2. **Only listed accounts can start a release.** The environment no longer waits for a click — a release by the
-   maintainer shouldn't need the maintainer to approve themselves. In its place the job refuses to run unless
-   `github.actor` is in `RELEASE_ACTORS` (a repository variable, `blessdyb` by default), so a tag pushed by
-   anyone else fails instead of producing a signed build. This is weaker than an approval: it trusts the account
-   rather than a person at the keyboard, so it stands on the account's own protection. Put the reviewers back
-   (Settings › Environments › release) if that trade stops being the right one.
-3. **The environment only accepts `v*` tags.** Its deployment branch policy is a single tag rule, so a run from a
-   branch — or from a tag with any other name — can't reach the secrets even with approval.
-4. **Release tags can't move.** A ruleset over `refs/tags/v*` blocks deletion, updates and force-pushes, so a
-   published tag always points at the commit that was reviewed. `main` is likewise protected from force-pushes
+1. **Signing secrets live only in `release`; publication credentials live only in `release-publish`.** The preparation
+   job has read-only Contents permission and cannot create a release. The publication job has no signing or Apple input,
+   and its static contract rejects any build, signing, provisioning, or notarization command.
+2. **Only listed accounts can start or rerun a release.** The environments do not need a self-approval click — a release
+   by the maintainer should not require the maintainer to approve themselves. In its place both jobs require
+   `github.actor` and `github.triggering_actor` to appear in `RELEASE_ACTORS` (a repository variable, `blessdyb` by
+   default). This also prevents an unlisted account from inheriting the original actor's authority by rerunning a job.
+   This is weaker than an approval: it trusts the allowed account rather than a person at the keyboard, so it stands on
+   that account's own protection. Put the reviewers back in Settings › Environments if that trade stops being right.
+3. **A trusted account authenticates the exact-head review receipt.** `RELEASE_REVIEWERS` is a repository variable
+   containing comma- or whitespace-separated GitHub logins. One of those logins, with owner/member/collaborator
+   association to this repository, must post the exact `Reviewed-Commit: <SHA>` line on the associated PR. Preparation
+   reads authenticated issue-comment metadata and retains its immutable ID and URL; a contributor-controlled PR body or
+   comment from any other account cannot satisfy this gate.
+4. **Both environments accept only `v*` tags.** Each deployment branch policy is a single tag rule, so a run from a
+   branch — or from a tag with any other name — cannot reach either credential set.
+5. **Only the designated release account can create release tags, and release tags can't move.** The active ruleset
+   over `refs/tags/v*` restricts creation with an always-bypass entry for the release account, then blocks deletion,
+   updates, and force-pushes for everyone. A collaborator therefore cannot tag attacker-controlled workflow content,
+   and a published tag always points at the commit that was reviewed. `main` is likewise protected from force-pushes
    and deletion.
+6. **Published releases are immutable.** Repository immutable releases are enabled. Draft assets remain replaceable
+   only while they are being verified; making the draft public locks the tag and assets. The retained Actions artifact
+   and GitHub attestations independently bind the same files to the source SHA.
 
-Third-party actions are pinned to a commit SHA rather than a moving tag, so a compromised action release can't
-change what runs here.
+Third-party actions are pinned to a commit SHA rather than a moving tag, so a compromised action release cannot change
+what runs here. Repository-enforced SHA pinning is also enabled; every current action uses a full commit SHA.
 
-**What's still true after all that.** Anyone who can approve a release can sign software as you, and anyone with
-admin access can change who that is — a compromise of the GitHub account is a compromise of the certificate. The
+**What's still true after all that.** Any allowed release account can cause CI to sign software as you, and anyone with
+admin access can change that allowlist or the environment controls — compromising either path compromises the certificate. The
 App Store Connect key only notarizes and can't sign, so rotating it is cheap; the Developer ID certificates are
 the ones that matter, and they're revocable in Apple's developer portal. If that trade is ever the wrong one, the
 local recipe above still works and the workflow can sit unused.

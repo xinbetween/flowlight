@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentazione</p>
     <h1>Usare Flowlight</h1>
-    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.17.3, macOS 15 o successivo.</p>
+    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.17.4, macOS 15 o successivo.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="In questa pagina">
@@ -99,7 +99,7 @@
         </div>
         <div class="toc-group">
           <strong>Controllo</strong>
-          <a href="#rules">Regole</a><a href="#allowlists">Elenchi consentiti</a>
+          <a href="#policies">Criteri</a><a href="#allowlists">Elenchi consentiti</a>
           <a href="#blocking">Rifiutare le connessioni</a><a href="#guardrails">Protezioni</a>
         </div>
         <div class="toc-group">
@@ -170,11 +170,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#alerts">Avvisi</a></td><td>⌘5</td><td>Tutto ciò che è sembrato insolito, con l'app, la destinazione e il numero che ha fatto scattare la regola.</td></tr>
         <tr><td><a href="#ask">Chiedi</a></td><td>⌘6</td><td>Domande sul tuo traffico in linguaggio naturale, a cui un modello locale o ospitato risponde a partire dalla cronologia registrata.</td></tr>
         <tr><td><a href="#inspection">Ispeziona</a></td><td>⌘7 · Developer ID</td><td>Opzionale: le richieste decifrate degli agenti che instradi attraverso Flowlight e le chiamate agli strumenti che le hanno prodotte. La ricerca entra nei corpi di richieste e risposte.</td></tr>
-        <tr><td><a href="#rules">Regole</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Ogni elenco consentiti e ogni rifiuto che hai impostato, cosa copre ciascuno e cosa ha fermato davvero.</td></tr>
-        <tr><td><a href="#sources">Origini</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Stato del Collector, canali dei dispositivi e copertura dei nomi in tre schede.</td></tr>
+        <tr><td><a href="#policies">Criteri</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Ogni criterio configurato, se è davvero effettivo e una cronologia unificata delle attività in sola lettura.</td></tr>
+        <tr><td><a href="#sources">Origini</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Stato e ripristino del Collector, canali facoltativi dei dispositivi e copertura in un'unica pagina operativa a scorrimento.</td></tr>
       </table>
-      <p>Le scorciatoie seguono l'ordine visibile della barra laterale. Le versioni Developer ID includono Ispeziona su ⌘7; quelle App Store lo omettono, quindi Regole e Origini passano a ⌘7 e ⌘8.</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=023b487c" loading="lazy"
+      <p>Le scorciatoie seguono l'ordine visibile della barra laterale. Le versioni Developer ID includono Ispeziona su ⌘7; quelle App Store lo omettono, quindi Criteri e Origini passano a ⌘7 e ⌘8.</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="La schermata In diretta: un elenco di applicazioni con le loro velocità attuali di invio e ricezione e la destinazione più trafficata."></div>
         <figcaption class="caption">In diretta, la schermata con cui Flowlight si apre.</figcaption></figure>
       <p>In Cronologia, passa il puntatore su una barra per aprire una scheda scorrevole che segue il cursore e mostra le app che hanno contribuito; le barre non ingrandiscono al clic. Fai doppio clic su una riga per limitare la cronologia a essa.</p>
@@ -404,16 +404,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         contattata: una simulazione cambia la risposta, non la possibilità di connettersi, quindi «l'API restituisce 500» funziona mentre «l'API
         è del tutto irraggiungibile» no.</p>
 
-      <h2 id="rules">Regole</h2>
-      <p>Un elenco consentiti è l'idea che un singolo agente ha di dove può andare. Una <strong>regola</strong> è la versione generale: indica un
+      <h2 id="policies"><span id="rules"></span>Criteri</h2>
+      <p><strong>Criteri</strong> riunisce in un solo inventario tutti i controlli che Flowlight può applicare: normali regole di consenso o blocco, elenchi consentiti
+        degli agenti, pacchetti gestiti e, dove è disponibile l'ispezione HTTPS, protezioni, simulazioni, riscritture delle richieste e trasformazioni delle
+        risposte. Ogni riga distingue lo stato configurato dall'effetto reale: applicazione attiva, sola segnalazione, monitoraggio, attesa, pianificato,
+        in pausa, esaurito, in corso di applicazione, revisione necessaria, non disponibile, incompatibile o non riuscito. Selezionando una riga si apre l'editor
+        contestuale responsabile di quel criterio; Criteri non sostituisce né confonde i distinti modelli di consenso e persistenza.</p>
+      <p>Un elenco consentiti è l'idea che un singolo agente ha di dove può andare. Una normale <strong>regola</strong> è la versione generale: indica un
         <strong>soggetto</strong> — un'app, un agente, una destinazione, un URL o una coppia di due di questi — e dice <strong>blocca</strong>
         o <strong>consenti</strong>. Fai clic con il tasto destro su una riga in In diretta, Cronologia, Agenti IA o Ispeziona per scriverne una su ciò che stai guardando;
-        tutte finiscono nello stesso editor della schermata <strong>Regole</strong>, perché una regola che entra in vigore fuori dalla vista
-        sarebbe una regola che non potresti più ritrovare.</p>
+        ognuna resta reperibile in Criteri e si apre nel proprio editor autorevole.</p>
       <p><strong>Modelli.</strong> Ventidue, in cinque gruppi: impedire a un agente di raggiungere i registri di pacchetti o altri
         provider di modelli, chiudere le vie più comuni per cui i dati escono (siti di paste, raccoglitori di webhook, servizi anonimi per caricare file, tunnel, DNS over
         HTTPS), analisi di prodotto e segnalazione degli arresti anomali, politiche sull'orario di lavoro, e il classico «blocca questo per un'ora mentre capisco
-        cos'è». Sfogliali dalla barra strumenti di Regole, oppure fai clic con il tasto destro su una riga in In diretta, Cronologia, Agenti IA o Ispeziona e
+        cos'è». Sfogliali dalla barra strumenti di Criteri, oppure fai clic con il tasto destro su una riga in In diretta, Cronologia, Agenti IA o Ispeziona e
         applicane uno a ciò che stai guardando.</p>
       <p>Ogni modello dice cosa farà prima di farlo. Tutto ciò che scrive più di una regola apre una scheda con l'elenco di ogni
         host e orario; tutto ciò che è permanente apre l'editor già compilato; e <strong>solo le regole che si annullano da sole</strong> — un'ora,
@@ -434,8 +438,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         l'indirizzo e la porta, nulla dei percorsi, e solo in modalità estensione. L'ispezione HTTPS rifiuta una singola richiesta, quindi può corrispondere a un
         URL e rispondere con uno stato che l'agente può leggere, invece di un socket morto senza spiegazioni. Il campionatore nettop non può
         rifiutare nulla. Una regola che la configurazione attuale non può applicare lo dice nell'elenco, invece di starsene lì con l'aria di essere in vigore.</p>
-      <p>Il secondo pannello è il <strong>flusso delle violazioni</strong>: ogni connessione decisa da una regola, con l'app, dove era diretta, quale
-        regola ha deciso e se si è trattato di un rifiuto o di un'eccezione che l'ha lasciata passare.</p>
+      <p>La seconda vista è <strong>Attività</strong>, in sola lettura: riunisce in un'unica cronologia le decisioni delle regole comuni, le violazioni degli elenchi consentiti,
+        gli eventi dei pacchetti gestiti e gli effetti distinti dei criteri di ispezione. Usa i record originali, ciascuno autorevole nel proprio ambito, invece di
+        riscrivere la cronologia in un unico modello generico di evento; le versioni Store omettono i tipi di criterio che dipendono dall'ispezione e le relative attività conservate.</p>
 
       <p><strong>Cosa avrebbe fatto.</strong> Una regola di blocco è facile da scrivere e spaventosa da attivare, perché la prima cosa
         che normalmente scopri di una regola così è che cosa ha rotto — e lo scopri dopo, da qualcosa che smette di funzionare altrove.
@@ -456,7 +461,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         testata su due ore di storico.</p>
 
       <h3 id="managed-packs">Pacchetti gestiti per pubblicità e tracker</h3>
-      <p><strong>Regole › Pacchetti</strong> contiene tre elenchi ufficiali di nomi host: <strong>Pubblicità</strong>, <strong>Tracciamento tra siti</strong> e <strong>Privacy e telemetria</strong>. Sono visibili fin dall’inizio e tutti disattivati per impostazione predefinita. Il blocco richiede l’Estensione di rete; il campionatore nettop può solo osservare.</p>
+      <p><strong>Criteri › Pacchetti gestiti</strong> contiene tre elenchi ufficiali di nomi host: <strong>Pubblicità</strong>, <strong>Tracciamento tra siti</strong> e <strong>Privacy e telemetria</strong>. Sono visibili fin dall’inizio e tutti disattivati per impostazione predefinita. Il blocco richiede l’Estensione di rete; il campionatore nettop può solo osservare.</p>
       <p><strong>Solo aggiornamenti ufficiali e firmati.</strong> Flowlight controlla un’unica fonte HTTPS fissa per trovare cataloghi più recenti firmati dall’editore. I controlli automatici sono attivi per impostazione predefinita e possono essere disattivati qui. Una firma autentica il contenuto, ma non lo attiva: un nuovo pacchetto resta disattivato e, se cambiano le destinazioni, l’applicazione di un pacchetto attivo viene sospesa finché non esamini l’esatta nuova versione e premi Salva. Durante un’interruzione, i contenuti accettati possono restare disponibili come ultima versione valida nota, visibilmente indicata come obsoleta. Si tratta di blocchi di rete a livello di nome host: non possono eliminare spazi vuoti nel DOM o nel layout, sovrapposizioni del browser, popup generati da script o finestre di app native.</p>
       <p>Quando l’ispezione HTTPS instrada un’app attraverso il proxy di Flowlight, questo decide le normali regole di destinazione e i pacchetti gestiti attivi usando l’identità originale dell’app prima di aprire qualsiasi connessione al server di origine. Per i tunnel CONNECT con pinning o mai decifrati, ciò funziona in base al nome host; gli elenchi consentiti degli agenti restano limitati al percorso diretto attraverso l’Estensione di rete. Se il proprietario o il nome host è sconosciuto, la connessione viene consentita.</p>
 
@@ -505,7 +510,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Questa non è una sandbox.</strong> Uno strumento rifiutato non viene più offerto e non riceve più risposta. Un agente che ha ancora una
         shell può fare a mano ciò che avrebbe fatto lo strumento. Flowlight lo registra; non pretende di impedirlo.</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Origini: Collector e motori</h2>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Origini: Collector, dispositivi e copertura</h2>
+      <p><strong>Origini</strong> è un'unica pagina operativa a scorrimento: prima il Collector, poi Dispositivi e Copertura come sezioni chiaramente
+        contrassegnate. Gli avvisi di stato, le risposte di Chiedi, le finestre ripristinate e i collegamenti usati per gli screenshot scorrono fino alla sezione pertinente
+        e la mettono brevemente in evidenza senza nascondere le altre.</p>
       <p>Flowlight registra il traffico in uno di due modi, da scegliere in <strong>Origini › Collector</strong>. Differiscono per ciò che possono perdere, e vale
         la pena capirlo prima di affidarsi all'uno o all'altro.</p>
       <table>
@@ -703,7 +711,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>Con la finestra chiusa Flowlight fa quasi nulla: mantiene le velocità nella barra dei menu e scrive una riga al secondo. L'estensione di rete
           costa meno del campionatore di riserva, che avvia un breve processo <code>nettop</code> ogni secondo.</dd>
         <dt><strong>Può bloccare le connessioni?</strong></dt>
-        <dd>Sì, con l'estensione di rete. L'elenco consentiti di un agente può rifiutare oltre che avvisare, una <a href="#rules">regola</a> può bloccare un'app,
+        <dd>Sì, con l'estensione di rete. L'elenco consentiti di un agente può rifiutare oltre che avvisare, una <a href="#policies">regola</a> può bloccare un'app,
           una destinazione o un URL per il tempo che dici tu, e una <a href="#guardrails">protezione</a> può togliere uno strumento a un agente
           prima che venga offerto al suo modello. Nulla blocca finché non glielo chiedi, e ogni rifiuto porta con sé la sua via d'uscita.</dd>
         <dt><strong>Mi serve l'estensione di rete?</strong></dt>
@@ -758,7 +766,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versione 0.17.3 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+      <span>Versione 0.17.4 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
     </div>
   </div>
 </footer>

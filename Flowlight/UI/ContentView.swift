@@ -92,7 +92,7 @@ struct ContentView: View {
                     InspectView()
                     #endif
                 case .ask: AskView()
-                case .sources: SourcesView(selection: $nav.sourcesTab)
+                case .sources: SourcesView(selection: $nav.sourcesTab, requestID: nav.sourcesRequestID)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

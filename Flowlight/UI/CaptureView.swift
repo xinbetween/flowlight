@@ -1,177 +1,81 @@
 import SwiftUI
 
-/// Pure recovery-state decisions keep the Sources checklist honest and easy to exercise without constructing views.
-enum SourceSetupPolicy {
-    enum CoverageHealth: Equatable { case empty, good, warning }
-
-    static func coverageHealth(named: Double, hasTraffic: Bool) -> CoverageHealth {
-        guard hasTraffic else { return .empty }
-        return named > 0.8 ? .good : .warning
-    }
-
-    static func collectorConfigured(mode: CaptureMode, extensionState: ExtensionManager.State,
-                                    extensionFellBack: Bool) -> Bool {
-        if mode == .nettop { return true }
-        return extensionState == .enabled && !extensionFellBack
-    }
-
-    static func setupComplete(mode: CaptureMode, extensionState: ExtensionManager.State,
-                              extensionFellBack: Bool, isReceiving: Bool) -> Bool {
-        collectorConfigured(mode: mode, extensionState: extensionState,
-                            extensionFellBack: extensionFellBack) && isReceiving
-    }
-}
-
-/// Collector setup, device channels and coverage belong to one operational destination. The compact health strip
-/// answers "is Flowlight working?" before someone has to know which of the three tabs contains the recovery action.
+/// Collector setup, device channels and coverage form one operational document. A requested section is a scroll
+/// target, not a visibility filter: links and restored windows establish context while the full workflow remains.
 struct SourcesView: View {
     @Binding var selection: SourcesTab
-    @EnvironmentObject var monitor: TrafficMonitor
-    @EnvironmentObject var extensionManager: ExtensionManager
+    var requestID: UUID
+    @AccessibilityFocusState private var accessibilityFocus: SourcesTab?
+    @State private var highlightedSection: SourcesTab?
+    @State private var focusGeneration = UUID()
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker(L("Sources"), selection: $selection) {
-                    ForEach(SourcesTab.allCases) { tab in Text(tab.title).tag(tab) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 32) {
+                    sourcesSection(.collector,
+                                   icon: "antenna.radiowaves.left.and.right",
+                                   detail: L("Choose the traffic source and verify that data is arriving.")) {
+                        CaptureView(embedded: true)
+                    }
+                    sourcesSection(.devices,
+                                   icon: "dot.radiowaves.left.and.right",
+                                   detail: L("Choose which local device channels Flowlight watches.")) {
+                        DevicesView(embedded: true)
+                    }
+                    sourcesSection(.coverage,
+                                   icon: "circle.dashed.inset.filled",
+                                   detail: L("Check what Flowlight can name, attribute, and inspect.")) {
+                        CoverageView(embedded: true)
+                    }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 420)
-
-                HStack(spacing: 10) {
-                    healthCard(.collector, icon: "antenna.radiowaves.left.and.right",
-                               title: L("Collector"), detail: collectorDetail,
-                               tint: monitor.isReceiving ? FL.good : FL.warning)
-                    healthCard(.coverage, icon: "circle.dashed.inset.filled",
-                               title: L("Coverage"), detail: coverageDetail,
-                               tint: coverageTint)
-                    healthCard(.devices, icon: "dot.radiowaves.left.and.right",
-                               title: L("Devices"), detail: deviceDetail,
-                               tint: monitor.devices.isWatchingAnything ? FL.good : .secondary)
-                }
-
-                if !sourceSetupComplete { sourceRecoveryChecklist }
+                .padding(Measure.gutter)
             }
-            .padding(.horizontal, Measure.gutter)
-            .padding(.vertical, 12)
-            .background(.bar)
-            .overlay(alignment: .bottom) { Divider() }
-
-            Group {
-                switch selection {
-                case .collector: CaptureView()
-                case .devices: DevicesView()
-                case .coverage: CoverageView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task { focus(selection, in: proxy) }
+            .onChange(of: selection) { _, section in focus(section, in: proxy) }
+            .onChange(of: requestID) { focus(selection, in: proxy) }
         }
         .navigationTitle(L("Sources"))
-        .navigationSubtitle(selection.title)
     }
 
-    private var collectorDetail: String {
-        if monitor.extensionFellBack {
-            #if APP_STORE
-            // The Store product has no sampler fallback; its fail-closed source is unavailable, not nettop.
-            return L("Nothing is arriving")
-            #else
-            return L("nettop sampler")
-            #endif
-        }
-        return monitor.isReceiving ? L("Data is arriving") : L("Nothing is arriving")
-    }
-
-    private var coverageHealth: SourceSetupPolicy.CoverageHealth {
-        SourceSetupPolicy.coverageHealth(named: monitor.coverage.named,
-                                         hasTraffic: monitor.coverage.hasTraffic)
-    }
-
-    private var coverageDetail: String {
-        guard coverageHealth != .empty else { return L("Nothing recorded in the last hour") }
-        return "\(monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))) \(L("Named"))"
-    }
-
-    private var coverageTint: Color {
-        switch coverageHealth {
-        case .empty: return .secondary
-        case .good: return FL.good
-        case .warning: return FL.warning
-        }
-    }
-
-    private var deviceDetail: String {
-        guard monitor.devices.isWatchingAnything else { return L("Not watching") }
-        var channels: [String] = []
-        if monitor.devices.watchingBluetooth { channels.append(L("Bluetooth")) }
-        if monitor.devices.watchingUSB { channels.append(L("USB")) }
-        if monitor.devices.watchingCamera { channels.append(L("Camera")) }
-        return channels.joined(separator: " · ")
-    }
-
-    private var collectorConfigured: Bool {
-        SourceSetupPolicy.collectorConfigured(mode: monitor.mode, extensionState: extensionManager.state,
-                                              extensionFellBack: monitor.extensionFellBack)
-    }
-
-    private var sourceSetupComplete: Bool {
-        SourceSetupPolicy.setupComplete(mode: monitor.mode, extensionState: extensionManager.state,
-                                        extensionFellBack: monitor.extensionFellBack,
-                                        isReceiving: monitor.isReceiving)
-    }
-
-    /// A short recovery path stays beside the source status. It reports completed steps instead of presenting one
-    /// generic error, and the action opens the one place where every unfinished step can be repaired.
-    private var sourceRecoveryChecklist: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(monitor.isReceiving ? L("Collector") : L("Nothing is arriving"))
-                    .font(.caption.weight(.semibold))
-                checklistRow(monitor.mode == .networkExtension ? L("Network Extension") : L("nettop sampler"),
-                             complete: collectorConfigured)
-                checklistRow(L("Data is arriving"), complete: monitor.isReceiving)
-            }
-            Spacer(minLength: 8)
-            Button { selection = .collector } label: {
-                Label(L("Collector"), systemImage: "chevron.right")
-                    .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .padding(10)
-        .background(FL.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(FL.warning.opacity(0.25)))
-    }
-
-    private func checklistRow(_ title: String, complete: Bool) -> some View {
-        Label(title, systemImage: complete ? "checkmark.circle.fill" : "circle")
-            .font(.caption)
-            .foregroundStyle(complete ? FL.good : .secondary)
-    }
-
-    private func healthCard(_ tab: SourcesTab, icon: String, title: String,
-                            detail: String, tint: Color) -> some View {
-        Button { selection = tab } label: {
-            HStack(alignment: .top, spacing: 9) {
+    private func sourcesSection<Content: View>(_ section: SourcesTab, icon: String, detail: String,
+                                               @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 10) {
                 Image(systemName: icon)
-                    .foregroundStyle(tint)
-                    .frame(width: 22, height: 22)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.caption.weight(.semibold))
-                    Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.title3)
+                    .foregroundStyle(FL.accent)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(section.title).font(.title2.weight(.semibold))
+                    Text(detail).font(.callout).foregroundStyle(.secondary).prose()
                 }
-                Spacer(minLength: 0)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selection == tab ? FL.accent.opacity(0.10) : Color.secondary.opacity(0.07),
+            .padding(8)
+            .background(highlightedSection == section ? FL.accent.opacity(0.12) : .clear,
                         in: RoundedRectangle(cornerRadius: 9))
-            .contentShape(Rectangle())
+            .accessibilityFocused($accessibilityFocus, equals: section)
+
+            content()
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selection == tab ? .isSelected : [])
+        .id(section.anchorID)
+    }
+
+    @MainActor
+    private func focus(_ section: SourcesTab, in proxy: ScrollViewProxy) {
+        selection = section
+        proxy.scrollTo(section.anchorID, anchor: .top)
+        accessibilityFocus = section
+        highlightedSection = section
+
+        let generation = UUID()
+        focusGeneration = generation
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.4))
+            guard focusGeneration == generation else { return }
+            highlightedSection = nil
+        }
     }
 }
 
@@ -182,6 +86,7 @@ struct SourcesView: View {
 /// explanations are all still here and all still true, but they are not what someone opens this panel for, so they
 /// sit behind a summary row instead of in front of the controls.
 struct CaptureView: View {
+    var embedded = false
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var extensionManager: ExtensionManager
     @State private var showExtensionSetup = false
@@ -198,27 +103,32 @@ struct CaptureView: View {
         monitor.mode == .networkExtension || showExtensionSetup
     }
 
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                statusCard
-                CaptureWarningBanner()
-                if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
-                sourceSection
-                filterSection
+    @ViewBuilder var body: some View {
+        if embedded {
+            content
                 #if !APP_STORE
-                if monitor.mode == .nettop { HostnameSection() }
+                // Which other content filters exist decides whether ours can work at all, so it's read on arrival.
+                .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
                 #endif
-            }
-            // A settings panel is read, not scanned, and a line of prose stretched across a maximised window is
-            // unreadable. The column stops at a comfortable measure and stays against the sidebar rather than
-            // floating in the middle of the window.
-            .padding(Measure.gutter)
+        } else {
+            ScrollView { content.padding(Measure.gutter) }
+                #if !APP_STORE
+                .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
+                #endif
         }
-        #if !APP_STORE
-        // Which other content filters exist decides whether ours can work at all, so it's read when the screen opens.
-        .task { otherFilters = SystemExtensionScan.competingFilters(in: await SystemExtensionScan.read()) }
-        #endif
+    }
+
+    private var content: some View {
+        LazyVStack(alignment: .leading, spacing: 18) {
+            statusCard
+            CaptureWarningBanner()
+            if !otherFilters.isEmpty { OtherFiltersNotice(filters: otherFilters) }
+            sourceSection
+            filterSection
+            #if !APP_STORE
+            if monitor.mode == .nettop { HostnameSection() }
+            #endif
+        }
     }
 
     // MARK: Source

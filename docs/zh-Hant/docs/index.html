@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">說明文件</p>
     <h1>使用 Flowlight</h1>
-    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.17.3，macOS 15 或以上版本。</p>
+    <p class="lede">從第一次啟動到調整代理規則，全都在這裡。Flowlight 0.17.4，macOS 15 或以上版本。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="本頁內容">
@@ -99,7 +99,7 @@
         </div>
         <div class="toc-group">
           <strong>管控</strong>
-          <a href="#rules">規則</a><a href="#allowlists">允許清單</a>
+          <a href="#policies">政策</a><a href="#allowlists">允許清單</a>
           <a href="#blocking">拒絕連線</a><a href="#guardrails">防護機制</a>
         </div>
         <div class="toc-group">
@@ -169,11 +169,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#alerts">警示</a></td><td>⌘5</td><td>所有看起來不尋常的事，附上 App、目標，以及觸發規則的那個數字。</td></tr>
         <tr><td><a href="#ask">提問</a></td><td>⌘6</td><td>用平常的話問你自己的流量，由本機模型或託管模型從記錄下來的歷史裡作答。</td></tr>
         <tr><td><a href="#inspection">檢查</a></td><td>⌘7 · Developer ID</td><td>選用：你轉送經過 Flowlight 的代理，其解密後的請求，以及背後的工具呼叫。搜尋也會查進請求與回應的內文。</td></tr>
-        <tr><td><a href="#rules">規則</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>你設過的每一條允許清單和拒絕，各自管到哪裡，以及實際攔下了什麼。</td></tr>
-        <tr><td><a href="#sources">來源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>在三個分頁中顯示收集器狀態、裝置頻道與命名涵蓋範圍。</td></tr>
+        <tr><td><a href="#policies">政策</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>每項已設定的政策、是否真的生效，以及整合後的唯讀活動記錄。</td></tr>
+        <tr><td><a href="#sources">來源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>收集器狀態與復原、選用的裝置通道和涵蓋範圍，集中在一張可捲動的操作頁面中。</td></tr>
       </table>
-      <p>快速鍵遵循可見的側邊欄順序。Developer ID 版本在 ⌘7 包含「檢查」；App Store 版本省略它，因此「規則」與「來源」會移到 ⌘7 和 ⌘8。</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=023b487c" loading="lazy"
+      <p>快速鍵遵循可見的側邊欄順序。Developer ID 版本在 ⌘7 包含「檢查」；App Store 版本省略它，因此「政策」與「來源」會移到 ⌘7 和 ⌘8。</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="即時畫面：一列 App，各自帶著目前的傳送與接收速率，以及最忙的目標。"></div>
         <figcaption class="caption">即時，Flowlight 開啟時的那個畫面。</figcaption></figure>
       <p>在「歷史」中，把指標移到長條上，就會開啟一張跟隨指標、可捲動的卡片，列出貢獻流量的 App；點選長條不會放大。任一列雙按可把歷史縮小到那一列。</p>
@@ -211,7 +211,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         一組，每個網域都標明是從這四種裡的哪一種知道的。帶著好幾個標籤的網域，是比只帶一個標籤更強的事實：設定檔裡寫了<em>而且</em>確實連過，
         比其中任何一項單獨說得更多；只被設定過的網域從來沒有被連上，而只被觀察到的網域從來沒有寫在任何你本來可以讀到的地方。</p>
       <p>每個網域提供兩種拒絕：<strong>「對這個代理」</strong>，涵蓋該代理以及它啟動的工具；或是<strong>「在所有地方」</strong>，涵蓋這台 Mac 上的
-        每一個 App。兩者寫下的都是普通規則，所以<strong>「違規紀錄」</strong>會報告它們，規則編輯器會解釋它們 — 而且正因為它們是普通規則，
+        每一個 App。兩者寫下的都是普通規則，所以<strong>「活動」</strong>會報告它們，規則編輯器會解釋它們 — 而且正因為它們是普通規則，
         編輯器裡的模擬會在你把它打開之前告訴你，它本來會拒絕掉什麼。</p>
       <p>有一類網域沒有按鈕。模型供應商自己去連的連接器 — 在請求內文裡聲明，從供應商那一側連過去 — 根本不會碰到這台 Mac，所以這裡的
         任何規則都碰不到它。那一列會把這件事說出來，而不是遞給你一個默默什麼都不做的拒絕。如果同一個主機在本機也有設定，或者
@@ -378,16 +378,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         會被連線：模擬改變的是答案，而不是連線能不能建立，所以「API 回傳 500」做得到，「API
         完全連不上」則做不到。</p>
 
-      <h2 id="rules">規則</h2>
-      <p>允許清單講的是某一個代理可以去哪裡。<strong>規則</strong>是它的通用版本：它會指名一個
+      <h2 id="policies"><span id="rules"></span>政策</h2>
+      <p><strong>政策</strong>集中列出 Flowlight 能套用的所有管控：一般的允許或封鎖規則、代理允許清單、受管理套件，以及在支援 HTTPS 檢查時的防護機制、模擬回應、請求改寫和回應轉換。每一列都會區分設定狀態與實際效果：生效、僅回報、監看、等待、已排程、暫停、已用完、正在套用、需要檢閱、無法使用、不相容或失敗。選取一列會開啟負責該政策的對應編輯器；「政策」不會取代或混淆這些功能各自獨立的授權與持久化方式。</p>
+      <p>允許清單講的是某一個代理可以去哪裡。一般<strong>規則</strong>是它的通用版本：它會指名一個
         <strong>對象</strong> — 一個 App、一個代理、一個目標、一個 URL，或其中兩者的組合 — 然後說<strong>封鎖</strong>
         或<strong>允許</strong>。在「即時」、「歷史」、「AI 代理」或「檢查」的任一列上按右鍵，就能針對你正在看的東西寫一條；
-        每一條都會進到<strong>「規則」</strong>畫面的同一個編輯器，因為在你看不到的地方生效的規則，
-        會是一條你再也找不到的規則。</p>
+        每條規則都能在「政策」中找到，並會在其權威編輯器中開啟。</p>
       <p><strong>範本。</strong>共二十二個，分成五組 — 阻止代理連到套件登錄或其他
         模型供應商、關上資料外流的常見途徑（貼文網站、webhook 接收器、匿名檔案上傳、通道、DNS over
         HTTPS）、產品分析與當掉回報、工作時段政策，以及一次性的「先封鎖一小時，讓我弄清楚
-        這是什麼」。你可以從「規則」工具列瀏覽它們，或在「即時」、「歷史」、「AI 代理」或「檢查」的任一列上按右鍵，
+        這是什麼」。你可以從「政策」工具列瀏覽它們，或在「即時」、「歷史」、「AI 代理」或「檢查」的任一列上按右鍵，
         把範本套用到你正在看的東西上。</p>
       <p>每個範本都會在動手之前先說明它要做什麼。會寫入多條規則的，會開一張卡片列出每一台
         主機和時程；任何永久性的，會開啟已預先填好的編輯器；而<strong>只有會自己失效的規則</strong> —
@@ -408,8 +408,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         位址和連接埠，但完全不知道路徑，而且只在延伸功能模式下有效。HTTPS 檢查拒絕的是單一請求，所以它能比對
         URL，並回覆一個代理讀得懂的狀態，而不是一個莫名死掉的 socket。nettop 取樣器完全無法
         拒絕任何東西。目前的設定執行不了的規則，會在列表中說明這一點，而不是擺在那裡看起來像已生效。</p>
-      <p>第二個標籤頁是<strong>違規紀錄</strong>：每一條由規則決定的連線，包含 App、它要去哪裡、是哪一條
-        規則決定的，以及那是一次拒絕，還是一個放行的例外。</p>
+      <p>第二個畫面是唯讀的<strong>活動</strong>：一般規則判定、允許清單違規、受管理套件事件，以及各類檢查政策的效果，都依時間排列在一起。它會轉接現有的權威記錄，而不是把歷史改寫成一種籠統的事件模型；App Store 版本會省略依賴檢查的政策類型及其保留的活動。</p>
 
       <p><strong>它本來會做什麼。</strong>封鎖的規則寫起來容易，打開卻令人害怕，因為你通常最先知道的是它
         弄壞了什麼 — 而且是後來才知道，從別處某個東西失敗上知道的。規則編輯器先回答這個問題：它拿記錄
@@ -427,7 +426,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         它能看到的最早的流量：一條只對照了兩小時歷史的規則，就是只對照了兩小時歷史。</p>
 
       <h3 id="managed-packs">受管理的廣告與追蹤器套件</h3>
-      <p><strong>規則 › 套件</strong>包含三個官方主機名稱清單：<strong>廣告</strong>、<strong>跨網站追蹤</strong>和<strong>隱私權與遙測</strong>。它們從一開始便可見，且預設全部關閉。封鎖功能需要網路延伸功能；nettop 取樣器只能觀察。</p>
+      <p><strong>政策 › 受管理套件</strong>包含三個官方主機名稱清單：<strong>廣告</strong>、<strong>跨網站追蹤</strong>和<strong>隱私權與遙測</strong>。它們從一開始便可見，且預設全部關閉。封鎖功能需要網路延伸功能；nettop 取樣器只能觀察。</p>
       <p><strong>僅限官方簽署的更新。</strong> Flowlight 會檢查一個固定的 HTTPS 來源，以尋找由發佈者簽署的新版目錄。自動檢查預設開啟，可在此處關閉。簽章可驗證內容，但不會啟用內容：新套件會保持關閉；如果目的地有所變更，已啟用的套件將停止執行，直到你檢閱確切的新版本並按下儲存。服務中斷期間，已接受的內容可能會繼續保留為已知正常的最後版本，並明確顯示為已過時。這些是主機名稱層級的網路封鎖，無法移除 DOM 或版面配置中的空白、瀏覽器覆疊層、由指令碼產生的彈出式視窗或原生應用程式視窗。</p>
       <p>當 HTTPS 檢查將 App 轉送經過 Flowlight 的代理伺服器時，一般目的地規則和已啟用的受管理套件會在開啟任何來源伺服器連線之前，使用原 App 的身分作出判定。對於使用憑證綁定或始終不解密的 CONNECT 通道，這項判定會按主機名稱進行；代理的允許清單仍只適用於直接經過網路延伸功能的路徑。如果擁有者或主機名稱未知，則會允許連線。</p>
 
@@ -476,7 +475,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>這不是沙箱。</strong>被拒絕的工具不會再被提供，也不會再得到回應。但仍然有
         shell 的代理，可以自己動手做那個工具原本要做的事。Flowlight 會把那件事記錄下來；它不會假裝自己能阻止。</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>來源：收集器與引擎</h2>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>來源：收集器、裝置與涵蓋範圍</h2>
+      <p><strong>來源</strong>是一張可捲動的操作頁面：先是收集器，接著是標題清楚的裝置與涵蓋範圍區段。狀態通知、提問答案、還原後的視窗和螢幕截圖連結都會捲動到相關區段並短暫標示，同時不隱藏其他內容。</p>
       <p>Flowlight 用兩種方式之一記錄流量，在<strong>「來源 › 收集器」</strong>中選擇。兩者會漏掉的東西不同，在你倚賴
         任何一種之前，值得先了解。</p>
       <table>
@@ -662,7 +662,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>視窗關著時，Flowlight 幾乎什麼都不做：只維持選單列上的速率，並每秒寫入一列資料。網路延伸功能
           比備用的取樣器更省，後者每秒都會啟動一個短命的 <code>nettop</code> 程序。</dd>
         <dt><strong>它能封鎖連線嗎？</strong></dt>
-        <dd>可以，搭配網路延伸功能。代理的允許清單除了警示也能拒絕，<a href="#rules">規則</a>可以封鎖一個 App、
+        <dd>可以，搭配網路延伸功能。代理的允許清單除了警示也能拒絕，<a href="#policies">規則</a>可以封鎖一個 App、
           一個目標或一個 URL，時間長短由你決定，而<a href="#guardrails">防護機制</a>可以在工具送到模型面前之前，
           先把它從代理手上拿走。在你要求之前不會封鎖任何東西，而每一次拒絕都帶著它的退路。</dd>
         <dt><strong>我一定要用網路延伸功能嗎？</strong></dt>
@@ -717,7 +717,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 貢獻者。Flowlight 是自由軟體，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 發布。</span>
-      <span>版本 0.17.3 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
+      <span>版本 0.17.4 · 與 Apple 及本站提及的任何 AI 供應商均無關聯。</span>
     </div>
   </div>
 </footer>

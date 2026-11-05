@@ -724,8 +724,6 @@
 "Seen as it happened, named, and readable." = "Seen as it happened, named, and readable.";
 
 /* UI/DevicesView.swift */
-"USB" = "USB";
-"Not watching" = "Not watching";
 "Read the device list again now (⌘R)" = "Read the device list again now (⌘R)";
 "Watch Bluetooth" = "Watch Bluetooth";
 "Watch USB and external storage" = "Watch USB and external storage";
@@ -1166,13 +1164,8 @@
 "Edit as normal rule…" = "Edit as normal rule…";
 
 /* UI/RulesView.swift */
-"Packs" = "Packs";
-"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts.";
 "Managed packs" = "Managed packs";
-"What they did" = "What they did";
 "Paused until %@" = "Paused until %@";
-"%lld in force" = "%lld in force";
-"%1$lld of %2$lld in force" = "%1$lld of %2$lld in force";
 "Templates" = "Templates";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "Rules worth having, grouped by what they are for, with the hosts already written out";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "Write a rule: an app, an agent, a destination or a URL, blocked or allowed";
@@ -1186,8 +1179,6 @@
 "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off.";
-"In force" = "In force";
-"Not in force" = "Not in force";
 "Nothing is being refused until %@." = "Nothing is being refused until %@.";
 "Resume now" = "Resume now";
 "No rules yet" = "No rules yet";
@@ -1197,7 +1188,6 @@
 "Nothing yet" = "Nothing yet";
 "Today" = "Today";
 "Yesterday" = "Yesterday";
-"A rule since deleted" = "A rule since deleted";
 "Edit…" = "Edit…";
 "Reset Count" = "Reset Count";
 "Delete" = "Delete";
@@ -1886,3 +1876,70 @@
 "Restart or reinstall the filter to finish the update" = "Restart or reinstall the filter to finish the update";
 "Return to the previous history scope" = "Return to the previous history scope";
 "Selected" = "Selected";
+
+/* 0.17.4 unified policies and sources */
+"Policies" = "Policies";
+"Activity" = "Activity";
+"Choose the traffic source and verify that data is arriving." = "Choose the traffic source and verify that data is arriving.";
+"Choose which local device channels Flowlight watches." = "Choose which local device channels Flowlight watches.";
+"Check what Flowlight can name, attribute, and inspect." = "Check what Flowlight can name, attribute, and inspect.";
+"Network rules" = "Network rules";
+"Agent allowlists" = "Agent allowlists";
+"Agent guardrails" = "Agent guardrails";
+"Request rewrites" = "Request rewrites";
+"Response transforms" = "Response transforms";
+"In effect" = "In effect";
+"Reporting only" = "Reporting only";
+"Waiting" = "Waiting";
+"Unavailable" = "Unavailable";
+"Not applying" = "Not applying";
+"HTTPS inspection is off." = "HTTPS inspection is off.";
+"HTTPS inspection is not running." = "HTTPS inspection is not running.";
+"This policy is switched off." = "This policy is switched off.";
+"This rule is switched off." = "This rule is switched off.";
+"Network blocking is paused." = "Network blocking is paused.";
+"This one-off rule has already been used." = "This one-off rule has already been used.";
+"This rule is outside its scheduled time." = "This rule is outside its scheduled time.";
+"Every destination" = "Every destination";
+"No listed destinations" = "No listed destinations";
+"1 listed destination" = "1 listed destination";
+"%lld listed destinations" = "%lld listed destinations";
+"This allowlist is switched off." = "This allowlist is switched off.";
+"Unlisted destinations raise alerts but are not blocked." = "Unlisted destinations raise alerts but are not blocked.";
+"Blocking is unavailable; unlisted destinations still raise alerts." = "Blocking is unavailable; unlisted destinations still raise alerts.";
+"Review the changed pack before it can keep applying." = "Review the changed pack before it can keep applying.";
+"This pack is switched off." = "This pack is switched off.";
+"The pack is matching destinations but cannot block them here." = "The pack is matching destinations but cannot block them here.";
+"The pack is waiting for the active filter to apply it." = "The pack is waiting for the active filter to apply it.";
+"The managed-pack engine is not applying this configuration." = "The managed-pack engine is not applying this configuration.";
+"No longer in the official catalog" = "No longer in the official catalog";
+"Blocking stopped automatically. Acknowledge this change after review." = "Blocking stopped automatically. Acknowledge this change after review.";
+"Every agent" = "Every agent";
+"A policy since deleted" = "A policy since deleted";
+"%@ · %lld connections" = "%@ · %lld connections";
+"%lld policies · none currently effective" = "%lld policies · none currently effective";
+"%1$lld policies · %2$lld currently effective" = "%1$lld policies · %2$lld currently effective";
+"Everything Flowlight can apply" = "Everything Flowlight can apply";
+"Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent." = "Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent.";
+"Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent." = "Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent.";
+"%lld destinations · %@" = "%lld destinations · %@";
+"every app" = "every app";
+"Official · pack v%@ · %@" = "Official · pack v%@ · %@";
+"Flowlight · signer %@" = "Flowlight · signer %@";
+"Catalog" = "Catalog";
+"Sequence %1$lld · digest %2$@" = "Sequence %1$lld · digest %2$@";
+"Last verified" = "Last verified";
+"Next check" = "Next check";
+"Official catalog details" = "Official catalog details";
+"Not checked" = "Not checked";
+"Verified" = "Verified";
+"Stale" = "Stale";
+"Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records." = "Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records.";
+"Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records." = "Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records.";
+"Blocked connection or request" = "Blocked connection or request";
+"Blocked by a managed pack" = "Blocked by a managed pack";
+"Outside an agent allowlist" = "Outside an agent allowlist";
+"Capability removed by a guardrail" = "Capability removed by a guardrail";
+"Answered by a mock" = "Answered by a mock";
+"Request changed before sending" = "Request changed before sending";
+"Response changed before delivery" = "Response changed before delivery";

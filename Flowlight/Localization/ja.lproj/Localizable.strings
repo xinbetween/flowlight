@@ -752,8 +752,6 @@
 "Seen as it happened, named, and readable." = "発生した時点で見えており、名前も付き、中身も読めています。";
 
 /* UI/DevicesView.swift */
-"USB" = "USB";
-"Not watching" = "監視していません";
 "Read the device list again now (⌘R)" = "デバイスのリストをいま読み直します（⌘R）";
 "Watch Bluetooth" = "Bluetooth を監視";
 "Watch USB and external storage" = "USB と外部ストレージを監視";
@@ -1234,13 +1232,8 @@
 "Edit as normal rule…" = "通常のルールとして編集…";
 
 /* UI/RulesView.swift */
-"Packs" = "パック";
-"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "ルールの判断とパックによるブロックの要約がここに表示されます。広告だらけのページがアラートだらけにならないよう、パックのアクティビティはまとめられます。";
 "Managed packs" = "管理対象パック";
-"What they did" = "判断の記録";
 "Paused until %@" = "%@ まで一時停止中";
-"%lld in force" = "%lld 件が有効";
-"%1$lld of %2$lld in force" = "%2$lld 件中 %1$lld 件が有効";
 "Templates" = "テンプレート";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "用意しておく価値のあるルールを用途別にまとめました。ホストはすでに書き込まれています";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "ルールを作成します。アプリ、エージェント、接続先、URL のいずれかを、ブロックまたは許可します";
@@ -1254,8 +1247,6 @@
 "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld 件のルールは監視されているだけで、実行されていません。データ経路に入って接続を拒否できるのはネットワーク機能拡張だけで、nettop サンプラーは事後にトラフィックを数えます。これらのルールを実行するには、ソース › コレクターでネットワーク機能拡張を選んでください。";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "1 件のルールは監視されているだけで、実行されていません。パスを指定したルールを照合できるのは HTTPS インスペクションだけで、それがオフになっています。";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld 件のルールは監視されているだけで、実行されていません。パスを指定したルールを照合できるのは HTTPS インスペクションだけで、それがオフになっています。";
-"In force" = "有効";
-"Not in force" = "無効";
 "Nothing is being refused until %@." = "%@ まで、何も拒否しません。";
 "Resume now" = "今すぐ再開";
 "No rules yet" = "ルールがありません";
@@ -1265,7 +1256,6 @@
 "Nothing yet" = "まだ何もありません";
 "Today" = "今日";
 "Yesterday" = "昨日";
-"A rule since deleted" = "すでに削除されたルール";
 "Edit…" = "編集…";
 "Reset Count" = "カウントをリセット";
 "Delete" = "削除";
@@ -1887,3 +1877,70 @@
 "Restart or reinstall the filter to finish the update" = "フィルタのアップデートを完了するには再起動または再インストールしてください";
 "Return to the previous history scope" = "前の履歴範囲に戻る";
 "Selected" = "選択中";
+
+/* 0.17.4 unified policies and sources */
+"Policies" = "ポリシー";
+"Activity" = "アクティビティ";
+"Choose the traffic source and verify that data is arriving." = "トラフィックソースを選択し、データが届いていることを確認します。";
+"Choose which local device channels Flowlight watches." = "Flowlight が監視するローカルデバイスのチャンネルを選択します。";
+"Check what Flowlight can name, attribute, and inspect." = "Flowlight が名前を付け、関連付け、インスペクトできる範囲を確認します。";
+"Network rules" = "ネットワークルール";
+"Agent allowlists" = "エージェントの許可リスト";
+"Agent guardrails" = "エージェントのガードレール";
+"Request rewrites" = "リクエストの書き換え";
+"Response transforms" = "レスポンスの変換";
+"In effect" = "適用中";
+"Reporting only" = "報告のみ";
+"Waiting" = "待機中";
+"Unavailable" = "利用不可";
+"Not applying" = "未適用";
+"HTTPS inspection is off." = "HTTPS インスペクションはオフです。";
+"HTTPS inspection is not running." = "HTTPS インスペクションは稼働していません。";
+"This policy is switched off." = "このポリシーはオフです。";
+"This rule is switched off." = "このルールはオフです。";
+"Network blocking is paused." = "ネットワークのブロックは一時停止中です。";
+"This one-off rule has already been used." = "この一度きりのルールはすでに使用済みです。";
+"This rule is outside its scheduled time." = "このルールは現在、設定された時間帯の外です。";
+"Every destination" = "すべての接続先";
+"No listed destinations" = "登録された接続先なし";
+"1 listed destination" = "登録された接続先 1 件";
+"%lld listed destinations" = "登録された接続先 %lld 件";
+"This allowlist is switched off." = "この許可リストはオフです。";
+"Unlisted destinations raise alerts but are not blocked." = "リストにない接続先はアラートを出しますが、ブロックされません。";
+"Blocking is unavailable; unlisted destinations still raise alerts." = "ブロックは利用できませんが、リストにない接続先は引き続きアラートを出します。";
+"Review the changed pack before it can keep applying." = "変更されたパックを確認すると、再び適用できるようになります。";
+"This pack is switched off." = "このパックはオフです。";
+"The pack is matching destinations but cannot block them here." = "このパックは接続先に一致していますが、ここではブロックできません。";
+"The pack is waiting for the active filter to apply it." = "このパックは、有効なフィルタによる適用を待っています。";
+"The managed-pack engine is not applying this configuration." = "管理対象パックのエンジンは、この設定を適用していません。";
+"No longer in the official catalog" = "公式カタログから削除済み";
+"Blocking stopped automatically. Acknowledge this change after review." = "ブロックは自動的に停止しました。確認後、この変更を承認してください。";
+"Every agent" = "すべてのエージェント";
+"A policy since deleted" = "すでに削除されたポリシー";
+"%@ · %lld connections" = "%@ · 接続 %lld 件";
+"%lld policies · none currently effective" = "ポリシー %lld 件 · 現在適用中のものはありません";
+"%1$lld policies · %2$lld currently effective" = "ポリシー %1$lld 件 · 現在 %2$lld 件が適用中";
+"Everything Flowlight can apply" = "Flowlight が適用できるすべての制御";
+"Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent." = "ネットワークの判断、エージェントの制限、管理対象の接続先リスト、開発者向けインスペクションポリシーをここにまとめます。各ポリシーを選ぶと、その動作と同意を管理する本来のエディタが開きます。";
+"Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent." = "ネットワークの判断、エージェントの制限、管理対象の接続先リストをここにまとめます。各ポリシーを選ぶと、その動作と同意を管理する本来のエディタが開きます。";
+"%lld destinations · %@" = "接続先 %lld 件 · %@";
+"every app" = "すべてのアプリ";
+"Official · pack v%@ · %@" = "公式 · パック v%@ · %@";
+"Flowlight · signer %@" = "Flowlight · 署名者 %@";
+"Catalog" = "カタログ";
+"Sequence %1$lld · digest %2$@" = "シーケンス %1$lld · ダイジェスト %2$@";
+"Last verified" = "最終検証";
+"Next check" = "次回確認";
+"Official catalog details" = "公式カタログの詳細";
+"Not checked" = "未確認";
+"Verified" = "検証済み";
+"Stale" = "古い";
+"Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records." = "ブロック、例外、許可リスト違反、ガードレール、モック、リクエストやレスポンスの変更を、元の記録を変えずにここへ表示します。";
+"Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records." = "ネットワークのブロック、例外、管理対象パックへの一致、許可リスト違反を、元の記録を変えずにここへ表示します。";
+"Blocked connection or request" = "ブロックされた接続またはリクエスト";
+"Blocked by a managed pack" = "管理対象パックによるブロック";
+"Outside an agent allowlist" = "エージェントの許可リスト外";
+"Capability removed by a guardrail" = "ガードレールによって取り除かれた機能";
+"Answered by a mock" = "モックによる応答";
+"Request changed before sending" = "送信前に変更されたリクエスト";
+"Response changed before delivery" = "受け渡し前に変更されたレスポンス";

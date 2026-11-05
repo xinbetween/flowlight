@@ -775,8 +775,6 @@
 "Seen as it happened, named, and readable." = "在发生时即被看到，有名称，内容也可读。";
 
 /* UI/DevicesView.swift */
-"USB" = "USB";
-"Not watching" = "未监视";
 "Read the device list again now (⌘R)" = "立即重新读取设备列表（⌘R）";
 "Watch Bluetooth" = "监视蓝牙";
 "Watch USB and external storage" = "监视 USB 和外置存储";
@@ -1257,13 +1255,8 @@
 "Edit as normal rule…" = "作为普通规则编辑…";
 
 /* UI/RulesView.swift */
-"Packs" = "包";
-"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "规则判定和包的阻止摘要会显示在这里。包活动会被分组，以免满是广告的页面变成满是警报的页面。";
 "Managed packs" = "托管包";
-"What they did" = "它们做了什么";
 "Paused until %@" = "已暂停至 %@";
-"%lld in force" = "%lld 条生效中";
-"%1$lld of %2$lld in force" = "%2$lld 条中有 %1$lld 条生效中";
 "Templates" = "模板";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "值得拥有的规则，按用途分组，主机已经写好";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "写一条规则：应用、代理、目标或 URL，阻止或允许";
@@ -1277,8 +1270,6 @@
 "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld 条规则只是被监视，而没有被执行。只有网络扩展位于数据路径上，能够拒绝连接；nettop 采样器是事后计数。请在“来源 › 收集器”中选择网络扩展，以执行这些规则。";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "有一条规则只是被监视，而没有被执行 —— 指明路径的规则只能由 HTTPS 检查匹配，而它已关闭。";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld 条规则只是被监视，而没有被执行 —— 指明路径的规则只能由 HTTPS 检查匹配，而它已关闭。";
-"In force" = "生效中";
-"Not in force" = "未生效";
 "Nothing is being refused until %@." = "在 %@ 之前不会拒绝任何连接。";
 "Resume now" = "立即恢复";
 "No rules yet" = "还没有规则";
@@ -1288,7 +1279,6 @@
 "Nothing yet" = "暂无内容";
 "Today" = "今天";
 "Yesterday" = "昨天";
-"A rule since deleted" = "一条已被删除的规则";
 "Edit…" = "编辑…";
 "Reset Count" = "重置计数";
 "Delete" = "删除";
@@ -1886,3 +1876,70 @@
 "Restart or reinstall the filter to finish the update" = "重新启动或重新安装过滤器以完成更新";
 "Return to the previous history scope" = "返回上一个历史记录范围";
 "Selected" = "已选择";
+
+/* 0.17.4 策略与整合后的来源 */
+"Policies" = "策略";
+"Activity" = "活动";
+"Choose the traffic source and verify that data is arriving." = "选择流量来源，并确认数据正在到达。";
+"Choose which local device channels Flowlight watches." = "选择 Flowlight 要监视的本地设备通道。";
+"Check what Flowlight can name, attribute, and inspect." = "检查 Flowlight 能够命名、归属和检查哪些内容。";
+"Network rules" = "网络规则";
+"Agent allowlists" = "代理允许列表";
+"Agent guardrails" = "代理护栏";
+"Request rewrites" = "请求改写";
+"Response transforms" = "响应转换";
+"In effect" = "生效中";
+"Reporting only" = "仅报告";
+"Waiting" = "等待中";
+"Unavailable" = "不可用";
+"Not applying" = "未在执行";
+"HTTPS inspection is off." = "HTTPS 检查已关闭。";
+"HTTPS inspection is not running." = "HTTPS 检查未在运行。";
+"This policy is switched off." = "此策略已关闭。";
+"This rule is switched off." = "此规则已关闭。";
+"Network blocking is paused." = "网络阻止已暂停。";
+"This one-off rule has already been used." = "这条一次性规则已经用过。";
+"This rule is outside its scheduled time." = "此规则当前不在预定时段内。";
+"Every destination" = "所有目标";
+"No listed destinations" = "没有列出的目标";
+"1 listed destination" = "列出了 1 个目标";
+"%lld listed destinations" = "列出了 %lld 个目标";
+"This allowlist is switched off." = "此允许列表已关闭。";
+"Unlisted destinations raise alerts but are not blocked." = "未列出的目标会触发警报，但不会被阻止。";
+"Blocking is unavailable; unlisted destinations still raise alerts." = "阻止功能不可用；未列出的目标仍会触发警报。";
+"Review the changed pack before it can keep applying." = "请先检查已更改的包，之后它才能继续生效。";
+"This pack is switched off." = "此包已关闭。";
+"The pack is matching destinations but cannot block them here." = "此包正在匹配目标，但无法在这里阻止它们。";
+"The pack is waiting for the active filter to apply it." = "此包正在等待活动的过滤器应用它。";
+"The managed-pack engine is not applying this configuration." = "托管包引擎没有执行此配置。";
+"No longer in the official catalog" = "已不在官方目录中";
+"Blocking stopped automatically. Acknowledge this change after review." = "阻止已自动停止。检查后请确认此项变更。";
+"Every agent" = "所有代理";
+"A policy since deleted" = "一项已删除的策略";
+"%@ · %lld connections" = "%@ · %lld 个连接";
+"%lld policies · none currently effective" = "%lld 项策略 · 当前均未生效";
+"%1$lld policies · %2$lld currently effective" = "%1$lld 项策略 · 当前 %2$lld 项生效";
+"Everything Flowlight can apply" = "Flowlight 可以执行的所有策略";
+"Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent." = "网络判定、代理限制、托管目标列表和开发者检查策略都集中在这里。每项策略仍会在负责其行为与授权的编辑器中打开。";
+"Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent." = "网络判定、代理限制和托管目标列表都集中在这里。每项策略仍会在负责其行为与授权的编辑器中打开。";
+"%lld destinations · %@" = "%lld 个目标 · %@";
+"every app" = "所有应用";
+"Official · pack v%@ · %@" = "官方 · 包 v%@ · %@";
+"Flowlight · signer %@" = "Flowlight · 签名者 %@";
+"Catalog" = "目录";
+"Sequence %1$lld · digest %2$@" = "序列 %1$lld · 摘要 %2$@";
+"Last verified" = "上次验证";
+"Next check" = "下次检查";
+"Official catalog details" = "官方目录详情";
+"Not checked" = "未检查";
+"Verified" = "已验证";
+"Stale" = "已过期";
+"Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records." = "阻止、例外、允许列表违规、护栏、模拟响应以及请求或响应改动都会显示在这里，原始记录不会被更改。";
+"Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records." = "网络阻止、例外、托管包匹配和允许列表违规都会显示在这里，原始记录不会被更改。";
+"Blocked connection or request" = "连接或请求已被阻止";
+"Blocked by a managed pack" = "被托管包阻止";
+"Outside an agent allowlist" = "不在代理的允许列表中";
+"Capability removed by a guardrail" = "能力已被护栏移除";
+"Answered by a mock" = "由模拟响应作答";
+"Request changed before sending" = "请求在发送前已更改";
+"Response changed before delivery" = "响应在送达前已更改";

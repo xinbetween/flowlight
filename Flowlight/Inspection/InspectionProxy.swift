@@ -32,6 +32,9 @@ protocol ProxyObserver: AnyObject {
     /// The request whose bytes come next left with something taken out of it — a guardrail removing tools an
     /// agent is not allowed to use. What is recorded is what the server was sent, which is what happened.
     func flow(_ flow: ProxyFlow, guardedBy note: String)
+    /// A configured rewrite changed the request that left for the server. Kept separate from guardrail metadata so
+    /// Activity can say whether policy removed an agent capability or edited an HTTP request.
+    func flow(_ flow: ProxyFlow, rewrittenBy note: String)
     /// The upstream response bytes that come next were changed before the client received them. This is deliberately
     /// distinct from a mock (which never contacted the origin) and a guardrail (which changed the request).
     func flow(_ flow: ProxyFlow, responseTransformedBy note: String)
@@ -414,7 +417,7 @@ final class InspectionProxy: @unchecked Sendable {
                 observer?.flow(flow, clientSent: bytes)
             case .rewritten(let bytes, let note):
                 // Recorded as what left, not as what arrived: Inspect shows the request the server was sent.
-                observer?.flow(flow, guardedBy: note)
+                observer?.flow(flow, rewrittenBy: note)
                 observer?.flow(flow, clientSent: bytes)
                 onward.append(bytes)
             case .answer(let rule, let bytes, let head):

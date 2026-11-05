@@ -655,6 +655,11 @@ final class TrafficDatabase: @unchecked Sendable {
         if !exchangeColumns.contains("guardrail") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN guardrail TEXT NOT NULL DEFAULT ''")
         }
+        // Request rewrites used the guardrail column before central policy activity needed to distinguish their
+        // effects. Keep old rows readable as they were and give new recordings truthful metadata.
+        if !exchangeColumns.contains("request_rewrite") {
+            try conn.execute("ALTER TABLE http_exchanges ADD COLUMN request_rewrite TEXT NOT NULL DEFAULT ''")
+        }
         // Unlike a mock, this names a response the origin really sent before Flowlight changed it for the client.
         if !exchangeColumns.contains("response_transform") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN response_transform TEXT NOT NULL DEFAULT ''")
@@ -2440,8 +2445,9 @@ final class TrafficDatabase: @unchecked Sendable {
             try conn.run("""
                 INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                     req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                    agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail, response_transform)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail, request_rewrite,
+                    response_transform)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                       .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                       .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
@@ -2449,7 +2455,8 @@ final class TrafficDatabase: @unchecked Sendable {
                       .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
                       .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
                       .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
-                      .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? ""), .text(e.responseTransform ?? "")])
+                      .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? ""),
+                      .text(e.requestRewrite ?? ""), .text(e.responseTransform ?? "")])
             insertedID = try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
             var stored = e
             stored.id = insertedID
@@ -2753,7 +2760,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
-                   tool_results, mcp, llm, mock_rule, guardrail, response_transform
+                   tool_results, mcp, llm, mock_rule, guardrail, request_rewrite, response_transform
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
                                                    OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)
             ORDER BY ts DESC LIMIT ?
@@ -2775,7 +2782,7 @@ final class TrafficDatabase: @unchecked Sendable {
                 mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
                 llm: llm.isEmpty ? nil : try? decoder.decode(LLMFacts.self, from: Data(llm.utf8)),
                 note: row.text(23).nilIfEmpty, mockRule: row.text(27).nilIfEmpty, guardrail: row.text(28).nilIfEmpty,
-                responseTransform: row.text(29).nilIfEmpty)
+                requestRewrite: row.text(29).nilIfEmpty, responseTransform: row.text(30).nilIfEmpty)
         }
     }
 

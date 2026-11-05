@@ -30,7 +30,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>管控</strong>
-          <a href="#rules">规则</a><a href="#allowlists">允许列表</a>
+          <a href="#policies">策略</a><a href="#allowlists">允许列表</a>
           <a href="#blocking">拒绝连接</a><a href="#guardrails">护栏</a>
         </div>
         <div class="toc-group">
@@ -97,10 +97,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#alerts">警报</a></td><td>⌘5</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
         <tr><td><a href="#ask">提问</a></td><td>⌘6</td><td>用平常的话问你自己的流量，由本地模型或托管模型从记录下来的历史里作答。</td></tr>
         <tr><td><a href="#inspection">检查</a></td><td>⌘7 · Developer ID</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
-        <tr><td><a href="#rules">规则</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>你设过的每一条允许列表和拒绝，各自管到哪里，以及实际拦下了什么。</td></tr>
-        <tr><td><a href="#sources">来源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>在三个标签页中显示收集器状态、设备通道和命名覆盖范围。</td></tr>
+        <tr><td><a href="#policies">策略</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>每项已配置的策略、是否真正生效，以及统一的只读活动记录。</td></tr>
+        <tr><td><a href="#sources">来源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>收集器状态与恢复、可选设备通道和覆盖范围，集中在一张可滚动的运维页面中。</td></tr>
       </table>
-      <p>快捷键遵循可见的侧边栏顺序。Developer ID 版本在 ⌘7 包含检查；App Store 版本省略检查，因此规则和来源会移到 ⌘7 和 ⌘8。</p>
+      <p>快捷键遵循可见的侧边栏顺序。Developer ID 版本在 ⌘7 包含检查；App Store 版本省略检查，因此策略和来源会移到 ⌘7 和 ⌘8。</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="实时视图：一列应用，各自带着当前的发送与接收速率，以及最忙的目标。"></div>
         <figcaption class="caption">实时，Flowlight 打开时进入的那个视图。</figcaption></figure>
@@ -139,7 +139,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         每个域名都标明是从这四种里的哪一种知道的。带着好几个标签的域名，是比只带一个标签更强的事实：配置文件里写了<em>而且</em>确实
         连过，比其中任何一项单独说得更多；只被配置过的域名从未被访问过，而只被观察到的域名从来没有写在任何你本可以读到的地方。</p>
       <p>每个域名给出两种拒绝：<strong>对这个代理</strong>，覆盖该代理以及它启动的工具；或者<strong>在所有地方</strong>，覆盖这台 Mac 上的
-        每一个应用。两者写下的都是普通规则，所以<strong>违规流水</strong>会报告它们，规则编辑器会解释它们——而且正因为它们是普通规则，
+        每一个应用。两者写下的都是普通规则，所以<strong>活动</strong>会报告它们，规则编辑器会解释它们——而且正因为它们是普通规则，
         编辑器里的模拟会在你把它打开之前告诉你，它本会拒绝掉什么。</p>
       <p>有一类域名没有按钮。模型提供方自己去连的连接器——在请求正文里声明，从提供方那一侧连接——根本不会碰到这台 Mac，所以这里的
         任何规则都够不到它。那一行会把这件事说出来，而不是递给你一个悄悄什么都不做的拒绝。如果同一个主机在本地也被配置过，或者
@@ -304,16 +304,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         连接：模拟改变的是答案，而不是连接能否建立，所以“这个 API 返回 500”行得通，而“这个 API
         完全不可达”不行。</p>
 
-      <h2 id="rules">规则</h2>
-      <p>允许列表是某一个代理关于它可以去哪里的说法。<strong>规则</strong>是它的通用版本：它指明一个
+      <h2 id="policies"><span id="rules"></span>策略</h2>
+      <p><strong>策略</strong>集中列出 Flowlight 能执行的所有管控：普通的允许或阻止规则、代理允许列表、托管包，以及在支持 HTTPS 检查时的护栏、模拟响应、请求改写和响应转换。每一行都会区分配置状态与实际效果：生效、仅报告、监视、等待、已排期、暂停、已用完、正在应用、需要检查、不可用、不兼容或失败。选择一行会打开负责该策略的对应编辑器；“策略”不会取代或混淆这些功能各自独立的授权和持久化方式。</p>
+      <p>允许列表是某一个代理关于它可以去哪里的说法。普通<strong>规则</strong>是它的通用版本：它指明一个
         <strong>对象</strong>——应用、代理、目标、URL，或其中两者的组合——并决定<strong>阻止</strong>
         还是<strong>允许</strong>。在实时、历史、AI 代理或检查里右键任意一行，就能针对你正看着的东西写一条；
-        它们全都落在<strong>规则</strong>界面上的同一个编辑器里，因为一条在看不见的地方生效的规则，
-        会是一条你再也找不到的规则。</p>
+        每条规则都能在“策略”中找到，并会在其权威编辑器中打开。</p>
       <p><strong>模板。</strong>共 22 个，分为五组——阻止代理访问软件包仓库或其他
         模型提供方；封住数据外流的常见途径（粘贴站点、webhook 接收器、匿名文件投放、隧道、DNS over
         HTTPS）；产品分析与崩溃上报；工作时段策略；以及一次性的“先把这个拦一小时，我弄清它
-        是什么”。可以从规则工具栏浏览它们，也可以在实时、历史、AI 代理或检查的任意一行上右键，
+        是什么”。可以从策略工具栏浏览它们，也可以在实时、历史、AI 代理或检查的任意一行上右键，
         把某个模板应用到你正看着的东西上。</p>
       <p>每个模板在动手之前都会说明它要做什么。凡是会写入多条规则的，都会打开一张卡片，列出每个
         主机和时段；凡是永久生效的，都会打开预填好的编辑器；而<strong>只有会自行撤销的规则</strong>——一
@@ -334,8 +334,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         地址和端口，对路径一无所知，而且只在扩展模式下有效。HTTPS 检查拒绝的是单个请求，所以它能匹配
         URL，并用代理读得懂的状态码作答，而不是一个不声不响就断掉的套接字。nettop 采样器
         完全无法拒绝任何东西。当前配置无法执行的规则会在列表里明说，而不是摆在那里装作已经生效。</p>
-      <p>第二个标签页是<strong>违规流水</strong>：每一条由规则判定的连接，带上应用、它要去哪里、是哪条
-        规则判定的，以及那究竟是一次拒绝，还是一次放它通过的例外。</p>
+      <p>第二个视图是只读的<strong>活动</strong>：普通规则判定、允许列表违规、托管包事件，以及各类检查策略的效果，都按时间排列在一处。它会适配现有的权威记录，而不是把历史改写成一种笼统的事件模型；App Store 版本会省略依赖检查的策略类型及其保留的活动。</p>
 
       <p><strong>它本来会做什么。</strong>阻止的规则写起来容易，打开却让人害怕，因为你通常最先了解到的是它
         弄坏了什么——而且是后来才知道的，从别处某个东西失败上知道的。规则编辑器先回答这个问题：它拿记录
@@ -353,7 +352,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         的最早的流量：一条只对照了两小时历史的规则，就是只对照了两小时历史。</p>
 
       <h3 id="managed-packs">托管广告和跟踪器包</h3>
-      <p><strong>规则 › 包</strong>包含三个官方主机名列表：<strong>广告</strong>、<strong>跨站跟踪</strong>和<strong>隐私与遥测</strong>。它们从一开始就可见，并且默认均为关闭状态。阻止功能需要网络扩展；nettop 采样器只能观察。</p>
+      <p><strong>策略 › 托管包</strong>包含三个官方主机名列表：<strong>广告</strong>、<strong>跨站跟踪</strong>和<strong>隐私与遥测</strong>。它们从一开始就可见，并且默认均为关闭状态。阻止功能需要网络扩展；nettop 采样器只能观察。</p>
       <p><strong>仅限官方签名更新。</strong> Flowlight 会检查一个固定的 HTTPS 源，以查找由发布者签名的新版目录。自动检查默认开启，可在此处关闭。签名可验证内容，但不会启用内容：新包会保持关闭；如果目标发生变化，已启用的包将停止执行，直到你审查确切的新版本并按下保存。服务中断期间，已接受的内容可能会继续作为最后已知正常版本保留，并明确显示为已过期。这些是主机名级别的网络阻止，无法移除 DOM 或布局中的空白、浏览器叠加层、脚本生成的弹出窗口或原生应用窗口。</p>
       <p>当 HTTPS 检查将应用经由 Flowlight 的代理转发时，普通目标规则和已启用的托管包会在打开任何源站连接之前，使用原应用的身份作出判定。对于固定了证书或始终不解密的 CONNECT 隧道，这一判定按主机名进行；代理允许列表仍只适用于直接经过网络扩展的路径。如果所有者或主机名未知，则会允许连接。</p>
 
@@ -402,7 +401,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>这不是沙盒。</strong>被拒绝的工具不再提供给模型，也不再被响应。而仍然拥有
         shell 的代理，可以手动做到那个工具本来要做的事。Flowlight 会把它记录下来；它不会假装能阻止。</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>来源：收集器与引擎</h2>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>来源：收集器、设备与覆盖范围</h2>
+      <p><strong>来源</strong>是一张可滚动的运维页面：先是收集器，接着是标题清晰的设备与覆盖范围分区。状态通知、提问答案、恢复后的窗口和截图链接都会滚动到相关分区并短暂突出显示，同时不隐藏其他内容。</p>
       <p>Flowlight 用两种方式之一记录流量，在<strong>来源 › 收集器</strong>里选择。它们会漏掉的东西不同，在依赖任何
         一种之前，值得先了解清楚。</p>
       <table>
@@ -588,7 +588,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>窗口关闭时 Flowlight 几乎什么都不做：它保留菜单栏速率，每秒写入一行。网络扩展
           比作为后备的采样器更省，后者每秒都要启动一个短命的 <code>nettop</code> 进程。</dd>
         <dt><strong>它能阻止连接吗？</strong></dt>
-        <dd>能，配合网络扩展。代理的允许列表除了警告也可以拒绝，一条<a href="#rules">规则</a>可以按你指定的时长阻止一个应用、
+        <dd>能，配合网络扩展。代理的允许列表除了警告也可以拒绝，一条<a href="#policies">规则</a>可以按你指定的时长阻止一个应用、
           一个目标或一个 URL，而一条<a href="#guardrails">护栏</a>可以在模型看到某个工具之前，把它从代理手里
           拿走。在你要求之前不会阻止任何东西，而且每次拒绝都带着它的出口。</dd>
         <dt><strong>我需要网络扩展吗？</strong></dt>

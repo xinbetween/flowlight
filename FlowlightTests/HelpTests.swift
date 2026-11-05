@@ -24,7 +24,7 @@ final class HelpTests: XCTestCase {
     }
 
     func testTheHelpURLIsBuiltFromTheAnchorRatherThanGuessed() {
-        XCTAssertEqual(Help.forScreen(.rules).absoluteString, "https://flowlight.xinbetween.com/docs/#rules")
+        XCTAssertEqual(Help.forScreen(.rules).absoluteString, "https://flowlight.xinbetween.com/docs/#policies")
         XCTAssertEqual(Help.forScreen(.inspect).absoluteString, "https://flowlight.xinbetween.com/docs/#inspection")
     }
 

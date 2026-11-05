@@ -201,9 +201,12 @@ jobs:
           scripts/test-rule-pack-policy.sh
           scripts/test-swift-warnings.sh
           scripts/test-codeql-gate.sh
+          scripts/test-update-cask.sh
           python3 -I scripts/test_classify_changes.py
           python3 -I scripts/test_check_site.py
-          python3 scripts/test_release_checks.py
+          python3 -I scripts/test_release_checks.py
+          python3 -I scripts/test_release_artifact.py
+          python3 -I scripts/test_release_workflow.py
 
       # Ad-hoc signing: the entitlements that need a Developer ID profile are only exercised by the release build.
       - name: Test

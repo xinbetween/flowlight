@@ -1,14 +1,16 @@
 #!/bin/zsh
-# Puts everything .github/workflows/release.yml needs into GitHub Actions secrets.
+# Puts the signing inputs .github/workflows/release.yml's preparation job needs into GitHub Actions secrets.
 #
 #   scripts/ci-secrets.sh
 #
 # It reads the two .p12 certificate exports, the two provisioning profiles and the App Store Connect key you point
 # it at, and uploads each with `gh secret set`. File contents are piped straight to gh and never printed.
 #
-# They go into the `release` environment, not the repository, so only the release job can read them and only after
-# a human approves the run. Even so: anyone who can approve a release can sign software as you, and anyone with
-# admin access can change who that is. Revoke the identities in Apple's developer portal if that stops being true.
+# They go into the `release` preparation environment, not the repository, so only the tag-push preparation job can
+# read them. RELEASE_ACTORS, the authenticated RELEASE_REVIEWERS comment receipt, and the environment's v* tag policy
+# gate that job; the environment currently has no human reviewer. Anyone who can change those controls can sign software
+# as you. Revoke the identities in Apple's developer
+# portal if that stops being acceptable. Publication uses a separate `release-publish` environment with no signing input.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,8 +23,8 @@ ask() { printf '%s' "$1" >&2; read -r REPLY; print -r -- "$REPLY"; }
 
 echo "Setting Actions secrets on $REPO, in the $ENVIRONMENT environment."
 gh api "repos/$REPO/environments/$ENVIRONMENT" >/dev/null 2>&1 || {
-  echo "No $ENVIRONMENT environment on $REPO. Create it first (Settings › Environments), with a required reviewer" >&2
-  echo "and a deployment branch policy limited to the tag pattern v*." >&2
+  echo "No $ENVIRONMENT environment on $REPO. Create it first (Settings › Environments)," >&2
+  echo "with a deployment branch policy limited to the tag pattern v*." >&2
   exit 1
 }
 echo
@@ -178,9 +180,9 @@ set_secret DMG_SIGN_IDENTITY         "$APP_ID"
 set_secret INSTALLER_IDENTITY        "$INSTALLER_ID"
 
 echo
-echo "TAP_TOKEN is optional: a fine-grained token with Contents: write on xinbetween/homebrew-tap, which lets the"
-echo "release job update the Homebrew cask. Add it to the same environment; without it that step is skipped and"
-echo "you run scripts/update-cask.sh yourself."
+echo "TAP_TOKEN is optional: a fine-grained token with Contents: write on xinbetween/homebrew-tap. Put it only in"
+echo "the separate release-publish environment; never add signing or notarization secrets there. Without it, GitHub"
+echo "publication still succeeds and you update the cask manually from the verified DMG."
 echo
-echo "Try it against a tag that already exists: gh workflow run Release --repo $REPO --ref v0.2.2"
-echo "It will wait for your approval before it touches any of this."
+echo "A v* tag push prepares the signed artifact. After that run succeeds, publish with:"
+echo "  gh workflow run Release --repo $REPO --ref <tag> -f prepare_run_id=<successful-tag-push-run-id>"

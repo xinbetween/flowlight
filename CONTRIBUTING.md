@@ -48,7 +48,7 @@ Internals are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 Every release follows this non-negotiable sequence:
 
 ```text
-feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main
+feature branch → release branch → reviewed green PR → immutable tag → signed preparation → publish exact bytes and verify → merge to main
 ```
 
 `main` is what has shipped, not what is being built. Start each feature from it and rebase it onto it; never merge
@@ -65,28 +65,32 @@ git merge --ff-only feature/relaunch-through-proxy
 
 git push -u origin release/0.13.4
 gh pr create --base main --title "Flowlight 0.13.4"
-# wait for review and every required PR check to pass
+# after reviewing the final head, a login configured in RELEASE_REVIEWERS must post
+# `Reviewed-Commit: <exact SHA>` as a PR comment; the PR author's editable body is not evidence
+# wait for that authenticated receipt and every required PR check to pass
 
 git tag -a v0.13.4 -m "Flowlight 0.13.4"
-git push origin v0.13.4  # automatically runs the signed dry run; it cannot publish
-# inspect that successful signed/notarized/Gatekeeper run, then publish from the same tag:
-gh workflow run Release --ref v0.13.4 -f tag=v0.13.4
-# verify the GitHub release, DMG, PKG and SHA256SUMS.txt before the final merge
+git push origin v0.13.4  # prepares, attests and retains the only bytes publication may use
+# inspect that successful preparation, then publish its exact artifact from the same tag:
+gh workflow run Release --ref v0.13.4 -f prepare_run_id=<successful-tag-push-run-id>
+# verify the GitHub release, DMG, PKG, SHA256SUMS.txt and RELEASE-MANIFEST.json before the final merge
 gh pr merge --merge --delete-branch
 ```
 
-**Tags are immutable.** Never retag, force-push or move a version after it has been pushed. If a tag is wrong or a
-release needs another change, bump the patch version and begin a new release branch and tag.
+**Release-tag creation is restricted and tags are immutable.** Only the designated release account may create a
+`v*` tag. Never retag, force-push, or move a version after it has been pushed. If a tag is wrong or a release needs
+another change, bump the patch version and begin a new release branch and tag.
 
 **The PR precedes the tag, and the merge follows publication.** Review and green checks protect the exact tree that
 will be signed. Publishing before merging keeps the GitHub Pages site from announcing a download that does not exist:
 `docs/` is served from `main`, its Download button resolves to the latest GitHub release, CI requires `docs/` to match
 `site/`, and the site builder reads `MARKETING_VERSION`.
 
-A tag push starts `release.yml` in dry-run-only mode; push-triggered runs cannot publish. It must prove tests, signing,
-notarization and Gatekeeper verification before an explicit production dispatch for that immutable tag. After production
-succeeds, verify the release page and downloaded DMG, PKG and
-`SHA256SUMS.txt` checksums, then merge the release PR into `main`.
+A tag push starts `release.yml` in preparation-only mode; push-triggered runs cannot publish. It verifies reviewed
+exact-head evidence, builds/signs/notarizes once, passes Gatekeeper, records a manifest, attests every prepared file, and
+retains one immutable Actions artifact. The explicit publication dispatch names that successful run, has no signing or
+notarization credentials, and can only verify and publish those bytes. After it succeeds, verify the release page and
+downloaded DMG, PKG, `SHA256SUMS.txt`, and `RELEASE-MANIFEST.json`, then merge the release PR into `main`.
 
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches) documents the signing inputs and workflow internals.
 

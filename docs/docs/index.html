@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.17.3, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.17.4, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -99,7 +99,7 @@
         </div>
         <div class="toc-group">
           <strong>Control</strong>
-          <a href="#rules">Rules</a><a href="#allowlists">Allowlists</a>
+          <a href="#policies">Policies</a><a href="#allowlists">Allowlists</a>
           <a href="#blocking">Refusing connections</a><a href="#guardrails">Guardrails</a>
         </div>
         <div class="toc-group">
@@ -170,11 +170,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#alerts">Alerts</a></td><td>⌘5</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
         <tr><td><a href="#ask">Ask</a></td><td>⌘6</td><td>Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.</td></tr>
         <tr><td><a href="#inspection">Inspect</a></td><td>⌘7 · Developer ID</td><td>Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.</td></tr>
-        <tr><td><a href="#rules">Rules</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.</td></tr>
-        <tr><td><a href="#capture">Sources</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Collector health and recovery, hostname coverage, and opt-in camera, Bluetooth, USB and storage activity in three tabs.</td></tr>
+        <tr><td><a href="#policies">Policies</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Every configured policy, whether it is actually effective, and a unified read-only activity trail.</td></tr>
+        <tr><td><a href="#capture">Sources</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Collector health and recovery, opt-in device channels, and coverage as one scrollable operational page.</td></tr>
       </table>
-      <p>The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Rules and Sources move to ⌘7 and ⌘8.</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../assets/screenshots/live.png?v=023b487c" loading="lazy"
+      <p>The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Policies and Sources move to ⌘7 and ⌘8.</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="The Live screen: a list of applications with their current send and receive rates and busiest destination."></div>
         <figcaption class="caption">Live, the screen Flowlight opens on.</figcaption></figure>
       <p>In <strong>History</strong>, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with <strong>Nearby context</strong> and can switch to <strong>All history</strong>: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.</p>
@@ -216,7 +216,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         in a configuration file <em>and</em> actually contacted says more than either alone, while a domain only ever configured has
         never been reached, and one only ever observed was never written down anywhere you could have read it.</p>
       <p>Each domain offers two refusals: <strong>for this agent</strong>, which covers the agent and the tools it starts, or
-        <strong>everywhere</strong>, which covers every app on the Mac. Both write an ordinary rule, so the violations feed reports
+        <strong>everywhere</strong>, which covers every app on the Mac. Both write an ordinary rule, so Activity reports
         them and the rule editor explains them — and because they are ordinary rules, the simulation in the editor will tell you what
         one would have refused before you switch it on.</p>
       <p>One kind of domain has no buttons. A connector the model provider reaches on its own — declared in the request body and
@@ -415,16 +415,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
         is entirely unreachable" does not.</p>
 
-      <h2 id="rules">Rules</h2>
-      <p>An allowlist is one agent's idea of where it may go. A <strong>rule</strong> is the general version: it names a
+      <h2 id="policies"><span id="rules"></span>Policies</h2>
+      <p><strong>Policies</strong> is one inventory for every control Flowlight can apply: ordinary allow/block rules, agent
+        allowlists, managed packs, and—where HTTPS inspection is available—guardrails, mocks, request rewrites, and response
+        transforms. Each row distinguishes configured state from actual effect: enforcing, reporting, watching, waiting,
+        scheduled, paused, spent, applying, review required, unavailable, incompatible, or failed. Selecting a row opens the
+        contextual editor that owns that policy; Policies does not replace or blur those separate consent and persistence models.</p>
+      <p>An allowlist is one agent's idea of where it may go. An ordinary <strong>rule</strong> is the general version: it names a
         <strong>subject</strong> — an app, an agent, a destination, a URL, or a pairing of two of those — and says <strong>block</strong>
         or <strong>allow</strong>. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at;
-        every one of them lands in the same editor on the <strong>Rules</strong> screen, because a rule that took effect out of sight
-        would be a rule you could never find again.</p>
+        every one remains findable in Policies and opens in its authoritative editor.</p>
       <p><strong>Templates.</strong> Twenty-two of them, in five groups — stopping an agent reaching package registries or other
         model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
         HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
-        what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
+        what it is". Browse them from the Policies toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
         apply one to what you're looking at.</p>
       <p>Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
         host and schedule; anything permanent opens the editor pre-filled; and <strong>only rules that undo themselves</strong> — an
@@ -445,8 +449,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
         URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
         refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.</p>
-      <p>The second tab is the <strong>violations feed</strong>: every connection a rule decided, with the app, where it was headed, which
-        rule decided it and whether that was a refusal or an exception letting it through.</p>
+      <p>The second view is read-only <strong>Activity</strong>: ordinary rule decisions, allowlist violations, managed-pack events,
+        and distinct inspection-policy effects in one chronology. It adapts the existing authoritative records rather than rewriting
+        history into one generic event model; Store builds omit inspection-dependent policy kinds and their retained activity.</p>
 
       <p><strong>What it would have done.</strong> A blocking rule is easy to write and frightening to switch on, because the first
         thing you normally learn about one is what it broke — and you learn it later, from something failing somewhere else. The rule
@@ -466,7 +471,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         history has been tested against two hours of history.</p>
 
       <h3 id="managed-packs">Managed ad and tracker packs</h3>
-      <p><strong>Rules › Packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
+      <p><strong>Policies › Managed packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
         advertising delivery and auction hosts; <strong>Cross-site tracking</strong> covers common analytics, session replay and
         cross-site measurement hosts; and <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and
         audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.</p>
@@ -551,8 +556,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>This is not a sandbox.</strong> A refused tool stops being offered and stops being answered. An agent that still has a
         shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Sources: collector, coverage and devices</h2>
-      <p><strong>Sources</strong> keeps operational setup in one place. Its health summary shows whether traffic is arriving, how much is named, and which optional device channels are active; any unfinished collector step links directly to <strong>Sources › Collector</strong>.</p>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Sources: collector, devices and coverage</h2>
+      <p><strong>Sources</strong> is one scrollable operational page: Collector first, then Devices and Coverage as clearly headed
+        sections. Status notices, Ask answers, restored windows, and screenshot links scroll to and briefly focus the relevant section
+        without hiding the others.</p>
       <p>Flowlight records traffic one of two ways, chosen under <strong>Sources › Collector</strong>. They differ in what they can miss, which is worth
         understanding before you rely on either.</p>
       <table>
@@ -755,7 +762,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
           costs less than the fallback sampler, which starts a short-lived <code>nettop</code> process every second.</dd>
         <dt><strong>Can it block connections?</strong></dt>
-        <dd>Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a <a href="#rules">rule</a> can block an app,
+        <dd>Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a <a href="#policies">rule</a> can block an app,
           a destination or a URL for as long as you say, and a <a href="#guardrails">guardrail</a> can take a tool away from an agent
           before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out.</dd>
         <dt><strong>Do I need the Network Extension?</strong></dt>
@@ -811,7 +818,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.17.4 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

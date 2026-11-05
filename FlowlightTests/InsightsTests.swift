@@ -161,6 +161,24 @@ final class InsightsTests: XCTestCase {
         XCTAssertEqual(ReportChartHoverLayout.cardX(lineX: 10, chartWidth: 200), 0)
     }
 
+    func testReportHoverRejectsPointersOutsideThePlotArea() {
+        let plot = CGRect(x: 40, y: 20, width: 600, height: 240)
+
+        XCTAssertTrue(ReportChartHoverLayout.contains(CGPoint(x: 320, y: 100), in: plot))
+        XCTAssertFalse(ReportChartHoverLayout.contains(CGPoint(x: 20, y: 100), in: plot),
+                       "the y-axis and leading chart furniture are not time buckets")
+        XCTAssertFalse(ReportChartHoverLayout.contains(CGPoint(x: 320, y: 280), in: plot),
+                       "leaving the plot must clear transient hover")
+        XCTAssertFalse(ReportChartHoverLayout.contains(CGPoint(x: plot.minX, y: 100), in: plot),
+                       "a hover clamped to the leading edge means the pointer has left the plot")
+        XCTAssertFalse(ReportChartHoverLayout.contains(CGPoint(x: plot.maxX, y: 100), in: plot),
+                       "a hover clamped to the trailing edge means the pointer has left the plot")
+        XCTAssertTrue(ReportChartHoverLayout.contains(CGPoint(x: plot.minX + 1, y: 100), in: plot),
+                      "the first bucket remains inspectable inside the plot")
+        XCTAssertTrue(ReportChartHoverLayout.contains(CGPoint(x: plot.maxX - 1, y: 100), in: plot),
+                      "the last bucket remains inspectable inside the plot")
+    }
+
     func testReportChartKeyboardSelectionMovesAcrossBuckets() {
         let dates = [10.0, 20.0, 30.0].map(Date.init(timeIntervalSince1970:))
 
@@ -169,6 +187,30 @@ final class InsightsTests: XCTestCase {
         XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[1], direction: .left, dates: dates), dates[0])
         XCTAssertEqual(ReportChartKeyboardSelection.move(from: dates[0], direction: .left, dates: dates), dates[0])
         XCTAssertNil(ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: []))
+    }
+
+    func testReportChartFocusDoesNotCreateAnUpperLeftSelection() {
+        let dates = [10.0, 20.0, 30.0].map(Date.init(timeIntervalSince1970:))
+
+        XCTAssertNil(ReportChartKeyboardSelection.reconcile(nil, chartFocused: true, dates: dates),
+                     "focus alone must not synthesize a first-bucket tooltip")
+        XCTAssertEqual(
+            ReportChartHighlightSelection.date(hovered: dates[1], keyboard: dates[0], chartFocused: true),
+            dates[1],
+            "pointer inspection takes precedence over a previous keyboard selection"
+        )
+        XCTAssertNil(ReportChartHighlightSelection.date(hovered: nil, keyboard: nil, chartFocused: true),
+                     "leaving the chart after pointer inspection must not reveal a synthetic keyboard tooltip")
+        XCTAssertEqual(
+            ReportChartHighlightSelection.date(hovered: nil, keyboard: dates[0], chartFocused: true),
+            dates[0],
+            "leaving pointer inspection restores an intentional keyboard selection"
+        )
+        XCTAssertEqual(
+            ReportChartKeyboardSelection.reconcile(dates[2], chartFocused: true, dates: Array(dates.prefix(2))),
+            dates[0],
+            "an intentional keyboard selection remains usable when the series changes"
+        )
     }
 
     func testHistoryPresetUsesAnIndependentVisibleWindowAndResolution() {

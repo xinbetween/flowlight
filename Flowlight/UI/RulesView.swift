@@ -1,6 +1,326 @@
 import SwiftUI
 
-/// Every rule Flowlight has been given, what each one is doing, and what they have refused.
+struct PolicyInventoryCapabilities: Equatable, Sendable {
+    var inspectionPolicies: Bool
+
+    static var current: PolicyInventoryCapabilities {
+        #if APP_STORE
+        PolicyInventoryCapabilities(inspectionPolicies: false)
+        #else
+        PolicyInventoryCapabilities(inspectionPolicies: true)
+        #endif
+    }
+}
+
+enum PolicyInventoryKind: String, CaseIterable, Sendable {
+    case networkRule = "rule"
+    case agentAllowlist = "allowlist"
+    case managedPack = "pack"
+    case guardrail
+    case mock
+    case requestRewrite = "request-rewrite"
+    case responseTransform = "response-transform"
+
+    var requiresInspection: Bool {
+        switch self {
+        case .guardrail, .mock, .requestRewrite, .responseTransform: return true
+        case .networkRule, .agentAllowlist, .managedPack: return false
+        }
+    }
+
+    @MainActor var sectionTitle: String {
+        switch self {
+        case .networkRule: return L("Network rules")
+        case .agentAllowlist: return L("Agent allowlists")
+        case .managedPack: return L("Managed packs")
+        case .guardrail: return L("Agent guardrails")
+        case .mock: return L("Mock responses")
+        case .requestRewrite: return L("Request rewrites")
+        case .responseTransform: return L("Response transforms")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .networkRule: return "hand.raised"
+        case .agentAllowlist: return "checklist"
+        case .managedPack: return "shippingbox"
+        case .guardrail: return "wrench.and.screwdriver"
+        case .mock: return "wand.and.stars"
+        case .requestRewrite: return "slider.horizontal.3"
+        case .responseTransform: return "arrow.left.arrow.right"
+        }
+    }
+}
+
+enum PolicyInventoryID {
+    static func make(_ kind: PolicyInventoryKind, sourceID: String) -> String {
+        "\(kind.rawValue):\(sourceID)"
+    }
+}
+
+enum PolicyEffectState: Equatable, Sendable {
+    case effective
+    case reportingOnly
+    case watchingOnly
+    case waiting
+    case off
+    case needsReview
+    case unavailable
+    case failed
+
+    var isEffective: Bool {
+        switch self {
+        case .effective, .reportingOnly, .watchingOnly: return true
+        case .waiting, .off, .needsReview, .unavailable, .failed: return false
+        }
+    }
+
+    @MainActor var title: String {
+        switch self {
+        case .effective: return L("In effect")
+        case .reportingOnly: return L("Reporting only")
+        case .watchingOnly: return L("Watching only")
+        case .waiting: return L("Waiting")
+        case .off: return L("Off")
+        case .needsReview: return L("Needs review")
+        case .unavailable: return L("Unavailable")
+        case .failed: return L("Not applying")
+        }
+    }
+}
+
+struct PolicyInventoryItem: Identifiable, Equatable, Sendable {
+    var kind: PolicyInventoryKind
+    var sourceID: String
+    var title: String
+    var detail: String
+    /// The persisted switch or configuration intent. This is not evidence that the policy can currently act.
+    var isEnabled: Bool
+    var effect: PolicyEffectState
+    var reason: String?
+    var destination: PolicyDestination
+    var id: String { PolicyInventoryID.make(kind, sourceID: sourceID) }
+
+    func isVisible(in capabilities: PolicyInventoryCapabilities) -> Bool {
+        capabilities.inspectionPolicies || !kind.requiresInspection
+    }
+}
+
+enum PolicyInventoryBuilder {
+    @MainActor
+    static func build(rules: [Rule], allowlists: [String: AgentPolicy], packs: [RulePackDefinition],
+                      unavailablePacks: [RulePackConfiguration] = [],
+                      packConfiguration: (String) -> RulePackConfiguration,
+                      packNeedsReview: (RulePackDefinition) -> Bool = { _ in false },
+                      packStatus: RulePackStore.ApplyStatus = .off,
+                      guardrails: [Guardrail], mocks: [MockRule], rewrites: [RewriteRule],
+                      transforms: [ResponseTransformRule], extensionRunning: Bool = true,
+                      canBlock: Bool = true, inspectionEnabled: Bool = true, inspectionRunning: Bool = true,
+                      rulesPaused: Bool = false, now: Date = Date(), ruleSession: String = RuleStore.session,
+                      capabilities: PolicyInventoryCapabilities = .current) -> [PolicyInventoryItem] {
+        let inspectionReason = !inspectionEnabled ? L("HTTPS inspection is off.") : L("HTTPS inspection is not running.")
+        func inspectionEffect(_ enabled: Bool) -> (PolicyEffectState, String?) {
+            guard enabled else { return (.off, L("This policy is switched off.")) }
+            return inspectionEnabled && inspectionRunning ? (.effective, nil) : (.waiting, inspectionReason)
+        }
+
+        var items = rules.map { rule -> PolicyInventoryItem in
+            let effect: PolicyEffectState
+            let reason: String?
+            if !rule.enabled {
+                (effect, reason) = (.off, L("This rule is switched off."))
+            } else if rulesPaused {
+                (effect, reason) = (.waiting, L("Network blocking is paused."))
+            } else if !rule.isUsable {
+                (effect, reason) = (.waiting, L("This one-off rule has already been used."))
+            } else if !rule.schedule.isActive(at: now, session: ruleSession) {
+                (effect, reason) = (.waiting, L("This rule is outside its scheduled time."))
+            } else if let limitation = RuleWords.limitation(rule, extensionRunning: extensionRunning,
+                                                             inspecting: inspectionEnabled && inspectionRunning) {
+                (effect, reason) = (.watchingOnly, limitation)
+            } else {
+                (effect, reason) = (.effective, nil)
+            }
+            return PolicyInventoryItem(kind: .networkRule, sourceID: rule.id.uuidString.lowercased(),
+                                       title: RuleWords.title(rule),
+                                       detail: rule.destination.isEmpty ? L("Every destination") : rule.destination,
+                                       isEnabled: rule.enabled, effect: effect, reason: reason,
+                                       destination: .rule(rule.id))
+        }
+        items += allowlists.keys.sorted().compactMap { agentID in
+            guard let policy = allowlists[agentID] else { return nil }
+            let detail = policy.patterns.isEmpty ? L("No listed destinations")
+                : (policy.patterns.count == 1 ? L("1 listed destination") : L("%lld listed destinations", policy.patterns.count))
+            let effect: PolicyEffectState
+            let reason: String?
+            if !policy.enabled {
+                (effect, reason) = (.off, L("This allowlist is switched off."))
+            } else if !policy.enforce {
+                (effect, reason) = (.reportingOnly, L("Unlisted destinations raise alerts but are not blocked."))
+            } else if canBlock {
+                (effect, reason) = (.effective, nil)
+            } else {
+                (effect, reason) = (.reportingOnly, L("Blocking is unavailable; unlisted destinations still raise alerts."))
+            }
+            return PolicyInventoryItem(kind: .agentAllowlist, sourceID: agentID, title: agentID, detail: detail,
+                                       isEnabled: policy.enabled, effect: effect, reason: reason,
+                                       destination: .allowlist(agentID))
+        }
+        items += packs.map { pack in
+            let configuration = packConfiguration(pack.id)
+            let effect: PolicyEffectState
+            let reason: String?
+            if packNeedsReview(pack) {
+                (effect, reason) = (.needsReview, L("Review the changed pack before it can keep applying."))
+            } else if !configuration.enabled {
+                (effect, reason) = (.off, L("This pack is switched off."))
+            } else {
+                switch packStatus {
+                case .enforcing where canBlock: (effect, reason) = (.effective, nil)
+                case .watchingOnly, .enforcing:
+                    (effect, reason) = (.watchingOnly, L("The pack is matching destinations but cannot block them here."))
+                case .applying, .ready:
+                    (effect, reason) = (.waiting, L("The pack is waiting for the active filter to apply it."))
+                case .incompatible(let message), .failed(let message):
+                    (effect, reason) = (.failed, message)
+                case .off:
+                    (effect, reason) = (.waiting, L("The managed-pack engine is not applying this configuration."))
+                }
+            }
+            return PolicyInventoryItem(kind: .managedPack, sourceID: pack.id, title: L(pack.manifest.titleKey),
+                                       detail: L("%lld destinations", pack.entries.count),
+                                       isEnabled: configuration.enabled, effect: effect, reason: reason,
+                                       destination: .managedPack(pack.id))
+        }
+        let knownPackIDs = Set(packs.map(\.id))
+        items += unavailablePacks.filter { !knownPackIDs.contains($0.packID) }.map { configuration in
+            PolicyInventoryItem(kind: .managedPack, sourceID: configuration.packID, title: configuration.packID,
+                                detail: L("No longer in the official catalog"), isEnabled: configuration.enabled,
+                                effect: .unavailable,
+                                reason: L("Blocking stopped automatically. Acknowledge this change after review."),
+                                destination: .managedPack(configuration.packID))
+        }
+        items += guardrails.map { guardrail in
+            let (effect, reason) = inspectionEffect(guardrail.enabled)
+            return PolicyInventoryItem(kind: .guardrail, sourceID: guardrail.id.uuidString.lowercased(),
+                                       title: guardrail.localizedTitle,
+                                       detail: guardrail.agent.isEmpty ? L("Every agent") : guardrail.agent,
+                                       isEnabled: guardrail.enabled, effect: effect, reason: reason,
+                                       destination: .guardrail(id: guardrail.id, agentID: guardrail.agent))
+        }
+        items += mocks.map { rule in
+            let (effect, reason) = inspectionEffect(rule.enabled)
+            return PolicyInventoryItem(kind: .mock, sourceID: rule.id.uuidString.lowercased(), title: rule.title,
+                                       detail: "\(rule.method.isEmpty ? "ANY" : rule.method.uppercased()) \(rule.host)\(rule.path)",
+                                       isEnabled: rule.enabled, effect: effect, reason: reason,
+                                       destination: .mock(rule.id))
+        }
+        items += rewrites.map { rule in
+            let (effect, reason) = inspectionEffect(rule.enabled)
+            return PolicyInventoryItem(kind: .requestRewrite, sourceID: rule.id.uuidString.lowercased(), title: rule.title,
+                                       detail: "\(rule.method.isEmpty ? "ANY" : rule.method.uppercased()) \(rule.host)\(rule.path)",
+                                       isEnabled: rule.enabled, effect: effect, reason: reason,
+                                       destination: .requestRewrite(rule.id))
+        }
+        items += transforms.map { rule in
+            let (effect, reason) = inspectionEffect(rule.enabled)
+            return PolicyInventoryItem(kind: .responseTransform, sourceID: rule.id.uuidString.lowercased(), title: rule.title,
+                                       detail: "\(rule.method.isEmpty ? "ANY" : rule.method.uppercased()) \(rule.host)\(rule.path)",
+                                       isEnabled: rule.enabled, effect: effect, reason: reason,
+                                       destination: .responseTransform(rule.id))
+        }
+        return items.filter { $0.isVisible(in: capabilities) }
+    }
+}
+
+enum PolicyActivityEffect: String, Equatable, Hashable, Sendable {
+    case blocked
+    case allowed
+    case packBlocked = "pack-blocked"
+    case allowlistViolation = "allowlist-violation"
+    case guardrailApplied = "guardrail-applied"
+    case mocked
+    case requestRewritten = "request-rewritten"
+    case responseTransformed = "response-transformed"
+}
+
+struct PolicyActivityItem: Identifiable, Equatable, Sendable {
+    var id: String
+    var timestamp: Date
+    var kind: PolicyInventoryKind
+    var effect: PolicyActivityEffect
+    var title: String
+    var detail: String
+    var policyID: String?
+}
+
+enum PolicyActivityBuilder {
+    static func build(ruleEvents: [RuleEventRecord], packEvents: [RulePackEventRecord], alerts: [AlertRecord],
+                      exchanges: [HTTPExchange], rules: [Rule], guardrails: [Guardrail], packs: [RulePackDefinition],
+                      mocks: [MockRule], rewrites: [RewriteRule], transforms: [ResponseTransformRule],
+                      capabilities: PolicyInventoryCapabilities = .current) -> [PolicyActivityItem] {
+        let guardrailIDs = Set(guardrails.map(\.id))
+        var activity = ruleEvents.map { event -> PolicyActivityItem in
+            let isGuardrail = guardrailIDs.contains(event.ruleID)
+            let title = rules.first(where: { $0.id == event.ruleID }).map(RuleWords.title)
+                ?? guardrails.first(where: { $0.id == event.ruleID })?.localizedTitle ?? L("A policy since deleted")
+            return PolicyActivityItem(
+                id: "rule-event:\(event.id)", timestamp: event.timestamp,
+                kind: isGuardrail ? .guardrail : .networkRule,
+                effect: isGuardrail ? .guardrailApplied : (event.action == .block ? .blocked : .allowed),
+                title: title, detail: event.path.isEmpty ? "\(event.destination):\(event.port)" : "\(event.method) \(event.destination)\(event.path)",
+                policyID: PolicyInventoryID.make(isGuardrail ? .guardrail : .networkRule,
+                                                 sourceID: event.ruleID.uuidString.lowercased()))
+        }
+        activity += packEvents.map { event in
+            let title = packs.first(where: { $0.id == event.packID }).map { L($0.manifest.titleKey) } ?? event.packID
+            return PolicyActivityItem(id: "pack-event:\(event.id)", timestamp: event.lastAt, kind: .managedPack,
+                                      effect: .packBlocked,
+                                      title: title, detail: L("%@ · %lld connections", event.host, event.count),
+                                      policyID: PolicyInventoryID.make(.managedPack, sourceID: event.packID))
+        }
+        activity += alerts.filter { $0.kind == AnomalyEngine.Kind.allowlistViolation.rawValue }.map { alert in
+            PolicyActivityItem(id: "alert:\(alert.id)", timestamp: alert.timestamp, kind: .agentAllowlist,
+                               effect: .allowlistViolation,
+                               title: alert.appName, detail: alert.detail,
+                               policyID: PolicyInventoryID.make(.agentAllowlist, sourceID: alert.bundleID))
+        }
+        for exchange in exchanges {
+            let source = exchange.id.map(String.init) ?? "\(exchange.started.timeIntervalSince1970)"
+            let detail = "\(exchange.method) \(exchange.host)\(exchange.path)"
+            if let value = exchange.guardrail {
+                let policy = guardrails.first { $0.localizedTitle == value || $0.title == value }
+                activity.append(PolicyActivityItem(id: "exchange:\(source):guardrail", timestamp: exchange.started,
+                                                   kind: .guardrail, effect: .guardrailApplied, title: value, detail: detail,
+                                                   policyID: policy.map { PolicyInventoryID.make(.guardrail, sourceID: $0.id.uuidString.lowercased()) }))
+            }
+            if let value = exchange.mockRule, let policy = mocks.first(where: { $0.title == value }) {
+                // Request-level network blocks use the same answer machinery but already have a RuleEvent. Only a
+                // saved mock belongs in this adapter, otherwise one refusal would appear twice with two effects.
+                activity.append(PolicyActivityItem(id: "exchange:\(source):mock", timestamp: exchange.started,
+                                                   kind: .mock, effect: .mocked, title: value, detail: detail,
+                                                   policyID: PolicyInventoryID.make(.mock, sourceID: policy.id.uuidString.lowercased())))
+            }
+            if let value = exchange.requestRewrite {
+                let policy = rewrites.first { $0.title == value }
+                activity.append(PolicyActivityItem(id: "exchange:\(source):request-rewrite", timestamp: exchange.started,
+                                                   kind: .requestRewrite, effect: .requestRewritten, title: value, detail: detail,
+                                                   policyID: policy.map { PolicyInventoryID.make(.requestRewrite, sourceID: $0.id.uuidString.lowercased()) }))
+            }
+            if let value = exchange.responseTransform {
+                let policy = transforms.first { $0.title == value }
+                activity.append(PolicyActivityItem(id: "exchange:\(source):response-transform", timestamp: exchange.started,
+                                                   kind: .responseTransform, effect: .responseTransformed, title: value, detail: detail,
+                                                   policyID: policy.map { PolicyInventoryID.make(.responseTransform, sourceID: $0.id.uuidString.lowercased()) }))
+            }
+        }
+        return activity.filter { capabilities.inspectionPolicies || !$0.kind.requiresInspection }
+            .sorted { ($0.timestamp, $0.id) > ($1.timestamp, $1.id) }
+    }
+}
+
+/// Every policy Flowlight has been given, what each one is doing, and what it has changed.
 ///
 /// The screen answers three questions, in the order people ask them: what have I said, is it actually happening,
 /// and why is this getting through? The last two are why the list carries a limitation beside a rule the current
@@ -11,17 +331,24 @@ struct RulesView: View {
     @ObservedObject private var templates = RuleTemplateRequests.shared
     @State private var sheet: Sheet?
     @State private var now = Date()
+    @State private var allowlists: [String: AgentPolicy] = [:]
+    @State private var alerts: [AlertRecord] = []
+    @State private var exchanges: [HTTPExchange] = []
+    @State private var focusPolicyID: String?
+    @State private var packSaveErrors: [String: String] = [:]
 
     /// One sheet at a time, named rather than implied by two booleans — the editor and the library are alternatives
     /// and the type should say so.
     private enum Sheet: Identifiable {
         case editor(Rule, isNew: Bool)
         case library(RuleTemplate.ID?, RuleTemplate.Subject)
+        case pack(RulePackDefinition, RulePackEditorDraft.Intent)
 
         var id: String {
             switch self {
             case .editor(let rule, _): return "editor-\(rule.id)"
             case .library(let focus, _): return "library-\(focus ?? "all")"
+            case .pack(let pack, let intent): return "pack-\(pack.id)-\(intent)"
             }
         }
     }
@@ -31,15 +358,11 @@ struct RulesView: View {
     var body: some View {
         Group {
             switch nav.rulesTab {
-            case .rules:
-                if store.rules.isEmpty { empty } else { ruleList }
-            case .packs:
-                RulePacksView()
-            case .activity:
-                activityFeed
+            case .rules: inventory
+            case .activity: activityFeed
             }
         }
-        .navigationTitle(L("Rules"))
+        .navigationTitle(L("Policies"))
         // The title bar carries the state that would otherwise need a trip to the screen to discover: how many
         // rules are live, and whether they are standing down.
         .navigationSubtitle(subtitle)
@@ -55,6 +378,10 @@ struct RulesView: View {
                 RuleTemplateLibrary(focus: focus, subject: subject) { rules in
                     for rule in rules { store.save(rule) }
                 }
+            case .pack(let pack, let intent):
+                RulePackEditor(pack: pack, receipt: monitor.rulePacks.reviewReceipt(for: pack),
+                               saved: monitor.rulePacks.configuration(for: pack.id), intent: intent,
+                               packs: monitor.rulePacks, rules: store)
             }
         }
         .onChange(of: nav.ruleRequest) { _, request in
@@ -63,6 +390,12 @@ struct RulesView: View {
             nav.ruleRequest = nil
         }
         .onChange(of: templates.pending?.id) { _, _ in takeTemplateRequest() }
+        .onChange(of: nav.policyRequest, initial: true) { _, request in
+            guard let request else { return }
+            handle(request.destination)
+            nav.policyRequest = nil
+        }
+        .task(id: monitor.dataVersion) { await loadPolicySources() }
         .onAppear {
             if let request = nav.ruleRequest {
                 sheet = .editor(request.rule, isNew: true)
@@ -81,28 +414,79 @@ struct RulesView: View {
         templates.pending = nil
     }
 
+    private func handle(_ destination: PolicyDestination) {
+        nav.rulesTab = .rules
+        switch destination {
+        case .rule(let id):
+            if let rule = store.rules.first(where: { $0.id == id }) { sheet = .editor(rule, isNew: false) }
+        case .managedPack(let packID):
+            focusPolicyID = packID.map { PolicyInventoryID.make(.managedPack, sourceID: $0) } ?? "managed-packs"
+            if let packID, let pack = monitor.rulePacks.definitions.first(where: { $0.id == packID }) {
+                sheet = .pack(pack, .review)
+            }
+        case .allowlist(let agentID):
+            nav.showAgentPolicy(agentID: agentID, section: .allowlist)
+        case .guardrail(_, let agentID):
+            guard !agentID.isEmpty else { return }
+            nav.showAgentPolicy(agentID: agentID, section: .guardrails)
+        case .mock:
+            nav.showInspectionPolicy(.mocks)
+        case .requestRewrite:
+            nav.showInspectionPolicy(.requestRewrites)
+        case .responseTransform:
+            nav.showInspectionPolicy(.responseTransforms)
+        }
+    }
+
+    private func loadPolicySources() async {
+        let loaded = try? await monitor.read { db in
+            (try db.loadPolicies(),
+             try db.alerts(limit: 2_000).filter { $0.kind == AnomalyEngine.Kind.allowlistViolation.rawValue },
+             try db.exchanges(since: Date().addingTimeInterval(-30 * 86_400), limit: 2_000))
+        }
+        guard let loaded else { return }
+        allowlists = loaded.0
+        alerts = loaded.1
+        exchanges = loaded.2
+    }
+
+    private var inventoryItems: [PolicyInventoryItem] {
+        PolicyInventoryBuilder.build(rules: store.rules, allowlists: allowlists,
+                                     packs: monitor.rulePacks.definitions,
+                                     unavailablePacks: monitor.rulePacks.unavailableReviewConfigurations,
+                                     packConfiguration: { monitor.rulePacks.configuration(for: $0) },
+                                     packNeedsReview: monitor.rulePacks.needsReview,
+                                     packStatus: monitor.rulePacks.status,
+                                     guardrails: monitor.guardrails.guardrails,
+                                     mocks: monitor.inspection.mockRules,
+                                     rewrites: monitor.inspection.rewriteRules,
+                                     transforms: monitor.inspection.responseTransformRules,
+                                     extensionRunning: monitor.canBlock, canBlock: monitor.canBlock,
+                                     inspectionEnabled: monitor.inspection.enabled,
+                                     inspectionRunning: monitor.inspection.running,
+                                     rulesPaused: store.isPaused, now: now)
+    }
+
     private var subtitle: String {
         if store.isPaused, let until = store.pausedUntil {
             return L("Paused until %@", until.formatted(date: .omitted, time: .shortened))
         }
-        let live = store.liveRules.count
-        guard !store.rules.isEmpty else { return "" }
-        return live == store.rules.count
-            ? L("%lld in force", live) : L("%1$lld of %2$lld in force", live, store.rules.count)
+        let effective = inventoryItems.filter { $0.effect.isEffective }.count
+        guard !inventoryItems.isEmpty else { return "" }
+        return effective == 0
+            ? L("%lld policies · none currently effective", inventoryItems.count)
+            : L("%1$lld policies · %2$lld currently effective", inventoryItems.count, effective)
     }
 
     // MARK: Toolbar
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        // Nothing to switch between until there is something in one of them.
-        if !store.rules.isEmpty || !store.events.isEmpty || monitor.rulePacks.hasPackNavigation {
-            ToolbarItem(placement: .principal) {
-                Picker("", selection: $nav.rulesTab) {
-                    ForEach(RulesTab.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 310)
+        ToolbarItem(placement: .principal) {
+            Picker("", selection: $nav.rulesTab) {
+                ForEach(RulesTab.allCases) { Text($0.title).tag($0) }
             }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 220)
         }
         ToolbarItemGroup {
             pauseControl
@@ -181,26 +565,273 @@ struct RulesView: View {
         store.rules.filter { !($0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: RuleStore.session)) }
     }
 
-    private var ruleList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
-                if !resting.isEmpty && !inForce.isEmpty { heading(L("In force")) }
-                ForEach(inForce) { rule in row(rule) }
-                if !resting.isEmpty {
-                    heading(L("Not in force")).padding(.top, inForce.isEmpty ? 0 : 12)
-                    ForEach(resting) { rule in row(rule) }
+    private var inventory: some View {
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    inventoryIntroduction
+                    if inventoryItems.isEmpty { empty }
+                    ForEach(PolicyInventoryKind.allCases, id: \.self) { kind in
+                        let items = inventoryItems.filter { $0.kind == kind }
+                        if !items.isEmpty { inventorySection(kind, items: items) }
+                    }
+                }
+                .padding(Measure.gutter)
+            }
+            .onChange(of: focusPolicyID) { _, target in
+                guard let target else { return }
+                withAnimation { scroll.scrollTo(target, anchor: .center) }
+                focusPolicyID = nil
+            }
+            .onAppear {
+                guard let target = focusPolicyID else { return }
+                DispatchQueue.main.async {
+                    scroll.scrollTo(target, anchor: .center)
+                    focusPolicyID = nil
                 }
             }
-            .padding(Measure.gutter)
         }
         .safeAreaInset(edge: .top, spacing: 0) { banner }
     }
 
+    private var inventoryIntroduction: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(L("Everything Flowlight can apply")).font(.headline)
+            Text(PolicyInventoryCapabilities.current.inspectionPolicies
+                 ? L("Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent.")
+                 : L("Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent."))
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func inventorySection(_ kind: PolicyInventoryKind, items: [PolicyInventoryItem]) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Image(systemName: kind.symbol).font(.caption).foregroundStyle(.tertiary)
+                Text(kind.sectionTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("\(items.count)").font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
+                Spacer()
+                if kind == .managedPack { packCatalogControls }
+            }
+            .id(kind == .managedPack ? "managed-packs" : "section-\(kind.rawValue)")
+            if kind == .managedPack { packCatalogProvenance }
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    if index > 0 { Divider().padding(.leading, 40) }
+                    inventoryRow(item).id(item.id)
+                }
+            }
+            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    @ViewBuilder
+    private func inventoryRow(_ item: PolicyInventoryItem) -> some View {
+        if item.kind == .networkRule,
+           let rule = store.rules.first(where: { $0.id.uuidString.caseInsensitiveCompare(item.sourceID) == .orderedSame }) {
+            row(rule)
+        } else if item.kind == .managedPack,
+                  let pack = monitor.rulePacks.definitions.first(where: { $0.id == item.sourceID }) {
+            packRow(pack)
+        } else if item.kind == .managedPack,
+                  let configuration = monitor.rulePacks.unavailableReviewConfigurations.first(where: { $0.packID == item.sourceID }) {
+            unavailablePackRow(configuration)
+        } else {
+            Button { handle(item.destination) } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: item.kind.symbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(item.isEnabled ? FL.accent : .secondary)
+                        .frame(width: 26, height: 26)
+                        .background((item.isEnabled ? FL.accent : Color.secondary).opacity(0.12),
+                                    in: RoundedRectangle(cornerRadius: 7))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).font(.callout.weight(.medium)).lineLimit(1)
+                        Text(item.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        if let reason = item.reason {
+                            Text(reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(2)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Text(item.effect.title)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(policyStatusTint(item.effect))
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary).padding(.top, 3)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func policyStatusTint(_ effect: PolicyEffectState) -> AnyShapeStyle {
+        switch effect {
+        case .effective: return AnyShapeStyle(FL.good)
+        case .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
+        case .failed, .unavailable: return AnyShapeStyle(FL.critical)
+        case .off: return AnyShapeStyle(.tertiary)
+        }
+    }
+
+    private func packRow(_ pack: RulePackDefinition) -> some View {
+        let configuration = monitor.rulePacks.configuration(for: pack.id)
+        let item = inventoryItems.first { $0.kind == .managedPack && $0.sourceID == pack.id }
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "shippingbox")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(configuration.enabled ? FL.critical : .secondary)
+                .frame(width: 26, height: 26)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L(pack.manifest.titleKey)).font(.callout.weight(.medium))
+                Text(L("%lld destinations · %@", pack.entries.count,
+                       configuration.scope == .allApps ? L("every app") : L("%lld selected apps", configuration.apps.count)))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let reason = item?.reason {
+                    Text(reason).font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(L("Official · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
+                    .font(.caption2).foregroundStyle(.tertiary)
+                if let error = packSaveErrors[pack.id] {
+                    Text(error).font(.caption).foregroundStyle(FL.critical)
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+                if let item {
+                    Text(item.effect.title).font(.caption.weight(.medium))
+                        .foregroundStyle(policyStatusTint(item.effect))
+                }
+                HStack(spacing: 8) {
+                    Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
+                        if enabled {
+                            sheet = .pack(pack, .activate)
+                        } else {
+                            var changed = configuration
+                            changed.enabled = false
+                            packSaveErrors[pack.id] = nil
+                            monitor.rulePacks.save(changed) { success in
+                                if !success { packSaveErrors[pack.id] = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Save")) }
+                            }
+                        }
+                    }))
+                    .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                    Button(L("Review…")) { sheet = .pack(pack, .review) }.controlSize(.small)
+                }
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+    }
+
+    private func unavailablePackRow(_ configuration: RulePackConfiguration) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "shippingbox.and.arrow.backward")
+                .font(.caption.weight(.semibold)).foregroundStyle(FL.warning)
+                .frame(width: 26, height: 26).background(FL.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(configuration.packID).font(.callout.weight(.medium))
+                Text(L("This previously enabled official pack is no longer in the catalog. Blocking stopped automatically."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let error = packSaveErrors[configuration.packID] {
+                    Text(error).font(.caption).foregroundStyle(FL.critical)
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(PolicyEffectState.unavailable.title).font(.caption.weight(.medium))
+                    .foregroundStyle(policyStatusTint(.unavailable))
+                Button(L("Acknowledge")) {
+                    packSaveErrors[configuration.packID] = nil
+                    monitor.rulePacks.acknowledgeUnavailableReview(configuration.packID) { success in
+                        if !success {
+                            packSaveErrors[configuration.packID] = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Save"))
+                        }
+                    }
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+    }
+
+    private var packCatalogProvenance: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent(L("Source")) {
+                    Text(RulePackCatalogVerifier.sourceURL).font(.caption2.monospaced())
+                        .foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                if let receipt = monitor.rulePackCatalog.receipt {
+                    LabeledContent(L("Publisher")) {
+                        Text(L("Flowlight · signer %@", receipt.signerKeyID))
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                    LabeledContent(L("Catalog")) {
+                        Text(L("Sequence %1$lld · digest %2$@", receipt.sequence, String(receipt.digest.prefix(12))))
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                }
+                if let success = monitor.rulePackCatalog.catalogState.update.lastSuccess {
+                    LabeledContent(L("Last verified")) {
+                        Text(success.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                if monitor.rulePackCatalog.automaticRefresh,
+                   let next = monitor.rulePackCatalog.catalogState.update.nextEligibleAttempt {
+                    LabeledContent(L("Next check")) {
+                        Text(next.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.top, 5)
+        } label: {
+            Label(L("Official catalog details"), systemImage: "checkmark.seal")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var packCatalogControls: some View {
+        HStack(spacing: 8) {
+            Text(packCatalogStatus).font(.caption2).foregroundStyle(.tertiary)
+            Menu {
+                Toggle(L("Automatic updates"), isOn: Binding(
+                    get: { monitor.rulePackCatalog.automaticRefresh },
+                    set: { enabled in Task { await monitor.rulePackCatalog.setAutomaticRefresh(enabled) } }
+                ))
+                Button(L("Check Now")) { Task { await monitor.rulePackCatalog.checkNow() } }
+                    .disabled(monitor.rulePackCatalog.status == .checking)
+            } label: {
+                Image(systemName: "arrow.triangle.2.circlepath")
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help(L("Official pack updates"))
+        }
+    }
+
+    private var packCatalogStatus: String {
+        switch monitor.rulePackCatalog.status {
+        case .idle: return L("Not checked")
+        case .checking: return L("Checking…")
+        case .current: return L("Verified")
+        case .stale: return L("Stale")
+        case .recovery: return L("Recovery required")
+        case .failed: return L("Check failed")
+        }
+    }
+
     private func row(_ rule: Rule) -> some View {
-        RuleRow(rule: rule, store: store, now: now,
-                extensionRunning: monitor.mode == .networkExtension,
-                inspecting: monitor.inspection.enabled,
-                events: store.events(for: rule).count) {
+        let policy = inventoryItems.first { $0.kind == .networkRule && $0.sourceID == rule.id.uuidString.lowercased() }
+        return RuleRow(rule: rule, store: store, now: now,
+                extensionRunning: monitor.canBlock,
+                inspecting: monitor.inspection.enabled && monitor.inspection.running,
+                events: store.events(for: rule).count,
+                effect: policy?.effect ?? .off, effectReason: policy?.reason) {
             sheet = .editor(rule, isNew: false)
         }
         // A rule that has just been written, or has just crossed between in force and not, is a change of state
@@ -258,11 +889,13 @@ struct RulesView: View {
 
     private var activityFeed: some View {
         Group {
-            if store.events.isEmpty && monitor.rulePacks.events.isEmpty {
+            if policyActivity.isEmpty {
                 ContentUnavailableView {
                     Label(L("Nothing yet"), systemImage: "list.bullet.rectangle")
                 } description: {
-                    Text(L("Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts."))
+                    Text(PolicyInventoryCapabilities.current.inspectionPolicies
+                         ? L("Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records.")
+                         : L("Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records."))
                 }
             } else {
                 feed
@@ -270,71 +903,112 @@ struct RulesView: View {
         }
     }
 
-    /// The decisions, as the rest of the app reads: a day at a time, newest first. A table would sort and resize,
-    /// neither of which anybody asked of a feed — what is asked is "what happened, and which rule did it".
+    /// The existing sources, adapted into one read-only chronology. The original records remain the source of truth;
+    /// this list only gives their effects a shared vocabulary.
     private var feed: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
-                if !monitor.rulePacks.events.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        heading(L("Managed packs"))
-                        VStack(spacing: 0) {
-                            ForEach(Array(monitor.rulePacks.events.enumerated()), id: \.element.id) { index, event in
-                                if index > 0 { Divider().padding(.leading, 34) }
-                                RulePackEventRow(event: event)
-                            }
-                        }
-                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-                ForEach(feedDays) { day in
+                ForEach(activityDays) { day in
                     VStack(alignment: .leading, spacing: 6) {
                         heading(day.title)
                         VStack(spacing: 0) {
                             ForEach(Array(day.events.enumerated()), id: \.element.id) { index, event in
-                                if index > 0 { Divider().padding(.leading, 34) }
-                                EventRow(event: event, rule: name(of: event)) {
-                                    if let rule = store.rules.first(where: { $0.id == event.ruleID }) {
-                                        sheet = .editor(rule, isNew: false)
-                                    }
+                                if index > 0 { Divider().padding(.leading, 38) }
+                                PolicyActivityRow(event: event) {
+                                    guard let policyID = event.policyID,
+                                          let item = inventoryItems.first(where: { $0.id == policyID }) else { return }
+                                    handle(item.destination)
                                 }
                             }
                         }
                         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .entrance()
                 }
             }
             .padding(Measure.gutter)
         }
     }
 
-    private struct FeedDay: Identifiable {
+    private struct ActivityDay: Identifiable {
         let id: Date
         let title: String
-        let events: [RuleEventRecord]
+        let events: [PolicyActivityItem]
     }
 
-    private var feedDays: [FeedDay] {
+    private var policyActivity: [PolicyActivityItem] {
+        PolicyActivityBuilder.build(ruleEvents: store.events, packEvents: monitor.rulePacks.events,
+                                    alerts: alerts, exchanges: exchanges, rules: store.rules,
+                                    guardrails: monitor.guardrails.guardrails, packs: monitor.rulePacks.definitions,
+                                    mocks: monitor.inspection.mockRules, rewrites: monitor.inspection.rewriteRules,
+                                    transforms: monitor.inspection.responseTransformRules)
+    }
+
+    private var activityDays: [ActivityDay] {
         let calendar = Calendar.current
-        let byDay = Dictionary(grouping: store.events) { calendar.startOfDay(for: $0.timestamp) }
+        let byDay = Dictionary(grouping: policyActivity) { calendar.startOfDay(for: $0.timestamp) }
         return byDay.keys.sorted(by: >).map { day in
             let title = calendar.isDateInToday(day) ? L("Today")
                 : calendar.isDateInYesterday(day) ? L("Yesterday")
                 : day.formatted(date: .abbreviated, time: .omitted)
-            return FeedDay(id: day, title: title,
-                           events: (byDay[day] ?? []).sorted { $0.timestamp > $1.timestamp })
+            return ActivityDay(id: day, title: title, events: byDay[day] ?? [])
+        }
+    }
+}
+
+private struct PolicyActivityRow: View {
+    let event: PolicyActivityItem
+    let showPolicy: () -> Void
+
+    var body: some View {
+        Button(action: showPolicy) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.caption).foregroundStyle(tint).frame(width: 18).padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(event.title).font(.callout.weight(.medium)).lineLimit(1)
+                    Text(event.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(effectTitle).font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 8)
+                Text(event.timestamp.formatted(date: .omitted, time: .standard))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(event.policyID == nil)
+    }
+
+    private var effectTitle: String {
+        switch event.effect {
+        case .blocked: return L("Blocked connection or request")
+        case .allowed: return L("Allowed by an exception")
+        case .packBlocked: return L("Blocked by a managed pack")
+        case .allowlistViolation: return L("Outside an agent allowlist")
+        case .guardrailApplied: return L("Capability removed by a guardrail")
+        case .mocked: return L("Answered by a mock")
+        case .requestRewritten: return L("Request changed before sending")
+        case .responseTransformed: return L("Response changed before delivery")
         }
     }
 
-    /// A decision can come from a network rule or from a guardrail — the same question asked about a destination
-    /// or about a tool — so the feed looks in both lists before giving up on it.
-    private func name(of event: RuleEventRecord) -> String {
-        if let rule = store.rules.first(where: { $0.id == event.ruleID }) { return RuleWords.title(rule) }
-        if let guardrail = monitor.guardrails.guardrails.first(where: { $0.id == event.ruleID }) {
-            return guardrail.localizedTitle
+    private var symbol: String {
+        switch event.effect {
+        case .allowed: return "checkmark.shield.fill"
+        case .mocked: return "wand.and.stars"
+        case .requestRewritten: return "slider.horizontal.3"
+        case .responseTransformed: return "arrow.left.arrow.right"
+        case .guardrailApplied: return "wrench.and.screwdriver.fill"
+        case .allowlistViolation: return "checklist.unchecked"
+        case .blocked, .packBlocked: return "hand.raised.fill"
         }
-        return L("A rule since deleted")
+    }
+
+    private var tint: Color {
+        event.effect == .allowed ? FL.good
+            : (event.effect == .mocked || event.effect == .requestRewritten || event.effect == .responseTransformed
+               ? FL.tool : FL.critical)
     }
 }
 
@@ -350,6 +1024,8 @@ private struct RuleRow: View {
     let extensionRunning: Bool
     let inspecting: Bool
     let events: Int
+    let effect: PolicyEffectState
+    let effectReason: String?
     let edit: () -> Void
 
     private var limitation: String? {
@@ -380,6 +1056,8 @@ private struct RuleRow: View {
                     meta
                 }
                 Spacer(minLength: 8)
+                Text(effect.title).font(.caption.weight(.medium)).foregroundStyle(effectTint)
+                    .padding(.top, 3)
                 Toggle("", isOn: Binding(get: { rule.enabled }, set: { store.setEnabled(rule, $0) }))
                     .toggleStyle(.switch).controlSize(.mini).labelsHidden()
                     .accessibilityLabel(L("Enable %@", RuleWords.title(rule)))
@@ -399,6 +1077,8 @@ private struct RuleRow: View {
             }
             if let limitation {
                 note(limitation, icon: "eye", tint: FL.warning)
+            } else if let effectReason, rule.isUsable {
+                note(effectReason, icon: effect == .off ? "power" : "clock", tint: .secondary)
             }
             if !rule.isUsable {
                 note(L("Used up — a one-off allowance, already spent."), icon: "checkmark.circle", tint: .secondary)
@@ -414,6 +1094,15 @@ private struct RuleRow: View {
             if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }
             Divider()
             Button(L("Delete"), role: .destructive) { store.delete(rule) }
+        }
+    }
+
+    private var effectTint: AnyShapeStyle {
+        switch effect {
+        case .effective: return AnyShapeStyle(FL.good)
+        case .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
+        case .failed, .unavailable: return AnyShapeStyle(FL.critical)
+        case .off: return AnyShapeStyle(.tertiary)
         }
     }
 

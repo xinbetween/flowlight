@@ -297,7 +297,7 @@ private struct RulePacksContent: View {
     }
 }
 
-private struct RulePackEditor: View {
+struct RulePackEditor: View {
     let pack: RulePackDefinition
     let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor

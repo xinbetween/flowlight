@@ -133,11 +133,12 @@ traffic, DNS, essential Apple system services and Flowlight's own connections ar
 after the app stops running. When HTTPS inspection proxies an app, destination rules and enabled managed packs are decided against the
 original app before Flowlight opens the origin connection; agent allowlists still apply only on the direct Network Extension path.
 
-### Rules
-An allowlist is one agent's idea of where it may go. A **rule** is the general version: it names a subject — an app,
-an agent, a destination, a URL, or a pairing of two of those — and says block or allow. Right-click any row in Live,
-History, AI Agents or Inspect to write one about what you're looking at; all of them land in the same editor on the
-**Rules** screen.
+### Policies
+**Policies** is the inventory for every control Flowlight can apply: ordinary allow/block rules, agent allowlists,
+managed packs, and—where HTTPS inspection is available—guardrails, mocks, request rewrites, and response transforms.
+Each row reports whether it is actually enforcing, reporting, watching, waiting, scheduled, paused, or unavailable, and
+opens the contextual editor that owns it. An allowlist is one agent's idea of where it may go; an ordinary **rule** is
+the general version, naming an app, agent, destination, URL, or pairing and saying block or allow.
 
 - **The most specific match decides**, and a tie goes to the block. An exception written underneath a broad block
   works; one broader than what it excepts doesn't quietly widen it.
@@ -148,15 +149,17 @@ History, AI Agents or Inspect to write one about what you're looking at; all of 
 - **A rule says where it bites.** The extension refuses whole connections and knows nothing about paths; HTTPS
   inspection refuses one request and answers with a status the agent can read; the sampler refuses nothing. A rule
   the current setup can't carry out says so in the list instead of looking enforced.
-- A **violations feed** beside the list: every connection a rule decided, refusals and exceptions alike.
+- A unified read-only **Activity** feed beside the inventory: rule decisions, allowlist violations, managed-pack events,
+  and distinct inspection-policy effects without pretending different policy types share one persistence model.
 
 ### Managed ad and tracker packs
 Flowlight includes three official hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and telemetry**.
 Their baseline is built into the signed app for offline use and the app checks one fixed HTTPS source for newer
-publisher-signed catalogs. Automatic checks are on by default and can be switched off in **Rules › Packs**; no traffic,
-pack settings, or device identifier is sent. The server sees the Mac's IP address and `Flowlight/<version>` user agent.
+publisher-signed catalogs. Automatic checks are on by default and can be switched off under **Policies › Managed packs**;
+no traffic, pack settings, or device identifier is sent. The server sees the Mac's IP address and `Flowlight/<version>`
+user agent.
 
-All three packs are visible in **Rules › Packs** and off by default. A valid signature authenticates content but never
+All three packs are visible under **Policies › Managed packs** and off by default. A valid signature authenticates content but never
 grants enforcement consent: new packs remain off, and changed destinations disable that pack until you review the exact
 new version and press Save. A verified accepted catalog remains available as visible stale last-known-good during an
 outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed. Enable a pack for every app or only
@@ -217,11 +220,13 @@ Flowlight says *Extension connection invalidated*, and neither changes its mind.
 Flowlight climbs out of that on its own: redial twice, then ask macOS which build it has and reinstall the
 extension if it isn't this app's, then redial again — and if none of it works, capture with the nettop sampler so
 there is still data. It says which rung it is on and how long until the next one. Your chosen source isn't
-rewritten, blocking is switched off while the sampler stands in (the sampler can't refuse anything, and Rules
+rewritten, blocking is switched off while the sampler stands in (the sampler can't refuse anything, and Policies
 shouldn't claim otherwise), and **Try the extension again** starts over.
 
-### Sources: collector, coverage and devices
-**Sources** keeps collector health and recovery, hostname coverage, and opt-in device channels in one destination. Its health summary shows whether traffic is arriving, how much is named, and which device channels are active.
+### Sources: collector, devices and coverage
+**Sources** is one scrollable operational page: Collector first, then Devices and Coverage as clearly headed sections.
+Status notices, Ask answers, restored windows, and screenshot links scroll to and briefly focus the relevant section
+without hiding the others.
 
 A Mac sends and receives over more than TCP and UDP. **Sources › Devices** covers the non-network channels, with every channel off
 until you turn it on because watching more of your Mac should be a decision rather than something an update did.
@@ -317,7 +322,7 @@ No account, no cloud, no telemetry. Everything stays in a local SQLite database.
 answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
 Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
 Team Cymru's DNS service, and you can turn it off in Sources › Collector. Release and official rule-pack checks make standard HTTPS
-requests with no traffic or pack settings; each has its own off switch in Settings or Rules › Packs. To attribute tools
+requests with no traffic or pack settings; each has its own off switch in Settings or Policies › Managed packs. To attribute tools
 and MCP servers, Flowlight reads process command lines and your agents' MCP config files
 on your Mac; none of it leaves your Mac. HTTPS inspection is off unless you turn it on, and what it records stays in the
 same local database.
@@ -484,7 +489,7 @@ Shipped:
 
 - [x] AI visualization: a separate mode for proved agent clients, attributed tools and MCP servers, LLM providers,
   and every other destination they reached (0.16.0). Tool traffic folds into its parent agent without erasing the
-  selectable tool node; provider grouping keeps exact hosts underneath for honest Reports, Inspect and Rules
+  selectable tool node; provider grouping keeps exact hosts underneath for honest History, Inspect and Policies
   navigation. Process lineage is labelled “works for,” never an invocation count without inspected evidence. The
   full evidence, data, status and acceptance contract lives in [docs/VISUALIZATION.md](docs/VISUALIZATION.md).
 
@@ -526,20 +531,23 @@ Releases are deliberately not ordinary merges. `main` represents published softw
 new version and generated site until a downloadable, verified build exists. Every release follows this order:
 
 ```text
-feature branch → release branch → reviewed green PR → immutable tag → signed dry run → publish and verify → merge to main
+feature branch → release branch → reviewed green PR → immutable tag → signed preparation → publish exact bytes and verify → merge to main
 ```
 
 1. Branch a feature from `main`, test it, and rebase it onto current `main` rather than merging `main` into it.
 2. Fast-forward finished features into `release/<version>` and make one final release commit containing the version bump,
    release entry in `site/pages/releases.html`, and regenerated `docs/` website output.
-3. Push the release branch and open a PR to `main`. Do not tag until it has been reviewed and every required check is
-   green.
-4. Create and push an annotated `v<version>` tag on that exact release commit. Tags are immutable: never retag, move or
+3. Push the release branch and open a PR to `main`. After reviewing the final head, a login configured in the
+   `RELEASE_REVIEWERS` repository variable must post `Reviewed-Commit: <exact SHA>` as a PR comment. The editable PR
+   body is not review evidence. Do not tag until that authenticated receipt and every required check are green.
+4. The designated release account creates and pushes an annotated `v<version>` tag on that exact release commit; the
+   active ruleset rejects release-tag creation by other write collaborators. Tags are immutable: never retag, move, or
    force-push one. If it is wrong, issue the next patch release instead.
-5. The tag push automatically runs the signed/notarized/Gatekeeper **dry run** and cannot publish. After it passes,
-   explicitly dispatch production for that same tag.
-6. Verify the GitHub release and its DMG, PKG and `SHA256SUMS.txt` assets/checksums. Only then merge the release PR into
-   `main`, allowing GitHub Pages to advertise the downloadable release.
+5. The tag push builds, signs, notarizes, Gatekeeper-verifies, attests, and retains one immutable preparation artifact;
+   it cannot publish. After it passes, explicitly dispatch publication with that preparation run ID.
+6. Publication verifies the run, archive digest, manifest, checksums, and provenance, then creates and re-downloads a draft
+   before making those exact bytes public. Verify the DMG, PKG, `SHA256SUMS.txt`, and `RELEASE-MANIFEST.json`; only then
+   merge the release PR into `main`, allowing GitHub Pages to advertise the downloadable release.
 
 The full commands, signing prerequisites and CI behavior live in [CONTRIBUTING.md](CONTRIBUTING.md#branches-and-releases)
 and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches).

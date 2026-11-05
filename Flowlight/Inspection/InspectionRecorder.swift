@@ -44,6 +44,9 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     /// What a guardrail took out of this request before it left. Its own field for the same reason: the exchange
     /// is real and was really sent, but it is not quite what the agent wrote, and that has to be readable.
     var guardrail: String?
+    /// What a configured request rewrite changed before the request left. Earlier builds put this text in
+    /// `guardrail`; new recordings keep the two effects distinct without altering either enforcement path.
+    var requestRewrite: String? = nil
     /// The rule that changed a real upstream response before the client received it. A mock is intentionally not
     /// reused here: a transformed exchange really reached its origin.
     var responseTransform: String? = nil
@@ -111,7 +114,15 @@ enum SocketOwner {
 /// them to the process (and agent) behind the connection, reads tool calls, redacts credentials, and hands each
 /// finished exchange to `onExchange`.
 final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
-    private struct Pending { var head: HTTPHead; var body: HTTPBody; var started: Date; var mock: String?; var guardrail: String?; var responseTransform: String? }
+    private struct Pending {
+        var head: HTTPHead
+        var body: HTTPBody
+        var started: Date
+        var mock: String?
+        var guardrail: String?
+        var requestRewrite: String?
+        var responseTransform: String?
+    }
 
     private final class FlowState {
         let request: HTTPStreamParser
@@ -120,6 +131,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         /// Set by the proxy just before the bytes that complete a request it answers itself.
         var nextMock: String?
         var nextGuardrail: String?
+        var nextRequestRewrite: String?
         /// Marked by the proxy immediately before the transformed response is fed here. The oldest pending request
         /// is the response being delivered, including on a pipelined keep-alive connection.
         var nextResponseTransform: String?
@@ -162,9 +174,11 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         state.request.onHead = { response.requestMethods.append($0.method) }
         state.request.onMessage = { [weak state] head, body in
             state?.queue.append(Pending(head: head, body: body, started: Date(), mock: state?.nextMock,
-                                        guardrail: state?.nextGuardrail, responseTransform: nil))
+                                        guardrail: state?.nextGuardrail, requestRewrite: state?.nextRequestRewrite,
+                                        responseTransform: nil))
             state?.nextMock = nil
             state?.nextGuardrail = nil
+            state?.nextRequestRewrite = nil
         }
         state.response.onMessage = { [weak self, weak state] head, body in
             guard let self, let state, !state.queue.isEmpty else { return }
@@ -195,6 +209,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     func flow(_ flow: ProxyFlow, serverSent data: Data) { flows[flow.id]?.response.feed(data) }
     func flow(_ flow: ProxyFlow, mockedBy rule: String) { flows[flow.id]?.nextMock = rule }
     func flow(_ flow: ProxyFlow, guardedBy note: String) { flows[flow.id]?.nextGuardrail = note }
+    func flow(_ flow: ProxyFlow, rewrittenBy note: String) { flows[flow.id]?.nextRequestRewrite = note }
     func flow(_ flow: ProxyFlow, responseTransformedBy note: String) { flows[flow.id]?.nextResponseTransform = note }
 
     func flowEnded(_ flow: ProxyFlow, note: String?) {
@@ -204,7 +219,8 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
             // Nothing was decrypted; record why, so the user sees which app and host were passed through.
             let head = HTTPHead(startLine: "CONNECT \(flow.host):\(flow.port) HTTP/1.1", headers: [])
             emit(flow: flow, state: state,
-                 request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil, guardrail: nil),
+                 request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil, guardrail: nil,
+                                  requestRewrite: nil, responseTransform: nil),
                  responseHead: nil, responseBody: HTTPBody(), note: note)
         }
     }
@@ -256,7 +272,8 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 contentType: request.head.value("Content-Type") ?? responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
                 toolResults: results, mcp: mcp, llm: llm, note: notes.isEmpty ? nil : notes.joined(separator: " "),
-                mockRule: request.mock, guardrail: request.guardrail, responseTransform: request.responseTransform)
+                mockRule: request.mock, guardrail: request.guardrail, requestRewrite: request.requestRewrite,
+                responseTransform: request.responseTransform)
             onExchange(exchange)
         }
     }

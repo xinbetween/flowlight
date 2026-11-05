@@ -17,4 +17,4 @@ The capture gate requires:
 - every retained image to be exactly 2880×1800 pixels;
 - English and light appearance for a consistent US storefront set.
 
-Upload the numbered files in `macos/` in filename order. The Store set uses Rules in place of Inspect because the Store product deliberately omits HTTPS inspection. Replace the complete existing App Store Connect screenshot set together; do not mix images from different builds or menu vocabularies.
+Upload the numbered files in `macos/` in filename order. The Store set uses Policies in place of Inspect because the Store product deliberately omits HTTPS inspection. Replace the complete existing App Store Connect screenshot set together; do not mix images from different builds or menu vocabularies.

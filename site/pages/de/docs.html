@@ -30,7 +30,7 @@ nav: docs
         </div>
         <div class="toc-group">
           <strong>Steuerung</strong>
-          <a href="#rules">Regeln</a><a href="#allowlists">Erlaubnislisten</a>
+          <a href="#policies">Richtlinien</a><a href="#allowlists">Erlaubnislisten</a>
           <a href="#blocking">Verbindungen verweigern</a><a href="#guardrails">Schutzregeln</a>
         </div>
         <div class="toc-group">
@@ -101,10 +101,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#alerts">Warnungen</a></td><td>⌘5</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
         <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
         <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7 · Developer ID</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
-        <tr><td><a href="#rules">Regeln</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Jede Erlaubnisliste und jede Verweigerung, die du gesetzt hast, was jede davon abdeckt und was sie tatsächlich gestoppt hat.</td></tr>
-        <tr><td><a href="#sources">Quellen</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Collector-Zustand, Gerätekanäle und Benennungsabdeckung in drei Tabs.</td></tr>
+        <tr><td><a href="#policies">Richtlinien</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Jede konfigurierte Richtlinie, ob sie tatsächlich wirksam ist, und ein einheitlicher schreibgeschützter Aktivitätsverlauf.</td></tr>
+        <tr><td><a href="#sources">Quellen</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Zustand und Wiederherstellung des Collectors, optionale Gerätekanäle und Abdeckung auf einer einzigen scrollbaren Betriebsseite.</td></tr>
       </table>
-      <p>Die Kurzbefehle folgen der sichtbaren Reihenfolge der Seitenleiste. Developer-ID-Versionen enthalten Inspizieren auf ⌘7; App-Store-Versionen lassen es weg, daher rücken Regeln und Quellen auf ⌘7 und ⌘8.</p>
+      <p>Die Kurzbefehle folgen der sichtbaren Reihenfolge der Seitenleiste. Developer-ID-Versionen enthalten Inspizieren auf ⌘7; App-Store-Versionen lassen es weg, daher rücken Richtlinien und Quellen auf ⌘7 und ⌘8.</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
         <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
@@ -147,7 +147,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         eine nur konfigurierte Domain nie erreicht wurde und eine nur beobachtete nirgends aufgeschrieben stand, wo du sie hättest lesen können.</p>
       <p>Jede Domain bietet zwei Verweigerungen an: <strong>für diesen Agenten</strong>, was den Agenten und die von ihm gestarteten Tools
         abdeckt, oder <strong>überall</strong>, was jede App auf dem Mac abdeckt. Beide schreiben eine ganz gewöhnliche Regel, sodass der
-        Verstoß-Verlauf sie meldet und der Regeleditor sie erklärt – und weil es gewöhnliche Regeln sind, sagt dir die Simulation im Editor, was
+        schreibgeschützte Aktivität sie meldet und der Regeleditor sie erklärt – und weil es gewöhnliche Regeln sind, sagt dir die Simulation im Editor, was
         eine davon verweigert hätte, bevor du sie einschaltest.</p>
       <p>Eine Art von Domain hat keine Knöpfe. Ein Connector, den der Modellanbieter von sich aus erreicht – im Body der Anfrage deklariert und
         von der Seite des Anbieters aus kontaktiert –, berührt diesen Mac überhaupt nicht, also kann keine Regel hier ihn erreichen. Die Zeile sagt
@@ -338,16 +338,16 @@ open build/Build/Products/Release/Flowlight.app</pre>
         verbunden: Ein Mock ändert die Antwort, nicht die Frage, ob die Verbindung zustande kommt. „Die API liefert 500“ funktioniert also, „die API
         ist überhaupt nicht erreichbar“ nicht.</p>
 
-      <h2 id="rules">Regeln</h2>
-      <p>Eine Erlaubnisliste ist die Vorstellung eines Agenten davon, wohin er gehen darf. Eine <strong>Regel</strong> ist die allgemeine Fassung: Sie nennt ein
+      <h2 id="policies"><span id="rules"></span>Richtlinien</h2>
+      <p>Unter <strong>Richtlinien</strong> sind alle Kontrollen, die Flowlight anwenden kann, in einem gemeinsamen Verzeichnis zusammengefasst: gewöhnliche Erlaubnis- und Sperrregeln, Agenten-Erlaubnislisten, verwaltete Pakete und – wo die HTTPS-Inspektion verfügbar ist – Schutzregeln, Mock-Antworten, Anfrageumschreibungen und Antworttransformationen. Jede Zeile unterscheidet den konfigurierten Zustand von der tatsächlichen Wirkung: wirksam, nur meldend, beobachtend, wartend, geplant, pausiert, verbraucht, in Anwendung, Prüfung erforderlich, nicht verfügbar, inkompatibel oder fehlgeschlagen. Wenn du eine Zeile auswählst, öffnet sich der zugehörige Editor dieser Richtlinie; die gemeinsame Ansicht ersetzt oder vermischt nicht deren unterschiedliche Einwilligungs- und Speichermodelle.</p>
+      <p>Eine Erlaubnisliste ist die Vorstellung eines Agenten davon, wohin er gehen darf. Eine gewöhnliche <strong>Regel</strong> ist die allgemeine Fassung: Sie nennt ein
         <strong>Subjekt</strong> – eine App, einen Agenten, ein Ziel, eine URL oder ein Paar aus zwei davon – und sagt <strong>blockieren</strong>
         oder <strong>erlauben</strong>. Rechtsklicke eine Zeile in Live, Verlauf, KI-Agenten oder Inspizieren, um eine Regel über das zu schreiben, was du gerade ansiehst;
-        jede davon landet im selben Editor auf dem Bildschirm <strong>Regeln</strong>, denn eine Regel, die im Verborgenen greift,
-        wäre eine Regel, die du nie wiederfindest.</p>
+        jede bleibt unter Richtlinien auffindbar und öffnet sich in ihrem maßgeblichen Editor.</p>
       <p><strong>Vorlagen.</strong> Zweiundzwanzig, in fünf Gruppen – einen Agenten von Paketregistern oder anderen
         Modellanbietern fernhalten, die üblichen Wege schließen, auf denen Daten abfließen (Paste-Dienste, Webhook-Fänger, anonyme Datei-Ablagen, Tunnel, DNS over
         HTTPS), Produktanalyse und Crash-Berichte, Regeln für Arbeitszeiten und das einmalige „blockiere das eine Stunde lang, bis ich
-        herausgefunden habe, was es ist“. Durchsuche sie über die Symbolleiste von Regeln, oder rechtsklicke irgendwo in Live, Verlauf, KI-Agenten oder Inspizieren eine Zeile und
+        herausgefunden habe, was es ist“. Durchsuche sie über die Symbolleiste von Richtlinien, oder rechtsklicke irgendwo in Live, Verlauf, KI-Agenten oder Inspizieren eine Zeile und
         wende eine auf das an, was du ansiehst.</p>
       <p>Jede Vorlage sagt, was sie tun wird, bevor sie es tut. Alles, was mehr als eine Regel schreibt, öffnet eine Karte mit jedem
         Host und jedem Zeitplan; alles Dauerhafte öffnet den vorausgefüllten Editor; und <strong>nur Regeln, die sich selbst aufheben</strong> – nach einer
@@ -368,8 +368,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Adresse und Port, nichts über Pfade, und das nur im Erweiterungsmodus. Die HTTPS-Inspektion verweigert eine einzelne Anfrage, kann also eine
         URL treffen und mit einem Status antworten, den der Agent lesen kann, statt mit einem Socket, der ohne Erklärung starb. Der nettop-Sampler kann
         überhaupt nichts verweigern. Eine Regel, die die aktuelle Einrichtung nicht umsetzen kann, sagt das in der Liste, statt dort durchgesetzt auszusehen.</p>
-      <p>Der zweite Tab ist der <strong>Verstoß-Verlauf</strong>: jede Verbindung, über die eine Regel entschieden hat, mit der App, dem Ziel, welche
-        Regel entschied und ob das eine Verweigerung war oder eine Ausnahme, die sie durchließ.</p>
+      <p>Die zweite Ansicht ist die schreibgeschützte <strong>Aktivität</strong>: gewöhnliche Regelentscheidungen, Verstöße gegen Erlaubnislisten, Ereignisse verwalteter Pakete und eigenständige Wirkungen von Inspektionsrichtlinien in einer gemeinsamen Chronologie. Sie bereitet die bestehenden maßgeblichen Einträge auf, statt den Verlauf in ein einheitliches allgemeines Ereignismodell umzuschreiben; App-Store-Versionen lassen von der Inspektion abhängige Richtlinienarten und deren aufbewahrte Aktivität weg.</p>
 
       <p><strong>Was sie bewirkt hätte.</strong> Eine Regel, die blockiert, ist leicht zu schreiben und beängstigend einzuschalten, denn
         das Erste, was man normalerweise über eine solche Regel erfährt, ist, was sie kaputt gemacht hat – und man erfährt es später,
@@ -391,7 +390,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         getestet wurde, ist gegen zwei Stunden Aufzeichnung getestet.</p>
 
       <h3 id="managed-packs">Verwaltete Werbe- und Tracker-Pakete</h3>
-      <p><strong>Regeln › Pakete</strong> enthält drei offizielle Hostnamenlisten: <strong>Werbung</strong>, <strong>Websiteübergreifendes Tracking</strong> und <strong>Datenschutz und Telemetrie</strong>. Sie sind von Anfang an sichtbar und standardmäßig alle deaktiviert. Zum Blockieren ist die Netzwerkerweiterung erforderlich; der nettop-Sampler kann nur beobachten.</p>
+      <p><strong>Richtlinien › Verwaltete Pakete</strong> enthält drei offizielle Hostnamenlisten: <strong>Werbung</strong>, <strong>Websiteübergreifendes Tracking</strong> und <strong>Datenschutz und Telemetrie</strong>. Sie sind von Anfang an sichtbar und standardmäßig alle deaktiviert. Zum Blockieren ist die Netzwerkerweiterung erforderlich; der nettop-Sampler kann nur beobachten.</p>
       <p><strong>Ausschließlich offizielle, signierte Updates.</strong> Flowlight prüft eine einzige festgelegte HTTPS-Quelle auf neuere, vom Herausgeber signierte Kataloge. Automatische Prüfungen sind standardmäßig aktiviert und können hier deaktiviert werden. Eine Signatur authentifiziert den Inhalt, aktiviert ihn aber nicht: Ein neues Paket bleibt deaktiviert, und bei geänderten Zielen wird ein aktiviertes Paket nicht mehr durchgesetzt, bis du die genaue neue Version geprüft und auf Sichern geklickt hast. Akzeptierte Inhalte können während eines Ausfalls als sichtbar veralteter letzter bekannter funktionsfähiger Stand erhalten bleiben. Dies sind Netzwerksperren auf Hostnamenebene: Sie können keine Lücken im DOM oder Layout, Browser-Overlays, skriptgesteuerten Pop-ups oder Fenster nativer Apps entfernen.</p>
       <p>Wenn die HTTPS-Inspektion eine App durch Flowlights Proxy leitet, entscheidet er anhand der ursprünglichen App-Identität über gewöhnliche Zielregeln und aktivierte verwaltete Pakete, bevor eine Verbindung zum Ursprungsserver geöffnet wird. Bei angepinnten oder nie entschlüsselten CONNECT-Tunneln funktioniert das anhand des Hostnamens; Agenten-Erlaubnislisten bleiben auf den direkten Weg über die Netzwerkerweiterung beschränkt. Ist der Eigentümer oder Hostname unbekannt, wird die Verbindung im Zweifel zugelassen.</p>
 
@@ -440,7 +439,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>Das ist keine Sandbox.</strong> Ein verweigertes Tool wird nicht mehr angeboten und nicht mehr beantwortet. Ein Agent, der noch eine
         Shell hat, kann von Hand tun, was das Tool getan hätte. Flowlight zeichnet das auf; es tut nicht so, als würde es das verhindern.</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Quellen: Collector und Engines</h2>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Quellen: Collector, Geräte und Abdeckung</h2>
+      <p><strong>Quellen</strong> ist eine einzige scrollbare Betriebsseite: zuerst Collector, dann Geräte und Abdeckung als klar bezeichnete Abschnitte. Statushinweise, Antworten unter Fragen, wiederhergestellte Fenster und Links aus Screenshots lassen die Seite zum passenden Abschnitt scrollen und heben ihn kurz hervor, ohne die anderen auszublenden.</p>
       <p>Flowlight zeichnet Datenverkehr auf eine von zwei Weisen auf, wählbar unter <strong>Quellen › Collector</strong>. Sie unterscheiden sich darin, was sie verpassen können, und das lohnt
         sich zu verstehen, bevor du dich auf eine verlässt.</p>
       <table>
@@ -637,7 +637,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>Mit geschlossenem Fenster tut Flowlight fast nichts: Es hält die Raten in der Menüleiste und schreibt eine Zeile pro Sekunde. Die Netzwerkerweiterung
           kostet weniger als der Sampler als Rückfallebene, der jede Sekunde einen kurzlebigen <code>nettop</code>-Prozess startet.</dd>
         <dt><strong>Kann es Verbindungen blockieren?</strong></dt>
-        <dd>Ja, mit der Netzwerkerweiterung. Die Erlaubnisliste eines Agenten kann verweigern und nicht nur warnen, eine <a href="#rules">Regel</a> kann eine App,
+        <dd>Ja, mit der Netzwerkerweiterung. Die Erlaubnisliste eines Agenten kann verweigern und nicht nur warnen, eine <a href="#policies">Regel</a> kann eine App,
           ein Ziel oder eine URL so lange blockieren, wie du sagst, und eine <a href="#guardrails">Schutzregel</a> kann einem Agenten ein Tool wegnehmen,
           bevor sein Modell es angeboten bekommt. Nichts blockiert, bis du es verlangst, und jede Verweigerung führt ihren Ausweg mit.</dd>
         <dt><strong>Brauche ich die Netzwerkerweiterung?</strong></dt>

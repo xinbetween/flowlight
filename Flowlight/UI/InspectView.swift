@@ -98,15 +98,17 @@ private struct InspectContent: View {
     @State private var rewriteDraft: RewriteRuleDraft?
     /// A response-transform rule is created only after its selected exchange's stored response has been read.
     @State private var responseTransformDraft: ResponseTransformDraft?
-    /// Setup was opened to look at the mock rules, so it opens on them.
+    /// Setup was opened to look at one contextual policy editor, so it opens on that section.
     @State private var openMocks = false
+    @State private var openRewrites = false
     @State private var openResponseTransforms = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
                 ScrollView {
-                    InspectionSetup(inspection: inspection, openMocks: openMocks, openResponseTransforms: openResponseTransforms, done: { showSetup = false })
+                    InspectionSetup(inspection: inspection, openMocks: openMocks, openRewrites: openRewrites,
+                                    openResponseTransforms: openResponseTransforms, done: { showSetup = false })
                         .padding(.bottom, 20)
                 }
             } else {
@@ -163,6 +165,12 @@ private struct InspectContent: View {
             scopeAgentParent = request.agentParent
             scopeMCPServer = request.mcpServer
             potentialHarmOnly = request.potentialHarmOnly
+            if let section = request.policySection {
+                showSetup = true
+                openMocks = section == .mocks
+                openRewrites = section == .requestRewrites
+                openResponseTransforms = section == .responseTransforms
+            }
             nav.inspectRequest = nil
         }
         .onChange(of: monitor.localRiskVersion) {
@@ -510,6 +518,7 @@ private struct InspectContent: View {
 private struct InspectionSetup: View {
     @ObservedObject var inspection: InspectionController
     var openMocks = false
+    var openRewrites = false
     var openResponseTransforms = false
     var done: () -> Void
     @State private var newPattern = ""
@@ -685,6 +694,7 @@ private struct InspectionSetup: View {
         .onAppear {
             inspection.refreshStatus()
             showMocks = showMocks || openMocks
+            showRewrites = showRewrites || openRewrites
             showResponseTransforms = showResponseTransforms || openResponseTransforms
         }
     }

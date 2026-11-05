@@ -775,8 +775,6 @@
 "Seen as it happened, named, and readable." = "일어난 순간에 포착되고, 이름이 붙고, 내용도 읽혔습니다.";
 
 /* UI/DevicesView.swift */
-"USB" = "USB";
-"Not watching" = "감시하지 않음";
 "Read the device list again now (⌘R)" = "지금 기기 목록 다시 읽기 (⌘R)";
 "Watch Bluetooth" = "Bluetooth 감시";
 "Watch USB and external storage" = "USB 및 외장 저장 장치 감시";
@@ -1257,13 +1255,8 @@
 "Edit as normal rule…" = "일반 규칙으로 편집…";
 
 /* UI/RulesView.swift */
-"Packs" = "팩";
-"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "규칙 판단과 팩 차단 요약이 여기에 표시됩니다. 광고가 많은 페이지 때문에 알림이 가득 차지 않도록 팩 활동은 묶어서 표시됩니다.";
 "Managed packs" = "관리형 팩";
-"What they did" = "동작 내역";
 "Paused until %@" = "%@까지 일시 중지됨";
-"%lld in force" = "%lld개 적용 중";
-"%1$lld of %2$lld in force" = "%2$lld개 중 %1$lld개 적용 중";
 "Templates" = "템플릿";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "쓸 만한 규칙을 용도별로 모아 두었고, 호스트도 이미 채워져 있습니다";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "규칙 작성: 앱, 에이전트, 목적지 또는 URL을 차단하거나 허용합니다";
@@ -1277,8 +1270,6 @@
 "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "규칙 %lld개가 관찰만 되고 실행되지는 않습니다. 데이터 경로에 자리해 연결을 거부할 수 있는 것은 네트워크 확장 프로그램뿐이며, nettop 샘플러는 트래픽을 사후에 집계합니다. 이 규칙을 적용하려면 소스 › 컬렉터에서 네트워크 확장 프로그램을 선택하세요.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "규칙 1개가 관찰만 되고 실행되지는 않습니다. 경로를 지정한 규칙은 HTTPS 검사로만 일치시킬 수 있는데, 검사가 꺼져 있습니다.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "규칙 %lld개가 관찰만 되고 실행되지는 않습니다. 경로를 지정한 규칙은 HTTPS 검사로만 일치시킬 수 있는데, 검사가 꺼져 있습니다.";
-"In force" = "적용 중";
-"Not in force" = "적용되지 않음";
 "Nothing is being refused until %@." = "%@까지는 아무것도 거부하지 않습니다.";
 "Resume now" = "지금 다시 시작";
 "No rules yet" = "아직 규칙이 없습니다";
@@ -1288,7 +1279,6 @@
 "Nothing yet" = "아직 없음";
 "Today" = "오늘";
 "Yesterday" = "어제";
-"A rule since deleted" = "이후 삭제된 규칙";
 "Edit…" = "편집…";
 "Reset Count" = "횟수 재설정";
 "Delete" = "삭제";
@@ -1886,3 +1876,70 @@
 "Restart or reinstall the filter to finish the update" = "업데이트를 완료하려면 필터를 재시작하거나 다시 설치하세요";
 "Return to the previous history scope" = "이전 기록 범위로 돌아가기";
 "Selected" = "선택됨";
+
+/* 0.17.4 unified policies and sources */
+"Policies" = "정책";
+"Activity" = "활동";
+"Choose the traffic source and verify that data is arriving." = "트래픽 소스를 선택하고 데이터가 들어오는지 확인합니다.";
+"Choose which local device channels Flowlight watches." = "Flowlight가 감시할 로컬 기기 채널을 선택합니다.";
+"Check what Flowlight can name, attribute, and inspect." = "Flowlight가 이름을 붙이고, 출처를 연결하고, 검사할 수 있는 범위를 확인합니다.";
+"Network rules" = "네트워크 규칙";
+"Agent allowlists" = "에이전트 허용 목록";
+"Agent guardrails" = "에이전트 가드레일";
+"Request rewrites" = "요청 다시 쓰기";
+"Response transforms" = "응답 변환";
+"In effect" = "적용 중";
+"Reporting only" = "보고만 함";
+"Waiting" = "대기 중";
+"Unavailable" = "사용할 수 없음";
+"Not applying" = "적용되지 않음";
+"HTTPS inspection is off." = "HTTPS 검사가 꺼져 있습니다.";
+"HTTPS inspection is not running." = "HTTPS 검사가 실행 중이 아닙니다.";
+"This policy is switched off." = "이 정책은 꺼져 있습니다.";
+"This rule is switched off." = "이 규칙은 꺼져 있습니다.";
+"Network blocking is paused." = "네트워크 차단이 일시 중지되었습니다.";
+"This one-off rule has already been used." = "이 일회성 규칙은 이미 사용되었습니다.";
+"This rule is outside its scheduled time." = "이 규칙은 현재 지정된 시간대 밖에 있습니다.";
+"Every destination" = "모든 목적지";
+"No listed destinations" = "등록된 목적지 없음";
+"1 listed destination" = "등록된 목적지 1개";
+"%lld listed destinations" = "등록된 목적지 %lld개";
+"This allowlist is switched off." = "이 허용 목록은 꺼져 있습니다.";
+"Unlisted destinations raise alerts but are not blocked." = "목록에 없는 목적지는 알림을 띄우지만 차단하지 않습니다.";
+"Blocking is unavailable; unlisted destinations still raise alerts." = "차단을 사용할 수 없지만, 목록에 없는 목적지는 계속 알림을 띄웁니다.";
+"Review the changed pack before it can keep applying." = "변경된 팩을 검토해야 다시 적용할 수 있습니다.";
+"This pack is switched off." = "이 팩은 꺼져 있습니다.";
+"The pack is matching destinations but cannot block them here." = "이 팩은 목적지를 찾아내고 있지만 여기서는 차단할 수 없습니다.";
+"The pack is waiting for the active filter to apply it." = "이 팩은 활성 필터가 적용하기를 기다리고 있습니다.";
+"The managed-pack engine is not applying this configuration." = "관리형 팩 엔진이 이 구성을 적용하지 않고 있습니다.";
+"No longer in the official catalog" = "공식 카탈로그에서 삭제됨";
+"Blocking stopped automatically. Acknowledge this change after review." = "차단이 자동으로 중지되었습니다. 검토한 뒤 이 변경을 확인하세요.";
+"Every agent" = "모든 에이전트";
+"A policy since deleted" = "이후 삭제된 정책";
+"%@ · %lld connections" = "%@ · 연결 %lld개";
+"%lld policies · none currently effective" = "정책 %lld개 · 현재 적용 중인 정책 없음";
+"%1$lld policies · %2$lld currently effective" = "정책 %1$lld개 · 현재 %2$lld개 적용 중";
+"Everything Flowlight can apply" = "Flowlight가 적용할 수 있는 모든 제어";
+"Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent." = "네트워크 판정, 에이전트 제한, 관리형 목적지 목록, 개발자용 검사 정책을 한곳에서 봅니다. 각 정책을 선택하면 그 동작과 동의를 관리하는 원래 편집기가 열립니다.";
+"Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent." = "네트워크 판정, 에이전트 제한, 관리형 목적지 목록을 한곳에서 봅니다. 각 정책을 선택하면 그 동작과 동의를 관리하는 원래 편집기가 열립니다.";
+"%lld destinations · %@" = "목적지 %lld개 · %@";
+"every app" = "모든 앱";
+"Official · pack v%@ · %@" = "공식 · 팩 v%@ · %@";
+"Flowlight · signer %@" = "Flowlight · 서명자 %@";
+"Catalog" = "카탈로그";
+"Sequence %1$lld · digest %2$@" = "순번 %1$lld · 다이제스트 %2$@";
+"Last verified" = "마지막 검증";
+"Next check" = "다음 확인";
+"Official catalog details" = "공식 카탈로그 세부 정보";
+"Not checked" = "확인하지 않음";
+"Verified" = "검증됨";
+"Stale" = "오래됨";
+"Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records." = "차단, 예외, 허용 목록 위반, 가드레일, 모의 응답, 요청·응답 변경을 원래 기록은 그대로 둔 채 여기에 표시합니다.";
+"Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records." = "네트워크 차단, 예외, 관리형 팩 일치, 허용 목록 위반을 원래 기록은 그대로 둔 채 여기에 표시합니다.";
+"Blocked connection or request" = "차단된 연결 또는 요청";
+"Blocked by a managed pack" = "관리형 팩으로 차단됨";
+"Outside an agent allowlist" = "에이전트 허용 목록 밖";
+"Capability removed by a guardrail" = "가드레일이 제거한 기능";
+"Answered by a mock" = "모의 응답으로 처리됨";
+"Request changed before sending" = "전송 전에 변경된 요청";
+"Response changed before delivery" = "전달 전에 변경된 응답";

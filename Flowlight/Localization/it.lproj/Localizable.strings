@@ -752,8 +752,6 @@
 "Seen as it happened, named, and readable." = "Visto mentre accadeva, con un nome e leggibile.";
 
 /* UI/DevicesView.swift */
-"USB" = "USB";
-"Not watching" = "Non monitorato";
 "Read the device list again now (⌘R)" = "Rileggi subito l'elenco dei dispositivi (⌘R)";
 "Watch Bluetooth" = "Monitora il Bluetooth";
 "Watch USB and external storage" = "Monitora USB e archiviazione esterna";
@@ -1234,13 +1232,8 @@
 "Edit as normal rule…" = "Modifica come regola normale…";
 
 /* UI/RulesView.swift */
-"Packs" = "Pacchetti";
-"Rule decisions and summarized pack blocks land here. Pack activity is grouped so a page full of ads does not become a page full of alerts." = "Qui compaiono le decisioni delle regole e i blocchi riepilogati dei pacchetti. L’attività dei pacchetti viene raggruppata, così una pagina piena di pubblicità non diventa una pagina piena di avvisi.";
 "Managed packs" = "Pacchetti gestiti";
-"What they did" = "Cosa hanno fatto";
 "Paused until %@" = "In pausa fino a %@";
-"%lld in force" = "%lld in vigore";
-"%1$lld of %2$lld in force" = "%1$lld di %2$lld in vigore";
 "Templates" = "Modelli";
 "Rules worth having, grouped by what they are for, with the hosts already written out" = "Regole utili, raggruppate per scopo, con gli host già scritti";
 "Write a rule: an app, an agent, a destination or a URL, blocked or allowed" = "Scrivi una regola: un'app, un agente, una destinazione o un URL, bloccato o consentito";
@@ -1254,8 +1247,6 @@
 "%lld rules are being watched but not carried out. Only the Network Extension sits in the data path and can refuse a connection; the nettop sampler counts traffic after the fact. Select the Network Extension in Sources › Collector to enforce these rules." = "%lld regole vengono osservate ma non applicate. Solo l'estensione di rete si trova sul percorso dei dati e può rifiutare una connessione; il campionatore nettop conta il traffico a posteriori. Seleziona l'estensione di rete in Origini › Collector per applicare queste regole.";
 "One rule is being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "Una regola viene osservata ma non applicata: una regola che indica un percorso può essere confrontata solo dall'ispezione HTTPS, che è disattivata.";
 "%lld rules are being watched but not carried out — a rule that names a path can only be matched by HTTPS inspection, and it is off." = "%lld regole vengono osservate ma non applicate: una regola che indica un percorso può essere confrontata solo dall'ispezione HTTPS, che è disattivata.";
-"In force" = "In vigore";
-"Not in force" = "Non in vigore";
 "Nothing is being refused until %@." = "Nulla viene rifiutato fino a %@.";
 "Resume now" = "Riprendi adesso";
 "No rules yet" = "Ancora nessuna regola";
@@ -1265,7 +1256,6 @@
 "Nothing yet" = "Ancora nulla";
 "Today" = "Oggi";
 "Yesterday" = "Ieri";
-"A rule since deleted" = "Una regola poi eliminata";
 "Edit…" = "Modifica…";
 "Reset Count" = "Azzera il conteggio";
 "Delete" = "Elimina";
@@ -1887,3 +1877,70 @@
 "Restart or reinstall the filter to finish the update" = "Riavvia o reinstalla il filtro per completare l'aggiornamento";
 "Return to the previous history scope" = "Torna all'ambito precedente della cronologia";
 "Selected" = "Selezionato";
+
+/* 0.17.4 criteri unificati e origini */
+"Policies" = "Criteri";
+"Activity" = "Attività";
+"Choose the traffic source and verify that data is arriving." = "Scegli l'origine del traffico e verifica che i dati stiano arrivando.";
+"Choose which local device channels Flowlight watches." = "Scegli quali canali dei dispositivi locali deve monitorare Flowlight.";
+"Check what Flowlight can name, attribute, and inspect." = "Verifica che cosa Flowlight può nominare, attribuire e ispezionare.";
+"Network rules" = "Regole di rete";
+"Agent allowlists" = "Elenchi consentiti degli agenti";
+"Agent guardrails" = "Protezioni degli agenti";
+"Request rewrites" = "Riscritture delle richieste";
+"Response transforms" = "Trasformazioni delle risposte";
+"In effect" = "Effettivo";
+"Reporting only" = "Solo segnalazione";
+"Waiting" = "In attesa";
+"Unavailable" = "Non disponibile";
+"Not applying" = "Non applicato";
+"HTTPS inspection is off." = "L'ispezione HTTPS è disattivata.";
+"HTTPS inspection is not running." = "L'ispezione HTTPS non è in esecuzione.";
+"This policy is switched off." = "Questo criterio è disattivato.";
+"This rule is switched off." = "Questa regola è disattivata.";
+"Network blocking is paused." = "Il blocco della rete è in pausa.";
+"This one-off rule has already been used." = "Questa regola monouso è già stata utilizzata.";
+"This rule is outside its scheduled time." = "Questa regola è fuori dall'orario programmato.";
+"Every destination" = "Tutte le destinazioni";
+"No listed destinations" = "Nessuna destinazione elencata";
+"1 listed destination" = "1 destinazione elencata";
+"%lld listed destinations" = "%lld destinazioni elencate";
+"This allowlist is switched off." = "Questo elenco consentiti è disattivato.";
+"Unlisted destinations raise alerts but are not blocked." = "Le destinazioni non elencate generano avvisi ma non vengono bloccate.";
+"Blocking is unavailable; unlisted destinations still raise alerts." = "Il blocco non è disponibile; le destinazioni non elencate continuano a generare avvisi.";
+"Review the changed pack before it can keep applying." = "Esamina il pacchetto modificato prima che possa continuare a essere applicato.";
+"This pack is switched off." = "Questo pacchetto è disattivato.";
+"The pack is matching destinations but cannot block them here." = "Il pacchetto trova corrispondenze tra le destinazioni ma qui non può bloccarle.";
+"The pack is waiting for the active filter to apply it." = "Il pacchetto attende che il filtro attivo lo applichi.";
+"The managed-pack engine is not applying this configuration." = "Il motore dei pacchetti gestiti non sta applicando questa configurazione.";
+"No longer in the official catalog" = "Non è più nel catalogo ufficiale";
+"Blocking stopped automatically. Acknowledge this change after review." = "Il blocco è stato interrotto automaticamente. Dopo aver esaminato la modifica, confermala.";
+"Every agent" = "Tutti gli agenti";
+"A policy since deleted" = "Un criterio poi eliminato";
+"%@ · %lld connections" = "%@ · %lld connessioni";
+"%lld policies · none currently effective" = "%lld criteri · nessuno attualmente applicato";
+"%1$lld policies · %2$lld currently effective" = "%1$lld criteri · %2$lld attualmente applicati";
+"Everything Flowlight can apply" = "Tutto ciò che Flowlight può applicare";
+"Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent." = "Qui trovi le decisioni di rete, i limiti degli agenti, gli elenchi gestiti di destinazioni e i criteri di ispezione per sviluppatori. Ogni criterio continua ad aprirsi nell'editor responsabile del relativo comportamento e consenso.";
+"Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent." = "Qui trovi le decisioni di rete, i limiti degli agenti e gli elenchi gestiti di destinazioni. Ogni criterio continua ad aprirsi nell'editor responsabile del relativo comportamento e consenso.";
+"%lld destinations · %@" = "%lld destinazioni · %@";
+"every app" = "ogni app";
+"Official · pack v%@ · %@" = "Ufficiale · pacchetto v%@ · %@";
+"Flowlight · signer %@" = "Flowlight · firmatario %@";
+"Catalog" = "Catalogo";
+"Sequence %1$lld · digest %2$@" = "Sequenza %1$lld · digest %2$@";
+"Last verified" = "Ultima verifica";
+"Next check" = "Prossimo controllo";
+"Official catalog details" = "Dettagli del catalogo ufficiale";
+"Not checked" = "Non controllato";
+"Verified" = "Verificato";
+"Stale" = "Obsoleto";
+"Blocks, exceptions, allowlist violations, guardrails, mocks, and request or response changes appear here without changing their original records." = "Blocchi, eccezioni, violazioni degli elenchi consentiti, protezioni, simulazioni e modifiche a richieste o risposte compaiono qui senza alterare i record originali.";
+"Network blocks, exceptions, managed-pack matches, and allowlist violations appear here without changing their original records." = "Blocchi di rete, eccezioni, corrispondenze dei pacchetti gestiti e violazioni degli elenchi consentiti compaiono qui senza alterare i record originali.";
+"Blocked connection or request" = "Connessione o richiesta bloccata";
+"Blocked by a managed pack" = "Bloccata da un pacchetto gestito";
+"Outside an agent allowlist" = "Fuori dall'elenco consentiti di un agente";
+"Capability removed by a guardrail" = "Funzionalità rimossa da una protezione";
+"Answered by a mock" = "Risposta fornita da una simulazione";
+"Request changed before sending" = "Richiesta modificata prima dell'invio";
+"Response changed before delivery" = "Risposta modificata prima della consegna";

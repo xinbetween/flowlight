@@ -1,5 +1,18 @@
 import SwiftUI
 
+struct AgentPolicyDeepLinkState: Equatable {
+    var request: AgentPolicyRequest?
+
+    func section(for agentID: String) -> AgentPolicySection? {
+        guard request?.agentID == agentID else { return nil }
+        return request?.section
+    }
+
+    mutating func consume() {
+        request = nil
+    }
+}
+
 enum AgentWindow: String, CaseIterable, Identifiable {
     case hour, day, week
     var id: String { rawValue }
@@ -32,6 +45,7 @@ struct AgentsView: View {
     @State private var inspectedAgents: Set<String> = []
     @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
     @State private var selection: AgentSummary.ID?
+    @State private var policyDeepLink = AgentPolicyDeepLinkState()
     @State private var sortOrder = [KeyPathComparator(\AgentSummary.riskScore, order: .reverse)]
     @State private var loaded = false
 
@@ -93,15 +107,24 @@ struct AgentsView: View {
                                 activity: toolActivity[selected.bundleID] ?? [], servers: mcpServers[selected.bundleID] ?? [],
                                 profile: profiles[selected.bundleID], inspected: inspectedAgents.contains(selected.bundleID),
                                 workspaces: workspaceStore.workspaces(bundleID: selected.bundleID, name: selected.name),
-                                policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false)) { policy in
+                                policy: policies[selected.bundleID] ?? AgentPolicy(agentID: selected.bundleID, enabled: false),
+                                requestedPolicySection: policyDeepLink.section(for: selected.bundleID),
+                                consumeRequestedPolicySection: { policyDeepLink.consume() }) { policy in
                         policies[policy.agentID] = policy
                         monitor.savePolicy(policy)
                     }
+                    .id(selected.id)
                 }
             }
         }
         .padding()
         .navigationTitle(L("AI Agents"))
+        .onChange(of: nav.agentPolicyRequest, initial: true) { _, request in
+            guard let request else { return }
+            selection = request.agentID
+            policyDeepLink.request = request
+            nav.agentPolicyRequest = nil
+        }
         .task(id: LoadKey(window: window, version: monitor.dataVersion, focus: focus.scope)) { await load() }
     }
 
@@ -530,11 +553,17 @@ struct AgentDetail: View {
     var inspected = false
     var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
+    var requestedPolicySection: AgentPolicySection?
+    var consumeRequestedPolicySection: () -> Void = {}
     var save: (AgentPolicy) -> Void
     @State private var tab = Tab.fromLaunchArgument
 
     enum Tab: Hashable {
         case destinations, calls, tools, servers, guardrails
+
+        static func policyLanding(_ section: AgentPolicySection) -> Tab {
+            section == .guardrails ? .guardrails : .destinations
+        }
 
         /// `-FLAgentTab tools`, for the screenshots. The default is what someone actually opens on.
         static var fromLaunchArgument: Tab {
@@ -738,6 +767,13 @@ struct AgentDetail: View {
                 }
             }
             .lineLimit(1)
+        }
+        .onChange(of: requestedPolicySection, initial: true) { _, section in
+            guard let section else { return }
+            // The allowlist is always visible in the left column; returning the right column to Destinations keeps
+            // it in the normal overview instead of preserving a Guardrails tab from a previous deep link.
+            tab = Tab.policyLanding(section)
+            consumeRequestedPolicySection()
         }
     }
 

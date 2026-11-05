@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.17.4, macOS 15 or later.
 
  On this page
 
@@ -79,7 +79,7 @@ Documentation
  AskHTTPS inspectionMock responses
 
  Control
- RulesAllowlists
+ PoliciesAllowlists
  Refusing connectionsGuardrails
 
  Sources
@@ -163,13 +163,13 @@ open build/Build/Products/Release/Flowlight.app
 
  Inspect⌘7 · Developer IDOptional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
 
- Rules⌘8 · Developer ID
-⌘7 · App StoreEvery allowlist and refusal you have set, what each one covers, and what it has actually stopped.
+ Policies⌘8 · Developer ID
+⌘7 · App StoreEvery configured policy, whether it is actually effective, and a unified read-only activity trail.
 
  Sources⌘9 · Developer ID
-⌘8 · App StoreCollector health and recovery, hostname coverage, and opt-in camera, Bluetooth, USB and storage activity in three tabs.
+⌘8 · App StoreCollector health and recovery, opt-in device channels, and coverage as one scrollable operational page.
 
- The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Rules and Sources move to ⌘7 and ⌘8.
+ The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Policies and Sources move to ⌘7 and ⌘8.
 
  Live, the screen Flowlight opens on.
  In History, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with Nearby context and can switch to All history: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.
@@ -224,7 +224,7 @@ open build/Build/Products/Release/Flowlight.app
  never been reached, and one only ever observed was never written down anywhere you could have read it.
 
  Each domain offers two refusals: for this agent, which covers the agent and the tools it starts, or
- everywhere, which covers every app on the Mac. Both write an ordinary rule, so the violations feed reports
+ everywhere, which covers every app on the Mac. Both write an ordinary rule, so Activity reports
  them and the rule editor explains them — and because they are ordinary rules, the simulation in the editor will tell you what
  one would have refused before you switch it on.
 
@@ -464,18 +464,23 @@ open build/Build/Products/Release/Flowlight.app
  connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
  is entirely unreachable" does not.
 
- Rules
+ Policies
 
- An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
+ Policies is one inventory for every control Flowlight can apply: ordinary allow/block rules, agent
+ allowlists, managed packs, and—where HTTPS inspection is available—guardrails, mocks, request rewrites, and response
+ transforms. Each row distinguishes configured state from actual effect: enforcing, reporting, watching, waiting,
+ scheduled, paused, spent, applying, review required, unavailable, incompatible, or failed. Selecting a row opens the
+ contextual editor that owns that policy; Policies does not replace or blur those separate consent and persistence models.
+
+ An allowlist is one agent's idea of where it may go. An ordinary rule is the general version: it names a
  subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
  or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at;
- every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
- would be a rule you could never find again.
+ every one remains findable in Policies and opens in its authoritative editor.
 
  Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
  model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
  HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
- what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
+ what it is". Browse them from the Policies toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
  apply one to what you're looking at.
 
  Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
@@ -502,8 +507,9 @@ open build/Build/Products/Release/Flowlight.app
  URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
  refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.
 
- The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
- rule decided it and whether that was a refusal or an exception letting it through.
+ The second view is read-only Activity: ordinary rule decisions, allowlist violations, managed-pack events,
+ and distinct inspection-policy effects in one chronology. It adapts the existing authoritative records rather than rewriting
+ history into one generic event model; Store builds omit inspection-dependent policy kinds and their retained activity.
 
  What it would have done. A blocking rule is easy to write and frightening to switch on, because the first
  thing you normally learn about one is what it broke — and you learn it later, from something failing somewhere else. The rule
@@ -526,7 +532,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Managed ad and tracker packs
 
- Rules › Packs contains three official lists built into Flowlight: Advertising covers known
+ Policies › Managed packs contains three official lists built into Flowlight: Advertising covers known
  advertising delivery and auction hosts; Cross-site tracking covers common analytics, session replay and
  cross-site measurement hosts; and Privacy and telemetry covers crash reporting, install attribution, and
  audited Apple advertising and analytics hosts. The packs are visible from the start and all are off by default.
@@ -631,9 +637,11 @@ open build/Build/Products/Release/Flowlight.app
  This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
  shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
 
- Sources: collector, coverage and devices
+ Sources: collector, devices and coverage
 
- Sources keeps operational setup in one place. Its health summary shows whether traffic is arriving, how much is named, and which optional device channels are active; any unfinished collector step links directly to Sources › Collector.
+ Sources is one scrollable operational page: Collector first, then Devices and Coverage as clearly headed
+ sections. Status notices, Ask answers, restored windows, and screenshot links scroll to and briefly focus the relevant section
+ without hiding the others.
 
  Flowlight records traffic one of two ways, chosen under Sources › Collector. They differ in what they can miss, which is worth
  understanding before you rely on either.
@@ -920,7 +928,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.17.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1003,8 +1011,8 @@ Where did it all go? From 15 minutes through all history, grouped by app, destin
 What looked wrong? Explainable, per-app alerts with the destination and the threshold.
 ⌘5
 
- Rules
-What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
+ Policies
+What controls exist, and are they effective? Every policy, its real state, and a unified activity trail.
 ⌘8 · Developer ID / ⌘7 · App Store
 
  Ask
@@ -1012,7 +1020,7 @@ Questions in plain language, answered from the history — with every query it r
 ⌘6
 
  Sources
-Is data arriving, how much is named, and which device channels are active? Collector, Devices and Coverage in one place.
+Is data arriving, which device channels are active, and what can Flowlight account for? One page: Collector, Devices, then Coverage.
 ⌘9 · Developer ID / ⌘8 · App Store
 
  Inspect
@@ -1614,7 +1622,7 @@ Privacy
 
  Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
 
- Official rule-pack updateflowlight.xinbetween.comA standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the Flowlight/<version> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifierAfter startup when due and then at most daily while healthy. On by default; off switch and manual Check Now in Rules › Packs
+ Official rule-pack updateflowlight.xinbetween.comA standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the Flowlight/<version> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifierAfter startup when due and then at most daily while healthy. On by default; off switch and manual Check Now under Policies › Managed packs
 
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this
 
@@ -1664,8 +1672,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.17.3
+ 0.17.4
 November 4, 2026Latest
+
+ See every control in Policies. Rules is now a unified Policies inventory for ordinary rules, agent allowlists, managed packs, and Developer-only inspection policies, with truthful effective states rather than treating every enabled item as active.
+
+ Keep each policy's real editor and evidence. Selecting an item opens the contextual editor that owns it; Managed packs retain compact provenance and consent, while Activity adapts the existing authoritative records without conflating policy types.
+
+ Read Sources as one operational page. Collector, Devices and Coverage now flow in that order without a segmented control, while status links, Ask answers, restored windows and screenshot arguments still focus the requested section.
+
+ Dismiss chart details when the pointer leaves. History no longer leaves a zero-value tooltip floating at the upper-left after the cursor exits the All traffic plot; keyboard bucket inspection remains unchanged.
+
+ Sign each release once. The immutable tag run builds, signs, notarizes, Gatekeeper-verifies, attests and retains one artifact; publication has no signing credentials and can only verify and publish those exact prepared bytes.
+
+ 0.17.3
+November 4, 2026
 
  Keep every input in one operational home. Capture, Devices and Coverage are now Collector, Devices and Coverage tabs inside Sources, with a shared health summary and a step-by-step recovery card when traffic is not arriving.
 

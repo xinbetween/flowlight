@@ -146,6 +146,11 @@ enum ReportChartHoverLayout {
             : lineX - gap - cardWidth
         return min(max(0, proposed), max(0, chartWidth - cardWidth))
     }
+
+    static func contains(_ location: CGPoint, in plotFrame: CGRect) -> Bool {
+        location.x > plotFrame.minX && location.x < plotFrame.maxX
+            && location.y > plotFrame.minY && location.y < plotFrame.maxY
+    }
 }
 
 enum ReportChartKeyboardDirection {
@@ -160,6 +165,17 @@ enum ReportChartKeyboardSelection {
         case .left: return dates[max(0, index - 1)]
         case .right: return dates[min(dates.count - 1, index + 1)]
         }
+    }
+
+    static func reconcile(_ current: Date?, chartFocused: Bool, dates: [Date]) -> Date? {
+        guard chartFocused, let current, !dates.contains(current) else { return current }
+        return move(from: nil, direction: .right, dates: dates)
+    }
+}
+
+enum ReportChartHighlightSelection {
+    static func date(hovered: Date?, keyboard: Date?, chartFocused: Bool) -> Date? {
+        hovered ?? (chartFocused ? keyboard : nil)
     }
 }
 
@@ -252,10 +268,12 @@ struct ReportsView: View {
     /// From the series, not the table rows, so shares stay right even if the table is capped.
     private var grandTotal: Int64 { max(1, series.reduce(0) { $0 + $1.total }) }
     private var highlightedPoint: SeriesPoint? {
-        if chartFocused, let keyboardBucketDate {
-            return series.first { $0.date == keyboardBucketDate }
-        }
-        return hovered
+        let date = ReportChartHighlightSelection.date(
+            hovered: hovered?.date,
+            keyboard: keyboardBucketDate,
+            chartFocused: chartFocused
+        )
+        return series.first { $0.date == date }
     }
 
     var body: some View {
@@ -701,9 +719,12 @@ struct ReportsView: View {
                             case .active(let location):
                                 hoverDismissID = UUID()
                                 tooltipHovered = false
-                                hovered = point(at: location, proxy: proxy, geo: geo)
-                                hoverLineX = hovered.flatMap { lineX(for: $0, proxy: proxy, geo: geo) }
-                                    ?? location.x
+                                if let point = point(at: location, proxy: proxy, geo: geo) {
+                                    hovered = point
+                                    hoverLineX = lineX(for: point, proxy: proxy, geo: geo) ?? location.x
+                                } else {
+                                    clearTransientChartHover()
+                                }
                             case .ended:
                                 scheduleHoverDismissal()
                             }
@@ -713,17 +734,12 @@ struct ReportsView: View {
             .focusable()
             .focusEffectDisabled()
             .focused($chartFocused)
-            .onChange(of: chartFocused) { _, focused in
-                guard focused else { return }
-                keyboardBucketDate = ReportChartKeyboardSelection.move(
-                    from: keyboardBucketDate,
-                    direction: .right,
-                    dates: series.map(\.date)
-                )
-            }
             .onChange(of: series.map(\.date)) { _, dates in
-                guard chartFocused, !dates.contains(keyboardBucketDate ?? .distantPast) else { return }
-                keyboardBucketDate = ReportChartKeyboardSelection.move(from: nil, direction: .right, dates: dates)
+                keyboardBucketDate = ReportChartKeyboardSelection.reconcile(
+                    keyboardBucketDate,
+                    chartFocused: chartFocused,
+                    dates: dates
+                )
             }
             .onMoveCommand { direction in
                 let keyboardDirection: ReportChartKeyboardDirection
@@ -769,6 +785,9 @@ struct ReportsView: View {
                                 }
                         }
                     }
+                }
+                .onHover { inside in
+                    if !inside { clearTransientChartHover() }
                 }
                 .frame(height: 300)
                 HistoryNavigator(points: overview, contextPoints: navigatorDetail,
@@ -1107,8 +1126,9 @@ struct ReportsView: View {
 
     private func point(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> SeriesPoint? {
         guard let plot = proxy.plotFrame else { return nil }
-        let origin = geo[plot].origin
-        guard let date: Date = proxy.value(atX: location.x - origin.x) else { return nil }
+        let frame = geo[plot]
+        guard ReportChartHoverLayout.contains(location, in: frame),
+              let date: Date = proxy.value(atX: location.x - frame.origin.x) else { return nil }
         return series.last { $0.date <= date } ?? series.first
     }
 
@@ -1118,14 +1138,20 @@ struct ReportsView: View {
         return geo[plot].origin.x + x
     }
 
+    private func clearTransientChartHover() {
+        hoverDismissID = UUID()
+        tooltipHovered = false
+        hovered = nil
+        hoverLineX = nil
+    }
+
     private func scheduleHoverDismissal() {
         let requestID = UUID()
         hoverDismissID = requestID
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
             guard hoverDismissID == requestID, !tooltipHovered else { return }
-            hovered = nil
-            hoverLineX = nil
+            clearTransientChartHover()
         }
     }
 
