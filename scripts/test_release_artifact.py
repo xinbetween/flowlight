@@ -27,6 +27,13 @@ extract_archive = release_artifact.extract_archive
 verify_run = release_artifact.verify_run
 REQUIRED_REVIEW_CHECKS = release_artifact.REQUIRED_REVIEW_CHECKS
 
+CHECKS_SCRIPT = pathlib.Path(__file__).with_name("check_release_checks.py")
+CHECKS_SPEC = importlib.util.spec_from_file_location("release_check_contract", CHECKS_SCRIPT)
+assert CHECKS_SPEC and CHECKS_SPEC.loader
+release_check_contract = importlib.util.module_from_spec(CHECKS_SPEC)
+sys.modules[CHECKS_SPEC.name] = release_check_contract
+CHECKS_SPEC.loader.exec_module(release_check_contract)
+
 REPOSITORY = "xinbetween/flowlight"
 TAG = "v0.17.4"
 SHA = "a" * 40
@@ -326,11 +333,19 @@ class PreparedBundleTests(unittest.TestCase):
         (self.root / "RELEASE-NOTES.md").unlink()
         verify(self.root, public=True)
 
-    def test_accepts_viewer_dependent_association_metadata(self):
-        manifest = self._load_manifest()
-        manifest["review_evidence"]["review_receipts"][0]["author_association"] = "CONTRIBUTOR"
-        self._save_manifest(manifest)
-        verify(self.root)
+    def test_accepts_github_association_metadata(self):
+        for association in sorted(release_artifact.GITHUB_AUTHOR_ASSOCIATIONS):
+            with self.subTest(association=association):
+                manifest = self._load_manifest()
+                manifest["review_evidence"]["review_receipts"][0]["author_association"] = association
+                self._save_manifest(manifest)
+                verify(self.root)
+
+    def test_author_association_enum_matches_evidence_collector(self):
+        self.assertEqual(
+            release_artifact.GITHUB_AUTHOR_ASSOCIATIONS,
+            release_check_contract.GITHUB_AUTHOR_ASSOCIATIONS,
+        )
 
     def test_rejects_changed_or_malformed_bundles(self):
         cases = {
@@ -361,6 +376,8 @@ class PreparedBundleTests(unittest.TestCase):
             "manifest receipt invalid ID": lambda: self._review_receipt_field(0, "comment_id", 0),
             "manifest receipt missing reviewer": lambda: self._review_receipt_field(0, "reviewer", ""),
             "manifest receipt missing association": lambda: self._review_receipt_field(0, "author_association", ""),
+            "manifest receipt whitespace association": lambda: self._review_receipt_field(0, "author_association", "  "),
+            "manifest receipt unknown association": lambda: self._review_receipt_field(0, "author_association", "FORGED"),
             "manifest receipt non-string association": lambda: self._review_receipt_field(0, "author_association", 1),
             "manifest receipt wrong SHA": lambda: self._review_receipt_field(0, "reviewed_commit", "d" * 40),
             "manifest receipt wrong URL": lambda: self._review_receipt_field(

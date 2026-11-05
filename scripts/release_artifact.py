@@ -35,6 +35,10 @@ REVIEW_WORKFLOWS = {
     ("github-actions", "Review / gate"): ".github/workflows/ci.yml",
     ("github-actions", "CodeQL / gate"): ".github/workflows/codeql.yml",
 }
+GITHUB_AUTHOR_ASSOCIATIONS = frozenset({
+    "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR",
+    "MANNEQUIN", "MEMBER", "NONE", "OWNER",
+})
 
 
 class ReleaseArtifactError(ValueError):
@@ -267,9 +271,9 @@ def verify_review_evidence(evidence, repository, source_sha):
         # GitHub's author association is viewer-dependent when organization
         # membership is private. Authorization was already established by the
         # configured reviewer login allowlist when this evidence was collected;
-        # retain association only as non-empty audit metadata.
+        # retain a valid GitHub association only as audit metadata.
         association = receipt["author_association"]
-        if not isinstance(association, str) or not association:
+        if association not in GITHUB_AUTHOR_ASSOCIATIONS:
             raise ReleaseArtifactError("review receipt author association is malformed")
         if receipt["reviewed_commit"] != source_sha:
             raise ReleaseArtifactError("review receipt does not bind the exact release commit")

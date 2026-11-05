@@ -25,6 +25,10 @@ EXPECTED_ACTIONS_WORKFLOWS = {
     ("github-actions", "Review / gate"): ".github/workflows/ci.yml",
     ("github-actions", "CodeQL / gate"): ".github/workflows/codeql.yml",
 }
+GITHUB_AUTHOR_ASSOCIATIONS = frozenset({
+    "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR",
+    "MANNEQUIN", "MEMBER", "NONE", "OWNER",
+})
 
 
 def load(path):
@@ -161,7 +165,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         association = comment.get("author_association")
         comment_id = comment.get("id")
         html_url = comment.get("html_url")
-        if not isinstance(association, str) or not association:
+        if association not in GITHUB_AUTHOR_ASSOCIATIONS:
             continue
         if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
             continue
