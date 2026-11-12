@@ -43,13 +43,18 @@ nav: privacy
         étiquettes qui en résultent («&nbsp;via curl&nbsp;», «&nbsp;github MCP&nbsp;»). Rien de ces fichiers ni de ces lignes de commande n’est envoyé où que ce soit.</p>
 
       <h2 id="inspection">Inspection HTTPS</h2>
-      <p>Désactivée par défaut. Si vous l’activez, Flowlight crée une autorité de certification sur votre Mac (sa clé ne quitte jamais
-        <code>~/Library/Application Support/Flowlight/Inspection</code>) et fait tourner un proxy qui n’accepte de connexions que depuis ce Mac. Pour les apps que vous
-        faites passer par lui, il enregistre les requêtes et les réponses, corps compris jusqu’à 2 MB, dans la base de données locale pendant 3 jours. Les en-têtes d’identification
-        sont remplacés par leur longueur avant tout enregistrement — repérés par leur nom (Authorization, cookies, clés d’API) et par les mots de
-        leur nom, si bien que <code>X-Access-Key</code> est attrapé aussi. C’est une heuristique, pas une garantie&nbsp;: un en-tête portant un secret sous
-        un nom que rien ne reconnaît serait enregistré. Flowlight exclut du déchiffrement sa liste intégrée de services Apple et de gestionnaires de mots de passe. Les données d’inspection enregistrées ne sont pas envoyées par Flowlight. Désactiver l’inspection arrête le proxy&nbsp;; <strong>Supprimer le certificat &amp; les données
-        enregistrées</strong> supprime le certificat, son réglage d’approbation et chaque requête enregistrée.</p>
+      <p>Désactivée par défaut. Si vous l’activez, Flowlight crée une autorité de certification sur votre Mac et fait tourner un proxy de boucle locale qui n’accepte
+        de connexions que depuis ce Mac. Le produit Developer ID conserve ses éléments d’inspection dans <code>~/Library/Application Support/Flowlight/Inspection</code>&nbsp;;
+        le produit Mac App Store génère des clés privées P-256 natives dans son groupe d’accès au trousseau et n’exporte que le certificat public de l’autorité. L’app Store ne
+        modifie jamais les réglages système de proxy ou de confiance&nbsp;: vous importez et approuvez vous-même le certificat public, puis configurez explicitement chaque app
+        inspectée pour qu’elle utilise l’adresse de proxy affichée dans Inspecter.</p>
+      <p>Pour les apps que vous faites passer par lui, Flowlight enregistre les requêtes et les réponses, corps compris jusqu’à 2 MB, dans la base de données locale pendant 3 jours.
+        Les en-têtes d’identification sont remplacés par leur longueur avant tout enregistrement — repérés par leur nom (Authorization, cookies, clés d’API) et par les mots de
+        leur nom, si bien que <code>X-Access-Key</code> est attrapé aussi. C’est une heuristique, pas une garantie&nbsp;: un en-tête portant un secret sous un nom que rien ne reconnaît
+        serait enregistré. Flowlight exclut du déchiffrement sa liste intégrée de services Apple et de gestionnaires de mots de passe. Les données d’inspection enregistrées ne sont
+        pas envoyées. Désactiver l’inspection arrête le proxy&nbsp;; <strong>Supprimer le certificat &amp; les données enregistrées</strong> supprime les clés appartenant à Flowlight,
+        les certificats générés et chaque requête enregistrée. Une autorité publique importée dans le produit Store reste la propriété de l’utilisateur et doit être supprimée
+        séparément dans Trousseaux d’accès.</p>
 
       <h2 id="requests">Les requêtes réseau que fait l’app</h2>
       <table>
@@ -61,7 +66,7 @@ nav: privacy
         <tr><td>Recherche du propriétaire de réseau</td><td>Team Cymru, par DNS</td><td>Des adresses IP publiques sans nom d’hôte connu. Les adresses privées et réservées ne quittent jamais votre Mac</td><td>Activé par défaut. Interrupteur d’arrêt dans Sources › Collecteur › Identifier les propriétaires de réseau</td></tr>
         <tr><td>Demander avec un modèle hébergé</td><td>Le fournisseur que vous choisissez&nbsp;: Anthropic, OpenAI, Google Gemini ou un point de terminaison compatible</td><td>Votre question et les résultats renvoyés par les requêtes Flowlight en lecture seule choisies par le modèle. La base de données de trafic elle-même n’est pas envoyée</td><td>Seulement quand vous choisissez un fournisseur hébergé et soumettez une question. L’écran Demander montre les requêtes transmises</td></tr>
         <tr><td>Exportation vers un collecteur</td><td>Le point de terminaison OpenTelemetry ou HTTP que vous configurez</td><td>Les champs indiqués dans Réglages › Exportation, comme les agrégats de trafic et les alertes. Les en-têtes d’authentification sont stockés dans le trousseau</td><td>Seulement après que vous avez configuré un point de terminaison et activé l’exportation</td></tr>
-        <tr><td>Trafic d’une application inspectée</td><td>La destination d’origine demandée par l’application inspectée</td><td>La requête de l’application, transmise par le proxy local de Flowlight après déchiffrement</td><td>Seulement tant que l’inspection HTTPS est activée et que l’application est acheminée par le proxy</td></tr>
+        <tr><td>Trafic d’une application inspectée</td><td>La destination d’origine demandée par l’application inspectée</td><td>La requête de l’application, transmise par le proxy local de Flowlight après déchiffrement</td><td>Seulement tant que l’inspection HTTPS est activée et que l’application est explicitement acheminée par le proxy&nbsp;; le produit Store ne modifie pas les réglages système de proxy</td></tr>
       </table>
 
       <h2 id="permissions">Autorisations</h2>

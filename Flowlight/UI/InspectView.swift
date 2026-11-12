@@ -125,7 +125,11 @@ private struct InspectContent: View {
                         Label(L("Nothing inspected yet"), systemImage: "lock.open.display")
                     } description: {
                         VStack(spacing: 10) {
+                            #if APP_STORE
+                            Text(L("Configure an app to use the HTTP proxy shown in Setup. Only that app's routed requests appear here; Flowlight never changes system proxy settings in the App Store build."))
+                            #else
                             Text(L("Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal."))
+                            #endif
                             if let diagnosis = inspection.diagnosis {
                                 Text(diagnosis)
                                     .font(.callout)
@@ -135,7 +139,9 @@ private struct InspectContent: View {
                         }
                         .frame(maxWidth: 460)
                     } actions: {
+                        #if !APP_STORE
                         Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
+                        #endif
                         Button(L("Check Setup")) { Task { await inspection.checkSetup() } }
                     }
                     .frame(maxHeight: .infinity)
@@ -261,7 +267,9 @@ private struct InspectContent: View {
     }
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
-        !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil && exchange.status != nil && !exchange.responseTruncated
+        ProductCapabilities.current.responseTransforms
+            && !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil
+            && exchange.status != nil && !exchange.responseTruncated
     }
 
     private func prepareMock(from exchange: HTTPExchange) {
@@ -407,8 +415,10 @@ private struct InspectContent: View {
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
             if !DemoData.isEnabled {
+                #if !APP_STORE
                 Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
                     .help(L("A Terminal window whose agents and tools go through Flowlight"))
+                #endif
                 Button(L("Setup…")) { openMocks = false; showSetup = true }
             }
         }
@@ -605,12 +615,17 @@ private struct InspectionSetup: View {
                     })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L("Turn on HTTPS inspection")).font(.headline)
+                            #if APP_STORE
+                            Text(L("Creates a local certificate and starts an explicit proxy. You choose which apps use it; Flowlight never changes system proxy settings."))
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            #else
                             Text(L("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back."))
                                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            #endif
                         }
                     }
                     .toggleStyle(.switch)
-                    .disabled(inspection.working)
+                    .disabled(inspection.working || (!inspection.enabled && !inspection.policyStateReady))
 
                     if inspection.working {
                         HStack(spacing: 6) {
@@ -620,14 +635,33 @@ private struct InspectionSetup: View {
                     } else if inspection.enabled {
                         VStack(alignment: .leading, spacing: 4) {
                             ready(L("Certificate trusted on this Mac"), ok: inspection.trusted)
+                            #if APP_STORE
+                            ready(L("Local proxy listening at %@", inspection.proxyURL), ok: inspection.running)
+                            ready(L("Trusted app attribution"), ok: inspection.attributionReady)
+                            Text(L("In the app you want to inspect, set its HTTP and HTTPS proxy to %@. Trust the Flowlight certificate first for HTTPS.", inspection.proxyURL))
+                                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            if let diagnosis = inspection.diagnosis, !inspection.diagnosisIsGood {
+                                Label(diagnosis, systemImage: "exclamationmark.triangle")
+                                    .foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
+                            }
+                            #else
                             ready(L("Apps routed through Flowlight"), ok: inspection.systemProxyOn)
                             ready(inspection.scope == .all ? L("Decrypting every app that uses the proxy")
                                                            : L("Decrypting AI agents and their tools"), ok: inspection.running)
+                            #endif
                         }
                         .font(.caption)
                         HStack {
+                            #if APP_STORE
+                            Button(L("Show Certificate in Finder")) { inspection.revealCertificate() }
+                            Button(L("Copy Proxy Address")) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(inspection.proxyURL, forType: .string)
+                            }
+                            #else
                             Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
                                 .help(L("Command-line agents ignore system proxy settings; start them from this window instead"))
+                            #endif
                             Spacer()
                             Button(L("Done")) { done() }.keyboardShortcut(.defaultAction)
                         }
@@ -723,20 +757,35 @@ private struct InspectionSetup: View {
                 }
             }
 
-            DisclosureGroup(isExpanded: $showResponseTransforms) {
-                ResponseTransformRulesSection(inspection: inspection).padding(.top, 10)
-            } label: {
-                HStack(spacing: 8) {
-                    Text(L("Modify responses")).font(.headline)
-                    if inspection.activeResponseTransformRules > 0 {
-                        Label(inspection.activeResponseTransformRules == 1 ? L("1 on") : L("%lld on", inspection.activeResponseTransformRules),
-                              systemImage: "arrow.left.arrow.right")
-                            .font(.caption.bold()).foregroundStyle(FL.tool)
+            if ProductCapabilities.current.responseTransforms {
+                DisclosureGroup(isExpanded: $showResponseTransforms) {
+                    ResponseTransformRulesSection(inspection: inspection).padding(.top, 10)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(L("Modify responses")).font(.headline)
+                        if inspection.activeResponseTransformRules > 0 {
+                            Label(inspection.activeResponseTransformRules == 1 ? L("1 on") : L("%lld on", inspection.activeResponseTransformRules),
+                                  systemImage: "arrow.left.arrow.right")
+                                .font(.caption.bold()).foregroundStyle(FL.tool)
+                        }
                     }
                 }
             }
         }
         .measured(Measure.prose)
+        #if APP_STORE
+        .confirmationDialog(L("Turn on HTTPS inspection?"), isPresented: $confirmTurnOn) {
+            Button(L("Create Certificate and Proxy")) { inspection.setEnabled(true) }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("Flowlight creates a private local certificate authority and listens only on this Mac. You will trust the public certificate and choose which apps use the proxy in the next step."))
+        }
+        .confirmationDialog(L("Remove HTTPS inspection?"), isPresented: $confirmRemove) {
+            Button(L("Remove"), role: .destructive) { inspection.removeEverything() }
+        } message: {
+            Text(L("Turns inspection off, deletes Flowlight's private keys and recorded requests. If you trusted the public certificate in macOS, remove that certificate from Keychain Access separately."))
+        }
+        #else
         .confirmationDialog(L("macOS will ask you twice"), isPresented: $confirmTurnOn) {
             Button(L("Continue")) { inspection.setEnabled(true) }
             Button(L("Cancel"), role: .cancel) {}
@@ -748,6 +797,12 @@ private struct InspectionSetup: View {
         } message: {
             Text(L("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request."))
         }
+        #endif
+        #if APP_STORE
+        .task {
+            if inspection.enabled { await inspection.checkSetup() }
+        }
+        #endif
         .onAppear {
             inspection.refreshStatus()
             showMocks = showMocks || openMocks

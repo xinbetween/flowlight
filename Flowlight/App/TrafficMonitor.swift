@@ -29,6 +29,24 @@ struct LiveSnapshot: Equatable {
 
 /// Isolates the one-second live feed from the slower application state. Views that show rates or the live chart
 /// observe this object directly; publishing a new sample must not invalidate every screen that uses TrafficMonitor.
+/// Thread-safe enforcing allowlists for the inspection proxy. The extension remains authoritative for direct traffic;
+/// this mirror closes the two exempt relay legs without asking a main-actor model on the proxy data path.
+final class LiveAgentPolicies: @unchecked Sendable {
+    private let lock = NSLock()
+    private var policies: [AgentPolicy] = []
+
+    func replace(_ values: [AgentPolicy]) {
+        lock.lock()
+        policies = values.filter { $0.enabled && $0.enforce }
+        lock.unlock()
+    }
+
+    func resolve(identities: [String]) -> AgentPolicy? {
+        lock.lock(); defer { lock.unlock() }
+        return AgentPolicy.resolve(policies, identities: identities.filter { !$0.isEmpty })
+    }
+}
+
 @MainActor
 final class TrafficLiveState: ObservableObject {
     @Published private(set) var snapshot = LiveSnapshot()
@@ -94,6 +112,8 @@ final class TrafficMonitor: ObservableObject {
     let rulePacks: RulePackStore
     /// The exact extension-committed generation, readable from the inspection proxy's queue.
     private let liveRulePacks = LiveRulePacks()
+    /// Enforcing allowlists mirrored for proxied traffic, whose two extension-visible relay legs are exempt.
+    private let liveAgentPolicies = LiveAgentPolicies()
     /// The active extension is the one atomic authority for bounded rules across direct and proxied flows.
     private let liveRuleClaims = LiveRuleClaimAuthority()
     /// App-local pack refusals use their own ordered, retryable delivery session.
@@ -122,6 +142,7 @@ final class TrafficMonitor: ObservableObject {
     let activity = ActivityMonitor()
     private let engine: AnomalyEngine
     private let trafficSourceFactory: (() -> TrafficSource)?
+    private let policyLoader: @Sendable (TrafficDatabase) throws -> [String: AgentPolicy]
     private let catalogTransportInjected: Bool
     private var source: TrafficSource?
     private var timers: [Timer] = []
@@ -159,7 +180,8 @@ final class TrafficMonitor: ObservableObject {
 
     init(databaseURL: URL? = nil,
          catalogTransport: HTTPDataTransport? = nil,
-         trafficSourceFactory: (() -> TrafficSource)? = nil) {
+         trafficSourceFactory: (() -> TrafficSource)? = nil,
+         policyLoader: @escaping @Sendable (TrafficDatabase) throws -> [String: AgentPolicy] = { try $0.loadPolicies() }) {
         AnomalySettings.registerDefaults()
         LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
@@ -169,6 +191,7 @@ final class TrafficMonitor: ObservableObject {
         mode = CaptureMode(rawValue: UserDefaults.standard.string(forKey: AnomalySettings.Keys.captureMode) ?? "") ?? .nettop
         #endif
         self.trafficSourceFactory = trafficSourceFactory
+        self.policyLoader = policyLoader
         catalogTransportInjected = catalogTransport != nil
         rulePacks = RulePackStore(currentAppVersion: ExtensionManager.appVersion)
         do {
@@ -236,6 +259,20 @@ final class TrafficMonitor: ObservableObject {
 
     private var started = false
     private var rulePackCatalogReady = false
+    private var inspectionRulesReady = false
+    private var inspectionPoliciesReady = false
+    private var inspectionGuardrailsReady = false
+    private var inspectionRulePacksReady = false
+    private var inspectionAttached = false
+
+    private func attachInspectionWhenPolicyStateIsReady() {
+        let ready = inspectionRulesReady && inspectionPoliciesReady
+            && inspectionGuardrailsReady && inspectionRulePacksReady
+        inspection.setPolicyStateReady(ready)
+        guard ready, !inspectionAttached else { return }
+        inspectionAttached = true
+        inspection.attach(db: db)
+    }
 
     func start() {
         guard !started else { return }
@@ -261,7 +298,6 @@ final class TrafficMonitor: ObservableObject {
             guard let self else { return }
             Task { await self.localRisk.wake() }
         }
-        inspection.attach(db: db)
         Task { await localRisk.recover() }
         rules.onChange = { [weak self] set in
             guard let self else { return }
@@ -271,10 +307,15 @@ final class TrafficMonitor: ObservableObject {
                 self.source?.setRules(set)
             }
         }
-        rules.attach(db: db)
+        rules.attach(db: db) { [weak self] in
+            self?.inspectionRulesReady = true
+            self?.attachInspectionWhenPolicyStateIsReady()
+        }
         rulePacks.onChange = { [weak self] snapshot in
             guard let self else { return }
             self.liveRulePacks.replace(snapshot: nil)
+            self.inspectionRulePacksReady = snapshot == nil
+            self.attachInspectionWhenPolicyStateIsReady()
             if self.source is ExtensionTrafficSource { self.rulePacks.markApplying() }
             else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
             self.source?.setRulePacks(snapshot)
@@ -284,6 +325,9 @@ final class TrafficMonitor: ObservableObject {
         inspection.requestRuleGeneration = { [live = rules.live] in live.currentGeneration }
         inspection.flowRuleDecision = { [live = rules.live] facts in
             live.flowDecision(facts)
+        }
+        inspection.previewFlowRuleDecision = { [live = rules.live] facts in
+            live.previewFlowDecision(facts)
         }
         inspection.claimFlowRule = { [liveRuleClaims] claim, completion in
             liveRuleClaims.claim(claim, completion: completion)
@@ -298,27 +342,61 @@ final class TrafficMonitor: ObservableObject {
                 rules?.retireBoundedClaim(claim, completion: completion) ?? completion(false)
             }
         }
+        #if APP_STORE
+        inspection.trustedProxyOwner = { [weak self] clientAddress, clientPort, proxyPort, completion in
+            Task { @MainActor in
+                guard let source = self?.source as? ExtensionTrafficSource else {
+                    completion(nil)
+                    return
+                }
+                source.resolveInspectionProxyClient(
+                    clientAddress: clientAddress,
+                    clientPort: clientPort,
+                    proxyPort: proxyPort,
+                    completion: completion
+                )
+            }
+        }
+        inspection.publishProxyPort = { [weak self] port in
+            Task { @MainActor in
+                (self?.source as? ExtensionTrafficSource)?.setInspectionProxyPort(port)
+            }
+        }
+        #endif
         inspection.rulePackMatch = { [liveRulePacks] host, bundleID in
             liveRulePacks.match(host: host, bundleID: bundleID)
         }
         inspection.onRulePackRefusal = { [weak proxyRulePackEvents] event, completion in
             proxyRulePackEvents?.enqueue(event, completion: completion) ?? completion(false)
         }
-        inspection.onRuleRefusal = { [weak self] event in
-            Task { @MainActor in self?.rules.record([event]) }
+        inspection.agentPolicy = { [liveAgentPolicies] owner in
+            liveAgentPolicies.resolve(identities: [
+                owner.agent ?? "", owner.bundleID, owner.agentName ?? "", owner.appName,
+            ])
         }
-        guardrails.attach(db: db)
+        inspection.onAllowlistRefusal = { [weak self] event, completion in
+            self?.recordBlocked([event], reply: completion) ?? completion(false)
+        }
+        inspection.onRuleRefusal = { [weak self] event, completion in
+            Task { @MainActor in
+                self?.rules.record([event], completion: completion) ?? completion(false)
+            }
+        }
+        // Starting the proxy before these persisted publications are loaded creates a real bypass window. Attach and
+        // apply inspection only after ordinary rules and enforcing AgentPolicy state are both available to its queue.
+        pushEnforcement { [weak self] loaded in
+            self?.inspectionPoliciesReady = loaded
+            self?.attachInspectionWhenPolicyStateIsReady()
+        }
+        guardrails.attach(db: db) { [weak self] in
+            self?.inspectionGuardrailsReady = true
+            self?.attachInspectionWhenPolicyStateIsReady()
+        }
         plugins.attach(db: db)
         devices.attach(db: db)
         ask.attach(db: readDB)
         ask.environment = { [weak self] in self?.askEnvironment() ?? .empty }
         inspection.guardrails = { [live = guardrails.live] in live.all() }
-        inspection.onGuardrail = { [weak self] event in
-            Task { @MainActor in
-                self?.guardrails.record([event])
-                self?.rules.record([event])
-            }
-        }
         inspection.onGuardrailHit = { [weak self] event in
             Task { @MainActor in self?.guardrails.record([event]) }
         }
@@ -350,6 +428,8 @@ final class TrafficMonitor: ObservableObject {
             self.rulePacks.attach(db: self.db) { [weak self] in
                 guard let self else { return }
                 self.rulePackCatalogReady = true
+                self.inspectionRulePacksReady = !self.rulePacks.hasEnabledPacks
+                self.attachInspectionWhenPolicyStateIsReady()
                 self.startSource()
                 let mayUseNetwork = self.catalogTransportInjected
                     || !DemoData.isEnabled && !FlowlightApp.runningTests
@@ -517,7 +597,14 @@ final class TrafficMonitor: ObservableObject {
     private func startSource() {
         guard rulePackCatalogReady else { return }
         liveRulePacks.replace(snapshot: nil)
+        if rulePacks.hasEnabledPacks {
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
+        }
         source?.stop()
+        #if APP_STORE
+        inspection.setAttributionReady(false)
+        #endif
         let newSource: TrafficSource
         // A build without the entitlement can never reach the extension; capture with the sampler rather than
         // sitting there recording nothing.
@@ -549,8 +636,20 @@ final class TrafficMonitor: ObservableObject {
             ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
             : nil
         if let extensionSource = newSource as? ExtensionTrafficSource {
-            extensionSource.onFilterUnavailable = { [weak self] message in
-                Task { @MainActor in self?.captureWarning = message }
+            #if APP_STORE
+            extensionSource.onAttributionReadinessChanged = { [weak self, weak extensionSource] ready in
+                Task { @MainActor in
+                    guard let self, let extensionSource, self.source === extensionSource else { return }
+                    self.inspection.setAttributionReady(ready)
+                }
+            }
+            #endif
+            extensionSource.onFilterAvailabilityChanged = { [weak self, weak extensionSource] running, message in
+                Task { @MainActor in
+                    guard let self, let extensionSource, self.source === extensionSource,
+                          !UserDefaults.standard.bool(forKey: "FLForceFilterWarning") else { return }
+                    self.captureWarning = running ? nil : message
+                }
             }
             extensionSource.onBlocked = { [weak self] events, reply in
                 guard let self else { reply(false); return }
@@ -586,6 +685,9 @@ final class TrafficMonitor: ObservableObject {
         }
         source = newSource
         let extensionSource = newSource as? ExtensionTrafficSource
+        #if APP_STORE
+        extensionSource?.setInspectionProxyPort(inspection.port)
+        #endif
         liveRuleClaims.replace(extensionSource)
         let sourceRuleSet: RuleSet
         if extensionSource != nil {
@@ -606,6 +708,9 @@ final class TrafficMonitor: ObservableObject {
         newSource.setRules(sourceRuleSet)
         newSource.setRulePacks(rulePacks.snapshot)
         if rulePacks.hasEnabledPacks, !(newSource is ExtensionTrafficSource) {
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
+            inspection.lastError = L("HTTPS inspection is waiting for the filter to commit the enabled managed policies.")
             rulePacks.updateStatus(.watchingOnly)
         }
     }
@@ -614,23 +719,39 @@ final class TrafficMonitor: ObservableObject {
         switch result.status {
         case .accepted:
             liveRulePacks.replace(snapshot: nil)
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
             rulePacks.updateStatus(.applying)
         case .committed:
             let desired = rulePacks.snapshot
             liveRulePacks.commit(snapshot: desired, activeDigest: result.activeDigest)
             if desired?.digest == result.activeDigest {
+                inspectionRulePacksReady = true
+                attachInspectionWhenPolicyStateIsReady()
                 rulePacks.updateStatus(.enforcing)
             } else {
-                rulePacks.updateStatus(.failed("The filter acknowledged a different rule pack snapshot."))
+                inspectionRulePacksReady = false
+                attachInspectionWhenPolicyStateIsReady()
+                let message = "The filter acknowledged a different rule pack snapshot."
+                inspection.lastError = L("The filter acknowledged a different rule pack snapshot.")
+                rulePacks.updateStatus(.failed(message))
             }
         case .cleared:
             liveRulePacks.replace(snapshot: nil)
+            inspectionRulePacksReady = true
+            attachInspectionWhenPolicyStateIsReady()
             rulePacks.updateStatus(.off)
         case .incompatible:
             liveRulePacks.replace(snapshot: nil)
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
+            inspection.lastError = result.detail
             rulePacks.updateStatus(.incompatible(result.detail))
         case .invalid, .stale:
             liveRulePacks.replace(snapshot: nil)
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
+            inspection.lastError = result.detail
             rulePacks.updateStatus(.failed(result.detail))
         }
     }
@@ -733,10 +854,26 @@ final class TrafficMonitor: ObservableObject {
     /// Hands the capture source the allowlists it should refuse connections against. Only the ones the user has
     /// switched to blocking travel: everything else stays a matter for alerts, and a source that can't block
     /// ignores them.
-    private func pushEnforcement() {
-        db.async { [weak self] db in
-            let enforcing = try db.loadPolicies().values.filter { $0.enabled && $0.enforce }
-            Task { @MainActor in self?.source?.setEnforcement(Array(enforcing)) }
+    private func pushEnforcement(completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
+        let db = db
+        let loader = policyLoader
+        let liveAgentPolicies = liveAgentPolicies
+        Task { [weak self] in
+            do {
+                let enforcing = try await db.asyncResult { db in
+                    Array(try loader(db).values.filter { $0.enabled && $0.enforce })
+                }
+                guard let self else { return }
+                liveAgentPolicies.replace(enforcing)
+                self.source?.setEnforcement(enforcing)
+                completion(true)
+            } catch {
+                guard let self else { return }
+                // Do not publish an empty list: that would turn a persistence failure into a policy bypass. Complete
+                // the startup barrier as failed, keep inspection stopped, and make the reason visible instead.
+                self.inspection.lastError = L("Could not open database: %@", error.localizedDescription)
+                completion(false)
+            }
         }
     }
 

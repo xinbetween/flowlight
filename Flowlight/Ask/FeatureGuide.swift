@@ -218,14 +218,40 @@ extension FeatureGuide {
             keywords: ["update", "upgrade", "version", "homebrew", "brew", "new release"]),
         ]
         #if APP_STORE
-        return guides.filter { !["hostnames", "guardrails", "inspection", "mocks", "updates"].contains($0.id) }
+        return guides.filter { $0.id != "updates" }
             .map { guide in
-                guard guide.id == "capture" else { return guide }
                 var storeGuide = guide
-                storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
-                storeGuide.steps = ["Open Sources and go to Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
-                storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
-                storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
+                if guide.id == "capture" {
+                    storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
+                    storeGuide.steps = ["Open Sources and go to Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                    storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
+                    storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
+                } else if guide.id == "hostnames" {
+                    storeGuide.summary = "Turning IP addresses into names. The content filter learns hostnames automatically from TLS SNI, HTTP Host headers and DNS answers."
+                    storeGuide.steps = ["Open Sources and go to Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                    storeGuide.caveats = ["If the content filter is disabled or unavailable, Flowlight cannot learn hostnames from new traffic."]
+                    storeGuide.keywords = ["dns", "sni", "domain", "ip only", "no domain names", "content filter"]
+                } else if guide.id == "inspection" {
+                    storeGuide.steps = [
+                        "Open Inspect and turn on HTTPS inspection.",
+                        "Show the public Flowlight certificate in Finder, import it into your login keychain, and trust it for SSL.",
+                        "Configure the app you choose to use the HTTP proxy address shown by Flowlight."
+                    ]
+                    storeGuide.caveats = [
+                        "The App Store build never changes system proxy settings or another app's configuration.",
+                        "Apple services and password managers are never decrypted. Apps that pin certificates are passed through untouched."
+                    ]
+                } else if guide.id == "data" {
+                    storeGuide.summary = "Recorded traffic, baselines, alerts, device events, rule activity and inspected exchanges are stored in SQLite inside Flowlight's sandboxed Application Support container."
+                    storeGuide.steps = [
+                        "Open Settings with ⌘, and choose Data & Privacy.",
+                        "Use Clear All Data to delete recorded activity while keeping policies and settings.",
+                        "To remove HTTPS inspection material, use Remove Certificate & Recorded Data in Inspect, then remove any public Flowlight certificate you imported from Keychain Access."
+                    ]
+                    storeGuide.caveats = [
+                        "Clear All Data does not remove policies, settings, certificate files or Keychain credentials."
+                    ]
+                }
                 return storeGuide
             }
         #else

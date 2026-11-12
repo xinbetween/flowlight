@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Dokumentation</p>
     <h1>Flowlight benutzen</h1>
-    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.17.9, macOS 15 oder neuer.</p>
+    <p class="lede">Alles vom ersten Start bis zum Feinschliff an den Agentenregeln. Flowlight 0.18.0, macOS 15 oder neuer.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Auf dieser Seite">
@@ -169,11 +169,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#visualize">Verbindungen</a></td><td>⌘4</td><td>Eine stabile Karte der Apps und ihrer genauen Ziele mit gewichteten Pfaden, bewegten Richtungsmarkern, Verbindungszahlen und einer gleichwertigen Liste.</td></tr>
         <tr><td><a href="#alerts">Warnungen</a></td><td>⌘5</td><td>Alles, was ungewöhnlich aussah, mit App, Ziel und dem Wert, der die Regel ausgelöst hat.</td></tr>
         <tr><td><a href="#ask">Fragen</a></td><td>⌘6</td><td>Fragen zu deinem eigenen Datenverkehr in normaler Sprache, beantwortet aus der aufgezeichneten Historie von einem lokalen oder einem gehosteten Modell.</td></tr>
-        <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7 · Developer ID</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
-        <tr><td><a href="#policies">Richtlinien</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Jede konfigurierte Richtlinie, ob sie tatsächlich wirksam ist, und ein einheitlicher schreibgeschützter Aktivitätsverlauf.</td></tr>
-        <tr><td><a href="#sources">Quellen</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Zustand und Wiederherstellung des Collectors, optionale Gerätekanäle und Abdeckung auf einer einzigen scrollbaren Betriebsseite.</td></tr>
+        <tr><td><a href="#inspection">Inspizieren</a></td><td>⌘7</td><td>Optional: entschlüsselte Anfragen der Agenten, die du über Flowlight leitest, und die Tool-Aufrufe dahinter. Die Suche reicht in Anfrage- und Antwort-Bodys hinein.</td></tr>
+        <tr><td><a href="#policies">Richtlinien</a></td><td>⌘8</td><td>Jede konfigurierte Richtlinie, ob sie tatsächlich wirksam ist, und ein einheitlicher schreibgeschützter Aktivitätsverlauf.</td></tr>
+        <tr><td><a href="#sources">Quellen</a></td><td>⌘9</td><td>Zustand und Wiederherstellung des Collectors, optionale Gerätekanäle und Abdeckung in drei fokussierten Segmenten.</td></tr>
       </table>
-      <p>Die Kurzbefehle folgen der sichtbaren Reihenfolge der Seitenleiste. Developer-ID-Versionen enthalten Inspizieren auf ⌘7; App-Store-Versionen lassen es weg, daher rücken Richtlinien und Quellen auf ⌘7 und ⌘8.</p>
+      <p>Die Kurzbefehle folgen der sichtbaren Reihenfolge der Seitenleiste und sind in Developer-ID- und Mac-App-Store-Versionen gleich.</p>
       <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="Der Bildschirm Live: eine Liste von Anwendungen mit ihren aktuellen Sende- und Empfangsraten und ihrem meistgenutzten Ziel."></div>
         <figcaption class="caption">Live, der Bildschirm, mit dem Flowlight startet.</figcaption></figure>
@@ -328,16 +328,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         die, die der Anbieter auf seinen eigenen Servern ausführt (Websuche, Codeausführung), und die MCP-Server, mit denen der Anbieter sich für den Agenten verbindet
         (Anthropics <code>mcp_servers</code>, OpenAIs <code>mcp</code>-Tool) samt URL, Token, Freigabeeinstellung und erlaubten Tools. Diese
         letzte Gruppe erscheint nie in deinem Netzwerk, weil der Anbieter diese Verbindungen aufbaut, nicht dein Mac.</p>
-      <p><strong>Die Einrichtung ist ein Schalter.</strong> Schalte die HTTPS-Inspektion unter <strong>Inspizieren</strong> ein, und Flowlight erzeugt sein Zertifikat,
-        fragt einmal nach deinem Passwort, stuft das Zertifikat als vertrauenswürdig ein und leitet Apps über den Proxy. Den Schalter wieder auszuschalten macht alles rückgängig. Die
-        Proxy-Datei fällt auf eine direkte Verbindung zurück, wann immer Flowlight nicht läuft – es zu beenden schneidet deinen Mac also nie ab.</p>
-      <p>Agenten auf der Kommandozeile ignorieren die Proxy-Einstellungen des Systems; nutze für Claude Code, Codex, Gemini CLI oder Aider daher <strong>Inspiziertes Terminal öffnen</strong>
-        und starte sie dort. Unter <strong>Erweitert</strong> kannst du nur KI-Agenten statt aller Apps entschlüsseln, die Liste der nie entschlüsselten Ziele bearbeiten, die
-        Shell-Einrichtung für eine Shell kopieren oder das Zertifikat und alles Aufgezeichnete entfernen.</p>
+      <p><strong>Die Developer-ID-Einrichtung kann automatisch erfolgen.</strong> Schalte die HTTPS-Inspektion unter <strong>Inspizieren</strong> ein, und Flowlight erzeugt sein
+        Zertifikat. <strong>Inspiziertes Terminal öffnen</strong> startet Kommandozeilen-Agenten mit den passenden Proxy-Variablen und der Zertifikatsumgebung;
+        du kannst dem Zertifikat auch vertrauen und Flowlight für Desktop-Apps eine systemweite PAC-Datei einrichten lassen. Diese Datei fällt immer dann auf eine direkte
+        Verbindung zurück, wenn Flowlight nicht läuft.</p>
+      <p><strong>Die Einrichtung aus dem Mac App Store bleibt ausdrücklich manuell.</strong> Die Store-App betreibt ihren Loopback-Proxy in der Sandbox; Inspizieren erzeugt eine native, im Schlüsselbund gespeicherte P-256-Zertifizierungsstelle,
+        zeigt die genaue <code>127.0.0.1</code>-Proxy-Adresse und legt das öffentliche Zertifikat im Finder offen. Importiere und vertraue diesem Zertifikat selbst und richte dann
+        jede App ausdrücklich für den angezeigten HTTP/HTTPS-Proxy ein. Die Store-App ändert niemals die systemweiten Proxy- oder Vertrauenseinstellungen, schreibt die Konfiguration
+        einer anderen App um oder startet beziehungsweise überwacht eine andere App neu. Ihre Inhaltsfilter-Erweiterung nutzt die macOS-Audit-Token-Identität des exakten aktiven
+        Loopback-Sockets; ist diese Identität nicht verfügbar oder veraltet, schlägt die appbezogene Durchsetzung offen fehl, statt zu raten.</p>
       <p>Flowlight nimmt seine eingebaute Liste von Apple-Diensten und Passwortmanagern von der Entschlüsselung aus (bearbeitbar in der Einrichtung). Apps, die ihre Zertifikate anpinnen, können das
         Flowlight-Zertifikat ablehnen; Flowlight merkt das und lässt sie verschlüsselt durch. Standardmäßig werden Header-Werte nur behalten, wenn der Header einer ist,
-        den du erlaubst, und alles andere wird vor dem Speichern durch seine Länge ersetzt – aufgezeichnete Anfragen werden so lange aufbewahrt, wie du es einstellst, und <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht das Zertifikat, seine
-        Vertrauenseinstellung und alles Aufgezeichnete. Die Inspektion läuft nur über HTTP/1.1 (Flowlight verlangt es von beiden Seiten) und ist im Demomodus nicht verfügbar.</p>
+        den du erlaubst, und alles andere wird vor dem Speichern durch seine Länge ersetzt – aufgezeichnete Anfragen werden so lange aufbewahrt, wie du es einstellst. <strong>Zertifikat &amp; aufgezeichnete Daten entfernen</strong> löscht
+        Flowlight-eigene Schlüssel, erzeugte Zertifikate und alles Aufgezeichnete. In der Store-Version bleibt eine von dir importierte öffentliche CA in deinem Besitz;
+        Inspizieren weist dich darauf hin, sie separat in der Schlüsselbundverwaltung zu entfernen. Die Inspektion läuft nur über HTTP/1.1 (Flowlight verlangt es von beiden Seiten) und ist im Demomodus nicht verfügbar.</p>
 
       <p><strong>Was die Inspektion behalten darf.</strong> Aufgezeichnete Bodys sind das Sensibelste, was Flowlight vorhält, und bis 0.9.3
         war das Einzige, was sie schützte, eine Vermutung darüber, welche Header Zugangsdaten tragen. Eine Vermutung hat dafür die falsche Form: Sie
@@ -408,7 +412,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         ist überhaupt nicht erreichbar“ nicht.</p>
 
       <h2 id="policies"><span id="rules"></span>Richtlinien</h2>
-      <p>Unter <strong>Richtlinien</strong> sind alle Kontrollen, die Flowlight anwenden kann, in einem gemeinsamen Verzeichnis zusammengefasst: gewöhnliche Erlaubnis- und Sperrregeln, Agenten-Erlaubnislisten, verwaltete Pakete und – wo die HTTPS-Inspektion verfügbar ist – Schutzregeln, Mock-Antworten, Anfrageumschreibungen und Antworttransformationen. Jede Zeile unterscheidet den konfigurierten Zustand von der tatsächlichen Wirkung: wirksam, nur meldend, beobachtend, wartend, geplant, pausiert, verbraucht, in Anwendung, Prüfung erforderlich, nicht verfügbar, inkompatibel oder fehlgeschlagen. Wenn du eine Zeile auswählst, öffnet sich der zugehörige Editor dieser Richtlinie; die gemeinsame Ansicht ersetzt oder vermischt nicht deren unterschiedliche Einwilligungs- und Speichermodelle.</p>
+      <p>Unter <strong>Richtlinien</strong> sind alle Kontrollen, die Flowlight anwenden kann, in einem gemeinsamen Verzeichnis zusammengefasst: gewöhnliche Erlaubnis- und Sperrregeln, Agenten-Erlaubnislisten, verwaltete Pakete und – wo die HTTPS-Inspektion verfügbar ist – Schutzregeln, Mock-Antworten und Anfrageumschreibungen. Developer-ID-Versionen enthalten außerdem Antworttransformationen; die Store-Version bietet weder Antworttransformations-Skripte noch Skript-Plugins. Jede Zeile unterscheidet den konfigurierten Zustand von der tatsächlichen Wirkung: wirksam, nur meldend, beobachtend, wartend, geplant, pausiert, verbraucht, in Anwendung, Prüfung erforderlich, nicht verfügbar, inkompatibel oder fehlgeschlagen. Wenn du eine Zeile auswählst, öffnet sich der zugehörige Editor dieser Richtlinie; die gemeinsame Ansicht ersetzt oder vermischt nicht deren unterschiedliche Einwilligungs- und Speichermodelle.</p>
       <p>Eine Erlaubnisliste ist die Vorstellung eines Agenten davon, wohin er gehen darf. Eine gewöhnliche <strong>Regel</strong> ist die allgemeine Fassung: Sie nennt ein
         <strong>Subjekt</strong> – eine App, einen Agenten, ein Ziel, eine URL oder ein Paar aus zwei davon – und sagt <strong>blockieren</strong>
         oder <strong>erlauben</strong>. Rechtsklicke eine Zeile in Live, Verlauf, KI-Agenten oder Inspizieren, um eine Regel über das zu schreiben, was du gerade ansiehst;
@@ -437,7 +441,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Adresse und Port, nichts über Pfade, und das nur im Erweiterungsmodus. Die HTTPS-Inspektion verweigert eine einzelne Anfrage, kann also eine
         URL treffen und mit einem Status antworten, den der Agent lesen kann, statt mit einem Socket, der ohne Erklärung starb. Der nettop-Sampler kann
         überhaupt nichts verweigern. Eine Regel, die die aktuelle Einrichtung nicht umsetzen kann, sagt das in der Liste, statt dort durchgesetzt auszusehen.</p>
-      <p>Die zweite Ansicht ist die schreibgeschützte <strong>Aktivität</strong>: gewöhnliche Regelentscheidungen, Verstöße gegen Erlaubnislisten, Ereignisse verwalteter Pakete und eigenständige Wirkungen von Inspektionsrichtlinien in einer gemeinsamen Chronologie. Sie bereitet die bestehenden maßgeblichen Einträge auf, statt den Verlauf in ein einheitliches allgemeines Ereignismodell umzuschreiben; App-Store-Versionen lassen von der Inspektion abhängige Richtlinienarten und deren aufbewahrte Aktivität weg.</p>
+      <p>Die zweite Ansicht ist die schreibgeschützte <strong>Aktivität</strong>: gewöhnliche Regelentscheidungen, Verstöße gegen Erlaubnislisten, Ereignisse verwalteter Pakete und eigenständige Wirkungen von Inspektionsrichtlinien in einer gemeinsamen Chronologie. Sie bereitet die bestehenden maßgeblichen Einträge auf, statt den Verlauf in ein einheitliches allgemeines Ereignismodell umzuschreiben. Store-Versionen behalten die Aktivität von Schutzregeln, Mock-Antworten und Anfrageumschreibungen bei; sie lassen nur Antworttransformationen und Wirkungen von Skript-Plugins weg, die das Store-Produkt nicht ausführen kann.</p>
 
       <p><strong>Was sie bewirkt hätte.</strong> Eine Regel, die blockiert, ist leicht zu schreiben und beängstigend einzuschalten, denn
         das Erste, was man normalerweise über eine solche Regel erfährt, ist, was sie kaputt gemacht hat – und man erfährt es später,
@@ -509,7 +513,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         Shell hat, kann von Hand tun, was das Tool getan hätte. Flowlight zeichnet das auf; es tut nicht so, als würde es das verhindern.</p>
 
       <h2 id="sources"><span id="capture"></span><span id="engines"></span>Quellen: Collector, Geräte und Abdeckung</h2>
-      <p><strong>Quellen</strong> ist eine einzige scrollbare Betriebsseite: zuerst Collector, dann Geräte und Abdeckung als klar bezeichnete Abschnitte. Statushinweise, Antworten unter Fragen, wiederhergestellte Fenster und Links aus Screenshots lassen die Seite zum passenden Abschnitt scrollen und heben ihn kurz hervor, ohne die anderen auszublenden.</p>
+      <p><strong>Quellen</strong> nutzt dieselbe fokussierte Segmentnavigation wie Richtlinien: <strong>Collector</strong>,
+        <strong>Geräte</strong> und <strong>Abdeckung</strong>. Statushinweise, Antworten unter Fragen, wiederhergestellte Fenster und Deep Links wählen
+        das genaue Segment aus; der gemeinsame Zustand und die Hinweise zur Behebung bleiben in allen drei Segmenten verfügbar.</p>
       <p>Flowlight zeichnet Datenverkehr auf eine von zwei Weisen auf, wählbar unter <strong>Quellen › Collector</strong>. Sie unterscheiden sich darin, was sie verpassen können, und das lohnt
         sich zu verstehen, bevor du dich auf eine verlässt.</p>
       <table>
@@ -761,7 +767,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Die Flowlight-Mitwirkenden. Flowlight ist freie Software, veröffentlicht unter der <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.9 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
+      <span>Version 0.18.0 · Nicht verbunden mit Apple oder einem der hier genannten KI-Anbieter.</span>
     </div>
   </div>
 </footer>

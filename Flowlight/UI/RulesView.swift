@@ -2,13 +2,14 @@ import SwiftUI
 
 struct PolicyInventoryCapabilities: Equatable, Sendable {
     var inspectionPolicies: Bool
+    var responseTransforms: Bool = true
 
     static var current: PolicyInventoryCapabilities {
-        #if APP_STORE
-        PolicyInventoryCapabilities(inspectionPolicies: false)
-        #else
-        PolicyInventoryCapabilities(inspectionPolicies: true)
-        #endif
+        let product = ProductCapabilities.current
+        return PolicyInventoryCapabilities(
+            inspectionPolicies: product.proxyInspection,
+            responseTransforms: product.responseTransforms
+        )
     }
 }
 
@@ -61,6 +62,7 @@ enum PolicyInventoryID {
 
 enum PolicyEffectState: Equatable, Sendable {
     case effective
+    case httpOnly
     case reportingOnly
     case watchingOnly
     case waiting
@@ -71,7 +73,7 @@ enum PolicyEffectState: Equatable, Sendable {
 
     var isEffective: Bool {
         switch self {
-        case .effective, .reportingOnly, .watchingOnly: return true
+        case .effective, .httpOnly, .reportingOnly, .watchingOnly: return true
         case .waiting, .off, .needsReview, .unavailable, .failed: return false
         }
     }
@@ -79,6 +81,7 @@ enum PolicyEffectState: Equatable, Sendable {
     @MainActor var title: String {
         switch self {
         case .effective: return L("In effect")
+        case .httpOnly: return L("HTTP only")
         case .reportingOnly: return L("Reporting only")
         case .watchingOnly: return L("Watching only")
         case .waiting: return L("Waiting")
@@ -103,7 +106,8 @@ struct PolicyInventoryItem: Identifiable, Equatable, Sendable {
     var id: String { PolicyInventoryID.make(kind, sourceID: sourceID) }
 
     func isVisible(in capabilities: PolicyInventoryCapabilities) -> Bool {
-        capabilities.inspectionPolicies || !kind.requiresInspection
+        if kind == .responseTransform { return capabilities.responseTransforms }
+        return capabilities.inspectionPolicies || !kind.requiresInspection
     }
 }
 
@@ -117,12 +121,23 @@ enum PolicyInventoryBuilder {
                       guardrails: [Guardrail], mocks: [MockRule], rewrites: [RewriteRule],
                       transforms: [ResponseTransformRule], extensionRunning: Bool = true,
                       canBlock: Bool = true, inspectionEnabled: Bool = true, inspectionRunning: Bool = true,
+                      inspectionTrusted: Bool = true, inspectionAttributionReady: Bool = true,
                       rulesPaused: Bool = false, now: Date = Date(), ruleSession: String = RuleStore.session,
                       capabilities: PolicyInventoryCapabilities = .current) -> [PolicyInventoryItem] {
-        let inspectionReason = !inspectionEnabled ? L("HTTPS inspection is off.") : L("HTTPS inspection is not running.")
-        func inspectionEffect(_ enabled: Bool) -> (PolicyEffectState, String?) {
+        let attributionReason = L("The proxy is ready, but trusted app attribution is unavailable. Enable Flowlight under Content filter, then press Check Setup. App-scoped policies fail open until attribution is available.")
+        func attributionEffect(_ required: Bool) -> (PolicyEffectState, String?)? {
+            guard required, inspectionEnabled, inspectionRunning, !inspectionAttributionReady else { return nil }
+            return (.waiting, attributionReason)
+        }
+        func inspectionEffect(_ enabled: Bool, requiresAttribution: Bool = false) -> (PolicyEffectState, String?) {
             guard enabled else { return (.off, L("This policy is switched off.")) }
-            return inspectionEnabled && inspectionRunning ? (.effective, nil) : (.waiting, inspectionReason)
+            guard inspectionEnabled else { return (.waiting, L("HTTPS inspection is off.")) }
+            guard inspectionRunning else { return (.waiting, L("HTTPS inspection is not running.")) }
+            if let effect = attributionEffect(requiresAttribution) { return effect }
+            guard inspectionTrusted else {
+                return (.httpOnly, L("In effect for plain HTTP. HTTPS waits until the Flowlight inspection certificate is trusted."))
+            }
+            return (.effective, nil)
         }
 
         var items = rules.map { rule -> PolicyInventoryItem in
@@ -139,6 +154,10 @@ enum PolicyInventoryBuilder {
             } else if let limitation = RuleWords.limitation(rule, extensionRunning: extensionRunning,
                                                              inspecting: inspectionEnabled && inspectionRunning) {
                 (effect, reason) = (.watchingOnly, limitation)
+            } else if rule.engine != .flow {
+                (effect, reason) = inspectionEffect(true, requiresAttribution: !rule.app.isEmpty)
+            } else if let attribution = attributionEffect(!rule.app.isEmpty) {
+                (effect, reason) = attribution
             } else {
                 (effect, reason) = (.effective, nil)
             }
@@ -158,10 +177,12 @@ enum PolicyInventoryBuilder {
                 (effect, reason) = (.off, L("This allowlist is switched off."))
             } else if !policy.enforce {
                 (effect, reason) = (.reportingOnly, L("Unlisted destinations raise alerts but are not blocked."))
-            } else if canBlock {
-                (effect, reason) = (.effective, nil)
-            } else {
+            } else if !canBlock {
                 (effect, reason) = (.reportingOnly, L("Blocking is unavailable; unlisted destinations still raise alerts."))
+            } else if let attribution = attributionEffect(true) {
+                (effect, reason) = attribution
+            } else {
+                (effect, reason) = (.effective, nil)
             }
             return PolicyInventoryItem(kind: .agentAllowlist, sourceID: agentID, title: agentID, detail: detail,
                                        isEnabled: policy.enabled, effect: effect, reason: reason,
@@ -177,7 +198,12 @@ enum PolicyInventoryBuilder {
                 (effect, reason) = (.off, L("This pack is switched off."))
             } else {
                 switch packStatus {
-                case .enforcing where canBlock: (effect, reason) = (.effective, nil)
+                case .enforcing where canBlock:
+                    if let attribution = attributionEffect(configuration.scope == .selectedApps) {
+                        (effect, reason) = attribution
+                    } else {
+                        (effect, reason) = (.effective, nil)
+                    }
                 case .watchingOnly, .enforcing:
                     (effect, reason) = (.watchingOnly, L("The pack is matching destinations but cannot block them here."))
                 case .applying, .ready:
@@ -202,7 +228,7 @@ enum PolicyInventoryBuilder {
                                 destination: .managedPack(configuration.packID))
         }
         items += guardrails.map { guardrail in
-            let (effect, reason) = inspectionEffect(guardrail.enabled)
+            let (effect, reason) = inspectionEffect(guardrail.enabled, requiresAttribution: !guardrail.agent.isEmpty)
             return PolicyInventoryItem(kind: .guardrail, sourceID: guardrail.id.uuidString.lowercased(),
                                        title: guardrail.localizedTitle,
                                        detail: guardrail.agent.isEmpty ? L("Every agent") : guardrail.agent,
@@ -245,6 +271,12 @@ enum PolicyActivityEffect: String, Equatable, Hashable, Sendable {
     case responseTransformed = "response-transformed"
 }
 
+enum PolicyActivitySource: Equatable, Sendable {
+    case rule(RuleEventRecord)
+    case managedPack(RulePackEventRecord)
+    case generic
+}
+
 struct PolicyActivityItem: Identifiable, Equatable, Sendable {
     var id: String
     var timestamp: Date
@@ -253,6 +285,17 @@ struct PolicyActivityItem: Identifiable, Equatable, Sendable {
     var title: String
     var detail: String
     var policyID: String?
+    var source: PolicyActivitySource = .generic
+}
+
+enum NetworkRuleGrouping {
+    static func inForce(_ rules: [Rule], at now: Date, session: String) -> [Rule] {
+        rules.filter { $0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: session) }
+    }
+
+    static func resting(_ rules: [Rule], at now: Date, session: String) -> [Rule] {
+        rules.filter { !($0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: session)) }
+    }
 }
 
 enum PolicyActivityBuilder {
@@ -305,7 +348,8 @@ enum PolicyActivityBuilder {
                 effect: isGuardrail ? .guardrailApplied : (event.action == .block ? .blocked : .allowed),
                 title: title, detail: event.path.isEmpty ? "\(event.destination):\(event.port)" : "\(event.method) \(event.destination)\(event.path)",
                 policyID: exists ? PolicyInventoryID.make(isGuardrail ? .guardrail : .networkRule,
-                                                          sourceID: event.ruleID.uuidString.lowercased()) : nil)
+                                                          sourceID: event.ruleID.uuidString.lowercased()) : nil,
+                source: isGuardrail ? .generic : .rule(event))
         }
         activity += packEvents.map { event in
             let title = packs.first(where: { $0.id == event.packID }).map { L($0.manifest.titleKey) } ?? event.packID
@@ -313,7 +357,8 @@ enum PolicyActivityBuilder {
                                       effect: .packBlocked,
                                       title: title, detail: L("%@ · %lld connections", event.host, event.count),
                                       policyID: packIDs.contains(event.packID)
-                                          ? PolicyInventoryID.make(.managedPack, sourceID: event.packID) : nil)
+                                          ? PolicyInventoryID.make(.managedPack, sourceID: event.packID) : nil,
+                                      source: .managedPack(event))
         }
         activity += alerts.filter { $0.kind == AnomalyEngine.Kind.allowlistViolation.rawValue }.map { alert in
             let policy = AgentPolicy.resolve(
@@ -602,7 +647,12 @@ struct RulesView: View {
     }
 
     private var inventoryItems: [PolicyInventoryItem] {
-        PolicyInventoryBuilder.build(rules: store.rules, allowlists: allowlists,
+        #if APP_STORE
+        let attributionReady = monitor.inspection.attributionReady
+        #else
+        let attributionReady = true
+        #endif
+        return PolicyInventoryBuilder.build(rules: store.rules, allowlists: allowlists,
                                      packs: monitor.rulePacks.definitions,
                                      unavailablePacks: monitor.rulePacks.unavailableReviewConfigurations,
                                      packConfiguration: { monitor.rulePacks.configuration(for: $0) },
@@ -615,6 +665,8 @@ struct RulesView: View {
                                      extensionRunning: monitor.canBlock, canBlock: monitor.canBlock,
                                      inspectionEnabled: monitor.inspection.enabled,
                                      inspectionRunning: monitor.inspection.running,
+                                     inspectionTrusted: monitor.inspection.trusted,
+                                     inspectionAttributionReady: attributionReady,
                                      rulesPaused: store.isPaused, now: now)
     }
 
@@ -709,11 +761,11 @@ struct RulesView: View {
     /// screen, just not among the ones doing the work. The global pause deliberately doesn't move anything: it is
     /// said once in the banner, and shuffling the whole list for ten minutes would lose people's place.
     private var inForce: [Rule] {
-        store.rules.filter { $0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: RuleStore.session) }
+        NetworkRuleGrouping.inForce(store.rules, at: now, session: RuleStore.session)
     }
 
     private var resting: [Rule] {
-        store.rules.filter { !($0.enabled && $0.isUsable && $0.schedule.isActive(at: now, session: RuleStore.session)) }
+        NetworkRuleGrouping.resting(store.rules, at: now, session: RuleStore.session)
     }
 
     private var inventory: some View {
@@ -724,7 +776,10 @@ struct RulesView: View {
                     if inventoryItems.isEmpty { empty }
                     ForEach(PolicyInventoryKind.allCases, id: \.self) { kind in
                         let items = inventoryItems.filter { $0.kind == kind }
-                        if !items.isEmpty { inventorySection(kind, items: items) }
+                        if !items.isEmpty {
+                            if kind == .networkRule { networkRuleSection(items: items) }
+                            else { inventorySection(kind, items: items) }
+                        }
                     }
                 }
                 .padding(Measure.gutter)
@@ -751,9 +806,40 @@ struct RulesView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(L("Everything Flowlight can apply")).font(.headline)
             Text(PolicyInventoryCapabilities.current.inspectionPolicies
-                 ? L("Network decisions, agent limits, managed destination lists, and developer inspection policies live here. Each policy still opens in the editor that owns its behavior and consent.")
+                 ? L("Network decisions, agent limits, managed destination lists, and inspection policies live here. Each policy still opens in the editor that owns its behavior and consent.")
                  : L("Network decisions, agent limits, and managed destination lists live here. Each policy still opens in the editor that owns its behavior and consent."))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func networkRuleSection(items: [PolicyInventoryItem]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 7) {
+                Image(systemName: PolicyInventoryKind.networkRule.symbol)
+                    .font(.caption).foregroundStyle(.tertiary)
+                Text(PolicyInventoryKind.networkRule.sectionTitle)
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("\(items.count)").font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
+                Spacer()
+            }
+            ruleGroup(L("In force"), rules: inForce)
+            ruleGroup(L("Not in force"), rules: resting)
+        }
+    }
+
+    @ViewBuilder
+    private func ruleGroup(_ title: String, rules: [Rule]) -> some View {
+        if !rules.isEmpty {
+            VStack(alignment: .leading, spacing: 7) {
+                heading(title)
+                VStack(spacing: 7) {
+                    ForEach(rules) { rule in
+                        row(rule)
+                            .id(PolicyInventoryID.make(.networkRule,
+                                                       sourceID: rule.id.uuidString.lowercased()))
+                    }
+                }
+            }
         }
     }
 
@@ -821,7 +907,7 @@ struct RulesView: View {
     private func policyStatusTint(_ effect: PolicyEffectState) -> AnyShapeStyle {
         switch effect {
         case .effective: return AnyShapeStyle(FL.good)
-        case .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
+        case .httpOnly, .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
         case .failed, .unavailable: return AnyShapeStyle(FL.critical)
         case .off: return AnyShapeStyle(.tertiary)
         }
@@ -830,6 +916,8 @@ struct RulesView: View {
     private func packRow(_ pack: RulePackDefinition) -> some View {
         let configuration = monitor.rulePacks.configuration(for: pack.id)
         let item = inventoryItems.first { $0.kind == .managedPack && $0.sourceID == pack.id }
+        let blocks = monitor.rulePacks.events(for: pack.id).reduce(0) { $0 + $1.count }
+        let exceptions = monitor.rulePacks.overrides(for: pack.id).count
         return HStack(alignment: .top, spacing: 10) {
             Image(systemName: "shippingbox")
                 .font(.caption.weight(.semibold))
@@ -841,11 +929,20 @@ struct RulesView: View {
                 Text(L("%lld destinations · %@", pack.entries.count,
                        configuration.scope == .allApps ? L("every app") : L("%lld selected apps", configuration.apps.count)))
                     .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    if blocks > 0 { Text(L("%lld blocked", blocks)).foregroundStyle(FL.critical) }
+                    if exceptions > 0 { Text(L("%lld exceptions", exceptions)).foregroundStyle(FL.good) }
+                }
+                .font(.caption2.monospacedDigit())
                 if let reason = item?.reason {
                     Text(reason).font(.caption2).foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(L("Official · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
+                Text(L(pack.manifest.caveatKey)).font(.caption2).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(monitor.rulePackCatalog.isDownloadedUpdate(pack)
+                     ? L("Official · Verified official update · pack v%@ · %@", pack.manifest.version, pack.manifest.license)
+                     : L("Official · Bundled baseline · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
                     .font(.caption2).foregroundStyle(.tertiary)
                 if let error = packSaveErrors[pack.id] {
                     Text(error).font(.caption).foregroundStyle(FL.critical)
@@ -1042,7 +1139,7 @@ struct RulesView: View {
 
     private var activityFeed: some View {
         Group {
-            if policyActivity.isEmpty {
+            if policyActivity.isEmpty && monitor.rulePacks.deliveryStats.droppedHits == 0 {
                 ContentUnavailableView {
                     Label(L("Nothing yet"), systemImage: "list.bullet.rectangle")
                 } description: {
@@ -1061,17 +1158,20 @@ struct RulesView: View {
     private var feed: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
+                if monitor.rulePacks.deliveryStats.droppedHits > 0 {
+                    Label(L("%lld managed-pack decisions were omitted from activity because the extension's bounded queue was full.",
+                            monitor.rulePacks.deliveryStats.droppedHits), systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(FL.warning)
+                        .padding(10).background(FL.warning.opacity(0.1),
+                                                in: RoundedRectangle(cornerRadius: Radius.chip))
+                }
                 ForEach(activityDays) { day in
                     VStack(alignment: .leading, spacing: 6) {
                         heading(day.title)
                         VStack(spacing: 0) {
                             ForEach(Array(day.events.enumerated()), id: \.element.id) { index, event in
                                 if index > 0 { Divider().padding(.leading, 38) }
-                                PolicyActivityRow(event: event) {
-                                    guard let policyID = event.policyID,
-                                          let item = inventoryItems.first(where: { $0.id == policyID }) else { return }
-                                    handle(item.destination)
-                                }
+                                activityRow(event)
                             }
                         }
                         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
@@ -1086,6 +1186,24 @@ struct RulesView: View {
             }
             .padding(Measure.gutter)
         }
+    }
+
+    @ViewBuilder
+    private func activityRow(_ event: PolicyActivityItem) -> some View {
+        switch event.source {
+        case .rule(let record):
+            EventRow(event: record, rule: event.title) { showPolicy(for: event) }
+        case .managedPack(let record):
+            RulePackEventRow(event: record)
+        case .generic:
+            PolicyActivityRow(event: event) { showPolicy(for: event) }
+        }
+    }
+
+    private func showPolicy(for event: PolicyActivityItem) {
+        guard let policyID = event.policyID,
+              let item = inventoryItems.first(where: { $0.id == policyID }) else { return }
+        handle(item.destination)
     }
 
     private struct ActivityDay: Identifiable {
@@ -1283,7 +1401,7 @@ private struct RuleRow: View {
     private var effectTint: AnyShapeStyle {
         switch effect {
         case .effective: return AnyShapeStyle(FL.good)
-        case .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
+        case .httpOnly, .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
         case .failed, .unavailable: return AnyShapeStyle(FL.critical)
         case .off: return AnyShapeStyle(.tertiary)
         }

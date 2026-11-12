@@ -163,6 +163,7 @@
 		50CD7EF8F4121F7DD1C65680 /* RewriteRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CCD94E9D554D6DD61486FF /* RewriteRulesView.swift */; };
 		51694FE8AB65C2BC3BD5B21D /* GuardrailsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F08D1913575FFC1F548CAB5 /* GuardrailsPane.swift */; };
 		518B305308454622B576FF3B /* HostCanonicalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA83082A5085897BE34D963 /* HostCanonicalizer.swift */; };
+		51D81BEA1E6D18240F15A30D /* StoreInspectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AAF535D9725BFD44E05EC66 /* StoreInspectionTests.swift */; };
 		52A067CD50920CBDEC98A32F /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33480D5241332B3AA21CBE49 /* Localization.swift */; };
 		55434CF888AEE73E90EDA953 /* UpdateVerificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FEECAD5C958CF49A659E14 /* UpdateVerificationTests.swift */; };
 		55FB36AE92AEF84914CCA6E8 /* RuleTemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 254FA06DF59A8410C9BAE161 /* RuleTemplateTests.swift */; };
@@ -180,6 +181,7 @@
 		5AA48BB88F9E0F6F858DC553 /* BluetoothMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B6A48D086EF16CF6E438FF /* BluetoothMonitor.swift */; };
 		5AD8431BC3E97C3DE167CF9F /* AgentGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */; };
 		5B0715A36BAB76BC06AE4052 /* FlowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8267406A5D7DA536B7A713 /* FlowTracker.swift */; };
+		5CF0C11E5CD4AD73D76C16F4 /* StoreCertificateAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD30A0BCBB9E98BEF5AB740 /* StoreCertificateAuthority.swift */; };
 		5D637AB4C3D308EAC8CC9448 /* RulePackDeliveryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B24C254E2C17056730C06B /* RulePackDeliveryStats.swift */; };
 		5D6F528946645297E0F1520A /* DurableEventQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4183E1566D10914F8E7FDB30 /* DurableEventQueue.swift */; };
 		5E22345FC07C19F4A32C5002 /* RuleEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08643257F8D11784563BD6CC /* RuleEditor.swift */; };
@@ -348,6 +350,7 @@
 		B88D4DE798915EA469DF73B3 /* PacketSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F062E6D35F98D8EEF1EBE47C /* PacketSniffer.swift */; };
 		B8AF34F3100E3ABF6190BE68 /* FilterDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F212ADB3B37A2EF68A7CFB84 /* FilterDataProvider.swift */; };
 		B8B770675C09113D28BDF3F1 /* SettingsEnforcer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8251DBDC21C44CB92CC1C67 /* SettingsEnforcer.swift */; };
+		B8D61D875EC08A3D3BC6C33A /* ProductCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7D95D23EB97832BFFAAB69 /* ProductCapabilities.swift */; };
 		B9C2B47C6EC39C01E90F055B /* AITrafficGraph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5F3C5C8A0175A409580782 /* AITrafficGraph.swift */; };
 		BA072680D0A6AC1C40DB8608 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1CF4C48AA260D71155C022 /* Components.swift */; };
 		BA5C8DE36B0484931B6652E0 /* ProcessLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E489125D1DBF3EF98AEED4EB /* ProcessLookup.swift */; };
@@ -369,6 +372,7 @@
 		C35F10A4B87D29525A740DD5 /* AgentAttributor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B98E13F994F7E684F57C07 /* AgentAttributor.swift */; };
 		C456CD5C4C3C603419925D58 /* NetworkChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A21E183B79E3C66146070D /* NetworkChannel.swift */; };
 		C49DD542101E64D0EEBD05E4 /* ExportDisclosureSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA72D307E4B1A08BE4B8AEF8 /* ExportDisclosureSheet.swift */; };
+		C4CB9E97F06971D76FEF8DC2 /* StoreCertificateAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD30A0BCBB9E98BEF5AB740 /* StoreCertificateAuthority.swift */; };
 		C4F66F4C8F679F53C70399D6 /* MCPAttribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FE9D6F8BA82F3C266E147A /* MCPAttribution.swift */; };
 		C5077734C82AD352CC3EFA5C /* BlockRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80BC5E16F824FC642C12C8B0 /* BlockRules.swift */; };
 		C513F5D1936E202D0D6ECEFD /* BuiltInRulePacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD4C8B6E3620F5E46C69434 /* BuiltInRulePacks.swift */; };
@@ -399,6 +403,7 @@
 		CF2049DA978EB9588596556F /* RulePack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10036A17CDFCA45E068708EE /* RulePack.swift */; };
 		CF8EE120DA5241445ECD1797 /* DeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC1036E5ABBFDB8740405F3 /* DeviceStore.swift */; };
 		CF9E8E6FBFB1D1DBD7610DA1 /* ToolCallLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98FE7804F3D1F6A247F0C8DF /* ToolCallLinks.swift */; };
+		D0D7F8385A1189C1BC8D29F7 /* ProductCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7D95D23EB97832BFFAAB69 /* ProductCapabilities.swift */; };
 		D10DE307D1AD32A7D8173A41 /* HostCanonicalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA83082A5085897BE34D963 /* HostCanonicalizer.swift */; };
 		D211B6AF0F0C9ABE3F5D1A57 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0F9AC24A75E20F3FA0B2BB /* LocalizationTests.swift */; };
 		D30A985B88E65A6F89E9E7E7 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9C36E21D6DB161C80DF3F6 /* UpdateChecker.swift */; };
@@ -531,6 +536,13 @@
 			remoteGlobalIDString = 94D00543044D9B601CDCA877;
 			remoteInfo = FlowlightExtension;
 		};
+		9E07BFAFC5DC7ECFB763D9C8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 27052BCDFA1783A148CD45FD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E90A4F6F62FF71E3D3A1786;
+			remoteInfo = FlowlightAppStore;
+		};
 		A212C96A4D9348FC9F87A9EA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 27052BCDFA1783A148CD45FD /* Project object */;
@@ -580,6 +592,7 @@
 		02ACC341615D95ADA623BBEC /* PluginSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginSettingsView.swift; sourceTree = "<group>"; };
 		02B5736850B28B462739C2CD /* RulePackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackStore.swift; sourceTree = "<group>"; };
 		02EE3A99F49A058BF061C147 /* MCPAttributionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPAttributionTests.swift; sourceTree = "<group>"; };
+		03C397ABDA52AFBC0E285D5B /* FlowlightStoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowlightStoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0599916780428125A134B249 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		06816A9441C5EFEF5EF55CA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		077EA8EE506D61EC90E4411E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -661,6 +674,7 @@
 		461E9D1F76A4F9505335AB87 /* LocalRiskViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRiskViews.swift; sourceTree = "<group>"; };
 		48B24C254E2C17056730C06B /* RulePackDeliveryStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackDeliveryStats.swift; sourceTree = "<group>"; };
 		497DF4817317CE033F2A83A2 /* NettopParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopParser.swift; sourceTree = "<group>"; };
+		4AD30A0BCBB9E98BEF5AB740 /* StoreCertificateAuthority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreCertificateAuthority.swift; sourceTree = "<group>"; };
 		4D2C6211A645D4DDF8526DF2 /* ExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportController.swift; sourceTree = "<group>"; };
 		4D73C529EED550F2BD81CB72 /* AppLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLifecycleTests.swift; sourceTree = "<group>"; };
 		4D9926D17DD57B7F97E895C9 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
@@ -674,6 +688,7 @@
 		594F3762D9AD6347C83BA710 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		59A21E183B79E3C66146070D /* NetworkChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChannel.swift; sourceTree = "<group>"; };
 		59B40E5AD74F74A029AD46E4 /* RulePackCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackCatalogTests.swift; sourceTree = "<group>"; };
+		5AAF535D9725BFD44E05EC66 /* StoreInspectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreInspectionTests.swift; sourceTree = "<group>"; };
 		5B9F2521A73E6E3264F557E6 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		5BC2D26D49B4E14A148BE9C6 /* InspectScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectScopeTests.swift; sourceTree = "<group>"; };
 		5C0F9AC24A75E20F3FA0B2BB /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
@@ -827,6 +842,7 @@
 		DCF7C56CAF72886BEB812F8F /* ExportDisclosureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportDisclosureTests.swift; sourceTree = "<group>"; };
 		DD30777A046F705110A99269 /* AgentLauncherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLauncherTests.swift; sourceTree = "<group>"; };
 		DD71004CFB571B9167866770 /* AskQueryRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskQueryRunner.swift; sourceTree = "<group>"; };
+		DE7D95D23EB97832BFFAAB69 /* ProductCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductCapabilities.swift; sourceTree = "<group>"; };
 		E45902808344F173033EB0F5 /* WindowVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowVisibility.swift; sourceTree = "<group>"; };
 		E489125D1DBF3EF98AEED4EB /* ProcessLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessLookup.swift; sourceTree = "<group>"; };
 		E593C4ED11E1BCADD22099E6 /* PluginScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginScriptRunner.swift; sourceTree = "<group>"; };
@@ -859,6 +875,7 @@
 		FC4ADEE1B3578FBC6DFD9B74 /* RulePackCatalogState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackCatalogState.swift; sourceTree = "<group>"; };
 		FCD98C0A49FC6C5521129087 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		FD00CA1EF2A7DA909E3A31B5 /* RuleTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleTemplates.swift; sourceTree = "<group>"; };
+		FF7AB605231404AF6BB54946 /* Info-AppStore.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-AppStore.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -965,6 +982,7 @@
 				615E4FAE5D0865FB1E2492E8 /* Assets.xcassets */,
 				4017B3BE9E7FC6895D23FB6C /* Flowlight-AppStore.entitlements */,
 				AEB593C0CD03CAA473F143ED /* Flowlight.entitlements */,
+				FF7AB605231404AF6BB54946 /* Info-AppStore.plist */,
 				A5A9D356FF073F1DA1C05522 /* Info.plist */,
 				3944E092E097CA9FE66602C2 /* Analysis */,
 				AD43AD3D26806E2C0D8E2898 /* App */,
@@ -1031,6 +1049,7 @@
 				DB223BC3AD00430A5673C439 /* ResponseTransformRule.swift */,
 				AFA3B4EB0E0D40E39CE24E1B /* RewriteRule.swift */,
 				C8251DBDC21C44CB92CC1C67 /* SettingsEnforcer.swift */,
+				4AD30A0BCBB9E98BEF5AB740 /* StoreCertificateAuthority.swift */,
 				1B2E7474FB6A7B8B56B98917 /* ToolActivity.swift */,
 				98FE7804F3D1F6A247F0C8DF /* ToolCallLinks.swift */,
 				E6A7703953570391821257DD /* ToolResults.swift */,
@@ -1247,6 +1266,7 @@
 				D1C046DCF0CB1227CA93DA24 /* FlowlightExtension.systemextension */,
 				BD0D85E63A3FEC65FE1FD068 /* FlowlightResponseScriptHelper */,
 				9341EDA5AB3454E82FECD53A /* FlowlightStoreExtension.appex */,
+				03C397ABDA52AFBC0E285D5B /* FlowlightStoreTests.xctest */,
 				0CBBF571DC526F85E7232F79 /* FlowlightTests.xctest */,
 			);
 			name = Products;
@@ -1263,6 +1283,7 @@
 				9FFEA980768CD488D58CC0B1 /* DemoInspection.swift */,
 				B3244269609CC161996866B5 /* FlowlightApp.swift */,
 				5C34C9D0A9B302B4CF4C7125 /* HTTPDataTransport.swift */,
+				DE7D95D23EB97832BFFAAB69 /* ProductCapabilities.swift */,
 				DBC0A436E879000F8F5FF9E7 /* TrafficMonitor.swift */,
 				9C9C36E21D6DB161C80DF3F6 /* UpdateChecker.swift */,
 				121FF2EBC93394E8EDCFF0BF /* UpdateInstaller.swift */,
@@ -1368,6 +1389,14 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		CD90BDBC1C2A18F3BF63380A /* FlowlightStoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				5AAF535D9725BFD44E05EC66 /* StoreInspectionTests.swift */,
+			);
+			path = FlowlightStoreTests;
+			sourceTree = "<group>";
+		};
 		DC95BF9D5F32304264FF7BD0 = {
 			isa = PBXGroup;
 			children = (
@@ -1375,6 +1404,7 @@
 				19F2ECDA2D0846DD0C8AA438 /* Flowlight */,
 				315048F637ED4E869E58FC34 /* FlowlightExtension */,
 				F377D0F1A3D6A6F8C5DC5F1A /* FlowlightResponseScriptHelper */,
+				CD90BDBC1C2A18F3BF63380A /* FlowlightStoreTests */,
 				47D0F2D7B8D7DEDEA845284F /* FlowlightTests */,
 				8AB062F3019C5E4A8D16A9E9 /* Shared */,
 				ADA9F48B47F7D9E8BA6C8F1C /* Frameworks */,
@@ -1489,6 +1519,24 @@
 			productReference = BD0D85E63A3FEC65FE1FD068 /* FlowlightResponseScriptHelper */;
 			productType = "com.apple.product-type.tool";
 		};
+		891E68D41C13893367C938C8 /* FlowlightStoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90CED5CFCBEB5E73F74E6A2A /* Build configuration list for PBXNativeTarget "FlowlightStoreTests" */;
+			buildPhases = (
+				5CF7A1C5D07F813D36E1DF2E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				91C9F37DC3DE1DF074F7732B /* PBXTargetDependency */,
+			);
+			name = FlowlightStoreTests;
+			packageProductDependencies = (
+			);
+			productName = FlowlightStoreTests;
+			productReference = 03C397ABDA52AFBC0E285D5B /* FlowlightStoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		904DAC0BB81071A09FF1A5B0 /* FlowlightStoreExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D76A79764257B12EB4B0EB70 /* Build configuration list for PBXNativeTarget "FlowlightStoreExtension" */;
@@ -1546,6 +1594,9 @@
 					36B21D467163CD9F57115778 = {
 						ProvisioningStyle = Automatic;
 					};
+					891E68D41C13893367C938C8 = {
+						ProvisioningStyle = Automatic;
+					};
 					904DAC0BB81071A09FF1A5B0 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -1582,6 +1633,7 @@
 				94D00543044D9B601CDCA877 /* FlowlightExtension */,
 				904DAC0BB81071A09FF1A5B0 /* FlowlightStoreExtension */,
 				0E90A4F6F62FF71E3D3A1786 /* FlowlightAppStore */,
+				891E68D41C13893367C938C8 /* FlowlightStoreTests */,
 				0249194ABEFD25813E6C14AB /* FlowlightTests */,
 			);
 		};
@@ -1666,6 +1718,14 @@
 				BBCAB0EE0D040C8BF3E30556 /* TLSSNIParser.swift in Sources */,
 				668FFA90C24788C66043286B /* TrafficModels.swift in Sources */,
 				45C6C2569D63744568474B91 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5CF7A1C5D07F813D36E1DF2E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				51D81BEA1E6D18240F15A30D /* StoreInspectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1867,6 +1927,7 @@
 				C6B736C06DB70C19217FA5AE /* PluginStore.swift in Sources */,
 				A4CEEDBC97449B58C674CD4F /* ProcessLookup.swift in Sources */,
 				155D31587F84936506FDEBB2 /* ProcessNaming.swift in Sources */,
+				B8D61D875EC08A3D3BC6C33A /* ProductCapabilities.swift in Sources */,
 				61648ED4A0DBCEC775673448 /* ProtocolCatalog.swift in Sources */,
 				0D37699776684FD04F8D9D07 /* ProtocolClassifier.swift in Sources */,
 				4DEE6972B16DC40CB8828B75 /* ProviderProfileStore.swift in Sources */,
@@ -1903,6 +1964,7 @@
 				B8B770675C09113D28BDF3F1 /* SettingsEnforcer.swift in Sources */,
 				F5AE32D382E6DDD1B06783B8 /* SettingsView.swift in Sources */,
 				846FECA436B94D952C489DEE /* SharedStrings.swift in Sources */,
+				C4CB9E97F06971D76FEF8DC2 /* StoreCertificateAuthority.swift in Sources */,
 				939DB311C31E0F1B33583B8A /* SystemExtensionScan.swift in Sources */,
 				149824D7E5DBBF87A16CFBDB /* TLSSNIParser.swift in Sources */,
 				8B41FBD2537503B964EC5C81 /* ToolActivity.swift in Sources */,
@@ -2084,6 +2146,7 @@
 				A8869D4F16D83EC7120D901E /* PluginStore.swift in Sources */,
 				BA5C8DE36B0484931B6652E0 /* ProcessLookup.swift in Sources */,
 				850653E102AF3CD2C3833524 /* ProcessNaming.swift in Sources */,
+				D0D7F8385A1189C1BC8D29F7 /* ProductCapabilities.swift in Sources */,
 				CAE2EEC350E48F001B343DE1 /* ProtocolCatalog.swift in Sources */,
 				0ACF3321E6670591EC9B1306 /* ProtocolClassifier.swift in Sources */,
 				439EC38B0B2E45EF0C8F626E /* ProviderProfileStore.swift in Sources */,
@@ -2120,6 +2183,7 @@
 				80D7CBA2AE6B117ACC0BE7BB /* SettingsEnforcer.swift in Sources */,
 				8DAA531E3904A7B356FE2B77 /* SettingsView.swift in Sources */,
 				8B74946210FB3616E1F4ACD1 /* SharedStrings.swift in Sources */,
+				5CF0C11E5CD4AD73D76C16F4 /* StoreCertificateAuthority.swift in Sources */,
 				EF884A8D586CA5022C4DD01B /* SystemExtensionScan.swift in Sources */,
 				2F80C3268E914A2041232706 /* TLSSNIParser.swift in Sources */,
 				0B9096994698EFB06A95D26D /* ToolActivity.swift in Sources */,
@@ -2154,6 +2218,11 @@
 			target = 1C9BF0C33D1912981FB4B5AD /* Flowlight */;
 			targetProxy = 7C42FA3A564662B5DB0FD5BF /* PBXContainerItemProxy */;
 		};
+		91C9F37DC3DE1DF074F7732B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E90A4F6F62FF71E3D3A1786 /* FlowlightAppStore */;
+			targetProxy = 9E07BFAFC5DC7ECFB763D9C8 /* PBXContainerItemProxy */;
+		};
 		CBC6CA3966123861544E6E1F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 94D00543044D9B601CDCA877 /* FlowlightExtension */;
@@ -2187,6 +2256,25 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		09C38D096BA66331AF5A697A /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.store-tests";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flowlight.app/Contents/MacOS/Flowlight";
+			};
+			name = AppStore;
+		};
 		0B4E4BC53709054EB9EDCBAF /* AppStore */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2225,6 +2313,25 @@
 			};
 			name = Debug;
 		};
+		0CBCB0137FE3E8792D29541F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.store-tests";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flowlight.app/Contents/MacOS/Flowlight";
+			};
+			name = Debug;
+		};
 		2BA4D1560ECB8CD40C5DB361 /* AppStore */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2232,7 +2339,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Flowlight/Flowlight-AppStore.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Flowlight/Info.plist;
+				INFOPLIST_FILE = "Flowlight/Info-AppStore.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -2280,7 +2387,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2295,7 +2402,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.17.9;
+				MARKETING_VERSION = 0.18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2341,7 +2448,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 38RJUJHKZS;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2356,7 +2463,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.17.9;
+				MARKETING_VERSION = 0.18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2366,6 +2473,25 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = AppStore;
+		};
+		4AB45ED38A7D1809B566ED34 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.store-tests";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flowlight.app/Contents/MacOS/Flowlight";
+			};
+			name = Release;
 		};
 		532DCA2CF4D443B8A0124ECE /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -2421,7 +2547,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2442,7 +2568,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.17.9;
+				MARKETING_VERSION = 0.18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2556,7 +2682,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Flowlight/Flowlight-AppStore.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Flowlight/Info.plist;
+				INFOPLIST_FILE = "Flowlight/Info-AppStore.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -2685,7 +2811,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Flowlight/Flowlight-AppStore.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Flowlight/Info.plist;
+				INFOPLIST_FILE = "Flowlight/Info-AppStore.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -2762,6 +2888,16 @@
 				59D8FF91B8AD2C705CDDAC5E /* AppStore */,
 				98278C91D8AA57F268A040BA /* Debug */,
 				7B63A17199D52F8B6039FF81 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = AppStore;
+		};
+		90CED5CFCBEB5E73F74E6A2A /* Build configuration list for PBXNativeTarget "FlowlightStoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				09C38D096BA66331AF5A697A /* AppStore */,
+				0CBCB0137FE3E8792D29541F /* Debug */,
+				4AB45ED38A7D1809B566ED34 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = AppStore;

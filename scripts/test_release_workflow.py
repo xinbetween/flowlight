@@ -61,7 +61,8 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         cls.workflow = WORKFLOW.read_text()
         cls.ci_workflow = CI_WORKFLOW.read_text()
         cls.prepare = job_block(cls.workflow, "prepare", "publish")
-        cls.publish = job_block(cls.workflow, "publish")
+        cls.publish = job_block(cls.workflow, "publish", "homebrew")
+        cls.homebrew = job_block(cls.workflow, "homebrew")
         cls.merge_compatibility = job_block(cls.ci_workflow, "merge-compatibility", "gate")
 
     def test_manual_publication_requires_preparation_run(self):
@@ -139,10 +140,10 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             self.assertNotIn("${{", script)
         self.assertIn("github.triggering_actor", self.prepare)
         self.assertIn("github.triggering_actor", self.publish)
-        self.assertNotIn("TAP_TOKEN", self.publish[:self.publish.index("- name: Update Homebrew")])
-        self.assertLess(self.publish.index("- name: Update Homebrew"), self.publish.index("TAP_TOKEN:"))
+        self.assertNotIn("TAP_TOKEN", self.publish)
         self.assertNotIn("x-access-token", self.publish)
-        self.assertIn('export GH_TOKEN="$TAP_TOKEN"', self.publish)
+        self.assertIn("TAP_TOKEN: ${{ secrets.TAP_TOKEN }}", self.homebrew)
+        self.assertIn('export GH_TOKEN="$TAP_TOKEN"', self.homebrew)
 
     def test_expression_detector_rejects_deliberate_input_injection_fixture(self):
         unsafe = "        run: |\n          run_id=\"${{ inputs.prepare_run_id }}\"\n"
@@ -187,9 +188,16 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("gh release upload", self.publish)
         self.assertIn("--clobber", self.publish)
 
-    def test_homebrew_requires_the_verified_local_dmg(self):
-        self.assertIn("REQUIRE_LOCAL_DMG=1", self.publish)
-        self.assertNotRegex(self.publish, r"update-cask\.sh[^\n]*https?://")
+    def test_homebrew_runs_only_after_publication_with_the_existing_environment_secret(self):
+        self.assertIn("needs: publish", self.homebrew)
+        self.assertRegex(self.homebrew, r"(?m)^    environment: release$")
+        self.assertEqual(permissions(self.homebrew), {"contents": "read"})
+        self.assertIn('gh release view "$EVENT_TAG" --json isDraft', self.homebrew)
+        self.assertIn('gh release download "$EVENT_TAG"', self.homebrew)
+        self.assertIn('ACTUAL=$(sha256sum "$PUBLIC/Flowlight.dmg"', self.homebrew)
+        self.assertIn("REQUIRE_LOCAL_DMG=1", self.homebrew)
+        self.assertNotRegex(self.homebrew, r"update-cask\.sh[^\n]*https?://")
+        self.assertEqual(forbidden_publication_values(self.homebrew), [])
 
 
 if __name__ == "__main__":

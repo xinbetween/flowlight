@@ -2,17 +2,19 @@ import Foundation
 import Security
 
 enum InspectionError: LocalizedError {
-    case openssl(String), importFailed(OSStatus), trust(String)
+    case openssl(String), importFailed(OSStatus), trust(String), native(String)
 
     var errorDescription: String? {
         switch self {
         case .openssl(let detail): return "Couldn't create a certificate: \(detail)"
         case .importFailed(let status): return "Couldn't load a certificate (error \(status))."
         case .trust(let detail): return detail
+        case .native(let detail): return "Couldn't create a certificate: \(detail)"
         }
     }
 }
 
+#if !APP_STORE
 /// The local certificate authority behind HTTPS inspection.
 ///
 /// It's created on this Mac the first time inspection is turned on and never leaves it. The CA key signs a short-lived
@@ -248,3 +250,4 @@ final class CertificateAuthority: @unchecked Sendable {
         return (process.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 }
+#endif

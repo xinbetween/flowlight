@@ -2,20 +2,53 @@ import Foundation
 import Network
 import Security
 
-/// One proxied connection, as seen by observers.
+private final class ProxyAnswerAuthorizationCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    private let completion: @Sendable (Bool) -> Void
+
+    init(completion: @escaping @Sendable (Bool) -> Void) {
+        self.completion = completion
+    }
+
+    func finish(_ allowed: Bool) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true
+        lock.unlock()
+        completion(allowed)
+    }
+}
+
+struct ProxyAuthorization: Sendable {
+    var allowed: Bool
+    var owner: InspectionRecorder.Owner
+    /// Ordinary rule already committed for the hostname decision, if any. The resolved-IP pass uses this to avoid
+    /// consuming or recording the same allowance twice while still letting a more-specific IP/CIDR rule win.
+    var ruleID: UUID? = nil
+}
+
+/// One proxied connection, as seen by observers. The owner is the immutable identity established before CONNECT is
+/// accepted; every later request policy and recording hook uses this value rather than re-resolving a reusable port.
 final class ProxyFlow: @unchecked Sendable {
     let id = UUID()
     let host: String
     let port: Int
-    /// Source port of the client's connection to the proxy, used to find the process that opened it.
+    /// Source endpoint of the client's connection to the proxy, used to find the exact process that opened it.
+    let clientAddress: String
     let clientPort: UInt16
+    let owner: InspectionRecorder.Owner
+    let authorizedRuleID: UUID?
     let started = Date()
     /// True when TLS was terminated and the plaintext is visible; false for tunnels passed through untouched.
     let inspected: Bool
     let scheme: String
 
-    init(host: String, port: Int, clientPort: UInt16, inspected: Bool, scheme: String) {
-        self.host = host; self.port = port; self.clientPort = clientPort; self.inspected = inspected; self.scheme = scheme
+    init(host: String, port: Int, clientAddress: String, clientPort: UInt16,
+         owner: InspectionRecorder.Owner = .init(), authorizedRuleID: UUID? = nil,
+         inspected: Bool, scheme: String) {
+        self.host = host; self.port = port; self.clientAddress = clientAddress; self.clientPort = clientPort
+        self.owner = owner; self.authorizedRuleID = authorizedRuleID; self.inspected = inspected; self.scheme = scheme
     }
 }
 
@@ -56,27 +89,44 @@ final class InspectionProxy: @unchecked Sendable {
     private var hostListeners: [String: HostListener] = [:]
     /// Bridge source port → the flow it carries, so the TLS listener can match an accepted connection to its target.
     private var pending: [UInt16: ProxyFlow] = [:]
-    /// Hosts whose clients rejected our certificate recently; tunnelled without inspection until the date passes.
-    private var pinned: [String: Date] = [:]
+    private struct PinnedClientHost: Hashable {
+        var host: String
+        var bundleID: String
+    }
+    /// Pinning is app-specific: one client rejecting the local CA must not disable inspection for every other app.
+    private var pinned: [PinnedClientHost: Date] = [:]
+    /// Every accepted client and relay leg. Turning inspection off cancels the complete live graph immediately, so an
+    /// existing keep-alive connection cannot continue decrypting or recording after the switch says Off.
+    private var activeConnections: [ObjectIdentifier: NWConnection] = [:]
 
     weak var observer: ProxyObserver?
-    /// Decides whether a client connection may reach its origin. The answer can wait for a durable refusal record;
-    /// routing resumes on the proxy queue and no upstream socket exists before an allow answer.
-    var authorizeConnection: @Sendable (_ host: String, _ port: Int, _ clientPort: UInt16,
-                                        _ answer: @escaping @Sendable (Bool) -> Void) -> Void = {
-        _, _, _, answer in answer(true)
+    /// Decides whether a client connection may reach its origin and binds the authenticated owner to that decision.
+    /// The answer can wait for a durable refusal record; no upstream socket exists before an allow answer.
+    var authorizeConnection: @Sendable (_ host: String, _ port: Int, _ clientAddress: String, _ clientPort: UInt16,
+                                        _ answer: @escaping @Sendable (ProxyAuthorization) -> Void) -> Void = {
+        _, _, _, _, answer in answer(ProxyAuthorization(allowed: true, owner: .init()))
     }
-    /// Decides whether to decrypt a CONNECT to `host` from the client at `clientPort`. May answer asynchronously
-    /// (it can look up the owning process); the proxy continues on its own queue.
-    var shouldInspect: (_ host: String, _ clientPort: UInt16, _ answer: @escaping (Bool) -> Void) -> Void = { _, _, answer in answer(true) }
-    /// The enabled mock rules that could answer for a host. Asked once per inspected flow, before any framing.
-    var mockRules: (_ host: String, _ clientPort: UInt16) -> [MockRule] = { _, _ in [] }
-    /// Called with every request Flowlight answered itself, and the flow it arrived on. A rule refusing a request
-    /// has to be recordable as a refusal, not only as an exchange with an odd status.
-    var onAnswered: (_ rule: MockRule, _ flow: ProxyFlow, _ head: ProxyRequestHead?) -> Void = { _, _, _ in }
+    /// Rechecks the exact address Network.framework selected before any client bytes cross the upstream socket.
+    var authorizeResolvedConnection: @Sendable (_ flow: ProxyFlow, _ remoteIP: String,
+                                                 _ answer: @escaping @Sendable (Bool) -> Void) -> Void = {
+        _, _, answer in answer(true)
+    }
+    /// Decides whether to decrypt a CONNECT using the owner authenticated for this accepted connection.
+    var shouldInspect: (_ host: String, _ owner: InspectionRecorder.Owner,
+                        _ answer: @escaping (Bool) -> Void) -> Void = { _, _, answer in answer(true) }
+    /// The enabled mock rules that could answer for a flow. Asked once before any framing.
+    var mockRules: (_ flow: ProxyFlow) -> [MockRule] = { _ in [] }
+    /// Authorizes a local request answer. Blocks wait for their refusal record to commit; false fails open by sending
+    /// the original request upstream. Ordinary mocks answer immediately through the default implementation.
+    var authorizeAnswer: @Sendable (
+        _ rule: MockRule,
+        _ flow: ProxyFlow,
+        _ head: ProxyRequestHead?,
+        _ answer: @escaping @Sendable (Bool) -> Void
+    ) -> Void = { _, _, _, answer in answer(true) }
     /// Asked once per connection: is there anything that would want to read, change or answer whole requests on
     /// it? Nil means every request on this connection streams untouched, which is what almost all of them do.
-    var interventions: (_ host: String, _ clientPort: UInt16) -> ((ProxyRequestHead, Data) -> MockGate.Intervention?)? = { _, _ in nil }
+    var interventions: (_ flow: ProxyFlow) -> ((ProxyRequestHead, Data) -> MockGate.Intervention?)? = { _ in nil }
     /// Response transforms are separate from request interventions: their gate observes only bytes actually sent
     /// upstream and can replace a bounded upstream response before it reaches both the client and recorder.
     var responseInterventions: (_ flow: ProxyFlow) -> ResponseGate.Intervention? = { _ in nil }
@@ -86,7 +136,72 @@ final class InspectionProxy: @unchecked Sendable {
 
     private(set) var port: UInt16?
 
+    enum UpstreamState: Equatable {
+        case ready
+        case recoverable
+        case failed(String)
+        case cancelled
+        case pending
+    }
+
+    static func classifyUpstreamState(_ state: NWConnection.State, host: String) -> UpstreamState {
+        switch state {
+        case .ready: return .ready
+        case .waiting: return .recoverable
+        case .failed(let error): return .failed("Couldn't reach \(host): \(error.localizedDescription)")
+        case .cancelled: return .cancelled
+        default: return .pending
+        }
+    }
+
     init(ca: CertificateAuthority = .shared) { self.ca = ca }
+
+    private func track(_ connection: NWConnection) {
+        activeConnections[ObjectIdentifier(connection)] = connection
+    }
+
+    private func close(_ connections: NWConnection...) {
+        for connection in connections {
+            activeConnections.removeValue(forKey: ObjectIdentifier(connection))
+            connection.cancel()
+        }
+    }
+
+    private func closeAllConnections() {
+        let connections = Array(activeConnections.values)
+        activeConnections.removeAll()
+        connections.forEach { $0.cancel() }
+    }
+
+    func isInspectionAvailable(host: String, owner: InspectionRecorder.Owner) -> Bool {
+        // Unknown Store owners share the empty identity key. Attribution failure must not make a repeatedly rejecting
+        // client retry the same TLS interception on every connection.
+        let key = PinnedClientHost(host: host.lowercased(), bundleID: owner.bundleID)
+        guard let until = pinned[key] else { return true }
+        guard until <= Date() else { return false }
+        pinned.removeValue(forKey: key)
+        return true
+    }
+
+    func markInspectionUnavailable(host: String, owner: InspectionRecorder.Owner, until: Date) {
+        pinned[PinnedClientHost(host: host.lowercased(), bundleID: owner.bundleID)] = until
+    }
+
+    private func authorizeResolved(_ flow: ProxyFlow, remoteIP: String?, proceed: @escaping (Bool) -> Void) {
+        // A literal was already checked as an IP before the upstream socket existed. Hostnames need a second decision
+        // against the exact address Network.framework selected; no client bytes move until that decision commits.
+        guard HostCanonicalizer.address(flow.host) == nil else {
+            proceed(true)
+            return
+        }
+        guard let remoteIP, !remoteIP.isEmpty else {
+            proceed(false)
+            return
+        }
+        authorizeResolvedConnection(flow, remoteIP) { [weak self] allowed in
+            self?.queue.async { proceed(allowed) }
+        }
+    }
 
     // MARK: Lifecycle
 
@@ -120,6 +235,7 @@ final class InspectionProxy: @unchecked Sendable {
             listener?.cancel(); listener = nil; port = nil
             hostListeners.values.forEach { $0.listener.cancel() }
             hostListeners.removeAll(); pending.removeAll()
+            closeAllConnections()
             onStateChange(nil)
         }
     }
@@ -127,9 +243,11 @@ final class InspectionProxy: @unchecked Sendable {
     // MARK: Client side
 
     private func accept(_ client: NWConnection) {
+        track(client)
         client.start(queue: queue)
         readHead(client, buffer: Data()) { [weak self] head, rest in
-            guard let self, let head else { client.cancel(); return }
+            guard let self else { client.cancel(); return }
+            guard let head else { self.close(client); return }
             self.route(client, head: head, rest: rest)
         }
     }
@@ -151,6 +269,7 @@ final class InspectionProxy: @unchecked Sendable {
     }
 
     private func route(_ client: NWConnection, head: ProxyRequestHead, rest: Data) {
+        let clientAddress = Self.peerAddress(client)
         let clientPort = Self.remotePort(client)
         // Never proxy our own connections (a system proxy pointing at Flowlight would otherwise loop).
         if !head.target.hasPrefix("/"), let port, SocketOwner.isOwnConnection(clientPort: clientPort, proxyPort: port) {
@@ -159,24 +278,30 @@ final class InspectionProxy: @unchecked Sendable {
         }
         if head.method == "CONNECT" {
             guard let (host, port) = head.authority else { respond(client, status: "400 Bad Request"); return }
-            authorizeConnection(host, port, clientPort) { [weak self] allowed in
+            authorizeConnection(host, port, clientAddress, clientPort) { [weak self] authorization in
                 self?.queue.async {
                     guard let self else { client.cancel(); return }
-                    guard allowed else { self.respond(client, status: "403 Forbidden"); return }
-                    let notPinned = self.pinned[host].map { $0 < Date() } ?? true
+                    guard authorization.allowed else { self.respond(client, status: "403 Forbidden"); return }
+                    let owner = authorization.owner
+                    let notPinned = self.isInspectionAvailable(host: host, owner: owner)
                     let proceed: (Bool) -> Void = { [weak self] inspect in
                         self?.queue.async {
                             client.send(content: Data("HTTP/1.1 200 Connection Established\r\n\r\n".utf8), completion: .contentProcessed { error in
-                                guard let self, error == nil else { client.cancel(); return }
+                                guard let self else { client.cancel(); return }
+                                guard error == nil else { self.close(client); return }
                                 if inspect && notPinned {
-                                    self.bridge(client, host: host, port: port, clientPort: clientPort, early: rest)
+                                    self.bridge(client, host: host, port: port, clientAddress: clientAddress,
+                                                clientPort: clientPort, owner: owner,
+                                                authorizedRuleID: authorization.ruleID, early: rest)
                                 } else {
-                                    self.tunnel(client, host: host, port: port, clientPort: clientPort, early: rest)
+                                    self.tunnel(client, host: host, port: port, clientAddress: clientAddress,
+                                                clientPort: clientPort, owner: owner,
+                                                authorizedRuleID: authorization.ruleID, early: rest)
                                 }
                             })
                         }
                     }
-                    if notPinned { self.shouldInspect(host, clientPort, proceed) } else { proceed(false) }
+                    if notPinned { self.shouldInspect(host, owner, proceed) } else { proceed(false) }
                 }
             }
         } else if head.target.hasPrefix("/") {
@@ -189,11 +314,13 @@ final class InspectionProxy: @unchecked Sendable {
         } else if let url = URL(string: head.target), url.scheme == "http", let host = url.host {
             // Plain HTTP through the proxy: decide before an origin socket exists, then forward and observe it.
             let port = url.port ?? 80
-            authorizeConnection(host, port, clientPort) { [weak self] allowed in
+            authorizeConnection(host, port, clientAddress, clientPort) { [weak self] authorization in
                 self?.queue.async {
                     guard let self else { client.cancel(); return }
-                    guard allowed else { self.respond(client, status: "403 Forbidden"); return }
-                    let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "http")
+                    guard authorization.allowed else { self.respond(client, status: "403 Forbidden"); return }
+                    let flow = ProxyFlow(host: host, port: port, clientAddress: clientAddress, clientPort: clientPort,
+                                         owner: authorization.owner, authorizedRuleID: authorization.ruleID,
+                                         inspected: true, scheme: "http")
                     var request = head.originForm()
                     request.append(rest)
                     let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)),
@@ -211,32 +338,49 @@ final class InspectionProxy: @unchecked Sendable {
         for (k, v) in headers { text += "\(k): \(v)\r\n" }
         var data = Data((text + "\r\n").utf8)
         data.append(body)
-        client.send(content: data, completion: .contentProcessed { _ in client.cancel() })
+        client.send(content: data, completion: .contentProcessed { [weak self] _ in
+            self?.queue.async { self?.close(client) }
+        })
     }
 
     // MARK: Pass-through
 
-    private func tunnel(_ client: NWConnection, host: String, port: Int, clientPort: UInt16, early: Data) {
-        let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: false, scheme: "https")
+    private func tunnel(_ client: NWConnection, host: String, port: Int, clientAddress: String,
+                        clientPort: UInt16, owner: InspectionRecorder.Owner, authorizedRuleID: UUID?, early: Data) {
+        let flow = ProxyFlow(host: host, port: port, clientAddress: clientAddress, clientPort: clientPort,
+                             owner: owner, authorizedRuleID: authorizedRuleID, inspected: false, scheme: "https")
         let upstream = NWConnection(host: .init(host), port: .init(integerLiteral: UInt16(clamping: port)), using: Self.direct(.tcp))
+        track(upstream)
         observer?.flowStarted(flow)
+        var ended = false
+        let finish: (String?) -> Void = { [weak self] note in
+            guard !ended else { return }
+            ended = true
+            self?.observer?.flowEnded(flow, note: note)
+            self?.close(client, upstream)
+        }
         upstream.stateUpdateHandler = { [weak self] state in
-            switch state {
+            guard let self else { return }
+            switch Self.classifyUpstreamState(state, host: flow.host) {
             case .ready:
-                if let ip = Self.remoteIP(upstream) { self?.observer?.flow(flow, connectedTo: ip) }
-                if !early.isEmpty { upstream.send(content: early, completion: .idempotent) }
-                var ended = false
-                let finish = {
+                let remoteIP = Self.remoteIP(upstream)
+                self.authorizeResolved(flow, remoteIP: remoteIP) { allowed in
                     guard !ended else { return }
-                    ended = true
-                    self?.observer?.flowEnded(flow, note: nil)
-                    client.cancel(); upstream.cancel()
+                    guard allowed else {
+                        finish(remoteIP == nil ? "Couldn't verify the resolved address for \(flow.host)." : nil)
+                        return
+                    }
+                    if let remoteIP { self.observer?.flow(flow, connectedTo: remoteIP) }
+                    if !early.isEmpty { upstream.send(content: early, completion: .idempotent) }
+                    self.pump(client, into: upstream, tap: nil) { finish(nil) }
+                    self.pump(upstream, into: client, tap: nil) { finish(nil) }
                 }
-                self?.pump(client, into: upstream, tap: nil, closed: finish)
-                self?.pump(upstream, into: client, tap: nil, closed: finish)
-            case .failed, .cancelled:
-                client.cancel()
-            default: break
+            case .failed(let message):
+                finish(message)
+            case .recoverable, .pending:
+                break
+            case .cancelled:
+                finish(nil)
             }
         }
         upstream.start(queue: queue)
@@ -244,26 +388,30 @@ final class InspectionProxy: @unchecked Sendable {
 
     // MARK: Decrypting bridge
 
-    private func bridge(_ client: NWConnection, host: String, port: Int, clientPort: UInt16, early: Data) {
+    private func bridge(_ client: NWConnection, host: String, port: Int, clientAddress: String,
+                        clientPort: UInt16, owner: InspectionRecorder.Owner, authorizedRuleID: UUID?, early: Data) {
         hostListener(for: host) { [weak self] listenerPort in
             guard let self else { return }
             guard let listenerPort else {
                 // No certificate for this host; don't break the app, tunnel instead.
-                self.tunnel(client, host: host, port: port, clientPort: clientPort, early: early)
+                self.tunnel(client, host: host, port: port, clientAddress: clientAddress,
+                            clientPort: clientPort, owner: owner, authorizedRuleID: authorizedRuleID, early: early)
                 return
             }
             let bridge = NWConnection(host: "127.0.0.1", port: .init(integerLiteral: listenerPort), using: Self.direct(.tcp))
-            let flow = ProxyFlow(host: host, port: port, clientPort: clientPort, inspected: true, scheme: "https")
+            self.track(bridge)
+            let flow = ProxyFlow(host: host, port: port, clientAddress: clientAddress, clientPort: clientPort,
+                                 owner: owner, authorizedRuleID: authorizedRuleID, inspected: true, scheme: "https")
             bridge.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
                     if let local = Self.localPort(bridge) { self.pending[local] = flow }
                     if !early.isEmpty { bridge.send(content: early, completion: .idempotent) }
-                    let finish = { client.cancel(); bridge.cancel() }
+                    let finish = { self.close(client, bridge) }
                     self.pump(client, into: bridge, tap: nil, closed: finish)
                     self.pump(bridge, into: client, tap: nil, closed: finish)
                 case .failed, .cancelled:
-                    client.cancel()
+                    self.close(client, bridge)
                 default: break
                 }
             }
@@ -313,12 +461,13 @@ final class InspectionProxy: @unchecked Sendable {
 
     /// The client finished (or failed) its TLS handshake with our certificate.
     private func acceptDecrypted(_ inner: NWConnection, host: String) {
+        track(inner)
         let key = Self.remotePort(inner)
         inner.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
             case .ready:
-                guard let flow = self.pending.removeValue(forKey: key) else { inner.cancel(); return }
+                guard let flow = self.pending.removeValue(forKey: key) else { self.close(inner); return }
                 let tls = NWProtocolTLS.Options()
                 sec_protocol_options_set_tls_server_name(tls.securityProtocolOptions, flow.host)
                 sec_protocol_options_add_tls_application_protocol(tls.securityProtocolOptions, "http/1.1")
@@ -329,11 +478,15 @@ final class InspectionProxy: @unchecked Sendable {
                 // Most often the app pins its certificates or doesn't trust the Flowlight CA. Stop decrypting this
                 // host for an hour so the app keeps working.
                 if let flow = self.pending.removeValue(forKey: key) {
-                    self.pinned[host] = Date().addingTimeInterval(3600)
+                    self.markInspectionUnavailable(
+                        host: host,
+                        owner: flow.owner,
+                        until: Date().addingTimeInterval(3600)
+                    )
                     self.observer?.flowStarted(flow)
                     self.observer?.flowEnded(flow, note: "The app rejected Flowlight's certificate (\(error.localizedDescription)). This host is passed through without inspection for an hour.")
                 }
-                inner.cancel()
+                self.close(inner)
             default: break
             }
         }
@@ -343,24 +496,40 @@ final class InspectionProxy: @unchecked Sendable {
     // MARK: Relay
 
     private func relay(client: NWConnection, upstream: NWConnection, flow: ProxyFlow, firstClientBytes: Data?) {
+        track(client)
+        track(upstream)
         observer?.flowStarted(flow)
         // Read once per flow: a host no enabled rule names gets the plain relay, with its requests never framed.
-        let mocks = mockRules(flow.host, flow.clientPort)
-        let intervene = interventions(flow.host, flow.clientPort)
+        let mocks = mockRules(flow)
+        let intervene = interventions(flow)
         let gate = mocks.isEmpty && intervene == nil ? nil : MockGate(host: flow.host, rules: mocks)
         gate?.intervene = intervene
         let responseTransform = responseInterventions(flow)
         let responseGate = responseTransform.map { ResponseGate(transform: $0.transform, shouldTransform: $0.shouldTransform) }
-        let fromClient: (Data) -> Data = { [weak self] data in
-            guard let self else { return data }
+        var ended = false
+        let finish: (String?) -> Void = { [weak self] note in
+            guard !ended else { return }
+            ended = true
+            self?.observer?.flowEnded(flow, note: note)
+            self?.close(client, upstream)
+        }
+        let fromClient: (Data, @escaping (Data) -> Void) -> Void = { [weak self] data, completion in
+            guard let self else { completion(data); return }
             guard let gate else {
                 self.observer?.flow(flow, clientSent: data)
                 responseGate?.clientSent(data)
-                return data
+                completion(data)
+                return
             }
-            let onward = self.apply(gate.clientSent(data), flow: flow, client: client)
-            responseGate?.clientSent(onward)
-            return onward
+            self.apply(
+                gate.clientSent(data),
+                flow: flow,
+                client: client,
+                localRefusalAnswered: { finish(nil) }
+            ) { onward in
+                responseGate?.clientSent(onward)
+                completion(onward)
+            }
         }
         let fromServer: (Data) -> Data = { [weak self] data in
             guard let self else { return data }
@@ -374,29 +543,40 @@ final class InspectionProxy: @unchecked Sendable {
             }
             return onward
         }
-        var ended = false
-        let finish: (String?) -> Void = { [weak self] note in
-            guard !ended else { return }
-            ended = true
-            self?.observer?.flowEnded(flow, note: note)
-            client.cancel(); upstream.cancel()
-        }
         upstream.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
-            switch state {
+            switch Self.classifyUpstreamState(state, host: flow.host) {
             case .ready:
-                if let ip = Self.remoteIP(upstream) { self.observer?.flow(flow, connectedTo: ip) }
-                if let first = firstClientBytes, !first.isEmpty {
-                    let onward = fromClient(first)
-                    if !onward.isEmpty { upstream.send(content: onward, completion: .idempotent) }
+                let remoteIP = Self.remoteIP(upstream)
+                self.authorizeResolved(flow, remoteIP: remoteIP) { allowed in
+                    guard !ended else { return }
+                    guard allowed else {
+                        finish(remoteIP == nil ? "Couldn't verify the resolved address for \(flow.host)." : nil)
+                        return
+                    }
+                    if let remoteIP { self.observer?.flow(flow, connectedTo: remoteIP) }
+                    let startClientPump = {
+                        self.pumpAsync(client, into: upstream, transform: fromClient) { finish(nil) }
+                    }
+                    self.pump(upstream, into: client, tap: fromServer) { finish(nil) }
+                    if let first = firstClientBytes, !first.isEmpty {
+                        fromClient(first) { onward in
+                            guard !ended else { return }
+                            guard !onward.isEmpty else { startClientPump(); return }
+                            upstream.send(content: onward, completion: .contentProcessed { error in
+                                if error == nil { startClientPump() } else { finish(nil) }
+                            })
+                        }
+                    } else {
+                        startClientPump()
+                    }
                 }
-                self.pump(client, into: upstream, tap: fromClient) { finish(nil) }
-                self.pump(upstream, into: client, tap: fromServer) { finish(nil) }
-            case .failed(let error):
-                finish("Couldn't reach \(flow.host): \(error.localizedDescription)")
-            case .waiting(let error):
-                finish("Couldn't reach \(flow.host): \(error.localizedDescription)")
-            default: break
+            case .failed(let message):
+                finish(message)
+            case .recoverable, .pending:
+                break
+            case .cancelled:
+                finish(nil)
             }
         }
         upstream.start(queue: queue)
@@ -404,43 +584,96 @@ final class InspectionProxy: @unchecked Sendable {
 
     // MARK: Mock responses
 
-    /// Performs what the gate decided, and returns the bytes that still go upstream.
-    private func apply(_ actions: [MockGate.Action], flow: ProxyFlow, client: NWConnection) -> Data {
+    /// Performs the gate's actions in order. A local block pauses this connection until its refusal is durable; if
+    /// persistence fails or times out, every byte read so far continues upstream and the remainder streams unchanged.
+    private func apply(
+        _ actions: [MockGate.Action],
+        flow: ProxyFlow,
+        client: NWConnection,
+        localRefusalAnswered: @escaping () -> Void,
+        completion: @escaping (Data) -> Void
+    ) {
         var onward = Data()
-        for action in actions {
-            switch action {
+        func process(_ index: Int) {
+            guard actions.indices.contains(index) else {
+                completion(onward)
+                return
+            }
+            switch actions[index] {
             case .forward(let bytes):
                 observer?.flow(flow, clientSent: bytes)
                 onward.append(bytes)
+                process(index + 1)
             case .hold(let bytes):
-                // Recorded like any other request byte: what the agent sent is exactly what it would have sent.
+                // Ordinary mocks may wait for a body to finish, but no second relay buffer is needed: unlike a durable
+                // refusal they have no persistence-failure path that must restore those bytes upstream.
                 observer?.flow(flow, clientSent: bytes)
+                process(index + 1)
             case .rewritten(let bytes, let guardrail, let rewrite):
-                // Recorded as what left, not as what arrived: Inspect shows the request the server was sent. Guardrail
-                // capability removal and configured request rewriting retain independent activity identities.
                 if let guardrail { observer?.flow(flow, guardedBy: guardrail) }
                 if let rewrite { observer?.flow(flow, rewrittenBy: rewrite) }
                 observer?.flow(flow, clientSent: bytes)
                 onward.append(bytes)
-            case .answer(let rule, let bytes, let head):
-                // Mark before the bytes that complete the request, so the recorder can label the exchange it is
-                // about to parse rather than having to match it up afterwards.
+                process(index + 1)
+            case .answer(let rule, let bytes, _):
+                guard onward.isEmpty else {
+                    observer?.flow(flow, clientSent: bytes)
+                    onward.append(bytes)
+                    process(index + 1)
+                    return
+                }
                 observer?.flow(flow, mockedBy: rule.recordingReference ?? rule.title)
                 observer?.flow(flow, clientSent: bytes)
-                onAnswered(rule, flow, head)
                 answer(rule, to: client, flow: flow)
+                process(index + 1)
+            case .refuse(let rule, let bytes, let head):
+                // Returning a local response after an earlier request has been prepared for upstream would violate
+                // HTTP response order. Fail open before persisting a refusal that cannot safely be enacted.
+                guard onward.isEmpty else {
+                    observer?.flow(flow, clientSent: bytes)
+                    onward.append(bytes)
+                    process(index + 1)
+                    return
+                }
+                let decision = ProxyAnswerAuthorizationCompletion { [weak self] approved in
+                    self?.queue.async {
+                        guard let self else { return }
+                        if approved {
+                            // Mark before the bytes that complete the request so the recorder labels this exchange.
+                            self.observer?.flow(flow, mockedBy: rule.recordingReference ?? rule.title)
+                            self.observer?.flow(flow, clientSent: bytes)
+                            self.answer(
+                                rule,
+                                to: client,
+                                flow: flow,
+                                completion: localRefusalAnswered
+                            )
+                            return
+                        }
+                        self.observer?.flow(flow, clientSent: bytes)
+                        onward.append(bytes)
+                        process(index + 1)
+                    }
+                }
+                queue.asyncAfter(deadline: .now() + 0.5) { decision.finish(false) }
+                authorizeAnswer(rule, flow, head) { approved in decision.finish(approved) }
             }
         }
-        return onward
+        process(actions.startIndex)
     }
 
     /// Writes a rule's canned response to the client, after its delay. The observer sees it as if the server had
     /// sent it, which is what puts a mocked exchange in Inspect beside the real ones.
-    private func answer(_ rule: MockRule, to client: NWConnection, flow: ProxyFlow) {
+    private func answer(
+        _ rule: MockRule,
+        to client: NWConnection,
+        flow: ProxyFlow,
+        completion: (() -> Void)? = nil
+    ) {
         let bytes = rule.responseBytes()
         let send = { [weak self] in
             self?.observer?.flow(flow, serverSent: bytes)
-            client.send(content: bytes, completion: .idempotent)
+            client.send(content: bytes, completion: .contentProcessed { _ in completion?() })
         }
         if rule.delay > 0 {
             queue.asyncAfter(deadline: .now() + rule.delay, execute: send)
@@ -454,6 +687,46 @@ final class InspectionProxy: @unchecked Sendable {
     /// Copies bytes from `source` to `destination` until `source` closes, waiting for each write before reading more.
     /// `tap` sees every byte and returns what carries on to `destination` — all of it, except for a request that a
     /// mock rule answered, which is recorded but never relayed.
+    private func pumpAsync(
+        _ source: NWConnection,
+        into destination: NWConnection,
+        transform: @escaping (Data, @escaping (Data) -> Void) -> Void,
+        closed: @escaping () -> Void
+    ) {
+        source.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, complete, error in
+            guard let self else { closed(); return }
+            guard let data, !data.isEmpty else {
+                if complete || error != nil {
+                    destination.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
+                    closed()
+                } else {
+                    self.pumpAsync(source, into: destination, transform: transform, closed: closed)
+                }
+                return
+            }
+            transform(data) { onward in
+                guard !onward.isEmpty else {
+                    if complete || error != nil {
+                        destination.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
+                        closed()
+                    } else {
+                        self.pumpAsync(source, into: destination, transform: transform, closed: closed)
+                    }
+                    return
+                }
+                destination.send(content: onward, completion: .contentProcessed { sendError in
+                    if sendError != nil { closed(); return }
+                    if complete || error != nil {
+                        destination.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
+                        closed()
+                    } else {
+                        self.pumpAsync(source, into: destination, transform: transform, closed: closed)
+                    }
+                })
+            }
+        }
+    }
+
     private func pump(_ source: NWConnection, into destination: NWConnection, tap: ((Data) -> Data)?, closed: @escaping () -> Void) {
         source.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, complete, error in
             if let data, !data.isEmpty {
@@ -487,6 +760,16 @@ final class InspectionProxy: @unchecked Sendable {
     }
 
     // MARK: Endpoints
+
+    static func peerAddress(_ conn: NWConnection) -> String {
+        guard case .hostPort(let host, _) = conn.endpoint else { return "" }
+        switch host {
+        case .ipv4(let address): return "\(address)"
+        case .ipv6(let address): return "\(address)".components(separatedBy: "%").first ?? "\(address)"
+        case .name(let name, _): return HostCanonicalizer.address(name) ?? ""
+        @unknown default: return ""
+        }
+    }
 
     static func remotePort(_ conn: NWConnection) -> UInt16 {
         if case .hostPort(_, let port) = conn.endpoint { return port.rawValue }

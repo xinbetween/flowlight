@@ -3264,6 +3264,23 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(beforeLayout.edgeCurves, afterLayout.edgeCurves)
     }
 
+    func testCanvasTaskRestartsWhenVisibleViewportGrowsInsideTheSameMinimumCanvas() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "app", domain: "example.com", ip: "203.0.113.8", bytesOut: 10)
+        ], limits: .unbounded)
+        let graphSize = CGSize(width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+                               height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot))
+        let initial = TrafficGraphRenderKey(snapshot: snapshot, graphSize: graphSize,
+                                            viewportSize: CGSize(width: 10, height: 10))
+        let settled = TrafficGraphRenderKey(snapshot: snapshot, graphSize: graphSize,
+                                            viewportSize: CGSize(width: 700, height: 500))
+
+        XCTAssertNotEqual(initial, settled,
+                          "the final viewport must refit even when the minimum graph canvas did not change")
+        XCTAssertEqual(initial.layout, settled.layout,
+                       "a viewport-only resize may preserve the graph's atomic geometry")
+    }
+
     func testCapsAreDeterministicAndAccountForEverythingHidden() {
         let rows = (0..<12).map { index in
             row(app: "app.\(index)", domain: "host\(index).example", ip: "203.0.113.\(index)",
@@ -3472,8 +3489,8 @@ final class TrafficGraphTests: XCTestCase {
     }
 
     func testFlowDashPhaseIsSparseDeterministicAndDirectional() {
-        XCTAssertEqual(TrafficGraphFlowDash.pattern, [8, 26])
-        XCTAssertEqual(TrafficGraphFlowDash.strokeWidth, 1.8)
+        XCTAssertEqual(TrafficGraphFlowDash.pattern, [4, 22])
+        XCTAssertEqual(TrafficGraphFlowDash.strokeWidth, GraphStyle.flowPulseWidth)
         XCTAssertEqual(TrafficGraphFlowDash.frameInterval, 1 / 30)
         let first = TrafficGraphEdgeID(rawValue: "observed|app.a|one.example")
         let second = TrafficGraphEdgeID(rawValue: "observed|app.b|two.example")
@@ -3518,12 +3535,64 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(lanes.sent.offset, 7.5)
         XCTAssertEqual(
             TrafficGraphFlowDash.borderOffset(totalWidth: 20, direction: .received),
-            -9.1
+            -8.9
         )
         XCTAssertEqual(
             TrafficGraphFlowDash.borderOffset(totalWidth: 20, direction: .sent),
-            9.1
+            8.9
         )
+    }
+
+    func testMotionPolicyCapsAndPrioritizesVisibleFocusedPaths() {
+        let selectedNode = TrafficGraphNodeID(rawValue: "app:focused")
+        let edges: [TrafficGraphEdge] = (0..<24).map { index -> TrafficGraphEdge in
+            let edgeID = TrafficGraphEdgeID(rawValue: String(format: "edge-%02d", index))
+            let source = index == 2 || index == 3
+                ? selectedNode
+                : TrafficGraphNodeID(rawValue: "app:\(index)")
+            let target = TrafficGraphNodeID(rawValue: "destination:\(index)")
+            let counters = FlowCounters(bytesIn: Int64(index + 1), flows: 1)
+            return TrafficGraphEdge(
+                id: edgeID,
+                source: source,
+                target: target,
+                counters: counters,
+                filter: .none
+            )
+        }
+        let visible: Set<TrafficGraphEdgeID> = Set(edges.map { $0.id })
+        let selected = edges[0].id
+        let hovered = edges[1].id
+
+        let active = TrafficGraphMotionPolicy.activeEdgeIDs(
+            edges: edges,
+            visibleEdgeIDs: visible,
+            selectedNode: selectedNode,
+            selectedEdge: selected,
+            hoveredEdge: hovered
+        )
+
+        XCTAssertEqual(active.count, GraphStyle.maximumAnimatedEdges)
+        XCTAssertEqual(Array(active.prefix(2)), [selected, hovered])
+        XCTAssertTrue(active.contains(edges[2].id))
+        XCTAssertTrue(active.contains(edges[3].id))
+        XCTAssertEqual(
+            active,
+            TrafficGraphMotionPolicy.activeEdgeIDs(
+                edges: Array(edges.reversed()),
+                visibleEdgeIDs: visible,
+                selectedNode: selectedNode,
+                selectedEdge: selected,
+                hoveredEdge: hovered
+            ),
+            "source ordering must not change the bounded animated set"
+        )
+    }
+
+    func testMotionPolicySuppressesTimelineForReduceMotionAndNoVisibleFlow() {
+        XCTAssertFalse(TrafficGraphMotionPolicy.animatesFlow(reduceMotion: true, hasVisibleFlow: true))
+        XCTAssertFalse(TrafficGraphMotionPolicy.animatesFlow(reduceMotion: false, hasVisibleFlow: false))
+        XCTAssertTrue(TrafficGraphMotionPolicy.animatesFlow(reduceMotion: false, hasVisibleFlow: true))
     }
 
     func testLayoutPreservesSurvivingNodeFramesWhenTopologyChanges() {
@@ -3698,6 +3767,30 @@ final class TrafficGraphTests: XCTestCase {
                 )
             }
         }
+    }
+
+    func testDemoTrafficMapFitsTheVisibleCanvasInsteadOfCollapsingToAThumbnail() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("demo-traffic-graph-\(UUID().uuidString).sqlite")
+        let database = try TrafficDatabase(url: url)
+        try DemoData.seed(database, now: now)
+        let from = now.addingTimeInterval(-Granularity.day.defaultWindow)
+        let rows = try database.appDestinationRows(.day, from: from, to: now, filter: .none)
+        let attempts = try database.blockedAttempts(from: from, to: now)
+        let build = TrafficGraphBuilder.buildForPresentation(rows: rows, blockedAttempts: attempts)
+        let size = CGSize(width: TrafficGraphLayout.minimumCanvasWidth(for: build.map),
+                          height: TrafficGraphLayout.minimumCanvasHeight(for: build.map))
+        let canvas = CGRect(origin: .zero, size: size)
+        let layout = TrafficGraphLayout.layout(snapshot: build.map, in: canvas)
+        var viewport = TrafficGraphViewport()
+        viewport.fit(content: layout.contentBounds, in: CGRect(x: 0, y: 0, width: 700, height: 500))
+
+        XCTAssertGreaterThan(build.map.nodes.count, 10)
+        XCTAssertTrue(canvas.contains(layout.contentBounds),
+                      "traffic routes must stay inside the canvas: \(layout.contentBounds) in \(size)")
+        XCTAssertGreaterThan(viewport.scale, 0.2,
+                             "the default traffic graph must remain readable after automatic Fit")
     }
 
     func testRelationshipEdgesRouteAroundUnrelatedLaneCards() {

@@ -43,8 +43,10 @@ FlowlightTests/             Parser, classifier, BPF filter, rollup, chart, agent
 | Protocols | First bytes + ports | Ports only |
 | Short-lived flows | Every flow | Flows shorter than ~1 s are missed |
 
-Choose the source in **Sources › Collector**. Both produce the same per-second batches, so storage, reports and
-anomaly detection work the same way with either one.
+Choose the source in **Sources › Collector**. **Collector**, **Devices**, and **Coverage** are focused segments in the
+single Sources destination; deep links and restored windows select one segment without losing the shared health context.
+Both traffic collectors produce the same per-second batches, so storage, reports and anomaly detection work the same
+way with either one.
 
 ### Hostnames in nettop mode
 
@@ -79,7 +81,36 @@ open build/Build/Products/Release/Flowlight.app
 TEAM_ID=ABCDE12345 scripts/build-signed.sh
 ```
 
-Run the tests with `xcodebuild -scheme Flowlight test CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`.
+Run the Developer tests with `xcodebuild -scheme Flowlight test CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`.
+Run the Store-hosted inspection tests with `xcodebuild test -project Flowlight.xcodeproj -scheme "Flowlight App Store" -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO`.
+
+### Mac App Store inspection boundary
+
+The Developer ID and Store targets share inspection parsing, policy, recorder, and proxy logic but compile different
+capability and packaging graphs. The Developer app embeds the system extension and response-script helper, may configure
+a system PAC file and supported external apps, and supports response transforms and script plugins. The Store app embeds
+only `FlowlightStoreExtension.appex`; it must not embed the Developer system extension or response helper, link
+`SystemExtensions.framework`, or contain `OSSystemExtension` symbols.
+
+The Store app hosts its own sandboxed loopback HTTP/HTTPS proxy and declares `network.server`. Its extension does not.
+Users import and trust the exported public CA themselves and explicitly configure each client application; Store code
+never mutates system proxy settings, trust settings, or another app's configuration and never relaunches or supervises
+another app. Store private keys are P-256 `SecKey` values in the shared Keychain access group. The app builds and signs
+its CA and DNS/IP leaf certificates in process with Security.framework, exports only public CA material, and caps its
+in-session leaf cache.
+
+For app-scoped Store policy, `NEFilterSocketFlow.sourceAppAuditToken` is the identity authority. The extension binds that
+identity to one live TCP loopback flow whose client source address, client source port, and active proxy destination port
+all match, and returns it only over the existing authenticated XPC connection. Unknown, stale, mismatched, reconnected,
+or unavailable identity is `nil`; the proxy then fails open for app-scoped rules and allowlists rather than guessing,
+while destination-only rules and all-app packs still apply. Guardrails, mocks, request rewrites, managed-pack decisions,
+and enforcing allowlists use the same resolved owner. Setup becomes ready only after the exact extension version accepts
+the durable protocol, macOS reports the filter running, and the extension acknowledges the listener port.
+
+The first Store launch disables any inherited Developer inspection session, clears external-agent routing markers, and
+moves the explicit listener to port 8878. It reads effective macOS proxy state only to detect a Developer PAC or stale
+loopback proxy and gives manual remediation; Store code never changes that state. Response transforms and script plugins
+stay absent from Store UI and execution paths.
 
 `project.yml` remains the editable project definition. After changing it, run
 `scripts/check_xcode_project.sh --write`, verify with `scripts/check_xcode_project.sh`, and commit the four shared files under
@@ -181,9 +212,11 @@ sits in the path of a connection, and a switch that did nothing would be worse t
   process, the destination and the fact that it didn't get there. That alert's context menu offers *Allow … from
   Now On*, which adds the destination to the agent's list and pushes the change straight back to the filter.
 - A flow through the HTTPS inspection proxy leaves the Mac as exempt Flowlight traffic. Before opening that upstream
-  connection, the proxy attributes the original client and applies destination rules plus the exact managed-pack snapshot
-  acknowledged by the extension. Pack refusal waits for its durable activity record and fails open if that record cannot
-  commit. Agent allowlists remain extension-only and do not compose with the proxied leg.
+  connection, the proxy attributes the original client and applies destination rules, the exact managed-pack snapshot
+  acknowledged by the extension, and any enforcing allowlist resolved for that original agent. Pack and allowlist refusals
+  wait for durable activity evidence and fail open if it cannot commit. Store attribution matches the complete client
+  address/source-port/proxy-port tuple through the content filter's audit token; an unknown or conflicting identity keeps
+  app-scoped policy fail-open while identity-independent policy still applies.
 - `BlockRules` is plain functions over plain data (like `AgentPolicy.matches`), so `BlockingTests` covers the whole
   decision without a filter installed.
 
@@ -273,8 +306,9 @@ per-image version, checksum and dimension manifest that `check_site.py` enforces
 those images, so CI rejects a release that leaves older screenshots behind. For the Store listing, build the
 `Flowlight App Store` scheme and run `FL_APP=/absolute/path/to/Flowlight.app scripts/app-store-screenshots.sh`; it
 requires the embedded Store extension, rejects the Developer ID system-extension product, and produces the complete
-numbered 2880×1800 set under `packaging/app-store/screenshots/macos/`. Both capture paths refuse a candidate that
-opens anything other than `demo.sqlite*`, and CI validates the complete Store set against its own manifest.
+numbered 2880×1800 set under `packaging/app-store/screenshots/macos/`, including the Store Inspect setup screen.
+Both capture paths refuse a candidate that opens anything other than `demo.sqlite*`, and CI validates the complete
+Store set against its own manifest.
 
 ## Known limitations
 
@@ -310,7 +344,7 @@ that has gone wrong, most of them in production:
 | Every screen's `helpAnchor` has a docs section | Coverage shipped with a Help button and nothing on the page to land on |
 | Screenshots exist, and none is unused | `live.png` was served to nobody for two releases |
 | Every website and Store screenshot manifest entry matches the current version, bytes and dimensions | Two renamed menu items shipped beside eight screenshots that still showed the old sidebar |
-| The Store set contains all nine upload-ready 2880×1800 images | App Store Connect could otherwise retain screenshots from different builds |
+| The Store set contains all ten upload-ready 2880×1800 images, including Inspect | App Store Connect could otherwise retain screenshots from different builds or omit Store inspection setup |
 | The views table matches the sidebar | It gave Inspect ⌘5 long after it became ⌘7, and never listed Rules, Ask, Devices or Coverage |
 | One `<h1>` per page | A translation duplicating a heading while editing |
 
@@ -485,8 +519,9 @@ the required PR CI and CodeQL checks, then signs, notarizes, verifies with `spct
 notes, attests every file, and uploads one immutable artifact. A tag push always stops there. An explicit dispatch for
 that tag and preparation run ID verifies the run metadata, archive digest, manifest, checksums, and attestations; creates
 or safely resumes a draft from those exact files; re-downloads and compares every release asset and the release body;
-then publishes. If `TAP_TOKEN` is configured, Homebrew is updated idempotently from the already verified DMG; otherwise
-GitHub publication succeeds and the cask is updated manually.
+then publishes. A separate post-publication job downloads the public DMG and manifest again, verifies their checksum,
+and updates Homebrew idempotently. Missing `TAP_TOKEN` fails that completion job visibly instead of silently leaving the
+cask on an older release.
 
 Pull-request verification jobs explicitly check out the PR head SHA associated with their checks, not GitHub's
 synthetic merge ref. App-changing PRs also receive one required prospective-merge build of the synthetic tree, so exact
@@ -538,9 +573,10 @@ notarize, so revoking it breaks nothing else, whereas an app-specific password a
 | `TEAM_ID` | e.g. `38RJUJHKZS` |
 | `DMG_SIGN_IDENTITY`, `INSTALLER_IDENTITY` | the identity names, e.g. `Developer ID Application: Your Name (TEAMID)` |
 
-All values above belong only to the `release` preparation environment. `TAP_TOKEN` is the sole secret in the separate
-`release-publish` environment: an optional fine-grained token with Contents: write on `xinbetween/homebrew-tap`. Never
-put certificates or notarization credentials in `release-publish`, and never put the tap token in `release`.
+All values above belong only to the `release` environment. That environment also carries `TAP_TOKEN`, a fine-grained
+token with Contents: write only on `xinbetween/homebrew-tap`; the workflow references it exclusively from the downstream
+Homebrew job after public-byte verification. The separate `release-publish` environment has no signing, notarization,
+Apple, or tap secret.
 
 ### What protects it
 
@@ -548,9 +584,10 @@ A signing identity in GitHub Actions is a signing identity outside your Mac, so 
 ways. The repository settings among them are not stored in this file, so this is also the record of what to check if the
 setup is ever rebuilt.
 
-1. **Signing secrets live only in `release`; publication credentials live only in `release-publish`.** The preparation
-   job has read-only Contents permission and cannot create a release. The publication job has no signing or Apple input,
-   and its static contract rejects any build, signing, provisioning, or notarization command.
+1. **Signing and tap credentials live in `release`; byte publication remains credential-free in `release-publish`.**
+   The preparation job has read-only Contents permission and cannot create a release. The publication job has no signing,
+   Apple, or tap input, and its static contract rejects any build, signing, provisioning, or notarization command. Only
+   the downstream Homebrew job references `TAP_TOKEN`, after the public DMG has been verified against its manifest.
 2. **Only listed accounts can start or rerun a release.** The environments do not need a self-approval click — a release
    by the maintainer should not require the maintainer to approve themselves. In its place both jobs require
    `github.actor` and `github.triggering_actor` to appear in `RELEASE_ACTORS` (a repository variable, `blessdyb` by

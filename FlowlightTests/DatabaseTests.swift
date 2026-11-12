@@ -772,6 +772,35 @@ final class DatabaseTests: XCTestCase {
                        "the concurrent capture commit becomes visible after the read snapshot ends")
     }
 
+    func testConnectionsProjectionUsesOneCommittedReadSnapshot() throws {
+        let t0: Int64 = 1_700_000_000
+        let writer = try TrafficDatabase(url: db.url)
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: key("browser", "example.com"),
+                          counters: FlowCounters(bytesIn: 10, flows: 1))
+        ])])
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 60))
+
+        let projection = try db.readSnapshot { () -> (Int64, Int) in
+            let trafficTotal = try db.appDestinationRows(.second, from: from, to: to)
+                .reduce(Int64(0)) { $0 + $1.counters.bytesIn }
+            try writer.recordRuleEvents([
+                RuleEvent(at: t0 + 1, ruleID: UUID(), action: .block, engine: .flow,
+                          agentKey: "", agentName: "", appName: "Browser", bundleID: "browser",
+                          host: "blocked.example", ip: "", port: 443)
+            ])
+            let blockedCount = try db.blockedAttempts(from: from, to: to).count
+            return (trafficTotal, blockedCount)
+        }
+
+        XCTAssertEqual(projection.0, 10)
+        XCTAssertEqual(projection.1, 0,
+                       "traffic and refusal evidence must share one committed WAL snapshot")
+        XCTAssertEqual(try db.blockedAttempts(from: from, to: to).count, 1,
+                       "the concurrent refusal becomes visible after the Connections read snapshot ends")
+    }
+
     func testReportsAndTrafficVisualizationAgreeOnPerAppTotals() throws {
         let t0: Int64 = 1_700_000_000
         var routed = key("claude", "api.anthropic.com", ip: "203.0.113.8")

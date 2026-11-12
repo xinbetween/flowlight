@@ -4,13 +4,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case live, agents, reports, alerts, rules, ask, inspect, sources, visualize
     var id: String { rawValue }
 
-    static var availableCases: [SidebarItem] {
-        #if APP_STORE
-        allCases.filter { $0 != .inspect }
-        #else
-        allCases
-        #endif
-    }
+    static var availableCases: [SidebarItem] { allCases }
 
     /// The part of the documentation that explains this screen.
     ///
@@ -143,8 +137,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// The three sections in the single Sources destination. The cases remain navigation state so restored windows,
-/// screenshot arguments and links can scroll to the exact operational section without hiding the other two.
+/// The three focused views in the single Sources destination. The cases remain navigation state so restored windows,
+/// screenshot arguments and deep links select the exact operational segment.
 enum SourcesTab: String, CaseIterable, Identifiable, Sendable {
     case collector, devices, coverage
 
@@ -158,7 +152,6 @@ enum SourcesTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var anchorID: String { "sources-\(rawValue)" }
 
     /// `devices` and `coverage` were once standalone screens, then visible tabs. Both old forms still restore to
     /// the corresponding section; an explicit modern section always wins over the legacy screen value.
@@ -267,9 +260,9 @@ final class AppNavigation: ObservableObject {
         let defaults = UserDefaults.standard
         return SourcesTab.restored(explicitRawValue: defaults.string(forKey: "FLSourcesTab"),
                                    legacyScreenRawValue: defaults.string(forKey: "FLScreen"))
-    }()
-    /// A separate pulse makes a repeated link to the already-selected section scroll again.
-    @Published private(set) var sourcesRequestID = UUID()
+    }() {
+        didSet { UserDefaults.standard.set(sourcesTab.rawValue, forKey: "FLSourcesTab") }
+    }
     @Published var alertsTab: AlertsTab = .alerts
     @Published var rulesTab: RulesTab = {
         RulesTab.restored(from: UserDefaults.standard.string(forKey: "FLRulesTab"))
@@ -340,7 +333,6 @@ final class AppNavigation: ObservableObject {
 
     func showSources(_ tab: SourcesTab = .collector) {
         sourcesTab = tab
-        sourcesRequestID = UUID()
         show(.sources)
     }
 

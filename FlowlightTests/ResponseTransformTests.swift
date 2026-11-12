@@ -289,7 +289,8 @@ final class ResponseTransformProvenanceTests: XCTestCase {
         let recorded = expectation(description: "recorded")
         var exchange: HTTPExchange?
         recorder.onExchange = { exchange = $0; recorded.fulfill() }
-        let flow = ProxyFlow(host: "api.example.com", port: 443, clientPort: 1, inspected: true, scheme: "https")
+        let flow = ProxyFlow(host: "api.example.com", port: 443, clientAddress: "127.0.0.1", clientPort: 1,
+                             inspected: true, scheme: "https")
         recorder.flowStarted(flow)
         recorder.flow(flow, clientSent: Data("GET /items HTTP/1.1\r\nHost: api.example.com\r\n\r\n".utf8))
         recorder.flow(flow, responseTransformedBy: "Rewrite status")

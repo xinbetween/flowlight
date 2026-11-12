@@ -1,81 +1,30 @@
 import SwiftUI
 
-/// Collector setup, device channels and coverage form one operational document. A requested section is a scroll
-/// target, not a visibility filter: links and restored windows establish context while the full workflow remains.
+/// Collector setup, device channels and coverage share one destination while each keeps enough room for its own
+/// controls and evidence. Deep links select the exact segment instead of scrolling a long operational document.
 struct SourcesView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @Binding var selection: SourcesTab
-    var requestID: UUID
-    @AccessibilityFocusState private var accessibilityFocus: SourcesTab?
-    @State private var highlightedSection: SourcesTab?
-    @State private var focusGeneration = UUID()
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 32) {
-                    sourcesSection(.collector,
-                                   icon: "antenna.radiowaves.left.and.right",
-                                   detail: L("Choose the traffic source and verify that data is arriving.")) {
-                        CaptureView(embedded: true, liveState: monitor.liveState)
-                    }
-                    sourcesSection(.devices,
-                                   icon: "dot.radiowaves.left.and.right",
-                                   detail: L("Choose which local device channels Flowlight watches.")) {
-                        DevicesView(embedded: true)
-                    }
-                    sourcesSection(.coverage,
-                                   icon: "circle.dashed.inset.filled",
-                                   detail: L("Check what Flowlight can name, attribute, and inspect.")) {
-                        CoverageView(embedded: true)
-                    }
-                }
-                .padding(Measure.gutter)
+        Group {
+            switch selection {
+            case .collector: CaptureView(liveState: monitor.liveState)
+            case .devices: DevicesView()
+            case .coverage: CoverageView()
             }
-            .task { focus(selection, in: proxy) }
-            .onChange(of: selection) { _, section in focus(section, in: proxy) }
-            .onChange(of: requestID) { focus(selection, in: proxy) }
         }
         .navigationTitle(L("Sources"))
-    }
-
-    private func sourcesSection<Content: View>(_ section: SourcesTab, icon: String, detail: String,
-                                               @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(FL.accent)
-                    .frame(width: 26)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(section.title).font(.title2.weight(.semibold))
-                    Text(detail).font(.callout).foregroundStyle(.secondary).prose()
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("", selection: $selection) {
+                    ForEach(SourcesTab.allCases) { Text($0.title).tag($0) }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 300)
+                .accessibilityLabel(L("Sources"))
             }
-            .padding(8)
-            .background(highlightedSection == section ? FL.accent.opacity(0.12) : .clear,
-                        in: RoundedRectangle(cornerRadius: 9))
-            .accessibilityFocused($accessibilityFocus, equals: section)
-
-            content()
-        }
-        .id(section.anchorID)
-    }
-
-    @MainActor
-    private func focus(_ section: SourcesTab, in proxy: ScrollViewProxy) {
-        selection = section
-        proxy.scrollTo(section.anchorID, anchor: .top)
-        accessibilityFocus = section
-        highlightedSection = section
-
-        let generation = UUID()
-        focusGeneration = generation
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.4))
-            guard focusGeneration == generation else { return }
-            highlightedSection = nil
         }
     }
 }

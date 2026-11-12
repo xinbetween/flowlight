@@ -42,19 +42,18 @@ class SidebarOrderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_site.sidebar_order("enum SidebarItem { case live, alerts }")
 
-    def test_product_specific_shortcuts_account_for_missing_store_inspect(self):
+    def test_shared_sidebar_shortcuts_include_store_inspect(self):
         order = ["live", "agents", "reports", "visualize", "alerts", "ask", "inspect",
                  "rules", "sources"]
         requirements = check_site.shortcut_requirements(order)
-        self.assertEqual(requirements["inspect"], ["⌘7 · Developer ID"])
-        self.assertEqual(requirements["rules"], ["⌘8 · Developer ID", "⌘7 · App Store"])
-        self.assertEqual(requirements["sources"], ["⌘9 · Developer ID", "⌘8 · App Store"])
+        self.assertEqual(requirements["inspect"], ["⌘7"])
+        self.assertEqual(requirements["rules"], ["⌘8"])
+        self.assertEqual(requirements["sources"], ["⌘9"])
 
-    def test_universal_sources_shortcut_fails_store_requirement(self):
-        required = ["⌘9 · Developer ID", "⌘8 · App Store"]
-        self.assertEqual(check_site.missing_shortcuts("⌘9", required), required)
-        self.assertEqual(check_site.missing_shortcuts(
-            "⌘9 · Developer ID<br>⌘8 · App Store", required), [])
+    def test_stale_product_specific_sources_shortcut_fails_shared_requirement(self):
+        required = ["⌘9"]
+        self.assertEqual(check_site.missing_shortcuts("⌘8 · App Store", required), required)
+        self.assertEqual(check_site.missing_shortcuts("⌘9", required), [])
 
 
 class ScreenshotProvenanceTests(unittest.TestCase):

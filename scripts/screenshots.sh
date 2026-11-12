@@ -127,8 +127,8 @@ capture() {
   # with the same bundle identifier, producing a real candidate window on the wrong screen.
   "$executable" -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
     -FLDemo YES -FLRenderLive YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
-    -FLForceLightAppearance YES -FLPinScreenshotScreen YES \
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO -inspection.store.enabled NO \
+    -FLForceLightAppearance YES -FLPinScreenshotScreen YES -FLDisableMotion YES \
     "${banner[@]}" "${visualization[@]}" "${rules[@]}" >/dev/null 2>&1 &
   local pid=$!
   local command=""

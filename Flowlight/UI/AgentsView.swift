@@ -187,7 +187,9 @@ struct AgentsView: View {
                 .help(item.name)
             }
             .width(125)
-            TableColumn(L("Health"), value: \.healthRank) { AgentHealthBadge(state: $0.health) }
+            TableColumn(L("Health"), value: \.healthRank) { item in
+                AgentHealthBadge(state: item.health, selected: selection == item.id)
+            }
                 .width(95)
             TableColumn(L("Why")) { item in
                 Text(item.reasons.first ?? "").lineLimit(2).foregroundStyle(.secondary)
@@ -204,13 +206,16 @@ struct AgentsView: View {
             }
             .width(65)
             TableColumn(L("Policy")) { item in
-                Text(policyLabel(item.policy)).font(.caption).foregroundStyle(item.policy.uncoveredDestinations > 0
-                    ? TrafficColors.anomaly : .secondary)
+                Text(policyLabel(item.policy)).font(.caption).foregroundStyle(selection == item.id
+                    ? Color.primary
+                    : (item.policy.uncoveredDestinations > 0 ? TrafficColors.anomaly : .secondary))
             }
             .width(60)
             TableColumn(L("Alerts"), value: \.unresolvedAlerts) { item in
                 Text(item.unresolvedAlerts == 0 ? "–" : "\(item.unresolvedAlerts)").monospacedDigit()
-                    .foregroundStyle(item.unresolvedAlerts > 0 ? TrafficColors.anomaly : .secondary)
+                    .foregroundStyle(selection == item.id
+                        ? Color.primary
+                        : (item.unresolvedAlerts > 0 ? TrafficColors.anomaly : .secondary))
             }
             .width(40)
         }
@@ -266,19 +271,15 @@ struct AgentsView: View {
     }
 
     private func inspectionDiagnostics() -> AgentInspectionDiagnostics {
-        #if APP_STORE
-        return .unavailable
-        #else
         let inspection = monitor.inspection
         return AgentInspectionDiagnostics(
-            available: true,
+            available: ProductCapabilities.current.proxyInspection,
             enabled: inspection.enabled,
             running: inspection.running,
             certificateTrusted: inspection.trusted,
             setupFailed: inspection.enabled && (inspection.lastError != nil
                 || inspection.diagnosis != nil && !inspection.diagnosisIsGood)
         )
-        #endif
     }
 
     private func isInspected(_ identities: [String]) -> Bool {
@@ -469,11 +470,14 @@ struct AgentsView: View {
 
 private struct AgentHealthBadge: View {
     var state: AgentHealthState
+    var selected = false
 
     var body: some View {
         Label(state.title, systemImage: icon)
             .font(.caption.weight(.medium))
-            .foregroundStyle(tint)
+            // Semantic colors identify unselected rows. The system selection fill supplies state by itself and needs
+            // the native selected-content color for readable contrast in every accent color and appearance.
+            .foregroundStyle(selected ? Color.primary : tint)
     }
 
     private var icon: String {
@@ -763,7 +767,12 @@ struct AllowlistEditor: View {
                     } message: {
                         Text(L("Until now this allowlist only raised alerts. From here on, anything %@ or its tools contact that isn't listed will be refused, which can stop the agent from working. Local network, Apple services and Flowlight's own traffic are never blocked, and every refusal appears in Alerts.", agentName))
                     }
-            } else if policy.enabled {
+            } else if policy.enabled
+                        && !(DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLPinScreenshotScreen")) {
+                // The deterministic screenshot fixture is synthetic and never enforces traffic. Keep the real
+                // unavailable-state warning everywhere else, but do not publish the unsigned local build's signing
+                // state as if it described the signed Store product. The footer below still says demo traffic is not
+                // blocked.
                 BlockingUnavailableNotice(enforcing: policy.enforce)
             }
             if !policy.patterns.isEmpty {
@@ -1562,9 +1571,6 @@ struct InspectionHint: View {
     private var inspecting: Bool { inspection.enabled && inspection.running }
 
     var body: some View {
-        #if APP_STORE
-        EmptyView()
-        #else
         VStack(alignment: .leading, spacing: 6) {
             Text(message)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -1572,6 +1578,10 @@ struct InspectionHint: View {
                 Button(L("Set up HTTPS inspection")) { nav.show(.inspect) }
                     .controlSize(.small)
             } else if !seen {
+                #if APP_STORE
+                Button(L("Review Proxy Setup")) { nav.show(.inspect) }
+                    .controlSize(.small)
+                #else
                 HStack(spacing: 8) {
                     // Offered first, because when something else is starting the agents it is the only one of
                     // the three that changes anything: a new window is a shell no agent will ever descend from.
@@ -1590,6 +1600,7 @@ struct InspectionHint: View {
                     Text(relaunchError).font(.caption).foregroundStyle(FL.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                #endif
             }
         }
         .padding(.bottom, 4)
@@ -1610,7 +1621,6 @@ struct InspectionHint: View {
             Text(L("%@ starts %@, so the proxy settings have to reach %@ rather than a new window — a shell opened now would never be any agent's parent. Restarting it ends every session it is currently running, including this one. It is started again with the same command and its HTTPS pointed at Flowlight.",
                    supervisor?.name ?? "", agent, supervisor?.name ?? ""))
         }
-        #endif
     }
 
     /// What is actually starting this agent, when it is something other than a terminal.
@@ -1654,6 +1664,17 @@ struct InspectionHint: View {
     }
 
     private var message: String {
+        #if APP_STORE
+        if !inspecting {
+            return L("Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@.", agent, what)
+        }
+        if !seen {
+            return reaching.map {
+                L("%1$@ reached %2$@ directly, not through the explicit proxy, so there was nothing to read. Review Inspect setup and configure the app that launches %1$@ to use Flowlight's proxy.", agent, $0)
+            } ?? L("HTTPS inspection is on, but nothing of %@'s has gone through the explicit proxy in this window. Review Inspect setup and configure its launcher to use Flowlight's proxy.", agent)
+        }
+        return L("No %@ in this window. Flowlight is decrypting %@'s traffic; its model just hasn't asked for any.", subject, agent)
+        #else
         if !inspecting {
             return L("Flowlight sees %@'s connections, but not what's inside them. Turn on HTTPS inspection to see %@.", agent, what)
         }
@@ -1665,5 +1686,6 @@ struct InspectionHint: View {
             return L("%1$@ reached %2$@ directly, not through the proxy, so there was nothing to read. Tool calls are taken from the model's own replies, and those arrived encrypted. A command-line agent only uses the proxy if it was started with it set in its own shell — Inspect › Open Inspected Terminal, then run %1$@ from there.", agent, reaching)
         }
         return L("No %@ in this window. Flowlight is decrypting %@'s traffic; its model just hasn't asked for any.", subject, agent)
+        #endif
     }
 }

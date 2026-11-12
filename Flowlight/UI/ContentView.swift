@@ -68,14 +68,9 @@ struct ContentView: View {
                 case .visualize: VisualizeView()
                 case .alerts: AlertsView()
                 case .rules: RulesView()
-                case .inspect:
-                    #if APP_STORE
-                    LiveView(liveState: monitor.liveState)
-                    #else
-                    InspectView()
-                    #endif
+                case .inspect: InspectView()
                 case .ask: AskView()
-                case .sources: SourcesView(selection: $nav.sourcesTab, requestID: nav.sourcesRequestID)
+                case .sources: SourcesView(selection: $nav.sourcesTab)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

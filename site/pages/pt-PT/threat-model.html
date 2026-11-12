@@ -84,6 +84,12 @@ nav: threat-model
         propósito, porque quebrar uma ligação com o certificado fixado quebraria a app. O QUIC também não é entregue ao proxy.</p>
       <p>Por isso um ecrã Inspecionar vazio significa «não foi encaminhado nada para aqui», não «não aconteceu nada». Origens › Cobertura diz qual das duas
         coisas se aplica, app por app.</p>
+      <p><strong>O produto Store não assume o controlo das definições de proxy ou de confiança.</strong> Expõe um proxy de loopback e uma autoridade pública,
+        mas é o utilizador que importa essa autoridade e encaminha cada aplicação. A extensão de filtro de conteúdos atribui uma ligação a um proxy explícito
+        a partir do token de auditoria que o macOS associou ao socket de loopback ativo exato, fazendo corresponder tanto a porta de origem como a do proxy.
+        Uma identidade desconhecida, obsoleta ou não correspondente falha em aberto para a aplicação por app; o Flowlight nunca a substitui por um processo
+        adivinhado. Remover a inspeção elimina as chaves pertencentes à app e os certificados folha gerados, enquanto uma autoridade pública importada pelo
+        utilizador continua a pertencer-lhe e tem de ser removida separadamente no Acesso às Chaves.</p>
 
       <h2 id="blocking">O que o bloqueio é, e não é</h2>
       <p>Uma regra que recusa ligações é normalmente levada a cabo pela extensão de rede, no caminho, antes de a ligação ser feita. Para o tráfego

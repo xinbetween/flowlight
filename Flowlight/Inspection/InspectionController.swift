@@ -1,5 +1,8 @@
 import AppKit
 import Foundation
+#if APP_STORE
+import SystemConfiguration
+#endif
 
 /// Socket ownership can lag connection acceptance briefly while libproc publishes the new descriptor. Keep the
 /// authorization wait bounded, but give app-scoped rules and managed packs more than one scheduling instant to find it.
@@ -51,6 +54,114 @@ enum ProxyOwnerLookup {
     }
 }
 
+#if APP_STORE
+private final class StoreProxyIdentityCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    private let completion: @Sendable (ProxyClientIdentity?) -> Void
+
+    init(completion: @escaping @Sendable (ProxyClientIdentity?) -> Void) {
+        self.completion = completion
+    }
+
+    func finish(_ identity: ProxyClientIdentity?) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true
+        lock.unlock()
+        completion(identity)
+    }
+}
+
+/// A stalled content-filter reply must not strand CONNECT before either the local refusal or upstream socket exists.
+/// The first reply wins; timeout fails open with unknown identity and any late XPC callback is ignored.
+enum StoreProxyIdentityLookup {
+    typealias Scheduler = @Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void
+    static let timeout: TimeInterval = 0.25
+
+    static func resolve(
+        lookup: @escaping @Sendable (@escaping @Sendable (ProxyClientIdentity?) -> Void) -> Void,
+        completion: @escaping @Sendable (ProxyClientIdentity?) -> Void
+    ) {
+        resolve(
+            timeout: timeout,
+            lookup: lookup,
+            schedule: { delay, work in
+                DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay, execute: work)
+            },
+            completion: completion
+        )
+    }
+
+    static func resolve(
+        timeout: TimeInterval,
+        lookup: @escaping @Sendable (@escaping @Sendable (ProxyClientIdentity?) -> Void) -> Void,
+        schedule: @escaping Scheduler,
+        completion: @escaping @Sendable (ProxyClientIdentity?) -> Void
+    ) {
+        let gate = StoreProxyIdentityCompletion(completion: completion)
+        schedule(timeout) { gate.finish(nil) }
+        lookup { gate.finish($0) }
+    }
+}
+
+enum StoreInheritedProxyRoute: Equatable {
+    case flowlightPAC
+    case staleExplicitProxy(port: Int)
+}
+
+/// Reads the effective macOS proxy dictionary without changing it. Store builds use this only to identify routing a
+/// Developer build left behind; App Review-safe remediation remains a user action in System Settings.
+enum StoreProxyConfiguration {
+    private static func enabled(_ value: Any?) -> Bool {
+        (value as? NSNumber)?.boolValue == true || (value as? Bool) == true
+    }
+
+    private static func port(_ value: Any?) -> Int? {
+        (value as? NSNumber)?.intValue ?? (value as? Int)
+    }
+
+    private static func isLoopback(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        if host == "localhost" { return true }
+        guard let address = HostCanonicalizer.address(host) else { return false }
+        return address == "127.0.0.1" || address == "::1"
+    }
+
+    static func inheritedRoute(
+        in proxies: [String: Any],
+        storePort: UInt16,
+        developerPort: UInt16 = 8_877
+    ) -> StoreInheritedProxyRoute? {
+        if enabled(proxies[kSCPropNetProxiesProxyAutoConfigEnable as String]),
+           let value = proxies[kSCPropNetProxiesProxyAutoConfigURLString as String] as? String,
+           let url = URL(string: value), isLoopback(url.host), url.path == "/proxy.pac",
+           url.port == Int(developerPort) {
+            return .flowlightPAC
+        }
+
+        let explicit: [(enable: CFString, host: CFString, port: CFString)] = [
+            (kSCPropNetProxiesHTTPEnable, kSCPropNetProxiesHTTPProxy, kSCPropNetProxiesHTTPPort),
+            (kSCPropNetProxiesHTTPSEnable, kSCPropNetProxiesHTTPSProxy, kSCPropNetProxiesHTTPSPort),
+        ]
+        for keys in explicit where enabled(proxies[keys.enable as String]) {
+            let host = proxies[keys.host as String] as? String
+            guard isLoopback(host), let configured = port(proxies[keys.port as String]),
+                  configured == Int(developerPort), configured != Int(storePort) else { continue }
+            return .staleExplicitProxy(port: configured)
+        }
+        return nil
+    }
+
+    static func inheritedRoute(storePort: UInt16) -> StoreInheritedProxyRoute? {
+        guard let proxies = SCDynamicStoreCopyProxies(nil) as? [String: Any] else { return nil }
+        let storedDeveloperPort = UserDefaults.standard.object(forKey: "inspection.port") as? NSNumber
+        let developerPort = UInt16(clamping: storedDeveloperPort?.intValue ?? 8_877)
+        return inheritedRoute(in: proxies, storePort: storePort, developerPort: developerPort)
+    }
+}
+#endif
+
 /// HTTPS inspection: an opt-in mode, off by default, that decrypts the traffic of apps routed through Flowlight's
 /// local proxy using a certificate authority created on this Mac. Everything it records stays in the local database.
 @MainActor
@@ -62,8 +173,17 @@ final class InspectionController: ObservableObject {
     }
 
     enum Keys {
+        #if APP_STORE
+        // The Store and Developer products share a bundle defaults domain. Consent, listener port, and session timing
+        // must still remain product-scoped so alternating installed channels cannot silently enable the other one.
+        static let enabled = "inspection.store.enabled"
+        static let port = "inspection.store.port"
+        static let sessionStarted = "inspection.store.sessionStarted"
+        #else
         static let enabled = "inspection.enabled"
         static let port = "inspection.port"
+        static let sessionStarted = "inspection.sessionStarted"
+        #endif
         static let scope = "inspection.scope"
         static let neverInspect = "inspection.neverInspect"
         static let systemProxy = "inspection.systemProxy"
@@ -72,19 +192,38 @@ final class InspectionController: ObservableObject {
         static let rewriteRules = "inspection.rewriteRules"
         /// Scripts that change eligible upstream responses after the origin answered (see `ResponseTransformRule`).
         static let responseTransformRules = "inspection.responseTransformRules"
-        /// When the running session was switched on, so its end survives a relaunch.
-        static let sessionStarted = "inspection.sessionStarted"
         /// Names of the agents the user asked Flowlight to keep routed through the proxy by editing their own
         /// settings files (see `SettingsEnforcer`), so it applies again on every launch without being asked.
         static let monitoredAgents = "inspection.monitoredAgents"
+        #if APP_STORE
+        static let storeMigration = "inspection.storeExplicitProxyMigration.1"
+        #endif
     }
 
     /// Hosts that are never decrypted, even when routed through the proxy: Apple services (many pin certificates and
     /// carry account data) and password managers.
+    nonisolated static let defaultScope: Scope = .agents
+
     nonisolated static let defaultNeverInspect = [
         "apple.com", "icloud.com", "icloud-content.com", "apple-cloudkit.com", "mzstatic.com", "cdn-apple.com",
         "1password.com", "1password.ca", "1password.eu", "bitwarden.com", "lastpass.com", "dashlane.com", "keepersecurity.com",
     ]
+
+    #if APP_STORE
+    nonisolated static let storeDefaultPort: UInt16 = 8878
+
+    /// Product replacement keeps the app's defaults domain. Store consent and session state use Store-only keys, so
+    /// Developer settings can neither enable this product nor be erased when somebody alternates distribution channels.
+    nonisolated static func migrateStoreDefaults(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: Keys.storeMigration) else { return }
+        defaults.set(false, forKey: Keys.enabled)
+        defaults.removeObject(forKey: Keys.sessionStarted)
+        defaults.set(Int(storeDefaultPort), forKey: Keys.port)
+        // Developer routing metadata remains Developer-owned. The Store product ignores it and reports any inherited
+        // macOS route read-only, but deleting it would prevent the Developer product from later undoing that route.
+        defaults.set(true, forKey: Keys.storeMigration)
+    }
+    #endif
 
     @Published private(set) var running = false
     @Published private(set) var port: UInt16?
@@ -100,6 +239,12 @@ final class InspectionController: ObservableObject {
     /// Whether that sentence is the good news. Kept beside it rather than read back out of it: the sentence is
     /// translated, so matching its wording would only work in English.
     @Published private(set) var diagnosisIsGood = false
+    #if APP_STORE
+    /// True only while the exact Store extension is authenticated, filtering, and has accepted this proxy port.
+    @Published private(set) var attributionReady = false
+    /// A Developer build may have left macOS routing through Flowlight's old PAC. Store builds detect but never alter it.
+    @Published private(set) var inheritedProxyRoute: StoreInheritedProxyRoute?
+    #endif
 
     private let proxy = InspectionProxy()
     private let recorder = InspectionRecorder()
@@ -107,6 +252,9 @@ final class InspectionController: ObservableObject {
     private weak var db: TrafficDatabase?
     private var pruneTimer: Timer?
     private var sessionTimer: Timer?
+    /// False while persisted policy is loading or an enabled managed-pack generation is not yet committed.
+    @Published private(set) var policyStateReady = false
+    private(set) var attached = false
     var onRecorded: () -> Void = {}
     /// Wakes post-capture local analysis only after the exchange and any derived job are durable.
     var onLocalRiskCandidate: () -> Void = {}
@@ -118,9 +266,18 @@ final class InspectionController: ObservableObject {
     /// is conservatively ignored rather than crediting an obsolete request decision to a replacement definition.
     nonisolated(unsafe) var requestRuleGeneration: @Sendable () -> UInt64 = { 0 }
     /// Called with every request or proxied connection a rule refused, ready for the violations feed.
-    nonisolated(unsafe) var onRuleRefusal: @Sendable (RuleEvent) -> Void = { _ in }
+    /// Persists an ordinary proxy refusal before it becomes a local 403. False means fail open so the UI and durable
+    /// activity can never disagree about whether Flowlight blocked the connection.
+    nonisolated(unsafe) var onRuleRefusal: @Sendable (
+        RuleEvent,
+        @escaping @Sendable (Bool) -> Void
+    ) -> Void = { _, completion in completion(false) }
     /// One atomic flow-level rule answer, including whether the global escape hatch is active.
     nonisolated(unsafe) var flowRuleDecision: @Sendable (FlowFacts) -> LiveFlowRuleDecision = {
+        _ in LiveFlowRuleDecision(paused: false, decision: RuleDecision(verdict: .allow, rule: nil), externalClaim: nil)
+    }
+    /// Side-effect-free counterpart used after DNS resolution so the hostname decision is not consumed twice.
+    nonisolated(unsafe) var previewFlowRuleDecision: @Sendable (FlowFacts) -> LiveFlowRuleDecision = {
         _ in LiveFlowRuleDecision(paused: false, decision: RuleDecision(verdict: .allow, rule: nil), externalClaim: nil)
     }
     /// Bounded rules are previewed locally, then atomically claimed by the active enforcement source.
@@ -138,30 +295,48 @@ final class InspectionController: ObservableObject {
         RuleClaim,
         @escaping @Sendable (Bool) -> Void
     ) -> Void = { _, completion in completion(false) }
+    #if APP_STORE
+    /// In Store builds the content-filter extension resolves the exact loopback client through its audit token.
+    /// Nil is an attribution miss and remains fail-open for every app-scoped decision.
+    nonisolated(unsafe) var trustedProxyOwner: @Sendable (
+        String,
+        UInt16,
+        UInt16,
+        @escaping @Sendable (ProxyClientIdentity?) -> Void
+    ) -> Void = { _, _, _, completion in completion(nil) }
+    /// Publishes the listener port to the content filter, or nil when the proxy is stopped.
+    nonisolated(unsafe) var publishProxyPort: @Sendable (UInt16?) -> Void = { _ in }
+    #endif
     /// The exact extension-committed managed-pack generation, queried with the original proxied app identity.
     nonisolated(unsafe) var rulePackMatch: @Sendable (String, String) -> RulePackMatch? = { _, _ in nil }
     /// Persists a proxy pack refusal before the proxy acts. False means fail open: no invisible refusal.
     nonisolated(unsafe) var onRulePackRefusal: @Sendable (RulePackEvent, @escaping @Sendable (Bool) -> Void) -> Void = {
         _, completion in completion(false)
     }
+    /// The enforcing allowlist resolved for the exact trusted proxy owner. Nil keeps unknown identity fail-open.
+    nonisolated(unsafe) var agentPolicy: @Sendable (InspectionRecorder.Owner) -> AgentPolicy? = { _ in nil }
+    /// Persists a proxy allowlist refusal before the proxy acts. False means fail open: no invisible refusal.
+    nonisolated(unsafe) var onAllowlistRefusal: @Sendable (BlockEvent, @escaping @Sendable (Bool) -> Void) -> Void = {
+        _, completion in completion(false)
+    }
     /// The guardrails in force, read fresh per connection like the rules.
     nonisolated(unsafe) var guardrails: @Sendable () -> [Guardrail] = { [] }
-    /// Called with every tool a guardrail took away, and every call it refused.
-    nonisolated(unsafe) var onGuardrail: @Sendable (RuleEvent) -> Void = { _ in }
-    /// Updates a guardrail's hit count when the exchange itself carries the durable activity record.
+    /// Updates a guardrail's hit count after its refusal activity is durable, or when an upstream exchange carries
+    /// the durable activity record for a filtered declaration.
     nonisolated(unsafe) var onGuardrailHit: @Sendable (RuleEvent) -> Void = { _ in }
 
     init() {
+        #if APP_STORE
+        let defaultPort = Int(Self.storeDefaultPort)
+        #else
+        let defaultPort = 8877
+        #endif
         UserDefaults.standard.register(defaults: [
-            Keys.enabled: false, Keys.port: 8877, Keys.scope: Scope.all.rawValue,
+            Keys.enabled: false, Keys.port: defaultPort, Keys.scope: Self.defaultScope.rawValue,
             Keys.neverInspect: Self.defaultNeverInspect, Keys.systemProxy: false,
         ])
         #if APP_STORE
-        // The Store sandbox cannot install a root certificate, mutate system proxy settings, or rewrite agent
-        // configuration. Clear any preference copied from a direct build before lifecycle setup can act on it.
-        UserDefaults.standard.set(false, forKey: Keys.enabled)
-        UserDefaults.standard.set(false, forKey: Keys.systemProxy)
-        UserDefaults.standard.removeObject(forKey: Keys.monitoredAgents)
+        Self.migrateStoreDefaults(.standard)
         #endif
         proxy.observer = recorder
         recorder.proxyPort = { [proxy] in proxy.port }
@@ -171,6 +346,9 @@ final class InspectionController: ObservableObject {
                 self?.running = proxy.port != nil
                 self?.port = proxy.port
                 ProxyAttribution.shared.proxyPort = proxy.port
+                #if APP_STORE
+                self?.publishProxyPort(proxy.port)
+                #endif
                 if let message { self?.lastError = message }
                 // The proxy going up or down decides whether it is safe for a settings file to point at it, so the
                 // persisted routing is reconciled to that here rather than only when the switch is flipped.
@@ -187,25 +365,17 @@ final class InspectionController: ObservableObject {
         }
         let mockRules = { Self.decodeMockRules(UserDefaults.standard.data(forKey: Keys.mockRules)) }
         let rewriteRules = { Self.decodeRewriteRules(UserDefaults.standard.data(forKey: Keys.rewriteRules)) }
-        let responseTransforms = { Self.decodeResponseTransformRules(UserDefaults.standard.data(forKey: Keys.responseTransformRules)) }
+        let responseTransforms: () -> [ResponseTransformRule] = {
+            guard ProductCapabilities.current.responseTransforms else { return [] }
+            return Self.decodeResponseTransformRules(UserDefaults.standard.data(forKey: Keys.responseTransformRules))
+        }
         // A rule refusing a request is answered by the same machinery that gives a mock its canned response, and
         // it goes first: a block someone wrote has to outrank a mock they left switched on.
-        let answersFor = { [weak self, recorder, proxy] (host: String, clientPort: UInt16) -> [MockRule] in
-            let destination = Self.proxyDestination(host)
+        let answersFor = { [weak self] (host: String, owner: InspectionRecorder.Owner) -> [MockRule] in
             let generation = self?.requestRuleGeneration() ?? 0
-            var refusals = (self?.requestRules() ?? []).filter {
-                $0.action == .block && ($0.destination.isEmpty
-                    || $0.destinationMatches(host: destination.host, ip: destination.ip))
-            }
-            if refusals.contains(where: { !$0.app.isEmpty }) {
-                // Only then is it worth asking who opened this connection: naming an app is the uncommon case,
-                // and the answer costs a lookup on the proxy's own queue.
-                let owner = recorder.owner(clientPort: clientPort, proxyPort: proxy.port)
-                refusals = refusals.filter {
-                    Rule.appMatches($0.app, bundleID: owner.bundleID, agentKey: owner.agent ?? owner.bundleID)
-                        || Rule.appMatches($0.app, bundleID: owner.appName, agentKey: owner.agentName ?? "")
-                }
-            }
+            let decisions = Self.requestRuleAnswers(
+                self?.requestRules() ?? [], host: host, owner: owner, generation: generation
+            )
             let mocks = MockRules.mocks(mockRules(), host: host).map { rule -> MockRule in
                 var recorded = rule
                 recorded.recordingReference = InspectionPolicyReference.encode([
@@ -213,26 +383,59 @@ final class InspectionController: ObservableObject {
                 ]) ?? rule.title
                 return recorded
             }
-            return refusals.map {
-                $0.asRefusal(host: host, ruleSession: RuleStore.session, ruleGeneration: generation)
-            } + mocks
+            return decisions + mocks
         }
-        proxy.mockRules = { host, clientPort in answersFor(host, clientPort) }
-        proxy.authorizeConnection = { [weak self, recorder, proxy] host, port, clientPort, answer in
-            guard let self else { answer(true); return }
-            ProxyOwnerLookup.resolve(
-                lookup: { recorder.owner(clientPort: clientPort, proxyPort: proxy.port) }
-            ) { owner in
-                self.authorizeProxyConnection(host: host, port: port, owner: owner, answer: answer)
+        proxy.mockRules = { flow in answersFor(flow.host, flow.owner) }
+        proxy.authorizeConnection = { [weak self, recorder, proxy] host, port, clientAddress, clientPort, answer in
+            guard let self else {
+                answer(ProxyAuthorization(allowed: true, owner: .init()))
+                return
             }
+            let authorize: @Sendable (InspectionRecorder.Owner) -> Void = { owner in
+                self.authorizeProxyConnectionWithRule(host: host, port: port, owner: owner) { allowed, ruleID in
+                    answer(ProxyAuthorization(allowed: allowed, owner: owner, ruleID: ruleID))
+                }
+            }
+            #if APP_STORE
+            guard let proxyPort = proxy.port else {
+                answer(ProxyAuthorization(allowed: true, owner: .init()))
+                return
+            }
+            StoreProxyIdentityLookup.resolve(
+                lookup: { completion in
+                    self.trustedProxyOwner(clientAddress, clientPort, proxyPort, completion)
+                }
+            ) { identity in
+                authorize(identity.map { recorder.owner(for: $0) } ?? InspectionRecorder.Owner())
+            }
+            #else
+            ProxyOwnerLookup.resolve(
+                lookup: {
+                    recorder.owner(clientAddress: clientAddress, clientPort: clientPort, proxyPort: proxy.port)
+                },
+                completion: authorize
+            )
+            #endif
+        }
+        proxy.authorizeResolvedConnection = { [weak self] flow, remoteIP, answer in
+            guard let self else { answer(true); return }
+            self.authorizeResolvedProxyConnection(
+                host: flow.host,
+                remoteIP: remoteIP,
+                port: flow.port,
+                owner: flow.owner,
+                authorizedRuleID: flow.authorizedRuleID,
+                answer: answer
+            )
         }
         // Guardrails read and change whole requests, which is a different job from matching a URL, so they get
         // their own hook rather than being squeezed into the answer machinery.
-        proxy.interventions = { [weak self, recorder, proxy] host, clientPort in
+        proxy.interventions = { [weak self] flow in
             guard let self else { return nil }
+            let host = flow.host
+            let owner = flow.owner
             let guardrails = self.guardrails()
             let rewrites = RewriteRules.matching(rewriteRules(), host: host)
-            let owner = recorder.owner(clientPort: clientPort, proxyPort: proxy.port)
             let agent = owner.agent ?? owner.bundleID
             let guardsApply = !guardrails.isEmpty && GuardrailBook.any(guardrails, agent: agent)
             // Hold the request only when something would act on it: a guardrail for this agent, or a rewrite rule
@@ -244,10 +447,8 @@ final class InspectionController: ObservableObject {
                 // A guardrail that answers an MCP call locally short-circuits — nothing goes upstream to rewrite.
                 if guardsApply, let body = Self.body(of: bytes),
                    let refusal = GuardrailEngine.refuse(jsonrpc: body, guardrails: guardrails, agent: agent, server: server) {
-                    self.report(refusal.guardrail, subject: refusal.subject, owner: owner, host: host,
-                                port: UInt16(clamping: 443), method: head.method, engine: .guardrail)
                     return .answer(MockRule(id: refusal.guardrail.id, name: refusal.guardrail.title, host: host,
-                                            path: "*", status: 200, body: refusal.body, blocked: true))
+                                            path: refusal.subject, status: 200, body: refusal.body, blocked: true))
                 }
                 var current = bytes
                 var guardrailReference: String?
@@ -306,32 +507,21 @@ final class InspectionController: ObservableObject {
                 }
             )
         }
-        proxy.onAnswered = { [weak self, recorder, proxy] rule, flow, head in
-            guard rule.blocked, let refused = (self?.requestRules() ?? []).first(where: { $0.id == rule.id }) else { return }
-            let owner = recorder.owner(clientPort: flow.clientPort, proxyPort: proxy.port)
-            let path = head?.target.split(separator: "?").first.map(String.init) ?? refused.path
-            self?.onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: refused.id,
-                                          ruleSession: rule.ruleSession, ruleGeneration: rule.ruleGeneration,
-                                          action: .block, engine: .request, agentKey: owner.agent ?? owner.bundleID,
-                                          agentName: owner.agentName ?? owner.appName, appName: owner.appName,
-                                          bundleID: owner.bundleID, host: flow.host, ip: "",
-                                          port: UInt16(clamping: flow.port), path: path,
-                                          method: head?.method ?? refused.method))
+        proxy.authorizeAnswer = { [weak self] rule, flow, head, answer in
+            guard let self else { answer(false); return }
+            self.authorizeProxyAnswer(rule: rule, flow: flow, head: head, answer: answer)
         }
-        let decide = DispatchQueue(label: "flowlight.inspect.decide", qos: .userInitiated, attributes: .concurrent)
-        proxy.shouldInspect = { [recorder, proxy] host, clientPort, answer in
+        proxy.shouldInspect = { host, owner, answer in
             let (scope, never) = scopeAndList()
             guard !Self.matches(host: host, patterns: never) else { answer(false); return }
             // A host someone wrote a mock rule for is decrypted whatever the scope says: a rule can only answer a
             // request Flowlight can read, and "my mock didn't fire" is a bad afternoon.
-            guard answersFor(host, clientPort).isEmpty else { answer(true); return }
+            guard answersFor(host, owner).isEmpty else { answer(true); return }
             // Same for a host with a rewrite or response-transform rule: it can only edit bytes Flowlight can read.
             guard RewriteRules.matching(rewriteRules(), host: host).isEmpty else { answer(true); return }
             guard ResponseTransformRules.matching(responseTransforms(), host: host).isEmpty else { answer(true); return }
             guard scope == .agents else { answer(true); return }
-            decide.async {
-                answer(recorder.owner(clientPort: clientPort, proxyPort: proxy.port).agent != nil)
-            }
+            answer(owner.agent != nil)
         }
         recorder.onExchange = { [weak self] exchange in
             // Plain-HTTP requests reach the recorder regardless of scope; keep only what the scope allows.
@@ -357,15 +547,6 @@ final class InspectionController: ObservableObject {
             }
         }
         refreshStatus()
-    }
-
-    /// One decision a guardrail made, on its way to the same feed the network rules use — it is the same
-    /// question, asked about a tool instead of a destination.
-    nonisolated private func report(_ guardrail: Guardrail?, subject: String, owner: InspectionRecorder.Owner,
-                                    host: String, port: UInt16, method: String, engine: Rule.Engine) {
-        guard let guardrail else { return }
-        onGuardrail(guardrailEvent(guardrail, subject: subject, owner: owner, host: host, port: port,
-                                   method: method, engine: engine))
     }
 
     nonisolated private func reportHit(_ guardrail: Guardrail, subject: String, owner: InspectionRecorder.Owner,
@@ -405,17 +586,10 @@ final class InspectionController: ObservableObject {
         return out
     }
 
-    #if APP_STORE
-    var enabled: Bool {
-        get { false }
-        set { }
-    }
-    #else
     var enabled: Bool {
         get { UserDefaults.standard.bool(forKey: Keys.enabled) }
         set { UserDefaults.standard.set(newValue, forKey: Keys.enabled); objectWillChange.send(); apply() }
     }
-    #endif
 
     var scope: Scope {
         get { Scope(rawValue: UserDefaults.standard.string(forKey: Keys.scope) ?? "") ?? .agents }
@@ -503,8 +677,29 @@ final class InspectionController: ObservableObject {
 
     var configuredPort: UInt16 { UInt16(clamping: max(1024, UserDefaults.standard.integer(forKey: Keys.port))) }
 
+    #if APP_STORE
+    func setAttributionReady(_ ready: Bool) {
+        guard attributionReady != ready else { return }
+        attributionReady = ready
+        if enabled {
+            Task { await checkSetup() }
+        } else {
+            diagnosis = nil
+            diagnosisIsGood = false
+        }
+    }
+    #endif
+
+    func setPolicyStateReady(_ ready: Bool) {
+        guard policyStateReady != ready else { return }
+        policyStateReady = ready
+        guard attached else { return }
+        if ready { apply() } else { proxy.stop() }
+    }
+
     func attach(db: TrafficDatabase) {
         self.db = db
+        attached = true
         guard !DemoData.isEnabled else { return }
         reconcileEnforcementAtLaunch()
         apply()
@@ -525,11 +720,14 @@ final class InspectionController: ObservableObject {
         sessionTimer?.invalidate()
         sessionTimer = nil
         let minutes = budget.sessionMinutes
-        guard enabled, running, minutes > 0 else {
+        guard enabled, minutes > 0 else {
             sessionEndsAt = nil
             UserDefaults.standard.removeObject(forKey: Keys.sessionStarted)
             return
         }
+        // The clock runs from when inspection was switched on, including the brief asynchronous listener startup.
+        // Requiring `running` here clears the persisted start before NWListener can become ready and makes the session
+        // effectively unlimited.
         // The clock runs from when inspection was switched on, not from now, so changing an unrelated setting
         // cannot quietly buy another eight hours.
         let started = (UserDefaults.standard.object(forKey: Keys.sessionStarted) as? Date) ?? Date()
@@ -573,8 +771,33 @@ final class InspectionController: ObservableObject {
     /// Everything the simple switch does: create the certificate, trust it, start the proxy and route apps through it.
     /// Trusting and changing the proxy both need an administrator, so they go in one prompt rather than two.
     func setEnabled(_ on: Bool) {
+        // Never let a fast UI action outrun the persisted-policy startup barrier. Turning inspection off remains
+        // available while policy state is loading; turning it on becomes available as soon as every publication is ready.
+        guard !on || policyStateReady else { return }
         #if APP_STORE
-        return
+        lastError = nil
+        if !on { attributionReady = false }
+        if on {
+            do {
+                try ca.ensure()
+                caExists = true
+                UserDefaults.standard.set(true, forKey: Keys.enabled)
+                UserDefaults.standard.set(Date(), forKey: Keys.sessionStarted)
+                proxy.start(port: configuredPort)
+            } catch {
+                UserDefaults.standard.set(false, forKey: Keys.enabled)
+                lastError = error.localizedDescription
+            }
+        } else {
+            UserDefaults.standard.set(false, forKey: Keys.enabled)
+            UserDefaults.standard.removeObject(forKey: Keys.sessionStarted)
+            proxy.stop()
+        }
+        diagnosis = nil
+        diagnosisIsGood = false
+        objectWillChange.send()
+        refreshStatus()
+        scheduleSessionExpiry()
         #else
         lastError = nil
         if on {
@@ -653,14 +876,27 @@ final class InspectionController: ObservableObject {
 
     /// Starts or stops the proxy to match the setting.
     func apply() {
+        guard policyStateReady else {
+            proxy.stop()
+            refreshStatus()
+            return
+        }
         #if APP_STORE
-        running = false
-        port = nil
-        trusted = false
-        caExists = false
+        refreshStatus()
         systemProxyOn = false
-        proxy.stop()
-        return
+        if enabled && !DemoData.isEnabled {
+            do {
+                try ca.ensure()
+                caExists = true
+                proxy.start(port: configuredPort)
+            } catch {
+                lastError = error.localizedDescription
+                UserDefaults.standard.set(false, forKey: Keys.enabled)
+                proxy.stop()
+            }
+        } else {
+            proxy.stop()
+        }
         #else
         refreshStatus()
         if enabled && !DemoData.isEnabled {
@@ -677,7 +913,12 @@ final class InspectionController: ObservableObject {
     func refreshStatus() {
         caExists = ca.exists
         trusted = caExists && ca.isTrustedAnywhere
+        #if APP_STORE
+        systemProxyOn = false
+        inheritedProxyRoute = StoreProxyConfiguration.inheritedRoute(storePort: configuredPort)
+        #else
         systemProxyOn = UserDefaults.standard.bool(forKey: Keys.systemProxy)
+        #endif
     }
 
     // MARK: Always monitor — persisting routing into agents' own settings
@@ -755,7 +996,13 @@ final class InspectionController: ObservableObject {
 
     func trustCertificate() {
         #if APP_STORE
-        return
+        do {
+            try ca.ensure()
+            refreshStatus()
+            revealCertificate()
+        } catch {
+            lastError = error.localizedDescription
+        }
         #else
         lastError = nil
         Task.detached { [ca] in
@@ -865,7 +1112,38 @@ final class InspectionController: ObservableObject {
     /// came up or a proxy setting that didn't take leaves the app quietly inspecting nothing.
     func checkSetup() async {
         diagnosisIsGood = false
+        refreshStatus()
         guard UserDefaults.standard.bool(forKey: Keys.enabled) else { diagnosis = nil; return }
+        #if APP_STORE
+        guard let listening = port else {
+            diagnosis = L("The proxy isn't listening. Another program may be using port %lld — change it under Advanced.",
+                          Int(configuredPort))
+            return
+        }
+        if let inheritedProxyRoute {
+            switch inheritedProxyRoute {
+            case .flowlightPAC:
+                diagnosis = L("macOS is still using Flowlight's Developer proxy configuration. Turn off Automatic Proxy Configuration in System Settings › Network before routing an app to this Store build. Flowlight cannot change that setting from the App Store build.")
+            case .staleExplicitProxy(let oldPort):
+                diagnosis = L("macOS is still routing through Flowlight's old proxy on port %lld. Remove that HTTP or HTTPS proxy in System Settings › Network before using %@.", oldPort, proxyURL)
+            }
+            return
+        }
+        guard trusted else {
+            diagnosis = L("The proxy is ready on 127.0.0.1:%lld. Trust the exported Flowlight certificate, then configure an app to use this HTTP proxy.",
+                          Int(listening))
+            return
+        }
+        guard attributionReady else {
+            diagnosis = L("The proxy and certificate are ready, but trusted app attribution is unavailable. Enable Flowlight under Content filter, then press Check Setup. App-scoped policies fail open until attribution is available.")
+            return
+        }
+        let covered = scope == .agents ? L("AI agents and their tools") : L("every app that uses the proxy")
+        diagnosis = L("Ready on 127.0.0.1:%lld for %@. Configure an app to use this HTTP proxy.",
+                      Int(listening), covered)
+        diagnosisIsGood = true
+        return
+        #else
         guard let listening = port else {
             diagnosis = L("The proxy isn't listening. Another program may be using port %lld — change it under Advanced.",
                           Int(configuredPort))
@@ -901,6 +1179,7 @@ final class InspectionController: ObservableObject {
         diagnosis = L("Ready: %@ routed through 127.0.0.1:%lld, inspecting %@.",
                       services.joined(separator: ", "), Int(listening), covered)
         diagnosisIsGood = true
+        #endif
     }
 
     nonisolated static func pacScript(port: UInt16, never patterns: [String]) -> String {
@@ -952,37 +1231,179 @@ final class InspectionController: ObservableObject {
 
     // MARK: Matching
 
-    nonisolated private func authorizeProxyConnection(
+    nonisolated static func requestRuleAnswers(
+        _ rules: [Rule],
+        host: String,
+        owner: InspectionRecorder.Owner,
+        generation: UInt64
+    ) -> [MockRule] {
+        let destination = proxyDestination(host)
+        let candidates = rules.filter {
+            guard $0.destination.isEmpty
+                    || $0.destinationMatches(host: destination.host, ip: destination.ip) else { return false }
+            guard !$0.app.isEmpty else { return true }
+            return Rule.appMatches($0.app, bundleID: owner.bundleID, agentKey: owner.agent ?? owner.bundleID)
+                || Rule.appMatches($0.app, bundleID: owner.appName, agentKey: owner.agentName ?? "")
+        }
+        return RuleBook.orderedByPrecedence(candidates).map { rule in
+            rule.action == .block
+                ? rule.asRefusal(host: host, ruleSession: RuleStore.session, ruleGeneration: generation)
+                : rule.asRequestAllowance(host: host)
+        }
+    }
+
+    /// Authorizes a local request refusal only after its activity is durable. Guardrails use their own IDs rather than
+    /// ordinary request-rule IDs, but share the same fail-open persistence contract.
+    nonisolated func authorizeProxyAnswer(
+        rule: MockRule,
+        flow: ProxyFlow,
+        head: ProxyRequestHead?,
+        answer: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard rule.blocked else { answer(true); return }
+        let owner = flow.owner
+        if let refused = requestRules().first(where: { $0.id == rule.id }) {
+            let path = head?.target.split(separator: "?").first.map(String.init) ?? refused.path
+            onRuleRefusal(RuleEvent(at: Int64(Date().timeIntervalSince1970), ruleID: refused.id,
+                                    ruleSession: rule.ruleSession, ruleGeneration: rule.ruleGeneration,
+                                    action: .block, engine: .request, agentKey: owner.agent ?? owner.bundleID,
+                                    agentName: owner.agentName ?? owner.appName, appName: owner.appName,
+                                    bundleID: owner.bundleID, host: flow.host, ip: "",
+                                    port: UInt16(clamping: flow.port), path: path,
+                                    method: head?.method ?? refused.method), answer)
+            return
+        }
+        guard let guardrail = guardrails().first(where: { $0.id == rule.id }) else {
+            answer(false)
+            return
+        }
+        let event = guardrailEvent(guardrail, subject: rule.path, owner: owner, host: flow.host,
+                                   port: UInt16(clamping: flow.port), method: head?.method ?? "",
+                                   engine: .guardrail)
+        onRuleRefusal(event) { [weak self] committed in
+            if committed { self?.onGuardrailHit(event) }
+            answer(committed)
+        }
+    }
+
+    /// Applies identity-independent policy even when Store attribution is unavailable. Rules and packs that name an
+    /// app still fail open naturally because empty identity cannot match them; destination-global policy does not.
+    nonisolated func authorizeProxyConnection(
         host: String,
         port: Int,
         owner: InspectionRecorder.Owner,
         answer: @escaping @Sendable (Bool) -> Void
     ) {
-        guard !owner.bundleID.isEmpty else { answer(true); return }
+        authorizeProxyConnectionWithRule(host: host, port: port, owner: owner) { allowed, _ in answer(allowed) }
+    }
+
+    nonisolated private func authorizeProxyConnectionWithRule(
+        host: String,
+        port: Int,
+        owner: InspectionRecorder.Owner,
+        answer: @escaping @Sendable (Bool, UUID?) -> Void
+    ) {
         let facts = Self.proxyFlowFacts(host: host, port: port, owner: owner)
-        guard !BlockRules.isExempt(facts) else { answer(true); return }
+        guard !BlockRules.isExempt(facts) else { answer(true, nil); return }
         let ruled = flowRuleDecision(facts)
-        guard !ruled.paused else { answer(true); return }
+        guard !ruled.paused else { answer(true, nil); return }
         if let rule = ruled.decision.rule {
             authorizeProxyRule(
                 rule,
                 externalClaim: ruled.externalClaim,
                 facts: facts,
-                owner: owner,
-                answer: answer
-            )
+                owner: owner
+            ) { allowed in
+                answer(allowed, allowed && rule.action == .allow ? rule.id : nil)
+            }
             return
         }
-        guard let match = rulePackMatch(host, owner.bundleID) else { answer(true); return }
-        let now = Int64(Date().timeIntervalSince1970)
-        let event = RulePackEvent(bucket: now / 60 * 60, packID: match.packID,
-                                  packVersion: match.packVersion, entryID: match.entry.id,
-                                  category: match.entry.category, match: match.entry.match, action: .block,
-                                  count: 1, firstAt: now, lastAt: now, bundleID: owner.bundleID,
-                                  appName: owner.appName, agentKey: facts.agentKey,
-                                  agentName: owner.agentName ?? owner.appName, host: match.matchedHost,
-                                  matchedHost: match.entry.host, port: facts.port)
-        onRulePackRefusal(event) { committed in answer(!committed) }
+        if let match = rulePackMatch(host, owner.bundleID) {
+            let now = Int64(Date().timeIntervalSince1970)
+            let event = RulePackEvent(bucket: now / 60 * 60, packID: match.packID,
+                                      packVersion: match.packVersion, entryID: match.entry.id,
+                                      category: match.entry.category, match: match.entry.match, action: .block,
+                                      count: 1, firstAt: now, lastAt: now, bundleID: owner.bundleID,
+                                      appName: owner.appName, agentKey: facts.agentKey,
+                                      agentName: owner.agentName ?? owner.appName, host: match.matchedHost,
+                                      matchedHost: match.entry.host, port: facts.port)
+            onRulePackRefusal(event) { [weak self] committed in
+                guard !committed else { answer(false, nil); return }
+                self?.authorizeProxyAllowlist(facts: facts, owner: owner) { allowed in
+                    answer(allowed, nil)
+                } ?? answer(true, nil)
+            }
+            return
+        }
+        authorizeProxyAllowlist(facts: facts, owner: owner) { allowed in answer(allowed, nil) }
+    }
+
+    /// Re-evaluates the hostname together with the exact address selected by Network.framework. A hostname allowance
+    /// already committed before CONNECT is reused rather than consumed twice; a different, more-specific IP/CIDR rule
+    /// is committed before the first client byte is sent upstream.
+    nonisolated func authorizeResolvedProxyConnection(
+        host: String,
+        remoteIP: String,
+        port: Int,
+        owner: InspectionRecorder.Owner,
+        authorizedRuleID: UUID?,
+        answer: @escaping @Sendable (Bool) -> Void
+    ) {
+        let facts = Self.proxyFlowFacts(host: host, resolvedIP: remoteIP, port: port, owner: owner)
+        guard !BlockRules.isExempt(facts) else { answer(true); return }
+        let preview = previewFlowRuleDecision(facts)
+        guard !preview.paused else { answer(true); return }
+        if let rule = preview.decision.rule, rule.id == authorizedRuleID {
+            answer(true)
+            return
+        }
+        guard preview.decision.rule != nil else {
+            authorizeProxyAllowlist(facts: facts, owner: owner, answer: answer)
+            return
+        }
+        let ruled = flowRuleDecision(facts)
+        guard !ruled.paused else { answer(true); return }
+        guard let rule = ruled.decision.rule else {
+            authorizeProxyAllowlist(facts: facts, owner: owner, answer: answer)
+            return
+        }
+        authorizeProxyRule(
+            rule,
+            externalClaim: ruled.externalClaim,
+            facts: facts,
+            owner: owner,
+            answer: answer
+        )
+    }
+
+    nonisolated private func authorizeProxyAllowlist(
+        facts: FlowFacts,
+        owner: InspectionRecorder.Owner,
+        answer: @escaping @Sendable (Bool) -> Void
+    ) {
+        guard let policy = agentPolicy(owner) else { answer(true); return }
+        switch BlockRules.verdict(for: facts, policy: policy) {
+        case .allow, .undecided:
+            answer(true)
+        case .block:
+            // A hostname decision is provisional until Network.framework exposes the selected address. That address
+            // may satisfy a CIDR/IP allowance or the local-network exemption; literal-IP destinations are final now.
+            guard facts.host.isEmpty || !facts.ip.isEmpty else {
+                answer(true)
+                return
+            }
+            let event = BlockEvent(
+                at: Int64(Date().timeIntervalSince1970),
+                agentKey: policy.agentID,
+                agentName: owner.agentName ?? owner.appName,
+                appName: owner.appName,
+                bundleID: owner.bundleID,
+                host: facts.host,
+                ip: facts.ip,
+                port: facts.port
+            )
+            onAllowlistRefusal(event) { committed in answer(!committed) }
+        }
     }
 
     nonisolated private func authorizeProxyRule(
@@ -998,12 +1419,13 @@ final class InspectionController: ObservableObject {
                               action: rule.action, engine: .flow, agentKey: facts.agentKey,
                               agentName: owner.agentName ?? owner.appName, appName: owner.appName,
                               bundleID: owner.bundleID, host: facts.host, ip: facts.ip, port: facts.port)
-        let finish: @Sendable (Rule) -> Void = { [onRuleRefusal] rule in
-            onRuleRefusal(event)
-            answer(rule.action != .block)
-        }
         guard let externalClaim else {
-            finish(rule)
+            if rule.action == .block {
+                onRuleRefusal(event) { committed in answer(!committed) }
+            } else {
+                onRuleRefusal(event) { _ in }
+                answer(true)
+            }
             return
         }
         claimFlowRule(externalClaim) { [weak self] claimed in
@@ -1045,6 +1467,7 @@ final class InspectionController: ObservableObject {
 
     nonisolated static func proxyFlowFacts(
         host: String,
+        resolvedIP: String? = nil,
         port: Int,
         owner: InspectionRecorder.Owner
     ) -> FlowFacts {
@@ -1053,7 +1476,7 @@ final class InspectionController: ObservableObject {
             agentKey: owner.agent ?? owner.bundleID,
             bundleID: owner.bundleID,
             host: destination.host,
-            ip: destination.ip,
+            ip: resolvedIP.flatMap(HostCanonicalizer.address) ?? destination.ip,
             port: UInt16(clamping: port),
             hostSettled: true
         )
@@ -1072,6 +1495,7 @@ final class InspectionController: ObservableObject {
     }
 }
 
+#if !APP_STORE
 enum SystemProxy {
     /// Enabled network service names ("Wi-Fi", "Ethernet"). Disabled services are listed with a leading asterisk.
     static func services() -> [String] {
@@ -1081,6 +1505,7 @@ enum SystemProxy {
             .map(String.init).filter { !$0.hasPrefix("*") && !$0.isEmpty }
     }
 }
+#endif
 
 enum InspectionShell {
     static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }

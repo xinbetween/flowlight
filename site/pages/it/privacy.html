@@ -43,13 +43,18 @@ nav: privacy
         etichette che ne derivano («via curl», «github MCP») insieme al tuo traffico. Nulla di quei file o di quelle righe di comando viene inviato da nessuna parte.</p>
 
       <h2 id="inspection">Ispezione HTTPS</h2>
-      <p>Disattivata per impostazione predefinita. Se la attivi, Flowlight crea un'autorità di certificazione sul tuo Mac (la sua chiave non lascia mai
-        <code>~/Library/Application Support/Flowlight/Inspection</code>) e avvia un proxy che accetta connessioni solo da questo Mac. Per le app che
-        instradi attraverso di esso registra richieste e risposte, compresi i corpi fino a 2 MB, nel database locale per 3 giorni. Le intestazioni con credenziali
-        vengono sostituite con la loro lunghezza prima che qualsiasi cosa venga archiviata — riconosciute per nome (Authorization, cookie, chiavi API) e
-        per le parole nel nome, così che anche <code>X-Access-Key</code> venga intercettata. È un'euristica, non una garanzia: un'intestazione che porti un
-        segreto sotto un nome che nulla riconosce verrebbe registrata. Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password. I dati registrati dall'ispezione non vengono caricati da Flowlight. Disattivando l'ispezione il proxy si arresta; <strong>Rimuovi certificato e dati
-        registrati</strong> elimina il certificato, la sua impostazione di attendibilità e tutte le richieste registrate.</p>
+      <p>Disattivata per impostazione predefinita. Se la attivi, Flowlight crea un'autorità di certificazione sul tuo Mac e avvia un proxy di loopback che accetta
+        connessioni solo da questo Mac. Il prodotto Developer ID conserva il materiale d'ispezione in <code>~/Library/Application Support/Flowlight/Inspection</code>;
+        il prodotto Mac App Store genera chiavi private P-256 native nel proprio gruppo di accesso al portachiavi ed esporta soltanto il certificato pubblico dell'autorità.
+        L'app Store non modifica mai le impostazioni proxy o di attendibilità del sistema: sei tu a importare e considerare attendibile il certificato pubblico e a configurare
+        esplicitamente ogni app ispezionata perché usi l'indirizzo proxy mostrato in Ispeziona.</p>
+      <p>Per le app che instradi attraverso di esso, Flowlight registra richieste e risposte, compresi i corpi fino a 2 MB, nel database locale per 3 giorni. Le intestazioni con
+        credenziali vengono sostituite con la loro lunghezza prima che qualsiasi cosa venga archiviata — riconosciute per nome (Authorization, cookie, chiavi API) e per le parole
+        nel nome, così che anche <code>X-Access-Key</code> venga intercettata. È un'euristica, non una garanzia: un'intestazione che porti un segreto sotto un nome che nulla riconosce
+        verrebbe registrata. Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password. I dati registrati dall'ispezione non vengono
+        caricati. Disattivando l'ispezione il proxy si arresta; <strong>Rimuovi certificato e dati registrati</strong> elimina le chiavi di proprietà di Flowlight, i certificati
+        generati e tutte le richieste registrate. Un'autorità pubblica importata nel prodotto Store resta di proprietà dell'utente e deve essere rimossa separatamente in
+        Accesso Portachiavi.</p>
 
       <h2 id="requests">Richieste di rete che fa l'app</h2>
       <table>
@@ -61,7 +66,7 @@ nav: privacy
         <tr><td>Ricerca del proprietario della rete</td><td>Team Cymru, via DNS</td><td>Indirizzi IP pubblici senza nome host noto. Gli indirizzi privati e riservati non lasciano mai il tuo Mac</td><td>Attiva per impostazione predefinita. Interruttore per disattivarla in Acquisizione › Identifica i proprietari della rete</td></tr>
         <tr><td>Chiedi con un modello ospitato</td><td>Il provider che selezioni: Anthropic, OpenAI, Google Gemini o un endpoint compatibile</td><td>La tua domanda e i risultati restituiti dalle query di sola lettura di Flowlight selezionate dal modello. Il database del traffico non viene caricato</td><td>Solo quando selezioni un provider ospitato e invii una domanda. La schermata Chiedi mostra le richieste trasmesse</td></tr>
         <tr><td>Esportazione verso un collector</td><td>L'endpoint OpenTelemetry o HTTP che configuri</td><td>I campi mostrati in Impostazioni › Esportazione, come le aggregazioni del traffico e gli avvisi. Le intestazioni di autenticazione sono conservate nel portachiavi</td><td>Solo dopo che hai configurato un endpoint e attivato l'esportazione</td></tr>
-        <tr><td>Traffico delle applicazioni ispezionate</td><td>La destinazione originale richiesta dall'applicazione ispezionata</td><td>La richiesta dell'applicazione, inoltrata attraverso il proxy locale di Flowlight dopo la decifrazione</td><td>Solo mentre l'ispezione HTTPS è attiva e l'applicazione è instradata attraverso il proxy</td></tr>
+        <tr><td>Traffico delle applicazioni ispezionate</td><td>La destinazione originale richiesta dall'applicazione ispezionata</td><td>La richiesta dell'applicazione, inoltrata attraverso il proxy locale di Flowlight dopo la decifrazione</td><td>Solo mentre l'ispezione HTTPS è attiva e l'applicazione è instradata esplicitamente attraverso il proxy; il prodotto Store non modifica le impostazioni proxy di sistema</td></tr>
       </table>
 
       <h2 id="permissions">Permessi</h2>

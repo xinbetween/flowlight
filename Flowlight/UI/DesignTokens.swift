@@ -54,6 +54,15 @@ enum Radius {
     static let panel: CGFloat = 16
 }
 
+/// Connections rendering budgets and mark geometry. Motion is deliberately bounded: stable paths carry meaning,
+/// while a small set of visible paths may animate to show direction without turning monitoring into decoration.
+enum GraphStyle {
+    static let maximumAnimatedEdges = 12
+    static let staticLaneWidth: CGFloat = 1.15
+    static let flowPulseWidth: CGFloat = 2.2
+    static let selectedSignalWidth: CGFloat = 5
+}
+
 extension Color {
     /// A colour that resolves differently in light and dark, like an asset-catalog colour set but defined in code so
     /// the whole palette lives in one file. `0xRRGGBB`.

@@ -599,31 +599,6 @@ jobs:
             exit 1
           }
 
-      - name: Update Homebrew from the verified DMG
-        env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$TAP_TOKEN" ]]; then
-            echo "TAP_TOKEN is not configured in release-publish; GitHub publication is complete and Homebrew must be updated manually."
-            exit 0
-          fi
-          VERSION="$RELEASE_VERSION"
-          PREPARED="$RUNNER_TEMP/prepared-release"
-          mkdir build
-          cp "$PREPARED/Flowlight.dmg" build/Flowlight.dmg
-          export GH_TOKEN="$TAP_TOKEN"
-          gh auth setup-git
-          gh repo clone xinbetween/homebrew-tap "$RUNNER_TEMP/tap"
-          git -C "$RUNNER_TEMP/tap" config user.name "github-actions[bot]"
-          git -C "$RUNNER_TEMP/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          VERSION="$VERSION" REQUIRE_LOCAL_DMG=1 TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
-          EXPECTED=$(jq -r '.assets[] | select(.name == "Flowlight.dmg") | .sha256' "$PREPARED/RELEASE-MANIFEST.json")
-          ACTUAL=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$RUNNER_TEMP/tap/Casks/flowlight.rb")
-          [[ "$ACTUAL" == "$EXPECTED" ]] || { echo "::error::Homebrew checksum differs from the prepared manifest."; exit 1; }
-          git -C "$RUNNER_TEMP/tap" push
-
       - name: Record the published identity
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
@@ -641,3 +616,74 @@ jobs:
             echo "- Prepared artifact digest: \`$ARTIFACT_DIGEST\`"
             echo "- No build, signing, notarization, or Apple credential step ran during publication."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  homebrew:
+    name: Publish verified Homebrew cask
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # TAP_TOKEN already lives here. The job references no signing or notarization input; publication remains in the
+    # credential-free release-publish environment, and this follow-up receives only the cross-repository tap token.
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download and verify the public release DMG
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must run from a v* tag."; exit 1; }
+          VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          [[ "$EVENT_TAG" == "v$VERSION" ]] || { echo "::error::Tag $EVENT_TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the dispatch SHA."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^{}")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the dispatch SHA."; exit 1; }
+          [[ "$(gh release view "$EVENT_TAG" --json isDraft --jq .isDraft)" == false ]] || {
+            echo "::error::$EVENT_TAG is not a public release."
+            exit 1
+          }
+          PUBLIC="$RUNNER_TEMP/public-release"
+          mkdir "$PUBLIC"
+          gh release download "$EVENT_TAG" --dir "$PUBLIC" --pattern Flowlight.dmg --pattern RELEASE-MANIFEST.json
+          EXPECTED=$(jq -r '.assets[] | select(.name == "Flowlight.dmg") | .sha256' "$PUBLIC/RELEASE-MANIFEST.json")
+          ACTUAL=$(sha256sum "$PUBLIC/Flowlight.dmg" | cut -d' ' -f1)
+          [[ -n "$EXPECTED" && "$EXPECTED" != null && "$ACTUAL" == "$EXPECTED" ]] || {
+            echo "::error::Public DMG checksum $ACTUAL differs from release manifest $EXPECTED."
+            exit 1
+          }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$ACTUAL" >> "$GITHUB_OUTPUT"
+
+      - name: Update the tap from the verified public DMG
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA256: ${{ steps.release.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$TAP_TOKEN" ]] || { echo "::error::TAP_TOKEN is not configured in the release environment."; exit 1; }
+          mkdir build
+          cp "$RUNNER_TEMP/public-release/Flowlight.dmg" build/Flowlight.dmg
+          export GH_TOKEN="$TAP_TOKEN"
+          gh auth setup-git
+          gh repo clone xinbetween/homebrew-tap "$RUNNER_TEMP/tap"
+          git -C "$RUNNER_TEMP/tap" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          VERSION="$RELEASE_VERSION" REQUIRE_LOCAL_DMG=1 TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
+          ACTUAL=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$RUNNER_TEMP/tap/Casks/flowlight.rb")
+          [[ "$ACTUAL" == "$RELEASE_SHA256" ]] || {
+            echo "::error::Homebrew checksum differs from the verified public DMG."
+            exit 1
+          }
+          git -C "$RUNNER_TEMP/tap" push

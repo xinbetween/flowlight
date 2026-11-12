@@ -15,13 +15,14 @@ final class GuardrailStore: ObservableObject {
 
     private weak var db: TrafficDatabase?
 
-    func attach(db: TrafficDatabase) {
+    func attach(db: TrafficDatabase, completion: (() -> Void)? = nil) {
         self.db = db
         db.async { [weak self] db in
             let loaded = (try? db.loadGuardrails()) ?? []
             Task { @MainActor in
                 self?.guardrails = loaded
                 self?.publish()
+                completion?()
             }
         }
     }

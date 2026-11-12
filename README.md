@@ -91,13 +91,16 @@ These rules watch every agent:
 Every threshold is adjustable in Settings.
 
 ### HTTPS inspection (optional)
-Off by default. When enabled, Flowlight runs a local proxy (`127.0.0.1:8877`) with a certificate authority created
-on your Mac. For supported HTTP traffic routed through the proxy, it records headers, bodies, status and timing.
+Off by default in both products. When enabled, Flowlight runs a local loopback proxy with a certificate authority
+created on your Mac. For supported HTTP traffic routed through the proxy, it records headers, bodies, status and timing.
 
 - **AI agents only, by default.** Other apps sent through the proxy pass through encrypted and aren't recorded.
-- **Route an agent** with *Open Inspected Terminal* (or paste the shell setup): proxy variables plus the Flowlight
-  certificate for Node, Python, curl and Git, for that shell only. Optionally trust the certificate and use the system
-  proxy for desktop apps; its PAC file falls back to a direct connection whenever Flowlight isn't running.
+- **Developer ID setup can be automatic.** *Open Inspected Terminal* supplies proxy variables and Flowlight's
+  certificate for Node, Python, curl and Git in one shell. You can also trust the certificate and let Flowlight use a
+  system PAC file for desktop apps; it falls back to a direct connection whenever Flowlight isn't running.
+- **Mac App Store setup stays explicit.** Inspect shows the exact `127.0.0.1` proxy address and reveals the public CA
+  certificate. You import and trust that certificate yourself, then configure each app to use the proxy. The Store app
+  never changes system proxy settings, rewrites another app's configuration, or relaunches/supervises another app.
 - **Excluded by default:** Flowlight's built-in list of Apple services and password managers, plus any destination
   you add. Applications that pin certificates may reject interception and are passed through when detected.
 - **What each agent declares.** Tools it offers the model (and which the model actually used), the provider's own tools
@@ -105,8 +108,10 @@ on your Mac. For supported HTTP traffic routed through the proxy, it records hea
 - **MCP servers, all three kinds:** local processes, servers this Mac calls over HTTPS, and servers the *provider*
   connects to for the agent, with their URL, approval setting and allowed tools. The last kind never touches your network.
 - **Readable bodies:** JSON as a collapsible tree in its original key order, event streams one event at a time, or raw.
-- **Credential headers are never stored**, recordings are kept 3 days, and one button removes the certificate, its trust
-  setting and everything recorded.
+- **Known credential header values are never stored**; unrecognized header names still require the stricter allowlist or
+  no-values mode described in Advanced. Recordings are kept 3 days. Removing inspection deletes Flowlight-owned keys,
+  generated certificates, and recorded requests; in the Store product, a public CA you imported remains user-owned and
+  Inspect tells you to remove that trust separately in Keychain Access.
 
 ### Mock responses
 Answer a chosen host, path and method with your own status, headers, body and delay, to see how an agent copes when
@@ -130,12 +135,14 @@ connections as well, recording each one as an alert with **Allow … from Now On
 
 It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
 traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, and enforcement lapses a few seconds
-after the app stops running. When HTTPS inspection proxies an app, destination rules and enabled managed packs are decided against the
-original app before Flowlight opens the origin connection; agent allowlists still apply only on the direct Network Extension path.
+after the app stops running. When HTTPS inspection proxies an app, destination rules, enabled managed packs, and enforcing agent
+allowlists are decided against the original app before Flowlight opens the origin connection. App-scoped decisions fail open whenever
+the Store content filter cannot prove that identity; destination-only rules and all-app packs continue to apply.
 
 ### Policies
 **Policies** is the inventory for every control Flowlight can apply: ordinary allow/block rules, agent allowlists,
-managed packs, and—where HTTPS inspection is available—guardrails, mocks, request rewrites, and response transforms.
+managed packs, and—where HTTPS inspection is available—guardrails, mocks, and request rewrites. Developer ID builds
+also offer response transforms; the Store product does not run response-transform scripts or script plugins.
 Each row reports whether it is actually enforcing, reporting, watching, waiting, scheduled, paused, or unavailable, and
 opens the contextual editor that owns it. An allowlist is one agent's idea of where it may go; an ordinary **rule** is
 the general version, naming an app, agent, destination, URL, or pairing and saying block or allow.
@@ -224,9 +231,9 @@ rewritten, blocking is switched off while the sampler stands in (the sampler can
 shouldn't claim otherwise), and **Try the extension again** starts over.
 
 ### Sources: collector, devices and coverage
-**Sources** is one scrollable operational page: Collector first, then Devices and Coverage as clearly headed sections.
-Status notices, Ask answers, restored windows, and screenshot links scroll to and briefly focus the relevant section
-without hiding the others.
+**Sources** uses the same focused segmented navigation as Policies: **Collector**, **Devices**, and **Coverage**. Status
+notices, Ask answers, restored windows, and deep links select the exact segment while shared health and remediation
+context remains available across all three.
 
 A Mac sends and receives over more than TCP and UDP. **Sources › Devices** covers the non-network channels, with every channel off
 until you turn it on because watching more of your Mac should be a decision rather than something an update did.

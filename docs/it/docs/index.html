@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentazione</p>
     <h1>Usare Flowlight</h1>
-    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.17.9, macOS 15 o successivo.</p>
+    <p class="lede">Tutto, dal primo avvio alla messa a punto delle regole per gli agenti. Flowlight 0.18.0, macOS 15 o successivo.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="In questa pagina">
@@ -169,11 +169,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#visualize">Connessioni</a></td><td>⌘4</td><td>Una mappa stabile delle app e delle destinazioni esatte, con percorsi ponderati, indicatori di direzione in movimento, conteggi delle connessioni e un elenco equivalente.</td></tr>
         <tr><td><a href="#alerts">Avvisi</a></td><td>⌘5</td><td>Tutto ciò che è sembrato insolito, con l'app, la destinazione e il numero che ha fatto scattare la regola.</td></tr>
         <tr><td><a href="#ask">Chiedi</a></td><td>⌘6</td><td>Domande sul tuo traffico in linguaggio naturale, a cui un modello locale o ospitato risponde a partire dalla cronologia registrata.</td></tr>
-        <tr><td><a href="#inspection">Ispeziona</a></td><td>⌘7 · Developer ID</td><td>Opzionale: le richieste decifrate degli agenti che instradi attraverso Flowlight e le chiamate agli strumenti che le hanno prodotte. La ricerca entra nei corpi di richieste e risposte.</td></tr>
-        <tr><td><a href="#policies">Criteri</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Ogni criterio configurato, se è davvero effettivo e una cronologia unificata delle attività in sola lettura.</td></tr>
-        <tr><td><a href="#sources">Origini</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Stato e ripristino del Collector, canali facoltativi dei dispositivi e copertura in un'unica pagina operativa a scorrimento.</td></tr>
+        <tr><td><a href="#inspection">Ispeziona</a></td><td>⌘7</td><td>Opzionale: le richieste decifrate degli agenti che instradi attraverso Flowlight e le chiamate agli strumenti che le hanno prodotte. La ricerca entra nei corpi di richieste e risposte.</td></tr>
+        <tr><td><a href="#policies">Criteri</a></td><td>⌘8</td><td>Ogni criterio configurato, se è davvero effettivo e una cronologia unificata delle attività in sola lettura.</td></tr>
+        <tr><td><a href="#sources">Origini</a></td><td>⌘9</td><td>Stato e ripristino del Collector, canali facoltativi dei dispositivi e copertura in tre segmenti dedicati.</td></tr>
       </table>
-      <p>Le scorciatoie seguono l'ordine visibile della barra laterale. Le versioni Developer ID includono Ispeziona su ⌘7; quelle App Store lo omettono, quindi Criteri e Origini passano a ⌘7 e ⌘8.</p>
+      <p>Le scorciatoie seguono l'ordine visibile della barra laterale e sono uguali nelle versioni Developer ID e Mac App Store.</p>
       <figure><div class="frame"><img height="994" width="1600" src="../../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="La schermata In diretta: un elenco di applicazioni con le loro velocità attuali di invio e ricezione e la destinazione più trafficata."></div>
         <figcaption class="caption">In diretta, la schermata con cui Flowlight si apre.</figcaption></figure>
@@ -327,16 +327,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         quelli che il provider esegue sui propri server (ricerca web, esecuzione di codice) e i server MCP a cui il provider si collega per l'agente
         (<code>mcp_servers</code> di Anthropic, lo strumento <code>mcp</code> di OpenAI) con il loro URL, token, impostazione di approvazione e strumenti consentiti.
         Quest'ultimo gruppo non compare mai sulla tua rete, perché quelle connessioni le fa il provider, non il tuo Mac.</p>
-      <p><strong>Configurarla è un solo interruttore.</strong> Attiva l'ispezione HTTPS in <strong>Ispeziona</strong> e Flowlight crea il suo certificato,
-        chiede una volta la password, lo considera affidabile e instrada le app attraverso il proxy. Disattivando l'interruttore tutto torna come prima. Il file
-        di configurazione del proxy ripiega su una connessione diretta ogni volta che Flowlight non è in esecuzione, così chiuderlo non taglia mai fuori il Mac.</p>
-      <p>Gli agenti a riga di comando ignorano le impostazioni proxy di sistema, quindi per Claude Code, Codex, Gemini CLI o Aider usa <strong>Apri Terminale ispezionato</strong>
-        e avviali da lì. In <strong>Avanzate</strong> puoi decifrare solo gli agenti IA invece di tutte le app, modificare l'elenco di quelli mai decifrati, copiare
-        la configurazione shell per una shell, oppure rimuovere il certificato e tutto ciò che è stato registrato.</p>
+      <p><strong>La configurazione Developer ID può essere automatica.</strong> Attiva l'ispezione HTTPS in <strong>Ispeziona</strong> e Flowlight crea il proprio
+        certificato. <strong>Apri Terminale ispezionato</strong> avvia gli agenti a riga di comando con le variabili proxy e l'ambiente dei certificati corretti;
+        puoi anche considerare attendibile il certificato e lasciare che Flowlight configuri un file PAC di sistema per le app desktop. Quel file ripiega su una connessione
+        diretta ogni volta che Flowlight non è in esecuzione.</p>
+      <p><strong>La configurazione Mac App Store resta esplicita.</strong> L'app Store esegue il proxy di loopback nella sandbox; Ispeziona crea un'autorità P-256 nativa con chiave conservata nel portachiavi,
+        mostra l'indirizzo proxy esatto su <code>127.0.0.1</code> e rende visibile nel Finder il certificato pubblico. Importa e considera attendibile il certificato in prima persona,
+        poi configura ogni app perché usi il proxy HTTP/HTTPS mostrato. L'app Store non modifica mai le impostazioni proxy o di attendibilità del sistema, non riscrive la configurazione
+        di un'altra app e non riavvia né supervisiona un'altra app. La sua estensione del filtro dei contenuti usa l'identità del token di audit di macOS per l'esatto socket di
+        loopback attivo; se l'identità non è disponibile o è obsoleta, l'applicazione per app fallisce in modalità aperta invece di tirare a indovinare.</p>
       <p>Flowlight esclude dalla decifrazione il proprio elenco integrato di servizi Apple e gestori di password (modifica l'elenco in Configura). Le app che applicano il pinning dei certificati possono rifiutare il
         certificato di Flowlight; Flowlight lo rileva e le inoltra cifrate. Per impostazione predefinita, i valori delle intestazioni vengono conservati solo quando
-        l'intestazione è una che consenti, e tutto il resto viene sostituito dalla sua lunghezza prima che qualsiasi cosa venga memorizzata — le richieste registrate vengono conservate per il tempo che imposti e <strong>Rimuovi certificato e dati registrati</strong> elimina il certificato, la sua
-        impostazione di attendibilità e tutto ciò che è stato registrato. L'ispezione è solo HTTP/1.1 (Flowlight lo richiede a entrambe le parti) e non è disponibile in modalità demo.</p>
+        l'intestazione è una che consenti, e tutto il resto viene sostituito dalla sua lunghezza prima che qualsiasi cosa venga memorizzata; le richieste registrate vengono conservate per il tempo che imposti. <strong>Rimuovi certificato e dati registrati</strong> elimina
+        le chiavi di proprietà di Flowlight, i certificati generati e tutto ciò che è stato registrato. Nella versione Store, l'autorità pubblica che hai importato resta di tua proprietà;
+        Ispeziona indica di rimuoverla separatamente in Accesso Portachiavi. L'ispezione è solo HTTP/1.1 (Flowlight lo richiede a entrambe le parti) e non è disponibile in modalità demo.</p>
 
       <p><strong>Cosa può conservare l'ispezione.</strong> I corpi registrati sono la cosa più delicata che Flowlight conserva e, fino alla 0.9.3,
         l'unica cosa che li proteggeva era una supposizione su quali intestazioni portino credenziali. Una supposizione ha la forma sbagliata per
@@ -406,10 +410,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
 
       <h2 id="policies"><span id="rules"></span>Criteri</h2>
       <p><strong>Criteri</strong> riunisce in un solo inventario tutti i controlli che Flowlight può applicare: normali regole di consenso o blocco, elenchi consentiti
-        degli agenti, pacchetti gestiti e, dove è disponibile l'ispezione HTTPS, protezioni, simulazioni, riscritture delle richieste e trasformazioni delle
-        risposte. Ogni riga distingue lo stato configurato dall'effetto reale: applicazione attiva, sola segnalazione, monitoraggio, attesa, pianificato,
-        in pausa, esaurito, in corso di applicazione, revisione necessaria, non disponibile, incompatibile o non riuscito. Selezionando una riga si apre l'editor
-        contestuale responsabile di quel criterio; Criteri non sostituisce né confonde i distinti modelli di consenso e persistenza.</p>
+        degli agenti, pacchetti gestiti e, dove è disponibile l'ispezione HTTPS, protezioni, simulazioni e riscritture delle richieste. Le versioni Developer ID
+        includono anche le trasformazioni delle risposte; il prodotto Store non offre script di trasformazione delle risposte né plugin di script. Ogni riga distingue
+        lo stato configurato dall'effetto reale: applicazione attiva, sola segnalazione, monitoraggio, attesa, pianificato, in pausa, esaurito, in corso di applicazione,
+        revisione necessaria, non disponibile, incompatibile o non riuscito. Selezionando una riga si apre l'editor contestuale responsabile di quel criterio;
+        Criteri non sostituisce né confonde i distinti modelli di consenso e persistenza.</p>
       <p>Un elenco consentiti è l'idea che un singolo agente ha di dove può andare. Una normale <strong>regola</strong> è la versione generale: indica un
         <strong>soggetto</strong> — un'app, un agente, una destinazione, un URL o una coppia di due di questi — e dice <strong>blocca</strong>
         o <strong>consenti</strong>. Fai clic con il tasto destro su una riga in In diretta, Cronologia, Agenti IA o Ispeziona per scriverne una su ciò che stai guardando;
@@ -440,7 +445,8 @@ open build/Build/Products/Release/Flowlight.app</pre>
         rifiutare nulla. Una regola che la configurazione attuale non può applicare lo dice nell'elenco, invece di starsene lì con l'aria di essere in vigore.</p>
       <p>La seconda vista è <strong>Attività</strong>, in sola lettura: riunisce in un'unica cronologia le decisioni delle regole comuni, le violazioni degli elenchi consentiti,
         gli eventi dei pacchetti gestiti e gli effetti distinti dei criteri di ispezione. Usa i record originali, ciascuno autorevole nel proprio ambito, invece di
-        riscrivere la cronologia in un unico modello generico di evento; le versioni Store omettono i tipi di criterio che dipendono dall'ispezione e le relative attività conservate.</p>
+        riscrivere la cronologia in un unico modello generico di evento. Le versioni Store conservano le attività di protezioni, simulazioni e riscritture delle richieste,
+        omettendo solo le trasformazioni delle risposte e gli effetti dei plugin di script che il prodotto Store non può eseguire.</p>
 
       <p><strong>Cosa avrebbe fatto.</strong> Una regola di blocco è facile da scrivere e spaventosa da attivare, perché la prima cosa
         che normalmente scopri di una regola così è che cosa ha rotto — e lo scopri dopo, da qualcosa che smette di funzionare altrove.
@@ -511,9 +517,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         shell può fare a mano ciò che avrebbe fatto lo strumento. Flowlight lo registra; non pretende di impedirlo.</p>
 
       <h2 id="sources"><span id="capture"></span><span id="engines"></span>Origini: Collector, dispositivi e copertura</h2>
-      <p><strong>Origini</strong> è un'unica pagina operativa a scorrimento: prima il Collector, poi Dispositivi e Copertura come sezioni chiaramente
-        contrassegnate. Gli avvisi di stato, le risposte di Chiedi, le finestre ripristinate e i collegamenti usati per gli screenshot scorrono fino alla sezione pertinente
-        e la mettono brevemente in evidenza senza nascondere le altre.</p>
+      <p><strong>Origini</strong> usa la stessa navigazione segmentata e mirata di Criteri: <strong>Collector</strong>,
+        <strong>Dispositivi</strong> e <strong>Copertura</strong>. Gli avvisi di stato, le risposte di Chiedi, le finestre ripristinate e i collegamenti diretti
+        selezionano il segmento esatto, mentre il contesto condiviso sullo stato e sul ripristino resta disponibile in tutti e tre.</p>
       <p>Flowlight registra il traffico in uno di due modi, da scegliere in <strong>Origini › Collector</strong>. Differiscono per ciò che possono perdere, e vale
         la pena capirlo prima di affidarsi all'uno o all'altro.</p>
       <table>
@@ -766,7 +772,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Chi contribuisce a Flowlight. Flowlight è software libero, distribuito sotto la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versione 0.17.9 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
+      <span>Versione 0.18.0 · Non affiliato ad Apple né ad alcun fornitore di IA citato in questo sito.</span>
     </div>
   </div>
 </footer>

@@ -152,8 +152,9 @@ private enum TrafficGraphStableHash {
 }
 
 enum TrafficGraphFlowDash {
-    static let pattern: [CGFloat] = [8, 26]
-    static let strokeWidth: CGFloat = 1.8
+    /// Short rounded marks read as directional light pulses without requiring one animated view per edge.
+    static let pattern: [CGFloat] = [4, 22]
+    static let strokeWidth: CGFloat = GraphStyle.flowPulseWidth
     static let frameInterval: TimeInterval = 1 / 30
     private static let basePointsPerSecond: CGFloat = 32
     private static let minimumSpeedMultiplier: CGFloat = 0.70
@@ -228,6 +229,53 @@ enum TrafficGraphFlowDash {
     }
 }
 
+enum TrafficGraphMotionPolicy {
+    static func animatesFlow(reduceMotion: Bool, hasVisibleFlow: Bool) -> Bool {
+        !reduceMotion && hasVisibleFlow
+    }
+
+    /// Prioritizes the person's current focus, then the busiest visible paths. The stable ID tie-break keeps the
+    /// animated set from flickering when counters are equal or the source order changes.
+    static func activeEdgeIDs(
+        edges: [TrafficGraphEdge],
+        visibleEdgeIDs: Set<TrafficGraphEdgeID>,
+        selectedNode: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?,
+        hoveredEdge: TrafficGraphEdgeID?,
+        limit: Int = GraphStyle.maximumAnimatedEdges
+    ) -> [TrafficGraphEdgeID] {
+        guard limit > 0 else { return [] }
+        let candidates = edges.filter {
+            visibleEdgeIDs.contains($0.id) && TrafficGraphFlowDash.animates($0)
+        }
+        let candidateIDs = Set(candidates.map(\.id))
+        var result: [TrafficGraphEdgeID] = []
+        var added: Set<TrafficGraphEdgeID> = []
+
+        func append(_ id: TrafficGraphEdgeID?) {
+            guard let id, candidateIDs.contains(id), added.insert(id).inserted, result.count < limit else { return }
+            result.append(id)
+        }
+
+        append(selectedEdge)
+        append(hoveredEdge)
+
+        let ranked = candidates.sorted {
+            if $0.displayedCounters.total != $1.displayedCounters.total {
+                return $0.displayedCounters.total > $1.displayedCounters.total
+            }
+            return $0.id < $1.id
+        }
+        if let selectedNode {
+            for edge in ranked where edge.source == selectedNode || edge.target == selectedNode {
+                append(edge.id)
+            }
+        }
+        for edge in ranked { append(edge.id) }
+        return result
+    }
+}
+
 struct TrafficGraphLayoutKey: Equatable, Sendable {
     var nodeIDs: [TrafficGraphNodeID]
     var edgeIDs: [TrafficGraphEdgeID]
@@ -239,6 +287,20 @@ struct TrafficGraphLayoutKey: Equatable, Sendable {
         edgeIDs = snapshot.edges.map(\.id)
         width = Int(size.width.rounded())
         height = Int(size.height.rounded())
+    }
+}
+
+/// Restarts viewport fitting when the visible canvas settles or resizes, even if the graph's minimum layout canvas
+/// remains unchanged. The nested layout key still controls atomic geometry publication independently.
+struct TrafficGraphRenderKey: Equatable, Sendable {
+    var layout: TrafficGraphLayoutKey
+    var viewportWidth: Int
+    var viewportHeight: Int
+
+    init(snapshot: TrafficGraphSnapshot, graphSize: CGSize, viewportSize: CGSize) {
+        layout = TrafficGraphLayoutKey(snapshot: snapshot, size: graphSize)
+        viewportWidth = Int(viewportSize.width.rounded())
+        viewportHeight = Int(viewportSize.height.rounded())
     }
 }
 

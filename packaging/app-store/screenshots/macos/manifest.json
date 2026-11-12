@@ -3,56 +3,62 @@
   "screenshots": {
     "01-connections.png": {
       "height": 1800,
-      "sha256": "53c91bfbcc17d1af55a118a200dd735228d7a01d0e32bdf7f8209cd836997799",
-      "version": "0.17.4",
+      "sha256": "f40d1fe642d9cfd5ac412254986d20cc74a2079bbd1c27887d9d6756eb6e6a42",
+      "version": "0.18.0",
       "width": 2880
     },
     "02-ai-agents.png": {
       "height": 1800,
-      "sha256": "0057280406d7a80a6e28bb333f260feb8cdec4870b7c7de446e59d8847c9c377",
-      "version": "0.17.4",
+      "sha256": "01b6a740c633d3acef386495aa22cdd6fa0d0a2ab1653add681342f368f5b200",
+      "version": "0.18.0",
       "width": 2880
     },
     "03-history.png": {
       "height": 1800,
-      "sha256": "aecf4e2d9d803767d555f3631d70fc1c6f3f8526e34ec2d71a1cc82a6556d320",
-      "version": "0.17.4",
+      "sha256": "bf981fd1d0ddecc75a1750118abc99cb3750432c627955b4335a153c074f2e54",
+      "version": "0.18.0",
       "width": 2880
     },
-    "04-rules.png": {
+    "04-inspect.png": {
       "height": 1800,
-      "sha256": "a477dfd351921321f41bc5be88c9465820b14fb1b177a896530e21193c2fa833",
-      "version": "0.17.4",
+      "sha256": "731c13d235f2813ff7bb586082e5098c18582257d401ae4b6269c242526c4dfd",
+      "version": "0.18.0",
       "width": 2880
     },
-    "05-live.png": {
+    "05-policies.png": {
       "height": 1800,
-      "sha256": "e7d351a00a431c34661b795d61b22cdf2dbb0ad02da19b94d64b2637dc8d2ffa",
-      "version": "0.17.4",
+      "sha256": "49a19c4c2e65a13a6f1d61e9e328a5b50c6d5f5973d010564b7ee7d474f97ff9",
+      "version": "0.18.0",
       "width": 2880
     },
-    "06-alerts.png": {
+    "06-live.png": {
       "height": 1800,
-      "sha256": "54d4aa50adf2feb55547086f16f02744969b448258f6a9dc57461e4c973c092b",
-      "version": "0.17.4",
+      "sha256": "e08d05933eb2137637d228f515cf04aa689441edb4dfb04410ae17cf9c9fb0d3",
+      "version": "0.18.0",
       "width": 2880
     },
-    "07-agent-detail.png": {
+    "07-alerts.png": {
       "height": 1800,
-      "sha256": "b3c1343cbeb505639831cd049b497cdfeaeead5acc625450dbb7212bac86cf45",
-      "version": "0.17.4",
+      "sha256": "6851ee8caf04692cd88ecb616ea52957649307b7cb9277e4a4aac7289294326a",
+      "version": "0.18.0",
       "width": 2880
     },
-    "08-agent-tools.png": {
+    "08-agent-detail.png": {
       "height": 1800,
-      "sha256": "21847d1b756a5b10479e1c9cd62204a3e57068f3063e4e291366aee79627d7ff",
-      "version": "0.17.4",
+      "sha256": "61d2ba7a127632d6563a48b5153dd13d7aedbe851e1f8f01b2eeadb2962c2216",
+      "version": "0.18.0",
       "width": 2880
     },
-    "09-mcp-servers.png": {
+    "09-agent-tools.png": {
       "height": 1800,
-      "sha256": "6b58562f0bf91f461d6e561c406dfd9607812aaa2469da58515ea892ffcef3d3",
-      "version": "0.17.4",
+      "sha256": "fd79e2e3c729d4ba1e5569b336fd7ce350b74bffb4fcd03d0f37b9576732054a",
+      "version": "0.18.0",
+      "width": 2880
+    },
+    "10-mcp-servers.png": {
+      "height": 1800,
+      "sha256": "4484fa2ad74ad38ac100a2c1ce2f8fd1bf47214cf9aa98f9130cb5ca3d6d9986",
+      "version": "0.18.0",
       "width": 2880
     }
   }

@@ -28,6 +28,46 @@ struct RulePackPushGate {
     }
 }
 
+#if APP_STORE
+/// The Store proxy can trust app-scoped identity only after every part of the extension handshake agrees. Keeping
+/// this as a tiny value makes the fail-open boundary explicit and lets tests prove that no partial setup reads ready.
+struct StoreAttributionGate: Equatable {
+    var protocolAccepted = false
+    var filterRunning = false
+    private(set) var filterGeneration: UInt64 = 0
+    var publishedProxyPort: UInt16?
+
+    var isReady: Bool {
+        protocolAccepted && filterRunning && publishedProxyPort != nil
+    }
+
+    /// Capture heartbeats prove filtering only after the durable protocol and the current filter generation agree.
+    /// Proxy-port publication is an attribution concern and does not affect ordinary capture health.
+    var captureHealthy: Bool { protocolAccepted && filterRunning }
+
+    func acceptsIdentityReply(_ reply: ProxyClientIdentityReply, proxyPort: UInt16) -> Bool {
+        isReady && publishedProxyPort == proxyPort && reply.filterGeneration == filterGeneration
+    }
+
+    /// State replies can cross while the filter starts or stops. Only the newest extension generation may change
+    /// readiness, so a delayed "running" reply from before a stop cannot make attribution authoritative again.
+    @discardableResult
+    mutating func updateFilterState(running: Bool, generation: UInt64) -> Bool {
+        guard generation >= filterGeneration else { return false }
+        filterGeneration = generation
+        filterRunning = running
+        return true
+    }
+
+    mutating func reset() {
+        protocolAccepted = false
+        filterRunning = false
+        filterGeneration = 0
+        publishedProxyPort = nil
+    }
+}
+#endif
+
 /// Receives per-second batches from the system extension over XPC.
 final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @unchecked Sendable {
     static func acceptsRegisteredVersion(_ actual: String, expected: String) -> Bool {
@@ -50,6 +90,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// Called when macOS has the extension running but isn't letting it filter — a state the user can only fix by
     /// switching source, so it needs to reach the UI as something more than a line of status text.
     var onFilterUnavailable: ((String) -> Void)?
+    /// Every authoritative state reply, including recovery. A successful heartbeat lets the owner clear a prior
+    /// unavailable warning without reconnecting the source.
+    var onFilterAvailabilityChanged: ((Bool, String?) -> Void)?
     /// Connections the filter refused. The reply returns only after durable evidence and alerts commit, so the
     /// extension can safely retain and retry the same stable event IDs if the connection drops.
     var onBlocked: (([BlockEvent], @escaping @Sendable (Bool) -> Void) -> Void)?
@@ -58,6 +101,15 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private var enforcement: [AgentPolicy] = []
     /// The rule list, kept for the same reason and re-sent on the same reconnect.
     private var ruleSet = RuleSet()
+    #if APP_STORE
+    /// The active explicit inspection proxy port. It is republished after every reconnect so the extension accepts
+    /// identity lookups only for the listener owned by this exact app session.
+    private var inspectionProxyPort: UInt16?
+    /// A connection alone is insufficient: app identity is authoritative only after the exact Store extension has
+    /// accepted the durable protocol, macOS reports its filter running, and it has accepted this listener's port.
+    private var attributionGate = StoreAttributionGate()
+    var onAttributionReadinessChanged: ((Bool) -> Void)?
+    #endif
     /// Connections a rule decided, refusals and relaxations alike. The reply is sent after durable commit.
     var onRuleDecisions: (([RuleEvent], @escaping @Sendable (Bool) -> Void) -> Void)?
     /// Aggregated managed-pack decisions. These never enter the ordinary block-alert path.
@@ -101,6 +153,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         heartbeatTimer = nil
         connection?.invalidate()
         connection = nil
+        #if APP_STORE
+        resetAttributionReadiness()
+        #endif
     }
 
     /// Always on the main thread: `connection` is read from XPC callbacks, the retry timer and stop(), and
@@ -115,6 +170,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         superseded?.invalidate()
         rulePackPushEpoch &+= 1
         rulePackPushGate.reset()
+        #if APP_STORE
+        resetAttributionReadiness()
+        #endif
 
         let connection = NSXPCConnection(machServiceName: FlowlightConstants.machServiceName, options: [])
         connection.remoteObjectInterface = NSXPCInterface(with: FlowlightProviderXPC.self)
@@ -157,6 +215,11 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                     self.status?(self.sawTraffic ? L("Connected to filter extension %@", version)
                                                  : L("Connected to filter extension %@ — no traffic from it yet", version))
                     self.startHeartbeat()
+                    #if APP_STORE
+                    self.attributionGate.protocolAccepted = true
+                    self.publishAttributionReadiness()
+                    self.publishInspectionProxyPort()
+                    #endif
                     self.reportPackStatus(.init(status: .accepted, detail: "Synchronizing managed packs"))
                     // Initial synchronization is ordered: explicit user allows exist before AgentPolicy is enabled.
                     // Managed packs remain independently cleared until their own commit or clear acknowledges.
@@ -197,16 +260,24 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private func checkFilterState(on connection: NSXPCConnection?, version: String) {
         guard let connection else { return }
         let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? FlowlightProviderXPC
-        proxy?.filterState { [weak self] running, detail in
-            guard let self, running == false else { return }
+        proxy?.filterState { [weak self] running, detail, generation in
             DispatchQueue.main.async {
-                guard self.connection === connection, !self.sawTraffic else { return }
+                guard let self, self.connection === connection else { return }
+                #if APP_STORE
+                guard self.attributionGate.updateFilterState(running: running, generation: generation) else { return }
+                self.publishAttributionReadiness()
+                #endif
+                if running {
+                    self.onFilterAvailabilityChanged?(true, nil)
+                    return
+                }
                 let message = detail.isEmpty
                     ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
                     : L("macOS refused to start Flowlight's filter: %@", detail)
                 self.status?(detail.isEmpty ? L("Connected to the extension %@, but it isn't filtering", version)
                                             : L("The filter couldn't start"))
                 self.onFilterUnavailable?(message)
+                self.onFilterAvailabilityChanged?(false, message)
             }
         }
     }
@@ -215,10 +286,22 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     private func startHeartbeat() {
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.stopped else { return }
+            #if APP_STORE
+            if self.attributionGate.captureHealthy { self.sink?([]) }
+            #else
             self.sink?([])   // green straight away rather than after the first second
+            #endif
             self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                self?.sink?([])
+                guard let self else { return }
+                #if APP_STORE
+                // XPC liveness is not capture health. Keep polling a stopped provider, but do not let those polls make
+                // the Live screen green until macOS says this generation is filtering again.
+                if self.attributionGate.captureHealthy { self.sink?([]) }
+                self.checkFilterState(on: self.connection, version: self.version)
+                #else
+                self.sink?([])
+                #endif
             }
         }
     }
@@ -239,6 +322,9 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = nil
             self.connection = nil
+            #if APP_STORE
+            self.resetAttributionReadiness()
+            #endif
             // Let go of it properly rather than just dropping the reference: a connection whose registration was
             // refused is still live, and the extension goes on holding a client it will never hear from again.
             connection.invalidate()
@@ -307,6 +393,102 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             self.pushRules()
         }
     }
+
+    #if APP_STORE
+    func setInspectionProxyPort(_ port: UInt16?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard self.inspectionProxyPort != port else {
+                self.publishInspectionProxyPort()
+                return
+            }
+            self.inspectionProxyPort = port
+            self.attributionGate.publishedProxyPort = nil
+            self.publishAttributionReadiness()
+            self.publishInspectionProxyPort()
+        }
+    }
+
+    private func publishInspectionProxyPort() {
+        guard let connection else {
+            attributionGate.publishedProxyPort = nil
+            publishAttributionReadiness()
+            return
+        }
+        let requestedPort = inspectionProxyPort
+        let value = Int(requestedPort ?? 0)
+        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self, weak connection] _ in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection else { return }
+                self.attributionGate.publishedProxyPort = nil
+                self.publishAttributionReadiness()
+            }
+        } as? FlowlightProviderXPC
+        guard let proxy else {
+            attributionGate.publishedProxyPort = nil
+            publishAttributionReadiness()
+            return
+        }
+        proxy.setInspectionProxyPort(value) { [weak self, weak connection] accepted in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection,
+                      self.inspectionProxyPort == requestedPort else { return }
+                self.attributionGate.publishedProxyPort = accepted ? requestedPort : nil
+                self.publishAttributionReadiness()
+            }
+        }
+    }
+
+    private func resetAttributionReadiness() {
+        attributionGate.reset()
+        publishAttributionReadiness()
+    }
+
+    private func publishAttributionReadiness() {
+        onAttributionReadinessChanged?(attributionGate.isReady)
+    }
+
+    /// Resolves one explicit-proxy client through the filter's audit-token identity. The reply is empty on any
+    /// connection transition or mismatch; callers treat that as unknown and keep app-scoped enforcement fail-open.
+    func resolveInspectionProxyClient(
+        clientAddress: String,
+        clientPort: UInt16,
+        proxyPort: UInt16,
+        completion: @escaping @Sendable (ProxyClientIdentity?) -> Void
+    ) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.attributionGate.isReady,
+                  self.attributionGate.publishedProxyPort == proxyPort,
+                  let connection = self.connection else {
+                completion(nil)
+                return
+            }
+            let proxy = connection.remoteObjectProxyWithErrorHandler { _ in completion(nil) }
+                as? FlowlightProviderXPC
+            guard let proxy else {
+                completion(nil)
+                return
+            }
+            proxy.inspectionProxyClient(
+                clientAddress: clientAddress,
+                clientPort: Int(clientPort),
+                proxyPort: Int(proxyPort)
+            ) {
+                [weak self, weak connection] data in
+                DispatchQueue.main.async {
+                    guard let self, let connection, self.connection === connection,
+                          let reply = BlockCoding.decode(ProxyClientIdentityReply.self, from: data),
+                          self.attributionGate.acceptsIdentityReply(reply, proxyPort: proxyPort) else {
+                        completion(nil)
+                        return
+                    }
+                    completion(reply.identity)
+                }
+            }
+        }
+    }
+
+    #endif
 
     private func pushRules(completion: (() -> Void)? = nil) {
         guard let connection else { return }

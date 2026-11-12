@@ -292,6 +292,39 @@ final class BlockEnforcer: @unchecked Sendable {
         return AgentPolicy.resolve(policies.values, identities: [identity.bundleID, identity.name])
     }
 
+    #if APP_STORE
+    /// Agent lineage exported for one exact Store proxy leg. Enforcing custom/discovered policies are authoritative;
+    /// the built-in catalog remains the fallback when no policy names the process or one of its ancestors.
+    func inspectionAgentContext(
+        for process: ProcessInfoRecord,
+        maxDepth: Int = 16
+    ) -> (bundleID: String, name: String)? {
+        guard maxDepth > 0 else { return nil }
+        var lineage = [InspectionAgentLineageIdentity(
+            bundleID: process.bundleID,
+            name: process.name
+        )]
+        var pid = process.pid
+        for _ in 1..<maxDepth {
+            guard pid > 1, let parent = Self.parent(of: pid), parent > 1, parent != pid,
+                  let next = Self.identity(of: parent) else { break }
+            pid = parent
+            lineage.append(InspectionAgentLineageIdentity(
+                bundleID: next.bundleID,
+                name: next.name
+            ))
+        }
+        lock.lock()
+        let appliedPolicies = Array(policies.values)
+        lock.unlock()
+        guard let context = InspectionAgentContextResolver.resolve(
+            lineage: lineage,
+            policies: appliedPolicies
+        ) else { return nil }
+        return (context.bundleID, context.name)
+    }
+    #endif
+
     /// Parent pid from the kernel process table.
     static func parent(of pid: Int32) -> Int32? {
         var info = kinfo_proc()

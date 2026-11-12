@@ -112,14 +112,16 @@
         것은 그 결과로 붙는 표시(“curl 경유”, “github MCP”)뿐입니다. 이 파일이나 명령줄의 내용은 어디로도 보내지 않습니다.</p>
 
       <h2 id="inspection">HTTPS 검사</h2>
-      <p>기본값은 끔입니다. 켜면 Flowlight가 Mac 안에 인증 기관을 만들고(그 키는
-        <code>~/Library/Application Support/Flowlight/Inspection</code>를 벗어나지 않습니다) 이 Mac에서 오는 연결만 받는 프록시를
-        돌립니다. 이 프록시를 거치도록 지정한 앱에 대해서는 요청과 응답을, 최대 2 MB까지의 본문을 포함해 로컬 데이터베이스에 3일
-        동안 기록합니다. 인증 정보 헤더는 저장 전에 그 길이 값으로 대체됩니다. 이름(Authorization, 쿠키,
-        API 키)으로, 그리고 이름에 든 낱말로 알아보므로 <code>X-Access-Key</code>도 걸립니다. 다만 그것은 추정 규칙이고 보장이
-        아닙니다. 아무것도 알아보지 못하는 이름 아래 비밀을 실어 보내는 헤더는 기록됩니다. Flowlight는 내장된
-        Apple 서비스와 암호 관리자 목록을 복호화에서 제외합니다. 기록된 검사 데이터를 Flowlight가 업로드하는 일은 없습니다. 검사를
-        끄면 프록시가 멈추고, <strong>인증서 및 기록된 데이터 제거</strong>는 인증서와 그 신뢰 설정, 기록된 모든 요청을 삭제합니다.</p>
+      <p>기본값은 끔입니다. 켜면 Flowlight가 Mac 안에 인증 기관을 만들고 이 Mac에서 오는 연결만 받는 루프백 프록시를 돌립니다.
+        Developer ID 제품은 검사 자료를 <code>~/Library/Application Support/Flowlight/Inspection</code>에 보관합니다. Mac App Store 제품은
+        네이티브 P-256 비밀 키를 전용 키체인 접근 그룹에 만들고 공개 인증 기관 인증서만 내보냅니다. Store 앱은 시스템 프록시나 신뢰 설정을
+        바꾸지 않습니다. 사용자가 공개 인증서를 직접 가져와 신뢰하도록 설정하고, 검사에 표시된 프록시 주소를 검사할 앱마다 명시적으로 구성합니다.</p>
+      <p>이 프록시를 거치도록 지정한 앱에 대해서는 요청과 응답을, 최대 2 MB까지의 본문을 포함해 로컬 데이터베이스에 3일 동안 기록합니다.
+        인증 정보 헤더는 저장 전에 그 길이 값으로 대체됩니다. 이름(Authorization, 쿠키, API 키)으로, 그리고 이름에 든 낱말로 알아보므로
+        <code>X-Access-Key</code>도 걸립니다. 다만 그것은 추정 규칙이고 보장이 아닙니다. 아무것도 알아보지 못하는 이름 아래 비밀을 실어 보내는
+        헤더는 기록됩니다. Flowlight는 내장된 Apple 서비스와 암호 관리자 목록을 복호화에서 제외하며, 기록된 검사 데이터를 업로드하지 않습니다.
+        검사를 끄면 프록시가 멈추고, <strong>인증서 및 기록된 데이터 제거</strong>는 Flowlight 소유 키와 생성된 인증서, 기록된 모든 요청을 삭제합니다.
+        Store 제품에서 가져온 공개 인증 기관은 사용자 소유로 남으므로 키체인 접근에서 별도로 제거해야 합니다.</p>
 
       <h2 id="requests">앱이 내는 네트워크 요청</h2>
       <table>
@@ -131,7 +133,7 @@
         <tr><td>네트워크 소유자 조회</td><td>Team Cymru, DNS로</td><td>알려진 호스트 이름이 없는 공용 IP 주소. 사설 주소와 예약 주소는 절대 Mac을 벗어나지 않습니다</td><td>기본값 켬. 끄는 스위치는 캡처 › 네트워크 소유자 확인</td></tr>
         <tr><td>호스팅 모델로 질문</td><td>선택한 제공업체: Anthropic, OpenAI, Google Gemini 또는 호환 엔드포인트</td><td>내 질문과, 모델이 고른 Flowlight 읽기 전용 질의가 돌려준 결과. 트래픽 데이터베이스 자체는 업로드되지 않습니다</td><td>호스팅 제공업체를 고르고 질문을 보낼 때만. 질문 화면에 전송된 요청이 표시됩니다</td></tr>
         <tr><td>수집기로 내보내기</td><td>직접 설정한 OpenTelemetry 또는 HTTP 엔드포인트</td><td>설정 › 내보내기에 표시된 필드, 예를 들어 트래픽 집계와 알림. 인증 헤더는 키체인에 저장됩니다</td><td>엔드포인트를 설정하고 내보내기를 켠 뒤에만</td></tr>
-        <tr><td>검사 대상 앱의 트래픽</td><td>검사 대상 앱이 요청한 원래 목적지</td><td>복호화한 뒤 Flowlight의 로컬 프록시를 거쳐 전달되는 그 앱의 요청</td><td>HTTPS 검사가 켜져 있고 그 앱이 프록시를 거치는 동안만</td></tr>
+        <tr><td>검사 대상 앱의 트래픽</td><td>검사 대상 앱이 요청한 원래 목적지</td><td>복호화한 뒤 Flowlight의 로컬 프록시를 거쳐 전달되는 그 앱의 요청</td><td>HTTPS 검사가 켜져 있고 그 앱이 명시적으로 프록시를 거치는 동안만. Store 제품은 시스템 프록시 설정을 바꾸지 않습니다</td></tr>
       </table>
 
       <h2 id="permissions">권한</h2>
@@ -190,7 +192,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 기여자들. Flowlight는 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 아래 배포되는 자유 소프트웨어입니다.</span>
-      <span>버전 0.17.9 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
+      <span>버전 0.18.0 · Apple 및 이 사이트에 언급된 어떤 AI 제공업체와도 무관합니다.</span>
     </div>
   </div>
 </footer>

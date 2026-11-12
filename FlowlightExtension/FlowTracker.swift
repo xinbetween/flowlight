@@ -6,6 +6,11 @@ import NetworkExtension
 final class FlowState: @unchecked Sendable {
     let id: UUID
     let process: ProcessInfoRecord
+    #if APP_STORE
+    let localIP: String
+    let localPort: UInt16
+    let filterGeneration: UInt64
+    #endif
     let remoteIP: String
     let remotePort: UInt16
     let transport: TransportProtocol
@@ -31,7 +36,24 @@ final class FlowState: @unchecked Sendable {
     let outboundPeek: Int
     let inboundPeek: Int
 
-    init(id: UUID, process: ProcessInfoRecord, remoteIP: String, remotePort: UInt16, transport: TransportProtocol, systemHostname: String?) {
+    #if APP_STORE
+    init(id: UUID, process: ProcessInfoRecord, localIP: String, localPort: UInt16, remoteIP: String, remotePort: UInt16,
+         transport: TransportProtocol, systemHostname: String?, filterGeneration: UInt64) {
+        self.id = id
+        self.process = process
+        self.localIP = localIP
+        self.localPort = localPort
+        self.filterGeneration = filterGeneration
+        self.remoteIP = remoteIP
+        self.remotePort = remotePort
+        self.transport = transport
+        self.systemHostname = systemHostname
+        self.outboundPeek = 8192
+        self.inboundPeek = remotePort == 53 ? 4096 : 512
+    }
+    #else
+    init(id: UUID, process: ProcessInfoRecord, remoteIP: String, remotePort: UInt16,
+         transport: TransportProtocol, systemHostname: String?) {
         self.id = id
         self.process = process
         self.remoteIP = remoteIP
@@ -41,6 +63,7 @@ final class FlowState: @unchecked Sendable {
         self.outboundPeek = 8192          // large enough for post-quantum ClientHellos
         self.inboundPeek = remotePort == 53 ? 4096 : 512
     }
+    #endif
 
     private var isDNS: Bool { remotePort == 53 }
     private var isFTPControl: Bool { remotePort == 21 }
@@ -146,6 +169,23 @@ final class FlowTracker: @unchecked Sendable {
     private let resolver = ProcessResolver()
     private var flows: [UUID: FlowState] = [:]
     private let lock = NSLock()
+    #if APP_STORE
+    private var activeFilterGeneration: UInt64?
+
+    func filterStarted(generation: UInt64) {
+        lock.lock()
+        flows.removeAll()
+        activeFilterGeneration = generation
+        lock.unlock()
+    }
+
+    func filterStopped() {
+        lock.lock()
+        activeFilterGeneration = nil
+        flows.removeAll()
+        lock.unlock()
+    }
+    #endif
 
     /// Counters for the once-a-minute log line. Diagnostics only.
     private(set) var flowsSeen = 0
@@ -156,7 +196,15 @@ final class FlowTracker: @unchecked Sendable {
     }
 
     func begin(_ flow: NEFilterSocketFlow) -> FlowState? {
-        lock.lock(); flowsSeen += 1; lock.unlock()
+        lock.lock()
+        flowsSeen += 1
+        #if APP_STORE
+        guard let filterGeneration = activeFilterGeneration else {
+            lock.unlock()
+            return nil
+        }
+        #endif
+        lock.unlock()
         let transport: TransportProtocol
         switch flow.socketProtocol {
         case IPPROTO_TCP: transport = .tcp
@@ -165,9 +213,31 @@ final class FlowTracker: @unchecked Sendable {
         }
         guard let endpoint = Self.remote(of: flow) else { return nil }
         let process = resolver.resolve(auditToken: flow.sourceAppAuditToken, signingIdentifier: nil)
+        #if APP_STORE
+        let state = FlowState(
+            id: flow.identifier,
+            process: process,
+            localIP: Self.ip(of: flow.localFlowEndpoint),
+            localPort: Self.port(of: flow.localFlowEndpoint),
+            remoteIP: endpoint.ip,
+            remotePort: endpoint.port,
+            transport: transport,
+            systemHostname: flow.remoteHostname,
+            filterGeneration: filterGeneration
+        )
+        #else
         let state = FlowState(id: flow.identifier, process: process, remoteIP: endpoint.ip, remotePort: endpoint.port,
                               transport: transport, systemHostname: flow.remoteHostname)
-        lock.lock(); flows[flow.identifier] = state; lock.unlock()
+        #endif
+        lock.lock()
+        #if APP_STORE
+        guard activeFilterGeneration == filterGeneration else {
+            lock.unlock()
+            return nil
+        }
+        #endif
+        flows[flow.identifier] = state
+        lock.unlock()
         return state
     }
 
@@ -200,6 +270,82 @@ final class FlowTracker: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         flows = flows.filter { $0.value.lastActivity > cutoff }
     }
+
+    #if APP_STORE
+    /// Identity for one live explicit-proxy leg, derived from the audit token macOS attached to that exact flow.
+    /// Both ports and loopback destination must match; a stale source-port reuse must never inherit another app.
+    func inspectionProxyClient(clientIP: String, clientPort: UInt16, proxyPort: UInt16,
+                               filterGeneration: UInt64) -> ProxyClientIdentity? {
+        guard let normalizedClientIP = HostCanonicalizer.address(clientIP) else { return nil }
+        lock.lock()
+        guard activeFilterGeneration == filterGeneration else { lock.unlock(); return nil }
+        // Snapshot only exact tuple candidates under the tracker lock. Process ancestry can touch the kernel process
+        // table, so doing it for every live flow here can exceed the Store host's 250 ms fail-open timeout.
+        let exact = flows.values.filter { state in
+            state.filterGeneration == filterGeneration
+                && state.transport == .tcp
+                && HostCanonicalizer.address(state.localIP) == normalizedClientIP
+                && state.localPort == clientPort
+                && state.remotePort == proxyPort
+                && (state.remoteIP == "127.0.0.1" || state.remoteIP == "::1")
+        }
+        lock.unlock()
+        let candidates = exact.map { state in
+            let context = BlockEnforcer.shared.inspectionAgentContext(for: state.process)
+            return ProxyClientFlowCandidate(
+                localIP: state.localIP,
+                localPort: state.localPort,
+                remoteIP: state.remoteIP,
+                remotePort: state.remotePort,
+                isTCP: true,
+                identity: ProxyClientIdentity(
+                    pid: state.process.pid,
+                    bundleID: state.process.bundleID,
+                    name: state.process.name,
+                    path: state.process.path,
+                    agentBundleID: context?.bundleID,
+                    agentName: context?.name,
+                    // The extension is not given user MCP configuration. Guessing from an executable name would make
+                    // server-scoped guardrails apply to ordinary tools, so unknown lineage remains explicitly nil.
+                    mcpServer: nil
+                ),
+                filterGeneration: state.filterGeneration
+            )
+        }
+        // The ancestry walk above deliberately runs unlocked. Revalidate after it: start/stop clears the flow table,
+        // but the snapshot retains its old objects and would otherwise still resolve an obsolete identity.
+        lock.lock()
+        guard activeFilterGeneration == filterGeneration else {
+            lock.unlock()
+            return nil
+        }
+        let identity = ProxyClientIdentityResolver.resolve(
+            candidates: candidates,
+            clientIP: clientIP,
+            clientPort: clientPort,
+            proxyPort: proxyPort,
+            filterGeneration: filterGeneration
+        )
+        lock.unlock()
+        return identity
+    }
+
+    private static func ip(of endpoint: Network.NWEndpoint?) -> String {
+        guard case .hostPort(let host, _)? = endpoint else { return "" }
+        switch host {
+        case .ipv4(let address): return "\(address)"
+        case .ipv6(let address): return "\(address)".components(separatedBy: "%").first ?? "\(address)"
+        case .name(let name, _): return HostCanonicalizer.address(name) ?? ""
+        @unknown default: return ""
+        }
+    }
+
+    private static func port(of endpoint: Network.NWEndpoint?) -> UInt16 {
+        guard case .hostPort(_, let port)? = endpoint else { return 0 }
+        return port.rawValue
+    }
+
+    #endif
 
     private static func remote(of flow: NEFilterSocketFlow) -> (ip: String, port: UInt16)? {
         guard let endpoint = flow.remoteFlowEndpoint, case let .hostPort(host, port) = endpoint else { return nil }

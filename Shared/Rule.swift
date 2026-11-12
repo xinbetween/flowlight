@@ -360,13 +360,18 @@ enum RuleBook {
         return RuleDecision(verdict: winner.action == .block ? .block : .allow, rule: winner)
     }
 
-    private static func best(of candidates: [Rule]) -> Rule? {
-        candidates.max { a, b in
-            if a.specificity != b.specificity { return a.specificity < b.specificity }
-            // Same reach: the block is the one that stands.
-            if a.action != b.action { return a.action == .allow }
-            return a.created < b.created
+    /// Most specific first, with block winning an exact tie and the newest equivalent rule winning after that.
+    /// The request proxy uses the same order before converting decisions into local-response matchers.
+    static func orderedByPrecedence(_ candidates: [Rule]) -> [Rule] {
+        candidates.sorted { a, b in
+            if a.specificity != b.specificity { return a.specificity > b.specificity }
+            if a.action != b.action { return a.action == .block }
+            return a.created > b.created
         }
+    }
+
+    private static func best(of candidates: [Rule]) -> Rule? {
+        orderedByPrecedence(candidates).first
     }
 
     /// Which rules could bite at all, given what is running. A rule the current engine can't carry out is shown as

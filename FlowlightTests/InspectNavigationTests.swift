@@ -81,8 +81,11 @@ final class InspectNavigationTests: XCTestCase {
                           PolicyInventoryID.make(.guardrail, sourceID: source))
     }
 
-    func testStoreCapabilitiesOmitEveryInspectionDependentPolicyKind() {
-        let capabilities = PolicyInventoryCapabilities(inspectionPolicies: false)
+    func testCapabilitiesWithoutInspectionHideEveryInspectionPolicyKind() {
+        let capabilities = PolicyInventoryCapabilities(
+            inspectionPolicies: false,
+            responseTransforms: false
+        )
         let items = PolicyInventoryKind.allCases.map { kind in
             PolicyInventoryItem(kind: kind, sourceID: kind.rawValue, title: kind.rawValue, detail: "",
                                 isEnabled: true, effect: .effective, reason: nil, destination: .managedPack(nil))
@@ -93,6 +96,23 @@ final class InspectNavigationTests: XCTestCase {
         XCTAssertFalse(visible.contains(.guardrail))
         XCTAssertFalse(visible.contains(.mock))
         XCTAssertFalse(visible.contains(.requestRewrite))
+        XCTAssertFalse(visible.contains(.responseTransform))
+    }
+
+    func testStoreLikeCapabilitiesKeepInspectionPoliciesWithoutResponseTransforms() {
+        let capabilities = PolicyInventoryCapabilities(
+            inspectionPolicies: true,
+            responseTransforms: false
+        )
+        let items = PolicyInventoryKind.allCases.map { kind in
+            PolicyInventoryItem(kind: kind, sourceID: kind.rawValue, title: kind.rawValue, detail: "",
+                                isEnabled: true, effect: .effective, reason: nil, destination: .managedPack(nil))
+        }
+        let visible = items.filter { $0.isVisible(in: capabilities) }.map(\.kind)
+
+        XCTAssertEqual(visible, [
+            .networkRule, .agentAllowlist, .managedPack, .guardrail, .mock, .requestRewrite
+        ])
         XCTAssertFalse(visible.contains(.responseTransform))
     }
 
@@ -133,6 +153,74 @@ final class InspectNavigationTests: XCTestCase {
         XCTAssertTrue(unavailable.isEnabled)
         XCTAssertEqual(unavailable.effect, .unavailable)
         XCTAssertNotNil(unavailable.reason)
+    }
+
+    func testRequestAndInspectionPoliciesRemainEffectiveForPlainHTTPWithoutCertificateTrust() throws {
+        var requestRule = Rule(action: .block, destination: "plain.example")
+        requestRule.path = "/v1/*"
+        let mock = MockRule(host: "plain.example")
+        let rewrite = RewriteRule(host: "plain.example", headers: [HeaderEdit(name: "X-Test", value: "yes")])
+        let guardrail = Guardrail(agent: "agent", tool: "bash")
+        let items = PolicyInventoryBuilder.build(
+            rules: [requestRule], allowlists: [:], packs: [], packConfiguration: { RulePackConfiguration(packID: $0) },
+            guardrails: [guardrail], mocks: [mock], rewrites: [rewrite], transforms: [],
+            inspectionEnabled: true, inspectionRunning: true, inspectionTrusted: false,
+            inspectionAttributionReady: true
+        )
+
+        for kind in [PolicyInventoryKind.networkRule, .guardrail, .mock, .requestRewrite] {
+            let item = try XCTUnwrap(items.first { $0.kind == kind })
+            XCTAssertEqual(item.effect, .httpOnly)
+            XCTAssertTrue(item.effect.isEffective)
+            XCTAssertTrue(item.reason?.contains("plain HTTP") == true)
+        }
+    }
+
+    func testAppScopedPoliciesWaitForTrustedAttributionWhileGlobalGuardrailsDoNot() throws {
+        var requestRule = Rule(action: .block, app: "com.example.agent", destination: "plain.example")
+        requestRule.path = "/v1/*"
+        let flowRule = Rule(action: .block, app: "com.example.agent", destination: "blocked.example")
+        let allowlist = AgentPolicy(agentID: "com.example.agent", enabled: true,
+                                    patterns: ["allowed.example"], enforce: true)
+        let pack = try XCTUnwrap(BuiltInRulePacks.all.first)
+        let scopedGuardrail = Guardrail(agent: "com.example.agent", tool: "bash")
+        let globalGuardrail = Guardrail(tool: "bash")
+        let items = PolicyInventoryBuilder.build(
+            rules: [requestRule, flowRule], allowlists: ["com.example.agent": allowlist], packs: [pack],
+            packConfiguration: { packID in
+                var configuration = RulePackConfiguration(packID: packID, enabled: true)
+                configuration.scope = .selectedApps
+                configuration.apps = ["com.example.agent"]
+                return configuration
+            },
+            packStatus: .enforcing, guardrails: [scopedGuardrail, globalGuardrail], mocks: [], rewrites: [],
+            transforms: [], extensionRunning: true, canBlock: true, inspectionEnabled: true,
+            inspectionRunning: true, inspectionTrusted: false, inspectionAttributionReady: false
+        )
+
+        for sourceID in [requestRule.id.uuidString.lowercased(), flowRule.id.uuidString.lowercased(),
+                         "com.example.agent", pack.id, scopedGuardrail.id.uuidString.lowercased()] {
+            let item = try XCTUnwrap(items.first { $0.sourceID == sourceID })
+            XCTAssertEqual(item.effect, .waiting, sourceID)
+            XCTAssertTrue(item.reason?.contains("trusted app attribution is unavailable") == true, sourceID)
+        }
+        let global = try XCTUnwrap(items.first { $0.sourceID == globalGuardrail.id.uuidString.lowercased() })
+        XCTAssertEqual(global.effect, .httpOnly)
+        XCTAssertTrue(global.reason?.contains("plain HTTP") == true)
+    }
+
+    func testHTTPOnlyGuardrailStillWaitsForTrustedAttribution() throws {
+        let guardrail = Guardrail(agent: "agent", tool: "bash")
+        let items = PolicyInventoryBuilder.build(
+            rules: [], allowlists: [:], packs: [], packConfiguration: { RulePackConfiguration(packID: $0) },
+            guardrails: [guardrail], mocks: [], rewrites: [], transforms: [],
+            inspectionEnabled: true, inspectionRunning: true, inspectionTrusted: false,
+            inspectionAttributionReady: false
+        )
+
+        let item = try XCTUnwrap(items.first { $0.kind == .guardrail })
+        XCTAssertEqual(item.effect, .waiting)
+        XCTAssertTrue(item.reason?.contains("trusted app attribution is unavailable") == true)
     }
 
     func testPackFocusCarriesExactPackIdentity() {
@@ -337,6 +425,75 @@ final class InspectNavigationTests: XCTestCase {
 
         XCTAssertEqual(activity.first?.kind, .guardrail)
         XCTAssertEqual(activity.first?.effect, .guardrailApplied)
+    }
+
+    func testUnifiedActivityPreservesOrdinaryAndPackSourceEvidence() throws {
+        let rule = Rule(action: .block, app: "com.example.browser", destination: "blocked.example")
+        let ruleEvent = RuleEventRecord(
+            id: 50, timestamp: Date(timeIntervalSince1970: 100), ruleID: rule.id,
+            action: .block, engine: .flow, bundleID: "com.example.browser", appName: "Browser",
+            agentKey: "agent", agentName: "Agent", host: "blocked.example", ip: "", port: 443,
+            path: "", method: ""
+        )
+        let packEvent = RulePackEventRecord(
+            id: 51, bucket: Date(timeIntervalSince1970: 120), packID: "official.privacy",
+            packVersion: "3", entryID: 7, category: .tracking, match: .suffix, action: .block,
+            count: 4, firstAt: Date(timeIntervalSince1970: 120), lastAt: Date(timeIntervalSince1970: 125),
+            bundleID: "com.example.browser", appName: "Browser", agentKey: "", agentName: "",
+            host: "cdn.blocked.example", matchedHost: "blocked.example", port: 443
+        )
+
+        let activity = PolicyActivityBuilder.build(
+            ruleEvents: [ruleEvent], packEvents: [packEvent], alerts: [], exchanges: [], rules: [rule],
+            guardrails: [], packs: [], mocks: [], rewrites: [], transforms: []
+        )
+
+        XCTAssertTrue(activity.contains { $0.source == .rule(ruleEvent) })
+        XCTAssertTrue(activity.contains { $0.source == .managedPack(packEvent) })
+    }
+
+    func testPackActivityActionsKeepExactAppMatchAndDestination() {
+        let event = RulePackEventRecord(
+            id: 52, bucket: Date(timeIntervalSince1970: 120), packID: "official.privacy",
+            packVersion: "3", entryID: 7, category: .tracking, match: .exact, action: .block,
+            count: 1, firstAt: Date(timeIntervalSince1970: 120), lastAt: Date(timeIntervalSince1970: 120),
+            bundleID: "com.example.browser", appName: "Browser", agentKey: "", agentName: "",
+            host: "www.blocked.example", matchedHost: "blocked.example", port: 443
+        )
+
+        let exception = RulePackActivityAction.exception(for: event)
+        XCTAssertEqual(exception.packID, event.packID)
+        XCTAssertEqual(exception.app, event.bundleID)
+        XCTAssertEqual(exception.host, event.matchedHost)
+        XCTAssertEqual(exception.match, event.match)
+
+        let rule = RulePackActivityAction.normalAllowRule(for: event)
+        XCTAssertEqual(rule.action, .allow)
+        XCTAssertEqual(rule.app, event.bundleID)
+        XCTAssertEqual(rule.destination, event.matchedHost)
+        XCTAssertEqual(rule.destinationMatch, .exact)
+
+        var suffixEvent = event
+        suffixEvent.match = .suffix
+        XCTAssertEqual(RulePackActivityAction.normalAllowRule(for: suffixEvent).destinationMatch, .suffix)
+    }
+
+    func testNetworkRuleGroupingSeparatesActiveFromDisabledExpiredAndSpent() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let session = "test-session"
+        let active = Rule(name: "active")
+        var disabled = Rule(name: "disabled")
+        disabled.enabled = false
+        var expired = Rule(name: "expired")
+        expired.schedule = .expiring(in: -1, from: now)
+        var spent = Rule(name: "spent")
+        spent.maxHits = 1
+        spent.hits = 1
+        let rules = [active, disabled, expired, spent]
+
+        XCTAssertEqual(NetworkRuleGrouping.inForce(rules, at: now, session: session).map(\.id), [active.id])
+        XCTAssertEqual(Set(NetworkRuleGrouping.resting(rules, at: now, session: session).map(\.id)),
+                       Set([disabled.id, expired.id, spent.id]))
     }
 
     func testUnifiedActivityKeepsGuardrailAndRewriteEffectsDistinct() {

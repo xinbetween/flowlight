@@ -46,13 +46,13 @@ final class RuleStore: ObservableObject {
 
     var isPaused: Bool { pausedUntil.map { Date() < $0 } ?? false }
 
-    func attach(db: TrafficDatabase) {
+    func attach(db: TrafficDatabase, completion: @escaping @MainActor () -> Void = {}) {
         self.db = db
-        reload()
+        reload(completion: completion)
     }
 
-    func reload() {
-        guard let db else { return }
+    func reload(completion: @escaping @MainActor () -> Void = {}) {
+        guard let db else { completion(); return }
         db.async { [weak self] db in
             let rules = (try? db.loadRules()) ?? []
             let events = (try? db.ruleEvents(limit: 300)) ?? []
@@ -65,6 +65,7 @@ final class RuleStore: ObservableObject {
                 self.events = events
                 for rule in expired { db.async { try $0.deleteRule(rule.id) } }
                 self.publish()
+                completion()
             }
         }
     }
@@ -146,7 +147,14 @@ final class RuleStore: ObservableObject {
             guard let eventSession = event.ruleSession, let eventGeneration = event.ruleGeneration else { return true }
             return acceptsDecision(ruleID: event.ruleID, session: eventSession, generation: eventGeneration)
         }
-        guard !candidates.isEmpty else { completion(true); return }
+        let allCurrent = candidates.count == incoming.count
+        let isDurableExtensionDelivery = incoming.allSatisfy {
+            $0.deliverySession != nil && $0.deliverySequence != nil
+        }
+        // A stale app-local refusal must fail authorization. A stale extension decision is different: its generation
+        // is terminally obsolete, so retaining and retrying it can never make it current and would wedge the durable
+        // queue. Acknowledge only complete extension deliveries; database-backed current siblings still commit below.
+        guard !candidates.isEmpty else { completion(isDurableExtensionDelivery); return }
         guard let db else {
             let accepted = candidates.filter { event in
                 guard let id = event.id else { return true }
@@ -177,8 +185,10 @@ final class RuleStore: ObservableObject {
                 )
                 let events = try db.ruleEvents(limit: 300)
                 // Acknowledge the database commit before publishing it to the UI. Extension health must not depend on
-                // main-actor availability after the durable receipt, event, and counters already succeeded.
-                completion(true)
+                // main-actor availability after the durable receipt, event, and counters already succeeded. A mixed
+                // extension batch may also contain a terminally stale sibling; it is safe to evict only after every
+                // current sibling commits. App-local stale refusals still return false and cannot authorize a response.
+                completion(allCurrent || isDurableExtensionDelivery)
                 Task { @MainActor in
                     guard let self else { return }
                     for event in accepted {
@@ -444,6 +454,19 @@ final class LiveRules: @unchecked Sendable {
         for ruleID in resetHitCounts {
             self.ruleInvalidatedAt[ruleID] = generation
         }
+    }
+
+    /// A side-effect-free decision for a proxy flow that has learned its exact upstream IP. The proxy compares this
+    /// with the hostname decision it already committed before deciding whether a second rule needs to be consumed.
+    func previewFlowDecision(_ facts: FlowFacts, now: Date = Date()) -> LiveFlowRuleDecision {
+        lock.lock(); defer { lock.unlock() }
+        let paused = pausedUntil.map { now < $0 } ?? false
+        return LiveFlowRuleDecision(
+            paused: paused,
+            decision: RuleBook.decide(facts, rules: rules, now: now, session: RuleStore.session,
+                                      pausedUntil: pausedUntil),
+            externalClaim: nil
+        )
     }
 
     /// The flow-level answer for an already named proxied connection. Pause and rules are read under one lock so a

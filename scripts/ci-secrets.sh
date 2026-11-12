@@ -10,7 +10,8 @@
 # read them. RELEASE_ACTORS, the authenticated RELEASE_REVIEWERS comment receipt, and the environment's v* tag policy
 # gate that job; the environment currently has no human reviewer. Anyone who can change those controls can sign software
 # as you. Revoke the identities in Apple's developer
-# portal if that stops being acceptable. Publication uses a separate `release-publish` environment with no signing input.
+# portal if that stops being acceptable. Publication uses a separate `release-publish` environment with no signing input;
+# the post-publication Homebrew job returns to `release` only for its separately referenced TAP_TOKEN.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -180,9 +181,9 @@ set_secret DMG_SIGN_IDENTITY         "$APP_ID"
 set_secret INSTALLER_IDENTITY        "$INSTALLER_ID"
 
 echo
-echo "TAP_TOKEN is optional: a fine-grained token with Contents: write on xinbetween/homebrew-tap. Put it only in"
-echo "the separate release-publish environment; never add signing or notarization secrets there. Without it, GitHub"
-echo "publication still succeeds and you update the cask manually from the verified DMG."
+echo "TAP_TOKEN completes the automated release: use a fine-grained token with Contents: write on"
+echo "xinbetween/homebrew-tap and store it in the release environment. The post-publication Homebrew job is the only"
+echo "workflow step that references it; release-publish remains free of signing, notarization, and tap credentials."
 echo
 echo "A v* tag push prepares the signed artifact. After that run succeeds, publish with:"
 echo "  gh workflow run Release --repo $REPO --ref <tag> -f prepare_run_id=<successful-tag-push-run-id>"

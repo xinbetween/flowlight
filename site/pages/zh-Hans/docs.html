@@ -96,11 +96,11 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#visualize">连接</a></td><td>⌘4</td><td>应用与其精确目标的稳定地图，带有按流量加权的路径、移动的方向标记、连接数以及等价列表。</td></tr>
         <tr><td><a href="#alerts">警报</a></td><td>⌘5</td><td>所有看起来不寻常的事，带上应用、目标和触发规则的那个数字。</td></tr>
         <tr><td><a href="#ask">提问</a></td><td>⌘6</td><td>用平常的话问你自己的流量，由本地模型或托管模型从记录下来的历史里作答。</td></tr>
-        <tr><td><a href="#inspection">检查</a></td><td>⌘7 · Developer ID</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
-        <tr><td><a href="#policies">策略</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>每项已配置的策略、是否真正生效，以及统一的只读活动记录。</td></tr>
-        <tr><td><a href="#sources">来源</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>收集器状态与恢复、可选设备通道和覆盖范围，集中在一张可滚动的运维页面中。</td></tr>
+        <tr><td><a href="#inspection">检查</a></td><td>⌘7</td><td>可选：你交给 Flowlight 转发的那些代理的解密请求，以及它们背后的工具调用。搜索能深入请求和响应正文。</td></tr>
+        <tr><td><a href="#policies">策略</a></td><td>⌘8</td><td>每项已配置的策略、是否真正生效，以及统一的只读活动记录。</td></tr>
+        <tr><td><a href="#sources">来源</a></td><td>⌘9</td><td>收集器状态与恢复、可选设备通道和覆盖范围，分为三个聚焦分段。</td></tr>
       </table>
-      <p>快捷键遵循可见的侧边栏顺序。Developer ID 版本在 ⌘7 包含检查；App Store 版本省略检查，因此策略和来源会移到 ⌘7 和 ⌘8。</p>
+      <p>快捷键遵循可见的侧边栏顺序，在 Developer ID 和 Mac App Store 版本中完全相同。</p>
       <figure><div class="frame"><img src="{{root}}assets/screenshots/live.png" loading="lazy"
         alt="实时视图：一列应用，各自带着当前的发送与接收速率，以及最忙的目标。"></div>
         <figcaption class="caption">实时，Flowlight 打开时进入的那个视图。</figcaption></figure>
@@ -246,16 +246,18 @@ open build/Build/Products/Release/Flowlight.app</pre>
         由提供方在自己服务器上运行的那些（网页搜索、代码执行），以及提供方替代理连接的 MCP 服务器
         （Anthropic 的 <code>mcp_servers</code>、OpenAI 的 <code>mcp</code> 工具），连同它们的 URL、令牌、审批设置和允许的工具。最后
         这一类永远不会出现在你的网络上，因为那些连接是提供方发起的，不是你的 Mac。</p>
-      <p><strong>设置只需一个开关。</strong>在<strong>检查</strong>里开启 HTTPS 检查，Flowlight 就会创建它的证书、
-        请你输入一次密码、信任该证书，并把应用经由代理转发。把开关关掉会撤销全部这些。代理
-        配置文件在 Flowlight 未运行时会回退为直连，所以退出它绝不会切断你的 Mac。</p>
-      <p>命令行代理会忽略系统代理设置，所以对 Claude Code、Codex、Gemini CLI 或 Aider，请用<strong>打开受检查的终端</strong>
-        并在那里启动它们。在<strong>高级</strong>里，你可以只解密 AI 代理而不是所有应用、编辑从不解密列表、拷贝
-        某个 shell 的配置，或者移除证书和所有已记录的内容。</p>
+      <p><strong>Developer ID 版本可以自动设置。</strong>在<strong>检查</strong>里开启 HTTPS 检查，Flowlight 就会创建自己的证书。
+        <strong>打开受检查的终端</strong>会用正确的代理变量和证书环境启动命令行代理；你也可以信任该证书，并让 Flowlight 为桌面应用设置系统 PAC 文件。
+        Flowlight 未运行时，这个文件会回退为直连。</p>
+      <p><strong>Mac App Store 版本仍由用户明确设置。</strong>Store 应用会在沙盒内运行环回代理；“检查”会创建一个私钥由钥匙串保管的原生 P-256 证书颁发机构，
+        显示准确的 <code>127.0.0.1</code> 代理地址，并在 Finder 中展示公共证书。请自行导入并信任该证书，然后明确配置每个应用使用所显示的
+        HTTP/HTTPS 代理。Store 应用绝不会更改系统代理或信任设置、改写其他应用的配置，也不会重新启动或监管其他应用。其内容过滤扩展会对准确的
+        活跃环回套接字使用 macOS 审计令牌身份；如果该身份不可用或已过期，按应用执行会开放放行，绝不猜测。</p>
       <p>Flowlight 会把内置的 Apple 服务和密码管理器名单排除在解密之外（在“设置”里可以编辑这份列表）。固定证书的应用可能会拒绝
         Flowlight 的证书；Flowlight 会发现并让它们以加密方式直接通过。默认情况下，只有当某个标头是你允许的标头时，它的值才会被保留，
-        其他所有值在任何内容被存储之前都会被替换为它们的长度——记录的请求会按你设定的时长保留，<strong>移除证书与记录的数据</strong>会删除证书、它的信任
-        设置以及所有已记录的内容。检查仅支持 HTTP/1.1（Flowlight 会向双方请求它），且在演示模式下不可用。</p>
+        其他所有值在任何内容被存储之前都会被替换为它们的长度；记录的请求会按你设定的时长保留。<strong>移除证书与记录的数据</strong>会删除 Flowlight 所有的私钥、
+        生成的证书以及所有已记录内容。在 Store 版本中，你导入的公共 CA 仍归你所有；“检查”会提示你另行在“钥匙串访问”中移除它。
+        检查仅支持 HTTP/1.1（Flowlight 会向双方请求它），且在演示模式下不可用。</p>
 
       <p><strong>检查可以保留什么。</strong>记录下来的正文是 Flowlight 保存的最敏感的内容，而在 0.9.3 之前，唯一保护它们的
         只是一次猜测：猜哪些标头带着凭据。这件事用猜测来做，形状本来就不对：它只能知道有人想到过的标头，而且失败时一声不响——所谓失败，
@@ -305,7 +307,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         完全不可达”不行。</p>
 
       <h2 id="policies"><span id="rules"></span>策略</h2>
-      <p><strong>策略</strong>集中列出 Flowlight 能执行的所有管控：普通的允许或阻止规则、代理允许列表、托管包，以及在支持 HTTPS 检查时的护栏、模拟响应、请求改写和响应转换。每一行都会区分配置状态与实际效果：生效、仅报告、监视、等待、已排期、暂停、已用完、正在应用、需要检查、不可用、不兼容或失败。选择一行会打开负责该策略的对应编辑器；“策略”不会取代或混淆这些功能各自独立的授权和持久化方式。</p>
+      <p><strong>策略</strong>集中列出 Flowlight 能执行的所有管控：普通的允许或阻止规则、代理允许列表、托管包，以及在支持 HTTPS 检查时的护栏、模拟响应和请求改写。Developer ID 版本还包含响应转换；Store 产品不提供响应转换脚本或脚本插件。每一行都会区分配置状态与实际效果：生效、仅报告、监视、等待、已排期、暂停、已用完、正在应用、需要检查、不可用、不兼容或失败。选择一行会打开负责该策略的对应编辑器；“策略”不会取代或混淆这些功能各自独立的授权和持久化方式。</p>
       <p>允许列表是某一个代理关于它可以去哪里的说法。普通<strong>规则</strong>是它的通用版本：它指明一个
         <strong>对象</strong>——应用、代理、目标、URL，或其中两者的组合——并决定<strong>阻止</strong>
         还是<strong>允许</strong>。在实时、历史、AI 代理或检查里右键任意一行，就能针对你正看着的东西写一条；
@@ -334,7 +336,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         地址和端口，对路径一无所知，而且只在扩展模式下有效。HTTPS 检查拒绝的是单个请求，所以它能匹配
         URL，并用代理读得懂的状态码作答，而不是一个不声不响就断掉的套接字。nettop 采样器
         完全无法拒绝任何东西。当前配置无法执行的规则会在列表里明说，而不是摆在那里装作已经生效。</p>
-      <p>第二个视图是只读的<strong>活动</strong>：普通规则判定、允许列表违规、托管包事件，以及各类检查策略的效果，都按时间排列在一处。它会适配现有的权威记录，而不是把历史改写成一种笼统的事件模型；App Store 版本会省略依赖检查的策略类型及其保留的活动。</p>
+      <p>第二个视图是只读的<strong>活动</strong>：普通规则判定、允许列表违规、托管包事件，以及各类检查策略的效果，都按时间排列在一处。它会适配现有的权威记录，而不是把历史改写成一种笼统的事件模型。Store 版本会保留护栏、模拟响应和请求改写活动，只省略 Store 产品无法执行的响应转换和脚本插件效果。</p>
 
       <p><strong>它本来会做什么。</strong>阻止的规则写起来容易，打开却让人害怕，因为你通常最先了解到的是它
         弄坏了什么——而且是后来才知道的，从别处某个东西失败上知道的。规则编辑器先回答这个问题：它拿记录
@@ -402,7 +404,9 @@ open build/Build/Products/Release/Flowlight.app</pre>
         shell 的代理，可以手动做到那个工具本来要做的事。Flowlight 会把它记录下来；它不会假装能阻止。</p>
 
       <h2 id="sources"><span id="capture"></span><span id="engines"></span>来源：收集器、设备与覆盖范围</h2>
-      <p><strong>来源</strong>是一张可滚动的运维页面：先是收集器，接着是标题清晰的设备与覆盖范围分区。状态通知、提问答案、恢复后的窗口和截图链接都会滚动到相关分区并短暂突出显示，同时不隐藏其他内容。</p>
+      <p><strong>来源</strong>采用与“策略”相同的聚焦分段导航：<strong>收集器</strong>、
+        <strong>设备</strong>和<strong>覆盖范围</strong>。状态通知、提问答案、恢复后的窗口和深层链接会精确选中对应分段，
+        三个分段中都能看到共用的运行状态与修复信息。</p>
       <p>Flowlight 用两种方式之一记录流量，在<strong>来源 › 收集器</strong>里选择。它们会漏掉的东西不同，在依赖任何
         一种之前，值得先了解清楚。</p>
       <table>

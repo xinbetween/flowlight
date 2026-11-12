@@ -484,7 +484,6 @@ struct ReportsView: View {
             }
             .toggleStyle(.switch)
             .disabled(!LocalRiskSettings.canAnalyze)
-            #if !APP_STORE
             if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0
                 && InspectNavigationScope.canInspect(filter, requireDestination: false) {
                 Button(L("Show in Inspect")) {
@@ -492,7 +491,6 @@ struct ReportsView: View {
                                                        potentialHarmOnly: true)
                 }
             }
-            #endif
         }
         .padding(10)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))

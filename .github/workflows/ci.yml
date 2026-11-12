@@ -354,6 +354,26 @@ jobs:
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
+      - name: Test Store-hosted inspection
+        run: |
+          xcodebuild test -project Flowlight.xcodeproj -scheme "Flowlight App Store" \
+            -configuration Debug -destination 'platform=macOS' -derivedDataPath "$RUNNER_TEMP/store-tests" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Prove Store product gates reject unsafe fixtures
+        run: |
+          set -euo pipefail
+          for fixture in \
+            --self-test-read-only \
+            --self-test-missing-proxy-server \
+            --self-test-missing-proxy-attribution \
+            --self-test-forbidden-symbol; do
+            if scripts/check_app_store_product.sh "$fixture"; then
+              echo "::error::Store product fixture unexpectedly passed: $fixture"
+              exit 1
+            fi
+          done
+
       # This compiles a different product graph and activation path from the Developer ID build. The build clears
       # protected entitlements because CI has no Store profiles; the next step re-signs the isolated product with the
       # repository plists so the product gate still inspects the actual executable entitlements it is meant to police.

@@ -84,6 +84,11 @@ nav: threat-model
         untouched — deliberately, because breaking a pinned connection would break the app. QUIC is not offered to the proxy either.</p>
       <p>So an empty Inspect screen means "nothing was routed here", not "nothing happened". Sources › Coverage says which of the two applies,
         per app.</p>
+      <p><strong>The Store product does not take over proxy or trust settings.</strong> It exposes a loopback proxy and a public CA,
+        but you import that CA and route each application yourself. Its content-filter extension attributes an explicit-proxy connection
+        from the audit token macOS attached to the exact live loopback socket, matching both source and proxy ports. Unknown, stale, or
+        mismatched identity fails open for app-scoped enforcement; Flowlight never substitutes a guessed process. Removing inspection
+        deletes app-owned keys and generated leaf certificates, while a public CA you imported remains yours to remove in Keychain Access.</p>
 
       <h2 id="blocking">What blocking is, and isn't</h2>
       <p>A rule that refuses a connection is normally carried out by the Network Extension, in the path, before the connection is made.

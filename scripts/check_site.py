@@ -69,22 +69,11 @@ def sidebar_order(source):
 
 
 def shortcut_requirements(order):
-    """Required labels for Developer ID and Store products, whose visible sidebars differ."""
+    """Required labels for the shared Developer ID and Store sidebar order."""
     def key(index):
         return "0" if index == 9 else str(index + 1)
 
-    store_order = [screen for screen in order if screen != "inspect"]
-    requirements = {}
-    for index, screen in enumerate(order):
-        developer_key = key(index)
-        store_key = key(store_order.index(screen)) if screen in store_order else None
-        if store_key == developer_key:
-            requirements[screen] = [f"⌘{developer_key}"]
-        else:
-            requirements[screen] = [f"⌘{developer_key} · Developer ID"]
-            if store_key is not None:
-                requirements[screen].append(f"⌘{store_key} · App Store")
-    return requirements
+    return {screen: [f"⌘{key(index)}"] for index, screen in enumerate(order)}
 
 
 def missing_shortcuts(cell, required):
@@ -338,8 +327,8 @@ def problems():
             found.append(f"docs/docs/index.html: no #{anchor} section, but the {screen} screen's Help "
                          f"button opens it — a new screen the documentation never got")
 
-    # 12. A shortcut the documentation gets wrong. Shortcuts follow each product's visible sidebar. Developer ID
-    #     includes Inspect; the Store product does not, so Policies and Sources move up by one there.
+    # 12. A shortcut the documentation gets wrong. Both products expose the same visible sidebar order, including
+    #     Store Inspect, so one positional shortcut contract applies to every localized page.
     order = sidebar_order(nav)
     requirements = shortcut_requirements(order)
     titles = dict(HELP_ANCHOR.findall(nav[nav.find("var englishTitle"):nav.find("var title")]))
@@ -469,8 +458,8 @@ def problems():
     # 2880x1800 dimensions reviewable so App Store Connect cannot silently retain a mixed-version screenshot.
     store_shots = ROOT / "packaging/app-store/screenshots/macos"
     expected_store_names = {
-        "01-connections.png", "02-ai-agents.png", "03-history.png", "04-rules.png", "05-live.png",
-        "06-alerts.png", "07-agent-detail.png", "08-agent-tools.png", "09-mcp-servers.png",
+        "01-connections.png", "02-ai-agents.png", "03-history.png", "04-inspect.png", "05-policies.png",
+        "06-live.png", "07-alerts.png", "08-agent-detail.png", "09-agent-tools.png", "10-mcp-servers.png",
     }
     store_files = sorted(store_shots.glob("*.png"))
     store_names = {shot.name for shot in store_files}

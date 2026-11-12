@@ -16,16 +16,13 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-	<!-- The extension's version is pinned here, on its OWN lifecycle, NOT $(MARKETING_VERSION). macOS runs one
-	     content filter at a time and holds superseded copies until a restart, so changing the extension's version
-	     on every app release forced a reboot each time. Kept fixed, an app-only update ships the version macOS
-	     already runs and replaces nothing. Bump these two ONLY when the FlowlightExtension binary itself changes
-	     (and expect one replacement when you do). Build 28 adds the refusing process identity to structured
-	     allowlist evidence so dependency paths remain truthful in the app. -->
+	<!-- Keep the Developer system extension on the same reviewed release identity as the app and Store extension.
+	     A new app release therefore replaces the embedded filter as one product; macOS may require one restart while
+	     it retires the previous system-extension copy. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.16.3</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>28</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>FLAppGroupIdentifier</key>

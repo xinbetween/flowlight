@@ -52,27 +52,37 @@ final class VisualizeNavigationTests: XCTestCase {
                        .collector)
     }
 
-    func testSourcesSectionsHaveStableDistinctScrollTargets() {
+    func testSourcesHasStableSegmentOrder() {
         XCTAssertEqual(SourcesTab.allCases, [.collector, .devices, .coverage])
-        XCTAssertEqual(SourcesTab.allCases.map(\.anchorID),
-                       ["sources-collector", "sources-devices", "sources-coverage"])
-        XCTAssertEqual(Set(SourcesTab.allCases.map(\.anchorID)).count, SourcesTab.allCases.count)
+        XCTAssertEqual(SourcesTab.allCases.map(\.rawValue), ["collector", "devices", "coverage"])
     }
 
-    func testRepeatedSourcesLinkCreatesANewSectionFocusRequest() {
+    func testSourcesDeepLinkSelectsTheExactSegment() {
         let nav = AppNavigation()
-        let initialRequest = nav.sourcesRequestID
 
         nav.showSources(.devices)
-        let firstRequest = nav.sourcesRequestID
         XCTAssertEqual(nav.selection, .sources)
         XCTAssertEqual(nav.sourcesTab, .devices)
-        XCTAssertNotEqual(firstRequest, initialRequest)
 
+        nav.showSources(.coverage)
+        XCTAssertEqual(nav.selection, .sources)
+        XCTAssertEqual(nav.sourcesTab, .coverage)
+    }
+
+    func testSourcesSegmentPersistsForTheNextNavigationState() {
+        let defaults = UserDefaults.standard
+        let previousTab = defaults.object(forKey: "FLSourcesTab")
+        defer {
+            if let previousTab { defaults.set(previousTab, forKey: "FLSourcesTab") }
+            else { defaults.removeObject(forKey: "FLSourcesTab") }
+        }
+        defaults.removeObject(forKey: "FLSourcesTab")
+
+        let nav = AppNavigation()
         nav.showSources(.devices)
-        XCTAssertEqual(nav.sourcesTab, .devices)
-        XCTAssertNotEqual(nav.sourcesRequestID, firstRequest,
-                          "a repeated link must scroll even when its section value did not change")
+
+        XCTAssertEqual(defaults.string(forKey: "FLSourcesTab"), SourcesTab.devices.rawValue)
+        XCTAssertEqual(AppNavigation().sourcesTab, .devices)
     }
 
     func testFocusNoticeClaimsFilteringOnlyWhereTheWholeScopeApplies() {

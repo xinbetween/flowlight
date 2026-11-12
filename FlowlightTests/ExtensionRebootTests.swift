@@ -49,22 +49,22 @@ final class ExtensionRebootTests: XCTestCase {
         XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
     }
 
-    /// The permanent fix: the extension's version is pinned to its own lifecycle, so an app-only update ships the
-    /// version macOS already runs. Installed matches expected → nothing stale, no restart — no matter how far the
-    /// app's own version has moved on. This is the case that used to force a reboot on every single release.
-    func testAnAppOnlyUpdateNeedsNeitherRepairNorRestart() {
+    /// A matching embedded and installed identity needs no repair or restart. Replacement releases still handle older
+    /// copies through the explicit held-slot state rather than misclassifying the current extension as stale.
+    func testAMatchingExtensionNeedsNeitherRepairNorRestart() {
         let state = check(installed: ["0.10.1/22"], awaiting: [], app: "0.10.1")
         XCTAssertFalse(state.needsRestart)
         XCTAssertFalse(ExtensionVersion.isStale(installed: state.installed, appVersion: state.expectedVersion))
     }
 
-    /// The version the installed extension is compared against is read from the extension embedded in the app
-    /// bundle, not assumed equal to the app's version. Empty would make every install look stale and re-activate
-    /// on a loop, so the read has to actually find it in the bundle that hosts these tests.
-    func testTheExpectedVersionIsReadFromTheEmbeddedExtension() {
-        XCTAssertFalse(ExtensionManager.expectedExtensionVersion.isEmpty)
-        XCTAssertTrue(ExtensionManager.expectedExtensionVersion.contains("/"),
-                      "the repair identity must include CFBundleVersion when extension code changes")
+    /// Both distribution products and their embedded filters share one reviewed version/build identity. The comparison
+    /// still reads the embedded extension because that is the exact binary macOS installs and repairs.
+    func testTheEmbeddedExtensionSharesTheAppReleaseIdentity() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        XCTAssertFalse(version.isEmpty)
+        XCTAssertFalse(build.isEmpty)
+        XCTAssertEqual(ExtensionManager.expectedExtensionVersion, "\(version)/\(build)")
     }
 
     /// The held-slot state, read from what `systemextensionsctl list` actually prints — the reliable signal, since
