@@ -42,19 +42,79 @@ class SidebarOrderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_site.sidebar_order("enum SidebarItem { case live, alerts }")
 
-    def test_product_specific_shortcuts_account_for_missing_store_inspect(self):
+    def test_shared_sidebar_shortcuts_include_store_inspect(self):
         order = ["live", "agents", "reports", "visualize", "alerts", "ask", "inspect",
                  "rules", "sources"]
         requirements = check_site.shortcut_requirements(order)
-        self.assertEqual(requirements["inspect"], ["⌘7 · Developer ID"])
-        self.assertEqual(requirements["rules"], ["⌘8 · Developer ID", "⌘7 · App Store"])
-        self.assertEqual(requirements["sources"], ["⌘9 · Developer ID", "⌘8 · App Store"])
+        self.assertEqual(requirements["inspect"], ["⌘7"])
+        self.assertEqual(requirements["rules"], ["⌘8"])
+        self.assertEqual(requirements["sources"], ["⌘9"])
 
-    def test_universal_sources_shortcut_fails_store_requirement(self):
-        required = ["⌘9 · Developer ID", "⌘8 · App Store"]
-        self.assertEqual(check_site.missing_shortcuts("⌘9", required), required)
-        self.assertEqual(check_site.missing_shortcuts(
-            "⌘9 · Developer ID<br>⌘8 · App Store", required), [])
+    def test_stale_product_specific_sources_shortcut_fails_shared_requirement(self):
+        required = ["⌘9"]
+        self.assertEqual(check_site.missing_shortcuts("⌘8 · App Store", required), required)
+        self.assertEqual(check_site.missing_shortcuts("⌘9", required), [])
+
+
+class ScreenshotProvenanceTests(unittest.TestCase):
+    def test_truthful_prior_capture_version_is_allowed(self):
+        entries = {
+            "agents.png": {"version": "0.17.4"},
+            "alerts.png": {"version": "0.17.4"},
+        }
+        self.assertEqual(check_site.capture_version_problems(entries, "0.17.5", "screenshots"), [])
+
+    def test_mixed_truthful_capture_versions_are_allowed(self):
+        entries = {
+            "agents.png": {"version": "0.17.4"},
+            "alerts.png": {"version": "0.17.5"},
+        }
+        self.assertEqual(check_site.capture_version_problems(entries, "0.17.5", "screenshots"), [])
+
+    def test_future_and_missing_capture_versions_fail(self):
+        self.assertEqual(
+            check_site.capture_version_problems(
+                {"agents.png": {"version": "0.18.0"}}, "0.17.5", "screenshots"
+            ),
+            ["screenshots: capture version is newer than app 0.17.5: 0.18.0"],
+        )
+        self.assertEqual(
+            check_site.capture_version_problems(
+                {"agents.png": {}}, "0.17.5", "screenshots"
+            ),
+            ["screenshots: agents.png has no capture version"],
+        )
+
+
+class PagesProvenanceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = check_site.PAGES_WORKFLOW.read_text()
+
+    def test_committed_workflow_uses_verified_ci_artifact(self):
+        self.assertEqual(check_site.pages_workflow_problems(self.source), [])
+
+    def test_source_bypassing_trigger_fails(self):
+        unsafe = self.source.replace("  workflow_run:\n", "  workflow_dispatch:\n  workflow_run:\n", 1)
+        self.assertIn("Pages has a source-bypassing trigger", check_site.pages_workflow_problems(unsafe))
+
+    def test_checkout_or_rebuild_fails(self):
+        unsafe = self.source.replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", 1)
+        self.assertIn("Pages checks out or rebuilds source", check_site.pages_workflow_problems(unsafe))
+
+    def test_missing_exact_artifact_consumption_fails(self):
+        unsafe = self.source.replace("consume-pages", "consume-unverified-pages", 1)
+        self.assertIn(
+            "Pages does not consume and upload the verified CI artifact",
+            check_site.pages_workflow_problems(unsafe),
+        )
+
+    def test_extra_deploy_permission_fails(self):
+        unsafe = self.source.replace("      pages: write\n", "      pages: write\n      contents: write\n", 1)
+        self.assertIn(
+            "Pages deploy permissions are not limited to pages and id-token write",
+            check_site.pages_workflow_problems(unsafe),
+        )
 
 
 if __name__ == "__main__":

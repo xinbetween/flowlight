@@ -69,28 +69,73 @@ def sidebar_order(source):
 
 
 def shortcut_requirements(order):
-    """Required labels for Developer ID and Store products, whose visible sidebars differ."""
+    """Required labels for the shared Developer ID and Store sidebar order."""
     def key(index):
         return "0" if index == 9 else str(index + 1)
 
-    store_order = [screen for screen in order if screen != "inspect"]
-    requirements = {}
-    for index, screen in enumerate(order):
-        developer_key = key(index)
-        store_key = key(store_order.index(screen)) if screen in store_order else None
-        if store_key == developer_key:
-            requirements[screen] = [f"⌘{developer_key}"]
-        else:
-            requirements[screen] = [f"⌘{developer_key} · Developer ID"]
-            if store_key is not None:
-                requirements[screen].append(f"⌘{store_key} · App Store")
-    return requirements
+    return {screen: [f"⌘{key(index)}"] for index, screen in enumerate(order)}
 
 
 def missing_shortcuts(cell, required):
     text = re.sub(r"<[^>]+>", " ", cell)
     text = " ".join(text.split())
     return [label for label in required if label not in text]
+
+
+def capture_version_problems(entries, current_version, label):
+    """Keep screenshot provenance truthful without forcing unrelated releases to relabel old image bytes."""
+    versions = []
+    for name, entry in entries.items():
+        version = entry.get("version") if isinstance(entry, dict) else None
+        if not isinstance(version, str):
+            return [f"{label}: {name} has no capture version"]
+        try:
+            parsed = version_key(version)
+        except (TypeError, ValueError):
+            return [f"{label}: {name} has invalid capture version {version!r}"]
+        versions.append((version, parsed))
+    found = []
+    future = sorted({version for version, parsed in versions if parsed > version_key(current_version)}, key=version_key)
+    if future:
+        found.append(f"{label}: capture version is newer than app {current_version}: {', '.join(future)}")
+    return found
+
+
+def pages_workflow_problems(source):
+    """Pages must deploy only the exact site artifact already verified by canonical main CI."""
+    found = []
+    trigger = source.split("\npermissions:", 1)[0]
+    if not all(marker in trigger for marker in (
+        "workflow_run:", "workflows: [CI]", "branches: [main]", "types: [completed]",
+    )):
+        found.append("Pages is not restricted to completed CI runs for main")
+    if "workflow_dispatch:" in trigger or re.search(r"(?m)^  (push|pull_request):", trigger):
+        found.append("Pages has a source-bypassing trigger")
+    if "actions/checkout@" in source or "scripts/build_site.py" in source:
+        found.append("Pages checks out or rebuilds source")
+    required_provenance = (
+        "github.repository == 'xinbetween/flowlight'",
+        "github.event.workflow_run.repository.full_name == 'xinbetween/flowlight'",
+        "github.event.workflow_run.head_repository.full_name == 'xinbetween/flowlight'",
+        "github.event.workflow_run.path == '.github/workflows/ci.yml'",
+        "github.event.workflow_run.event == 'push'",
+        "github.event.workflow_run.head_branch == 'main'",
+        "github.event.workflow_run.status == 'completed'",
+        "github.event.workflow_run.conclusion == 'success'",
+    )
+    if not all(marker in source for marker in required_provenance):
+        found.append("Pages does not bind its source to successful canonical main CI")
+    if "consume-pages" not in source or "actions/upload-pages-artifact@" not in source:
+        found.append("Pages does not consume and upload the verified CI artifact")
+    if source.count('CURRENT_MAIN=$(gh api "repos/$REPOSITORY/git/ref/heads/main"') != 1 \
+            or source.count('CURRENT_MAIN=$(curl --fail --silent --show-error') != 1:
+        found.append("Pages does not reject stale main before verification and deployment")
+    deploy = source.split("\n  deploy:\n", 1)[1] if "\n  deploy:\n" in source else ""
+    permission_block = re.search(r"(?ms)^    permissions:\n((?:      [^\n]+\n)+)", deploy)
+    permissions = permission_block.group(1) if permission_block else ""
+    if permissions.strip().splitlines() != ["pages: write", "      id-token: write"]:
+        found.append("Pages deploy permissions are not limited to pages and id-token write")
+    return found
 
 
 def problems():
@@ -282,8 +327,8 @@ def problems():
             found.append(f"docs/docs/index.html: no #{anchor} section, but the {screen} screen's Help "
                          f"button opens it — a new screen the documentation never got")
 
-    # 12. A shortcut the documentation gets wrong. Shortcuts follow each product's visible sidebar. Developer ID
-    #     includes Inspect; the Store product does not, so Rules and Sources move up by one there.
+    # 12. A shortcut the documentation gets wrong. Both products expose the same visible sidebar order, including
+    #     Store Inspect, so one positional shortcut contract applies to every localized page.
     order = sidebar_order(nav)
     requirements = shortcut_requirements(order)
     titles = dict(HELP_ANCHOR.findall(nav[nav.find("var englishTitle"):nav.find("var title")]))
@@ -300,24 +345,24 @@ def problems():
                          f"but the sidebar puts it at \u2318{key}")
 
     docs_pages = [OUT / "docs/index.html"] + [OUT / lang / "docs/index.html" for lang in LANGS]
-    shortcut_anchors = {
-        "inspect": ("inspection",),
-        "rules": ("rules",),
-        "sources": ("capture", "sources"),
+    shortcut_rows = {
+        "inspect": ("inspect", ("inspection",)),
+        "policies": ("rules", ("policies",)),
+        "sources": ("sources", ("capture", "sources")),
     }
     for docs_page in docs_pages:
         page_text = docs_page.read_text()
-        for screen, anchors in shortcut_anchors.items():
+        for label_name, (screen, anchors) in shortcut_rows.items():
             anchor_pattern = "|".join(re.escape(anchor) for anchor in anchors)
             cell_match = re.search(
                 rf'<tr><td><a href="#(?:{anchor_pattern})">.*?</a></td><td>(.*?)</td>',
                 page_text, re.S)
             label = str(docs_page.relative_to(ROOT))
             if cell_match is None:
-                found.append(f"{label}: the views table has no {screen} shortcut row")
+                found.append(f"{label}: the views table has no {label_name} shortcut row")
                 continue
             for missing in missing_shortcuts(cell_match.group(1), requirements[screen]):
-                found.append(f"{label}: the {screen} row never lists {missing}")
+                found.append(f"{label}: the {label_name} row never lists {missing}")
 
     # 14. The homepage repeats the same shortcut badges and a compact Sources promise. Keep Collector, Devices,
     #     and Coverage together, and keep both product-specific shortcut maps truthful.
@@ -380,8 +425,9 @@ def problems():
         if shot.name not in referenced:
             found.append(f"{shot.relative_to(ROOT)}: no page shows this screenshot")
 
-    # 11. Every screenshot records the app version, exact bytes and dimensions from its own capture. A selective
-    #     refresh must not bless untouched images: each entry advances only when that image is actually recaptured.
+    # 11. Every screenshot records the exact app version, bytes, and dimensions from its own capture. Screenshot
+    #     provenance does not advance merely because the app version does: unrelated releases may retain an older
+    #     truthful set, and a selective refresh must never bless untouched image bytes as newly captured.
     manifest_path = shots / "manifest.json"
     try:
         manifest = json.loads(manifest_path.read_text())
@@ -396,14 +442,13 @@ def problems():
         missing = sorted(names - set(entries))
         extra = sorted(set(entries) - names)
         found.append(f"{manifest_path.relative_to(ROOT)}: screenshot entries differ; missing={missing}, extra={extra}")
+    found.extend(capture_version_problems(entries, APP_VERSION, str(manifest_path.relative_to(ROOT))))
     for shot in screenshot_files:
         entry = entries.get(shot.name)
         if not isinstance(entry, dict):
             continue
         raw = shot.read_bytes()
         real = (int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big"))
-        if entry.get("version") != APP_VERSION:
-            found.append(f"{shot.relative_to(ROOT)}: captured for {entry.get('version')}, app is {APP_VERSION}")
         if entry.get("sha256") != hashlib.sha256(raw).hexdigest():
             found.append(f"{shot.relative_to(ROOT)}: bytes differ from the screenshot manifest")
         if (entry.get("width"), entry.get("height")) != real:
@@ -413,8 +458,8 @@ def problems():
     # 2880x1800 dimensions reviewable so App Store Connect cannot silently retain a mixed-version screenshot.
     store_shots = ROOT / "packaging/app-store/screenshots/macos"
     expected_store_names = {
-        "01-connections.png", "02-ai-agents.png", "03-history.png", "04-rules.png", "05-live.png",
-        "06-alerts.png", "07-agent-detail.png", "08-agent-tools.png", "09-mcp-servers.png",
+        "01-connections.png", "02-ai-agents.png", "03-history.png", "04-inspect.png", "05-policies.png",
+        "06-live.png", "07-alerts.png", "08-agent-detail.png", "09-agent-tools.png", "10-mcp-servers.png",
     }
     store_files = sorted(store_shots.glob("*.png"))
     store_names = {shot.name for shot in store_files}
@@ -435,14 +480,13 @@ def problems():
         found.append(f"{store_manifest_path.relative_to(ROOT)}: Store manifest entries differ; "
                      f"missing={sorted(expected_store_names - set(store_entries))}, "
                      f"extra={sorted(set(store_entries) - expected_store_names)}")
+    found.extend(capture_version_problems(store_entries, APP_VERSION, str(store_manifest_path.relative_to(ROOT))))
     for shot in store_files:
         entry = store_entries.get(shot.name)
         if not isinstance(entry, dict):
             continue
         raw = shot.read_bytes()
         real = (int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big"))
-        if entry.get("version") != APP_VERSION:
-            found.append(f"{shot.relative_to(ROOT)}: captured for {entry.get('version')}, app is {APP_VERSION}")
         if entry.get("sha256") != hashlib.sha256(raw).hexdigest():
             found.append(f"{shot.relative_to(ROOT)}: bytes differ from the screenshot manifest")
         if (entry.get("width"), entry.get("height")) != real:
@@ -570,36 +614,11 @@ def problems():
     if ".install-choices" not in site_css or ".github-link" not in site_css:
         found.append("site/site.css: installation-choice or secondary GitHub styling is missing")
 
-    # 16. Pages occasionally needs redeploying without changing public bytes. A manual dispatch has no `before`
-    # SHA, so it must compare with the signed catalog already being served rather than a guessed commit. Keep these
-    # contracts scoped to the trigger, deploy job, and catalog-verification step so duplicate text elsewhere cannot
-    # make a broken workflow look safe.
-    pages_workflow = PAGES_WORKFLOW.read_text()
-    trigger = pages_workflow.split("\npermissions:", 1)[0]
-    deploy = pages_workflow.split("\n  deploy:\n", 1)[1] if "\n  deploy:\n" in pages_workflow else ""
-    catalog_step = deploy.split("      - name: Verify the official rule-pack catalog\n", 1)[1] \
-        if "      - name: Verify the official rule-pack catalog\n" in deploy else ""
-    catalog_step = catalog_step.split("\n      - ", 1)[0]
-    if not re.search(r"(?m)^  workflow_dispatch:\s*$", trigger):
-        found.append(".github/workflows/pages.yml: manual Pages redeployment is unavailable")
-    main_only = r"(?m)^    if: \$\{\{ github\.event_name == 'push' \|\| github\.ref == 'refs/heads/main' \}\}\s*$"
-    if not re.search(main_only, deploy):
-        found.append(".github/workflows/pages.yml: manual deployment is not restricted to main")
-    gh_token = r"(?m)^          GH_TOKEN: \$\{\{ github\.token \}\}\s*$"
-    live_url = r"(?m)^          LIVE_CATALOG_URL: https://flowlight\.xinbetween\.com/packs/v1/official\.json\s*$"
-    deployment_lookup = r"(?s)if DEPLOYMENT_IDS=\$\(gh api .*?/deployments\?environment=github-pages&per_page=20'.*?DEPLOYMENT_STATE=\$\(gh api .*?/statuses.*?continue"
-    deployed_bytes = r"(?s)DEPLOYED_REF=\$\(gh api .*?application/vnd\.github\.raw\+json.*?/contents/site/packs/v1/official\.json\?ref=\$DEPLOYED_REF.*?> \"\$PREVIOUS_CATALOG\".*?DEPLOYED_CATALOG_FOUND=true"
-    live_fallback = r"(?s)if \[ \"\$DEPLOYED_CATALOG_FOUND\" != \"true\" \].*?curl .*?--output \"\$PREVIOUS_CATALOG\" \"\$LIVE_CATALOG_URL\""
-    baseline_verify = r"(?s)rule_pack_catalog\.py verify \"\$PREVIOUS_CATALOG\" .*?--expected-key-id flowlight-rule-packs-2026-01"
-    baseline_compare = r"(?s)compare-previous site/packs/v1/official\.json \\\n\s+--previous \"\$PREVIOUS_CATALOG\""
-    if (not re.search(gh_token, catalog_step)
-            or not re.search(live_url, catalog_step)
-            or not re.search(deployment_lookup, catalog_step)
-            or not re.search(deployed_bytes, catalog_step)
-            or not re.search(live_fallback, catalog_step)
-            or not re.search(baseline_verify, catalog_step)
-            or not re.search(baseline_compare, catalog_step)):
-        found.append(".github/workflows/pages.yml: manual deployment does not verify the recorded or live catalog baseline")
+    # 16. Pages deploys no source checkout and performs no rebuild. Only the exact manifested site artifact from a
+    # successful canonical main CI run may reach the deploy job, and the source SHA is checked again immediately
+    # before deployment so a queued stale run cannot publish after main advances.
+    for issue in pages_workflow_problems(PAGES_WORKFLOW.read_text()):
+        found.append(f".github/workflows/pages.yml: {issue}")
 
     return found
 

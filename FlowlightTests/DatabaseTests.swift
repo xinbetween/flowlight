@@ -44,6 +44,160 @@ final class DatabaseTests: XCTestCase {
         FlowKey(pid: 10, bundleID: app, appName: app, appPath: "", remoteIP: ip, domain: domain, port: port, transport: .tcp, appProtocol: "https")
     }
 
+    func testInspectedAgentIDsCoverRowsOlderThanBoundedExchangeDetails() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func exchange(index: Int, agent: String) -> HTTPExchange {
+            HTTPExchange(
+                id: nil, started: start.addingTimeInterval(TimeInterval(index)), duration: 0.01,
+                scheme: "https", host: "api.example", port: 443, method: "GET", path: "/", status: 200,
+                requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+                responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+                contentType: "application/json", pid: 10, bundleID: "agent.app", appName: "Agent",
+                agent: agent, agentName: agent, mcpServer: nil, toolCalls: [], note: nil,
+                mockRule: nil,
+                guardrail: index == 0 ? "old guardrail"
+                    : (index == 5_000 ? "new guardrail" : (index == 6_000 ? "latest guardrail" : nil))
+            )
+        }
+
+        _ = try db.insertExchange(exchange(index: 0, agent: "older-agent"))
+        for index in 1...5_000 {
+            _ = try db.insertExchange(exchange(index: index, agent: "newer-agent"))
+        }
+
+        let details = try db.exchanges(since: start, limit: 5_000)
+        XCTAssertEqual(Set(details.compactMap(\.agent)), ["newer-agent"])
+        let policyEffects = try db.exchanges(since: start, limit: nil, policyEffectsOnly: true)
+        XCTAssertEqual(policyEffects.compactMap(\.guardrail), ["new guardrail", "old guardrail"],
+                       "policy activity must not lose an older effect behind ordinary exchange volume")
+        let firstPage = try db.exchanges(since: start, limit: 1, policyEffectsOnly: true)
+        XCTAssertEqual(firstPage.compactMap(\.guardrail), ["new guardrail"])
+        let cursor = try XCTUnwrap(firstPage.first)
+        let cursorID = try XCTUnwrap(cursor.id)
+        _ = try db.insertExchange(exchange(index: 6_000, agent: "latest-agent"))
+        XCTAssertEqual(try db.exchanges(since: start, limit: 1, before: cursor.started, beforeID: cursorID,
+                                        policyEffectsOnly: true).compactMap(\.guardrail), ["old guardrail"],
+                       "cursor-paged policy activity must retain older effects without loading the whole window")
+        XCTAssertEqual(try db.inspectedAgentIDs(since: start), ["older-agent", "newer-agent", "latest-agent"])
+        XCTAssertEqual(try db.inspectedAgentIDs(
+            since: start, focus: FocusScope(bundleIDs: ["agent.app"])
+        ), ["older-agent", "newer-agent", "latest-agent"])
+        XCTAssertEqual(try db.inspectedAgentIDs(
+            since: start, focus: FocusScope(bundleIDs: ["older-agent"])
+        ), ["older-agent"], "agent Focus must retain attributed child exchanges")
+        XCTAssertTrue(try db.inspectedAgentIDs(
+            since: start, focus: FocusScope(bundleIDs: ["other.app"])
+        ).isEmpty)
+    }
+
+    func testLegacyInspectionEffectHistoryIsPreservedConservativelyAndMarkedOnce() throws {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        func exchange(offset: TimeInterval, guardrail: String) -> HTTPExchange {
+            HTTPExchange(
+                id: nil, started: base.addingTimeInterval(offset), duration: 0.1,
+                scheme: "https", host: "api.example.com", port: 443, method: "POST", path: "/v1/run",
+                status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0,
+                requestTruncated: false, responseHeaders: [], responseBody: Data(), responseSize: 0,
+                responseTruncated: false, contentType: "application/json", pid: 10, bundleID: "agent.app",
+                appName: "Agent", agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [],
+                note: nil, mockRule: nil, guardrail: guardrail
+            )
+        }
+
+        let rewriteOnly = try db.insertExchange(exchange(offset: 0, guardrail: "set X-Test"))
+        let pathDelimiter = try db.insertExchange(exchange(offset: 5, guardrail: "set profile · email"))
+        let guardrailOnly = try db.insertExchange(exchange(offset: 10, guardrail: "removed shell"))
+        let combined = try db.insertExchange(exchange(offset: 20, guardrail: "removed shell · scrub body"))
+        let deletedGuardrail = try db.insertExchange(exchange(offset: 30, guardrail: "removed deleted tool"))
+        let correlated: [(TimeInterval, UUID)] = [(10, UUID()), (20, UUID()), (30, UUID())]
+        try db.saveGuardrail(Guardrail(id: correlated[0].1, agent: "agent", tool: "shell"))
+        try db.saveGuardrail(Guardrail(id: correlated[1].1, agent: "agent", tool: "shell"))
+        try db.recordRuleEvents(correlated.map { offset, id in
+            RuleEvent(
+                at: Int64(base.addingTimeInterval(offset).timeIntervalSince1970), ruleID: id,
+                action: .block, engine: .request, agentKey: "agent", agentName: "Agent",
+                appName: "Agent", bundleID: "agent.app", host: "api.example.com", ip: "", port: 443,
+                path: "/v1/run", method: "POST"
+            )
+        })
+
+        let url = db.url
+        db = nil
+        let legacy = try SQLiteConnection(path: url.path)
+        try legacy.execute("ALTER TABLE http_exchanges DROP COLUMN request_rewrite")
+
+        var migrated: TrafficDatabase? = try TrafficDatabase(url: url)
+        let effects = try XCTUnwrap(migrated).raw(
+            "SELECT id, guardrail, request_rewrite FROM http_exchanges ORDER BY id",
+            map: { ($0.int(0), $0.text(1), $0.text(2)) }
+        )
+        XCTAssertEqual(effects.map(\.0), [rewriteOnly, pathDelimiter, guardrailOnly, combined, deletedGuardrail])
+        XCTAssertEqual(effects.map(\.1), [
+            "set X-Test", "set profile · email", "removed shell", "removed shell · scrub body", "removed deleted tool",
+        ])
+        XCTAssertEqual(effects.map(\.2), ["", "", "", "", ""],
+                       "ambiguous legacy text must never fabricate a second policy effect")
+        XCTAssertEqual(try XCTUnwrap(migrated).ruleEvents().map(\.engine), [.request, .guardrail, .guardrail])
+        XCTAssertEqual(try XCTUnwrap(migrated).raw(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.inspectionEffectSplit'",
+            map: { $0.int(0) }
+        ), [1])
+
+        let currentID = try XCTUnwrap(migrated).insertExchange(HTTPExchange(
+            id: nil, started: base.addingTimeInterval(40), duration: 0.1,
+            scheme: "https", host: "api.example.com", port: 443, method: "POST", path: "/v1/run",
+            status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0,
+            requestTruncated: false, responseHeaders: [], responseBody: Data(), responseSize: 0,
+            responseTruncated: false, contentType: "application/json", pid: 10, bundleID: "agent.app",
+            appName: "Agent", agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [],
+            note: nil, mockRule: nil, guardrail: "current guardrail", requestRewrite: "current rewrite"
+        ))
+        migrated = nil
+
+        let reopened = try TrafficDatabase(url: url)
+        let current = try reopened.raw(
+            "SELECT guardrail, request_rewrite FROM http_exchanges WHERE id = \(currentID)",
+            map: { ($0.text(0), $0.text(1)) }
+        )
+        XCTAssertEqual(current.first?.0, "current guardrail")
+        XCTAssertEqual(current.first?.1, "current rewrite")
+    }
+
+    func testInspectionEffectSplitFinishesWhenPrereleaseColumnAlreadyExists() throws {
+        let base = Date(timeIntervalSince1970: 1_700_000_100)
+        func exchange(_ guardrail: String) -> HTTPExchange {
+            HTTPExchange(
+                id: nil, started: base, duration: 0.1, scheme: "https", host: "api.example.com", port: 443,
+                method: "POST", path: "/v1/run", status: 200, requestHeaders: [], requestBody: Data(),
+                requestSize: 0, requestTruncated: false, responseHeaders: [], responseBody: Data(), responseSize: 0,
+                responseTruncated: false, contentType: "application/json", pid: 10, bundleID: "agent.app",
+                appName: "Agent", agent: "agent", agentName: "Agent", mcpServer: nil, toolCalls: [], note: nil,
+                mockRule: nil, guardrail: guardrail
+            )
+        }
+        let combined = try db.insertExchange(exchange("removed shell · scrub body"))
+        let ambiguous = try db.insertExchange(exchange("legacy localized note"))
+        let url = db.url
+        db = nil
+
+        var prerelease: SQLiteConnection? = try SQLiteConnection(path: url.path)
+        try prerelease?.execute("DELETE FROM rollup_state WHERE tier = 'schema.inspectionEffectSplit'")
+        prerelease = nil
+
+        let reopened = try TrafficDatabase(url: url)
+        let effects = try reopened.raw(
+            "SELECT id, guardrail, request_rewrite FROM http_exchanges ORDER BY id",
+            map: { ($0.int(0), $0.text(1), $0.text(2)) }
+        )
+        XCTAssertEqual(effects.map(\.0), [combined, ambiguous])
+        XCTAssertEqual(effects.map(\.1), ["removed shell · scrub body", "legacy localized note"])
+        XCTAssertEqual(effects.map(\.2), ["", ""])
+        XCTAssertEqual(try reopened.raw(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.inspectionEffectSplit'",
+            map: { $0.int(0) }
+        ), [1])
+    }
+
     func testTrafficDateBoundsAreNilWhenEmptyAndCoverRetainedTraffic() throws {
         XCTAssertNil(try db.trafficDateBounds())
 
@@ -250,6 +404,9 @@ final class DatabaseTests: XCTestCase {
             RuleEvent(at: 1_700_000_011, ruleID: ruleID, action: .allow, engine: .flow,
                       agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
                       host: "analytics.google.com", ip: "", port: 443),
+            RuleEvent(at: 1_700_000_012, ruleID: UUID(), action: .block, engine: .guardrail,
+                      agentKey: "claude", agentName: "Claude Code", appName: "Claude Code", bundleID: "claude",
+                      host: "api.example.com", ip: "", port: 443, path: "shell", method: "POST"),
             RuleEvent(at: 1_700_000_100, ruleID: ruleID, action: .block, engine: .flow,
                       agentKey: "", agentName: "", appName: "Browser", bundleID: "com.browser",
                       host: "outside.example", ip: "", port: 443)
@@ -290,13 +447,16 @@ final class DatabaseTests: XCTestCase {
 
         let attempts = try db.blockedAttempts(from: from, to: from.addingTimeInterval(60))
 
-        XCTAssertEqual(attempts.reduce(Int64(0)) { $0 + $1.count }, 5)
+        XCTAssertEqual(attempts.reduce(Int64(0)) { $0 + $1.count }, 6)
         XCTAssertEqual(Set(attempts.map(\.destination)),
-                       ["www.google-analytics.com", "telemetry.example", "uploads.example"])
+                       ["www.google-analytics.com", "telemetry.example", "uploads.example", "api.example.com"])
         XCTAssertFalse(attempts.contains { $0.destination == "analytics.google.com" })
         XCTAssertFalse(attempts.contains { $0.destination == "outside.example" })
         XCTAssertFalse(attempts.contains { $0.destination == "duplicate.example" })
         XCTAssertTrue(attempts.contains { $0.source == "managed-pack:official.privacy" && $0.count == 3 })
+        XCTAssertTrue(attempts.contains {
+            $0.source == "guardrail" && $0.destination == "api.example.com" && $0.category == "guardrail"
+        })
         XCTAssertTrue(attempts.contains {
             $0.source == "agent-allowlist" && $0.bundleID == "curl" && $0.agentKey == "claude"
                 && $0.destination == "uploads.example" && $0.count == 1
@@ -610,6 +770,35 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(try db.series(.second, from: from, to: to)
             .reduce(0) { $0 + $1.bytesOut }, 30,
                        "the concurrent capture commit becomes visible after the read snapshot ends")
+    }
+
+    func testConnectionsProjectionUsesOneCommittedReadSnapshot() throws {
+        let t0: Int64 = 1_700_000_000
+        let writer = try TrafficDatabase(url: db.url)
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: key("browser", "example.com"),
+                          counters: FlowCounters(bytesIn: 10, flows: 1))
+        ])])
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 60))
+
+        let projection = try db.readSnapshot { () -> (Int64, Int) in
+            let trafficTotal = try db.appDestinationRows(.second, from: from, to: to)
+                .reduce(Int64(0)) { $0 + $1.counters.bytesIn }
+            try writer.recordRuleEvents([
+                RuleEvent(at: t0 + 1, ruleID: UUID(), action: .block, engine: .flow,
+                          agentKey: "", agentName: "", appName: "Browser", bundleID: "browser",
+                          host: "blocked.example", ip: "", port: 443)
+            ])
+            let blockedCount = try db.blockedAttempts(from: from, to: to).count
+            return (trafficTotal, blockedCount)
+        }
+
+        XCTAssertEqual(projection.0, 10)
+        XCTAssertEqual(projection.1, 0,
+                       "traffic and refusal evidence must share one committed WAL snapshot")
+        XCTAssertEqual(try db.blockedAttempts(from: from, to: to).count, 1,
+                       "the concurrent refusal becomes visible after the Connections read snapshot ends")
     }
 
     func testReportsAndTrafficVisualizationAgreeOnPerAppTotals() throws {
@@ -1223,6 +1412,31 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(b!.mean, 1_100_000, accuracy: 30_000)
         XCTAssertGreaterThan(AnomalyEngine.zScore(20_000_000, b!, floor: 64_000), 3)
         XCTAssertLessThan(AnomalyEngine.zScore(1_150_000, b!, floor: 64_000), 3)
+    }
+
+    func testOpenAlertCountsAreGroupedFilteredAndWindowedInSQL() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        _ = try db.addAlert(kind: "test", bundleID: "claude", appName: "Claude Code",
+                            detail: "new", severity: 2, at: start.addingTimeInterval(10))
+        let investigating = try db.addAlert(kind: "test", bundleID: "claude", appName: "Claude Code",
+                                            detail: "investigating", severity: 2,
+                                            at: start.addingTimeInterval(20))
+        try db.setAlertTriageState(.investigating, ids: [investigating.id])
+        let resolved = try db.addAlert(kind: "test", bundleID: "claude", appName: "Claude Code",
+                                      detail: "resolved", severity: 2, at: start.addingTimeInterval(30))
+        try db.setAlertTriageState(.resolved, ids: [resolved.id])
+        _ = try db.addAlert(kind: "test", bundleID: "codex", appName: "Codex",
+                            detail: "other", severity: 2, at: start.addingTimeInterval(40))
+        _ = try db.addAlert(kind: "test", bundleID: "claude", appName: "Claude Code",
+                            detail: "old", severity: 2, at: start.addingTimeInterval(-10))
+
+        XCTAssertEqual(try db.openAlertCounts(since: start), [
+            AgentOpenAlertCount(bundleID: "claude", appName: "Claude Code", count: 2),
+            AgentOpenAlertCount(bundleID: "codex", appName: "Codex", count: 1),
+        ])
+        XCTAssertEqual(try db.openAlertCounts(since: start, focus: FocusScope(bundleIDs: ["claude"])), [
+            AgentOpenAlertCount(bundleID: "claude", appName: "Claude Code", count: 2),
+        ])
     }
 
     func testFirstContactAndPortRules() throws {

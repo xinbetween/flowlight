@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-fr", "url": "https://flowlight.xinbetween.com/fr/", "name": "Flowlight", "inLanguage": "fr", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/fr/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/fr/threat-model/", "name": "Modèle de menaces de Flowlight", "description": "Ce contre quoi Flowlight protège, ce contre quoi il ne peut pas, et pourquoi — observer plutôt qu’empêcher.", "inLanguage": "fr", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-fr"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/fr/"}, {"@type": "ListItem", "position": 2, "name": "Modèle de menaces de Flowlight", "item": "https://flowlight.xinbetween.com/fr/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-fr", "url": "https://flowlight.xinbetween.com/fr/", "name": "Flowlight", "inLanguage": "fr", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/fr/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/fr/threat-model/", "name": "Modèle de menaces de Flowlight", "description": "Ce contre quoi Flowlight protège, ce contre quoi il ne peut pas, et pourquoi — observer plutôt qu’empêcher.", "inLanguage": "fr", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-fr"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/fr/"}, {"@type": "ListItem", "position": 2, "name": "Modèle de menaces de Flowlight", "item": "https://flowlight.xinbetween.com/fr/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Aller au contenu</a>
@@ -153,6 +153,12 @@
         touchée — délibérément, parce que casser une connexion épinglée casserait l’app. QUIC n’est pas proposé au proxy non plus.</p>
       <p>Un écran Inspecter vide signifie donc «&nbsp;rien n’a été acheminé ici&nbsp;», pas «&nbsp;rien ne s’est passé&nbsp;». Sources › Couverture dit laquelle
         des deux s’applique, app par app.</p>
+      <p><strong>Le produit Store ne prend pas le contrôle des réglages de proxy ou de confiance.</strong> Il expose un proxy de boucle locale et une autorité publique,
+        mais c’est vous qui importez cette autorité et acheminez chaque application. Son extension de filtrage attribue une connexion à un proxy explicite grâce au jeton
+        d’audit que macOS a attaché à la socket de boucle locale active exacte, en faisant correspondre à la fois le port source et le port du proxy. Une identité inconnue,
+        périmée ou non concordante échoue en mode ouvert pour l’application par app&nbsp;; Flowlight ne lui substitue jamais un processus supposé. La suppression de
+        l’inspection efface les clés appartenant à l’app et les certificats terminaux générés, tandis qu’une autorité publique que vous avez importée reste votre propriété
+        et doit être supprimée séparément dans Trousseaux d’accès.</p>
 
       <h2 id="blocking">Ce que le blocage est, et n’est pas</h2>
       <p>Une règle qui refuse des connexions est normalement exécutée par l’extension réseau, sur le chemin, avant que la connexion ne soit faite. Pour
@@ -224,7 +230,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.3 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.18.0 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

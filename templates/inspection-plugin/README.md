@@ -20,6 +20,8 @@ Evidence must be bounded and redacted. Do not include raw request or response bo
 
 Define a synchronous `evaluate(context)` function. Flowlight passes `context.manifest` and `context.exchange`; the exchange contains only the sanitized metadata allowed by the plugin's declared permissions. It never contains request bodies, response bodies, header values, prompts, completions or full tool inputs.
 
+`context.manifest.configuration` contains this plugin's local string settings. `context.manifest.providerProfiles` is a separate array of enabled local profiles assigned to the plugin with the same guardrail provider. Each profile contains only `id`, `provider`, optional `endpoint`, and non-secret `configuration`. Flowlight never passes credential values or Keychain references to JavaScript, and profiles do not initiate network requests.
+
 Return up to 8 findings. Each finding uses `severity`, `title`, `summary`, bounded `evidence`, and optional `suggestedActions`. Actions can be `guardrail`, `networkRule`, `mockResponse`, `requestRewrite`, or `responseTransform`; each opens the matching Flowlight editor with bounded prefilled fields and is saved only if the user reviews and clicks Save. Suggestions require the `suggestAction` capability and permission. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout. Failures produce no findings.
 
 ## Files

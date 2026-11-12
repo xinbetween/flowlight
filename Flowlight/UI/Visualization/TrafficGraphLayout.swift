@@ -152,8 +152,9 @@ private enum TrafficGraphStableHash {
 }
 
 enum TrafficGraphFlowDash {
-    static let pattern: [CGFloat] = [8, 26]
-    static let strokeWidth: CGFloat = 1.8
+    /// Short rounded marks read as directional light pulses without requiring one animated view per edge.
+    static let pattern: [CGFloat] = [4, 22]
+    static let strokeWidth: CGFloat = GraphStyle.flowPulseWidth
     static let frameInterval: TimeInterval = 1 / 30
     private static let basePointsPerSecond: CGFloat = 32
     private static let minimumSpeedMultiplier: CGFloat = 0.70
@@ -228,6 +229,53 @@ enum TrafficGraphFlowDash {
     }
 }
 
+enum TrafficGraphMotionPolicy {
+    static func animatesFlow(reduceMotion: Bool, hasVisibleFlow: Bool) -> Bool {
+        !reduceMotion && hasVisibleFlow
+    }
+
+    /// Prioritizes the person's current focus, then the busiest visible paths. The stable ID tie-break keeps the
+    /// animated set from flickering when counters are equal or the source order changes.
+    static func activeEdgeIDs(
+        edges: [TrafficGraphEdge],
+        visibleEdgeIDs: Set<TrafficGraphEdgeID>,
+        selectedNode: TrafficGraphNodeID?,
+        selectedEdge: TrafficGraphEdgeID?,
+        hoveredEdge: TrafficGraphEdgeID?,
+        limit: Int = GraphStyle.maximumAnimatedEdges
+    ) -> [TrafficGraphEdgeID] {
+        guard limit > 0 else { return [] }
+        let candidates = edges.filter {
+            visibleEdgeIDs.contains($0.id) && TrafficGraphFlowDash.animates($0)
+        }
+        let candidateIDs = Set(candidates.map(\.id))
+        var result: [TrafficGraphEdgeID] = []
+        var added: Set<TrafficGraphEdgeID> = []
+
+        func append(_ id: TrafficGraphEdgeID?) {
+            guard let id, candidateIDs.contains(id), added.insert(id).inserted, result.count < limit else { return }
+            result.append(id)
+        }
+
+        append(selectedEdge)
+        append(hoveredEdge)
+
+        let ranked = candidates.sorted {
+            if $0.displayedCounters.total != $1.displayedCounters.total {
+                return $0.displayedCounters.total > $1.displayedCounters.total
+            }
+            return $0.id < $1.id
+        }
+        if let selectedNode {
+            for edge in ranked where edge.source == selectedNode || edge.target == selectedNode {
+                append(edge.id)
+            }
+        }
+        for edge in ranked { append(edge.id) }
+        return result
+    }
+}
+
 struct TrafficGraphLayoutKey: Equatable, Sendable {
     var nodeIDs: [TrafficGraphNodeID]
     var edgeIDs: [TrafficGraphEdgeID]
@@ -239,6 +287,20 @@ struct TrafficGraphLayoutKey: Equatable, Sendable {
         edgeIDs = snapshot.edges.map(\.id)
         width = Int(size.width.rounded())
         height = Int(size.height.rounded())
+    }
+}
+
+/// Restarts viewport fitting when the visible canvas settles or resizes, even if the graph's minimum layout canvas
+/// remains unchanged. The nested layout key still controls atomic geometry publication independently.
+struct TrafficGraphRenderKey: Equatable, Sendable {
+    var layout: TrafficGraphLayoutKey
+    var viewportWidth: Int
+    var viewportHeight: Int
+
+    init(snapshot: TrafficGraphSnapshot, graphSize: CGSize, viewportSize: CGSize) {
+        layout = TrafficGraphLayoutKey(snapshot: snapshot, size: graphSize)
+        viewportWidth = Int(viewportSize.width.rounded())
+        viewportHeight = Int(viewportSize.height.rounded())
     }
 }
 
@@ -821,8 +883,17 @@ enum TrafficGraphLayout {
         var previous = curve.start
         for step in 1...160 {
             let current = curve.point(at: CGFloat(step) / 160)
-            for obstacle in relevant where segment(previous, current, intersects: obstacle) {
-                return true
+            let minimumX = min(previous.x, current.x)
+            let maximumX = max(previous.x, current.x)
+            let minimumY = min(previous.y, current.y)
+            let maximumY = max(previous.y, current.y)
+            for obstacle in relevant {
+                // The curve-wide bounds above are intentionally conservative. Reject cards that cannot overlap this
+                // individual segment before running the more expensive exact clipping test; boundary contact remains
+                // inclusive, matching `segment(_:_:intersects:)`.
+                guard maximumX >= obstacle.minX, minimumX <= obstacle.maxX,
+                      maximumY >= obstacle.minY, minimumY <= obstacle.maxY else { continue }
+                if segment(previous, current, intersects: obstacle) { return true }
             }
             previous = current
         }
@@ -1199,6 +1270,10 @@ enum TrafficGraphLayout {
         frames: inout [TrafficGraphNodeID: CGRect],
         placementObserver: (@Sendable () -> Void)?
     ) -> Bool {
+        // Keep one ordered collision list for the whole placement pass. Rebuilding Array(frames.values) for every
+        // node turns a large graph into hundreds of successively larger allocations even though only one frame was
+        // added since the previous iteration.
+        var placedFrames = Array(frames.values)
         for lane in activeLanes {
             if Task<Never, Never>.isCancelled { return false }
             let nodes = ordered[lane] ?? []
@@ -1216,14 +1291,16 @@ enum TrafficGraphLayout {
                 if Task<Never, Never>.isCancelled { return false }
                 let preferredY = startY + size.height / 2 + CGFloat(index) * step
                 let preferred = CGPoint(x: column, y: preferredY)
-                frames[node.id] = place(
+                let frame = place(
                     size: size,
                     near: preferred,
                     laneX: column,
                     within: insetBounds,
-                    avoiding: Array(frames.values),
+                    avoiding: placedFrames,
                     gap: gap
                 )
+                frames[node.id] = frame
+                placedFrames.append(frame)
                 placementObserver?()
             }
         }

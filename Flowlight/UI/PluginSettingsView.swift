@@ -3,15 +3,65 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PluginSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var monitor: TrafficMonitor
+    @ObservedObject var providerProfiles: ProviderProfileStore
     @State private var showClearConfirmation = false
     @State private var message: String?
     @State private var configuring: PluginManifest?
     @State private var removing: PluginManifest?
     @State private var pendingReview: PluginPackageReview?
+    @State private var editingProfile: ProviderProfile?
+    @State private var removingProfile: ProviderProfile?
 
     var body: some View {
         Form {
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L("Plugins & Providers")).font(.title2.bold())
+                        Text(L("Inspection extensions, local routing metadata, and retained findings."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(L("Done")) { dismiss() }.keyboardShortcut(.defaultAction)
+                }
+            }
+
+            Section {
+                if providerProfiles.profiles.isEmpty {
+                    ContentUnavailableView {
+                        Label(L("No provider profiles"), systemImage: "point.3.connected.trianglepath.dotted")
+                    } description: {
+                        Text(L("Profiles group local provider settings with the inspection plugins that use them."))
+                    } actions: {
+                        Button(L("Add Provider…")) { editingProfile = ProviderProfile(name: "", provider: .flowlight) }
+                    }
+                } else {
+                    ForEach(providerProfiles.profiles) { profile in
+                        ProviderProfileRow(profile: profile, manifests: monitor.plugins.manifests, setEnabled: { enabled in
+                            var updated = profile
+                            updated.enabled = enabled
+                            saveProfile(updated)
+                        }, edit: {
+                            editingProfile = profile
+                        }, remove: {
+                            removingProfile = profile
+                        })
+                    }
+                    Button(L("Add Provider…")) { editingProfile = ProviderProfile(name: "", provider: .flowlight) }
+                }
+                if let issue = providerProfiles.loadIssue {
+                    Label(issue, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(FL.warning)
+                }
+            } header: {
+                Text(L("Provider profiles"))
+            } footer: {
+                Text(L("Profiles stay on this Mac. They contain non-secret options and optional Keychain references; Flowlight never stores credential values in a profile."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section {
                 Text(L("Plugins add advisory findings to inspected exchanges. They do not block, rewrite, mock, transform, save settings, or send traffic anywhere by themselves."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -33,7 +83,7 @@ struct PluginSettingsView: View {
                           empty: L("No third-party plugin packages are installed."))
         }
         .formStyle(.grouped)
-        .frame(height: 620)
+        .frame(minWidth: 620, idealWidth: 720, minHeight: 620, idealHeight: 680)
         .confirmationDialog(L("Clear plugin findings?"), isPresented: $showClearConfirmation, titleVisibility: .visible) {
             Button(L("Clear findings"), role: .destructive) { monitor.clearPluginFindings() }
         } message: {
@@ -69,6 +119,38 @@ struct PluginSettingsView: View {
                 }
                 pendingReview = nil
             }
+        }
+        .sheet(item: $editingProfile) { profile in
+            ProviderProfileEditor(profile: profile, manifests: monitor.plugins.manifests) { updated in
+                try providerProfiles.save(updated)
+                message = L("Saved provider profile %@.", updated.name)
+            }
+        }
+        .confirmationDialog(L("Remove provider profile?"), isPresented: Binding(
+            get: { removingProfile != nil },
+            set: { if !$0 { removingProfile = nil } }
+        ), titleVisibility: .visible) {
+            if let profile = removingProfile {
+                Button(L("Remove %@", profile.name), role: .destructive) {
+                    do {
+                        try providerProfiles.remove(id: profile.id)
+                        message = L("Removed provider profile %@.", profile.name)
+                    } catch {
+                        message = L("Could not remove provider profile.")
+                    }
+                    removingProfile = nil
+                }
+            }
+        } message: {
+            Text(L("Plugins and their retained findings stay installed."))
+        }
+    }
+
+    private func saveProfile(_ profile: ProviderProfile) {
+        do {
+            try providerProfiles.save(profile)
+        } catch {
+            message = error.localizedDescription
         }
     }
 
@@ -133,6 +215,213 @@ struct PluginSettingsView: View {
                     ?? L("Backfilled plugin findings: %lld findings.", result.findingCount)
             case .failure(let error): message = L("Backfill failed: %@", error.localizedDescription)
             }
+        }
+    }
+}
+
+private struct ProviderProfileRow: View {
+    var profile: ProviderProfile
+    var manifests: [PluginManifest]
+    var setEnabled: (Bool) -> Void
+    var edit: () -> Void
+    var remove: () -> Void
+
+    private var health: ProviderProfile.Health { profile.health(manifests: manifests) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(get: { profile.enabled }, set: setEnabled)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(profile.name).font(.callout.bold())
+                        PluginPill(profile.provider.title)
+                        PluginPill(health.title)
+                    }
+                    Label(health.reason, systemImage: healthIcon)
+                        .font(.caption)
+                        .foregroundStyle(healthColor)
+                    if let endpoint = profile.endpoint {
+                        Text(endpoint).font(.caption2.monospaced()).foregroundStyle(.tertiary).lineLimit(1)
+                    }
+                    if profile.credentialReference != nil {
+                        Label(L("Credential value kept in Keychain"), systemImage: "key.fill")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
+            HStack(spacing: 8) {
+                Button(L("Edit…"), action: edit)
+                Button(L("Remove"), role: .destructive, action: remove)
+            }
+            .font(.caption)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var healthIcon: String {
+        switch health {
+        case .disabled: return "pause.circle"
+        case .attention: return "exclamationmark.triangle.fill"
+        case .ready: return "checkmark.circle.fill"
+        }
+    }
+
+    private var healthColor: Color {
+        switch health {
+        case .disabled: return .secondary
+        case .attention: return FL.warning
+        case .ready: return FL.good
+        }
+    }
+}
+
+private struct ProviderProfileEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var profile: ProviderProfile
+    @State private var optionRows: [OptionRow]
+    @State private var error: String?
+    var manifests: [PluginManifest]
+    var save: (ProviderProfile) throws -> Void
+
+    init(profile: ProviderProfile, manifests: [PluginManifest], save: @escaping (ProviderProfile) throws -> Void) {
+        _profile = State(initialValue: profile)
+        _optionRows = State(initialValue: profile.configuration.sorted { $0.key < $1.key }.map { OptionRow(key: $0.key, value: $0.value) })
+        self.manifests = manifests
+        self.save = save
+    }
+
+    private var compatiblePlugins: [PluginManifest] {
+        manifests.filter { $0.guardrailProvider == profile.provider }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(profile.name.isEmpty ? L("Add Provider Profile") : L("Edit Provider Profile"))
+                .font(.headline)
+            Form {
+                Section(L("Identity")) {
+                    TextField(L("Name"), text: $profile.name)
+                    Picker(L("Provider"), selection: $profile.provider) {
+                        ForEach(PluginManifest.GuardrailProvider.allCases, id: \.self) { provider in
+                            Text(provider.title).tag(provider)
+                        }
+                    }
+                    Toggle(L("Enabled"), isOn: $profile.enabled)
+                }
+
+                Section {
+                    TextField(L("Endpoint (optional)"), text: Binding(
+                        get: { profile.endpoint ?? "" },
+                        set: { profile.endpoint = $0.isEmpty ? nil : $0 }
+                    ))
+                    TextField(L("Keychain reference (optional)"), text: Binding(
+                        get: { profile.credentialReference ?? "" },
+                        set: { profile.credentialReference = $0.isEmpty ? nil : $0 }
+                    ))
+                    Text(L("Use keychain:service/account. The credential value is never stored in this profile."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text(L("Connection"))
+                }
+
+                Section {
+                    if compatiblePlugins.isEmpty {
+                        Text(L("No installed plugins use this provider."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(compatiblePlugins) { plugin in
+                            Toggle(isOn: assignment(for: plugin.id)) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(plugin.name)
+                                    Text(plugin.enabled ? L("Plugin enabled") : L("Plugin disabled"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text(L("Inspection plugins"))
+                }
+
+                Section {
+                    ForEach($optionRows) { $row in
+                        HStack(spacing: 8) {
+                            TextField(L("Option"), text: $row.key)
+                            TextField(L("Value"), text: $row.value)
+                            Button {
+                                optionRows.removeAll { $0.id == row.id }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(L("Remove provider option"))
+                        }
+                    }
+                    Button(L("Add Option")) { optionRows.append(OptionRow()) }
+                    Text(L("Options are local non-secret metadata. API keys, tokens, passwords, and other credentials are rejected."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text(L("Provider options"))
+                }
+            }
+            .formStyle(.grouped)
+            .onChange(of: profile.provider) {
+                profile.pluginIDs.removeAll()
+            }
+
+            if let error {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(FL.warning)
+            }
+            HStack {
+                Spacer()
+                Button(L("Cancel")) { dismiss() }
+                Button(L("Save"), action: saveProfile)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 600, height: 650)
+    }
+
+    private func assignment(for pluginID: String) -> Binding<Bool> {
+        Binding(get: {
+            profile.pluginIDs.contains(pluginID)
+        }, set: { assigned in
+            if assigned {
+                if !profile.pluginIDs.contains(pluginID) { profile.pluginIDs.append(pluginID) }
+            } else {
+                profile.pluginIDs.removeAll { $0 == pluginID }
+            }
+        })
+    }
+
+    private func saveProfile() {
+        var configuration: [String: String] = [:]
+        for row in optionRows {
+            let key = row.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty else { continue }
+            configuration[key] = row.value
+        }
+        profile.configuration = configuration
+        do {
+            try save(profile)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private struct OptionRow: Identifiable {
+        let id = UUID()
+        var key = ""
+        var value = ""
+
+        init(key: String = "", value: String = "") {
+            self.key = key
+            self.value = value
         }
     }
 }

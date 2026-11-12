@@ -314,6 +314,32 @@ final class InspectionStorageTests: XCTestCase {
         XCTAssertFalse(rule.destinationMatches(host: child.host, ip: child.ip))
     }
 
+    func testNarrowRequestAllowOverridesBroadBlockWithoutSuppressingMocks() throws {
+        var block = Rule(action: .block, destination: "api.example.com")
+        block.path = "/v1/*"
+        var allow = Rule(action: .allow, destination: "api.example.com")
+        allow.path = "/v1/health"
+        let owner = InspectionRecorder.Owner(bundleID: "com.example.app")
+        let decisions = InspectionController.requestRuleAnswers(
+            [block, allow], host: "api.example.com", owner: owner, generation: 7
+        )
+
+        XCTAssertTrue(try XCTUnwrap(decisions.first).allowsUpstream)
+        XCTAssertNil(MockRules.match(decisions, host: "api.example.com", method: "GET", path: "/v1/health"))
+        let refusal = try XCTUnwrap(
+            MockRules.match(decisions, host: "api.example.com", method: "GET", path: "/v1/private")
+        )
+        XCTAssertTrue(refusal.blocked)
+        XCTAssertEqual(refusal.ruleGeneration, 7)
+
+        let mock = MockRule(name: "Health fixture", host: "api.example.com", path: "/v1/health", status: 204)
+        XCTAssertEqual(
+            MockRules.match(decisions + [mock], host: "api.example.com", method: "GET", path: "/v1/health")?.id,
+            mock.id,
+            "an ordinary allow suppresses request blocks, not an independently configured mock"
+        )
+    }
+
     func testProxyFactsKeepNamesAndExemptLocalAddresses() {
         let owner = InspectionRecorder.Owner(bundleID: "com.example.app")
         let named = InspectionController.proxyFlowFacts(host: "API.Example.com", port: 443, owner: owner)

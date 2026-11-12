@@ -44,7 +44,8 @@ struct Guardrail: Codable, Identifiable, Equatable, Sendable {
     /// names are written by hand in one place and generated in another.
     func refuses(agent key: String, server name: String?, tool called: String) -> Bool {
         guard enabled, isComplete else { return false }
-        if !agent.isEmpty, !GlobMatch.glob(agent.lowercased(), key.lowercased()), agent.lowercased() != key.lowercased() {
+        if !agent.isEmpty, !GlobMatch.glob(agent.lowercased(), key.lowercased()),
+           !AgentCatalog.sameAgentIdentity(agent, key) {
             return false
         }
         if !server.isEmpty {
@@ -59,7 +60,7 @@ struct Guardrail: Codable, Identifiable, Equatable, Sendable {
 
     func refuses(agent key: String, resource uri: String) -> Bool {
         guard enabled, !resource.isEmpty else { return false }
-        if !agent.isEmpty, agent.lowercased() != key.lowercased() { return false }
+        if !agent.isEmpty, !AgentCatalog.sameAgentIdentity(agent, key) { return false }
         let wanted = resource.lowercased(), got = uri.lowercased()
         return wanted == got || GlobMatch.glob(wanted, got)
     }
@@ -107,6 +108,8 @@ enum GuardrailBook {
     /// Whether any guardrail could apply to this agent at all. Asked before a request body is parsed, so an agent
     /// nobody has written a guardrail about never pays for the feature.
     static func any(_ guardrails: [Guardrail], agent: String) -> Bool {
-        guardrails.contains { $0.enabled && $0.isComplete && ($0.agent.isEmpty || $0.agent.lowercased() == agent.lowercased()) }
+        guardrails.contains {
+            $0.enabled && $0.isComplete && ($0.agent.isEmpty || AgentCatalog.sameAgentIdentity($0.agent, agent))
+        }
     }
 }

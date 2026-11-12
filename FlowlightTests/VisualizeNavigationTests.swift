@@ -43,31 +43,46 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertTrue(SidebarItem.sidebarOrder.allSatisfy { $0.shortcut != nil })
     }
 
-    func testSourcesCoverageDistinguishesNoEvidenceFromZeroPercentNamed() {
-        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0, hasTraffic: false), .empty)
-        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0, hasTraffic: true), .warning)
-        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0.8, hasTraffic: true), .warning)
-        XCTAssertEqual(SourceSetupPolicy.coverageHealth(named: 0.81, hasTraffic: true), .good)
+    func testSourcesRestoresExplicitAndLegacySectionTargets() {
+        XCTAssertEqual(SourcesTab.restored(explicitRawValue: "coverage", legacyScreenRawValue: "devices"),
+                       .coverage, "the modern section argument must win")
+        XCTAssertEqual(SourcesTab.restored(explicitRawValue: nil, legacyScreenRawValue: "devices"), .devices)
+        XCTAssertEqual(SourcesTab.restored(explicitRawValue: nil, legacyScreenRawValue: "coverage"), .coverage)
+        XCTAssertEqual(SourcesTab.restored(explicitRawValue: "unknown", legacyScreenRawValue: "capture"),
+                       .collector)
     }
 
-    func testSourcesRecoveryChecklistRequiresAConfiguredCollectorAndArrivingData() {
-        XCTAssertTrue(SourceSetupPolicy.collectorConfigured(mode: .nettop, extensionState: .notInstalled,
-                                                            extensionFellBack: false),
-                      "the sampler needs no separate filter setup")
-        XCTAssertFalse(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
-                                                             extensionState: .notInstalled,
-                                                             extensionFellBack: false))
-        XCTAssertTrue(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
-                                                            extensionState: .enabled,
-                                                            extensionFellBack: false))
-        XCTAssertFalse(SourceSetupPolicy.collectorConfigured(mode: .networkExtension,
-                                                             extensionState: .enabled,
-                                                             extensionFellBack: true),
-                       "fallback is working but is not the configured collector")
-        XCTAssertFalse(SourceSetupPolicy.setupComplete(mode: .nettop, extensionState: .unknown,
-                                                       extensionFellBack: false, isReceiving: false))
-        XCTAssertTrue(SourceSetupPolicy.setupComplete(mode: .nettop, extensionState: .unknown,
-                                                      extensionFellBack: false, isReceiving: true))
+    func testSourcesHasStableSegmentOrder() {
+        XCTAssertEqual(SourcesTab.allCases, [.collector, .devices, .coverage])
+        XCTAssertEqual(SourcesTab.allCases.map(\.rawValue), ["collector", "devices", "coverage"])
+    }
+
+    func testSourcesDeepLinkSelectsTheExactSegment() {
+        let nav = AppNavigation()
+
+        nav.showSources(.devices)
+        XCTAssertEqual(nav.selection, .sources)
+        XCTAssertEqual(nav.sourcesTab, .devices)
+
+        nav.showSources(.coverage)
+        XCTAssertEqual(nav.selection, .sources)
+        XCTAssertEqual(nav.sourcesTab, .coverage)
+    }
+
+    func testSourcesSegmentPersistsForTheNextNavigationState() {
+        let defaults = UserDefaults.standard
+        let previousTab = defaults.object(forKey: "FLSourcesTab")
+        defer {
+            if let previousTab { defaults.set(previousTab, forKey: "FLSourcesTab") }
+            else { defaults.removeObject(forKey: "FLSourcesTab") }
+        }
+        defaults.removeObject(forKey: "FLSourcesTab")
+
+        let nav = AppNavigation()
+        nav.showSources(.devices)
+
+        XCTAssertEqual(defaults.string(forKey: "FLSourcesTab"), SourcesTab.devices.rawValue)
+        XCTAssertEqual(AppNavigation().sourcesTab, .devices)
     }
 
     func testFocusNoticeClaimsFilteringOnlyWhereTheWholeScopeApplies() {
@@ -92,6 +107,12 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarItem.visualize.rawValue, "visualize")
         XCTAssertEqual(SidebarItem.visualize.helpAnchor, "visualize")
         XCTAssertEqual(SidebarItem.visualize.englishTitle, "Connections")
+    }
+
+    func testPoliciesKeepsTheCompatibleRulesRouteButUsesCurrentHelpAnchor() {
+        XCTAssertEqual(SidebarItem.rules.rawValue, "rules")
+        XCTAssertEqual(SidebarItem.rules.helpAnchor, "policies")
+        XCTAssertEqual(SidebarItem.rules.englishTitle, "Policies")
     }
 
     func testConnectionsLoadingAlwaysOutranksAStaleSnapshotAndYieldsToEmptyState() {
@@ -170,7 +191,8 @@ final class VisualizeNavigationTests: XCTestCase {
         nav.showPackReviews()
 
         XCTAssertEqual(nav.selection, .rules)
-        XCTAssertEqual(nav.rulesTab, .packs)
+        XCTAssertEqual(nav.rulesTab, .rules)
+        XCTAssertEqual(nav.policyRequest?.destination, .managedPack(nil))
         XCTAssertNil(
             nav.backDestination,
             "pack review navigation starts a new task and must not retain an unrelated investigation trail"

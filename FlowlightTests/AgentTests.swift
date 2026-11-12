@@ -58,7 +58,7 @@ final class AgentTests: XCTestCase {
         XCTAssertFalse(python.isKnown, "discovered through its LLM API calls")
         XCTAssertEqual(python.providers.first?.name, "OpenAI")
         XCTAssertTrue(python.otherDestinations.contains { $0.isUnnamed })
-        XCTAssertGreaterThan(claude.riskScore, python.riskScore)
+        XCTAssertTrue(claude.sensitiveProtocols.contains("smtp-submission"))
         XCTAssertTrue(IPOwnerLookup.isLocalNetwork("192.168.1.1"))
         XCTAssertTrue(IPOwnerLookup.isLocalNetwork("fe80::1"))
         XCTAssertFalse(IPOwnerLookup.isLocalNetwork("203.0.113.9"), "reserved ranges still count as leaving the Mac")

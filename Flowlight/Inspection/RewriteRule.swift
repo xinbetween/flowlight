@@ -1,5 +1,35 @@
 import Foundation
 
+/// Stable policy identity stored with inspected exchange activity. Titles remain useful after a policy is renamed or
+/// deleted, while IDs keep Activity navigation independent of mutable display text. Legacy plain strings still decode
+/// as nil and are handled by their existing title-based fallback.
+struct InspectionPolicyReference: Equatable, Sendable {
+    struct Entry: Codable, Equatable, Sendable {
+        var id: UUID
+        var title: String
+    }
+
+    private static let prefix = "flowlight-policy-v1:"
+
+    static func encode(_ entries: [Entry]) -> String? {
+        var seen = Set<UUID>()
+        let unique = entries.filter { seen.insert($0.id).inserted }
+        guard !unique.isEmpty, let data = try? JSONEncoder().encode(unique) else { return nil }
+        return prefix + data.base64EncodedString()
+    }
+
+    static func decode(_ value: String) -> [Entry]? {
+        guard value.hasPrefix(prefix),
+              let data = Data(base64Encoded: String(value.dropFirst(prefix.count))),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data), !entries.isEmpty else { return nil }
+        return entries
+    }
+
+    static func display(_ value: String) -> String {
+        decode(value)?.map(\.title).joined(separator: " · ") ?? value
+    }
+}
+
 /// An edit to one outgoing header: replace it (`set`), append another copy (`add`), or drop it (`remove`).
 struct HeaderEdit: Codable, Equatable, Identifiable, Sendable {
     enum Op: String, Codable, Sendable, CaseIterable { case set, add, remove }
@@ -123,7 +153,7 @@ enum RewriteRules {
     /// Apply every rule that matches this request to the framed bytes (full head + body). Returns the rewritten
     /// request and a short note of what changed, or nil when nothing matched or nothing changed.
     static func apply(_ rules: [RewriteRule], to request: Data, host: String, method: String, path: String)
-        -> (data: Data, note: String)? {
+        -> (data: Data, note: String, rules: [RewriteRule])? {
         let applicable = rules.filter {
             $0.enabled && GlobMatch.host($0.host, host) && GlobMatch.method($0.method, method) && GlobMatch.path($0.path, path)
         }
@@ -137,57 +167,75 @@ enum RewriteRules {
         var headerLines = lines
         var bodyData = Data(request[sep.upperBound...])
         var notes: [String] = []
+        var changedRuleIDs: Set<UUID> = []
 
-        for edit in applicable.flatMap(\.headers) {
-            // Sanitise both halves: a stray newline in a header value would forge extra headers or a second request.
-            let name = MockRule.headerSafe(edit.name)
-            guard !name.isEmpty else { continue }
-            let value = MockRule.headerSafe(edit.value)
-            let prefix = name.lowercased() + ":"
-            switch edit.op {
-            case .remove:
-                let before = headerLines.count
-                headerLines.removeAll { $0.lowercased().hasPrefix(prefix) }
-                if headerLines.count != before { notes.append("removed \(name)") }
-            case .set:
-                headerLines.removeAll { $0.lowercased().hasPrefix(prefix) }
-                headerLines.append("\(name): \(value)")
-                notes.append("set \(name)")
-            case .add:
-                headerLines.append("\(name): \(value)")
-                notes.append("added \(name)")
+        for rule in applicable {
+            for edit in rule.headers {
+                // Sanitise both halves: a stray newline in a header value would forge extra headers or a second request.
+                let name = MockRule.headerSafe(edit.name)
+                guard !name.isEmpty else { continue }
+                let value = MockRule.headerSafe(edit.value)
+                let prefix = name.lowercased() + ":"
+                let before = headerLines
+                switch edit.op {
+                case .remove:
+                    headerLines.removeAll { $0.lowercased().hasPrefix(prefix) }
+                    if headerLines != before { notes.append("removed \(name)") }
+                case .set:
+                    headerLines.removeAll { $0.lowercased().hasPrefix(prefix) }
+                    headerLines.append("\(name): \(value)")
+                    if headerLines != before { notes.append("set \(name)") }
+                case .add:
+                    headerLines.append("\(name): \(value)")
+                    notes.append("added \(name)")
+                }
+                if headerLines != before { changedRuleIDs.insert(rule.id) }
             }
         }
 
-        let bodyEdits = applicable.flatMap(\.body)
-        if !bodyEdits.isEmpty, !bodyData.isEmpty {
+        if applicable.contains(where: { !$0.body.isEmpty }), !bodyData.isEmpty {
             if var json = (try? JSONSerialization.jsonObject(with: bodyData)) as? [String: Any] {
-                var changed = false
-                for edit in bodyEdits {
-                    let comps = edit.path.split(separator: ".").map(String.init)
-                    guard !comps.isEmpty else { continue }
-                    switch edit.op {
-                    case .set: setJSON(&json, path: comps, value: parseValue(edit.value)); changed = true; notes.append("set \(edit.path)")
-                    case .remove: removeJSON(&json, path: comps); changed = true; notes.append("removed \(edit.path)")
+                var bodyChanged = false
+                for rule in applicable {
+                    for edit in rule.body {
+                        let comps = edit.path.split(separator: ".").map(String.init)
+                        guard !comps.isEmpty,
+                              let before = try? JSONSerialization.data(withJSONObject: json, options: .sortedKeys) else {
+                            continue
+                        }
+                        switch edit.op {
+                        case .set: setJSON(&json, path: comps, value: parseValue(edit.value))
+                        case .remove: removeJSON(&json, path: comps)
+                        }
+                        guard let after = try? JSONSerialization.data(withJSONObject: json, options: .sortedKeys),
+                              after != before else { continue }
+                        changedRuleIDs.insert(rule.id)
+                        bodyChanged = true
+                        notes.append(edit.op == .set ? "set \(edit.path)" : "removed \(edit.path)")
                     }
                 }
-                if changed, let out = try? JSONSerialization.data(withJSONObject: json) { bodyData = out }
+                if bodyChanged, let out = try? JSONSerialization.data(withJSONObject: json) { bodyData = out }
             } else if isFormEncoded(headerLines), var form = FormBody(bodyData) {
                 // A form body is flat, so a path is a field name taken whole — `a.b` means a field literally
                 // named `a.b`, not a nested one. The value is always text; forms have no types, so it is used
                 // verbatim rather than through `parseValue`.
-                var changed = false
-                for edit in bodyEdits {
-                    let field = edit.path
-                    guard !field.isEmpty else { continue }
-                    switch edit.op {
-                    case .set:
-                        form.set(field, to: edit.value); changed = true; notes.append("set \(field)")
-                    case .remove:
-                        if form.remove(field) { changed = true; notes.append("removed \(field)") }
+                var bodyChanged = false
+                for rule in applicable {
+                    for edit in rule.body {
+                        let field = edit.path
+                        guard !field.isEmpty else { continue }
+                        let before = form.encoded()
+                        switch edit.op {
+                        case .set: form.set(field, to: edit.value)
+                        case .remove: _ = form.remove(field)
+                        }
+                        guard form.encoded() != before else { continue }
+                        changedRuleIDs.insert(rule.id)
+                        bodyChanged = true
+                        notes.append(edit.op == .set ? "set \(field)" : "removed \(field)")
                     }
                 }
-                if changed { bodyData = form.encoded() }
+                if bodyChanged { bodyData = form.encoded() }
             }
         }
 
@@ -199,7 +247,7 @@ enum RewriteRules {
         var out = Data(([requestLine] + headerLines).joined(separator: "\r\n").utf8)
         out.append(Data("\r\n\r\n".utf8))
         out.append(bodyData)
-        return (out, notes.joined(separator: ", "))
+        return (out, notes.joined(separator: ", "), applicable.filter { changedRuleIDs.contains($0.id) })
     }
 
     /// Parse a value cell as JSON when it can be (number, bool, null, object, array, quoted string); otherwise take

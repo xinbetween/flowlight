@@ -1,6 +1,20 @@
 import XCTest
 @testable import Flowlight
 
+private final class LockedRuleRecordResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = true
+
+    var value: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return stored
+    }
+
+    func set(_ value: Bool) {
+        lock.lock(); stored = value; lock.unlock()
+    }
+}
+
 /// The rule engine, which decides whether a connection happens. Everything here is plain data in and a verdict
 /// out, so the whole of it can be checked without a filter, a proxy or a database.
 @MainActor
@@ -439,6 +453,8 @@ final class RuleTests: XCTestCase {
         let staleGeneration = store.ruleSet.generation
         store.resetHits(allow)
 
+        let completed = expectation(description: "stale decision rejected")
+        let durable = LockedRuleRecordResult()
         store.record([
             RuleEvent(
                 at: 1_700_000_000,
@@ -455,11 +471,68 @@ final class RuleTests: XCTestCase {
                 ip: "",
                 port: 443
             ),
-        ])
-        try await Task.sleep(for: .milliseconds(50))
+        ]) {
+            durable.set($0)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
 
+        XCTAssertFalse(durable.value, "a rejected stale decision must never authorize a local refusal")
         XCTAssertTrue(try db.sync { try $0.ruleEvents(limit: 10).isEmpty })
         XCTAssertTrue(store.events.isEmpty)
+    }
+
+    func testStaleDurableExtensionDecisionIsAcknowledgedAndEvicted() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-rule-stale-extension-event-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let store = RuleStore()
+        store.attach(db: db)
+        try await waitUntil { store.ruleSet.generation > 0 }
+        var allow = Rule(action: .allow, app: "com.example.app", destination: "api.example.com")
+        allow.maxHits = 1
+        store.save(allow)
+        let staleGeneration = store.ruleSet.generation
+        store.resetHits(allow)
+
+        var event = RuleEvent(
+            at: 1_700_000_000,
+            ruleID: allow.id,
+            ruleSession: RuleStore.session,
+            ruleGeneration: staleGeneration,
+            action: .allow,
+            engine: .flow,
+            agentKey: "com.example.app",
+            agentName: "Example",
+            appName: "Example",
+            bundleID: "com.example.app",
+            host: "api.example.com",
+            ip: "",
+            port: 443
+        )
+        event.deliverySession = UUID()
+        event.deliverySequence = 1
+        var queue = DurableEventQueue<RuleEvent>()
+        queue.append(event)
+        let delivery = try XCTUnwrap(queue.begin(clientGeneration: 1, limit: 500, id: \.id))
+        let source = ExtensionTrafficSource()
+        source.onRuleDecisions = { events, reply in
+            Task { @MainActor in store.record(events, completion: reply) }
+        }
+        let completed = expectation(description: "terminal stale decision acknowledged")
+        let acknowledged = LockedRuleRecordResult()
+
+        source.ruleDecisionsDurably(payload: BlockCoding.encode(delivery.events)) { committed in
+            acknowledged.set(committed)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+
+        XCTAssertTrue(acknowledged.value)
+        XCTAssertTrue(queue.complete(token: delivery.token, clientGeneration: 1,
+                                     committed: acknowledged.value, id: \.id))
+        XCTAssertTrue(queue.pending.isEmpty, "a terminal stale extension decision must not retry forever")
+        XCTAssertTrue(try db.sync { try $0.ruleEvents(limit: 10).isEmpty })
     }
 
     @MainActor

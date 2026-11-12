@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 FL_OUT="$TEMP" \
-FL_ONLY="visualize,agents,reports,rules,live,alerts,agent-detail,agent-tools,mcp-servers" \
+FL_ONLY="visualize,agents,reports,inspect,rules,live,alerts,agent-detail,agent-tools,mcp-servers" \
 FL_FORCE_SIZE="1440x900" \
 FL_EXPECT_PIXELS="2880x1800" \
 FL_WAIT="${FL_STORE_WAIT:-20}" \
@@ -33,19 +33,23 @@ FL_SKIP_MANIFEST="YES" \
 scripts/screenshots.sh
 
 mkdir -p "$OUT"
-cp "$TEMP/visualize.png"   "$OUT/01-connections.png"
-cp "$TEMP/agents.png"      "$OUT/02-ai-agents.png"
-cp "$TEMP/reports.png"     "$OUT/03-history.png"
-cp "$TEMP/rules.png"       "$OUT/04-rules.png"
-cp "$TEMP/live.png"        "$OUT/05-live.png"
-cp "$TEMP/alerts.png"      "$OUT/06-alerts.png"
-cp "$TEMP/agent-detail.png" "$OUT/07-agent-detail.png"
-cp "$TEMP/agent-tools.png" "$OUT/08-agent-tools.png"
-cp "$TEMP/mcp-servers.png" "$OUT/09-mcp-servers.png"
+# Remove only the superseded 0.17.x numbered names before writing the complete replacement set.
+rm -f "$OUT/04-rules.png" "$OUT/05-live.png" "$OUT/06-alerts.png" \
+  "$OUT/07-agent-detail.png" "$OUT/08-agent-tools.png" "$OUT/09-mcp-servers.png"
+cp "$TEMP/visualize.png"    "$OUT/01-connections.png"
+cp "$TEMP/agents.png"       "$OUT/02-ai-agents.png"
+cp "$TEMP/reports.png"      "$OUT/03-history.png"
+cp "$TEMP/inspect.png"      "$OUT/04-inspect.png"
+cp "$TEMP/rules.png"        "$OUT/05-policies.png"
+cp "$TEMP/live.png"         "$OUT/06-live.png"
+cp "$TEMP/alerts.png"       "$OUT/07-alerts.png"
+cp "$TEMP/agent-detail.png" "$OUT/08-agent-detail.png"
+cp "$TEMP/agent-tools.png"  "$OUT/09-agent-tools.png"
+cp "$TEMP/mcp-servers.png"  "$OUT/10-mcp-servers.png"
 
 VERSION=$(defaults read "$FL_APP/Contents/Info.plist" CFBundleShortVersionString)
 python3 scripts/screenshot_manifest.py --directory "$OUT" --version "$VERSION" --replace \
-  01-connections.png 02-ai-agents.png 03-history.png 04-rules.png 05-live.png \
-  06-alerts.png 07-agent-detail.png 08-agent-tools.png 09-mcp-servers.png
+  01-connections.png 02-ai-agents.png 03-history.png 04-inspect.png 05-policies.png \
+  06-live.png 07-alerts.png 08-agent-detail.png 09-agent-tools.png 10-mcp-servers.png
 
-echo "Wrote 9 Mac App Store screenshots to $OUT"
+echo "Wrote 10 Mac App Store screenshots to $OUT"

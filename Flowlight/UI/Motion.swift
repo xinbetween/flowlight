@@ -17,8 +17,27 @@ enum Motion {
     static let control = Animation.easeOut(duration: 0.16)
     /// A number or a chart settling on a new value.
     static let value = Animation.easeInOut(duration: 0.45)
+    /// A complete Connections generation replacing its loader. Geometry never animates between generations.
+    static let graphReveal = Animation.easeOut(duration: 0.18)
     /// Something that repeats while a state lasts — a pulse while capture is live.
     static let breathing = Animation.easeInOut(duration: 1.6).repeatForever(autoreverses: true)
+
+    /// Screenshot captures are deterministic UI fixtures, not samples of an animation in flight. This is guarded by
+    /// demo mode so a launch argument can never suppress motion in a real user's session.
+    static var isStaticFixture: Bool {
+        DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLDisableMotion")
+    }
+
+    /// Runs an explicit state change with the shared motion policy. Views pass the system preference they read from
+    /// the environment so imperative scroll and disclosure changes follow the same Reduce Motion behavior as modifiers.
+    @MainActor
+    static func perform(_ animation: Animation? = control, reduceMotion: Bool, updates: () -> Void) {
+        if reduceMotion || isStaticFixture {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
 
     /// How a new turn, row or card enters. Opacity plus a small rise, never a slide across, because a horizontal
     /// slide reads as navigation and nothing has navigated.
@@ -45,7 +64,7 @@ private struct MotionModifier<V: Equatable>: ViewModifier {
     let value: V
 
     func body(content: Content) -> some View {
-        content.animation(reduceMotion ? nil : animation, value: value)
+        content.animation(reduceMotion || Motion.isStaticFixture ? nil : animation, value: value)
     }
 }
 
@@ -54,11 +73,12 @@ private struct EntranceModifier: ViewModifier {
     @State private var shown = false
 
     func body(content: Content) -> some View {
+        let staticPresentation = reduceMotion || Motion.isStaticFixture
         content
-            .opacity(reduceMotion ? 1 : (shown ? 1 : 0))
-            .offset(y: reduceMotion ? 0 : (shown ? 0 : 8))
+            .opacity(staticPresentation ? 1 : (shown ? 1 : 0))
+            .offset(y: staticPresentation ? 0 : (shown ? 0 : 8))
             .onAppear {
-                guard !reduceMotion else { shown = true; return }
+                guard !staticPresentation else { shown = true; return }
                 withAnimation(Motion.appear) { shown = true }
             }
     }
@@ -77,13 +97,14 @@ struct LiveDot: View {
     @State private var breathing = false
 
     var body: some View {
+        let staticPresentation = reduceMotion || Motion.isStaticFixture
         Circle()
             .fill(color)
             .frame(width: size, height: size)
             .overlay {
                 // A ring that swells and fades outwards. Drawn outside the dot so the dot itself never changes
                 // size — a pulsing dot in a list makes the row it sits in twitch.
-                if active && !reduceMotion {
+                if active && !staticPresentation {
                     Circle()
                         .stroke(color, lineWidth: 1.5)
                         .scaleEffect(breathing ? 2.1 : 1)
@@ -92,7 +113,7 @@ struct LiveDot: View {
             }
             .onChange(of: active, initial: true) { _, on in
                 breathing = false
-                guard on, !reduceMotion else { return }
+                guard on, !staticPresentation else { return }
                 withAnimation(Motion.breathing) { breathing = true }
             }
     }

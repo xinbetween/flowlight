@@ -78,6 +78,14 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// when the oldest went first, a backlog this size left the live view empty until it had all drained.
     private let maxPendingBatches = 3600
     private let chunkSize = 300
+    #if APP_STORE
+    private weak var tracker: FlowTracker?
+    private var inspectionProxyPort: UInt16?
+
+    func attach(tracker: FlowTracker) {
+        queue.async { self.tracker = tracker }
+    }
+    #endif
 
     private var machServiceName: String {
         let ne = Bundle.main.object(forInfoDictionaryKey: "NetworkExtension") as? [String: Any]
@@ -120,6 +128,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 self.packTransfer.reset()
                 self.durableEventsEnabled = false
                 self.enforcementSynchronized = false
+                #if APP_STORE
+                self.inspectionProxyPort = nil
+                #endif
                 self.durableHealth.reset()
                 BlockEnforcer.shared.appConnectionChanged(connected: false)
             }
@@ -129,9 +140,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         return true
     }
 
-    func filterState(withReply reply: @escaping (Bool, String) -> Void) {
+    func filterState(withReply reply: @escaping (Bool, String, UInt64) -> Void) {
         let state = FilterDataProvider.filterStarted.withLock { $0 }
-        reply(state.running, state.detail)
+        reply(state.running, state.detail, state.generation)
     }
 
     func register(withReply reply: @escaping (Bool, String) -> Void) {
@@ -146,6 +157,9 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             self.packTransfer.reset()
             self.durableEventsEnabled = false
             self.enforcementSynchronized = false
+            #if APP_STORE
+            self.inspectionProxyPort = nil
+            #endif
             self.durableHealth.reset()
             // A reconnect begins fail-open. The app may have disabled or narrowed any of these while disconnected;
             // stale state must not become active during the policy/rule/pack synchronization that follows register.
@@ -312,6 +326,59 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             reply(BlockCoding.encode(result))
         }
     }
+
+    #if APP_STORE
+    func setInspectionProxyPort(_ port: Int, withReply reply: @escaping (Bool) -> Void) {
+        guard let connection = NSXPCConnection.current() else { reply(false); return }
+        queue.async {
+            guard self.client === connection, (0...Int(UInt16.max)).contains(port) else {
+                reply(false)
+                return
+            }
+            self.inspectionProxyPort = port == 0 ? nil : UInt16(port)
+            reply(true)
+        }
+    }
+
+    func inspectionProxyClient(
+        clientAddress: String,
+        clientPort: Int,
+        proxyPort: Int,
+        withReply reply: @escaping (Data) -> Void
+    ) {
+        guard let connection = NSXPCConnection.current() else { reply(Data()); return }
+        queue.async {
+            let filterState = FilterDataProvider.filterStarted.withLock { $0 }
+            guard self.client === connection,
+                  filterState.running,
+                  HostCanonicalizer.address(clientAddress) != nil,
+                  (1...Int(UInt16.max)).contains(clientPort),
+                  (1...Int(UInt16.max)).contains(proxyPort),
+                  self.inspectionProxyPort == UInt16(proxyPort),
+                  let identity = self.tracker?.inspectionProxyClient(
+                    clientIP: clientAddress,
+                    clientPort: UInt16(clientPort),
+                    proxyPort: UInt16(proxyPort),
+                    filterGeneration: filterState.generation
+                  ) else {
+                reply(Data())
+                return
+            }
+            // FlowTracker revalidates after process ancestry, then this closes the remaining boundary between that
+            // result and the provider's authoritative generation. A stop/start during either phase fails open.
+            let currentFilterState = FilterDataProvider.filterStarted.withLock { $0 }
+            guard currentFilterState.running, currentFilterState.generation == filterState.generation else {
+                reply(Data())
+                return
+            }
+            reply(BlockCoding.encode(ProxyClientIdentityReply(
+                identity: identity,
+                filterGeneration: filterState.generation
+            )))
+        }
+    }
+
+    #endif
 
     func send(_ batches: [TrafficBatch]) {
         queue.async {

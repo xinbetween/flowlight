@@ -19,7 +19,7 @@ struct FeatureGuide: Equatable, Sendable, Identifiable {
     var steps: [String]
     /// Where it lives, so an answer can offer to go there.
     var screen: SidebarItem?
-    /// The operational tab behind Sources, when the destination needs more precision than one sidebar item.
+    /// The section to focus in Sources, when the destination needs more precision than one sidebar item.
     var sourcesTab: SourcesTab? = nil
     /// What it can't do. Left out of an answer, these are the things people discover the hard way.
     var caveats: [String] = []
@@ -47,7 +47,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "capture", title: "Capture source",
             summary: "Where traffic comes from. The Network Extension is a content filter that sits in the data path and attributes every flow to its app; the nettop sampler needs no entitlement but samples once a second and misses flows shorter than that.",
-            steps: ["Open Sources and choose Collector.", "Pick Network Extension or nettop sampler.",
+            steps: ["Open Sources and go to Collector.", "Pick Network Extension or nettop sampler.",
                     "For the extension, press Install & enable filter and approve it in System Settings."],
             screen: .sources,
             sourcesTab: .collector,
@@ -58,7 +58,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "hostnames", title: "Hostnames",
             summary: "Turning IP addresses into names. The extension reads TLS SNI and DNS answers itself. On the sampler, a one-time packet-capture setup is what lets Flowlight see those names.",
-            steps: ["Open Sources and choose Collector.", "Turn on Read hostnames from the network.", "Give the helper permission when macOS asks."],
+            steps: ["Open Sources and go to Collector.", "Turn on Read hostnames from the network.", "Give the helper permission when macOS asks."],
             screen: .sources,
             sourcesTab: .collector,
             caveats: ["Without it the sampler falls back to reverse DNS, which is often missing or wrong."],
@@ -99,14 +99,14 @@ extension FeatureGuide {
             keywords: ["allowlist", "allow", "whitelist", "block agent", "enforce"]),
 
         FeatureGuide(
-            id: "rules", title: "Rules",
-            summary: "Block or allow anything: an app, an agent, a destination, a URL, or a pairing of those — forever, until a time, until Flowlight quits, or between chosen hours. The most specific rule wins and a tie goes to the block.",
-            steps: ["Open Rules and press ＋, or right-click any row in Live, History, AI Agents or Inspect and choose Block.",
-                    "Name an app or a destination, pick block or allow, and choose how long it lasts.",
-                    "Pause Blocking in the toolbar stands every rule down for a while."],
+            id: "rules", title: "Policies",
+            summary: "See ordinary rules, agent allowlists, managed packs and inspection policies together, with a truthful state and activity trail for each. Ordinary rules can block or allow an app, agent, destination, URL or pairing for a chosen duration.",
+            steps: ["Open Policies and press ＋ to write an ordinary rule, or right-click a row in Live, History, AI Agents or Inspect and choose Block.",
+                    "Select any existing policy to open the contextual editor that owns it.",
+                    "Use Activity to review decisions, and Pause Blocking when you need a temporary escape hatch."],
             screen: .rules,
-            caveats: ["A rule that names a path can only be carried out by HTTPS inspection; one that names a host needs the Network Extension. A rule the current setup can't enforce says so in the list."],
-            keywords: ["block", "refuse", "deny", "firewall", "stop app", "allow once", "pause"]),
+            caveats: ["A URL rule needs HTTPS inspection; a host rule needs the Network Extension. Policies distinguishes enforcing, reporting, watching, waiting and unavailable controls rather than calling every enabled item active."],
+            keywords: ["policy", "rules", "allowlist", "managed pack", "block", "refuse", "deny", "firewall", "stop app", "allow once", "pause"]),
 
         FeatureGuide(
             id: "guardrails", title: "Agent guardrails",
@@ -176,7 +176,7 @@ extension FeatureGuide {
         FeatureGuide(
             id: "devices", title: "Devices: camera, Bluetooth and USB",
             summary: "Whether each camera is active, which Bluetooth and USB devices are paired or attached, and when that changed. Every channel is off until you turn it on.",
-            steps: ["Open Sources and choose Devices.", "Turn on Watch camera activity, Watch Bluetooth, or Watch USB and external storage."],
+            steps: ["Open Sources and go to Devices.", "Turn on Watch camera activity, Watch Bluetooth, or Watch USB and external storage."],
             screen: .sources,
             sourcesTab: .devices,
             caveats: ["Camera activity names the camera, not the app using it; Flowlight never reads frames or requests camera access.",
@@ -218,14 +218,40 @@ extension FeatureGuide {
             keywords: ["update", "upgrade", "version", "homebrew", "brew", "new release"]),
         ]
         #if APP_STORE
-        return guides.filter { !["hostnames", "guardrails", "inspection", "mocks", "updates"].contains($0.id) }
+        return guides.filter { $0.id != "updates" }
             .map { guide in
-                guard guide.id == "capture" else { return guide }
                 var storeGuide = guide
-                storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
-                storeGuide.steps = ["Open Sources and choose Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
-                storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
-                storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
+                if guide.id == "capture" {
+                    storeGuide.summary = "Where traffic comes from. The Mac App Store build uses Flowlight's content-filter extension to attribute every flow to its app."
+                    storeGuide.steps = ["Open Sources and go to Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                    storeGuide.caveats = ["macOS runs one content filter at a time. If a VPN or a security agent holds that slot, Flowlight cannot receive traffic."]
+                    storeGuide.keywords = ["network extension", "content filter", "source", "no traffic", "nothing showing"]
+                } else if guide.id == "hostnames" {
+                    storeGuide.summary = "Turning IP addresses into names. The content filter learns hostnames automatically from TLS SNI, HTTP Host headers and DNS answers."
+                    storeGuide.steps = ["Open Sources and go to Collector.", "Under Content filter, press Enable Filter and approve it in System Settings."]
+                    storeGuide.caveats = ["If the content filter is disabled or unavailable, Flowlight cannot learn hostnames from new traffic."]
+                    storeGuide.keywords = ["dns", "sni", "domain", "ip only", "no domain names", "content filter"]
+                } else if guide.id == "inspection" {
+                    storeGuide.steps = [
+                        "Open Inspect and turn on HTTPS inspection.",
+                        "Show the public Flowlight certificate in Finder, import it into your login keychain, and trust it for SSL.",
+                        "Configure the app you choose to use the HTTP proxy address shown by Flowlight."
+                    ]
+                    storeGuide.caveats = [
+                        "The App Store build never changes system proxy settings or another app's configuration.",
+                        "Apple services and password managers are never decrypted. Apps that pin certificates are passed through untouched."
+                    ]
+                } else if guide.id == "data" {
+                    storeGuide.summary = "Recorded traffic, baselines, alerts, device events, rule activity and inspected exchanges are stored in SQLite inside Flowlight's sandboxed Application Support container."
+                    storeGuide.steps = [
+                        "Open Settings with ⌘, and choose Data & Privacy.",
+                        "Use Clear All Data to delete recorded activity while keeping policies and settings.",
+                        "To remove HTTPS inspection material, use Remove Certificate & Recorded Data in Inspect, then remove any public Flowlight certificate you imported from Keychain Access."
+                    ]
+                    storeGuide.caveats = [
+                        "Clear All Data does not remove policies, settings, certificate files or Keychain credentials."
+                    ]
+                }
                 return storeGuide
             }
         #else

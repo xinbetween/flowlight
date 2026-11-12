@@ -44,7 +44,17 @@ what Flowlight does defend against.
 
 ## Signed releases
 
-Releases are signed with a Developer ID and notarized by Apple, and every release publishes `SHA256SUMS.txt`.
+Releases are signed with a Developer ID and notarized by Apple, and every release publishes `SHA256SUMS.txt` plus
+`RELEASE-MANIFEST.json`. A tag-push preparation builds and signs once, passes Gatekeeper, attests the DMG, PKG,
+checksums, notes, and manifest, and retains those exact bytes. The separate publication job has no signing or Apple
+credentials: it verifies the selected run, source tag/SHA, archive digest, manifest, checksums, and GitHub provenance,
+then re-downloads a draft before making those same bytes public. For example:
+
+```sh
+gh attestation verify Flowlight.dmg --repo xinbetween/flowlight \
+  --signer-workflow xinbetween/flowlight/.github/workflows/release.yml
+```
+
 The in-app updater refuses a download whose checksum it cannot verify, and refuses to install an app that is
 not signed by the same team as the copy asking for the update.
 

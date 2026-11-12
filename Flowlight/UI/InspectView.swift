@@ -98,15 +98,23 @@ private struct InspectContent: View {
     @State private var rewriteDraft: RewriteRuleDraft?
     /// A response-transform rule is created only after its selected exchange's stored response has been read.
     @State private var responseTransformDraft: ResponseTransformDraft?
-    /// Setup was opened to look at the mock rules, so it opens on them.
+    /// Setup was opened to look at one contextual policy editor, so it opens on that section.
     @State private var openMocks = false
+    @State private var openRewrites = false
     @State private var openResponseTransforms = false
+    @State private var policyMock: MockRule?
+    @State private var policyRewrite: RewriteRule?
+    @State private var policyResponseTransform: ResponseTransformRule?
+    #if !APP_STORE
+    @State private var showPlugins = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
                 ScrollView {
-                    InspectionSetup(inspection: inspection, openMocks: openMocks, openResponseTransforms: openResponseTransforms, done: { showSetup = false })
+                    InspectionSetup(inspection: inspection, openMocks: openMocks, openRewrites: openRewrites,
+                                    openResponseTransforms: openResponseTransforms, done: { showSetup = false })
                         .padding(.bottom, 20)
                 }
             } else {
@@ -117,7 +125,11 @@ private struct InspectContent: View {
                         Label(L("Nothing inspected yet"), systemImage: "lock.open.display")
                     } description: {
                         VStack(spacing: 10) {
+                            #if APP_STORE
+                            Text(L("Configure an app to use the HTTP proxy shown in Setup. Only that app's routed requests appear here; Flowlight never changes system proxy settings in the App Store build."))
+                            #else
                             Text(L("Apps that follow the system proxy — browsers, most Mac apps — appear here on their own. Command-line agents don't: they need the environment from an inspected Terminal."))
+                            #endif
                             if let diagnosis = inspection.diagnosis {
                                 Text(diagnosis)
                                     .font(.callout)
@@ -127,7 +139,9 @@ private struct InspectContent: View {
                         }
                         .frame(maxWidth: 460)
                     } actions: {
+                        #if !APP_STORE
                         Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
+                        #endif
                         Button(L("Check Setup")) { Task { await inspection.checkSetup() } }
                     }
                     .frame(maxHeight: .infinity)
@@ -149,6 +163,20 @@ private struct InspectContent: View {
                                                                     : L("Starting…"))
                                                : L("Off"))
         .searchable(text: $search, placement: .toolbar, prompt: Text(L("Host, path, app, tool or anything in a body")))
+        #if !APP_STORE
+        .toolbar {
+            ToolbarItem {
+                Button { showPlugins = true } label: {
+                    Label(L("Plugins & Providers"), systemImage: "puzzlepiece.extension")
+                }
+                .help(L("Manage inspection plugins and local provider profiles"))
+            }
+        }
+        .sheet(isPresented: $showPlugins) {
+            PluginSettingsView(providerProfiles: monitor.providerProfiles)
+                .environmentObject(monitor)
+        }
+        #endif
         // Arriving from a row somewhere else: the subject lands in the search field rather than in a hidden
         // filter, so it is visible, editable and removable like anything else typed there.
         .onChange(of: nav.inspectRequest, initial: true) {
@@ -163,6 +191,22 @@ private struct InspectContent: View {
             scopeAgentParent = request.agentParent
             scopeMCPServer = request.mcpServer
             potentialHarmOnly = request.potentialHarmOnly
+            if let section = request.policySection {
+                showSetup = true
+                openMocks = section == .mocks
+                openRewrites = section == .requestRewrites
+                openResponseTransforms = section == .responseTransforms
+                if let policyID = request.policyID {
+                    switch section {
+                    case .mocks:
+                        policyMock = inspection.mockRules.first { $0.id == policyID }
+                    case .requestRewrites:
+                        policyRewrite = inspection.rewriteRules.first { $0.id == policyID }
+                    case .responseTransforms:
+                        policyResponseTransform = inspection.responseTransformRules.first { $0.id == policyID }
+                    }
+                }
+            }
             nav.inspectRequest = nil
         }
         .onChange(of: monitor.localRiskVersion) {
@@ -185,6 +229,26 @@ private struct InspectContent: View {
         .sheet(item: $responseTransformDraft) { draft in
             ResponseTransformRuleEditor(rule: draft.rule, isNew: true, draft: draft) { inspection.responseTransformRules.append($0) }
         }
+        .sheet(item: $policyMock) { rule in
+            MockRuleEditor(rule: rule, isNew: false) { saved in
+                guard let index = inspection.mockRules.firstIndex(where: { $0.id == saved.id }) else { return }
+                inspection.mockRules[index] = saved
+            }
+        }
+        .sheet(item: $policyRewrite) { rule in
+            RewriteRuleEditor(rule: rule, isNew: false) { saved in
+                guard let index = inspection.rewriteRules.firstIndex(where: { $0.id == saved.id }) else { return }
+                inspection.rewriteRules[index] = saved
+            }
+        }
+        .sheet(item: $policyResponseTransform) { rule in
+            ResponseTransformRuleEditor(rule: rule, isNew: false) { saved in
+                guard let index = inspection.responseTransformRules.firstIndex(where: { $0.id == saved.id }) else {
+                    return
+                }
+                inspection.responseTransformRules[index] = saved
+            }
+        }
         .task(id: LoadKey(version: monitor.inspectionVersion, localRiskVersion: monitor.localRiskVersion, pluginVersion: monitor.plugins.version,
                           search: search, window: window, enabled: inspection.enabled,
                           potentialHarmOnly: potentialHarmOnly, focus: focus.scope, app: scopeApp?.id,
@@ -203,7 +267,9 @@ private struct InspectContent: View {
     }
 
     private func canModifyResponse(_ exchange: HTTPExchange) -> Bool {
-        !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil && exchange.status != nil && !exchange.responseTruncated
+        ProductCapabilities.current.responseTransforms
+            && !DemoData.isEnabled && exchange.note == nil && exchange.mockRule == nil
+            && exchange.status != nil && !exchange.responseTruncated
     }
 
     private func prepareMock(from exchange: HTTPExchange) {
@@ -349,8 +415,10 @@ private struct InspectContent: View {
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 240)
             if !DemoData.isEnabled {
+                #if !APP_STORE
                 Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
                     .help(L("A Terminal window whose agents and tools go through Flowlight"))
+                #endif
                 Button(L("Setup…")) { openMocks = false; showSetup = true }
             }
         }
@@ -430,12 +498,19 @@ private struct InspectContent: View {
                             if let guardrail = e.guardrail {
                                 Label(L("Guarded"), systemImage: "shield.lefthalf.filled").font(.caption2.bold())
                                     .foregroundStyle(.teal).labelStyle(.titleAndIcon)
-                                    .help(L("A guardrail changed this request before it left: %@", guardrail))
+                                    .help(L("A guardrail changed this request before it left: %@",
+                                            InspectionPolicyReference.display(guardrail)))
+                            }
+                            if let rewrite = e.requestRewrite {
+                                Label(L("Request changed before sending"), systemImage: "slider.horizontal.3")
+                                    .font(.caption2.bold()).foregroundStyle(FL.tool).labelStyle(.titleAndIcon)
+                                    .help(InspectionPolicyReference.display(rewrite))
                             }
                             if let transform = e.responseTransform {
                                 Label(L("Response modified"), systemImage: "arrow.left.arrow.right").font(.caption2.bold())
                                     .foregroundStyle(.purple).labelStyle(.titleAndIcon)
-                                    .help(L("%@ answered, then Flowlight changed the response using %@ before the app received it", e.host, transform))
+                                    .help(L("%@ answered, then Flowlight changed the response using %@ before the app received it",
+                                            e.host, InspectionPolicyReference.display(transform)))
                             }
                         }
                         Text(e.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -510,6 +585,7 @@ private struct InspectContent: View {
 private struct InspectionSetup: View {
     @ObservedObject var inspection: InspectionController
     var openMocks = false
+    var openRewrites = false
     var openResponseTransforms = false
     var done: () -> Void
     @State private var newPattern = ""
@@ -539,12 +615,17 @@ private struct InspectionSetup: View {
                     })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L("Turn on HTTPS inspection")).font(.headline)
+                            #if APP_STORE
+                            Text(L("Creates a local certificate and starts an explicit proxy. You choose which apps use it; Flowlight never changes system proxy settings."))
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            #else
                             Text(L("Creates the certificate, asks for your password once to trust it, and sends apps through Flowlight. Turning it off puts everything back."))
                                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            #endif
                         }
                     }
                     .toggleStyle(.switch)
-                    .disabled(inspection.working)
+                    .disabled(inspection.working || (!inspection.enabled && !inspection.policyStateReady))
 
                     if inspection.working {
                         HStack(spacing: 6) {
@@ -554,14 +635,33 @@ private struct InspectionSetup: View {
                     } else if inspection.enabled {
                         VStack(alignment: .leading, spacing: 4) {
                             ready(L("Certificate trusted on this Mac"), ok: inspection.trusted)
+                            #if APP_STORE
+                            ready(L("Local proxy listening at %@", inspection.proxyURL), ok: inspection.running)
+                            ready(L("Trusted app attribution"), ok: inspection.attributionReady)
+                            Text(L("In the app you want to inspect, set its HTTP and HTTPS proxy to %@. Trust the Flowlight certificate first for HTTPS.", inspection.proxyURL))
+                                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            if let diagnosis = inspection.diagnosis, !inspection.diagnosisIsGood {
+                                Label(diagnosis, systemImage: "exclamationmark.triangle")
+                                    .foregroundStyle(FL.warning).fixedSize(horizontal: false, vertical: true)
+                            }
+                            #else
                             ready(L("Apps routed through Flowlight"), ok: inspection.systemProxyOn)
                             ready(inspection.scope == .all ? L("Decrypting every app that uses the proxy")
                                                            : L("Decrypting AI agents and their tools"), ok: inspection.running)
+                            #endif
                         }
                         .font(.caption)
                         HStack {
+                            #if APP_STORE
+                            Button(L("Show Certificate in Finder")) { inspection.revealCertificate() }
+                            Button(L("Copy Proxy Address")) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(inspection.proxyURL, forType: .string)
+                            }
+                            #else
                             Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
                                 .help(L("Command-line agents ignore system proxy settings; start them from this window instead"))
+                            #endif
                             Spacer()
                             Button(L("Done")) { done() }.keyboardShortcut(.defaultAction)
                         }
@@ -657,20 +757,35 @@ private struct InspectionSetup: View {
                 }
             }
 
-            DisclosureGroup(isExpanded: $showResponseTransforms) {
-                ResponseTransformRulesSection(inspection: inspection).padding(.top, 10)
-            } label: {
-                HStack(spacing: 8) {
-                    Text(L("Modify responses")).font(.headline)
-                    if inspection.activeResponseTransformRules > 0 {
-                        Label(inspection.activeResponseTransformRules == 1 ? L("1 on") : L("%lld on", inspection.activeResponseTransformRules),
-                              systemImage: "arrow.left.arrow.right")
-                            .font(.caption.bold()).foregroundStyle(FL.tool)
+            if ProductCapabilities.current.responseTransforms {
+                DisclosureGroup(isExpanded: $showResponseTransforms) {
+                    ResponseTransformRulesSection(inspection: inspection).padding(.top, 10)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(L("Modify responses")).font(.headline)
+                        if inspection.activeResponseTransformRules > 0 {
+                            Label(inspection.activeResponseTransformRules == 1 ? L("1 on") : L("%lld on", inspection.activeResponseTransformRules),
+                                  systemImage: "arrow.left.arrow.right")
+                                .font(.caption.bold()).foregroundStyle(FL.tool)
+                        }
                     }
                 }
             }
         }
         .measured(Measure.prose)
+        #if APP_STORE
+        .confirmationDialog(L("Turn on HTTPS inspection?"), isPresented: $confirmTurnOn) {
+            Button(L("Create Certificate and Proxy")) { inspection.setEnabled(true) }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("Flowlight creates a private local certificate authority and listens only on this Mac. You will trust the public certificate and choose which apps use the proxy in the next step."))
+        }
+        .confirmationDialog(L("Remove HTTPS inspection?"), isPresented: $confirmRemove) {
+            Button(L("Remove"), role: .destructive) { inspection.removeEverything() }
+        } message: {
+            Text(L("Turns inspection off, deletes Flowlight's private keys and recorded requests. If you trusted the public certificate in macOS, remove that certificate from Keychain Access separately."))
+        }
+        #else
         .confirmationDialog(L("macOS will ask you twice"), isPresented: $confirmTurnOn) {
             Button(L("Continue")) { inspection.setEnabled(true) }
             Button(L("Cancel"), role: .cancel) {}
@@ -682,11 +797,21 @@ private struct InspectionSetup: View {
         } message: {
             Text(L("Turns inspection off, removes the certificate and its trust setting, and deletes every recorded request."))
         }
+        #endif
+        #if APP_STORE
+        .task {
+            if inspection.enabled { await inspection.checkSetup() }
+        }
+        #endif
         .onAppear {
             inspection.refreshStatus()
             showMocks = showMocks || openMocks
+            showRewrites = showRewrites || openRewrites
             showResponseTransforms = showResponseTransforms || openResponseTransforms
         }
+        .onChange(of: openMocks) { _, open in if open { showMocks = true } }
+        .onChange(of: openRewrites) { _, open in if open { showRewrites = true } }
+        .onChange(of: openResponseTransforms) { _, open in if open { showResponseTransforms = true } }
     }
 
     private func ready(_ text: String, ok: Bool) -> some View {
@@ -933,20 +1058,31 @@ private struct ExchangeDetail: View {
             }
             if let mock = exchange.mockRule {
                 // The whole point of the feature is that this answer is a fiction; say so before anything below is read.
-                Label(L("Answered by Flowlight, not by %@ — mock rule “%@”. The request was never sent.", exchange.host, mock),
-                      systemImage: "wand.and.stars")
+                Label(L("Answered by Flowlight, not by %@ — mock rule “%@”. The request was never sent.", exchange.host,
+                        InspectionPolicyReference.display(mock)), systemImage: "wand.and.stars")
                     .foregroundStyle(FL.tool).fixedSize(horizontal: false, vertical: true)
             }
             if let guardrail = exchange.guardrail {
                 // The exchange really happened and really was sent — but not quite as the agent wrote it, and
                 // anyone reading it has to be told which part Flowlight took out.
                 Label(L("A guardrail changed this request before it left: %@. Everything below is what %@ was actually sent.",
-                        guardrail, exchange.host), systemImage: "shield.lefthalf.filled")
+                        InspectionPolicyReference.display(guardrail), exchange.host), systemImage: "shield.lefthalf.filled")
                     .foregroundStyle(.teal).fixedSize(horizontal: false, vertical: true)
+            }
+            if let rewrite = exchange.requestRewrite {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("Request changed before sending"))
+                        Text(InspectionPolicyReference.display(rewrite)).font(.caption).foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+                .foregroundStyle(FL.tool).fixedSize(horizontal: false, vertical: true)
             }
             if let transform = exchange.responseTransform {
                 Label(L("%@ answered this request. Flowlight then changed the response with “%@” before the app received it.",
-                        exchange.host, transform), systemImage: "arrow.left.arrow.right")
+                        exchange.host, InspectionPolicyReference.display(transform)), systemImage: "arrow.left.arrow.right")
                     .foregroundStyle(.purple).fixedSize(horizontal: false, vertical: true)
             }
             if let cause {

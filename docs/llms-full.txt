@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.17.3, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.0, macOS 15 or later.
 
  On this page
 
@@ -79,7 +79,7 @@ Documentation
  AskHTTPS inspectionMock responses
 
  Control
- RulesAllowlists
+ PoliciesAllowlists
  Refusing connectionsGuardrails
 
  Sources
@@ -161,15 +161,13 @@ open build/Build/Products/Release/Flowlight.app
 
  Ask⌘6Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.
 
- Inspect⌘7 · Developer IDOptional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
+ Inspect⌘7Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.
 
- Rules⌘8 · Developer ID
-⌘7 · App StoreEvery allowlist and refusal you have set, what each one covers, and what it has actually stopped.
+ Policies⌘8Every configured policy, whether it is actually effective, and a unified read-only activity trail.
 
- Sources⌘9 · Developer ID
-⌘8 · App StoreCollector health and recovery, hostname coverage, and opt-in camera, Bluetooth, USB and storage activity in three tabs.
+ Sources⌘9Collector health and recovery, opt-in device channels, and coverage in three focused segments.
 
- The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Rules and Sources move to ⌘7 and ⌘8.
+ The shortcuts follow the visible sidebar order and are the same in Developer ID and Mac App Store builds.
 
  Live, the screen Flowlight opens on.
  In History, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with Nearby context and can switch to All history: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.
@@ -224,7 +222,7 @@ open build/Build/Products/Release/Flowlight.app
  never been reached, and one only ever observed was never written down anywhere you could have read it.
 
  Each domain offers two refusals: for this agent, which covers the agent and the tools it starts, or
- everywhere, which covers every app on the Mac. Both write an ordinary rule, so the violations feed reports
+ everywhere, which covers every app on the Mac. Both write an ordinary rule, so Activity reports
  them and the rule editor explains them — and because they are ordinary rules, the simulation in the editor will tell you what
  one would have refused before you switch it on.
 
@@ -363,18 +361,22 @@ open build/Build/Products/Release/Flowlight.app
  (Anthropic's mcp_servers, OpenAI's mcp tool) with their URL, token, approval setting and allowed tools. That
  last group never appears on your network, because the provider makes those connections, not your Mac.
 
- Setting it up is one switch. Turn on HTTPS inspection in Inspect and Flowlight creates its certificate,
- asks for your password once, trusts the certificate and routes apps through the proxy. Turning the switch off undoes all of it. The proxy
- file falls back to a direct connection whenever Flowlight isn't running, so quitting it never cuts your Mac off.
+ Developer ID setup can be automatic. Turn on HTTPS inspection in Inspect and Flowlight creates its
+ certificate. Open Inspected Terminal starts command-line agents with the right proxy variables and certificate environment;
+ you can also trust the certificate and let Flowlight configure a system PAC file for desktop apps. That file falls back to a direct
+ connection whenever Flowlight is not running.
 
- Command-line agents ignore system proxy settings, so for Claude Code, Codex, Gemini CLI or Aider use Open Inspected Terminal
- and start them there. Under Advanced you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
- the shell setup for one shell, or remove the certificate and everything recorded.
+ Mac App Store setup stays explicit. Inspect creates a native Keychain-backed P-256 CA, shows the exact
+ 127.0.0.1 proxy address, and reveals the public certificate in Finder. Import and trust that certificate yourself, then configure
+ each app to use the shown HTTP/HTTPS proxy. The Store app never changes system proxy settings, rewrites another app's configuration,
+ or relaunches or supervises another app. Its content-filter extension uses macOS's audit-token identity for the exact live loopback socket;
+ if that identity is unavailable or stale, app-scoped enforcement fails open rather than guessing.
 
  Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
  Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
- allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and Remove Certificate & Recorded Data deletes the certificate, its trust
- setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.
+ allow, and everything else is replaced by its length before anything is stored. Remove Certificate & Recorded Data deletes
+ Flowlight-owned keys, generated certificates, and every recorded request. In the Store product, a public CA you imported remains user-owned;
+ Inspect tells you to remove it separately in Keychain Access. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and is not available in demo mode.
 
  Local risk analysis is separate and off by default. In History or Alerts › Detection, you can ask
  Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
@@ -464,18 +466,24 @@ open build/Build/Products/Release/Flowlight.app
  connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
  is entirely unreachable" does not.
 
- Rules
+ Policies
 
- An allowlist is one agent's idea of where it may go. A rule is the general version: it names a
+ Policies is one inventory for every control Flowlight can apply: ordinary allow/block rules, agent
+ allowlists, managed packs, and—where HTTPS inspection is available—guardrails, mocks, and request rewrites. Developer ID
+ builds also include response transforms; the Store product does not expose response-transform scripts or script plugins.
+ Each row distinguishes configured state from actual effect: enforcing, reporting, watching, waiting,
+ scheduled, paused, spent, applying, review required, unavailable, incompatible, or failed. Selecting a row opens the
+ contextual editor that owns that policy; Policies does not replace or blur those separate consent and persistence models.
+
+ An allowlist is one agent's idea of where it may go. An ordinary rule is the general version: it names a
  subject — an app, an agent, a destination, a URL, or a pairing of two of those — and says block
  or allow. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at;
- every one of them lands in the same editor on the Rules screen, because a rule that took effect out of sight
- would be a rule you could never find again.
+ every one remains findable in Policies and opens in its authoritative editor.
 
  Templates. Twenty-two of them, in five groups — stopping an agent reaching package registries or other
  model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
  HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
- what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
+ what it is". Browse them from the Policies toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
  apply one to what you're looking at.
 
  Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
@@ -502,8 +510,10 @@ open build/Build/Products/Release/Flowlight.app
  URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
  refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.
 
- The second tab is the violations feed: every connection a rule decided, with the app, where it was headed, which
- rule decided it and whether that was a refusal or an exception letting it through.
+ The second view is read-only Activity: ordinary rule decisions, allowlist violations, managed-pack events,
+ and distinct inspection-policy effects in one chronology. It adapts the existing authoritative records rather than rewriting
+ history into one generic event model. Store builds keep guardrail, mock, and request-rewrite activity while omitting response
+ transforms and script-plugin effects that the Store product cannot execute.
 
  What it would have done. A blocking rule is easy to write and frightening to switch on, because the first
  thing you normally learn about one is what it broke — and you learn it later, from something failing somewhere else. The rule
@@ -526,7 +536,7 @@ open build/Build/Products/Release/Flowlight.app
 
  Managed ad and tracker packs
 
- Rules › Packs contains three official lists built into Flowlight: Advertising covers known
+ Policies › Managed packs contains three official lists built into Flowlight: Advertising covers known
  advertising delivery and auction hosts; Cross-site tracking covers common analytics, session replay and
  cross-site measurement hosts; and Privacy and telemetry covers crash reporting, install attribution, and
  audited Apple advertising and analytics hosts. The packs are visible from the start and all are off by default.
@@ -631,9 +641,11 @@ open build/Build/Products/Release/Flowlight.app
  This is not a sandbox. A refused tool stops being offered and stops being answered. An agent that still has a
  shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.
 
- Sources: collector, coverage and devices
+ Sources: collector, devices and coverage
 
- Sources keeps operational setup in one place. Its health summary shows whether traffic is arriving, how much is named, and which optional device channels are active; any unfinished collector step links directly to Sources › Collector.
+ Sources uses the same focused segmented navigation as Policies: Collector,
+ Devices, and Coverage. Status notices, Ask answers, restored windows, and deep links select the
+ exact segment while shared health and remediation context remains available across all three.
 
  Flowlight records traffic one of two ways, chosen under Sources › Collector. They differ in what they can miss, which is worth
  understanding before you rely on either.
@@ -920,7 +932,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.17.3macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.0macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1003,21 +1015,21 @@ Where did it all go? From 15 minutes through all history, grouped by app, destin
 What looked wrong? Explainable, per-app alerts with the destination and the threshold.
 ⌘5
 
- Rules
-What have I refused, and is it happening? Every rule, what each has blocked, and a feed of every decision.
-⌘8 · Developer ID / ⌘7 · App Store
+ Policies
+What controls exist, and are they effective? Every policy, its real state, and a unified activity trail.
+⌘8
 
  Ask
 Questions in plain language, answered from the history — with every query it ran listed underneath.
 ⌘6
 
  Sources
-Is data arriving, how much is named, and which device channels are active? Collector, Devices and Coverage in one place.
-⌘9 · Developer ID / ⌘8 · App Store
+Is data arriving, which device channels are active, and what can Flowlight account for? Focused Collector, Devices, and Coverage segments.
+⌘9
 
  Inspect
 Optional. What did the agent actually send, and which tool call made it? Decrypted requests, tool calls, results.
-⌘7 · Developer ID
+⌘7
 
  Connections
 What is communicating? A zoomable Sankey map for app traffic and proved AI-agent paths, with exact list parity.
@@ -1461,6 +1473,8 @@ Plugins
 
  A JavaScript plugin defines a synchronous evaluate(context) function. Flowlight passes context.manifest and a sanitized context.exchange containing only the metadata families declared in permissions. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.
 
+ context.manifest.configuration contains that plugin's local string settings. context.manifest.providerProfiles is a separate array of enabled local profiles assigned to the plugin with the same guardrail provider; each entry contains only id, provider, optional endpoint, and non-secret configuration. Flowlight never gives a plugin credential values or Keychain references, and a profile does not initiate a provider request.
+
  A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.
 
  When a manifest declares the suggestAction capability and permission, a finding can also include suggestedActions. Flowlight stores those as inert suggestions; Inspect opens the matching editor and saves only when the user reviews and clicks Save.
@@ -1519,7 +1533,7 @@ Plugins
 
  Template package
 
- The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins and Flowlight will show the review sheet before installation.
+ The starter package lives at templates/inspection-plugin. It includes a manifest, plugin.js, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. In the Developer edition, open Inspect › Plugins & Providers and import the manifest JSON; Flowlight shows the review sheet before installation.
 
 cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
@@ -1591,13 +1605,19 @@ Privacy
 
  HTTPS inspection
 
- Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac (its key never leaves
- ~/Library/Application Support/Flowlight/Inspection) and runs a proxy that accepts connections only from this Mac. For apps you
- route through it, it records requests and responses, including bodies up to 2 MB, in the local database for 3 days. Credential headers are
- replaced with their length before anything is stored — recognised by name (Authorization, cookies, API keys) and by the words
- in the name, so X-Access-Key is caught as well. That is a heuristic, not a guarantee: a header carrying a secret
- under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy; Remove Certificate & Recorded
- Data deletes the certificate, its trust setting and every recorded request.
+ Off by default. If you turn it on, Flowlight creates a certificate authority on your Mac and runs a loopback proxy that
+ accepts connections only from this Mac. The Developer ID product keeps its inspection material under
+ ~/Library/Application Support/Flowlight/Inspection; the Mac App Store product generates native P-256 private keys in
+ its Keychain access group and exports only the public CA certificate. The Store app never changes system proxy settings or trust:
+ you import and trust the public certificate yourself and explicitly configure each inspected app to use the proxy address shown in Inspect.
+
+ For apps you route through it, Flowlight records requests and responses, including bodies up to 2 MB, in the local database for
+ 3 days. Credential headers are replaced with their length before anything is stored — recognised by name (Authorization, cookies,
+ API keys) and by the words in the name, so X-Access-Key is caught as well. That is a heuristic, not a guarantee: a
+ header carrying a secret under a name nothing recognises would be recorded. Flowlight excludes its built-in list of Apple services
+ and password managers from decryption. Recorded inspection data is not uploaded by Flowlight. Turning inspection off stops the proxy;
+ Remove Certificate & Recorded Data deletes Flowlight-owned keys, generated certificates, and every recorded request.
+ A public CA imported in the Store product remains user-owned and must be removed separately in Keychain Access.
 
  Optional local risk analysis. When you turn this separate setting on, Flowlight may send a bounded,
  redacted description of an eligible already-recorded request to Apple's on-device model. It does not send data to
@@ -1614,7 +1634,7 @@ Privacy
 
  Update downloadgithub.comThe disk image and its checksum fileOnly when you click Download & Open
 
- Official rule-pack updateflowlight.xinbetween.comA standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the Flowlight/<version> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifierAfter startup when due and then at most daily while healthy. On by default; off switch and manual Check Now in Rules › Packs
+ Official rule-pack updateflowlight.xinbetween.comA standard HTTPS request to the fixed official feed for a publisher-signed catalog. The server sees your IP address, the Flowlight/<version> user agent, and conditional cache validators; it receives no traffic, pack settings, or device identifierAfter startup when due and then at most daily while healthy. On by default; off switch and manual Check Now under Policies › Managed packs
 
  Reverse DNSYour configured DNS resolverA lookup of an IP address's registered name, when no hostname was seenAs needed, in the sampler capture mode, which is the default until the Network Extension is running. No off switch: without it the sampler cannot name most connections. The Network Extension names them from the traffic itself and does not do this
 
@@ -1624,7 +1644,7 @@ Privacy
 
  Collector exportThe OpenTelemetry or HTTP endpoint you configureThe fields shown in Settings › Export, such as traffic rollups and alerts. Authentication headers are stored in KeychainOnly after you configure an endpoint and enable export
 
- Inspected application trafficThe original destination requested by the inspected applicationThe application's request, forwarded through Flowlight's local proxy after decryptionOnly while HTTPS inspection is enabled and the application is routed through the proxy
+ Inspected application trafficThe original destination requested by the inspected applicationThe application's request, forwarded through Flowlight's local proxy after decryptionOnly while HTTPS inspection is enabled and the application is explicitly routed through the proxy; the Store product does not change system proxy settings
 
  Permissions
 
@@ -1664,8 +1684,25 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.0
+November 5, 2026Latest
+
+ Inspect HTTPS traffic from the Mac App Store edition. The Store product gains a sandbox-safe local inspection path, certificate lifecycle, onboarding and recovery without embedding the Developer system extension, response-script helper or privileged installer.
+
+ Understand every source in one place. Sources adopts focused Collector, Devices and Coverage segments with shared health and remediation context.
+
+ Keep every policy action and its evidence together. Policies restores pack activity actions, ordinary-activity copy and attribution, dropped-hit disclosure, pack counts and provenance, and explicit active/resting organization.
+
+ See connections form and change. Connections gains polished native path motion and relationship emphasis while preserving atomic generation commits, keyboard and VoiceOver meaning, reduced-motion behavior and measured rendering budgets.
+
+ Pause all network enforcement truthfully. Pause Blocking stands down ordinary destination rules, enforcing allowlists, extension-managed packs and inspection-proxy pack decisions together, while inspection policies keep their own visible status.
+
+ Carry every completed change forward safely. The unpublished 0.17.4 through 0.17.9 work ships here, including AI-agent inventory, alert triage, inspection providers, accessible Live charts, exact-evidence CI reuse and immutable prepared release bytes.
+
+ Keep Developer ID and Store products honest. The Store edition uses explicit proxy routing and user-mediated certificate trust while omitting system-proxy automation, external-app rewrites, response transforms and script plugins. Separate product gates enforce that boundary.
+
  0.17.3
-November 4, 2026Latest
+November 4, 2026
 
  Keep every input in one operational home. Capture, Devices and Coverage are now Collector, Devices and Coverage tabs inside Sources, with a shared health summary and a step-by-step recovery card when traffic is not arriving.
 
@@ -3363,6 +3400,12 @@ Threat model
 
  So an empty Inspect screen means "nothing was routed here", not "nothing happened". Sources › Coverage says which of the two applies,
  per app.
+
+ The Store product does not take over proxy or trust settings. It exposes a loopback proxy and a public CA,
+ but you import that CA and route each application yourself. Its content-filter extension attributes an explicit-proxy connection
+ from the audit token macOS attached to the exact live loopback socket, matching both source and proxy ports. Unknown, stale, or
+ mismatched identity fails open for app-scoped enforcement; Flowlight never substitutes a guessed process. Removing inspection
+ deletes app-owned keys and generated leaf certificates, while a public CA you imported remains yours to remove in Keychain Access.
 
  What blocking is, and isn't
 

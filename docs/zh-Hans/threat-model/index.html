@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-zh-Hans", "url": "https://flowlight.xinbetween.com/zh-Hans/", "name": "Flowlight", "inLanguage": "zh-Hans", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/zh-Hans/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/zh-Hans/threat-model/", "name": "Flowlight 威胁模型", "description": "Flowlight 能防住什么、防不住什么，以及为什么——它只做监控，不做防护。", "inLanguage": "zh-Hans", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-zh-Hans"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/zh-Hans/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight 威胁模型", "item": "https://flowlight.xinbetween.com/zh-Hans/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">跳到正文</a>
@@ -145,6 +145,10 @@
         在检查打开之前就启动的应用，或者固定自己证书的应用，都会原封不动地直接通过——这是刻意的，因为破坏一条固定了证书的连接
         就等于弄坏那个应用。QUIC 同样不会交给代理。</p>
       <p>所以，检查界面是空的，意思是“没有东西被转发到这里”，而不是“什么都没发生”。到底是哪一种，“来源 › 覆盖范围”会按应用逐个说明。</p>
+      <p><strong>Store 产品不会接管代理或信任设置。</strong>它会提供一个环回代理和公共 CA，但由你自行导入该 CA，并自行配置每个应用的路由。
+        其内容过滤扩展会根据 macOS 附在准确活跃环回套接字上的审计令牌来归属显式代理连接，并同时匹配来源端口和代理端口。身份未知、过期或不匹配时，
+        按应用执行会开放放行；Flowlight 绝不会用猜测出的进程代替。移除检查会删除应用所有的密钥和生成的叶证书，但你导入的公共 CA 仍归你所有，
+        需要另行在“钥匙串访问”中移除。</p>
 
       <h2 id="blocking">阻止是什么，不是什么</h2>
       <p>一条拒绝连接的规则通常由网络扩展执行，就在连接的路径上，在连接建立之前。对于经由 HTTPS 检查转发的流量，本地代理会在
@@ -210,7 +214,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight 贡献者。Flowlight 是自由软件，依 <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> 发布。</span>
-      <span>版本 0.17.3 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
+      <span>版本 0.18.0 · 与 Apple 及本站提及的任何 AI 提供方均无关联。</span>
     </div>
   </div>
 </footer>

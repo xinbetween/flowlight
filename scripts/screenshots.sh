@@ -46,10 +46,14 @@ SHOTS=(
   "inspect:inspect::"
   "visualize:visualize::1600x994"
 )
-# Rules is Store-capable but not one of the website's ten published assets. Add it only when an explicit capture set
-# asks for it, keeping the default website inventory and its all-images manifest stable.
+# Policies is Store-capable but not one of the website's ten published assets. The internal `rules` screen value and
+# output filename remain stable for screenshot automation and old arguments.
 if [ -n "${FL_ONLY:-}" ] && [[ ",${FL_ONLY}," == *",rules,"* ]]; then
   SHOTS+=("rules:rules::")
+fi
+# Sources is likewise available for release acceptance without expanding the website's committed image inventory.
+if [ -n "${FL_ONLY:-}" ] && [[ ",${FL_ONLY}," == *",sources,"* ]]; then
+  SHOTS+=("sources:sources::")
 fi
 
 exact_app_pids() {
@@ -80,7 +84,8 @@ expected_window_title() {
     agents) print -r -- "AI Agents" ;;
     reports) print -r -- "History" ;;
     alerts) print -r -- "Alerts" ;;
-    rules) print -r -- "Rules" ;;
+    rules) print -r -- "Policies" ;;
+    sources) print -r -- "Sources" ;;
     inspect) print -r -- "Inspect" ;;
     visualize) print -r -- "Connections" ;;
     *) echo "    no expected window title for screen $1" >&2; return 1 ;;
@@ -92,7 +97,7 @@ title_matches_screen() {
   expected=$(expected_window_title "$screen") || return 1
   case "$screen" in
     alerts) [[ "$actual" == "$expected" || "$actual" == "$expected – "* ]] ;;
-    rules) [[ "$actual" == "$expected" || "$actual" == "$expected – "*" in force" ]] ;;
+    rules) [[ "$actual" == "$expected" || "$actual" == "$expected – "* ]] ;;
     inspect) [[ "$actual" == "$expected" || "$actual" == "$expected – Off" ]] ;;
     *) [[ "$actual" == "$expected" ]] ;;
   esac
@@ -122,8 +127,8 @@ capture() {
   # with the same bundle identifier, producing a real candidate window on the wrong screen.
   "$executable" -ApplePersistenceIgnoreState YES -AppleLanguages "(en)" -AppleLocale en_US \
     -FLDemo YES -FLRenderLive YES -FLScreen "$screen" -FLAgentTab "${tab:-destinations}" \
-    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO \
-    -FLForceLightAppearance YES -FLPinScreenshotScreen YES \
+    -FLWindow "${w}x${h}" -FLInspectSelect paste.example -inspection.enabled NO -inspection.store.enabled NO \
+    -FLForceLightAppearance YES -FLPinScreenshotScreen YES -FLDisableMotion YES \
     "${banner[@]}" "${visualization[@]}" "${rules[@]}" >/dev/null 2>&1 &
   local pid=$!
   local command=""

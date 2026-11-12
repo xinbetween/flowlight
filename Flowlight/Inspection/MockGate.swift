@@ -16,18 +16,25 @@ final class MockGate {
         /// The bytes that complete that request, the rule that answers it, and the request line it answered —
         /// which a rule refusing a request needs in order to be recorded as having refused something in particular.
         case answer(MockRule, Data, ProxyRequestHead?)
+        /// A durable request refusal. Direct path/method rules can decide from the head, so they never retain an
+        /// unbounded upload body; failure forwards these exact bytes and turns the remainder into an opaque stream.
+        case refuse(MockRule, Data, ProxyRequestHead?)
         /// A whole request, changed on its way out: the bytes to send and record, and what to call the change.
         /// The original is not recorded, because it is not what the server was sent.
-        case rewritten(Data, String)
+        case rewritten(Data, guardrail: String?, rewrite: String?)
     }
 
     /// What to do with a whole request once its body has arrived.
     enum Intervention: Equatable {
         /// Send and record these bytes instead.
-        case replace(Data, note: String)
+        case replace(Data, guardrail: String?, rewrite: String?)
         /// Answer it here; nothing goes upstream.
         case answer(MockRule)
     }
+
+    /// Once any request on this keep-alive connection has gone upstream, a later local response could overtake that
+    /// request's server response. Refusals therefore fail open for the remainder of the connection.
+    private var forwardedRequest = false
 
     private enum State {
         case head
@@ -87,6 +94,26 @@ final class MockGate {
             let next = head.map(Self.bodyState(for:)) ?? .opaque
             let complete = Self.endsMessage(next)
             state = next
+            if answering != nil, forwardedRequest {
+                // A local answer could overtake the response to an earlier upstream request. Preserve HTTP ordering by
+                // failing open from this head onward, including any body bytes already present in the same read.
+                var received = take(length)
+                received.append(take(buffer.count))
+                answering = nil
+                state = .opaque
+                actions.append(.forward(received))
+                return false
+            }
+            // A path/method refusal is fully decided by the head. Stop framing now: persistence failure forwards every
+            // byte already received and lets the rest stream unchanged, while success closes the relay after the 403.
+            if let answering, answering.rule.blocked {
+                var received = take(length)
+                received.append(take(buffer.count))
+                self.answering = nil
+                state = .opaque
+                actions.append(.refuse(answering.rule, received, answering.head))
+                return false
+            }
             // A request worth reading whole is held until it is: a declaration can only be changed once all of it
             // has arrived. Nothing else is ever held, and a rule answering this request takes precedence.
             if answering == nil, let head, intervene != nil, Self.holdable(next) {
@@ -145,11 +172,19 @@ final class MockGate {
         guard let held = holding else { return }
         holding = nil
         switch intervene?(held.head, held.bytes) {
-        case .replace(let bytes, let note):
-            actions.append(.rewritten(bytes, note))
+        case .replace(let bytes, let guardrail, let rewrite):
+            forwardedRequest = true
+            actions.append(.rewritten(bytes, guardrail: guardrail, rewrite: rewrite))
         case .answer(let rule):
-            actions.append(.answer(rule, held.bytes, held.head))
+            if forwardedRequest {
+                actions.append(.forward(held.bytes))
+            } else {
+                actions.append(rule.blocked
+                    ? .refuse(rule, held.bytes, held.head)
+                    : .answer(rule, held.bytes, held.head))
+            }
         case nil:
+            forwardedRequest = true
             actions.append(.forward(held.bytes))
         }
     }
@@ -164,6 +199,7 @@ final class MockGate {
         }
         guard let answering else {
             if !bytes.isEmpty { actions.append(.forward(bytes)) }
+            if complete { forwardedRequest = true }
             return
         }
         if complete {

@@ -194,14 +194,14 @@ struct FlowlightApp: App {
         #endif
 
         MenuBarExtra {
-            MenuBarContent()
+            MenuBarContent(liveState: monitor.liveState)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(nav)
                 .environmentObject(updater)
                 .environmentObject(focus)
         } label: {
-            MenuBarLabel()
+            MenuBarLabel(liveState: monitor.liveState)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(updater)
@@ -215,6 +215,7 @@ struct FlowlightApp: App {
 }
 
 struct MenuBarLabel: View {
+    @ObservedObject var liveState: TrafficLiveState
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var extensionManager: ExtensionManager
     @EnvironmentObject var updater: UpdateChecker
@@ -242,7 +243,7 @@ struct MenuBarLabel: View {
                     .accessibilityHidden(true)
             }
             if showRates {
-                Text("↓\(ByteFormat.compact(monitor.currentIn)) ↑\(ByteFormat.compact(monitor.currentOut))")
+                Text("↓\(ByteFormat.compact(liveState.currentIn)) ↑\(ByteFormat.compact(liveState.currentOut))")
                     .monospacedDigit()
             } else {
                 Image(systemName: monitor.unacknowledgedAlerts > 0 ? "exclamationmark.arrow.triangle.2.circlepath" : "arrow.up.arrow.down.circle")

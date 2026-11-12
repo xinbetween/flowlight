@@ -197,7 +197,70 @@ struct BucketContributors: Sendable, Equatable {
     var remaining: FlowCounters
 }
 
+enum AlertTriageState: String, CaseIterable, Sendable, Hashable {
+    case new
+    case acknowledged
+    case investigating
+    case resolved
+    case dismissed
+
+    var isClosed: Bool { self == .resolved || self == .dismissed }
+
+    func canTransition(to next: AlertTriageState) -> Bool {
+        if self == next { return true }
+        switch self {
+        case .new:
+            return true
+        case .acknowledged:
+            return next == .investigating || next == .resolved || next == .dismissed
+        case .investigating:
+            return next == .resolved || next == .dismissed
+        case .resolved, .dismissed:
+            return next == .investigating
+        }
+    }
+}
+
+enum AlertDisposition: String, CaseIterable, Sendable, Hashable {
+    case unset
+    case truePositive = "true_positive"
+    case expectedBenign = "expected_benign"
+    case falsePositive = "false_positive"
+}
+
+enum AlertTriageFilter: String, CaseIterable, Sendable, Hashable {
+    case open
+    case investigating
+    case resolved
+    case dismissed
+
+    fileprivate var states: [AlertTriageState] {
+        switch self {
+        case .open: return [.new, .acknowledged, .investigating]
+        case .investigating: return [.investigating]
+        case .resolved: return [.resolved]
+        case .dismissed: return [.dismissed]
+        }
+    }
+}
+
+enum AlertTriageError: Error, Equatable {
+    case alertNotFound(Int64)
+    case invalidTransition(from: AlertTriageState, to: AlertTriageState)
+    case noteTooLong(maximum: Int)
+}
+
+/// Database-side rollup used by the agent inventory. Each row represents distinct alerts sharing the same
+/// recorded app identity, so callers never need to materialize an unbounded alert history just to show counts.
+struct AgentOpenAlertCount: Sendable, Equatable {
+    var bundleID: String
+    var appName: String
+    var count: Int
+}
+
 struct AlertRecord: Identifiable, Sendable, Hashable {
+    static let maximumNoteLength = 2_000
+
     var id: Int64
     var timestamp: Date
     var kind: String
@@ -205,10 +268,39 @@ struct AlertRecord: Identifiable, Sendable, Hashable {
     var appName: String
     var detail: String
     var severity: Int
-    var acknowledged: Bool
+    var state: AlertTriageState
+    var disposition: AlertDisposition
+    var note: String
+    var triageUpdatedAt: Date
     /// What "Allow from now on" would add to `bundleID`'s allowlist, for alerts that come from one. Empty for
     /// every other kind, which is what hides the offer.
     var allowPattern: String = ""
+
+    /// Compatibility for exporters and callers written before triage: every state except `new` has been seen.
+    var acknowledged: Bool { state != .new }
+
+    init(id: Int64, timestamp: Date, kind: String, bundleID: String, appName: String, detail: String, severity: Int,
+         state: AlertTriageState = .new, disposition: AlertDisposition = .unset, note: String = "",
+         triageUpdatedAt: Date? = nil, allowPattern: String = "") {
+        self.id = id
+        self.timestamp = timestamp
+        self.kind = kind
+        self.bundleID = bundleID
+        self.appName = appName
+        self.detail = detail
+        self.severity = severity
+        self.state = state
+        self.disposition = disposition
+        self.note = note
+        self.triageUpdatedAt = triageUpdatedAt ?? timestamp
+        self.allowPattern = allowPattern
+    }
+
+    init(id: Int64, timestamp: Date, kind: String, bundleID: String, appName: String, detail: String, severity: Int,
+         acknowledged: Bool, allowPattern: String = "") {
+        self.init(id: id, timestamp: timestamp, kind: kind, bundleID: bundleID, appName: appName, detail: detail,
+                  severity: severity, state: acknowledged ? .acknowledged : .new, allowPattern: allowPattern)
+    }
 }
 
 /// One decision a rule made, as the violations feed shows it.
@@ -279,6 +371,8 @@ final class TrafficDatabase: @unchecked Sendable {
     let queue = DispatchQueue(label: "flowlight.db", qos: .userInitiated)
     private let conn: SQLiteConnection
     let url: URL
+    /// App-lifetime, credential-free provider settings. The writer queue replaces this whole value atomically.
+    private var runtimeProviderProfiles: [ProviderRuntimeProfile] = []
 
     /// Always Application Support, so history survives a build gaining (or losing) the App Group entitlement and
     /// a change of Team ID. The extension never opens the database; it only shares the group for its XPC service.
@@ -641,6 +735,32 @@ final class TrafficDatabase: @unchecked Sendable {
         if !alertColumns.contains("allow_pattern") {
             try conn.execute("ALTER TABLE alerts ADD COLUMN allow_pattern TEXT NOT NULL DEFAULT ''")
         }
+        // 0.17.5 adds local single-user triage without rewriting or replacing the alert table. The old bit remains
+        // synchronized for database compatibility, and seeds the richer lifecycle exactly once on migration. Keep the
+        // column additions, backfills, and index atomic: a process interruption must not leave defaults that look like
+        // a completed migration on the next launch.
+        let needsTriageState = !alertColumns.contains("triage_state")
+        let needsTriageTimestamp = !alertColumns.contains("triage_updated_at")
+        try conn.transaction {
+            if needsTriageState {
+                try conn.execute("ALTER TABLE alerts ADD COLUMN triage_state TEXT NOT NULL DEFAULT 'new'")
+            }
+            // Also repairs a prerelease database interrupted after adding triage_state but before its later columns.
+            if needsTriageState || needsTriageTimestamp {
+                try conn.execute("UPDATE alerts SET triage_state = CASE WHEN acknowledged = 0 THEN 'new' ELSE 'acknowledged' END")
+            }
+            if !alertColumns.contains("disposition") {
+                try conn.execute("ALTER TABLE alerts ADD COLUMN disposition TEXT NOT NULL DEFAULT 'unset'")
+            }
+            if !alertColumns.contains("triage_note") {
+                try conn.execute("ALTER TABLE alerts ADD COLUMN triage_note TEXT NOT NULL DEFAULT ''")
+            }
+            if needsTriageTimestamp {
+                try conn.execute("ALTER TABLE alerts ADD COLUMN triage_updated_at REAL NOT NULL DEFAULT 0")
+                try conn.execute("UPDATE alerts SET triage_updated_at = ts WHERE triage_updated_at = 0")
+            }
+            try conn.execute("CREATE INDEX IF NOT EXISTS alerts_triage_state_ts ON alerts(triage_state, ts)")
+        }
         // Added in 0.1.5.
         let exchangeColumns = Set(try conn.query("PRAGMA table_info(http_exchanges)") { $0.text(1) })
         for column in ["tool_results", "mcp", "llm"] where !exchangeColumns.contains(column) {
@@ -655,6 +775,16 @@ final class TrafficDatabase: @unchecked Sendable {
         if !exchangeColumns.contains("guardrail") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN guardrail TEXT NOT NULL DEFAULT ''")
         }
+        // Request rewrites used the guardrail column before central policy activity needed to distinguish their
+        // effects. The durable marker, rather than column presence, completes the migration: a prerelease launch may
+        // have added the column and stopped before finishing the schema transaction. Every legacy value is inherently
+        // ambiguous once its short-lived RuleEvent has expired — even the old join delimiter may appear inside a
+        // user-entered JSON path — so history stays untouched rather than fabricating an effect.
+        let needsRequestRewriteColumn = !exchangeColumns.contains("request_rewrite")
+        let inspectionEffectSplitVersion = try conn.query(
+            "SELECT watermark FROM rollup_state WHERE tier = 'schema.inspectionEffectSplit'",
+            map: { $0.int(0) }
+        ).first ?? 0
         // Unlike a mock, this names a response the origin really sent before Flowlight changed it for the client.
         if !exchangeColumns.contains("response_transform") {
             try conn.execute("ALTER TABLE http_exchanges ADD COLUMN response_transform TEXT NOT NULL DEFAULT ''")
@@ -727,6 +857,28 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE INDEX IF NOT EXISTS rule_pack_events_time ON rule_pack_event_rollups(bucket DESC);
         CREATE INDEX IF NOT EXISTS rule_pack_events_pack ON rule_pack_event_rollups(pack_id, bucket DESC);
         """)
+        if needsRequestRewriteColumn || inspectionEffectSplitVersion < 1 {
+            // The schema change, conservative data split, and marker are one transaction. On interruption SQLite
+            // rolls all three back; if an earlier prerelease added only the column, the missing marker still runs this.
+            try conn.transaction {
+                if needsRequestRewriteColumn {
+                    try conn.execute("ALTER TABLE http_exchanges ADD COLUMN request_rewrite TEXT NOT NULL DEFAULT ''")
+                }
+                // A current guardrail row proves the event's policy kind without correlating unrelated requests by
+                // timestamp. Deleted historical policies cannot be identified safely and retain their original event
+                // engine; their exchange metadata below still preserves the guardrail effect.
+                try conn.execute("""
+                    UPDATE rule_events SET engine = 'guardrail'
+                    WHERE engine = 'request' AND rule_id IN (SELECT id FROM guardrails)
+                    """)
+                // Legacy exchange text is not rewritten. A middle dot is valid user data as well as the old join
+                // delimiter, and there is no durable per-effect identity that can distinguish those cases safely.
+                try conn.execute("""
+                    INSERT OR REPLACE INTO rollup_state (tier, watermark)
+                    VALUES ('schema.inspectionEffectSplit', 1)
+                    """)
+            }
+        }
         let packEventKeyVersion = try conn.query(
             "SELECT watermark FROM rollup_state WHERE tier = 'schema.rulePackEventKey'",
             map: { $0.int(0) }
@@ -1425,17 +1577,36 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Agent allowlists
 
     func loadPolicies() throws -> [String: AgentPolicy] {
-        let rows = try conn.query("SELECT policy FROM agent_policies") { $0.text(0) }
-        let policies = rows.compactMap { try? JSONDecoder().decode(AgentPolicy.self, from: Data($0.utf8)) }
-        return Dictionary(policies.map { ($0.agentID, $0) }, uniquingKeysWith: { a, _ in a })
+        let rows = try conn.query("""
+            SELECT agent_id, policy, updated FROM agent_policies
+            ORDER BY updated DESC, agent_id COLLATE NOCASE ASC, agent_id ASC
+            """) { ($0.text(0), $0.text(1), $0.int(2)) }
+        var selected: [AgentPolicy] = []
+        for row in rows {
+            guard var policy = try? JSONDecoder().decode(AgentPolicy.self, from: Data(row.1.utf8)) else { continue }
+            policy.agentID = row.0
+            guard AgentPolicy.resolve(selected, identities: [policy.agentID]) == nil else { continue }
+            selected.append(policy)
+        }
+        return Dictionary(uniqueKeysWithValues: selected.map { ($0.agentID, $0) })
     }
 
     func savePolicy(_ policy: AgentPolicy) throws {
         let json = String(decoding: try JSONEncoder().encode(policy), as: UTF8.self)
-        try conn.run("""
-            INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
-            ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
-            """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        try conn.transaction {
+            // One catalog agent has one policy. Remove obsolete alias-keyed copies so every reporter and enforcer
+            // receives the same decision even when older builds saved the agent under another stable identifier.
+            let aliases = try conn.query("SELECT agent_id FROM agent_policies") { $0.text(0) }.filter {
+                $0 != policy.agentID && AgentCatalog.sameAgentIdentity($0, policy.agentID)
+            }
+            for alias in aliases {
+                try conn.run("DELETE FROM agent_policies WHERE agent_id = ?", [.text(alias)])
+            }
+            try conn.run("""
+                INSERT INTO agent_policies (agent_id, policy, updated) VALUES (?,?,?)
+                ON CONFLICT(agent_id) DO UPDATE SET policy = excluded.policy, updated = excluded.updated
+                """, [.text(policy.agentID), .text(json), .int(Int64(Date().timeIntervalSince1970))])
+        }
     }
 
     // MARK: Rules
@@ -1666,7 +1837,8 @@ final class TrafficDatabase: @unchecked Sendable {
         var attempts = try conn.query("""
             SELECT bundle_id, app_name, agent, agent_name,
                    CASE WHEN host <> '' THEN host ELSE ip END, port, COUNT(*), rule_id,
-                   CASE WHEN engine = 'flow' THEN 'Flow rule' ELSE 'Request rule' END
+                   CASE engine WHEN 'flow' THEN 'Flow rule' WHEN 'guardrail' THEN 'Guardrail' ELSE 'Request rule' END,
+                   engine
             FROM rule_events
             WHERE action = 'block' AND ts >= ? AND ts < ?
             GROUP BY bundle_id, app_name, agent, agent_name, host, ip, port, rule_id, engine
@@ -1674,7 +1846,9 @@ final class TrafficDatabase: @unchecked Sendable {
                 BlockedAttemptRow(
                     bundleID: row.text(0), appName: row.text(1), agentKey: row.text(2), agentName: row.text(3),
                     destination: row.text(4), port: UInt16(clamping: row.int(5)), count: row.int(6),
-                    category: "rule", source: "ordinary-rule", detail: "\(row.text(8)) · \(row.text(7))"
+                    category: row.text(9) == "guardrail" ? "guardrail" : "rule",
+                    source: row.text(9) == "guardrail" ? "guardrail" : "ordinary-rule",
+                    detail: "\(row.text(8)) · \(row.text(7))"
                 )
             }
         attempts += try conn.query("""
@@ -2273,6 +2447,11 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: Plugins
 
+    /// Replaces one immutable runtime generation. Callers enqueue this on `queue`, alongside inserts and backfills.
+    func replaceProviderProfiles(_ profiles: [ProviderRuntimeProfile]) {
+        runtimeProviderProfiles = profiles
+    }
+
     func loadPluginManifests() throws -> [PluginManifest] {
         let rows = try conn.query("SELECT manifest, enabled FROM plugins ORDER BY updated") { ($0.text(0), $0.int(1) != 0) }
         return rows.compactMap { text, enabled in
@@ -2321,6 +2500,7 @@ final class TrafficDatabase: @unchecked Sendable {
         let evaluable = active.filter { $0.source == .builtIn || (!$0.script.isEmpty && $0.source == .installed) }
         guard !evaluable.isEmpty else { return 0 }
         let exchanges = try exchanges(since: since, limit: limit)
+        let profileSnapshot = runtimeProviderProfiles
         var inserted = 0
         try conn.transaction {
             if let pluginID { try conn.run("DELETE FROM plugin_findings WHERE plugin_id = ?", [.text(pluginID)]) }
@@ -2329,7 +2509,10 @@ final class TrafficDatabase: @unchecked Sendable {
             }
             for exchange in exchanges {
                 let before = conn.changes
-                try insertPluginFindings(PluginEngine.evaluate(exchange, manifests: evaluable), forExchangeID: exchange.id ?? 0)
+                try insertPluginFindings(
+                    PluginEngine.evaluate(exchange, manifests: evaluable, providerProfiles: profileSnapshot),
+                    forExchangeID: exchange.id ?? 0
+                )
                 inserted += max(0, conn.changes - before)
             }
         }
@@ -2440,8 +2623,9 @@ final class TrafficDatabase: @unchecked Sendable {
             try conn.run("""
                 INSERT INTO http_exchanges (ts, duration, scheme, host, port, method, path, status, req_headers, req_body, req_size,
                     req_truncated, resp_headers, resp_body, resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent,
-                    agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail, response_transform)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    agent_name, mcp_server, tool_calls, note, tool_results, mcp, llm, mock_rule, guardrail, request_rewrite,
+                    response_transform)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, [.double(e.started.timeIntervalSince1970), .double(e.duration), .text(e.scheme), .text(e.host), .int(Int64(e.port)),
                       .text(e.method), .text(e.path), e.status.map { .int(Int64($0)) } ?? .null,
                       .text(json(e.requestHeaders)), .blob(e.requestBody), .int(Int64(e.requestSize)), .int(e.requestTruncated ? 1 : 0),
@@ -2449,7 +2633,8 @@ final class TrafficDatabase: @unchecked Sendable {
                       .text(e.contentType), .int(Int64(e.pid)), .text(e.bundleID), .text(e.appName), .text(e.agent ?? ""),
                       .text(e.agentName ?? ""), .text(e.mcpServer ?? ""), .text(e.toolCalls.isEmpty ? "" : json(e.toolCalls)), .text(e.note ?? ""),
                       .text(e.toolResults.isEmpty ? "" : json(e.toolResults)), .text(e.mcp.isEmpty ? "" : json(e.mcp)),
-                      .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? ""), .text(e.responseTransform ?? "")])
+                      .text(e.llm.map(json) ?? ""), .text(e.mockRule ?? ""), .text(e.guardrail ?? ""),
+                      .text(e.requestRewrite ?? ""), .text(e.responseTransform ?? "")])
             insertedID = try conn.query("SELECT last_insert_rowid()", map: { $0.int(0) }).first ?? 0
             var stored = e
             stored.id = insertedID
@@ -2476,7 +2661,14 @@ final class TrafficDatabase: @unchecked Sendable {
             guard !manifests.isEmpty else { return }
             var stored = exchange
             stored.id = exchangeID
-            try insertPluginFindings(PluginScriptRunner.shared.evaluate(exchange: stored, manifests: manifests), forExchangeID: exchangeID)
+            try insertPluginFindings(
+                PluginScriptRunner.shared.evaluate(
+                    exchange: stored,
+                    manifests: manifests,
+                    providerProfiles: runtimeProviderProfiles
+                ),
+                forExchangeID: exchangeID
+            )
         } catch {
             appLog.error("installed plugin evaluation skipped: \(String(describing: error), privacy: .public)")
         }
@@ -2686,11 +2878,12 @@ final class TrafficDatabase: @unchecked Sendable {
     ///   is a different question from "find this text", and answering the first with the second matches any
     ///   response body that merely mentions the app's name — which is how asking for Claude Code's traffic
     ///   returned every GitHub page whose HTML says "Claude Code".
-    func exchanges(since: Date, search: String = "", limit: Int = 500, focus: FocusScope = .none,
-                   app: String? = nil, apps: [String] = [], host: String? = nil,
+    func exchanges(since: Date, search: String = "", limit: Int? = 500,
+                   before: Date? = nil, beforeID: Int64? = nil,
+                   focus: FocusScope = .none, app: String? = nil, apps: [String] = [], host: String? = nil,
                    hostIncludesSubdomains: Bool = true, includeAttributedChildren: Bool = false,
                    agentParent: String? = nil, mcpServer: String? = nil,
-                   potentialHarmOnly: Bool = false) throws -> [HTTPExchange] {
+                   potentialHarmOnly: Bool = false, policyEffectsOnly: Bool = false) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -2750,16 +2943,31 @@ final class TrafficDatabase: @unchecked Sendable {
                    AND r.severity IN ('medium', 'high')
              )
             """ : ""
+        let policyClause = policyEffectsOnly
+            ? " AND (mock_rule <> '' OR guardrail <> '' OR request_rewrite <> '' OR response_transform <> '')"
+            : ""
+        let cursorClause: String
+        let cursorValues: [SQLValue]
+        if let before, let beforeID {
+            cursorClause = " AND (ts < ? OR (ts = ? AND id < ?))"
+            cursorValues = [.double(before.timeIntervalSince1970), .double(before.timeIntervalSince1970), .int(beforeID)]
+        } else {
+            cursorClause = ""
+            cursorValues = []
+        }
+        let limitClause = limit == nil ? "" : " LIMIT ?"
+        var bindings: [SQLValue] = [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like),
+                                    .text(like), .text(like), .text(like), .text(like), .text(like), .text(like)]
+            + focusValues + scopeValues + cursorValues
+        if let limit { bindings.append(.int(Int64(limit))) }
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
-                   tool_results, mcp, llm, mock_rule, guardrail, response_transform
+                   tool_results, mcp, llm, mock_rule, guardrail, request_rewrite, response_transform
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)
-            ORDER BY ts DESC LIMIT ?
-            """, [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like), .text(like), .text(like), .text(like), .text(like),
-                  .text(like), .text(like)]
-                  + focusValues + scopeValues + [.int(Int64(limit))]) { row in
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)\(policyClause)\(cursorClause)
+            ORDER BY ts DESC, id DESC\(limitClause)
+            """, bindings) { row in
             let decoder = JSONDecoder()
             func headers(_ i: Int32) -> [HTTPHeader] { (try? decoder.decode([HTTPHeader].self, from: Data(row.text(i).utf8))) ?? [] }
             let tools = row.text(22), results = row.text(24), mcp = row.text(25), llm = row.text(26)
@@ -2775,8 +2983,34 @@ final class TrafficDatabase: @unchecked Sendable {
                 mcp: mcp.isEmpty ? [] : ((try? decoder.decode([MCPActivity].self, from: Data(mcp.utf8))) ?? []),
                 llm: llm.isEmpty ? nil : try? decoder.decode(LLMFacts.self, from: Data(llm.utf8)),
                 note: row.text(23).nilIfEmpty, mockRule: row.text(27).nilIfEmpty, guardrail: row.text(28).nilIfEmpty,
-                responseTransform: row.text(29).nilIfEmpty)
+                requestRewrite: row.text(29).nilIfEmpty, responseTransform: row.text(30).nilIfEmpty)
         }
+    }
+
+    /// Every agent with at least one decrypted exchange in the complete selected window. This intentionally has no
+    /// row limit: the inventory uses it as health evidence, while `exchanges` remains bounded for detail rendering.
+    func inspectedAgentIDs(since: Date, focus: FocusScope = .none) throws -> Set<String> {
+        var focusClause = ""
+        var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
+        if !focus.isEmpty {
+            var parts: [String] = []
+            if !focus.bundleIDs.isEmpty {
+                let marks = Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")
+                parts.append("(bundle_id IN (\(marks)) OR agent IN (\(marks)))")
+                values += focus.bundleIDs.map { .text($0) }
+                values += focus.bundleIDs.map { .text($0) }
+            }
+            for host in focus.hosts where !AgentPolicy.isIPAddress(host) {
+                parts.append("(host = ? OR host LIKE ?)")
+                values.append(.text(host))
+                values.append(.text("%." + host))
+            }
+            focusClause = parts.isEmpty ? " AND 0" : " AND (" + parts.joined(separator: " OR ") + ")"
+        }
+        return Set(try conn.query("""
+            SELECT DISTINCT agent FROM http_exchanges
+            WHERE ts >= ? AND agent != ''\(focusClause)
+            """, values) { $0.text(0) })
     }
 
     func exchangeBodies(id: Int64) throws -> (request: Data, response: Data)? {
@@ -2856,49 +3090,186 @@ final class TrafficDatabase: @unchecked Sendable {
     func addAlert(kind: String, bundleID: String, appName: String, detail: String, severity: Int, at date: Date = Date(),
                   allowPattern: String = "") throws -> AlertRecord {
         let ts = Int64(date.timeIntervalSince1970)
-        try conn.run("INSERT INTO alerts (ts, kind, bundle_id, app_name, detail, severity, allow_pattern) VALUES (?,?,?,?,?,?,?)",
-                     [.int(ts), .text(kind), .text(bundleID), .text(appName), .text(detail), .int(Int64(severity)),
-                      .text(allowPattern)])
+        try conn.run("""
+            INSERT INTO alerts
+                (ts, kind, bundle_id, app_name, detail, severity, acknowledged, allow_pattern,
+                 triage_state, disposition, triage_note, triage_updated_at)
+            VALUES (?,?,?,?,?,?,0,?,'new','unset','',?)
+            """, [.int(ts), .text(kind), .text(bundleID), .text(appName), .text(detail), .int(Int64(severity)),
+                   .text(allowPattern), .double(date.timeIntervalSince1970)])
         let id = try conn.query("SELECT last_insert_rowid()") { $0.int(0) }.first ?? 0
         return AlertRecord(id: id, timestamp: date, kind: kind, bundleID: bundleID, appName: appName, detail: detail,
-                           severity: severity, acknowledged: false, allowPattern: allowPattern)
+                           severity: severity, triageUpdatedAt: date, allowPattern: allowPattern)
     }
 
     /// Alerts newest first. An alert names the app that raised it and nothing about where it went, so Focus can
     /// only narrow these by app: focusing purely on destinations leaves the list alone rather than emptying it.
-    func alerts(limit: Int = 500, focus: FocusScope = .none) throws -> [AlertRecord] {
-        var clause = ""
+    func alerts(limit: Int = 500, focus: FocusScope = .none,
+                triageFilter: AlertTriageFilter? = nil, kind: String? = nil) throws -> [AlertRecord] {
+        var conditions: [String] = []
         var values: [SQLValue] = []
         if !focus.bundleIDs.isEmpty {
-            clause = " WHERE bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))"
-            values = focus.bundleIDs.map { .text($0) }
+            conditions.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+            values += focus.bundleIDs.map { .text($0) }
         }
+        if let triageFilter {
+            conditions.append("triage_state IN (\(Array(repeating: "?", count: triageFilter.states.count).joined(separator: ",")))")
+            values += triageFilter.states.map { .text($0.rawValue) }
+        }
+        if let kind {
+            conditions.append("kind = ?")
+            values.append(.text(kind))
+        }
+        let clause = conditions.isEmpty ? "" : " WHERE " + conditions.joined(separator: " AND ")
         return try conn.query("""
-            SELECT id, ts, kind, bundle_id, app_name, detail, severity, acknowledged, allow_pattern FROM alerts\(clause) \
-            ORDER BY ts DESC, id DESC LIMIT ?
+            SELECT id, ts, kind, bundle_id, app_name, detail, severity, allow_pattern,
+                   triage_state, disposition, triage_note, triage_updated_at
+            FROM alerts\(clause) ORDER BY ts DESC, id DESC LIMIT ?
             """, values + [.int(Int64(limit))]) { r in
-            AlertRecord(id: r.int(0), timestamp: Date(timeIntervalSince1970: TimeInterval(r.int(1))), kind: r.text(2),
-                        bundleID: r.text(3), appName: r.text(4), detail: r.text(5), severity: Int(r.int(6)),
-                        acknowledged: r.int(7) != 0, allowPattern: r.text(8))
+            let timestamp = Date(timeIntervalSince1970: TimeInterval(r.int(1)))
+            return AlertRecord(
+                id: r.int(0), timestamp: timestamp, kind: r.text(2), bundleID: r.text(3), appName: r.text(4),
+                detail: r.text(5), severity: Int(r.int(6)),
+                state: AlertTriageState(rawValue: r.text(8)) ?? .new,
+                disposition: AlertDisposition(rawValue: r.text(9)) ?? .unset,
+                note: r.text(10),
+                triageUpdatedAt: r.isNull(11) ? timestamp : Date(timeIntervalSince1970: r.double(11)),
+                allowPattern: r.text(7)
+            )
         }
     }
 
-    /// Narrowed by Focus the same way `alerts` is, so the sidebar badge matches the list it opens.
-    func unacknowledgedAlertCount(focus: FocusScope = .none) throws -> Int {
+    /// Open-alert counts grouped by their recorded app identity. The AI-agent inventory can join these compact rows
+    /// against catalog aliases without loading every alert in the selected window.
+    func openAlertCounts(since: Date, focus: FocusScope = .none) throws -> [AgentOpenAlertCount] {
+        var conditions = ["ts >= ?", "triage_state IN ('new','acknowledged','investigating')"]
+        var values: [SQLValue] = [.int(Int64(since.timeIntervalSince1970))]
+        if !focus.bundleIDs.isEmpty {
+            conditions.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
+            values += focus.bundleIDs.map { .text($0) }
+        }
+        return try conn.query("""
+            SELECT bundle_id, app_name, COUNT(*) FROM alerts
+            WHERE \(conditions.joined(separator: " AND "))
+            GROUP BY bundle_id, app_name
+            ORDER BY bundle_id COLLATE NOCASE, app_name COLLATE NOCASE
+            """, values) {
+            AgentOpenAlertCount(bundleID: $0.text(0), appName: $0.text(1), count: Int($0.int(2)))
+        }
+    }
+
+    /// The badge is deliberately narrower than "not resolved": it is the number of alerts nobody has triaged yet.
+    /// Focus is applied exactly as it is to `alerts`, so the sidebar badge matches the scope of the list it opens.
+    func newAlertCount(focus: FocusScope = .none) throws -> Int {
         var clause = ""
         var values: [SQLValue] = []
         if !focus.bundleIDs.isEmpty {
             clause = " AND bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))"
             values = focus.bundleIDs.map { .text($0) }
         }
-        return Int(try conn.query("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0\(clause)", values) { $0.int(0) }.first ?? 0)
+        return Int(try conn.query("SELECT COUNT(*) FROM alerts WHERE triage_state = 'new'\(clause)", values) {
+            $0.int(0)
+        }.first ?? 0)
     }
 
-    func acknowledgeAlerts(ids: [Int64]?) throws {
+    /// Compatibility name retained for older callers; "unacknowledged" now means exactly the `new` state.
+    func unacknowledgedAlertCount(focus: FocusScope = .none) throws -> Int {
+        try newAlertCount(focus: focus)
+    }
+
+    private static let alertIDBatchSize = 500
+
+    private func alertIDBatches(_ ids: [Int64]) -> [[Int64]] {
+        let unique = Array(Set(ids)).sorted()
+        return stride(from: 0, to: unique.count, by: Self.alertIDBatchSize).map { start in
+            Array(unique[start..<min(start + Self.alertIDBatchSize, unique.count)])
+        }
+    }
+
+    private func selectedAlertStates(ids: [Int64]) throws -> [(Int64, AlertTriageState)] {
+        let batches = alertIDBatches(ids)
+        guard !batches.isEmpty else { return [] }
+        var rows: [(Int64, AlertTriageState)] = []
+        for batch in batches {
+            let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+            rows += try conn.query("SELECT id, triage_state FROM alerts WHERE id IN (\(placeholders))",
+                                   batch.map { .int($0) }) {
+                ($0.int(0), AlertTriageState(rawValue: $0.text(1)) ?? .new)
+            }
+        }
+        let unique = batches.flatMap { $0 }
+        let found = Set(rows.map(\.0))
+        if let missing = unique.first(where: { !found.contains($0) }) { throw AlertTriageError.alertNotFound(missing) }
+        return rows
+    }
+
+    /// Validates every row before one update, so a mixed valid/invalid selection never partially advances.
+    func setAlertTriageState(_ state: AlertTriageState, ids: [Int64], at date: Date = Date()) throws {
+        let unique = Array(Set(ids)).sorted()
+        guard !unique.isEmpty else { return }
+        try conn.transaction {
+            let rows = try selectedAlertStates(ids: unique)
+            if let invalid = rows.first(where: { !$0.1.canTransition(to: state) }) {
+                throw AlertTriageError.invalidTransition(from: invalid.1, to: state)
+            }
+            for batch in alertIDBatches(unique) {
+                let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                try conn.run("""
+                    UPDATE alerts SET triage_state = ?, acknowledged = ?, triage_updated_at = ?
+                    WHERE id IN (\(placeholders))
+                    """, [.text(state.rawValue), .int(state == .new ? 0 : 1), .double(date.timeIntervalSince1970)]
+                        + batch.map { .int($0) })
+            }
+        }
+    }
+
+    func setAlertDisposition(_ disposition: AlertDisposition, ids: [Int64], at date: Date = Date()) throws {
+        let unique = Array(Set(ids)).sorted()
+        guard !unique.isEmpty else { return }
+        try conn.transaction {
+            _ = try selectedAlertStates(ids: unique)
+            for batch in alertIDBatches(unique) {
+                let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                try conn.run("""
+                    UPDATE alerts SET disposition = ?, triage_updated_at = ? WHERE id IN (\(placeholders))
+                    """, [.text(disposition.rawValue), .double(date.timeIntervalSince1970)] + batch.map { .int($0) })
+            }
+        }
+    }
+
+    func setAlertNote(_ note: String, id: Int64, at date: Date = Date()) throws {
+        guard note.count <= AlertRecord.maximumNoteLength else {
+            throw AlertTriageError.noteTooLong(maximum: AlertRecord.maximumNoteLength)
+        }
+        try conn.transaction {
+            _ = try selectedAlertStates(ids: [id])
+            try conn.run("UPDATE alerts SET triage_note = ?, triage_updated_at = ? WHERE id = ?",
+                         [.text(note), .double(date.timeIntervalSince1970), .int(id)])
+        }
+    }
+
+    /// Legacy acknowledgement is an additive adapter: it advances only `new` rows and cannot overwrite later work.
+    /// A nil selection means every new alert in the current Focus scope, updated as one set instead of materializing
+    /// an unbounded ID list.
+    func acknowledgeAlerts(ids: [Int64]?, focus: FocusScope = .none) throws {
         if let ids {
-            try conn.transaction { for id in ids { try conn.run("UPDATE alerts SET acknowledged = 1 WHERE id = ?", [.int(id)]) } }
+            let newIDs = try selectedAlertStates(ids: ids).filter { $0.1 == .new }.map(\.0)
+            try setAlertTriageState(.acknowledged, ids: newIDs)
         } else {
-            try conn.run("UPDATE alerts SET acknowledged = 1")
+            let bundleIDs = Array(Set(focus.bundleIDs)).sorted()
+            let clause: String
+            let values: [SQLValue]
+            if bundleIDs.isEmpty {
+                clause = ""
+                values = []
+            } else {
+                clause = " AND bundle_id IN (\(Array(repeating: "?", count: bundleIDs.count).joined(separator: ",")))"
+                values = bundleIDs.map { .text($0) }
+            }
+            try conn.run("""
+                UPDATE alerts SET triage_state = 'acknowledged', acknowledged = 1, triage_updated_at = ?
+                WHERE triage_state = 'new'\(clause)
+                """, [.double(Date().timeIntervalSince1970)] + values)
         }
     }
 

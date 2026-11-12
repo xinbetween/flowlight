@@ -4,13 +4,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case live, agents, reports, alerts, rules, ask, inspect, sources, visualize
     var id: String { rawValue }
 
-    static var availableCases: [SidebarItem] {
-        #if APP_STORE
-        allCases.filter { $0 != .inspect }
-        #else
-        allCases
-        #endif
-    }
+    static var availableCases: [SidebarItem] { allCases }
 
     /// The part of the documentation that explains this screen.
     ///
@@ -24,7 +18,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .reports: return "worth-a-look"
         case .visualize: return "visualize"
         case .alerts: return "alerts"
-        case .rules: return "rules"
+        case .rules: return "policies"
         case .ask: return "ask"
         case .inspect: return "inspection"
         case .sources: return "sources"
@@ -40,7 +34,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .reports: return "History"
         case .visualize: return "Connections"
         case .alerts: return "Alerts"
-        case .rules: return "Rules"
+        case .rules: return "Policies"
         case .ask: return "Ask"
         case .inspect: return "Inspect"
         case .sources: return "Sources"
@@ -54,7 +48,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .reports: return L("History")
         case .visualize: return L("Connections")
         case .alerts: return L("Alerts")
-        case .rules: return L("Rules")
+        case .rules: return L("Policies")
         case .ask: return L("Ask")
         case .inspect: return L("Inspect")
         case .sources: return L("Sources")
@@ -143,8 +137,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// The three operational views behind the single Sources destination. Keeping this in shared navigation lets a
-/// status notice open the exact recovery surface without putting three configuration screens back in the sidebar.
+/// The three focused views in the single Sources destination. The cases remain navigation state so restored windows,
+/// screenshot arguments and deep links select the exact operational segment.
 enum SourcesTab: String, CaseIterable, Identifiable, Sendable {
     case collector, devices, coverage
 
@@ -155,6 +149,18 @@ enum SourcesTab: String, CaseIterable, Identifiable, Sendable {
         case .collector: return L("Collector")
         case .devices: return L("Devices")
         case .coverage: return L("Coverage")
+        }
+    }
+
+
+    /// `devices` and `coverage` were once standalone screens, then visible tabs. Both old forms still restore to
+    /// the corresponding section; an explicit modern section always wins over the legacy screen value.
+    static func restored(explicitRawValue: String?, legacyScreenRawValue: String?) -> SourcesTab {
+        if let explicitRawValue, let explicit = SourcesTab(rawValue: explicitRawValue) { return explicit }
+        switch legacyScreenRawValue {
+        case "devices": return .devices
+        case "coverage": return .coverage
+        default: return .collector
         }
     }
 }
@@ -168,20 +174,57 @@ enum AlertsTab: String, CaseIterable, Identifiable {
     @MainActor var title: String { self == .alerts ? L("Alerts") : L("Detection") }
 }
 
-/// The three views inside Rules. This lives with the shared navigation state so an app-wide notice can take someone
-/// straight to a changed pack, while ordinary rule links always land back on the rule list.
+/// The two views inside Policies. The raw `rules` value is deliberately retained: restored windows and preferences
+/// written before the product rename must keep landing on the inventory rather than silently resetting.
 enum RulesTab: String, CaseIterable, Identifiable {
-    case rules, packs, activity
+    case rules, activity
 
     var id: String { rawValue }
 
     @MainActor var title: String {
         switch self {
-        case .rules: return L("Rules")
-        case .packs: return L("Packs")
-        case .activity: return L("What they did")
+        case .rules: return L("Policies")
+        case .activity: return L("Activity")
         }
     }
+
+    /// `packs` was a visible tab through 0.17.3. It now restores to the unified inventory, where managed packs have
+    /// their own section. Unknown future values take the same conservative path.
+    static func restored(from rawValue: String?) -> RulesTab {
+        rawValue == RulesTab.activity.rawValue ? .activity : .rules
+    }
+
+    static func restoresManagedPackFocus(from rawValue: String?) -> Bool {
+        rawValue == "packs"
+    }
+}
+
+enum AgentPolicySection: Equatable, Sendable { case allowlist, guardrails }
+
+struct AgentPolicyRequest: Equatable, Sendable {
+    var agentID: String
+    var section: AgentPolicySection
+    var guardrailID: UUID? = nil
+    var id = UUID()
+}
+
+enum InspectPolicySection: Equatable, Sendable { case mocks, requestRewrites, responseTransforms }
+
+/// A precise request into the policy inventory. It is intentionally source-shaped rather than carrying an editor:
+/// each destination still owns its consent, validation, and save behavior.
+enum PolicyDestination: Equatable, Sendable {
+    case rule(UUID)
+    case allowlist(String)
+    case managedPack(String?)
+    case guardrail(id: UUID, agentID: String)
+    case mock(UUID)
+    case requestRewrite(UUID)
+    case responseTransform(UUID)
+}
+
+struct PolicyRequest: Equatable, Sendable {
+    var destination: PolicyDestination
+    var id = UUID()
 }
 
 /// A rule the user started writing somewhere else — a table row, an alert — waiting for the Rules screen to open
@@ -215,22 +258,23 @@ final class AppNavigation: ObservableObject {
     }()
     @Published var sourcesTab: SourcesTab = {
         let defaults = UserDefaults.standard
-        if let explicit = SourcesTab(rawValue: defaults.string(forKey: "FLSourcesTab") ?? "") {
-            return explicit
-        }
-        switch defaults.string(forKey: "FLScreen") {
-        case "devices": return .devices
-        case "coverage": return .coverage
-        default: return .collector
-        }
-    }()
+        return SourcesTab.restored(explicitRawValue: defaults.string(forKey: "FLSourcesTab"),
+                                   legacyScreenRawValue: defaults.string(forKey: "FLScreen"))
+    }() {
+        didSet { UserDefaults.standard.set(sourcesTab.rawValue, forKey: "FLSourcesTab") }
+    }
     @Published var alertsTab: AlertsTab = .alerts
     @Published var rulesTab: RulesTab = {
-        RulesTab(rawValue: UserDefaults.standard.string(forKey: "FLRulesTab") ?? "") ?? .rules
+        RulesTab.restored(from: UserDefaults.standard.string(forKey: "FLRulesTab"))
     }()
     @Published var reportRequest: ReportRequest?
     @Published var inspectRequest: InspectRequest?
     @Published var ruleRequest: RuleRequest?
+    @Published var policyRequest: PolicyRequest? = {
+        RulesTab.restoresManagedPackFocus(from: UserDefaults.standard.string(forKey: "FLRulesTab"))
+            ? PolicyRequest(destination: .managedPack(nil)) : nil
+    }()
+    @Published var agentPolicyRequest: AgentPolicyRequest?
 
     private struct TrailEntry {
         var item: SidebarItem
@@ -294,7 +338,28 @@ final class AppNavigation: ObservableObject {
 
     func showPackReviews() {
         show(.rules)
-        rulesTab = .packs
+        policyRequest = PolicyRequest(destination: .managedPack(nil))
+    }
+
+    func showPolicyPack(_ packID: String) {
+        show(.rules)
+        policyRequest = PolicyRequest(destination: .managedPack(packID))
+    }
+
+    func showPolicy(_ destination: PolicyDestination) {
+        show(.rules)
+        policyRequest = PolicyRequest(destination: destination)
+    }
+
+    func showAgentPolicy(agentID: String, section: AgentPolicySection, guardrailID: UUID? = nil) {
+        agentPolicyRequest = AgentPolicyRequest(agentID: agentID, section: section, guardrailID: guardrailID)
+        followLink(to: .agents)
+    }
+
+    func showInspectionPolicy(_ section: InspectPolicySection, policyID: UUID? = nil) {
+        guard SidebarItem.availableCases.contains(.inspect) else { return }
+        inspectRequest = InspectRequest(search: "", policySection: section, policyID: policyID)
+        followLink(to: .inspect)
     }
 
     func showReport(filter: TrafficFilter, granularity: Granularity? = nil,
@@ -378,5 +443,9 @@ struct InspectRequest: Equatable {
     var mcpServer: String? = nil
     /// Explicitly displayed and removable in Inspect; Reports uses it for the potential-harm drill-in.
     var potentialHarmOnly = false
+    /// Opens setup on the contextual editor that owns this kind of policy.
+    var policySection: InspectPolicySection? = nil
+    /// The exact retained policy to edit. Nil keeps section-level navigation for generic setup links.
+    var policyID: UUID? = nil
     var id = UUID()
 }

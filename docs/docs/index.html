@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/docs/#webpage", "url": "https://flowlight.xinbetween.com/docs/", "name": "Flowlight documentation", "description": "Install Flowlight, name your traffic, read the views, tune the AI agent rules, and uninstall cleanly.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight documentation", "item": "https://flowlight.xinbetween.com/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/docs/#faq", "mainEntity": [{"@type": "Question", "name": "Why did macOS ask Flowlight for access to my Desktop or Documents?", "acceptedAnswer": {"@type": "Answer", "text": "Only because you pointed it at a project folder inside one of them. By default Flowlight reads agent configuration from the folders in your home folder and never touches those three."}}, {"@type": "Question", "name": "Does Flowlight see all my traffic, or does it miss some?", "acceptedAnswer": {"@type": "Answer", "text": "It depends which capture engine you use, and the difference is not subtle. The default sampler reads macOS's running byte counters once a second and records the change, so a long transfer is counted exactly — but a connection that opens and closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the extension from Sources › Collector. The full comparison is above."}}, {"@type": "Question", "name": "I turned on the Network Extension and nothing appears. The sampler works fine.", "acceptedAnswer": {"@type": "Answer", "text": "Almost always because another content filter already has the slot. macOS runs one content filter at a time, and corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar. Flowlight's filter still installs, activates and connects, so Sources › Collector says Connected to filter extension, but macOS never hands it a single connection and the screens stay empty. Sources › Collector lists the filters it finds and offers to switch you back to the sampler, which doesn't use a filter and works alongside them. You lose only the very short connections (the comparison); everything else is recorded the same way."}}, {"@type": "Question", "name": "The extension stopped working after Flowlight updated.", "acceptedAnswer": {"@type": "Answer", "text": "Versions before 0.2.5 had this: macOS keeps running whichever build of the extension was last activated, so after an update the extension was the old version and macOS refuses the connection between a mismatched pair. From 0.2.5 Flowlight checks at launch and re-activates the filter itself. On an older version, press Install & enable filter in Sources › Collector once."}}, {"@type": "Question", "name": "Something else is wrong with capture and I don't know what.", "acceptedAnswer": {"@type": "Answer", "text": "Run this and read what it prints — it reports state and counts only, never anything Flowlight recorded about your traffic: curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zshCopy It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded. Paste it into an issue."}}, {"@type": "Question", "name": "Does Flowlight send anything about me anywhere?", "acceptedAnswer": {"@type": "Answer", "text": "No account, no telemetry, no analytics, and your traffic database is never uploaded. Four requests can leave the Mac, all listed on the privacy page: release and signed rule-pack checks plus the optional network-owner lookup, all with off switches, and reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections."}}, {"@type": "Question", "name": "Will it slow my Mac down or drain the battery?", "acceptedAnswer": {"@type": "Answer", "text": "With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension costs less than the fallback sampler, which starts a short-lived nettop process every second."}}, {"@type": "Question", "name": "Can it block connections?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a rule can block an app, a destination or a URL for as long as you say, and a guardrail can take a tool away from an agent before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out."}}, {"@type": "Question", "name": "Do I need the Network Extension?", "acceptedAnswer": {"@type": "Answer", "text": "No. The sampler needs no entitlement and covers most traffic. The extension adds flows shorter than a second, attribution by code signature, hostnames without the packet-capture setup, and is the only engine that can refuse a connection."}}, {"@type": "Question", "name": "What happens to my data if I uninstall?", "acceptedAnswer": {"@type": "Answer", "text": "Everything lives in ~/Library/Application Support/Flowlight. Delete that folder and it's gone; see Uninstall for the packet-capture helper and the inspection certificate."}}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/docs/#webpage", "url": "https://flowlight.xinbetween.com/docs/", "name": "Flowlight documentation", "description": "Install Flowlight, name your traffic, read the views, tune the AI agent rules, and uninstall cleanly.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight documentation", "item": "https://flowlight.xinbetween.com/docs/"}]}, {"@type": "FAQPage", "@id": "https://flowlight.xinbetween.com/docs/#faq", "mainEntity": [{"@type": "Question", "name": "Why did macOS ask Flowlight for access to my Desktop or Documents?", "acceptedAnswer": {"@type": "Answer", "text": "Only because you pointed it at a project folder inside one of them. By default Flowlight reads agent configuration from the folders in your home folder and never touches those three."}}, {"@type": "Question", "name": "Does Flowlight see all my traffic, or does it miss some?", "acceptedAnswer": {"@type": "Answer", "text": "It depends which capture engine you use, and the difference is not subtle. The default sampler reads macOS's running byte counters once a second and records the change, so a long transfer is counted exactly — but a connection that opens and closes between two readings never appears at all. The Network Extension is called by macOS as each connection is made, so even a five-millisecond request is recorded. If you're watching an AI agent that fires many short requests, install the extension from Sources › Collector. The full comparison is above."}}, {"@type": "Question", "name": "I turned on the Network Extension and nothing appears. The sampler works fine.", "acceptedAnswer": {"@type": "Answer", "text": "Almost always because another content filter already has the slot. macOS runs one content filter at a time, and corporate security software usually claims it — Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar. Flowlight's filter still installs, activates and connects, so Sources › Collector says Connected to filter extension, but macOS never hands it a single connection and the screens stay empty. Sources › Collector lists the filters it finds and offers to switch you back to the sampler, which doesn't use a filter and works alongside them. You lose only the very short connections (the comparison); everything else is recorded the same way."}}, {"@type": "Question", "name": "The extension stopped working after Flowlight updated.", "acceptedAnswer": {"@type": "Answer", "text": "Versions before 0.2.5 had this: macOS keeps running whichever build of the extension was last activated, so after an update the extension was the old version and macOS refuses the connection between a mismatched pair. From 0.2.5 Flowlight checks at launch and re-activates the filter itself. On an older version, press Install & enable filter in Sources › Collector once."}}, {"@type": "Question", "name": "Something else is wrong with capture and I don't know what.", "acceptedAnswer": {"@type": "Answer", "text": "Run this and read what it prints — it reports state and counts only, never anything Flowlight recorded about your traffic: curl -fsSL https://raw.githubusercontent.com/xinbetween/flowlight/main/scripts/diagnose.sh | zshCopy It shows which extensions are installed, whether macOS actually started Flowlight's filter, and how recently anything was recorded. Paste it into an issue."}}, {"@type": "Question", "name": "Does Flowlight send anything about me anywhere?", "acceptedAnswer": {"@type": "Answer", "text": "No account, no telemetry, no analytics, and your traffic database is never uploaded. Four requests can leave the Mac, all listed on the privacy page: release and signed rule-pack checks plus the optional network-owner lookup, all with off switches, and reverse DNS while Flowlight is on the sampler, which has none — without it the sampler could not name most connections."}}, {"@type": "Question", "name": "Will it slow my Mac down or drain the battery?", "acceptedAnswer": {"@type": "Answer", "text": "With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension costs less than the fallback sampler, which starts a short-lived nettop process every second."}}, {"@type": "Question", "name": "Can it block connections?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a rule can block an app, a destination or a URL for as long as you say, and a guardrail can take a tool away from an agent before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out."}}, {"@type": "Question", "name": "Do I need the Network Extension?", "acceptedAnswer": {"@type": "Answer", "text": "No. The sampler needs no entitlement and covers most traffic. The extension adds flows shorter than a second, attribution by code signature, hostnames without the packet-capture setup, and is the only engine that can refuse a connection."}}, {"@type": "Question", "name": "What happens to my data if I uninstall?", "acceptedAnswer": {"@type": "Answer", "text": "Everything lives in ~/Library/Application Support/Flowlight. Delete that folder and it's gone; see Uninstall for the packet-capture helper and the inspection certificate."}}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.17.3, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.18.0, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -99,7 +99,7 @@
         </div>
         <div class="toc-group">
           <strong>Control</strong>
-          <a href="#rules">Rules</a><a href="#allowlists">Allowlists</a>
+          <a href="#policies">Policies</a><a href="#allowlists">Allowlists</a>
           <a href="#blocking">Refusing connections</a><a href="#guardrails">Guardrails</a>
         </div>
         <div class="toc-group">
@@ -169,12 +169,12 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <tr><td><a href="#visualize">Connections</a></td><td>⌘4</td><td>A stable map of apps and their exact destinations, with weighted paths, moving direction markers, connection counts, and an equivalent list.</td></tr>
         <tr><td><a href="#alerts">Alerts</a></td><td>⌘5</td><td>Everything that looked unusual, with the app, the destination and the number that tripped the rule.</td></tr>
         <tr><td><a href="#ask">Ask</a></td><td>⌘6</td><td>Questions about your own traffic in plain language, answered from the recorded history by a local or a hosted model.</td></tr>
-        <tr><td><a href="#inspection">Inspect</a></td><td>⌘7 · Developer ID</td><td>Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.</td></tr>
-        <tr><td><a href="#rules">Rules</a></td><td>⌘8 · Developer ID<br>⌘7 · App Store</td><td>Every allowlist and refusal you have set, what each one covers, and what it has actually stopped.</td></tr>
-        <tr><td><a href="#capture">Sources</a></td><td>⌘9 · Developer ID<br>⌘8 · App Store</td><td>Collector health and recovery, hostname coverage, and opt-in camera, Bluetooth, USB and storage activity in three tabs.</td></tr>
+        <tr><td><a href="#inspection">Inspect</a></td><td>⌘7</td><td>Optional: decrypted requests from the agents you route through Flowlight, and the tool calls behind them. Search reaches into request and response bodies.</td></tr>
+        <tr><td><a href="#policies">Policies</a></td><td>⌘8</td><td>Every configured policy, whether it is actually effective, and a unified read-only activity trail.</td></tr>
+        <tr><td><a href="#capture">Sources</a></td><td>⌘9</td><td>Collector health and recovery, opt-in device channels, and coverage in three focused segments.</td></tr>
       </table>
-      <p>The shortcuts follow the visible sidebar order. Developer ID builds include Inspect at ⌘7; App Store builds omit Inspect, so Rules and Sources move to ⌘7 and ⌘8.</p>
-      <figure><div class="frame"><img height="994" width="1600" src="../assets/screenshots/live.png?v=023b487c" loading="lazy"
+      <p>The shortcuts follow the visible sidebar order and are the same in Developer ID and Mac App Store builds.</p>
+      <figure><div class="frame"><img height="994" width="1600" src="../assets/screenshots/live.png?v=c1170b00" loading="lazy"
         alt="The Live screen: a list of applications with their current send and receive rates and busiest destination."></div>
         <figcaption class="caption">Live, the screen Flowlight opens on.</figcaption></figure>
       <p>In <strong>History</strong>, choose 15 min, 1h, 6h, 1d, 1w, 1 mo, 6 mo, 1y, or All. Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range. The navigator below the chart starts with <strong>Nearby context</strong> and can switch to <strong>All history</strong>: drag the brush to pan the selected window, or drag either edge to resize it. Double-click any breakdown row to narrow History to it.</p>
@@ -216,7 +216,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         in a configuration file <em>and</em> actually contacted says more than either alone, while a domain only ever configured has
         never been reached, and one only ever observed was never written down anywhere you could have read it.</p>
       <p>Each domain offers two refusals: <strong>for this agent</strong>, which covers the agent and the tools it starts, or
-        <strong>everywhere</strong>, which covers every app on the Mac. Both write an ordinary rule, so the violations feed reports
+        <strong>everywhere</strong>, which covers every app on the Mac. Both write an ordinary rule, so Activity reports
         them and the rule editor explains them — and because they are ordinary rules, the simulation in the editor will tell you what
         one would have refused before you switch it on.</p>
       <p>One kind of domain has no buttons. A connector the model provider reaches on its own — declared in the request body and
@@ -329,16 +329,20 @@ open build/Build/Products/Release/Flowlight.app</pre>
         the ones the provider runs on its own servers (web search, code execution), and the MCP servers the provider connects to for the agent
         (Anthropic's <code>mcp_servers</code>, OpenAI's <code>mcp</code> tool) with their URL, token, approval setting and allowed tools. That
         last group never appears on your network, because the provider makes those connections, not your Mac.</p>
-      <p><strong>Setting it up is one switch.</strong> Turn on HTTPS inspection in <strong>Inspect</strong> and Flowlight creates its certificate,
-        asks for your password once, trusts the certificate and routes apps through the proxy. Turning the switch off undoes all of it. The proxy
-        file falls back to a direct connection whenever Flowlight isn't running, so quitting it never cuts your Mac off.</p>
-      <p>Command-line agents ignore system proxy settings, so for Claude Code, Codex, Gemini CLI or Aider use <strong>Open Inspected Terminal</strong>
-        and start them there. Under <strong>Advanced</strong> you can decrypt AI agents only instead of every app, edit the never-decrypt list, copy
-        the shell setup for one shell, or remove the certificate and everything recorded.</p>
+      <p><strong>Developer ID setup can be automatic.</strong> Turn on HTTPS inspection in <strong>Inspect</strong> and Flowlight creates its
+        certificate. <strong>Open Inspected Terminal</strong> starts command-line agents with the right proxy variables and certificate environment;
+        you can also trust the certificate and let Flowlight configure a system PAC file for desktop apps. That file falls back to a direct
+        connection whenever Flowlight is not running.</p>
+      <p><strong>Mac App Store setup stays explicit.</strong> Inspect creates a native Keychain-backed P-256 CA, shows the exact
+        <code>127.0.0.1</code> proxy address, and reveals the public certificate in Finder. Import and trust that certificate yourself, then configure
+        each app to use the shown HTTP/HTTPS proxy. The Store app never changes system proxy settings, rewrites another app's configuration,
+        or relaunches or supervises another app. Its content-filter extension uses macOS's audit-token identity for the exact live loopback socket;
+        if that identity is unavailable or stale, app-scoped enforcement fails open rather than guessing.</p>
       <p>Flowlight excludes its built-in list of Apple services and password managers from decryption (edit the list in Setup). Apps that pin their certificates may reject the
         Flowlight certificate; Flowlight notices and passes them through encrypted. By default, header values are kept only when the header is one you
-        allow, and everything else is replaced by its length before anything is stored — recorded requests are kept for as long as you set, and <strong>Remove Certificate &amp; Recorded Data</strong> deletes the certificate, its trust
-        setting and everything recorded. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and not available in demo mode.</p>
+        allow, and everything else is replaced by its length before anything is stored. <strong>Remove Certificate &amp; Recorded Data</strong> deletes
+        Flowlight-owned keys, generated certificates, and every recorded request. In the Store product, a public CA you imported remains user-owned;
+        Inspect tells you to remove it separately in Keychain Access. Inspection is HTTP/1.1 only (Flowlight asks both sides for it) and is not available in demo mode.</p>
       <p><strong>Local risk analysis is separate and off by default.</strong> In History or Alerts › Detection, you can ask
         Apple’s on-device model to review only meaningful, already-recorded decrypted HTTP candidates after capture. It gets a
         bounded redacted description — never request or response bodies, header values, cookies, credentials or tool arguments —
@@ -415,16 +419,21 @@ open build/Build/Products/Release/Flowlight.app</pre>
         connected to: a mock changes the answer, not whether the connection can be made, so "the API returns 500" works while "the API
         is entirely unreachable" does not.</p>
 
-      <h2 id="rules">Rules</h2>
-      <p>An allowlist is one agent's idea of where it may go. A <strong>rule</strong> is the general version: it names a
+      <h2 id="policies"><span id="rules"></span>Policies</h2>
+      <p><strong>Policies</strong> is one inventory for every control Flowlight can apply: ordinary allow/block rules, agent
+        allowlists, managed packs, and—where HTTPS inspection is available—guardrails, mocks, and request rewrites. Developer ID
+        builds also include response transforms; the Store product does not expose response-transform scripts or script plugins.
+        Each row distinguishes configured state from actual effect: enforcing, reporting, watching, waiting,
+        scheduled, paused, spent, applying, review required, unavailable, incompatible, or failed. Selecting a row opens the
+        contextual editor that owns that policy; Policies does not replace or blur those separate consent and persistence models.</p>
+      <p>An allowlist is one agent's idea of where it may go. An ordinary <strong>rule</strong> is the general version: it names a
         <strong>subject</strong> — an app, an agent, a destination, a URL, or a pairing of two of those — and says <strong>block</strong>
         or <strong>allow</strong>. Right-click any row in Live, History, AI Agents or Inspect to write one about what you're looking at;
-        every one of them lands in the same editor on the <strong>Rules</strong> screen, because a rule that took effect out of sight
-        would be a rule you could never find again.</p>
+        every one remains findable in Policies and opens in its authoritative editor.</p>
       <p><strong>Templates.</strong> Twenty-two of them, in five groups — stopping an agent reaching package registries or other
         model providers, closing the common ways data leaves (paste sites, webhook catchers, anonymous file drops, tunnels, DNS over
         HTTPS), product analytics and crash reporting, working-hours policies, and one-off "block this for an hour while I work out
-        what it is". Browse them from the Rules toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
+        what it is". Browse them from the Policies toolbar, or right-click a row anywhere in Live, History, AI Agents or Inspect and
         apply one to what you're looking at.</p>
       <p>Each template says what it will do before it does it. Anything that writes more than one rule opens a card listing every
         host and schedule; anything permanent opens the editor pre-filled; and <strong>only rules that undo themselves</strong> — an
@@ -445,8 +454,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
         address and the port, nothing about paths, and only in extension mode. HTTPS inspection refuses one request, so it can match a
         URL and answer with a status the agent can read instead of a socket that died without saying why. The nettop sampler cannot
         refuse anything at all. A rule the current setup can't carry out says so in the list rather than sitting there looking enforced.</p>
-      <p>The second tab is the <strong>violations feed</strong>: every connection a rule decided, with the app, where it was headed, which
-        rule decided it and whether that was a refusal or an exception letting it through.</p>
+      <p>The second view is read-only <strong>Activity</strong>: ordinary rule decisions, allowlist violations, managed-pack events,
+        and distinct inspection-policy effects in one chronology. It adapts the existing authoritative records rather than rewriting
+        history into one generic event model. Store builds keep guardrail, mock, and request-rewrite activity while omitting response
+        transforms and script-plugin effects that the Store product cannot execute.</p>
 
       <p><strong>What it would have done.</strong> A blocking rule is easy to write and frightening to switch on, because the first
         thing you normally learn about one is what it broke — and you learn it later, from something failing somewhere else. The rule
@@ -466,7 +477,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         history has been tested against two hours of history.</p>
 
       <h3 id="managed-packs">Managed ad and tracker packs</h3>
-      <p><strong>Rules › Packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
+      <p><strong>Policies › Managed packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
         advertising delivery and auction hosts; <strong>Cross-site tracking</strong> covers common analytics, session replay and
         cross-site measurement hosts; and <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and
         audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.</p>
@@ -551,8 +562,10 @@ open build/Build/Products/Release/Flowlight.app</pre>
       <p><strong>This is not a sandbox.</strong> A refused tool stops being offered and stops being answered. An agent that still has a
         shell can do by hand what the tool would have done. Flowlight will record that; it does not pretend to prevent it.</p>
 
-      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Sources: collector, coverage and devices</h2>
-      <p><strong>Sources</strong> keeps operational setup in one place. Its health summary shows whether traffic is arriving, how much is named, and which optional device channels are active; any unfinished collector step links directly to <strong>Sources › Collector</strong>.</p>
+      <h2 id="sources"><span id="capture"></span><span id="engines"></span>Sources: collector, devices and coverage</h2>
+      <p><strong>Sources</strong> uses the same focused segmented navigation as Policies: <strong>Collector</strong>,
+        <strong>Devices</strong>, and <strong>Coverage</strong>. Status notices, Ask answers, restored windows, and deep links select the
+        exact segment while shared health and remediation context remains available across all three.</p>
       <p>Flowlight records traffic one of two ways, chosen under <strong>Sources › Collector</strong>. They differ in what they can miss, which is worth
         understanding before you rely on either.</p>
       <table>
@@ -755,7 +768,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         <dd>With the window closed Flowlight does almost nothing: it keeps the menu bar rates and writes one row a second. The Network Extension
           costs less than the fallback sampler, which starts a short-lived <code>nettop</code> process every second.</dd>
         <dt><strong>Can it block connections?</strong></dt>
-        <dd>Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a <a href="#rules">rule</a> can block an app,
+        <dd>Yes, with the Network Extension. An agent's allowlist can refuse as well as warn, a <a href="#policies">rule</a> can block an app,
           a destination or a URL for as long as you say, and a <a href="#guardrails">guardrail</a> can take a tool away from an agent
           before its model is offered it. Nothing blocks until you ask it to, and every refusal carries its way out.</dd>
         <dt><strong>Do I need the Network Extension?</strong></dt>
@@ -811,7 +824,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.18.0 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

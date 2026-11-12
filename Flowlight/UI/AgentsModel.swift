@@ -49,7 +49,6 @@ struct AgentSummary: Identifiable, Sendable, Equatable {
     static let largeUploadBytes: Int64 = 50_000_000
     var hasLargeUpload: Bool { egress.bytesOut >= Self.largeUploadBytes }
     var hasUnnamedHost: Bool { otherDestinations.contains { $0.isUnnamed && !IPOwnerLookup.isLocalNetwork($0.ip) } }
-    var riskScore: Int { sensitiveProtocols.count * 10 + alerts + (hasUnnamedHost ? 3 : 0) + (hasLargeUpload ? 5 : 0) }
 
     static func == (a: AgentSummary, b: AgentSummary) -> Bool {
         a.bundleID == b.bundleID && a.ai == b.ai && a.egress == b.egress && a.alerts == b.alerts && a.tools == b.tools

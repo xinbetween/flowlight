@@ -22,7 +22,7 @@ enum AskQueryRunner {
         var chart: AskChart?
         /// Where the answer points for a question about the app rather than about traffic.
         var screen: SidebarItem?
-        /// The exact operational tab when that screen is Sources.
+        /// The exact section to focus when that screen is Sources.
         var sourcesTab: SourcesTab? = nil
     }
 

@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-es", "url": "https://flowlight.xinbetween.com/es/", "name": "Flowlight", "inLanguage": "es", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/es/privacy/#webpage", "url": "https://flowlight.xinbetween.com/es/privacy/", "name": "Privacidad de Flowlight", "description": "Qué registra Flowlight, dónde se guarda y con qué servicios externos contacta la app.", "inLanguage": "es", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-es"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/es/"}, {"@type": "ListItem", "position": 2, "name": "Privacidad de Flowlight", "item": "https://flowlight.xinbetween.com/es/privacy/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-es", "url": "https://flowlight.xinbetween.com/es/", "name": "Flowlight", "inLanguage": "es", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/es/privacy/#webpage", "url": "https://flowlight.xinbetween.com/es/privacy/", "name": "Privacidad de Flowlight", "description": "Qué registra Flowlight, dónde se guarda y con qué servicios externos contacta la app.", "inLanguage": "es", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-es"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/es/"}, {"@type": "ListItem", "position": 2, "name": "Privacidad de Flowlight", "item": "https://flowlight.xinbetween.com/es/privacy/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Ir al contenido</a>
@@ -112,25 +112,30 @@
         etiquetas resultantes («vía curl», «MCP github») junto a tu tráfico. Nada de esos archivos ni de esas líneas de comandos se envía a ninguna parte.</p>
 
       <h2 id="inspection">Inspección HTTPS</h2>
-      <p>Desactivada por defecto. Si la activas, Flowlight crea una autoridad de certificación en tu Mac (su clave no sale nunca de
-        <code>~/Library/Application Support/Flowlight/Inspection</code>) y ejecuta un proxy que acepta conexiones solo de este Mac. En las apps que
-        encamines por él, registra las peticiones y las respuestas, incluidos los cuerpos de hasta 2 MB, en la base de datos local durante 3 días. Las cabeceras con credenciales
-        se sustituyen por su longitud antes de guardar nada — reconocidas por el nombre (Authorization, cookies, claves de API) y por las palabras
-        del nombre, así que <code>X-Access-Key</code> también se atrapa. Eso es una heurística, no una garantía: una cabecera que lleve un secreto con un
-        nombre que nada reconoce quedaría registrada. Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas. Flowlight no sube los datos de inspección registrados. Al desactivar la inspección se detiene el proxy; <strong>Eliminar el certificado y los datos
-        registrados</strong> borra el certificado, su ajuste de confianza y todas las peticiones registradas.</p>
+      <p>Desactivada por defecto. Si la activas, Flowlight crea una autoridad de certificación en tu Mac y ejecuta un proxy de bucle local que solo acepta conexiones
+        de este Mac. El producto Developer ID guarda su material de inspección en <code>~/Library/Application Support/Flowlight/Inspection</code>; el producto Mac App Store
+        genera claves privadas P-256 nativas en su grupo de acceso al llavero y exporta únicamente el certificado público de la autoridad. La app de la Store nunca cambia
+        los ajustes de proxy ni de confianza del sistema: tú mismo importas y consideras de confianza el certificado público y configuras expresamente cada app inspeccionada
+        para que use la dirección de proxy mostrada en Inspeccionar.</p>
+      <p>En las apps que encamines por él, Flowlight registra las peticiones y las respuestas, incluidos los cuerpos de hasta 2 MB, en la base de datos local durante 3 días.
+        Las cabeceras con credenciales se sustituyen por su longitud antes de guardar nada — reconocidas por el nombre (Authorization, cookies, claves de API) y por las palabras
+        del nombre, así que <code>X-Access-Key</code> también se atrapa. Eso es una heurística, no una garantía: una cabecera que lleve un secreto con un nombre que nada reconoce
+        quedaría registrada. Flowlight excluye del descifrado su lista integrada de servicios de Apple y gestores de contraseñas. No sube los datos de inspección registrados.
+        Al desactivar la inspección se detiene el proxy; <strong>Eliminar el certificado y los datos registrados</strong> borra las claves propiedad de Flowlight, los certificados
+        generados y todas las peticiones registradas. Una autoridad pública importada en el producto Store sigue siendo propiedad del usuario y debe eliminarse por separado en
+        Acceso a Llaveros.</p>
 
       <h2 id="requests">Peticiones de red que hace la app</h2>
       <table>
         <tr><th>Petición</th><th>Enviada a</th><th>Qué contiene</th><th>Cuándo</th></tr>
         <tr><td>Comprobación de actualizaciones</td><td><code>api.github.com</code></td><td>Una petición HTTPS normal de la última versión; GitHub ve tu dirección IP y el agente de usuario <code>Flowlight/&lt;version&gt;</code></td><td>Al arrancar y a diario, desde la 0.1.2. Interruptor para desactivarla en Ajustes › General</td></tr>
         <tr><td>Descarga de la actualización</td><td><code>github.com</code></td><td>La imagen de disco y su archivo de suma de verificación</td><td>Solo cuando pulsas Descargar y abrir</td></tr>
-        <tr><td>Actualización oficial del paquete de reglas</td><td><code>flowlight.xinbetween.com</code></td><td>Una solicitud HTTPS estándar al feed oficial fijo. El servidor ve tu dirección IP, el agente de usuario <code>Flowlight/&lt;version&gt;</code> y los validadores condicionales de caché; no recibe tráfico, ajustes de paquetes ni ningún identificador del dispositivo</td><td>Después del inicio, cuando corresponda, y luego como máximo una vez al día mientras todo funcione correctamente. Activada de forma predeterminada; interruptor para desactivarla y opción manual Buscar ahora en Reglas › Paquetes</td></tr>
+        <tr><td>Actualización oficial del paquete de reglas</td><td><code>flowlight.xinbetween.com</code></td><td>Una solicitud HTTPS estándar al feed oficial fijo. El servidor ve tu dirección IP, el agente de usuario <code>Flowlight/&lt;version&gt;</code> y los validadores condicionales de caché; no recibe tráfico, ajustes de paquetes ni ningún identificador del dispositivo</td><td>Después del inicio, cuando corresponda, y luego como máximo una vez al día mientras todo funcione correctamente. Activada de forma predeterminada; interruptor para desactivarla y opción manual Buscar ahora en Políticas › Paquetes gestionados</td></tr>
         <tr><td>DNS inverso</td><td>El servidor DNS que tengas configurado</td><td>Una consulta del nombre registrado de una dirección IP, cuando no se ha visto ningún nombre de host</td><td>Según haga falta, en el modo de captura del muestreador, que es el predeterminado hasta que la extensión de red esté en marcha. Sin interruptor para desactivarla: sin ella el muestreador no puede nombrar la mayoría de las conexiones. La extensión de red las nombra a partir del propio tráfico y no hace esta consulta</td></tr>
         <tr><td>Consulta del propietario de la red</td><td>Team Cymru, por DNS</td><td>Direcciones IP públicas sin nombre de host conocido. Las direcciones privadas y reservadas no salen nunca de tu Mac</td><td>Activada por defecto. Interruptor para desactivarla en Captura › Identificar a los propietarios de la red</td></tr>
         <tr><td>Preguntar con un modelo alojado</td><td>El proveedor que elijas: Anthropic, OpenAI, Google Gemini o un endpoint compatible</td><td>Tu pregunta y los resultados que devuelvan las consultas de solo lectura de Flowlight que elija el modelo. La base de datos de tráfico en sí no se sube</td><td>Solo cuando eliges un proveedor alojado y envías una pregunta. La pantalla Preguntar muestra las peticiones transmitidas</td></tr>
         <tr><td>Exportación a un colector</td><td>El endpoint de OpenTelemetry o de HTTP que configures</td><td>Los campos que se muestran en Ajustes › Exportación, como los agregados de tráfico y las alertas. Las cabeceras de autenticación se guardan en el llavero</td><td>Solo después de que configures un endpoint y actives la exportación</td></tr>
-        <tr><td>Tráfico de una aplicación inspeccionada</td><td>El destino original que pidió la aplicación inspeccionada</td><td>La petición de la aplicación, reenviada por el proxy local de Flowlight después de descifrarla</td><td>Solo mientras la inspección HTTPS está activada y la aplicación se encamina por el proxy</td></tr>
+        <tr><td>Tráfico de una aplicación inspeccionada</td><td>El destino original que pidió la aplicación inspeccionada</td><td>La petición de la aplicación, reenviada por el proxy local de Flowlight después de descifrarla</td><td>Solo mientras la inspección HTTPS está activada y la aplicación se encamina expresamente por el proxy; el producto Store no cambia los ajustes de proxy del sistema</td></tr>
       </table>
 
       <h2 id="permissions">Permisos</h2>
@@ -189,7 +194,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Quienes contribuyen a Flowlight. Flowlight es software libre, publicado bajo la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Versión 0.17.3 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
+      <span>Versión 0.18.0 · Sin relación con Apple ni con ningún proveedor de IA mencionado en este sitio.</span>
     </div>
   </div>
 </footer>

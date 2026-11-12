@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website", "url": "https://flowlight.xinbetween.com/", "name": "Flowlight", "inLanguage": "en", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/plugins/#webpage", "url": "https://flowlight.xinbetween.com/plugins/", "name": "Flowlight plugins", "description": "How Flowlight plugins add local advisory findings for inspected traffic and LLM/MCP guardrails.", "inLanguage": "en", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight plugins", "item": "https://flowlight.xinbetween.com/plugins/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
@@ -113,6 +113,7 @@
 
       <h2 id="findings">Findings</h2>
       <p>A JavaScript plugin defines a synchronous <code>evaluate(context)</code> function. Flowlight passes <code>context.manifest</code> and a sanitized <code>context.exchange</code> containing only the metadata families declared in <code>permissions</code>. Scripts run out of process with an empty environment, a 128 KB script limit and a short timeout; failures produce no findings.</p>
+      <p><code>context.manifest.configuration</code> contains that plugin's local string settings. <code>context.manifest.providerProfiles</code> is a separate array of enabled local profiles assigned to the plugin with the same guardrail provider; each entry contains only <code>id</code>, <code>provider</code>, optional <code>endpoint</code>, and non-secret <code>configuration</code>. Flowlight never gives a plugin credential values or Keychain references, and a profile does not initiate a provider request.</p>
       <p>A finding is a bounded record attached to one inspected exchange. Evidence should name facts, not leak content: method, host, redacted path shape, byte counts, header names, model provider, tool names, MCP server names, approval mode and policy labels. Do not store header values, raw bodies, credentials, full tool inputs, prompts, completions or unredacted query strings.</p>
       <p>When a manifest declares the <code>suggestAction</code> capability and permission, a finding can also include <code>suggestedActions</code>. Flowlight stores those as inert suggestions; Inspect opens the matching editor and saves only when the user reviews and clicks Save.</p>
 <pre>{
@@ -161,7 +162,7 @@
       </table>
 
       <h2 id="template">Template package</h2>
-      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, <code>plugin.js</code>, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. Import the manifest JSON from Settings › Plugins and Flowlight will show the review sheet before installation.</p>
+      <p>The starter package lives at <a href="https://github.com/xinbetween/flowlight/tree/main/templates/inspection-plugin">templates/inspection-plugin</a>. It includes a manifest, <code>plugin.js</code>, sample findings and a validator for ordinary traffic and LLM/MCP guardrail plugins. In the Developer edition, open Inspect › Plugins &amp; Providers and import the manifest JSON; Flowlight shows the review sheet before installation.</p>
 <pre>cp -R templates/inspection-plugin my-flowlight-plugin
 cd my-flowlight-plugin
 node validate.js</pre>
@@ -212,7 +213,7 @@ node validate.js</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.17.3 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.18.0 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

@@ -84,6 +84,12 @@ nav: threat-model
         intatta — deliberatamente, perché rompere una connessione con pinning romperebbe l'app. Nemmeno QUIC viene offerto al proxy.</p>
       <p>Quindi una schermata Ispeziona vuota significa «qui non è stato instradato nulla», non «non è successo nulla». Origini › Copertura dice quale delle due
         cose valga, app per app.</p>
+      <p><strong>Il prodotto Store non assume il controllo delle impostazioni proxy o di attendibilità.</strong> Espone un proxy di loopback e un'autorità pubblica,
+        ma sei tu a importare quell'autorità e a instradare ogni applicazione. La sua estensione del filtro dei contenuti attribuisce una connessione a un proxy esplicito
+        dal token di audit che macOS ha associato all'esatto socket di loopback attivo, facendo corrispondere sia la porta di origine sia quella del proxy. Un'identità
+        sconosciuta, obsoleta o non corrispondente fallisce in modalità aperta per l'applicazione per app; Flowlight non la sostituisce mai con un processo ipotizzato.
+        Rimuovendo l'ispezione vengono eliminate le chiavi di proprietà dell'app e i certificati foglia generati, mentre un'autorità pubblica che hai importato resta di
+        tua proprietà e va rimossa separatamente in Accesso Portachiavi.</p>
 
       <h2 id="blocking">Cosa è, e cosa non è, il blocco</h2>
       <p>Una regola che rifiuta le connessioni viene normalmente eseguita dall'estensione di rete, sul percorso, prima che la connessione venga stabilita.

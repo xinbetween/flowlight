@@ -6,44 +6,63 @@ import SwiftUI
 /// the question a monitoring tool usually leaves to its documentation — and which decides how much the other
 /// screens are worth.
 struct CoverageView: View {
+    var embedded = false
     @EnvironmentObject var monitor: TrafficMonitor
 
-    var body: some View { CoverageContent(inspection: monitor.inspection) }
+    var body: some View { CoverageContent(inspection: monitor.inspection, embedded: embedded) }
 }
 
 private struct CoverageContent: View {
     @ObservedObject var inspection: InspectionController
+    var embedded: Bool
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
     @AppStorage("coverage.window") private var window: AgentWindow = .day
     @State private var rows: [AppCoverage] = []
     @State private var loaded = false
 
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                summary
-                if rows.isEmpty && loaded {
-                    ContentUnavailableView {
-                        Label(L("Nothing recorded yet"), systemImage: "chart.bar.doc.horizontal")
-                    } description: {
-                        Text(L("Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment."))
+    @ViewBuilder var body: some View {
+        if embedded {
+            VStack(alignment: .leading, spacing: 14) {
+                windowPicker.labelsHidden().frame(maxWidth: 320, alignment: .leading)
+                content
+            }
+            .task(id: LoadKey(window: window, version: monitor.dataVersion, inspecting: inspection.enabled)) {
+                await load()
+            }
+        } else {
+            ScrollView { content.padding(Measure.gutter) }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        windowPicker.labelsHidden()
                     }
-                } else {
-                    table
                 }
-            }
-            .padding(Measure.gutter)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Picker(L("Window"), selection: $window) {
-                    ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
+                .task(id: LoadKey(window: window, version: monitor.dataVersion, inspecting: inspection.enabled)) {
+                    await load()
                 }
-                .pickerStyle(.segmented).labelsHidden()
+        }
+    }
+
+    private var windowPicker: some View {
+        Picker(L("Window"), selection: $window) {
+            ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var content: some View {
+        LazyVStack(alignment: .leading, spacing: 18) {
+            summary
+            if rows.isEmpty && loaded {
+                ContentUnavailableView {
+                    Label(L("Nothing recorded yet"), systemImage: "chart.bar.doc.horizontal")
+                } description: {
+                    Text(L("Coverage is worked out from traffic Flowlight has already recorded. Leave it running for a moment."))
+                }
+            } else {
+                table
             }
         }
-        .task(id: LoadKey(window: window, version: monitor.dataVersion, inspecting: inspection.enabled)) { await load() }
     }
 
     private struct LoadKey: Equatable { var window: AgentWindow; var version: Int; var inspecting: Bool }

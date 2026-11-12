@@ -9,8 +9,9 @@ extension RulePackOverride {
     }
 }
 
-/// The immutable pack generation the inspection proxy may carry out. A committed extension acknowledgement swaps the
-/// whole matcher in; applying, fallback, and failure clear it so the UI cannot say Blocking while the proxy uses stale policy.
+/// The extension-committed pack generation and global network pause the inspection proxy may carry out.
+/// Matcher publication and pause checks share one lock so a proxy decision cannot cross a pause transition with stale state;
+/// applying, fallback, and failure clear the matcher so the UI cannot say Blocking while the proxy uses stale policy.
 final class LiveRulePacks: @unchecked Sendable {
     private let lock = NSLock()
     private var digest = ""

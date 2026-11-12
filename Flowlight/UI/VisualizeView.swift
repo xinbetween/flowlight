@@ -304,7 +304,7 @@ struct VisualizeView: View {
                 isLoading: loading,
                 hasSnapshot: !completeSnapshot.nodes.isEmpty
             ) {
-                TrafficGraphLoadingView(reduceMotion: reduceMotion)
+                TrafficGraphLoadingView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if completeSnapshot.nodes.isEmpty {
                 emptyState
@@ -505,7 +505,7 @@ struct VisualizeView: View {
                 snapshot: mapSnapshot,
                 selectedNode: $selectedNode,
                 selectedEdge: $selectedEdge,
-                reduceMotion: reduceMotion,
+                reduceMotion: reduceMotion || Motion.isStaticFixture,
                 onToggleGroup: expandGroup
             )
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
@@ -584,15 +584,17 @@ struct VisualizeView: View {
         let from = to.addingTimeInterval(-granularity.defaultWindow)
         do {
             let loaded = try await monitor.read { database in
-                let rows: [BreakdownRow]
-                switch mode {
-                case .traffic:
-                    rows = try database.appDestinationRows(granularity, from: from, to: to, filter: .none)
-                case .ai:
-                    rows = try database.aiVisualizationRows(granularity, from: from, to: to)
+                try database.readSnapshot {
+                    let rows: [BreakdownRow]
+                    switch mode {
+                    case .traffic:
+                        rows = try database.appDestinationRows(granularity, from: from, to: to, filter: .none)
+                    case .ai:
+                        rows = try database.aiVisualizationRows(granularity, from: from, to: to)
+                    }
+                    let attempts = try database.blockedAttempts(from: from, to: to)
+                    return (rows, attempts)
                 }
-                let attempts = try database.blockedAttempts(from: from, to: to)
-                return (rows, attempts)
             }
             guard ConnectionsRenderPolicy.canCommit(
                 requestID: requestID,
@@ -916,31 +918,18 @@ private enum GraphSelection {
 }
 
 private struct TrafficGraphLoadingView: View {
-    var reduceMotion: Bool
-    @State private var flipped = false
-
     var body: some View {
         VStack(spacing: Spacing.m) {
             Image(nsImage: NSApplication.shared.applicationIconImage)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 52, height: 52)
-                .rotation3DEffect(
-                    .degrees(flipped && !reduceMotion ? 360 : 0),
-                    axis: (x: 0, y: 1, z: 0),
-                    perspective: 0.55
-                )
-                .animation(
-                    reduceMotion ? nil : .easeInOut(duration: 1.05).repeatForever(autoreverses: false),
-                    value: flipped
-                )
             Text(L("Loading visualization…"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(FL.muted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(FL.ground)
-        .onAppear { flipped = true }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("Loading visualization…"))
     }
@@ -969,7 +958,12 @@ private struct TrafficGraphCanvas: View {
                 height: max(TrafficGraphLayout.minimumCanvasHeight(for: snapshot), geometry.size.height)
             )
             let graphBounds = CGRect(origin: .zero, size: graphSize)
-            let layoutKey = TrafficGraphLayoutKey(snapshot: snapshot, size: graphSize)
+            let renderKey = TrafficGraphRenderKey(
+                snapshot: snapshot,
+                graphSize: graphSize,
+                viewportSize: geometry.size
+            )
+            let layoutKey = renderKey.layout
             let layout = cachedLayout.updatingTrafficWidths(for: snapshot)
             let layoutIsReady = renderedLayoutKey == layoutKey && !layout.nodeFrames.isEmpty
             let screenBounds = CGRect(origin: .zero, size: geometry.size)
@@ -983,11 +977,12 @@ private struct TrafficGraphCanvas: View {
                     .scaleEffect(viewport.scale, anchor: .topLeading)
                     .offset(viewport.offset)
                     .opacity(layoutIsReady ? 1 : 0)
+                    .animation(reduceMotion ? nil : Motion.graphReveal, value: layoutIsReady)
                     .allowsHitTesting(layoutIsReady)
                 if layoutIsReady {
                     viewportControls(layout: layout, in: screenBounds)
                 } else {
-                    TrafficGraphLoadingView(reduceMotion: reduceMotion)
+                    TrafficGraphLoadingView()
                         .transition(.opacity)
                 }
             }
@@ -1012,7 +1007,7 @@ private struct TrafficGraphCanvas: View {
             }
             .gesture(panGesture)
             .simultaneousGesture(zoomGesture(in: geometry.size))
-            .task(id: layoutKey) {
+            .task(id: renderKey) {
                 let canPreserve = TrafficGraphViewportPolicy.shouldPreserveLayout(
                     snapshot: snapshot,
                     previous: cachedLayout
@@ -1182,20 +1177,41 @@ private struct TrafficGraphCanvas: View {
                 let width = layout.edgeWidths[edge.id] ?? 1
                 let ribbonColor = FL.muted.opacity(emphasized ? 0.44 : related ? 0.20 : 0.05)
                 context.fill(ribbonPath(curve, width: width), with: .color(ribbonColor))
-                guard emphasized, counters.total > 0 else { continue }
+                guard counters.total > 0 else { continue }
 
                 let lanes = TrafficGraphFlowDash.lanes(counters: counters, totalWidth: width)
+                let laneOpacity = emphasized ? 0.88 : related ? 0.30 : 0.06
                 if lanes.received.width > 0 {
-                    context.fill(
-                        ribbonPath(curve, width: lanes.received.width, offset: lanes.received.offset),
-                        with: .color(FL.graphReceived.opacity(0.88))
+                    context.stroke(
+                        path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
+                            totalWidth: width,
+                            direction: .received
+                        ))),
+                        with: .color(FL.graphReceived.opacity(laneOpacity)),
+                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
                     )
+                    if emphasized {
+                        context.fill(
+                            ribbonPath(curve, width: lanes.received.width, offset: lanes.received.offset),
+                            with: .color(FL.graphReceived.opacity(0.82))
+                        )
+                    }
                 }
                 if lanes.sent.width > 0 {
-                    context.fill(
-                        ribbonPath(curve, width: lanes.sent.width, offset: lanes.sent.offset),
-                        with: .color(FL.graphSent.opacity(0.88))
+                    context.stroke(
+                        path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
+                            totalWidth: width,
+                            direction: .sent
+                        ))),
+                        with: .color(FL.graphSent.opacity(laneOpacity)),
+                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
                     )
+                    if emphasized {
+                        context.fill(
+                            ribbonPath(curve, width: lanes.sent.width, offset: lanes.sent.offset),
+                            with: .color(FL.graphSent.opacity(0.82))
+                        )
+                    }
                 }
             }
         }
@@ -1207,15 +1223,23 @@ private struct TrafficGraphCanvas: View {
         _ layout: TrafficGraphLayoutSnapshot,
         visible: TrafficGraphVisibleRegion
     ) -> some View {
-        if !reduceMotion {
-            let edgeSpeeds = TrafficGraphFlowDash.speeds(
-                for: snapshot.edges.filter(TrafficGraphFlowDash.animates).map(\.id)
-            )
+        let activeEdgeIDs = TrafficGraphMotionPolicy.activeEdgeIDs(
+            edges: snapshot.edges,
+            visibleEdgeIDs: visible.edgeIDs,
+            selectedNode: selectedNode,
+            selectedEdge: selectedEdge,
+            hoveredEdge: hoveredEdge
+        )
+        if TrafficGraphMotionPolicy.animatesFlow(
+            reduceMotion: reduceMotion,
+            hasVisibleFlow: !activeEdgeIDs.isEmpty
+        ) {
+            let active = Set(activeEdgeIDs)
+            let edgeSpeeds = TrafficGraphFlowDash.speeds(for: activeEdgeIDs)
             TimelineView(.periodic(from: .now, by: TrafficGraphFlowDash.frameInterval)) { timeline in
                 Canvas { context, _ in
                     let time = timeline.date.timeIntervalSinceReferenceDate
-                    for edge in snapshot.edges where TrafficGraphFlowDash.animates(edge)
-                        && visible.edgeIDs.contains(edge.id) && isEdgeRelated(edge) {
+                    for edge in snapshot.edges where active.contains(edge.id) && isEdgeRelated(edge) {
                         guard let curve = layout.edgeCurves[edge.id],
                               let width = layout.edgeWidths[edge.id] else { continue }
                         let emphasized = TrafficGraphSelection.emphasizes(
@@ -1278,7 +1302,7 @@ private struct TrafficGraphCanvas: View {
     ) -> StrokeStyle {
         StrokeStyle(
             lineWidth: lineWidth,
-            lineCap: .butt,
+            lineCap: .round,
             lineJoin: .round,
             dash: TrafficGraphFlowDash.pattern,
             dashPhase: TrafficGraphFlowDash.phase(
@@ -1394,8 +1418,14 @@ private struct TrafficGraphNodeView: View {
         .contentShape(Rectangle())
         .opacity(dimmed ? 0.28 : 1)
         .overlay {
-            if selected || hovered {
-                RoundedRectangle(cornerRadius: Radius.card).strokeBorder(FL.accent.opacity(selected ? 0.9 : 0.45), lineWidth: selected ? 2 : 1)
+            if selected {
+                RoundedRectangle(cornerRadius: Radius.card)
+                    .strokeBorder(FL.accent.opacity(0.13), lineWidth: GraphStyle.selectedSignalWidth)
+                RoundedRectangle(cornerRadius: Radius.card)
+                    .strokeBorder(FL.accent.opacity(0.92), lineWidth: 1.7)
+            } else if hovered {
+                RoundedRectangle(cornerRadius: Radius.card)
+                    .strokeBorder(FL.accent.opacity(0.45), lineWidth: 1)
             }
         }
         .accessibilityLabel(accessibilityLabel)
@@ -1553,7 +1583,6 @@ private struct TrafficGraphInspector: View {
                 }
             } else {
                 Button(L("Show in History")) { nav.showReport(filter: node.filter, granularity: granularity) }
-                #if !APP_STORE
                 if node.kind == .destination || node.kind == .service {
                     if VisualizeActionScope.canInspect(node.filter) {
                         Button(L("Inspect")) {
@@ -1567,7 +1596,6 @@ private struct TrafficGraphInspector: View {
                                         agentParent: node.filter.agentParent, mcpServer: node.filter.mcpServer)
                     }
                 }
-                #endif
             }
             Spacer()
             legend
@@ -1725,13 +1753,11 @@ private struct TrafficGraphInspector: View {
     private func exactActions(_ filter: TrafficFilter, source: TrafficGraphNode?) -> some View {
         HStack(spacing: Spacing.s) {
             Button(L("History")) { nav.showReport(filter: filter, granularity: granularity) }
-            #if !APP_STORE
             if VisualizeActionScope.canInspect(filter) {
                 Button(L("Inspect")) {
                     VisualizeActionScope.showInspect(nav, filter: filter, sourceTitle: source?.title)
                 }
             }
-            #endif
             if let rule = VisualizeActionScope.blockRule(for: filter) {
                 Button(L("Block…")) { nav.writeRule(rule) }
             }

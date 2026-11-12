@@ -105,7 +105,7 @@ class RepositoryTests(unittest.TestCase):
         self.assertFalse(result.app)
         self.assertFalse(result.python)
         self.assertFalse(result.actions)
-        self.assertEqual(result.schema, "flowlight-review-v2")
+        self.assertEqual(result.schema, "flowlight-review-v3")
         self.assertEqual(result.app_fingerprint, before)
 
     def test_site_python_change_routes_python_without_app_or_actions(self):

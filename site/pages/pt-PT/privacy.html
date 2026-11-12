@@ -43,25 +43,30 @@ nav: privacy
         etiquetas resultantes («via curl», «github MCP») junto do seu tráfego. Nada desses ficheiros ou dessas linhas de comandos é enviado para lado algum.</p>
 
       <h2 id="inspection">Inspeção HTTPS</h2>
-      <p>Desativada por predefinição. Se a ativar, o Flowlight cria uma autoridade de certificação no seu Mac (a chave nunca sai de
-        <code>~/Library/Application Support/Flowlight/Inspection</code>) e executa um proxy que aceita ligações apenas deste Mac. Nas apps que
-        encaminhar por ele, regista os pedidos e as respostas, incluindo corpos até 2 MB, na base de dados local durante 3 dias. Os cabeçalhos de credenciais
-        são substituídos pelo respetivo comprimento antes de algo ser guardado — reconhecidos pelo nome (Authorization, cookies, chaves de API) e pelas
-        palavras do nome, pelo que <code>X-Access-Key</code> também é apanhado. Isso é uma heurística, não uma garantia: um cabeçalho que leve um segredo
-        sob um nome que nada reconhece ficaria registado. O Flowlight exclui da desencriptação a sua lista integrada de serviços da Apple e de gestores de palavras-passe. Os dados de inspeção registados não são enviados pelo Flowlight. Desativar a inspeção interrompe o proxy; <strong>Remover o certificado e os dados
-        registados</strong> elimina o certificado, a sua definição de confiança e todos os pedidos registados.</p>
+      <p>Desativada por predefinição. Se a ativar, o Flowlight cria uma autoridade de certificação no seu Mac e executa um proxy de loopback que aceita
+        ligações apenas deste Mac. O produto Developer ID guarda o material de inspeção em <code>~/Library/Application Support/Flowlight/Inspection</code>;
+        o produto Mac App Store gera chaves privadas P-256 nativas no seu grupo de acesso ao porta-chaves e exporta apenas o certificado público da autoridade.
+        A app Store nunca altera as definições de proxy ou de confiança do sistema: é o utilizador que importa e torna o certificado público fidedigno e configura
+        explicitamente cada app inspecionada para usar o endereço de proxy mostrado em Inspecionar.</p>
+      <p>Nas apps que encaminhar por ele, o Flowlight regista os pedidos e as respostas, incluindo corpos até 2 MB, na base de dados local durante 3 dias. Os cabeçalhos
+        de credenciais são substituídos pelo respetivo comprimento antes de algo ser guardado — reconhecidos pelo nome (Authorization, cookies, chaves de API) e pelas
+        palavras do nome, pelo que <code>X-Access-Key</code> também é apanhado. Isso é uma heurística, não uma garantia: um cabeçalho que leve um segredo sob um nome que
+        nada reconhece ficaria registado. O Flowlight exclui da desencriptação a sua lista integrada de serviços da Apple e de gestores de palavras-passe. Os dados de inspeção
+        registados não são enviados. Desativar a inspeção interrompe o proxy; <strong>Remover o certificado e os dados registados</strong> elimina as chaves pertencentes ao
+        Flowlight, os certificados gerados e todos os pedidos registados. Uma autoridade pública importada no produto Store continua a pertencer ao utilizador e tem de ser
+        removida separadamente no Acesso às Chaves.</p>
 
       <h2 id="requests">Pedidos de rede que a app faz</h2>
       <table>
         <tr><th>Pedido</th><th>Enviado para</th><th>O que contém</th><th>Quando</th></tr>
         <tr><td>Procura de atualizações</td><td><code>api.github.com</code></td><td>Um pedido HTTPS normal pela versão mais recente; o GitHub vê o seu endereço IP e o agente de utilizador <code>Flowlight/&lt;version&gt;</code></td><td>Na abertura e uma vez por dia, a partir da 0.1.2. Interruptor para desativar em Definições › Geral</td></tr>
         <tr><td>Transferência da atualização</td><td><code>github.com</code></td><td>A imagem de disco e o seu ficheiro de soma de verificação</td><td>Só quando clica em Transferir e abrir</td></tr>
-        <tr><td>Atualização oficial do pacote de regras</td><td><code>flowlight.xinbetween.com</code></td><td>Um pedido HTTPS padrão ao feed oficial fixo. O servidor vê o seu endereço IP, o agente do utilizador <code>Flowlight/&lt;version&gt;</code> e os validadores condicionais de cache; não recebe tráfego, definições dos pacotes nem qualquer identificador do dispositivo</td><td>Após o arranque, quando for necessário, e depois, no máximo, uma vez por dia enquanto funcionar normalmente. Ativa por predefinição; opção para desativar e Procurar agora manualmente em Regras › Pacotes</td></tr>
+        <tr><td>Atualização oficial do pacote de regras</td><td><code>flowlight.xinbetween.com</code></td><td>Um pedido HTTPS padrão ao feed oficial fixo. O servidor vê o seu endereço IP, o agente do utilizador <code>Flowlight/&lt;version&gt;</code> e os validadores condicionais de cache; não recebe tráfego, definições dos pacotes nem qualquer identificador do dispositivo</td><td>Após o arranque, quando for necessário, e depois, no máximo, uma vez por dia enquanto funcionar normalmente. Ativa por predefinição; opção para desativar e Procurar agora manualmente em Políticas › Pacotes geridos</td></tr>
         <tr><td>DNS inverso</td><td>O resolvedor de DNS que tem configurado</td><td>Uma consulta do nome registado de um endereço IP, quando não foi visto nenhum nome de anfitrião</td><td>Conforme necessário, no modo de captura por amostrador, que é a predefinição até a extensão de rede estar a correr. Sem interruptor para desligar: sem isto, o amostrador não consegue dar nome à maioria das ligações. A extensão de rede dá-lhes nome a partir do próprio tráfego e não faz esta consulta</td></tr>
         <tr><td>Consulta do proprietário da rede</td><td>Team Cymru, por DNS</td><td>Endereços IP públicos sem nome de anfitrião conhecido. Os endereços privados e reservados nunca saem do seu Mac</td><td>Ativada por predefinição. Interruptor para desativar em Captura › Identificar os proprietários da rede</td></tr>
         <tr><td>Perguntar com um modelo alojado</td><td>O fornecedor que escolher: Anthropic, OpenAI, Google Gemini ou um endpoint compatível</td><td>A sua pergunta e os resultados devolvidos pelas consultas de leitura do Flowlight escolhidas pelo modelo. A base de dados de tráfego em si não é enviada</td><td>Só quando escolhe um fornecedor alojado e submete uma pergunta. O ecrã Perguntar mostra os pedidos transmitidos</td></tr>
         <tr><td>Exportação para um coletor</td><td>O endpoint de OpenTelemetry ou de HTTP que configurar</td><td>Os campos indicados em Definições › Exportação, como as agregações de tráfego e os alertas. Os cabeçalhos de autenticação ficam guardados no porta-chaves</td><td>Só depois de configurar um endpoint e ativar a exportação</td></tr>
-        <tr><td>Tráfego de uma aplicação inspecionada</td><td>O destino original pedido pela aplicação inspecionada</td><td>O pedido da aplicação, encaminhado pelo proxy local do Flowlight depois de desencriptado</td><td>Só enquanto a inspeção HTTPS estiver ativada e a aplicação estiver encaminhada pelo proxy</td></tr>
+        <tr><td>Tráfego de uma aplicação inspecionada</td><td>O destino original pedido pela aplicação inspecionada</td><td>O pedido da aplicação, encaminhado pelo proxy local do Flowlight depois de desencriptado</td><td>Só enquanto a inspeção HTTPS estiver ativada e a aplicação estiver explicitamente encaminhada pelo proxy; o produto Store não altera as definições de proxy do sistema</td></tr>
       </table>
 
       <h2 id="permissions">Permissões</h2>

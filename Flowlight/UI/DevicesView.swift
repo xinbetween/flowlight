@@ -7,47 +7,77 @@ import SwiftUI
 /// that changed. It does not report bytes, because macOS does not account for these per app and a number invented
 /// here would be worse than no number.
 struct DevicesView: View {
+    var embedded = false
     @EnvironmentObject var monitor: TrafficMonitor
 
     var body: some View {
-        DevicesContent(store: monitor.devices)
+        DevicesContent(store: monitor.devices, embedded: embedded)
     }
 }
 
 private struct DevicesContent: View {
     @ObservedObject var store: DeviceStore
+    var embedded: Bool
 
-    var body: some View {
-        Group {
-            if store.isWatchingAnything {
-                content
-            } else {
-                offer
+    @ViewBuilder var body: some View {
+        if embedded {
+            VStack(alignment: .leading, spacing: 12) {
+                embeddedControls
+                deviceContent
             }
+        } else {
+            deviceContent.toolbar { toolbar }
         }
-        .toolbar { toolbar }
+    }
+
+    @ViewBuilder
+    private var deviceContent: some View {
+        if store.isWatchingAnything {
+            if embedded {
+                sections
+            } else {
+                ScrollView { sections.padding(Measure.gutter) }
+            }
+        } else {
+            offer
+        }
     }
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
-            if store.isWatchingAnything {
-                Button { store.refresh() } label: { Label(L("Refresh"), systemImage: "arrow.clockwise") }
-                    .keyboardShortcut("r", modifiers: .command)
-                    .help(L("Read the device list again now (⌘R)"))
-            }
-            Menu {
-                Toggle(L("Watch Bluetooth"), isOn: Binding(get: { store.watchingBluetooth },
-                                                        set: { store.watchingBluetooth = $0 }))
-                Toggle(L("Watch USB and external storage"), isOn: Binding(get: { store.watchingUSB },
-                                                                       set: { store.watchingUSB = $0 }))
-                Toggle(L("Watch camera activity"), isOn: Binding(get: { store.watchingCamera },
-                                                                set: { store.watchingCamera = $0 }))
-            } label: {
-                Label(L("Channels"), systemImage: "switch.2")
-            }
-            .help(L("Choose which channels Flowlight watches"))
+            if store.isWatchingAnything { refreshButton }
+            channelMenu
         }
+    }
+
+    private var embeddedControls: some View {
+        HStack(spacing: 8) {
+            channelMenu
+            if store.isWatchingAnything { refreshButton }
+            Spacer(minLength: 0)
+        }
+        .controlSize(.small)
+    }
+
+    private var refreshButton: some View {
+        Button { store.refresh() } label: { Label(L("Refresh"), systemImage: "arrow.clockwise") }
+            .keyboardShortcut("r", modifiers: .command)
+            .help(L("Read the device list again now (⌘R)"))
+    }
+
+    private var channelMenu: some View {
+        Menu {
+            Toggle(L("Watch Bluetooth"), isOn: Binding(get: { store.watchingBluetooth },
+                                                    set: { store.watchingBluetooth = $0 }))
+            Toggle(L("Watch USB and external storage"), isOn: Binding(get: { store.watchingUSB },
+                                                                   set: { store.watchingUSB = $0 }))
+            Toggle(L("Watch camera activity"), isOn: Binding(get: { store.watchingCamera },
+                                                            set: { store.watchingCamera = $0 }))
+        } label: {
+            Label(L("Channels"), systemImage: "switch.2")
+        }
+        .help(L("Choose which channels Flowlight watches"))
     }
 
     /// Nothing is on yet. The offer says what each channel can and can't tell you before it is switched on, rather
@@ -66,16 +96,13 @@ private struct DevicesContent: View {
 
     // MARK: The screen
 
-    private var content: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                accounting
-                if store.watchingBluetooth { bluetoothSection }
-                if store.watchingUSB { usbSection }
-                if store.watchingCamera { cameraSection }
-                if !store.events.isEmpty { historySection }
-            }
-            .padding(Measure.gutter)
+    private var sections: some View {
+        LazyVStack(alignment: .leading, spacing: 18) {
+            accounting
+            if store.watchingBluetooth { bluetoothSection }
+            if store.watchingUSB { usbSection }
+            if store.watchingCamera { cameraSection }
+            if !store.events.isEmpty { historySection }
         }
     }
 

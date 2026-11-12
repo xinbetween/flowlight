@@ -48,7 +48,7 @@
 <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 
 <link rel="stylesheet" href="../../assets/site.css?v=214e5f7c">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ja/threat-model/", "name": "Flowlight の脅威モデル", "description": "Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-11-04"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight の脅威モデル", "item": "https://flowlight.xinbetween.com/ja/threat-model/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://flowlight.xinbetween.com/#website-ja", "url": "https://flowlight.xinbetween.com/ja/", "name": "Flowlight", "inLanguage": "ja", "publisher": {"@id": "https://flowlight.xinbetween.com/#publisher"}}, {"@type": "Organization", "@id": "https://flowlight.xinbetween.com/#publisher", "name": "xinbetween", "url": "https://flowlight.xinbetween.com/", "logo": "https://flowlight.xinbetween.com/assets/icon.png", "sameAs": ["https://github.com/xinbetween/flowlight"]}, {"@type": "WebPage", "@id": "https://flowlight.xinbetween.com/ja/threat-model/#webpage", "url": "https://flowlight.xinbetween.com/ja/threat-model/", "name": "Flowlight の脅威モデル", "description": "Flowlight が何を防ぎ、何を防げないのか、そしてその理由。防止ではなく監視です。", "inLanguage": "ja", "isPartOf": {"@id": "https://flowlight.xinbetween.com/#website-ja"}, "dateModified": "2026-11-05"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Flowlight", "item": "https://flowlight.xinbetween.com/ja/"}, {"@type": "ListItem", "position": 2, "name": "Flowlight の脅威モデル", "item": "https://flowlight.xinbetween.com/ja/threat-model/"}]}]}</script>
 </head>
 <body>
 <a class="skip" href="#main" style="position:absolute;left:-999px">本文へスキップ</a>
@@ -152,6 +152,12 @@
         通り過ぎます。これは意図してそうしています。ピン留めされた接続を壊せば、そのアプリが壊れるからです。QUIC もプロキシには渡されません。</p>
       <p>つまり、インスペクトの画面が空なら、それは「ここには何も通されなかった」という意味で、「何も起きなかった」という意味では
         ありません。どちらなのかは、ソース › カバー範囲がアプリごとに答えます。</p>
+      <p><strong>Store 版がプロキシ設定や信頼設定を引き継ぐことはありません。</strong>ループバックプロキシと公開認証局を提供しますが、その認証局を
+        読み込み、各アプリを経由させるのはユーザー自身です。コンテンツフィルタ機能拡張は、正確な稼働中のループバックソケットに macOS が付けた
+        監査トークンを使い、送信元ポートとプロキシポートの両方を一致させて、明示的なプロキシ接続を帰属させます。識別情報が不明、古い、または
+        一致しない場合、アプリ単位の適用はフェイルオープンとなり、Flowlight が推測したプロセスを代用することはありません。インスペクションを削除すると、
+        アプリが所有する鍵と生成済みのリーフ証明書は削除されますが、自分で読み込んだ公開認証局はユーザー所有のまま残るため、キーチェーンアクセスから
+        別途削除する必要があります。</p>
 
       <h2 id="blocking">ブロックとは何で、何でないか</h2>
       <p>接続を拒否するルールは通常、ネットワーク機能拡張がその経路の中で、接続が行われる前に実行します。HTTPS インスペクションを
@@ -222,7 +228,7 @@
     </div>
     <div class="legal">
       <span>© 2026 Flowlight コントリビューター。Flowlight は <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> のもとで公開されている自由ソフトウェアです。</span>
-      <span>バージョン 0.17.3 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
+      <span>バージョン 0.18.0 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
     </div>
   </div>
 </footer>

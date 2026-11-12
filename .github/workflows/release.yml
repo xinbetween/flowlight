@@ -1,112 +1,153 @@
 name: Release
 
-# A version-tag push builds, signs, notarizes and verifies without publishing. After that dry run passes, dispatch
-# this workflow for the existing tag with dry_run=false to publish it. The secrets this needs are listed in
-# docs/DEVELOPMENT.md, along with what it means to keep a signing identity in
-# GitHub. Without them the job fails at the import step rather than publishing something unsigned.
-#
-# It runs without waiting for an approval. What gates it instead: the release environment only accepts v* tags,
-# only the accounts in RELEASE_ACTORS may start one, and a v* tag can't be moved once pushed.
+# A version-tag push prepares the only signed bytes this release may publish. It builds, signs, notarizes,
+# verifies, attests, and retains one immutable Actions artifact. A later explicit dispatch names that successful
+# preparation run and publishes those exact bytes; the publication job cannot access signing credentials.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Existing tag to build (e.g. v0.2.3). Leave empty to build the current ref."
-        required: false
-      dry_run:
-        description: "Build, sign, notarize and verify — but publish nothing."
-        type: boolean
-        default: false
+      prepare_run_id:
+        description: "Successful tag-push preparation run whose exact bytes should be published"
+        required: true
+        type: string
 
-permissions:
-  contents: write
-  checks: read
-  pull-requests: read
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  prepare:
+    name: Prepare signed release
+    if: ${{ github.event_name == 'push' }}
     runs-on: macos-15
     timeout-minutes: 90
-    # Gated: the signing secrets live in this environment, it takes a human approval to start, and its policy only
-    # allows v* tags. A push to a branch — or a workflow someone adds to one — can't reach the certificates.
     environment: release
+    permissions:
+      contents: read
+      checks: read
+      issues: read
+      pull-requests: read
+      actions: read
+      id-token: write
+      attestations: write
     env:
       TEAM_ID: ${{ secrets.TEAM_ID }}
       APP_PROFILE: ${{ vars.APP_PROFILE || 'Flowlight Developer ID' }}
       EXT_PROFILE: ${{ vars.EXT_PROFILE || 'Flowlight Extension Developer ID' }}
-      # Job-level so the cask step can ask whether it was provided: the secrets context isn't readable from `if`.
-      TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
-      # The environment no longer asks for a click, so this is what stands in its place: a release may only be
-      # started by an account on this list. Anyone else pushing a v* tag gets a failed run rather than a signed
-      # build. Set RELEASE_ACTORS (comma-separated) to change who that is.
       - name: Check who asked for this release
         env:
           ALLOWED: ${{ vars.RELEASE_ACTORS || 'blessdyb' }}
+          EVENT_ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         run: |
           set -euo pipefail
-          actor="${{ github.actor }}"
-          if ! printf '%s' "$ALLOWED" | tr ',' '\n' | tr -d ' ' | grep -qx "$actor"; then
-            echo "::error::$actor isn't allowed to publish a release. Allowed: $ALLOWED"
-            exit 1
-          fi
-          echo "Release requested by $actor."
+          allowed_list=",${ALLOWED// /},"
+          for candidate in "$EVENT_ACTOR" "$TRIGGERING_ACTOR"; do
+            if [[ "$allowed_list" != *",$candidate,"* ]]; then
+              echo "::error::$candidate isn't allowed to prepare or rerun a release. Allowed: $ALLOWED"
+              exit 1
+            fi
+          done
+          echo "Release preparation requested by $EVENT_ACTOR and triggered by $TRIGGERING_ACTOR."
 
       - name: Read the version and check it matches the tag
         id: version
+        env:
+          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           BUILD=$(sed -n 's/.*CURRENT_PROJECT_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="$EVENT_TAG"
           [[ -n "$VERSION" && -n "$BUILD" ]] || { echo "::error::Missing version metadata in project.yml."; exit 1; }
+          [[ "$TAG" == "v$VERSION" ]] || { echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$TAG^{}")" == "$EVENT_SHA" ]] || {
+            echo "::error::The tag does not peel to the workflow source SHA."
+            exit 1
+          }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          if [[ "$TAG" != "v$VERSION" ]]; then
-            echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION in project.yml."
-            exit 1
-          fi
 
-      # The release runs at the immutable tag after its pull request gates have passed. Re-running the same test suite
-      # here used another macOS runner for no new evidence. Resolve the checked-out tag to its commit instead, then
-      # require the latest trusted CI and CodeQL results plus an open or merged main-targeting pull request at that SHA.
       - name: Require reviewed checks for the exact release commit
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_REVIEWERS: ${{ vars.RELEASE_REVIEWERS || 'blessdyb' }}
         run: |
           set -euo pipefail
           RELEASE_SHA=$(git rev-parse HEAD)
           CHECKS="$RUNNER_TEMP/release-checks.json"
           PULLS="$RUNNER_TEMP/release-pulls.json"
-          gh api --paginate --slurp \
-            "repos/${{ github.repository }}/commits/$RELEASE_SHA/check-runs?per_page=100" > "$CHECKS"
-          gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
-            "repos/${{ github.repository }}/commits/$RELEASE_SHA/pulls?per_page=100" > "$PULLS"
-          python3 -I scripts/check_release_checks.py \
-            --repo "${{ github.repository }}" --sha "$RELEASE_SHA" --checks "$CHECKS" --pulls "$PULLS"
+          RUNS="$RUNNER_TEMP/release-workflow-runs.json"
+          COMMENTS="$RUNNER_TEMP/release-review-comments.json"
+          COMMENTS_DIR="$RUNNER_TEMP/release-review-comment-pages"
+          EVIDENCE="$RUNNER_TEMP/review-evidence.json"
+          mkdir -p "$COMMENTS_DIR"
+          verified=false
+          for attempt in 1 2 3 4 5 6; do
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?per_page=100" > "$CHECKS"
+            gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls?per_page=100" > "$PULLS"
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&event=pull_request&per_page=100" > "$RUNS"
 
-      # The newest Xcode on the image, named in the log so a release says which compiler built it.
+            pull_numbers=$(jq -r --arg sha "$RELEASE_SHA" '
+              .[][]
+              | select(.head.sha == $sha and .base.ref == "main")
+              | select(.state == "open" or .merged_at != null)
+              | .number
+            ' "$PULLS")
+            comment_pages=()
+            for pull_number in $pull_numbers; do
+              [[ "$pull_number" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number."; exit 1; }
+              page="$COMMENTS_DIR/$pull_number.json"
+              gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/issues/$pull_number/comments?per_page=100" > "$page"
+              comment_pages+=("$page")
+            done
+            if (( ${#comment_pages[@]} == 0 )); then
+              jq -n '[]' > "$COMMENTS"
+            else
+              jq -s '[.[][]]' "${comment_pages[@]}" > "$COMMENTS"
+            fi
+
+            if python3 -I scripts/check_release_checks.py \
+              --repo "$GITHUB_REPOSITORY" --sha "$RELEASE_SHA" \
+              --checks "$CHECKS" --pulls "$PULLS" --runs "$RUNS" --comments "$COMMENTS" \
+              --reviewers "$RELEASE_REVIEWERS" --evidence-output "$EVIDENCE"; then
+              verified=true
+              break
+            fi
+            if [[ "$attempt" -lt 6 ]]; then
+              delay=$((attempt * 10))
+              echo "Release evidence is not complete yet; retrying in ${delay}s (attempt $attempt/6)."
+              sleep "$delay"
+            fi
+          done
+          [[ "$verified" == true ]] || { echo "::error::Release evidence did not become complete."; exit 1; }
+
       - name: Select Xcode
         run: |
           set -euo pipefail
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
-      # The committed project is the exact graph reviewed by CI and selected by Xcode Cloud. Verify its release
-      # metadata before consuming it so a stale project can never publish under a newer project.yml/tag.
       - name: Check committed project version
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
         run: |
           set -euo pipefail
           for target in Flowlight FlowlightAppStore; do
@@ -114,13 +155,12 @@ jobs:
             xcodebuild -project Flowlight.xcodeproj -target "$target" -configuration Release -showBuildSettings > "$settings"
             project_version=$(sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' "$settings")
             project_build=$(sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' "$settings")
-            if [[ "$project_version" != "${{ steps.version.outputs.version }}" || "$project_build" != "${{ steps.version.outputs.build }}" ]]; then
-              echo "::error::$target committed project is $project_version/$project_build; project.yml is ${{ steps.version.outputs.version }}/${{ steps.version.outputs.build }}."
+            if [[ "$project_version" != "$EXPECTED_VERSION" || "$project_build" != "$EXPECTED_BUILD" ]]; then
+              echo "::error::$target committed project is $project_version/$project_build; project.yml is $EXPECTED_VERSION/$EXPECTED_BUILD."
               exit 1
             fi
           done
 
-      # A keychain of its own, unlocked only for this job, so nothing lands in the runner's login keychain.
       - name: Import the signing certificates
         env:
           APP_CERTIFICATE_P12: ${{ secrets.APP_CERTIFICATE_P12 }}
@@ -142,7 +182,6 @@ jobs:
               -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/productbuild
             rm -f "$RUNNER_TEMP/$name.p12"
           done
-          # Lets codesign use the keys without a UI prompt the runner could never answer.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
           security find-identity -v -p codesigning "$KEYCHAIN"
@@ -153,7 +192,6 @@ jobs:
           EXT_PROVISIONING_PROFILE: ${{ secrets.EXT_PROVISIONING_PROFILE }}
         run: |
           set -euo pipefail
-          # Xcode 16 reads this directory; the older location is written too, in case a tool still looks there.
           for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
             mkdir -p "$dir"
             printf '%s' "$APP_PROVISIONING_PROFILE" | base64 --decode > "$dir/flowlight-app.provisionprofile"
@@ -162,7 +200,7 @@ jobs:
           security cms -D -i "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/flowlight-app.provisionprofile" \
             | plutil -extract Name raw -
 
-      - name: Build, sign and notarize
+      - name: Build, sign and notarize exactly once
         env:
           DMG_SIGN_IDENTITY: ${{ secrets.DMG_SIGN_IDENTITY }}
           INSTALLER_IDENTITY: ${{ secrets.INSTALLER_IDENTITY }}
@@ -174,11 +212,9 @@ jobs:
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
           set -euo pipefail
-          # Without these the scripts quietly produce an unsigned build, which is worse than failing here.
           for name in TEAM_ID DMG_SIGN_IDENTITY INSTALLER_IDENTITY; do
             [[ -n "${!name:-}" ]] || { echo "::error::Secret $name is not set."; exit 1; }
           done
-          # Either notarization credential is fine; having neither is not.
           if [[ -n "${NOTARY_KEY_P8:-}" && -n "${NOTARY_KEY_ID:-}" && -n "${NOTARY_ISSUER:-}" ]]; then
             export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
             printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY"
@@ -186,107 +222,468 @@ jobs:
           elif [[ -n "${NOTARY_APPLE_ID:-}" && -n "${NOTARY_TEAM_ID:-}" && -n "${NOTARY_PASSWORD:-}" ]]; then
             echo "Notarizing with an Apple ID and app-specific password."
           else
-            echo "::error::Set NOTARY_KEY_P8 + NOTARY_KEY_ID + NOTARY_ISSUER, or NOTARY_APPLE_ID + NOTARY_TEAM_ID + NOTARY_PASSWORD."
+            echo "::error::Set an App Store Connect notarization key or the complete Apple ID credential set."
             exit 1
           fi
-          # build-dmg.sh runs build-signed.sh itself; build-pkg.sh then reuses build/export/Flowlight.app.
           scripts/build-dmg.sh
           REUSE_EXPORT=1 scripts/build-pkg.sh
           rm -f "${NOTARY_KEY:-}"
 
-      - name: Check Gatekeeper accepts what was built
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          spctl -a -vvv -t open --context context:primary-signature build/Flowlight.dmg
-          spctl -a -vvv -t install "build/Flowlight-$VERSION.pkg"
-          hdiutil attach -nobrowse -quiet build/Flowlight.dmg
-          spctl -a -vvv /Volumes/Flowlight/Flowlight.app
-          hdiutil detach /Volumes/Flowlight -quiet
-          # Plain file names, because this file is published as an asset and the updater looks up the disk
-          # image by name. `cd build` rather than `sed` so the names in the file are the names on the release.
-          ( cd build && shasum -a 256 Flowlight.dmg "Flowlight-$VERSION.pkg" | tee SHA256SUMS.txt )
-
-      - name: Publish the release
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
+      - name: Verify the final signed products
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.version.outputs.tag }}"
-          NOTES="packaging/release-notes/$VERSION.md"
-          ARGS=(--title "Flowlight $VERSION")
-          # A hand-written file wins; otherwise the notes are built from the entry already written on the
-          # releases page. Falling through to --generate-notes produces one "Full Changelog" link, which is what
-          # the Software Update window showed for every release from 0.6.5 to 0.7.1.
-          if [[ ! -f "$NOTES" ]] && python3 scripts/release_notes.py "$VERSION" > "$RUNNER_TEMP/from-site.md"; then
-            NOTES="$RUNNER_TEMP/from-site.md"
-          fi
-          if [[ -f "$NOTES" ]]; then
-            # The checksums belong in the notes, and they're only known once the artifacts exist.
-            { cat "$NOTES"; echo; echo '### Checksums'; echo; echo '```'; cat build/SHA256SUMS.txt; echo '```'; } > "$RUNNER_TEMP/notes.md"
-            ARGS+=(--notes-file "$RUNNER_TEMP/notes.md")
-          else
-            echo "::error::No notes for $VERSION — neither $NOTES nor an entry on the releases page."
+          VERSION="$RELEASE_VERSION"
+          PKG="build/Flowlight-$VERSION.pkg"
+          [[ -f build/Flowlight.dmg && -f "$PKG" ]] || { echo "::error::Expected DMG or PKG is missing."; exit 1; }
+          [[ "$(find build -maxdepth 1 -type f -name 'Flowlight*.dmg' | wc -l | tr -d ' ')" == 1 ]] || {
+            echo "::error::Expected exactly one Flowlight DMG."
             exit 1
-          fi
-          # SHA256SUMS.txt is an asset, not just a paragraph in the notes. The updater refuses a download it
-          # cannot verify, and until 0.9.0 this file existed only inside the release body — where nothing can
-          # read it — so the verification was decorative and then, once it started failing closed, fatal.
-          gh release create "$TAG" "${ARGS[@]}" build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt
+          }
+          [[ "$(find build -maxdepth 1 -type f -name 'Flowlight*.pkg' | wc -l | tr -d ' ')" == 1 ]] || {
+            echo "::error::Expected exactly one Flowlight PKG."
+            exit 1
+          }
+          spctl -a -vvv -t open --context context:primary-signature build/Flowlight.dmg
+          spctl -a -vvv -t install "$PKG"
+          xcrun stapler validate build/Flowlight.dmg
+          xcrun stapler validate "$PKG"
+          MOUNT="$RUNNER_TEMP/flowlight-release-mount"
+          mkdir "$MOUNT"
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" build/Flowlight.dmg
+          codesign --verify --deep --strict --verbose=2 "$MOUNT/Flowlight.app"
+          spctl -a -vvv "$MOUNT/Flowlight.app"
+          xcrun stapler validate "$MOUNT/Flowlight.app"
+          hdiutil detach "$MOUNT" -quiet
+          (
+            cd build
+            shasum -a 256 Flowlight.dmg "Flowlight-$VERSION.pkg" > SHA256SUMS.txt
+          )
 
-      # The updater refuses a download whose checksum it can't find, so a release without this file is one
-      # nobody can install from inside the app. That is exactly what shipped from the beginning until 0.9.0:
-      # the checksums were written into the release body, where nothing can read them, and the missing asset
-      # was invisible because verification used to pass when it found nothing. Checked against the published
-      # release rather than the build directory, because what matters is what people can actually download.
-      - name: The release must carry the checksums the updater looks for
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
+      - name: Prepare release notes and provenance manifest
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD: ${{ steps.version.outputs.build }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.version.outputs.tag }}"
-          names=$(gh release view "$TAG" --json assets -q '.assets[].name')
-          echo "$names"
-          for required in SHA256SUMS.txt Flowlight.dmg; do
-            grep -qx "$required" <<< "$names" || {
-              echo "::error::$TAG has no $required. The in-app updater looks for it by name and refuses a"
-              echo "::error::download it cannot verify, so this release would be uninstallable from the app."
+          VERSION="$RELEASE_VERSION"
+          BUNDLE="$RUNNER_TEMP/prepared-release"
+          mkdir "$BUNDLE"
+          for source in build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt; do
+            [[ -f "$source" && ! -L "$source" ]] || {
+              echo "::error::Missing regular release file: $source"
               exit 1
             }
           done
-          # And the file has to name the disk image, not merely exist: the updater looks the name up inside it.
-          gh release download "$TAG" --pattern SHA256SUMS.txt --dir "$RUNNER_TEMP" --clobber
-          grep -q " Flowlight.dmg$" "$RUNNER_TEMP/SHA256SUMS.txt" || {
-            echo "::error::SHA256SUMS.txt has no line for Flowlight.dmg, so the updater can't verify it."
+          cp build/Flowlight.dmg "build/Flowlight-$VERSION.pkg" build/SHA256SUMS.txt "$BUNDLE/"
+          NOTES="packaging/release-notes/$VERSION.md"
+          if [[ -f "$NOTES" ]]; then
+            cp "$NOTES" "$RUNNER_TEMP/base-notes.md"
+          elif python3 -I scripts/release_notes.py "$VERSION" > "$RUNNER_TEMP/base-notes.md"; then
+            :
+          else
+            echo "::error::No release notes for $VERSION in packaging or the generated site."
+            exit 1
+          fi
+          {
+            cat "$RUNNER_TEMP/base-notes.md"
+            echo
+            echo '### Checksums'
+            echo
+            echo '```'
+            cat "$BUNDLE/SHA256SUMS.txt"
+            echo '```'
+          } > "$BUNDLE/RELEASE-NOTES.md"
+          WORKFLOW_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml" --jq .id)
+          python3 -I scripts/release_artifact.py create-manifest \
+            --bundle "$BUNDLE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$GITHUB_SHA" \
+            --source-tree "$(git rev-parse 'HEAD^{tree}')" \
+            --version "$VERSION" \
+            --build "$RELEASE_BUILD" \
+            --workflow-id "$WORKFLOW_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --evidence "$RUNNER_TEMP/review-evidence.json"
+          python3 -I scripts/release_artifact.py verify-bundle \
+            --bundle "$BUNDLE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$GITHUB_SHA" \
+            --version "$VERSION" \
+            --build "$RELEASE_BUILD" \
+            --workflow-id "$WORKFLOW_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+      - name: Attest the prepared files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
+        with:
+          subject-path: |
+            ${{ runner.temp }}/prepared-release/Flowlight.dmg
+            ${{ runner.temp }}/prepared-release/Flowlight-${{ steps.version.outputs.version }}.pkg
+            ${{ runner.temp }}/prepared-release/SHA256SUMS.txt
+            ${{ runner.temp }}/prepared-release/RELEASE-NOTES.md
+            ${{ runner.temp }}/prepared-release/RELEASE-MANIFEST.json
+
+      - name: Preserve the immutable prepared release
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flowlight-release-${{ steps.version.outputs.tag }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/prepared-release/Flowlight.dmg
+            ${{ runner.temp }}/prepared-release/Flowlight-${{ steps.version.outputs.version }}.pkg
+            ${{ runner.temp }}/prepared-release/SHA256SUMS.txt
+            ${{ runner.temp }}/prepared-release/RELEASE-NOTES.md
+            ${{ runner.temp }}/prepared-release/RELEASE-MANIFEST.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Record the publication handoff
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Signed release prepared once"
+            echo
+            echo "- Tag: \`$RELEASE_TAG\`"
+            echo "- Source: \`$GITHUB_SHA\`"
+            echo "- Preparation run: \`$GITHUB_RUN_ID\` (attempt $GITHUB_RUN_ATTEMPT)"
+            echo "- Artifact ID: \`$ARTIFACT_ID\`"
+            echo "- Artifact archive digest: \`$ARTIFACT_DIGEST\`"
+            echo
+            echo '```sh'
+            echo "gh workflow run Release --ref $RELEASE_TAG -f prepare_run_id=$GITHUB_RUN_ID"
+            echo '```'
+            echo
+            cat "$RUNNER_TEMP/prepared-release/SHA256SUMS.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish prepared release
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release-publish
+    permissions:
+      actions: read
+      attestations: read
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check publication identity and exact tag
+        id: version
+        env:
+          ALLOWED: ${{ vars.RELEASE_ACTORS || 'blessdyb' }}
+          EVENT_ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+        run: |
+          set -euo pipefail
+          allowed_list=",${ALLOWED// /},"
+          for candidate in "$EVENT_ACTOR" "$TRIGGERING_ACTOR"; do
+            if [[ "$allowed_list" != *",$candidate,"* ]]; then
+              echo "::error::$candidate isn't allowed to publish or rerun a release. Allowed: $ALLOWED"
+              exit 1
+            fi
+          done
+          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Publication must be dispatched from a v* tag."; exit 1; }
+          [[ "$PREPARE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::prepare_run_id must contain decimal digits only."; exit 1; }
+          VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          BUILD=$(sed -n 's/.*CURRENT_PROJECT_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          TAG="$EVENT_TAG"
+          RELEASE_SHA=$(git rev-parse HEAD)
+          [[ "$TAG" == "v$VERSION" ]] || { echo "::error::Tag $TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
+          [[ "$RELEASE_SHA" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the dispatch SHA."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$TAG^{}")" == "$RELEASE_SHA" ]] || { echo "::error::The tag does not peel to the dispatch SHA."; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the selected preparation run
+        id: prepared
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ steps.version.outputs.sha }}
+        run: |
+          set -euo pipefail
+          RUN_ID="$PREPARE_RUN_ID"
+          RUN_JSON="$RUNNER_TEMP/prepare-run.json"
+          ARTIFACTS_JSON="$RUNNER_TEMP/prepare-artifacts.json"
+          RESULT_JSON="$RUNNER_TEMP/prepare-result.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > "$RUN_JSON"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" > "$ARTIFACTS_JSON"
+          WORKFLOW_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml" --jq .id)
+          python3 -I scripts/release_artifact.py verify-run \
+            --run-json "$RUN_JSON" \
+            --artifacts-json "$ARTIFACTS_JSON" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow-id "$WORKFLOW_ID" \
+            --run-id "$RUN_ID" \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$RELEASE_SHA" > "$RESULT_JSON"
+          echo "workflow_id=$WORKFLOW_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$(jq -r .artifact_id "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
+          echo "artifact_digest=$(jq -r .artifact_digest "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
+          echo "run_attempt=$(jq -r .run_attempt "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify the immutable artifact archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.prepared.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/prepared-release.zip"
+          PREPARED="$RUNNER_TEMP/prepared-release"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$ARCHIVE"
+          EXPECTED="$ARTIFACT_DIGEST"
+          ACTUAL="sha256:$(sha256sum "$ARCHIVE" | cut -d' ' -f1)"
+          [[ "$ACTUAL" == "$EXPECTED" ]] || {
+            echo "::error::Artifact archive digest is $ACTUAL, expected $EXPECTED."
+            exit 1
+          }
+          python3 -I scripts/release_artifact.py extract-archive \
+            --archive "$ARCHIVE" --destination "$PREPARED" --version "$RELEASE_VERSION"
+
+      - name: Verify bundle identity and provenance attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ steps.version.outputs.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD: ${{ steps.version.outputs.build }}
+          WORKFLOW_ID: ${{ steps.prepared.outputs.workflow_id }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+          PREPARE_RUN_ATTEMPT: ${{ steps.prepared.outputs.run_attempt }}
+        run: |
+          set -euo pipefail
+          PREPARED="$RUNNER_TEMP/prepared-release"
+          python3 -I scripts/release_artifact.py verify-bundle \
+            --bundle "$PREPARED" \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$RELEASE_SHA" \
+            --version "$RELEASE_VERSION" \
+            --build "$RELEASE_BUILD" \
+            --workflow-id "$WORKFLOW_ID" \
+            --run-id "$PREPARE_RUN_ID" \
+            --run-attempt "$PREPARE_RUN_ATTEMPT"
+          for file in "$PREPARED"/*; do
+            gh attestation verify "$file" \
+              --repo "$GITHUB_REPOSITORY" \
+              --source-ref "refs/tags/$RELEASE_TAG" \
+              --source-digest "$RELEASE_SHA" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
+          done
+
+      - name: Create or resume the exact release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="$RELEASE_TAG"
+          VERSION="$RELEASE_VERSION"
+          PREPARED="$RUNNER_TEMP/prepared-release"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" == true ]]; then
+              echo "Resuming the existing draft for $TAG."
+              gh release edit "$TAG" --title "Flowlight $VERSION" --notes-file "$PREPARED/RELEASE-NOTES.md"
+              gh release upload "$TAG" --clobber \
+                "$PREPARED/Flowlight.dmg" \
+                "$PREPARED/Flowlight-$VERSION.pkg" \
+                "$PREPARED/SHA256SUMS.txt" \
+                "$PREPARED/RELEASE-MANIFEST.json"
+            else
+              echo "A public release already exists for $TAG; it will be verified without mutation."
+            fi
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --draft \
+              --latest \
+              --title "Flowlight $VERSION" \
+              --notes-file "$PREPARED/RELEASE-NOTES.md" \
+              "$PREPARED/Flowlight.dmg" \
+              "$PREPARED/Flowlight-$VERSION.pkg" \
+              "$PREPARED/SHA256SUMS.txt" \
+              "$PREPARED/RELEASE-MANIFEST.json"
+          fi
+
+      - name: Re-download and verify every release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ steps.version.outputs.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD: ${{ steps.version.outputs.build }}
+          WORKFLOW_ID: ${{ steps.prepared.outputs.workflow_id }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+          PREPARE_RUN_ATTEMPT: ${{ steps.prepared.outputs.run_attempt }}
+        run: |
+          set -euo pipefail
+          TAG="$RELEASE_TAG"
+          VERSION="$RELEASE_VERSION"
+          PREPARED="$RUNNER_TEMP/prepared-release"
+          CANDIDATE="$RUNNER_TEMP/release-candidate"
+          mkdir "$CANDIDATE"
+          gh release view "$TAG" --json assets -q '.assets[].name' > "$RUNNER_TEMP/candidate-assets.txt"
+          sort "$RUNNER_TEMP/candidate-assets.txt" > "$RUNNER_TEMP/candidate-assets-sorted.txt"
+          {
+            echo "Flowlight-$VERSION.pkg"
+            echo "Flowlight.dmg"
+            echo "RELEASE-MANIFEST.json"
+            echo "SHA256SUMS.txt"
+          } > "$RUNNER_TEMP/expected-assets.txt"
+          cmp "$RUNNER_TEMP/expected-assets.txt" "$RUNNER_TEMP/candidate-assets-sorted.txt"
+          gh release download "$TAG" --dir "$CANDIDATE"
+          python3 -I scripts/release_artifact.py verify-bundle \
+            --bundle "$CANDIDATE" \
+            --public \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --source-sha "$RELEASE_SHA" \
+            --version "$VERSION" \
+            --build "$RELEASE_BUILD" \
+            --workflow-id "$WORKFLOW_ID" \
+            --run-id "$PREPARE_RUN_ID" \
+            --run-attempt "$PREPARE_RUN_ATTEMPT"
+          cmp "$PREPARED/Flowlight.dmg" "$CANDIDATE/Flowlight.dmg"
+          cmp "$PREPARED/Flowlight-$VERSION.pkg" "$CANDIDATE/Flowlight-$VERSION.pkg"
+          cmp "$PREPARED/SHA256SUMS.txt" "$CANDIDATE/SHA256SUMS.txt"
+          cmp "$PREPARED/RELEASE-MANIFEST.json" "$CANDIDATE/RELEASE-MANIFEST.json"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/candidate-body.md"
+          python3 -I - "$PREPARED/RELEASE-NOTES.md" "$RUNNER_TEMP/candidate-body.md" <<'PY'
+          import pathlib, sys
+          expected, actual = (pathlib.Path(value).read_text().rstrip("\n") for value in sys.argv[1:])
+          if actual != expected:
+              raise SystemExit("release body differs from the prepared release notes")
+          PY
+
+      - name: Publish the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$RELEASE_TAG"
+          if [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" == true ]]; then
+            gh release edit "$TAG" --draft=false --latest
+          fi
+          [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" == false ]] || {
+            echo "::error::$TAG is still a draft after publication."
             exit 1
           }
 
-      # The cask points at the release that was just published, so this runs last.
-      - name: Update the Homebrew cask
-        if: ${{ env.TAP_TOKEN != '' && github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true' }}
+      - name: Record the published identity
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ steps.version.outputs.sha }}
+          PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+          ARTIFACT_DIGEST: ${{ steps.prepared.outputs.artifact_digest }}
         run: |
           set -euo pipefail
-          git clone "https://x-access-token:$TAP_TOKEN@github.com/xinbetween/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          {
+            echo "### Published the prepared release"
+            echo
+            echo "- Tag: \`$RELEASE_TAG\`"
+            echo "- Source: \`$RELEASE_SHA\`"
+            echo "- Preparation run: \`$PREPARE_RUN_ID\`"
+            echo "- Prepared artifact digest: \`$ARTIFACT_DIGEST\`"
+            echo "- No build, signing, notarization, or Apple credential step ran during publication."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  homebrew:
+    name: Publish verified Homebrew cask
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # TAP_TOKEN already lives here. The job references no signing or notarization input; publication remains in the
+    # credential-free release-publish environment, and this follow-up receives only the cross-repository tap token.
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download and verify the public release DMG
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must run from a v* tag."; exit 1; }
+          VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
+          [[ "$EVENT_TAG" == "v$VERSION" ]] || { echo "::error::Tag $EVENT_TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the dispatch SHA."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^{}")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the dispatch SHA."; exit 1; }
+          [[ "$(gh release view "$EVENT_TAG" --json isDraft --jq .isDraft)" == false ]] || {
+            echo "::error::$EVENT_TAG is not a public release."
+            exit 1
+          }
+          PUBLIC="$RUNNER_TEMP/public-release"
+          mkdir "$PUBLIC"
+          gh release download "$EVENT_TAG" --dir "$PUBLIC" --pattern Flowlight.dmg --pattern RELEASE-MANIFEST.json
+          EXPECTED=$(jq -r '.assets[] | select(.name == "Flowlight.dmg") | .sha256' "$PUBLIC/RELEASE-MANIFEST.json")
+          ACTUAL=$(sha256sum "$PUBLIC/Flowlight.dmg" | cut -d' ' -f1)
+          [[ -n "$EXPECTED" && "$EXPECTED" != null && "$ACTUAL" == "$EXPECTED" ]] || {
+            echo "::error::Public DMG checksum $ACTUAL differs from release manifest $EXPECTED."
+            exit 1
+          }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$ACTUAL" >> "$GITHUB_OUTPUT"
+
+      - name: Update the tap from the verified public DMG
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA256: ${{ steps.release.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$TAP_TOKEN" ]] || { echo "::error::TAP_TOKEN is not configured in the release environment."; exit 1; }
+          mkdir build
+          cp "$RUNNER_TEMP/public-release/Flowlight.dmg" build/Flowlight.dmg
+          export GH_TOKEN="$TAP_TOKEN"
+          gh auth setup-git
+          gh repo clone xinbetween/homebrew-tap "$RUNNER_TEMP/tap"
           git -C "$RUNNER_TEMP/tap" config user.name "github-actions[bot]"
           git -C "$RUNNER_TEMP/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
+          VERSION="$RELEASE_VERSION" REQUIRE_LOCAL_DMG=1 TAP="$RUNNER_TEMP/tap" scripts/update-cask.sh
+          ACTUAL=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$RUNNER_TEMP/tap/Casks/flowlight.rb")
+          [[ "$ACTUAL" == "$RELEASE_SHA256" ]] || {
+            echo "::error::Homebrew checksum differs from the verified public DMG."
+            exit 1
+          }
           git -C "$RUNNER_TEMP/tap" push
-
-      - name: Say what a dry run produced
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run == 'true' }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          {
-            echo "### Dry run: nothing was published"
-            echo
-            echo "Signed, notarized and accepted by Gatekeeper:"
-            echo '```'
-            cat build/SHA256SUMS.txt
-            echo '```'
-            echo "Dispatch this workflow for \`${{ steps.version.outputs.tag }}\` with **dry_run=false** to publish."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "Dry run complete — Flowlight $VERSION built and verified, nothing published."

@@ -16,24 +16,51 @@ final class FilterDataProvider: NEFilterDataProvider {
     private var flushTimer: DispatchSourceTimer?
 
     /// Set once macOS has asked this provider to start and the settings applied.
-    static let filterStarted = OSAllocatedUnfairLock(initialState: (running: false, detail: ""))
+    static let filterStarted = OSAllocatedUnfairLock(
+        initialState: (running: false, detail: "", generation: UInt64(0))
+    )
 
     override func startFilter(completionHandler: @escaping (Error?) -> Void) {
         #if APP_STORE
+        IPCServer.shared.attach(tracker: tracker)
         IPCServer.shared.startListener()
         #endif
         let anyNetwork = NENetworkRule(remoteNetworkEndpoint: nil, remotePrefix: 0, localNetworkEndpoint: nil, localPrefix: 0,
                                        protocol: .any, direction: .any)
         let settings = NEFilterSettings(rules: [NEFilterRule(networkRule: anyNetwork, action: .filterData)],
                                         defaultAction: .allow)
+        let generation = Self.filterStarted.withLock { state in
+            state.generation &+= 1
+            state.running = false
+            state.detail = ""
+            return state.generation
+        }
+        #if APP_STORE
+        tracker.filterStarted(generation: generation)
+        #endif
         apply(settings) { [weak self] error in
             if let error {
                 extensionLog.error("apply(settings) failed: \(error.localizedDescription, privacy: .public)")
-                Self.filterStarted.withLock { $0 = (false, error.localizedDescription) }
+                let current = Self.filterStarted.withLock { state -> Bool in
+                    guard state.generation == generation else { return false }
+                    state.running = false
+                    state.detail = error.localizedDescription
+                    return true
+                }
+                #if APP_STORE
+                if current { self?.tracker.filterStopped() }
+                #endif
             } else {
-                extensionLog.info("Filter started")
-                Self.filterStarted.withLock { $0 = (true, "") }
-                self?.startFlushing()
+                let current = Self.filterStarted.withLock { state -> Bool in
+                    guard state.generation == generation else { return false }
+                    state.running = true
+                    state.detail = ""
+                    return true
+                }
+                if current {
+                    extensionLog.info("Filter started")
+                    self?.startFlushing()
+                }
             }
             completionHandler(error)
         }
@@ -45,7 +72,14 @@ final class FilterDataProvider: NEFilterDataProvider {
         flushTimer = nil
         let batches = tracker.aggregator.drain(before: .max)
         if !batches.isEmpty { IPCServer.shared.send(batches) }
-        Self.filterStarted.withLock { $0 = (false, "") }
+        Self.filterStarted.withLock { state in
+            state.generation &+= 1
+            state.running = false
+            state.detail = ""
+        }
+        #if APP_STORE
+        tracker.filterStopped()
+        #endif
         completionHandler()
     }
 

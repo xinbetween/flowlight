@@ -49,8 +49,7 @@ final class ExtensionManager: NSObject, ObservableObject {
     struct VersionCheck: Equatable {
         var installed: [String] = []
         /// The version the installed extension is expected to be: the version of the extension *embedded in this
-        /// app bundle*. It follows the extension's own lifecycle, not the app's — so an app update that doesn't
-        /// change the extension ships the same version macOS already runs, and macOS replaces nothing.
+        /// app bundle*. The release keeps that identity equal to the app's version and build.
         var expectedVersion: String = ""
         /// Whether a re-activation was started to put the two back in step.
         var repairing = false
@@ -103,11 +102,9 @@ final class ExtensionManager: NSObject, ObservableObject {
 
     /// The version of the extension embedded in this app bundle — what the installed one should match.
     ///
-    /// Read from the embedded `.systemextension` rather than assumed equal to the app's version, because the two are
-    /// deliberately decoupled: the extension carries its own version, bumped only when its code changes, so an app
-    /// update that leaves the extension alone ships the version macOS already runs and triggers no replacement — and
-    /// therefore no "restart to finish the update". Falls back to the app version if the embedded copy can't be read,
-    /// which is the old behaviour and errs towards not crying "stale".
+    /// Read from the embedded product instead of reconstructing the value from app metadata. The release contract keeps
+    /// both identities equal, while this remains the authoritative binary macOS actually installs. Falls back to the app
+    /// version if the embedded copy cannot be read, which errs towards not incorrectly reporting a stale extension.
     nonisolated static var expectedExtensionVersion: String {
         #if APP_STORE
         let directory = "Contents/PlugIns"

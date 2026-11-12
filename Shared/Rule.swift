@@ -66,6 +66,9 @@ struct Rule: Codable, Identifiable, Equatable, Sendable {
         case flow
         /// The HTTPS inspection proxy, which refuses one request and answers with a status.
         case request
+        /// A guardrail changed or refused one inspected agent request. Persisted separately so deleting the guardrail
+        /// cannot relabel its historical activity as an ordinary network rule.
+        case guardrail
     }
 
     var engine: Engine { path.isEmpty && method.isEmpty ? .flow : .request }
@@ -302,6 +305,8 @@ extension Rule {
         let p = pattern.lowercased()
         guard !p.isEmpty else { return true }
         return p == bundleID.lowercased() || p == agentKey.lowercased()
+            || AgentCatalog.sameAgentIdentity(pattern, bundleID)
+            || AgentCatalog.sameAgentIdentity(pattern, agentKey)
     }
 }
 
@@ -355,13 +360,18 @@ enum RuleBook {
         return RuleDecision(verdict: winner.action == .block ? .block : .allow, rule: winner)
     }
 
-    private static func best(of candidates: [Rule]) -> Rule? {
-        candidates.max { a, b in
-            if a.specificity != b.specificity { return a.specificity < b.specificity }
-            // Same reach: the block is the one that stands.
-            if a.action != b.action { return a.action == .allow }
-            return a.created < b.created
+    /// Most specific first, with block winning an exact tie and the newest equivalent rule winning after that.
+    /// The request proxy uses the same order before converting decisions into local-response matchers.
+    static func orderedByPrecedence(_ candidates: [Rule]) -> [Rule] {
+        candidates.sorted { a, b in
+            if a.specificity != b.specificity { return a.specificity > b.specificity }
+            if a.action != b.action { return a.action == .block }
+            return a.created > b.created
         }
+    }
+
+    private static func best(of candidates: [Rule]) -> Rule? {
+        orderedByPrecedence(candidates).first
     }
 
     /// Which rules could bite at all, given what is running. A rule the current engine can't carry out is shown as
@@ -385,7 +395,7 @@ extension Rule {
         switch engine {
         case .flow:
             return extensionRunning ? nil : "Watching only — the Network Extension refuses connections, and it isn't running."
-        case .request:
+        case .request, .guardrail:
             return inspecting ? nil : "Watching only — a path can only be matched by HTTPS inspection, and it is off."
         }
     }

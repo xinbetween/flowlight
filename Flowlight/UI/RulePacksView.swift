@@ -297,7 +297,7 @@ private struct RulePacksContent: View {
     }
 }
 
-private struct RulePackEditor: View {
+struct RulePackEditor: View {
     let pack: RulePackDefinition
     let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor
@@ -581,6 +581,18 @@ private struct RulePackEditor: View {
     }
 }
 
+enum RulePackActivityAction {
+    static func exception(for event: RulePackEventRecord) -> RulePackOverride {
+        RulePackOverride(packID: event.packID, app: event.bundleID,
+                         host: event.matchedHost, match: event.match)
+    }
+
+    static func normalAllowRule(for event: RulePackEventRecord) -> Rule {
+        Rule(action: .allow, app: event.bundleID, destination: event.matchedHost,
+             destinationMatch: event.match == .exact ? .exact : .suffix)
+    }
+}
+
 struct RulePackEventRow: View {
     let event: RulePackEventRecord
     @EnvironmentObject var monitor: TrafficMonitor
@@ -616,7 +628,7 @@ struct RulePackEventRow: View {
                     Menu {
                         Button(L("Allow for %@", event.appName)) { allowForApp() }
                         Button(L("Edit as normal rule…")) {
-                            nav.writeRule(Rule(action: .allow, app: event.bundleID, destination: event.matchedHost))
+                            nav.writeRule(RulePackActivityAction.normalAllowRule(for: event))
                         }
                     } label: {
                         Text(L("Allow…"))
@@ -632,8 +644,7 @@ struct RulePackEventRow: View {
     }
 
     private func allowForApp() {
-        let exception = RulePackOverride(packID: event.packID, app: event.bundleID,
-                                         host: event.matchedHost, match: event.match)
+        let exception = RulePackActivityAction.exception(for: event)
         overrideSaving = true
         overrideError = nil
         monitor.rulePacks.addOverride(exception) { success in

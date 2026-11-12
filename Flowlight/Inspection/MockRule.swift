@@ -66,10 +66,23 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     /// changes only what the answer calls itself — the same machinery gives it, but "Flowlight blocked this" and
     /// "Flowlight pretended to be the server" are not the same thing to read in a log.
     var blocked = false
+    /// A winning ordinary allow rule. It suppresses lower-precedence request blocks but is never itself answered;
+    /// configured mocks remain independent and may still answer the request.
+    var allowsUpstream = false
     /// Request refusals carry the publication that made the decision, so an answer already in flight cannot credit
     /// activity to a later definition of the same rule. Ordinary saved mocks leave both values empty.
     var ruleSession: String?
     var ruleGeneration: UInt64?
+    /// Stable policy metadata recorded on the exchange. Kept separate from `name`, which is sent to the client in
+    /// `X-Flowlight-Mock` and must remain the human-readable title the configured mock promised.
+    var recordingReference: String?
+
+    // `allowsUpstream` is an ephemeral ordinary-rule marker, never user-authored mock configuration. Excluding it
+    // from Codable prevents a hand-edited defaults value from suppressing an enforcing request block.
+    private enum CodingKeys: String, CodingKey {
+        case id, enabled, name, host, path, method, status, headers, body, bodyEncoding, delay, blocked
+        case ruleSession, ruleGeneration, recordingReference
+    }
 
     /// Methods offered in the editor. `ANY` is the empty method.
     static let methods = ["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
@@ -93,11 +106,14 @@ struct MockRule: Codable, Equatable, Identifiable, Sendable {
     init(id: UUID = UUID(), enabled: Bool = true, name: String = "", host: String = "", path: String = "*",
          method: String = "", status: Int = 500, headers: [HTTPHeader] = [], body: String = "",
          bodyEncoding: MockBodyEncoding = .text, delay: Double = 0, blocked: Bool = false,
-         ruleSession: String? = nil, ruleGeneration: UInt64? = nil) {
+         allowsUpstream: Bool = false, ruleSession: String? = nil, ruleGeneration: UInt64? = nil,
+         recordingReference: String? = nil) {
         self.id = id; self.enabled = enabled; self.name = name; self.host = host; self.path = path
         self.method = method; self.status = status; self.headers = headers; self.body = body
         self.bodyEncoding = bodyEncoding; self.delay = delay; self.blocked = blocked
+        self.allowsUpstream = allowsUpstream
         self.ruleSession = ruleSession; self.ruleGeneration = ruleGeneration
+        self.recordingReference = recordingReference
     }
 }
 
@@ -118,8 +134,10 @@ extension MockRule {
         bodyEncoding = try c.decodeIfPresent(MockBodyEncoding.self, forKey: .bodyEncoding) ?? .text
         delay = try c.decodeIfPresent(Double.self, forKey: .delay) ?? 0
         blocked = try c.decodeIfPresent(Bool.self, forKey: .blocked) ?? false
+        allowsUpstream = false
         ruleSession = try c.decodeIfPresent(String.self, forKey: .ruleSession)
         ruleGeneration = try c.decodeIfPresent(UInt64.self, forKey: .ruleGeneration)
+        recordingReference = try c.decodeIfPresent(String.self, forKey: .recordingReference)
     }
 }
 
@@ -152,9 +170,19 @@ struct MockRuleDraft: Identifiable, Equatable, Sendable {
 /// Whether a request is answered by a rule, and which one. Plain functions over plain data, like `AgentPolicy`:
 /// nothing here knows about sockets, so the whole decision is testable without a proxy.
 enum MockRules {
-    /// The first enabled rule that answers this request, or nil when it should go upstream untouched.
+    /// The first enabled rule that answers this request, or nil when it should go upstream untouched. A winning
+    /// ordinary allow marker suppresses lower-precedence request blocks but does not suppress configured mocks.
     static func match(_ rules: [MockRule], host: String, method: String, path: String) -> MockRule? {
-        rules.first { $0.enabled && matches($0, host: host, method: method, path: path) }
+        var ordinaryRuleAllowed = false
+        for rule in rules where rule.enabled && matches(rule, host: host, method: method, path: path) {
+            if rule.allowsUpstream {
+                ordinaryRuleAllowed = true
+                continue
+            }
+            if ordinaryRuleAllowed && rule.blocked { continue }
+            return rule
+        }
+        return nil
     }
 
     static func matches(_ rule: MockRule, host: String, method: String, path: String) -> Bool {
@@ -286,5 +314,10 @@ extension Rule {
                         path: path.isEmpty ? "*" : path,
                         method: method, status: status, headers: [], body: body, delay: 0, blocked: true,
                         ruleSession: ruleSession, ruleGeneration: ruleGeneration)
+    }
+
+    func asRequestAllowance(host: String = "") -> MockRule {
+        MockRule(id: id, enabled: enabled, name: title, host: destination.isEmpty ? host : destination,
+                 path: path.isEmpty ? "*" : path, method: method, allowsUpstream: true)
     }
 }

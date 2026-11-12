@@ -1,7 +1,29 @@
 import XCTest
 @testable import Flowlight
 
+private enum InjectedPolicyLoadError: LocalizedError {
+    case failed
+    var errorDescription: String? { "injected policy load failure" }
+}
+
 final class TrafficMonitorRulePackStartupTests: XCTestCase {
+    private var priorInspectionEnabled: Any?
+
+    override func setUp() {
+        super.setUp()
+        priorInspectionEnabled = UserDefaults.standard.object(forKey: InspectionController.Keys.enabled)
+        UserDefaults.standard.set(false, forKey: InspectionController.Keys.enabled)
+    }
+
+    override func tearDown() {
+        if let priorInspectionEnabled {
+            UserDefaults.standard.set(priorInspectionEnabled, forKey: InspectionController.Keys.enabled)
+        } else {
+            UserDefaults.standard.removeObject(forKey: InspectionController.Keys.enabled)
+        }
+        super.tearDown()
+    }
+
     @MainActor
     func testTrafficSourceStartsAfterCatalogAndExceptionsReload() async throws {
         let url = temporaryDatabaseURL("startup-order")
@@ -32,6 +54,99 @@ final class TrafficMonitorRulePackStartupTests: XCTestCase {
         XCTAssertEqual(snapshot.configurations.map(\.packID), [definition.id])
         XCTAssertEqual(snapshot.overrides, [exception])
         XCTAssertEqual(monitor.rulePackCatalog.receipt?.sequence, verified.sequence)
+    }
+
+    @MainActor
+    func testPersistedGuardrailsLoadBeforeInspectionAttaches() async throws {
+        let url = temporaryDatabaseURL("guardrail-barrier")
+        let db = try TrafficDatabase(url: url)
+        let persisted = Guardrail(agent: "custom-agent", tool: "write_file")
+        try db.saveGuardrail(persisted)
+        let source = RecordingTrafficSource()
+        let monitor = TrafficMonitor(databaseURL: url, trafficSourceFactory: { source })
+
+        monitor.start()
+        try await waitUntil { monitor.inspection.attached }
+
+        XCTAssertTrue(monitor.inspection.policyStateReady)
+        XCTAssertEqual(monitor.guardrails.guardrails, [persisted])
+        XCTAssertEqual(monitor.inspection.guardrails(), [persisted])
+    }
+
+    @MainActor
+    func testPolicyLoadFailureCompletesStartupFailClosedWithVisibleError() async throws {
+        let source = RecordingTrafficSource()
+        let monitor = TrafficMonitor(
+            databaseURL: temporaryDatabaseURL("policy-load-failure"),
+            trafficSourceFactory: { source },
+            policyLoader: { _ in throw InjectedPolicyLoadError.failed }
+        )
+
+        monitor.start()
+        try await waitUntil { monitor.inspection.lastError?.contains("injected policy load failure") == true }
+
+        XCTAssertFalse(monitor.inspection.policyStateReady)
+        XCTAssertFalse(monitor.inspection.attached)
+    }
+
+    @MainActor
+    func testEnabledManagedPackKeepsInspectionStoppedUntilExactCommit() async throws {
+        let url = temporaryDatabaseURL("pack-commit-barrier")
+        let db = try TrafficDatabase(url: url)
+        let definition = BuiltInRulePacks.advertising
+        let verified = try productionCatalog()
+        _ = try db.acceptVerifiedRulePackCatalog(
+            try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4"), checkedAt: Date(),
+            nextEligibleAt: Date().addingTimeInterval(86_400)
+        )
+        var configuration = RulePackConfiguration(packID: definition.id, enabled: true)
+        configuration.consentedVersion = definition.manifest.version
+        configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(configuration)
+
+        let source = ExtensionTrafficSource()
+        let monitor = TrafficMonitor(databaseURL: url, trafficSourceFactory: { source })
+        monitor.start()
+        try await waitUntil {
+            source.onRulePackStatus != nil && monitor.rulePacks.snapshot != nil
+        }
+        let digest = try XCTUnwrap(monitor.rulePacks.snapshot?.digest)
+
+        XCTAssertFalse(monitor.inspection.attached)
+        XCTAssertFalse(monitor.inspection.policyStateReady)
+
+        source.onRulePackStatus?(.init(status: .committed, activeDigest: "not-\(digest)"))
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(monitor.inspection.attached)
+        XCTAssertFalse(monitor.inspection.policyStateReady)
+
+        source.onRulePackStatus?(.init(status: .committed, activeDigest: digest))
+        try await waitUntil { monitor.inspection.attached }
+        XCTAssertTrue(monitor.inspection.policyStateReady)
+    }
+
+    @MainActor
+    func testFilterWarningClearsWhenTheSameExtensionRecovers() async throws {
+        let defaults = UserDefaults.standard
+        let prior = defaults.object(forKey: "FLForceFilterWarning")
+        defaults.set(false, forKey: "FLForceFilterWarning")
+        defer {
+            if let prior { defaults.set(prior, forKey: "FLForceFilterWarning") }
+            else { defaults.removeObject(forKey: "FLForceFilterWarning") }
+        }
+        let source = ExtensionTrafficSource()
+        let monitor = TrafficMonitor(
+            databaseURL: temporaryDatabaseURL("filter-recovery"),
+            trafficSourceFactory: { source }
+        )
+        monitor.start()
+        try await waitUntil { source.onFilterAvailabilityChanged != nil }
+
+        source.onFilterAvailabilityChanged?(false, "filter unavailable")
+        try await waitUntil { monitor.captureWarning == "filter unavailable" }
+
+        source.onFilterAvailabilityChanged?(true, nil)
+        try await waitUntil { monitor.captureWarning == nil }
     }
 
     @MainActor

@@ -8,7 +8,7 @@ final class ResponseScriptRunner: @unchecked Sendable {
     static let maxPayloadBytes = ResponseGate.holdLimit
     static let timeout: TimeInterval = 0.25
 
-    struct Result: Sendable { var body: Data; var note: String }
+    struct Result: Sendable { var body: Data; var note: String; var rules: [ResponseTransformRule] }
 
     private final class OutputCapture: @unchecked Sendable {
         private let lock = NSLock()
@@ -27,16 +27,17 @@ final class ResponseScriptRunner: @unchecked Sendable {
         guard responseBody.count <= Self.maxPayloadBytes,
               let representation = ResponseRepresentation.detect(headers: responseHead.headers, body: responseBody) else { return nil }
         var body = responseBody
-        var names: [String] = []
+        var applied: [ResponseTransformRule] = []
         for rule in rules {
             guard rule.script.lengthOfBytes(using: .utf8) <= Self.maxScriptBytes,
                   let transformed = run(rule: rule, request: request, representation: representation, body: body),
-                  transformed.count <= Self.maxPayloadBytes else { continue }
+                  transformed.count <= Self.maxPayloadBytes,
+                  transformed != body else { continue }
             body = transformed
-            names.append(rule.title)
+            applied.append(rule)
         }
-        guard !names.isEmpty, body != responseBody else { return nil }
-        return Result(body: body, note: names.joined(separator: " · "))
+        guard !applied.isEmpty, body != responseBody else { return nil }
+        return Result(body: body, note: applied.map(\.title).joined(separator: " · "), rules: applied)
         #endif
     }
 

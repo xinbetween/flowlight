@@ -78,8 +78,13 @@ final class ResponseTransformRuleTests: XCTestCase {
 
         let textRule = ResponseTransformRule(host: "api.example.com", script: "function modifyResponse(args) { return args.responseText.toUpperCase(); }")
         let textHead = HTTPHead(startLine: "HTTP/1.1 200 OK", headers: [HTTPHeader(name: "Content-Type", value: "text/plain")])
-        let text = ResponseScriptRunner.shared.transform(rules: [textRule], request: request, responseHead: textHead, responseBody: Data("ready".utf8))
-        XCTAssertEqual(String(decoding: try! XCTUnwrap(text).body, as: UTF8.self), "READY")
+        let unchanged = ResponseTransformRule(host: "api.example.com",
+                                              script: "function modifyResponse(args) { return args.responseText; }")
+        let text = ResponseScriptRunner.shared.transform(rules: [unchanged, textRule], request: request,
+                                                         responseHead: textHead, responseBody: Data("ready".utf8))
+        let transformed = try! XCTUnwrap(text)
+        XCTAssertEqual(String(decoding: transformed.body, as: UTF8.self), "READY")
+        XCTAssertEqual(transformed.rules.map(\.id), [textRule.id])
     }
 
     func testRunnerWithholdsCredentialsAndFailsOpenForBrokenOrSlowScripts() {
@@ -284,7 +289,8 @@ final class ResponseTransformProvenanceTests: XCTestCase {
         let recorded = expectation(description: "recorded")
         var exchange: HTTPExchange?
         recorder.onExchange = { exchange = $0; recorded.fulfill() }
-        let flow = ProxyFlow(host: "api.example.com", port: 443, clientPort: 1, inspected: true, scheme: "https")
+        let flow = ProxyFlow(host: "api.example.com", port: 443, clientAddress: "127.0.0.1", clientPort: 1,
+                             inspected: true, scheme: "https")
         recorder.flowStarted(flow)
         recorder.flow(flow, clientSent: Data("GET /items HTTP/1.1\r\nHost: api.example.com\r\n\r\n".utf8))
         recorder.flow(flow, responseTransformedBy: "Rewrite status")

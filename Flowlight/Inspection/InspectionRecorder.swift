@@ -44,6 +44,9 @@ struct HTTPExchange: Identifiable, Equatable, Sendable {
     /// What a guardrail took out of this request before it left. Its own field for the same reason: the exchange
     /// is real and was really sent, but it is not quite what the agent wrote, and that has to be readable.
     var guardrail: String?
+    /// What a configured request rewrite changed before the request left. Earlier builds put this text in
+    /// `guardrail`; new recordings keep the two effects distinct without altering either enforcement path.
+    var requestRewrite: String? = nil
     /// The rule that changed a real upstream response before the client received it. A mock is intentionally not
     /// reused here: a transformed exchange really reached its origin.
     var responseTransform: String? = nil
@@ -111,7 +114,15 @@ enum SocketOwner {
 /// them to the process (and agent) behind the connection, reads tool calls, redacts credentials, and hands each
 /// finished exchange to `onExchange`.
 final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
-    private struct Pending { var head: HTTPHead; var body: HTTPBody; var started: Date; var mock: String?; var guardrail: String?; var responseTransform: String? }
+    private struct Pending {
+        var head: HTTPHead
+        var body: HTTPBody
+        var started: Date
+        var mock: String?
+        var guardrail: String?
+        var requestRewrite: String?
+        var responseTransform: String?
+    }
 
     private final class FlowState {
         let request: HTTPStreamParser
@@ -120,6 +131,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         /// Set by the proxy just before the bytes that complete a request it answers itself.
         var nextMock: String?
         var nextGuardrail: String?
+        var nextRequestRewrite: String?
         /// Marked by the proxy immediately before the transformed response is fed here. The oldest pending request
         /// is the response being delivered, including on a pipelined keep-alive connection.
         var nextResponseTransform: String?
@@ -162,9 +174,11 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         state.request.onHead = { response.requestMethods.append($0.method) }
         state.request.onMessage = { [weak state] head, body in
             state?.queue.append(Pending(head: head, body: body, started: Date(), mock: state?.nextMock,
-                                        guardrail: state?.nextGuardrail, responseTransform: nil))
+                                        guardrail: state?.nextGuardrail, requestRewrite: state?.nextRequestRewrite,
+                                        responseTransform: nil))
             state?.nextMock = nil
             state?.nextGuardrail = nil
+            state?.nextRequestRewrite = nil
         }
         state.response.onMessage = { [weak self, weak state] head, body in
             guard let self, let state, !state.queue.isEmpty else { return }
@@ -173,21 +187,15 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
             state.nextResponseTransform = nil
             self.emit(flow: flow, state: state, request: request, responseHead: head, responseBody: body, note: nil)
         }
+        state.owner = flow.owner
+        state.ownerReady.signal()
         flows[flow.id] = state
-        let port = proxyPort()
-        lookupQueue.async { [weak self] in
-            state.owner = self?.owner(clientPort: flow.clientPort, proxyPort: port)
-            state.ownerReady.signal()
-        }
     }
 
     func flow(_ flow: ProxyFlow, connectedTo remoteIP: String) {
-        guard let state = flows[flow.id] else { return }
+        guard flow.owner.pid > 0 else { return }
         lookupQueue.async {
-            // The lookup queue is serial, so the owner for this flow is already known.
-            if let owner = state.owner, owner.pid > 0 {
-                ProxyAttribution.shared.record(host: flow.host, ip: remoteIP, owner: owner)
-            }
+            ProxyAttribution.shared.record(host: flow.host, ip: remoteIP, owner: flow.owner)
         }
     }
 
@@ -195,16 +203,19 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     func flow(_ flow: ProxyFlow, serverSent data: Data) { flows[flow.id]?.response.feed(data) }
     func flow(_ flow: ProxyFlow, mockedBy rule: String) { flows[flow.id]?.nextMock = rule }
     func flow(_ flow: ProxyFlow, guardedBy note: String) { flows[flow.id]?.nextGuardrail = note }
+    func flow(_ flow: ProxyFlow, rewrittenBy note: String) { flows[flow.id]?.nextRequestRewrite = note }
     func flow(_ flow: ProxyFlow, responseTransformedBy note: String) { flows[flow.id]?.nextResponseTransform = note }
 
     func flowEnded(_ flow: ProxyFlow, note: String?) {
+        defer { forgetOwner(clientAddress: flow.clientAddress, clientPort: flow.clientPort) }
         guard let state = flows.removeValue(forKey: flow.id) else { return }
         state.response.finish()
         if let note {
             // Nothing was decrypted; record why, so the user sees which app and host were passed through.
             let head = HTTPHead(startLine: "CONNECT \(flow.host):\(flow.port) HTTP/1.1", headers: [])
             emit(flow: flow, state: state,
-                 request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil, guardrail: nil),
+                 request: Pending(head: head, body: HTTPBody(), started: flow.started, mock: nil, guardrail: nil,
+                                  requestRewrite: nil, responseTransform: nil),
                  responseHead: nil, responseBody: HTTPBody(), note: note)
         }
     }
@@ -212,8 +223,7 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
     private func emit(flow: ProxyFlow, state: FlowState, request: Pending, responseHead: HTTPHead?, responseBody: HTTPBody, note: String?) {
         let finished = Date()
         emitQueue.async { [self] in
-            if state.owner == nil { _ = state.ownerReady.wait(timeout: .now() + 2); state.ownerReady.signal() }
-            let owner = state.owner ?? Owner()
+            let owner = state.owner ?? flow.owner
             var calls = LLMToolCallReader.responseCalls(responseBody.data)
             var results = newResults(ToolResultReader.results(inRequest: request.body.data) + ToolResultReader.results(inResponse: responseBody.data))
             let endpoint = flow.host + (request.head.target.split(separator: "?").first.map(String.init) ?? "")
@@ -256,7 +266,8 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
                 contentType: request.head.value("Content-Type") ?? responseHead?.value("Content-Type") ?? "", pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName,
                 agent: owner.agent, agentName: owner.agentName, mcpServer: owner.mcpServer, toolCalls: calls,
                 toolResults: results, mcp: mcp, llm: llm, note: notes.isEmpty ? nil : notes.joined(separator: " "),
-                mockRule: request.mock, guardrail: request.guardrail, responseTransform: request.responseTransform)
+                mockRule: request.mock, guardrail: request.guardrail, requestRewrite: request.requestRewrite,
+                responseTransform: request.responseTransform)
             onExchange(exchange)
         }
     }
@@ -295,14 +306,43 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         return false
     }
 
-    private var owners: [UInt16: (owner: Owner, at: Date)] = [:]
+    private struct ClientEndpoint: Hashable {
+        var address: String
+        var port: UInt16
+    }
+
+    private var owners: [ClientEndpoint: (owner: Owner, at: Date)] = [:]
     private let ownersLock = NSLock()
+
+    /// Stores an identity supplied by the content filter for the exact source port. Store builds use this before
+    /// authorization so every later request/guardrail/recording hook sees the same trusted owner without libproc.
+    /// An attribution miss invalidates any prior owner for a reused source port; stale identity must never reach
+    /// request policy, inspection scope, or recording after the authoritative lookup has failed open.
+    func remember(owner: Owner, clientAddress: String, clientPort: UInt16) {
+        let endpoint = ClientEndpoint(address: clientAddress, port: clientPort)
+        ownersLock.lock()
+        defer { ownersLock.unlock() }
+        guard !owner.bundleID.isEmpty else {
+            owners.removeValue(forKey: endpoint)
+            return
+        }
+        if owners.count > 2000 { owners.removeAll() }
+        owners[endpoint] = (owner, Date())
+    }
+
+    private func forgetOwner(clientAddress: String, clientPort: UInt16) {
+        let endpoint = ClientEndpoint(address: clientAddress, port: clientPort)
+        ownersLock.lock()
+        owners.removeValue(forKey: endpoint)
+        ownersLock.unlock()
+    }
 
     /// The process (and agent) behind a client connection. Cached briefly per source port, because the proxy asks
     /// once to decide whether to decrypt and the recorder asks again to label the exchange.
-    func owner(clientPort: UInt16, proxyPort: UInt16?) -> Owner {
+    func owner(clientAddress: String, clientPort: UInt16, proxyPort: UInt16?) -> Owner {
+        let endpoint = ClientEndpoint(address: clientAddress, port: clientPort)
         ownersLock.lock()
-        if let hit = owners[clientPort], Date().timeIntervalSince(hit.at) < 30 { ownersLock.unlock(); return hit.owner }
+        if let hit = owners[endpoint], Date().timeIntervalSince(hit.at) < 30 { ownersLock.unlock(); return hit.owner }
         ownersLock.unlock()
         let owner = lookupOwner(clientPort: clientPort, proxyPort: proxyPort)
         // The socket can reach the listener just before libproc publishes it. Do not turn that timing miss into a
@@ -310,27 +350,52 @@ final class InspectionRecorder: ProxyObserver, @unchecked Sendable {
         guard !owner.bundleID.isEmpty else { return owner }
         ownersLock.lock()
         if owners.count > 2000 { owners.removeAll() }
-        owners[clientPort] = (owner, Date())
+        owners[endpoint] = (owner, Date())
         ownersLock.unlock()
         return owner
     }
 
+    #if APP_STORE
+    func owner(for identity: ProxyClientIdentity) -> Owner {
+        var owner = Owner(
+            pid: identity.pid,
+            bundleID: identity.bundleID,
+            appName: identity.name,
+            appPath: identity.path
+        )
+        if let agent = identity.agentBundleID, !agent.isEmpty {
+            owner.agent = agent
+            owner.agentName = identity.agentName
+            owner.mcpServer = identity.mcpServer
+            return owner
+        }
+        // Direct known/discovered agents can still be classified locally; only parent lineage is authoritative from XPC.
+        return contextualize(owner)
+    }
+
+    #endif
+
     private func lookupOwner(clientPort: UInt16, proxyPort: UInt16?) -> Owner {
         guard let proxyPort, let pid = SocketOwner.pid(clientPort: clientPort, proxyPort: proxyPort) else { return Owner() }
         let info = processes.info(pid: pid)
-        var owner = Owner(pid: pid, bundleID: info.bundleID, appName: info.name, appPath: info.path)
-        let key = FlowKey(pid: pid, bundleID: info.bundleID, appName: info.name, appPath: info.path, remoteIP: "", domain: "",
+        return contextualize(Owner(pid: pid, bundleID: info.bundleID, appName: info.name, appPath: info.path))
+    }
+
+    private func contextualize(_ original: Owner) -> Owner {
+        var owner = original
+        let key = FlowKey(pid: owner.pid, bundleID: owner.bundleID, appName: owner.appName, appPath: owner.appPath,
+                          remoteIP: "", domain: "",
                           port: 0, transport: .tcp, appProtocol: "")
         if let context = AgentAttributor.shared.agentContext(for: key) {
             owner.agent = context.agentBundleID
             owner.agentName = context.agentName
             owner.mcpServer = context.mcpServer
-        } else if let known = AgentCatalog.knownAgent(bundleID: info.bundleID, appName: info.name) {
-            owner.agent = info.bundleID
+        } else if let known = AgentCatalog.knownAgent(bundleID: owner.bundleID, appName: owner.appName) {
+            owner.agent = owner.bundleID
             owner.agentName = known.name
-        } else if AgentRegistry.shared.isDiscovered(info.bundleID) {
-            owner.agent = info.bundleID
-            owner.agentName = AgentRegistry.shared.name(bundleID: info.bundleID, appName: info.name) ?? info.name
+        } else if AgentRegistry.shared.isDiscovered(owner.bundleID) {
+            owner.agent = owner.bundleID
+            owner.agentName = AgentRegistry.shared.name(bundleID: owner.bundleID, appName: owner.appName) ?? owner.appName
         }
         return owner
     }

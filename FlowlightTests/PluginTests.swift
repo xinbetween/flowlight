@@ -513,6 +513,111 @@ final class PluginTests: XCTestCase {
         XCTAssertFalse(text.contains("do-not-leak"))
     }
 
+    func testInstalledPluginReceivesOnlyMatchingCredentialFreeProviderProfiles() throws {
+        let db = try database()
+        var manifest = PluginManifest(
+            id: "thirdparty.provider-context", name: "Provider Context", version: "0.1.0", kind: .traffic,
+            source: .installed, publisher: .thirdParty, guardrailProvider: .presidio,
+            description: "JS plugin.", privacySummary: "Uses local provider metadata only."
+        )
+        manifest.configuration = ["mode": "manifest-local"]
+        manifest.script = """
+        function evaluate(context) {
+          const profiles = context.manifest.providerProfiles || [];
+          if (profiles.length !== 1) return [];
+          const profile = profiles[0];
+          return [{
+            severity: 'low',
+            title: 'Provider profile visible',
+            summary: [profile.provider, profile.endpoint, profile.configuration.policy,
+                      context.manifest.configuration.mode,
+                      Object.keys(profile).sort().join(',')].join('|'),
+            evidence: []
+          }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        db.replaceProviderProfiles([
+            ProviderRuntimeProfile(id: UUID(), provider: .bedrock, endpoint: "https://wrong.example",
+                                   configuration: ["policy": "wrong-provider"], pluginIDs: [manifest.id]),
+            ProviderRuntimeProfile(id: UUID(), provider: .presidio, endpoint: "https://unassigned.example",
+                                   configuration: ["policy": "unassigned"], pluginIDs: ["another.plugin"]),
+            ProviderRuntimeProfile(id: UUID(), provider: .presidio, endpoint: "http://localhost:3000/analyze",
+                                   configuration: ["policy": "strict"], pluginIDs: [manifest.id]),
+        ])
+
+        let id = try db.insertExchange(exchange(requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(
+            try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == manifest.id }
+        )
+        XCTAssertEqual(
+            finding.summary,
+            "presidio|http://localhost:3000/analyze|strict|manifest-local|configuration,endpoint,id,provider"
+        )
+        XCTAssertFalse(finding.summary.localizedCaseInsensitiveContains("credential"))
+        XCTAssertFalse(finding.summary.contains("keychain:"))
+    }
+
+    func testSeveralValidProviderProfilesStayWithinHelperTransportEnvelope() throws {
+        let db = try database()
+        var manifest = PluginManifest(
+            id: "thirdparty.many-provider-contexts", name: "Many Provider Contexts", version: "0.1.0",
+            kind: .traffic, source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+            description: "JS plugin.", privacySummary: "Uses local provider metadata only."
+        )
+        manifest.script = """
+        function evaluate(context) {
+          const count = (context.manifest.providerProfiles || []).length;
+          if (count !== 30) return [];
+          return [{ severity: 'low', title: 'All profiles visible', summary: String(count), evidence: [] }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let configuration = Dictionary(uniqueKeysWithValues: (0..<32).map {
+            ("option\($0)", String(repeating: "safe value ", count: 50))
+        })
+        db.replaceProviderProfiles((0..<30).map { index in
+            ProviderRuntimeProfile(id: UUID(), provider: .custom,
+                                   endpoint: "https://provider-\(index).example.test/analyze",
+                                   configuration: configuration, pluginIDs: [manifest.id])
+        })
+
+        let id = try db.insertExchange(exchange(requestSize: 10, headers: []))
+        let finding = try XCTUnwrap(
+            try db.pluginFindings(exchangeIDs: [id])[id]?.first { $0.pluginID == manifest.id }
+        )
+        XCTAssertEqual(finding.summary, "30")
+    }
+
+    func testProviderProfileSnapshotIsUsedByBackfill() throws {
+        let db = try database()
+        var manifest = PluginManifest(
+            id: "thirdparty.provider-backfill", name: "Provider Backfill", version: "0.1.0", kind: .traffic,
+            source: .installed, publisher: .thirdParty, guardrailProvider: .custom,
+            description: "JS plugin.", privacySummary: "Uses local provider metadata only."
+        )
+        manifest.script = """
+        function evaluate(context) {
+          if ((context.manifest.providerProfiles || []).length === 0) return [];
+          return [{ severity: 'low', title: 'Profile backfill', summary: 'profile applied', evidence: [] }];
+        }
+        """
+        try db.savePluginManifest(manifest)
+        let id = try db.insertExchange(exchange(requestSize: 10, headers: []))
+        XCTAssertNil(try db.pluginFindings(exchangeIDs: [id], visibleOnly: false)[id]?.first {
+            $0.pluginID == manifest.id
+        })
+
+        db.replaceProviderProfiles([
+            ProviderRuntimeProfile(id: UUID(), provider: .custom, endpoint: nil,
+                                   configuration: ["mode": "local"], pluginIDs: [manifest.id]),
+        ])
+        XCTAssertEqual(try db.backfillPluginFindings(pluginID: manifest.id), 1)
+        XCTAssertNotNil(try db.pluginFindings(exchangeIDs: [id], visibleOnly: false)[id]?.first {
+            $0.pluginID == manifest.id && $0.title == "Profile backfill"
+        })
+    }
+
     func testBrokenJavaScriptPluginFailsOpenAfterExchangeInsertion() throws {
         let db = try database()
         var manifest = PluginManifest(id: "thirdparty.broken", name: "Broken", version: "0.1.0", kind: .traffic,

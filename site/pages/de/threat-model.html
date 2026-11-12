@@ -85,6 +85,12 @@ nav: threat-model
         unberührt durch – absichtlich, denn eine angepinnte Verbindung zu brechen würde die App brechen. QUIC wird dem Proxy ebenfalls nicht angeboten.</p>
       <p>Ein leerer Bildschirm Inspizieren heißt also „hier wurde nichts durchgeleitet“ und nicht „es ist nichts passiert“. Quellen › Abdeckung sagt pro App,
         welches von beidem gilt.</p>
+      <p><strong>Das Store-Produkt übernimmt weder Proxy- noch Vertrauenseinstellungen.</strong> Es stellt einen Loopback-Proxy und eine öffentliche CA bereit,
+        aber du importierst diese CA selbst und leitest jede Anwendung selbst dorthin. Seine Inhaltsfilter-Erweiterung ordnet eine Verbindung zu einem expliziten Proxy
+        anhand des Audit-Tokens zu, den macOS dem exakten aktiven Loopback-Socket angehängt hat, wobei sowohl Quell- als auch Proxy-Port übereinstimmen müssen.
+        Eine unbekannte, veraltete oder nicht übereinstimmende Identität schlägt bei appbezogener Durchsetzung offen fehl; Flowlight ersetzt sie niemals durch einen
+        geratenen Prozess. Das Entfernen der Inspektion löscht app-eigene Schlüssel und erzeugte Leaf-Zertifikate, während eine von dir importierte öffentliche CA
+        in deinem Besitz bleibt und separat in der Schlüsselbundverwaltung entfernt werden muss.</p>
 
       <h2 id="blocking">Was Blockieren ist und was nicht</h2>
       <p>Eine Regel, die Verbindungen verweigert, wird normalerweise von der Netzwerkerweiterung ausgeführt, im Weg der Verbindung, bevor sie zustande kommt.

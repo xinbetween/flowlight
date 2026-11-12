@@ -32,6 +32,26 @@ struct AgentPolicy: Codable, Equatable, Sendable {
         Preset(name: "Apple", patterns: ["apple.com", "icloud.com", "mzstatic.com"]),
     ]
 
+    /// Select one policy for an identity without depending on Dictionary iteration order. Exact identities win in
+    /// caller-provided order; catalog aliases are a fallback with a stable agent-ID tie-break for legacy duplicates.
+    static func resolve<S: Sequence>(_ policies: S, identities: [String]) -> AgentPolicy? where S.Element == AgentPolicy {
+        let candidates = Array(policies)
+        for identity in identities {
+            if let exact = candidates
+                .filter({ $0.agentID == identity })
+                .sorted(by: { $0.agentID < $1.agentID })
+                .first {
+                return exact
+            }
+        }
+        return candidates.filter { policy in
+            identities.contains { AgentCatalog.sameAgentIdentity(policy.agentID, $0) }
+        }.sorted {
+            let lhs = $0.agentID.lowercased(), rhs = $1.agentID.lowercased()
+            return lhs == rhs ? $0.agentID < $1.agentID : lhs < rhs
+        }.first
+    }
+
     /// Whether this destination is allowed. Local-network traffic always is.
     func allows(host: String, ip: String, isAIProvider: Bool) -> Bool {
         if NetworkScope.isLocalNetwork(ip) { return true }

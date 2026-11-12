@@ -144,6 +144,14 @@ final class MockResponseBytesTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("\r\n\r\n" + #"{"error":"busy"}"#))
     }
 
+    func testStableRecordingReferenceDoesNotReplaceClientFacingTitle() {
+        let reference = "flowlight-policy-v1:opaque"
+        let rule = MockRule(name: "Service unavailable", host: "a.test", recordingReference: reference)
+        let text = String(decoding: rule.responseBytes(), as: UTF8.self)
+        XCTAssertTrue(text.contains("X-Flowlight-Mock: Service unavailable\r\n"))
+        XCTAssertFalse(text.contains(reference))
+    }
+
     func testStatusesWithoutABodyGetNone() {
         let text = String(decoding: MockRule(host: "a.test", status: 304, body: "ignored").responseBytes(), as: UTF8.self)
         XCTAssertTrue(text.hasPrefix("HTTP/1.1 304 Not Modified\r\n"))
@@ -197,11 +205,29 @@ final class MockGateTests: XCTestCase {
                 case .forward(let d): forwarded.append(d); recorded.append(d)
                 case .hold(let d): recorded.append(d)
                 case .answer(let rule, let d, _): answered.append(rule.title); recorded.append(d)
-                case .rewritten(let d, _): recorded.append(d)
+                case .refuse(let rule, let d, _): answered.append(rule.title); recorded.append(d)
+                case .rewritten(let d, _, _): recorded.append(d)
                 }
             }
         }
         return (String(decoding: forwarded, as: UTF8.self), answered, String(decoding: recorded, as: UTF8.self))
+    }
+
+    func testInterventionPreservesGuardrailAndRewriteMetadataSeparately() {
+        let subject = gate([])
+        subject.intervene = { _, bytes in
+            .replace(bytes, guardrail: "guardrail-id", rewrite: "rewrite-id")
+        }
+        let request = Data("GET /v1/items HTTP/1.1\r\nHost: api.example.com\r\n\r\n".utf8)
+
+        let actions = subject.clientSent(request)
+
+        guard case .rewritten(let bytes, let guardrail, let rewrite) = actions.first else {
+            return XCTFail("expected rewritten action")
+        }
+        XCTAssertEqual(bytes, request)
+        XCTAssertEqual(guardrail, "guardrail-id")
+        XCTAssertEqual(rewrite, "rewrite-id")
     }
 
     func testNonMatchingRequestIsUntouched() {
@@ -209,6 +235,50 @@ final class MockGateTests: XCTestCase {
         let result = run(gate(), [request])
         XCTAssertEqual(result.forwarded, request)
         XCTAssertTrue(result.answered.isEmpty)
+    }
+
+    func testBlockedLargeUploadIsDecidedAtTheHeadWithoutBufferingItsBody() throws {
+        let refusal = MockRule(
+            name: "blocked",
+            host: "api.example.com",
+            path: "/upload",
+            method: "POST",
+            status: 403,
+            blocked: true
+        )
+        let subject = gate([refusal])
+        let opening = Data(
+            "POST /upload HTTP/1.1\r\nHost: api.example.com\r\nContent-Length: 10000000\r\n\r\nfirst".utf8
+        )
+
+        let actions = subject.clientSent(opening)
+        guard case .refuse(let rule, let received, let head) = try XCTUnwrap(actions.first) else {
+            return XCTFail("expected an immediate durable refusal")
+        }
+        XCTAssertEqual(rule.id, refusal.id)
+        XCTAssertEqual(head?.target, "/upload")
+        XCTAssertEqual(received, opening)
+        XCTAssertEqual(actions.count, 1)
+        XCTAssertEqual(
+            subject.clientSent(Data("remaining-body".utf8)),
+            [.forward(Data("remaining-body".utf8))],
+            "a persistence failure can resume as an exact opaque stream"
+        )
+    }
+
+    func testPipelinedRefusalAfterForwardedRequestFailsOpenInOrder() {
+        let refusal = MockRule(name: "blocked", host: "api.example.com", path: "/blocked",
+                               method: "GET", status: 403, blocked: true)
+        let first = "GET /allowed HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+        let second = "GET /blocked HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+
+        for chunks in [[first + second], [first, second]] {
+            let result = run(gate([refusal]), chunks)
+            XCTAssertEqual(result.forwarded, first + second)
+            XCTAssertTrue(result.answered.isEmpty,
+                          "a later local response must not overtake an earlier upstream response")
+            XCTAssertEqual(result.recorded, first + second)
+        }
     }
 
     func testMatchingRequestIsHeldAndAnswered() {
@@ -224,13 +294,14 @@ final class MockGateTests: XCTestCase {
         let first = "GET /v1/other HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
         let second = "POST /v1/items HTTP/1.1\r\nHost: api.example.com\r\nContent-Length: 2\r\n\r\nhi"
         let third = "GET /v1/more HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
-        // Arriving in one read, split across reads, and split mid-header: the framing has to survive all three.
+        // Arriving in one read, split across reads, and split mid-header: the framing has to survive all three. Once
+        // the first request goes upstream, a later local answer must fail open rather than overtake its response.
         let combined = first + second + third
         let split = [String(combined.prefix(30)), String(combined.dropFirst(30).prefix(80)), String(combined.dropFirst(110))]
         for chunks in [[combined], split] {
             let result = run(gate(), chunks)
-            XCTAssertEqual(result.forwarded, first + third)
-            XCTAssertEqual(result.answered, ["down"])
+            XCTAssertEqual(result.forwarded, combined)
+            XCTAssertTrue(result.answered.isEmpty)
             XCTAssertEqual(result.recorded, combined)
         }
     }
@@ -272,7 +343,8 @@ final class MockGateTests: XCTestCase {
         var exchanges: [HTTPExchange] = []
         let done = expectation(description: "exchange")
         recorder.onExchange = { exchanges.append($0); done.fulfill() }
-        let flow = ProxyFlow(host: "api.example.com", port: 443, clientPort: 1, inspected: true, scheme: "https")
+        let flow = ProxyFlow(host: "api.example.com", port: 443, clientAddress: "127.0.0.1", clientPort: 1,
+                             inspected: true, scheme: "https")
         recorder.flowStarted(flow)
         let answer = MockRule(name: "down", host: "api.example.com", status: 503, body: "nope")
         recorder.flow(flow, mockedBy: answer.title)
@@ -348,7 +420,7 @@ final class MockProxyTests: XCTestCase {
     private func startProxy(rules: [MockRule], recorder: InspectionRecorder) throws -> (InspectionProxy, UInt16) {
         let proxy = InspectionProxy()
         proxy.observer = recorder
-        proxy.mockRules = { _, _ in rules }
+        proxy.mockRules = { _ in rules }
         let ready = expectation(description: "proxy ready")
         proxy.onStateChange = { _ in if proxy.port != nil { ready.fulfill() } }
         proxy.start(port: 0)   // any free port: a fixed one would collide with a real Flowlight on this Mac
@@ -358,7 +430,9 @@ final class MockProxyTests: XCTestCase {
 
     private func startDeniedProxy() throws -> (InspectionProxy, UInt16) {
         let proxy = InspectionProxy()
-        proxy.authorizeConnection = { _, _, _, answer in answer(false) }
+        proxy.authorizeConnection = { _, _, _, _, answer in
+            answer(ProxyAuthorization(allowed: false, owner: .init()))
+        }
         let ready = expectation(description: "proxy ready")
         proxy.onStateChange = { _ in if proxy.port != nil { ready.fulfill() } }
         proxy.start(port: 0)
@@ -426,6 +500,94 @@ final class MockProxyTests: XCTestCase {
         XCTAssertEqual(result.body, "real")
         XCTAssertTrue(reached)
         XCTAssertNil(recorded.first?.mockRule)
+    }
+
+    func testRequestBlockIsAnsweredLocallyOnlyAfterRefusalPersists() throws {
+        var reached = false
+        let (upstream, upstreamPort) = try startUpstream { reached = true }
+        defer { upstream.cancel() }
+        let recorder = InspectionRecorder()
+        var recorded: [HTTPExchange] = []
+        let seen = expectation(description: "blocked exchange recorded")
+        recorder.onExchange = { recorded.append($0); seen.fulfill() }
+        let refusal = MockRule(name: "blocked", host: "127.0.0.1", path: "/blocked",
+                               status: 403, body: "blocked", blocked: true)
+        let (proxy, proxyPort) = try startProxy(rules: [refusal], recorder: recorder)
+        let persisted = expectation(description: "refusal persisted")
+        proxy.authorizeAnswer = { rule, flow, head, answer in
+            XCTAssertEqual(rule.id, refusal.id)
+            XCTAssertEqual(flow.host, "127.0.0.1")
+            XCTAssertEqual(head?.target, "/blocked")
+            persisted.fulfill()
+            answer(true)
+        }
+        defer { proxy.stop() }
+
+        let result = curl("http://127.0.0.1:\(upstreamPort)/blocked", through: proxyPort)
+        wait(for: [persisted, seen], timeout: 15)
+
+        XCTAssertEqual(result.status, "403")
+        XCTAssertEqual(result.body, "blocked")
+        XCTAssertFalse(reached, "a persisted refusal must never send request bytes upstream")
+        XCTAssertEqual(recorded.first?.mockRule, "blocked")
+        XCTAssertEqual(recorded.first?.status, 403)
+    }
+
+    func testRequestBlockFailsOpenWhenRefusalCannotBePersisted() throws {
+        var reached = false
+        let (upstream, upstreamPort) = try startUpstream { reached = true }
+        defer { upstream.cancel() }
+        let recorder = InspectionRecorder()
+        var recorded: [HTTPExchange] = []
+        let seen = expectation(description: "forwarded exchange recorded")
+        recorder.onExchange = { recorded.append($0); seen.fulfill() }
+        let refusal = MockRule(name: "blocked", host: "127.0.0.1", path: "/blocked",
+                               status: 403, body: "blocked", blocked: true)
+        let (proxy, proxyPort) = try startProxy(rules: [refusal], recorder: recorder)
+        proxy.authorizeAnswer = { _, _, _, answer in answer(false) }
+        defer { proxy.stop() }
+
+        let result = curl("http://127.0.0.1:\(upstreamPort)/blocked", through: proxyPort)
+        wait(for: [seen], timeout: 15)
+
+        XCTAssertEqual(result.status, "200")
+        XCTAssertEqual(result.body, "real")
+        XCTAssertTrue(reached)
+        XCTAssertNil(recorded.first?.mockRule, "a refusal that failed open must be recorded as the real exchange")
+    }
+
+    func testRequestBlockTimesOutFailOpenWithoutReorderingTheRequest() throws {
+        var reached = false
+        let (upstream, upstreamPort) = try startUpstream { reached = true }
+        defer { upstream.cancel() }
+        let recorder = InspectionRecorder()
+        let refusal = MockRule(name: "blocked", host: "127.0.0.1", path: "/blocked",
+                               status: 403, body: "blocked", blocked: true)
+        let (proxy, proxyPort) = try startProxy(rules: [refusal], recorder: recorder)
+        proxy.authorizeAnswer = { _, _, _, _ in }
+        defer { proxy.stop() }
+
+        let result = curl("http://127.0.0.1:\(upstreamPort)/blocked", through: proxyPort)
+
+        XCTAssertEqual(result.status, "200")
+        XCTAssertEqual(result.body, "real")
+        XCTAssertTrue(reached)
+        XCTAssertGreaterThanOrEqual(result.seconds, 0.45)
+        XCTAssertLessThan(result.seconds, 5)
+    }
+
+    func testWaitingUpstreamStateRemainsRecoverable() {
+        XCTAssertEqual(
+            InspectionProxy.classifyUpstreamState(.waiting(.posix(.ENETDOWN)), host: "api.example.com"),
+            .recoverable
+        )
+        guard case .failed(let message) = InspectionProxy.classifyUpstreamState(
+            .failed(.posix(.ECONNREFUSED)),
+            host: "api.example.com"
+        ) else {
+            return XCTFail("a failed connection must remain terminal")
+        }
+        XCTAssertTrue(message.contains("api.example.com"))
     }
 
     func testDeniedPlainHTTPConnectionNeverOpensUpstream() throws {

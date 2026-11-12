@@ -231,7 +231,8 @@ final class AnomalyEngine: @unchecked Sendable {
         agentMinutes[agentKey] = Array(history.suffix(60))
 
         // Allowlist: anything the agent (or its tools) contacts that isn't listed.
-        if let policy = policies[agentKey], policy.enabled, c.total > 0,
+        if let policy = AgentPolicy.resolve(policies.values, identities: [agentKey, agent]),
+           policy.enabled, c.total > 0,
            !policy.allows(host: k.domain, ip: k.remoteIP, isAIProvider: provider != nil) {
             let target = k.domain.isEmpty ? k.remoteIP : Self.registrableDomain(k.domain)
             if shouldAlert("allow|\(agentKey)|\(target)", every: 6 * 3600) {

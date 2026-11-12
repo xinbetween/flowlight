@@ -50,7 +50,10 @@ enum RulePackSimulation {
         let user = RuleBook.decide(flow.facts, rules: rules, now: flow.when, session: session)
         if user.rule != nil { return user.verdict == .block }
         if matcher?.matches(host: flow.host, bundleID: flow.bundleID).isEmpty == false { return true }
-        guard let policy = policies[flow.agentKey] ?? policies[flow.bundleID] else { return false }
+        guard let policy = AgentPolicy.resolve(
+            policies.values,
+            identities: [flow.agentKey, flow.bundleID]
+        ) else { return false }
         return BlockRules.verdict(for: flow.facts, policy: policy) == .block
     }
 
