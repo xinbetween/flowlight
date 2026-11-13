@@ -284,8 +284,8 @@ enum LocalGatewaySupportLegReconciler {
         var observed: [BreakdownRow] = []
         var support: [BreakdownRow] = []
         for row in rows {
-            let isSupport = proved.contains { isSupport(row, for: $0) }
-            if isSupport {
+            let supportLeg = proved.contains { isSupport(row, for: $0) }
+            if supportLeg {
                 support.append(row)
             } else {
                 observed.append(row)
