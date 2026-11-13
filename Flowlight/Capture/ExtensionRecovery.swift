@@ -1,5 +1,66 @@
 import Foundation
 
+/// An exact registration reply proved that macOS is running a different filter build from the one embedded in the
+/// current app. This is stronger evidence than an enabled preference or a failed XPC connection and is therefore the
+/// only Store-safe reason to call an outage an update mismatch.
+struct ExtensionIdentityMismatch: Equatable, Sendable {
+    var actual: String
+    var expected: String
+}
+
+/// A user-visible update fault. The active incident persists until the exact current extension registers and reports
+/// healthy filtering; presentation is separately de-duplicated so reconnect loops cannot keep reopening the dialog.
+struct ExtensionUpdateIncident: Identifiable, Equatable, Sendable {
+    enum Kind: String, Equatable, Sendable { case identityMismatch, heldCopies }
+
+    var kind: Kind
+    var actual: String?
+    var expected: String
+    var id: String {
+        switch kind {
+        case .identityMismatch: return "identity:\(actual ?? "unknown")->\(expected)"
+        case .heldCopies: return "held:\(expected)"
+        }
+    }
+}
+
+/// Keeps the persistent in-page diagnosis separate from the one-shot foreground presentation. Recovery clears the
+/// active diagnosis, but fingerprints remain session-sticky so a reconnect cannot reopen a warning that was dismissed.
+struct ExtensionUpdateIncidentState: Equatable, Sendable {
+    private(set) var active: ExtensionUpdateIncident?
+    private(set) var presentation: ExtensionUpdateIncident?
+    private(set) var presentedFingerprints: Set<String> = []
+
+    mutating func publish(_ incident: ExtensionUpdateIncident) {
+        active = incident
+        if presentedFingerprints.insert(incident.id).inserted {
+            presentation = incident
+        }
+    }
+
+    mutating func consumePresentation() {
+        presentation = nil
+    }
+
+    mutating func recovered() {
+        active = nil
+        presentation = nil
+    }
+}
+
+enum ExtensionReinstallState: Equatable, Sendable {
+    case idle
+    case reinstalling
+    case awaitingApproval
+    case failed(String)
+    case started
+    case rebootRequired
+
+    var isInProgress: Bool {
+        self == .reinstalling || self == .awaitingApproval
+    }
+}
+
 /// Decides what to do about a connection to the system extension that keeps failing.
 ///
 /// A lost XPC connection used to mean one thing: wait five seconds and dial again, for as long as the app was
@@ -92,6 +153,14 @@ struct ExtensionRecovery {
         attempts = 0
         totalAttempts = 0
         gaveUp = false
+    }
+
+    /// Registration itself already answered the version question and proved that no retry can succeed while this build
+    /// remains active. Stop immediately so the owner can use its product-specific unavailable fallback; a later outer
+    /// retry checks whether macOS has finally activated the exact embedded build.
+    mutating func identityMismatchDetected() {
+        versionChecked = true
+        gaveUp = true
     }
 
     /// What the status line says while a step is pending. It names the delay and how far along the ladder this

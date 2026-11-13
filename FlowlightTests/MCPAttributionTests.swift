@@ -101,6 +101,26 @@ final class MCPAttributionTests: XCTestCase {
         XCTAssertNil(context(400), "your own terminal's curl isn't attributed to anyone")
         XCTAssertNil(context(100), "an agent works for itself")
         XCTAssertNil(context(500), "an agent started by another agent keeps its own identity")
+
+        func withStickyDiscovery(_ bundle: String, _ app: String) -> String? {
+            if bundle == "curl" { return app }
+            return name(bundle, app)
+        }
+        XCTAssertEqual(
+            AgentLineage.context(
+                for: 200,
+                lookup: { table[$0] },
+                agentName: withStickyDiscovery,
+                servers: servers
+            ),
+            AgentContext(
+                agentBundleID: "claude",
+                agentName: "Claude Code",
+                mcpServer: nil,
+                agentPID: 100
+            ),
+            "a heuristic discovery must not turn a proved child tool into a separate agent root"
+        )
         let launcher = AgentLineage.launcher(forAgentPID: 100, lookup: { table[$0] })
         XCTAssertEqual(launcher?.bundleID, "com.apple.Terminal")
         XCTAssertNil(AgentLineage.launcher(forAgentPID: 999, lookup: { table[$0] }),

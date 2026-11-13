@@ -103,6 +103,7 @@ final class TrafficGraphTests: XCTestCase {
         launcher: (id: String, name: String, path: String)? = nil,
         upstreamLauncher: (id: String, name: String, path: String)? = nil,
         relay: (id: String, name: String, path: String)? = nil,
+        port: String = "",
         protocol appProtocol: String = "https",
         channel: NetworkChannel = .ip
     ) -> BreakdownRow {
@@ -112,7 +113,7 @@ final class TrafficGraphTests: XCTestCase {
             appPath: path,
             domain: domain,
             remoteIP: ip,
-            ports: "",
+            ports: port,
             protocols: appProtocol,
             counters: FlowCounters(bytesIn: bytesIn, bytesOut: bytesOut, flows: flows),
             owner: owner,
@@ -375,6 +376,46 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertTrue(capped.nodes.contains { $0.kind == .launcher && $0.title == "Herdr" },
                       "the immediate restart target has priority when launcher capacity is scarce")
         XCTAssertFalse(capped.nodes.contains { $0.kind == .launcher && $0.title == "Ghostty" })
+    }
+
+    func testAIFocusedSourceNarrowsSharedLauncherChainToSelectedAgent() throws {
+        let upstream = (id: "com.mitchellh.ghostty", name: "Ghostty", path: "/Applications/Ghostty.app")
+        let rows = [
+            row(
+                app: "claude", name: "Claude Code", domain: "api.anthropic.com", ip: "203.0.113.8",
+                bytesOut: 25,
+                launcher: ("herdr", "Herdr", "/Users/x/.local/bin/herdr"),
+                upstreamLauncher: upstream
+            ),
+            row(
+                app: "codex", name: "Codex", domain: "api.openai.com", ip: "203.0.113.9",
+                bytesOut: 20,
+                launcher: ("herdr", "Herdr", "/Users/x/.local/bin/herdr"),
+                upstreamLauncher: upstream
+            )
+        ]
+        let evidence = AITrafficGraphBuilder.buildForPresentation(rows: rows, mapLimits: .unbounded)
+        let claude = try XCTUnwrap(evidence.complete.nodes.first {
+            $0.kind == .agent && $0.filter.bundleID == "claude"
+        })
+
+        let focused = AITrafficGraphBuilder.buildForPresentation(
+            rows: rows,
+            mapLimits: .unbounded,
+            endpointQuery: .init(source: claude.id)
+        ).complete
+        let sharedEdge = try XCTUnwrap(focused.edges.first { edge in
+            edge.relationship == .launched
+                && focused.nodes.first { $0.id == edge.source }?.title == "Ghostty"
+                && focused.nodes.first { $0.id == edge.target }?.title == "Herdr"
+        })
+
+        XCTAssertTrue(focused.nodes.contains { $0.kind == .launcher && $0.title == "Ghostty" })
+        XCTAssertTrue(focused.nodes.contains { $0.kind == .launcher && $0.title == "Herdr" })
+        XCTAssertFalse(focused.nodes.contains { $0.kind == .agent && $0.filter.bundleID == "codex" })
+        XCTAssertEqual(sharedEdge.filter.bundleID, "claude")
+        XCTAssertTrue(sharedEdge.filter.bundleIDs.isEmpty,
+                      "edge actions must not re-expand a source-scoped shared launcher to another agent")
     }
 
     func testVisualizationSelectionClearsWhenSearchContextChanges() {
@@ -975,6 +1016,306 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertFalse(TrafficGraphFlowDash.animates(configured))
         XCTAssertFalse(TrafficGraphFlowDash.animates(route))
         XCTAssertTrue(TrafficGraphFlowDash.animates(observed))
+    }
+
+    func testConfiguredLocalGatewaySupportLegBuildsOneTruthfulChain() throws {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "com.yetone.magpie",
+            name: "magpie",
+            path: "/Applications/magpie.app"
+        )
+        let support = row(
+            app: "claude",
+            name: "Claude Code",
+            domain: "localhost",
+            ip: "127.0.0.1",
+            bytesIn: 12,
+            bytesOut: 8,
+            flows: 1,
+            launcher: ("herdr", "herdr", "/Users/x/.local/bin/herdr"),
+            upstreamLauncher: (
+                "com.mitchellh.ghostty",
+                "Ghostty",
+                "/Applications/Ghostty.app/Contents/MacOS/ghostty"
+            ),
+            port: "3425",
+            channel: .loopback
+        )
+        let routed = row(
+            app: identity.bundleID,
+            name: identity.name,
+            path: identity.path,
+            domain: "api.anthropic.com",
+            ip: "160.79.104.10",
+            bytesIn: 100,
+            bytesOut: 50,
+            flows: 2,
+            relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app"),
+            port: "443"
+        )
+        let resolved = [ResolvedAgentGateway(config: gateway, identity: identity)]
+        let partition = LocalGatewaySupportLegReconciler.partition(
+            [support, routed],
+            gateways: resolved
+        )
+
+        XCTAssertEqual(partition.support.count, 1)
+        XCTAssertEqual(partition.observed.count, 1)
+        let traffic = TrafficGraphBuilder.buildForPresentation(
+            rows: partition.observed,
+            mapLimits: .unbounded
+        ).complete
+        XCTAssertFalse(traffic.nodes.contains { $0.title == "localhost" })
+
+        let snapshot = AITrafficGraphBuilder.buildForPresentation(
+            rows: partition.observed,
+            lineageRows: partition.support,
+            gateways: [gateway],
+            resolveGateway: { _ in identity },
+            mapLimits: .unbounded
+        ).complete
+        func titles(for relationship: TrafficGraphRelationship) -> Set<String> {
+            Set(snapshot.edges.filter { $0.relationship == relationship }.compactMap { edge in
+                guard let source = snapshot.nodes.first(where: { $0.id == edge.source })?.title,
+                      let target = snapshot.nodes.first(where: { $0.id == edge.target })?.title
+                else { return nil }
+                return "\(source)→\(target)"
+            })
+        }
+
+        XCTAssertTrue(titles(for: .launched).contains("Ghostty→herdr"))
+        XCTAssertTrue(titles(for: .launched).contains("herdr→Claude Code"))
+        XCTAssertEqual(titles(for: .configuredGateway), ["Claude Code→magpie"])
+        XCTAssertEqual(titles(for: .routedThrough), ["magpie→Flowlight"])
+        XCTAssertEqual(titles(for: .observed), ["Flowlight→Anthropic"])
+        XCTAssertEqual(snapshot.total, routed.counters)
+        XCTAssertEqual(snapshot.visibleTotal, routed.counters)
+        XCTAssertEqual(
+            snapshot.edges.reduce(into: FlowCounters()) { $0 += $1.counters },
+            routed.counters,
+            "only the terminal observed edge owns captured counters"
+        )
+    }
+
+    func testDatabaseProjectionReconcilesTheFullConfiguredGatewayChain() throws {
+        let timestamp: Int64 = 1_800_000_000
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gateway-chain-\(UUID().uuidString).sqlite")
+        let database = try TrafficDatabase(url: url)
+        var local = FlowKey(
+            pid: 100,
+            bundleID: "claude",
+            appName: "Claude Code",
+            appPath: "/usr/local/bin/claude",
+            remoteIP: "127.0.0.1",
+            domain: "localhost",
+            port: 3425,
+            transport: .tcp,
+            appProtocol: "http"
+        )
+        local.channel = .loopback
+        local.launcherBundleID = "herdr"
+        local.launcherName = "herdr"
+        local.launcherPath = "/Users/x/.local/bin/herdr"
+        local.upstreamLauncherBundleID = "com.mitchellh.ghostty"
+        local.upstreamLauncherName = "Ghostty"
+        local.upstreamLauncherPath = "/Applications/Ghostty.app/Contents/MacOS/ghostty"
+        var remote = FlowKey(
+            pid: 200,
+            bundleID: "com.yetone.magpie",
+            appName: "magpie",
+            appPath: "/Applications/magpie.app",
+            remoteIP: "160.79.104.10",
+            domain: "api.anthropic.com",
+            port: 443,
+            transport: .tcp,
+            appProtocol: "https"
+        )
+        remote.routeProxyBundleID = "com.flowlight.app"
+        remote.routeProxyName = "Flowlight"
+        remote.routeProxyPath = "/Applications/Flowlight.app"
+        try database.insert([TrafficBatch(timestamp: timestamp, records: [
+            TrafficRecord(key: local, counters: FlowCounters(bytesOut: 20, flows: 1)),
+            TrafficRecord(key: remote, counters: FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
+        ])])
+        let rows = try database.aiVisualizationRows(
+            .second,
+            from: Date(timeIntervalSince1970: TimeInterval(timestamp)),
+            to: Date(timeIntervalSince1970: TimeInterval(timestamp + 1))
+        )
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(
+            bundleID: "com.yetone.magpie",
+            name: "magpie",
+            path: "/Applications/magpie.app"
+        )
+        let partition = LocalGatewaySupportLegReconciler.partition(
+            rows,
+            gateways: [ResolvedAgentGateway(config: gateway, identity: identity)]
+        )
+        let snapshot = AITrafficGraphBuilder.buildForPresentation(
+            rows: partition.observed,
+            lineageRows: partition.support,
+            gateways: [gateway],
+            resolveGateway: { _ in identity },
+            mapLimits: .unbounded
+        ).complete
+
+        XCTAssertEqual(Set(rows.map(\.ports)), ["3425", "443"])
+        XCTAssertFalse(snapshot.nodes.contains { $0.title == "localhost" })
+        XCTAssertEqual(snapshot.total, FlowCounters(bytesIn: 100, bytesOut: 50, flows: 2))
+        XCTAssertEqual(snapshot.edges.filter { !$0.counters.isEmpty }.count, 1)
+        XCTAssertEqual(
+            snapshot.edges.map(\.relationship).filter {
+                [.launched, .configuredGateway, .routedThrough, .observed].contains($0)
+            }.count,
+            5
+        )
+    }
+
+    func testLocalGatewayReconciliationPreservesUnprovedAndUnrelatedLocalTraffic() {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie", path: "")
+        let exact = row(app: "claude", domain: "localhost", ip: "127.0.0.1",
+                        bytesOut: 10, flows: 1, port: "3425", channel: .loopback)
+        let wrongPort = row(app: "claude", domain: "localhost", ip: "127.0.0.1",
+                            bytesOut: 11, flows: 1, port: "9999", channel: .loopback)
+        let wrongAddress = row(app: "claude", domain: "localhost", ip: "::1",
+                               bytesOut: 12, flows: 1, port: "3425", channel: .loopback)
+        let unrelated = row(app: "browser", domain: "localhost", ip: "127.0.0.1",
+                            bytesOut: 13, flows: 1, port: "3425", channel: .loopback)
+        let downstream = row(
+            app: identity.bundleID,
+            domain: "api.anthropic.com",
+            ip: "160.79.104.10",
+            bytesOut: 20,
+            flows: 1,
+            relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app"),
+            port: "443"
+        )
+        let unrelatedRemote = row(app: identity.bundleID, domain: "updates.example", ip: "192.0.2.44",
+                                  bytesOut: 5, flows: 1, port: "443")
+
+        let proved = LocalGatewaySupportLegReconciler.partition(
+            [exact, wrongPort, wrongAddress, downstream],
+            gateways: [ResolvedAgentGateway(config: gateway, identity: identity)]
+        )
+        XCTAssertEqual(proved.support.map(\.ports), ["3425"])
+        XCTAssertEqual(Set(proved.observed.map { "\($0.bundleID)|\($0.ports)" }), [
+            "claude|9999", "claude|3425", "com.yetone.magpie|443"
+        ])
+
+        let sharedEndpoint = LocalGatewaySupportLegReconciler.partition(
+            [exact, unrelated, downstream],
+            gateways: [ResolvedAgentGateway(config: gateway, identity: identity)]
+        )
+        XCTAssertTrue(sharedEndpoint.support.isEmpty)
+        XCTAssertEqual(sharedEndpoint.observed.count, 3,
+                       "a listener shared by another client cannot prove which client owns its remote route")
+
+        let secondConfiguredAgent = AgentGatewayConfig(
+            agent: "codex",
+            endpoint: gateway.endpoint,
+            source: "~/.codex/config.toml",
+            sourceKey: "model_providers.local.base_url"
+        )
+        let ambiguousConfiguration = LocalGatewaySupportLegReconciler.partition(
+            [exact, downstream],
+            gateways: [
+                ResolvedAgentGateway(config: gateway, identity: identity),
+                ResolvedAgentGateway(config: secondConfiguredAgent, identity: identity)
+            ]
+        )
+        XCTAssertTrue(ambiguousConfiguration.support.isEmpty)
+        XCTAssertEqual(ambiguousConfiguration.observed.count, 2)
+
+        let withoutRoute = LocalGatewaySupportLegReconciler.partition(
+            [exact, unrelatedRemote],
+            gateways: [ResolvedAgentGateway(config: gateway, identity: identity)]
+        )
+        XCTAssertTrue(withoutRoute.support.isEmpty)
+        XCTAssertEqual(withoutRoute.observed.count, 2,
+                       "ordinary listener-owned remote traffic must not hide a configured localhost row")
+
+        let unresolved = LocalGatewaySupportLegReconciler.partition(
+            [exact, downstream],
+            gateways: [ResolvedAgentGateway(config: gateway, identity: nil)]
+        )
+        XCTAssertTrue(unresolved.support.isEmpty)
+        XCTAssertEqual(unresolved.observed.count, 2)
+    }
+
+    func testGatewayRelationshipScopeKeepsBothHalvesForAgentAndProviderMatches() {
+        let gateway = AgentGatewayConfig(
+            agent: "claude",
+            endpoint: .init(scheme: "http", host: "127.0.0.1", port: 3425),
+            source: "~/.claude/settings.json",
+            sourceKey: "env.ANTHROPIC_BASE_URL"
+        )
+        let identity = AgentGatewayIdentity(bundleID: "com.yetone.magpie", name: "magpie", path: "")
+        let resolved = ResolvedAgentGateway(config: gateway, identity: identity)
+        let support = row(app: "claude", name: "Claude Code", domain: "localhost", ip: "127.0.0.1",
+                          bytesOut: 10, flows: 1, port: "3425", channel: .loopback)
+        let downstream = row(
+            app: identity.bundleID,
+            name: identity.name,
+            domain: "api.anthropic.com",
+            ip: "160.79.104.10",
+            bytesOut: 20,
+            flows: 1,
+            relay: ("com.flowlight.app", "Flowlight", "/Applications/Flowlight.app"),
+            port: "443"
+        )
+
+        let agentQuery = VisualizeGatewayRelationshipScope.visible(
+            observed: [downstream], support: [support], gateways: [resolved],
+            query: "claude", focus: .none
+        )
+        XCTAssertEqual(agentQuery.support.count, 1)
+        XCTAssertEqual(agentQuery.observed.count, 1)
+        XCTAssertEqual(agentQuery.gateways, [resolved])
+
+        let providerQuery = VisualizeGatewayRelationshipScope.visible(
+            observed: [downstream], support: [support], gateways: [resolved],
+            query: "api.anthropic.com", focus: .none
+        )
+        XCTAssertEqual(providerQuery.support.count, 1)
+        XCTAssertEqual(providerQuery.observed.count, 1)
+        XCTAssertEqual(providerQuery.gateways, [resolved])
+
+        for query in ["env.ANTHROPIC_BASE_URL", "~/.claude/settings.json", "3425"] {
+            let configurationQuery = VisualizeGatewayRelationshipScope.visible(
+                observed: [downstream], support: [support], gateways: [resolved],
+                query: query, focus: .none
+            )
+            XCTAssertEqual(configurationQuery.support.count, 1, query)
+            XCTAssertEqual(configurationQuery.observed.count, 1, query)
+            XCTAssertEqual(configurationQuery.gateways, [resolved], query)
+        }
+
+        let agentFocus = VisualizeGatewayRelationshipScope.visible(
+            observed: [downstream], support: [support], gateways: [resolved],
+            query: "", focus: FocusScope(bundleIDs: ["claude"])
+        )
+        XCTAssertEqual(agentFocus.support.count, 1)
+        XCTAssertEqual(agentFocus.observed.count, 1)
+        XCTAssertEqual(agentFocus.gateways, [resolved])
     }
 
     func testAIConfiguredGatewayUsesExistingApplicationAgentIdentity() throws {
@@ -3712,8 +4053,13 @@ final class TrafficGraphTests: XCTestCase {
         let from = now.addingTimeInterval(-Granularity.week.defaultWindow)
         let rows = try database.aiVisualizationRows(.week, from: from, to: now)
         let attempts = try database.blockedAttempts(from: from, to: now)
+        let resolved = DemoData.agentGateways.map {
+            ResolvedAgentGateway(config: $0, identity: DemoData.gatewayIdentity($0.endpoint))
+        }
+        let partition = LocalGatewaySupportLegReconciler.partition(rows, gateways: resolved)
         let build = AITrafficGraphBuilder.buildForPresentation(
-            rows: rows,
+            rows: partition.observed,
+            lineageRows: partition.support,
             blockedAttempts: attempts,
             gateways: DemoData.agentGateways,
             resolveGateway: { DemoData.gatewayIdentity($0) }

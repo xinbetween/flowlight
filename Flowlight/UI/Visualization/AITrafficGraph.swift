@@ -135,6 +135,8 @@ enum AITrafficGraphBuilder {
 
     static func build<Rows: Sequence>(rows sourceRows: Rows,
                                       visibleRows: [BreakdownRow]? = nil,
+                                      lineageRows: [BreakdownRow] = [],
+                                      visibleLineageRows: [BreakdownRow]? = nil,
                                       blockedAttempts: [BlockedAttemptRow] = [],
                                       gateways: [AgentGatewayConfig] = [],
                                       resolveGateway: @Sendable (AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? = {
@@ -145,17 +147,22 @@ enum AITrafficGraphBuilder {
     where Rows.Element == BreakdownRow {
         let sourceRows = sourceRows.filter { !$0.counters.isEmpty }
         let rows = (visibleRows ?? sourceRows).filter { !$0.counters.isEmpty }
+        let sourceLineageRows = lineageRows.filter { !$0.counters.isEmpty }
+        let visibleLineageRows = (visibleLineageRows ?? sourceLineageRows).filter { !$0.counters.isEmpty }
         let gatewayConfigs = gateways.map { ($0, resolveGateway($0.endpoint)) }
         let gatewayRelayBundleIDs = Set(gatewayConfigs.compactMap { $0.1?.bundleID })
         let isObservedGatewayRow: (BreakdownRow) -> Bool = { row in
             gatewayRelayBundleIDs.contains(row.bundleID) && !row.routeProxyBundleID.isEmpty
         }
-        let proofRows = sourceRows.filter { !isObservedGatewayRow($0) }
-        let visibleProofRows = rows.filter { !isObservedGatewayRow($0) }
+        let proofRows = (sourceRows + sourceLineageRows).filter { !isObservedGatewayRow($0) }
+        let visibleProofRows = (rows + visibleLineageRows).filter { !isObservedGatewayRow($0) }
         let proofGroups = Dictionary(grouping: proofRows) { row in
             AgentIdentity(bundleID: row.parentAgent.isEmpty ? row.bundleID : row.parentAgent)
         }
-        let grouped = Dictionary(grouping: visibleProofRows) { row in
+        let visibleProofGroups = Dictionary(grouping: visibleProofRows) { row in
+            AgentIdentity(bundleID: row.parentAgent.isEmpty ? row.bundleID : row.parentAgent)
+        }
+        let grouped = Dictionary(grouping: rows.filter { !isObservedGatewayRow($0) }) { row in
             AgentIdentity(bundleID: row.parentAgent.isEmpty ? row.bundleID : row.parentAgent)
         }
 
@@ -169,7 +176,7 @@ enum AITrafficGraphBuilder {
                 refusalNames[agent] = attempt.agentKey
             }
         }
-        let existingCandidates = Set(grouped.keys).union(refusalNames.keys)
+        let existingCandidates = Set(visibleProofGroups.keys).union(refusalNames.keys)
         let configuredGatewayAgents = gatewayConfigs.map { config, identity in
             let agent = existingCandidates.sorted { left, right in
                 let leftExact = left.bundleID.caseInsensitiveCompare(config.agent) == .orderedSame
@@ -646,7 +653,7 @@ enum AITrafficGraphBuilder {
         var launcherBundleIDs: [TrafficGraphNodeID: String] = [:]
         var launcherTraffic: [TrafficGraphNodeID: Int64] = [:]
         var immediateLauncherIDs: Set<TrafficGraphNodeID> = []
-        var upstreamLauncherLinks: Set<LauncherLink> = []
+        var upstreamLauncherAgents: [LauncherLink: Set<String>] = [:]
         for entry in included where visibleAgents.contains(agentID(entry.agent)) {
             for row in proofGroups[entry.agent] ?? [] where !row.launcherBundleID.isEmpty {
                 let launcher = LauncherIdentity(agent: entry.agent, bundleID: row.launcherBundleID)
@@ -682,7 +689,8 @@ enum AITrafficGraphBuilder {
                 if upstreamCurrent == nil || prefersMetadata(upstream, over: upstreamCurrent!) {
                     nodeMetadata[upstreamNodeID] = upstream
                 }
-                upstreamLauncherLinks.insert(LauncherLink(source: upstreamNodeID, target: nodeID))
+                let link = LauncherLink(source: upstreamNodeID, target: nodeID)
+                upstreamLauncherAgents[link, default: []].insert(entry.agent.bundleID)
             }
         }
         let rankedLaunchers = nodeMetadata.sorted {
@@ -719,14 +727,19 @@ enum AITrafficGraphBuilder {
                 filter: allNodes[agentNodeID]?.filter ?? .none, relationship: .launched
             ))
         }
-        for link in upstreamLauncherLinks.sorted(by: {
-            if $0.source != $1.source { return $0.source < $1.source }
-            return $0.target < $1.target
+        for (link, agentBundleIDs) in upstreamLauncherAgents.sorted(by: {
+            if $0.key.source != $1.key.source { return $0.key.source < $1.key.source }
+            return $0.key.target < $1.key.target
         }) where visibleLaunchers.contains(link.source) && visibleLaunchers.contains(link.target) {
+            let identities = agentBundleIDs.sorted()
             edges.append(TrafficGraphEdge(
                 id: TrafficGraphEdgeID(rawValue: link.source.rawValue + "→launched→" + link.target.rawValue),
                 source: link.source, target: link.target, counters: FlowCounters(),
-                filter: allNodes[link.target]?.filter ?? .none, relationship: .launched
+                filter: TrafficFilter(
+                    bundleID: identities.count == 1 ? identities[0] : nil,
+                    bundleIDs: identities.count > 1 ? identities : []
+                ),
+                relationship: .launched
             ))
         }
         for toolNodeID in visibleTools.sorted() {
@@ -756,7 +769,7 @@ enum AITrafficGraphBuilder {
             .union(blocked.keys.map { destinationID(blockedDestination($0)) }).count
         let lineageCount = toolMetadata.values.filter(\.hasLineage).count
         let allLauncherNodes = nodeMetadata.count
-        let allLauncherEdges = launcherMetadata.count + upstreamLauncherLinks.count
+        let allLauncherEdges = launcherMetadata.count + upstreamLauncherAgents.count
         let allObservedGatewayNodeIDs = Set(observedCounters.keys.map(\.source).filter {
             $0.rawValue.hasPrefix("proxy:")
         })
@@ -780,6 +793,8 @@ enum AITrafficGraphBuilder {
     static func buildForPresentation<Rows: Sequence>(
         rows sourceRows: Rows,
         visibleRows: [BreakdownRow]? = nil,
+        lineageRows: [BreakdownRow] = [],
+        visibleLineageRows: [BreakdownRow]? = nil,
         blockedAttempts: [BlockedAttemptRow] = [],
         gateways: [AgentGatewayConfig] = [],
         resolveGateway: @Sendable (AgentGatewayConfig.Endpoint) -> AgentGatewayIdentity? = {
@@ -795,6 +810,8 @@ enum AITrafficGraphBuilder {
         var evidence = build(
             rows: rows,
             visibleRows: visibleRows,
+            lineageRows: lineageRows,
+            visibleLineageRows: visibleLineageRows,
             blockedAttempts: blockedAttempts,
             gateways: gateways,
             resolveGateway: resolveGateway,

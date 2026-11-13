@@ -1,582 +1,367 @@
 <div align="center">
 
-<img src="docs/assets/icon.png" width="112" alt="Flowlight app icon">
+<a href="https://flowlight.xinbetween.com">
+  <img src="docs/assets/icon.png" width="112" alt="Flowlight app icon">
+</a>
 
 # Flowlight
 
-**Application-aware network monitoring for macOS, with focused visibility into AI agents.**
+### See where every Mac app connects — especially the AI agents acting for you.
 
-A native macOS network monitor that attributes observed traffic to applications and destinations.
-It highlights AI agent activity such as sensitive protocols, unfamiliar destinations, and large
-uploads, with local history and explainable alerts.
+Flowlight is a native, local-first network monitor for macOS. It connects observed traffic to applications,
+destinations, protocols, agent tools, MCP servers, configured gateways, and inspection routes without sending
+your history to a Flowlight service.
 
-[**Download for macOS**](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg) ·
-[Website](https://flowlight.xinbetween.com) ·
-[Build from source](#build-from-source) ·
-[How it works](#how-it-works)
-
+[![Latest release](https://img.shields.io/github/v/release/xinbetween/flowlight?label=release)](https://github.com/xinbetween/flowlight/releases/latest)
+[![GitHub stars](https://img.shields.io/github/stars/xinbetween/flowlight?style=flat)](https://github.com/xinbetween/flowlight/stargazers)
+[![CI](https://github.com/xinbetween/flowlight/actions/workflows/ci.yml/badge.svg)](https://github.com/xinbetween/flowlight/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111?logo=apple)
-![Swift](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
-![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-4a3aa7)
-![No telemetry](https://img.shields.io/badge/telemetry-none-1baf7a)
+![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
+[![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-4a3aa7)](LICENSE)
+![No telemetry](https://img.shields.io/badge/Flowlight%20telemetry-none-1baf7a)
 
-<img src="docs/assets/screenshots/agents.png" width="880" alt="Flowlight's AI Agents view listing Claude Code, Cursor, Codex and a Python script, with risk badges for SMTP, SSH, FTP, a large upload and a raw-IP connection">
+[**Download**](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg) ·
+[Website](https://flowlight.xinbetween.com) ·
+[Documentation](https://flowlight.xinbetween.com/docs/) ·
+[Privacy](https://flowlight.xinbetween.com/privacy/) ·
+[Threat model](https://flowlight.xinbetween.com/threat-model/)
+
+<img src="docs/assets/screenshots/visualize.png" width="920" alt="Flowlight Connections map showing applications, AI agents, gateways, inspection routes, and destinations">
 
 </div>
 
----
+## Is Flowlight for you?
 
-## Why Flowlight
+Flowlight is for people who want a precise answer to a simple question:
 
-Your Mac now runs software that makes its own decisions. Coding agents read your files, run shell commands
-and call tools, and any of those tools can open a socket. Activity Monitor shows *how much* traffic there
-is. A firewall asks you to allow *each* connection. Neither answers the question that matters now:
+> **What is this application—or the agent and tools behind it—talking to?**
 
-> **What are my agents talking to, besides their model provider?**
+It is a good fit when you want to:
 
-Flowlight answers that for observed application traffic, then provides additional context for recognized AI agents.
+- **See application traffic, not an anonymous interface total.** Flowlight attributes observed TCP and UDP activity to
+  apps, command-line tools, background services, hostnames, IP owners, ports, protocols, and network channels.
+- **Understand agent relationships.** It connects known agents to the tools and MCP servers they start, the local
+  gateways they are configured to use, Flowlight's optional inspection proxy, and the final observed destination.
+- **Turn evidence into a policy.** Rules, agent allowlists, and signed managed packs can report or refuse connections;
+  every row says whether it is enforcing, waiting, reporting only, or unavailable in the current capture mode.
+- **Keep the evidence on your Mac.** History lives in a local SQLite database. There is no Flowlight account, cloud,
+  analytics SDK, or product telemetry.
 
-## Features
+Flowlight is a monitor and policy tool for software you choose to run. It is not a sandbox or a defence against an
+attacker who already controls the Mac; the [threat model](https://flowlight.xinbetween.com/threat-model/) describes that
+boundary precisely.
 
-### Applications × destinations × protocols
-- **Per-app attribution** for observed TCP and UDP activity, including CLI tools and background services. Coverage
-  depends on the selected capture source; the nettop sampler can miss short-lived connections.
-- **Resolved hostnames where available.** Learned from observed TLS server names and DNS responses, with an optional
-  fallback to the network owner (*Cloudflare, Inc. · AS13335*).
-- **108 protocols in 13 families**, recognized by port and by content:
-  web (HTTP/1–3, QUIC, WebSocket) · email (SMTP, submission, IMAP, POP3 and their TLS variants) · file transfer
-  (FTP/FTPS, SMB, AFP, NFS, rsync, git) · remote access (SSH, RDP, VNC, Telnet) · name resolution (DNS, DoT, DoH, DoQ,
-  mDNS) · VPNs and tunnels (WireGuard, OpenVPN, IPsec, Tailscale, SOCKS, Tor) · databases (Postgres, MySQL, Redis,
-  MongoDB…) · messaging and queues (MQTT, AMQP, Kafka, XMPP, IRC) · voice and video (SIP, STUN, RTSP) · and more.
+## Quick start
 
-### AI Agent Watch
-Flowlight recognizes **16 agents** by name (Claude Code, Codex, Cursor, Windsurf, GitHub Copilot, Gemini CLI,
-Aider, Goose, Ollama, ZCode and more). It also classifies non-browser processes that contact one of 27 known LLM API
-providers. Provider contact is a classification signal, not proof that a process is autonomous or malicious.
+### 1. Install
 
-For each agent you see which AI providers it uses, and **everything else it contacted**, including what its tools
-and MCP servers did:
+With Homebrew:
 
-- **Tools & MCP servers.** Flowlight follows the process tree back to the agent that started each process, so the
-  `curl`, `git push` or `npm install` a Claude Code shell tool runs is counted as Claude Code's traffic, labelled
-  *via curl*. MCP servers are named from the agents' own configs (Claude Code, Claude Desktop, Cursor, Windsurf,
-  VS Code, Codex, Zed, Gemini CLI): *via github MCP*.
-- **Allowlists.** "Claude Code may talk to GitHub and npm, nothing else." Add domains (subdomains included), IPs or
-  CIDR ranges, or start from a preset (GitHub, npm, PyPI, Homebrew, Docker Hub…). The agent's AI providers and your
-  local network are always allowed; anything else raises an alert, and each destination has a one-click **Allow**.
+```sh
+brew install --cask xinbetween/tap/flowlight
+```
 
-- **Tool calls, from the model itself (optional).** Turn on [HTTPS inspection](#https-inspection-optional) and Flowlight
-  reads every tool the agent offers the model, every call the model asks for (Anthropic, OpenAI, Gemini, and MCP
-  `tools/call`) and the result the agent sent back, then links each tool's request back to the call that caused it:
-  *curl → paste.example ← Bash: curl -s https://paste.example/up*. For MCP servers reached over HTTP it also records the
-  server's name and version and the tools it offers. Each agent's detail has **Tool calls** and **MCP servers** tabs.
+Or download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it,
+and drag Flowlight to Applications. Releases are signed and notarized. Each
+[release](https://github.com/xinbetween/flowlight/releases/latest) also includes a `.pkg` installer.
 
-- **What each agent is set up to do.** With your say-so, Flowlight reads the agent configuration on this Mac — skills,
-  subagents, slash commands, **hooks** (the shell commands they run on events), permission rules and MCP servers — and
-  lists them per agent. A hook that posts to a webhook explains traffic you'd otherwise have to guess at. It looks only
-  at the agent folders in your home folder, plus project folders you pick, and remembers the result instead of
-  rescanning.
+### 2. Choose how to capture
 
-These rules watch every agent:
+Launch Flowlight and open **Sources › Collector**:
 
-| Rule | Fires when an agent… | Severity |
+| Source | Setup | Best for | Tradeoff |
+|---|---|---|---|
+| **nettop sampler** | None | Trying Flowlight immediately | Can miss a connection that opens and closes between one-second readings |
+| **Network Extension** | Approve the content filter in System Settings | Every flow, exact app identity, and blocking | Only one macOS content filter can be active at a time |
+
+The first-run **Name Your Traffic** step can install the optional hostname helper. It reads DNS answers and TLS server
+names; packet bodies are not stored.
+
+### 3. Explore safely with demo data
+
+```sh
+open /Applications/Flowlight.app --args -FLDemo YES
+```
+
+The isolated demo contains synthetic traffic, policies, alerts, AI agents, tool calls, and inspection records. It does
+not read your normal Flowlight history.
+
+## Supported AI agents
+
+Flowlight recognizes these clients by stable application or process identity:
+
+**Claude · Claude Code · ChatGPT · Codex · Cursor · Windsurf · Zed · GitHub Copilot · Gemini CLI · Aider · Goose ·
+OpenCode · Ollama · LM Studio · Perplexity · ZCode**
+
+It can also classify a non-browser process that contacts a known LLM API provider. That is a visibility heuristic—not a
+claim that the process is autonomous or unsafe. Browsers are excluded so opening a chat website does not turn the browser
+into an “agent.”
+
+For supported agent configurations, Flowlight can name local MCP servers and show configured proxy or model-gateway
+relationships. Capture-time process evidence keeps child tools such as `curl`, `git`, or `npm` attached to the agent that
+started them instead of inventing relationships later from names alone.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph Capture
+        N[nettop sampler]
+        E[Network Extension]
+        H[DNS + TLS hostname helper]
+    end
+
+    N --> B[Per-second app traffic]
+    E --> B
+    H --> B
+    B --> DB[(Local SQLite history)]
+    B --> A[Agent attribution + analysis]
+    A --> P[Policies + alerts]
+    DB --> UI[Live · History · Connections · Ask]
+
+    T[Terminal] -. launched .-> S[Supervisor]
+    S -. launched .-> C[AI agent]
+    C -. configured gateway .-> G[Local gateway]
+    G -. routed through .-> F[Flowlight inspection]
+    F --> D[Observed destination]
+```
+
+Relationship-only edges carry no duplicate byte or flow totals. In a proved
+`terminal → supervisor → agent → gateway → Flowlight → destination` route, the final observed edge owns the traffic
+counters once; launcher, configuration, and route edges explain how it got there.
+
+Two capture engines feed the same storage and UI model:
+
+| | **nettop sampler** | **Network Extension** |
 |---|---|---|
-| **Allowlist violation** | contacts anything not on its allowlist (when you've set one) | critical |
-| **Sensitive channel** | uses email, file transfer, SSH or remote desktop, a tunnel or proxy, peer-to-peer, or a database connection | critical for email, file transfer, tunnels and P2P |
-| **Possible exfiltration** | uploads more than 100 MB/hour to hosts that aren't AI providers | critical |
-| **Unnamed host** | connects to a raw IP with no hostname on an unusual port | warning |
-| **Active while you're away** | moves data after 15 minutes without keyboard or mouse input | warning |
-| **Fast learning** | new destinations are flagged after a 1-hour learning period (24 hours for other apps) | info |
+| Attribution | Process and app metadata | Audit token and signing identity |
+| Hostnames | DNS/TLS helper, reverse DNS, optional IP owner | SNI, HTTP host, DNS, optional IP owner |
+| Short-lived flows | May be missed between samples | Observed when the connection is opened |
+| Byte counts | Running-counter deltas for surviving flows | Filter statistics |
+| Blocking | Observe only | Can refuse before connection establishment |
 
-Every threshold is adjustable in Settings.
+History rolls from seconds into minute, hour, and day tables so long ranges stay responsive.
 
-### HTTPS inspection (optional)
-Off by default in both products. When enabled, Flowlight runs a local loopback proxy with a certificate authority
-created on your Mac. For supported HTTP traffic routed through the proxy, it records headers, bodies, status and timing.
+## What it does
 
-- **AI agents only, by default.** Other apps sent through the proxy pass through encrypted and aren't recorded.
-- **Developer ID setup can be automatic.** *Open Inspected Terminal* supplies proxy variables and Flowlight's
-  certificate for Node, Python, curl and Git in one shell. You can also trust the certificate and let Flowlight use a
-  system PAC file for desktop apps; it falls back to a direct connection whenever Flowlight isn't running.
-- **Mac App Store setup stays explicit.** Inspect shows the exact `127.0.0.1` proxy address and reveals the public CA
-  certificate. You import and trust that certificate yourself, then configure each app to use the proxy. The Store app
-  never changes system proxy settings, rewrites another app's configuration, or relaunches/supervises another app.
-- **Excluded by default:** Flowlight's built-in list of Apple services and password managers, plus any destination
-  you add. Applications that pin certificates may reject interception and are passed through when detected.
-- **What each agent declares.** Tools it offers the model (and which the model actually used), the provider's own tools
-  (web search, code execution), the model, the number of calls and tokens in/out/cached.
-- **MCP servers, all three kinds:** local processes, servers this Mac calls over HTTPS, and servers the *provider*
-  connects to for the agent, with their URL, approval setting and allowed tools. The last kind never touches your network.
-- **Readable bodies:** JSON as a collapsible tree in its original key order, event streams one event at a time, or raw.
-- **Known credential header values are never stored**; unrecognized header names still require the stricter allowlist or
-  no-values mode described in Advanced. Recordings are kept 3 days. Removing inspection deletes Flowlight-owned keys,
-  generated certificates, and recorded requests; in the Store product, a public CA you imported remains user-owned and
-  Inspect tells you to remove that trust separately in Keychain Access.
+### Connections you can explain
 
-### Mock responses
-Answer a chosen host, path and method with your own status, headers, body and delay, to see how an agent copes when
-an API fails or returns something odd. **Mock This…** pre-fills retained, redacted headers and payloads: request data
-is reference-only, while the response can be edited as text/JSON or lossless hexadecimal for binary bytes. Saving
-persists only the matcher and authored response rule; it remains until removed even if captured traffic is cleared.
-The request is never sent. Mocked exchanges are recorded and clearly marked, so a session read later still shows what
-was real. Needs HTTPS inspection, since only decrypted traffic can be answered — and a mock changes the reply, not
-whether the connection can be made.
-
-### History at any zoom
-- Range presets: **15 min**, **1h**, **6h**, **1d**, **1w**, **1 mo**, **6 mo**, **1y** and **All**.
-- Hover-only bars open a cursor-following, scrollable card with the bucket totals and contributing apps; they never change the selected range.
-- Switch the navigator between **Nearby context** and **All history**. Drag the brush to pan the selected window or either edge to resize it.
-- Group the breakdown by **App › Domain › IP**, **Destination › App › IP**, or **IP › App**.
-- Donut and trend charts with a top-5 + *Other* layout that stays readable with hundreds of apps. Export to CSV.
-
-### Blocking what an agent shouldn't reach
-An allowlist warns by default. Turn on **Refuse connections outside the list** for an agent and Flowlight drops those
-connections as well, recording each one as an alert with **Allow … from Now On** to add it to the list in a click.
-
-It needs the Network Extension — refusing a connection means being in its path, which the sampler can't do. Local
-traffic, DNS, essential Apple system services and Flowlight's own connections are never refused, and enforcement lapses a few seconds
-after the app stops running. When HTTPS inspection proxies an app, destination rules, enabled managed packs, and enforcing agent
-allowlists are decided against the original app before Flowlight opens the origin connection. App-scoped decisions fail open whenever
-the Store content filter cannot prove that identity; destination-only rules and all-app packs continue to apply.
-
-### Policies
-**Policies** is the inventory for every control Flowlight can apply: ordinary allow/block rules, agent allowlists,
-managed packs, and—where HTTPS inspection is available—guardrails, mocks, and request rewrites. Developer ID builds
-also offer response transforms; the Store product does not run response-transform scripts or script plugins.
-Each row reports whether it is actually enforcing, reporting, watching, waiting, scheduled, paused, or unavailable, and
-opens the contextual editor that owns it. An allowlist is one agent's idea of where it may go; an ordinary **rule** is
-the general version, naming an app, agent, destination, URL, or pairing and saying block or allow.
-
-- **The most specific match decides**, and a tie goes to the block. An exception written underneath a broad block
-  works; one broader than what it excepts doesn't quietly widen it.
-- **For as long as you say**: forever, until a time, until Flowlight quits, or between chosen hours on chosen days —
-  plus one global **Pause Blocking**, because the escape hatch is what makes strict rules liveable.
-- **Unblocking is part of blocking.** From the alert, allow it once, for an hour, or until Flowlight quits. Each of
-  those is itself a rule with an expiry, so the list can still answer *why is this getting through?* next week.
-- **A rule says where it bites.** The extension refuses whole connections and knows nothing about paths; HTTPS
-  inspection refuses one request and answers with a status the agent can read; the sampler refuses nothing. A rule
-  the current setup can't carry out says so in the list instead of looking enforced.
-- A unified read-only **Activity** feed beside the inventory: rule decisions, allowlist violations, managed-pack events,
-  and distinct inspection-policy effects without pretending different policy types share one persistence model.
-
-### Managed ad and tracker packs
-Flowlight includes three official hostname lists: **Advertising**, **Cross-site tracking**, and **Privacy and telemetry**.
-Their baseline is built into the signed app for offline use and the app checks one fixed HTTPS source for newer
-publisher-signed catalogs. Automatic checks are on by default and can be switched off under **Policies › Managed packs**;
-no traffic, pack settings, or device identifier is sent. The server sees the Mac's IP address and `Flowlight/<version>`
-user agent.
-
-All three packs are visible under **Policies › Managed packs** and off by default. A valid signature authenticates content but never
-grants enforcement consent: new packs remain off, and changed destinations disable that pack until you review the exact
-new version and press Save. A verified accepted catalog remains available as visible stale last-known-good during an
-outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed. Enable a pack for every app or only
-selected apps; enforcement needs the Network Extension, because the sampler can observe connections but cannot refuse them.
-
-Before enabling or broadening a pack, replay it against up to seven days of retained traffic to see which apps,
-destinations, connection counts and bytes would have changed. The activity feed groups repeated blocks instead of
-turning every ad request into a separate alert, while still naming the app, destination, matched list entry and pack.
-From any grouped event, add an exception for that app and destination in that pack. An ordinary allow rule remains the
-universal escape hatch, global **Pause Blocking** pauses packs too, and essential system traffic for accounts, push,
-updates, certificates and iCloud remains allowed.
-
-These are hostname-level network blocks, not page or window cleaners. The tracking pack blocks documented dedicated
-collection, replay and tracker-bootstrap hosts while keeping provider dashboards, login, billing, documentation and
-administration reachable. When collection shares a product hostname—such as `analytics.google.com/g/collect` or a
-Matomo tenant's `/matomo.php`—the hostname layer must allow it; HTTPS inspection may still apply an explicit URL rule
-when the path is visible. First-party tracking proxies, ECH, QUIC, encrypted DNS, direct-IP connections and shared CDNs
-can also limit coverage. Packs cannot remove first-party ads, DOM gaps, overlays, scripted popups or native app windows;
-cosmetic filtering needs a browser extension that can see and change page content.
-
-### Agent guardrails
-*Which tools may this agent use* is a different question from *which hosts may it reach*, so it gets its own tab in
-AI Agents: a switch on every tool the agent declares and every MCP server it reaches, presets (*read-only*, *no
-shell*, *no writes*), and a record of what has been taken away.
-
-- **The declaration is the strongest lever.** Agents re-send their whole tool list every turn; Flowlight removes a
-  refused tool from it before the request leaves, so the model is never offered it — no refusal to argue with, no
-  retry loop. Anthropic, OpenAI and Gemini shapes alike.
-- **A refused MCP call over HTTP** comes back as a result with `isError: true` and a sentence, which is the
-  protocol's own shape for a tool that failed. `resources/read` gets a JSON-RPC error, which is its.
-- **Connectors are narrowed**, since the provider reaches those servers and that traffic never touches this Mac.
-- **Local stdio servers speak over pipes.** Flowlight watches the server process's own traffic and hands you the
-  deny list to paste into the agent's settings, which takes effect when it restarts.
-- It needs HTTPS inspection, and **it is not a sandbox**: a refused tool stops being offered and stops being
-  answered, but an agent with a shell can still do by hand what the tool would have done. Flowlight records that
-  rather than pretending to prevent it.
-
-### Which way the bytes left
-Not all traffic goes to the internet. AirDrop, Handoff, AirPlay, Sidecar and Universal Control go straight to a
-device in the room over Apple Wireless Direct Link — no router, no internet, no address anyone else can reach.
-Flowlight was always counting those flows; it had no word for them, so an AirDrop of a 4 GB folder looked like a
-few megabytes to an address with no name.
-
-Every flow now carries a **channel**: the network, peer-to-peer Wi-Fi, this Mac, or a tunnel. Narrow a report to
-one of them from the toolbar, and peer-to-peer rows are named by the feature that opened them — *AirDrop and
-Handoff · nearby device* — because a link-local address tells you nothing and the device has no name this Mac can
-learn.
-
-The sampler reads the interface each socket is bound to, which is exact. The Network Extension is handed sockets
-rather than interfaces, so it judges by the address instead: link-local means peer-to-peer. That is the coarser of
-the two answers, and it says so.
-
-### When the extension stops answering
-macOS runs whichever build of the content filter was activated last, so after an app update the app and the
-extension can disagree — and then macOS refuses the connection between them. System Settings says *Filter enabled*,
-Flowlight says *Extension connection invalidated*, and neither changes its mind.
-
-Flowlight climbs out of that on its own: redial twice, then ask macOS which build it has and reinstall the
-extension if it isn't this app's, then redial again — and if none of it works, capture with the nettop sampler so
-there is still data. It says which rung it is on and how long until the next one. Your chosen source isn't
-rewritten, blocking is switched off while the sampler stands in (the sampler can't refuse anything, and Policies
-shouldn't claim otherwise), and **Try the extension again** starts over.
-
-### Sources: collector, devices and coverage
-**Sources** uses the same focused segmented navigation as Policies: **Collector**, **Devices**, and **Coverage**. Status
-notices, Ask answers, restored windows, and deep links select the exact segment while shared health and remediation
-context remains available across all three.
-
-A Mac sends and receives over more than TCP and UDP. **Sources › Devices** covers the non-network channels, with every channel off
-until you turn it on because watching more of your Mac should be a decision rather than something an update did.
-
-**Camera activity**: whether each camera is active and when it started or stopped. Flowlight reads the public
-CoreMediaIO device state; it never opens a capture session, requests camera access, or reads frames. That signal does
-not identify the owning app, so Flowlight names the camera and does not guess. The sandboxed Mac App Store product
-carries Apple's camera hardware entitlement so it can see the device list, but still never asks for capture consent.
-
-**Bluetooth**: which devices are paired, which are connected, when that changed, and which applications are built
-to use the radio. No byte counts — macOS keeps no per-app accounting for Bluetooth, and the traces that would give
-one need a profile an app can't read. The app list is who *asked* for Bluetooth, not who was *granted* it, and it
-says so.
-
-**USB and external storage**: what is attached, what it is, and a drive's capacity, with the moment each arrived
-and left. Volumes arrive from the workspace the instant one is mounted; USB devices are read periodically. No
-throughput, for the same reason.
-
-### Ask
-Ask in plain language and get an answer from what Flowlight recorded. *What did Claude Code upload yesterday?*
-*Which app started talking to somewhere new this week?* *Summarise the last hour.*
-
-**The model never gets your history.** It is handed a fixed list of read-only queries it may call — totals, top apps,
-top destinations, new destinations, alerts, agents, a series over time, and bounded summaries of recorded device
-transitions — and nothing else. Device summaries contain names, transition counts, and minute-rounded first and last
-times, never stable hardware identifiers. They report only changes Flowlight observed, not continuous use or the app
-responsible. There is no query that takes SQL, and there will not be one. Flowlight runs whichever the model names,
-locally, and hands back the aggregate answer.
-
-It answers questions about **Flowlight itself** as well — *how do I turn on HTTPS inspection?*, *why am I not
-seeing any traffic?* — from the app's own guide to every feature and a snapshot of how this Mac is set up, never
-from the model's memory. And it **draws a chart** when the shape of the answer matters more than the numbers:
-a line for change over time, bars to compare, a pie for a split. Flowlight draws it from the rows the query
-returned, so the picture and the sentence come from one source.
-
-**Local first**: the on-device model where macOS has one, or a server you already run (Ollama, LM Studio,
-llama.cpp). Both send nothing. **Or bring your own key** for Anthropic, OpenAI, Gemini or any OpenAI-compatible
-endpoint — the key lives in your login Keychain, the screen says when a question will leave the Mac, and every
-request is shown in full under the answer.
-
-Every query is listed under the answer. Clicking one opens History for traffic evidence, or the relevant app screen
-for device and configuration answers. And Ask's own traffic shows up in Live like any other app's — including when
-the model is a server on this same Mac.
-
-### Worth a look
-A third mode in History, beside the breakdown and the charts. It compares the apps in a report with each other and
-points at the ones whose destinations don't look like the rest — many more places than their peers, addresses that
-never resolved to a name, hostnames that look generated, far more sent than received, protocols that are a sideline
-rather than the app's purpose. Each finding shows its evidence; clicking one narrows the report to that app.
-
-It's *Worth a look*, not *Suspicious*: the data supports "unusual next to the other apps here", and a backup tool
-talks to a lot of places for good reasons.
-
-### Running in the background
-Flowlight keeps recording with its window closed and costs almost nothing while idle. **Settings › General › Run in
-the background** drops the Dock icon and the Cmd-Tab entry; the menu bar keeps the rates and offers **Show Dock
-Icon** to undo it. Quitting stops the sampler — it does not stop the Network Extension, which runs on its own until
-you disable it in Sources › Collector.
-
-### Running in the background, quietly
-The window reopens where and how you left it; a first run fills the screen. Hostname setup is offered a little after
-launch and only while a window is open, rather than meeting a first run with a password prompt — and it returns next
-launch until taken or dismissed.
-
-### Focus mode
-Pick a few apps and destinations and every screen shows only those — Live, History, Alerts, AI Agents and Inspect,
-plus the menu bar rates. It's for watching one agent work without the rest of the Mac in the way.
-
-- Add an app by name or bundle identifier — every application on the Mac is searchable, so one that has been quiet
-  still works, as does a command-line agent with no bundle — or pick from what has recently been busy.
-- One app is a focus. So is one destination. Neither needs the other.
-- Focus on something from any table's context menu, or from the Focus control at the bottom of the sidebar.
-- ⇧⌘F turns it on and off; the menu bar shows what's focused and can toggle it too.
-- Destinations take their subdomains with them (`example.com` covers `api.example.com`). IP addresses work; ranges don't.
-- **It filters what you see, never what's recorded.** History stays complete and the anomaly baselines keep learning
-  from everything, so turning Focus off shows the traffic it was hiding.
-- Alerts name an app and not a destination, so focusing on destinations alone leaves the alert list alone.
-
-### Anomaly detection you can explain
-Per-app baselines (EWMA + z-score) for hourly volume and daily destination counts, 99th-percentile upload checks,
-first contact with a new domain, non-standard ports, and uploads from apps you haven't touched. Every alert names
-the app, the destination and the number that tripped it.
-
-### Export to OpenTelemetry or a SIEM
-Off until you configure it, with no Flowlight-operated endpoint to send to — you name your own collector. OTLP over
-HTTP (rollups as metrics, alerts as logs) or newline-delimited JSON. The Settings panel lists every field that
-leaves and previews a real payload built from your own data first. Auth headers live in the Keychain. Nothing from
-HTTPS inspection can be exported — the payload types have nowhere to put a header or a body. What Flowlight sends
-appears in Live and History like any other app's traffic, including a collector on localhost.
-
-### Private by design
-No account, no cloud, no telemetry. Everything stays in a local SQLite database. Packet capture reads only DNS
-answers and TLS ClientHellos (a kernel filter drops everything else), and **packet contents are never stored**.
-Naming who owns an IP with no known hostname is **on by default**: it sends those public IPs (never private ones) to
-Team Cymru's DNS service, and you can turn it off in Sources › Collector. Release and official rule-pack checks make standard HTTPS
-requests with no traffic or pack settings; each has its own off switch in Settings or Policies › Managed packs. To attribute tools
-and MCP servers, Flowlight reads process command lines and your agents' MCP config files
-on your Mac; none of it leaves your Mac. HTTPS inspection is off unless you turn it on, and what it records stays in the
-same local database.
+The Connections map has ordinary Traffic and focused AI activity modes. Cards preserve exact underlying members for
+History, Inspect, and Policies navigation while grouping busy graphs into readable application and destination families.
+Configured gateway and proxy support legs stay distinct from observed traffic, and unrelated localhost services remain
+visible.
 
 <table>
 <tr>
-<td><img src="docs/assets/screenshots/reports.png" alt="History view with hourly traffic bars and donut charts for apps, destinations and protocols"></td>
-<td><img src="docs/assets/screenshots/alerts.png" alt="Alerts view listing agent exfiltration, SMTP, FTP and traffic spike alerts"></td>
+<td width="50%"><img src="docs/assets/screenshots/live.png" alt="Live application traffic in Flowlight"></td>
+<td width="50%"><img src="docs/assets/screenshots/agents.png" alt="Flowlight AI Agents inventory"></td>
 </tr>
 <tr>
-<td align="center"><sub>History: every range, every grouping</sub></td>
-<td align="center"><sub>Alerts: explainable, per app</sub></td>
-</tr>
-<tr>
-<td colspan="2"><img src="docs/assets/screenshots/inspect.png" alt="Inspect view: decrypted Claude Code requests, and curl's upload to paste.example traced to the Bash tool call that ran it"></td>
-</tr>
-<tr>
-<td colspan="2" align="center"><sub>Inspect (optional): every request an agent and its tools made, and the tool call behind it</sub></td>
+<td align="center"><sub>Live: application, destination, protocol, and current rate</sub></td>
+<td align="center"><sub>AI Agents: providers, tools, destinations, and explainable risk</sub></td>
 </tr>
 </table>
 
-## Install
+### Agent tools, MCP servers, and allowlists
 
-1. With Homebrew:
+Flowlight walks capture-time process lineage back to the nearest proved agent. A child process appears as a tool or named
+MCP server under that agent, with its own exact destinations. Per-agent allowlists can warn on anything outside the list,
+or refuse it when the Network Extension is healthy. AI-provider traffic and local-network traffic remain explicit in the
+policy model.
 
-   ```sh
-   brew install --cask xinbetween/tap/flowlight
-   ```
+Recognized signals include sensitive protocols, unfamiliar destinations, raw-IP traffic, large uploads, and activity
+while you are away. Every alert names the evidence and threshold that caused it.
 
-   Or download **[Flowlight.dmg](https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg)**, open it, and drag Flowlight into Applications.
-   Releases are signed and notarized, so it opens straight away.
-   Prefer an installer? Every [release](https://github.com/xinbetween/flowlight/releases/latest) also has a `.pkg`.
-2. Launch Flowlight. Traffic appears within a second, and the ↓↑ rates live in your menu bar.
-   After a clean quit and relaunch, Flowlight checks GitHub for a new release and opens its update window when one is
-   available; it also checks daily. The check is optional in Settings, and any download is verified before Flowlight
-   asks to quit and install it (Flowlight › Check for Updates…). Updating by hand? Quit Flowlight before dragging the
-   new version in.
-3. On first launch, **Name Your Traffic** offers the one-time setup that lets Flowlight read hostnames (it asks
-   for your password once). Network-owner lookups are on by default and can be turned off there or in Sources › Collector.
+### Policies that say what they can enforce
 
-> **Try it without your own data:** `open /Applications/Flowlight.app --args -FLDemo YES` launches with 90 days
-> of synthetic traffic, including an inspected Claude Code session. That's what the screenshots show.
+**Policies** brings together network rules, agent allowlists, managed packs, guardrails, mocks, and request rewrites. The
+three network inventories are collapsible, retain their expansion state, and summarize enforcing, reporting, waiting,
+and review-needed items while collapsed.
+
+- The most specific matching rule wins; an equally specific block beats an allow.
+- Rules can be permanent, temporary, session-bound, or scheduled.
+- Global **Pause Blocking** and scoped allow-once actions remain visible escape hatches.
+- Official advertising, cross-site tracking, and privacy/telemetry packs are signed, off by default, and require review
+  before changed destinations can enforce.
+- Collection endpoints can be blocked without making analytics dashboards, login, billing, or administration disappear.
+
+### Optional HTTPS inspection
+
+Inspection is off by default. When enabled, Flowlight runs a loopback proxy with a certificate authority created on your
+Mac and records supported HTTP requests routed through it.
+
+It can show headers, structured bodies, timing, model/tool declarations, tool calls, MCP traffic, and the request caused
+by a tool call. Known credential header values are never stored. Applications with certificate pinning may reject
+inspection and are not silently described as inspected.
+
+Inspection also powers:
+
+- **Guardrails** that remove refused tools from supported model requests or return protocol-shaped MCP errors.
+- **Mock responses** for a chosen host, path, and method without sending that request to the origin.
+- **Request rules and rewrites** with explicit scope and effect provenance.
+
+<img src="docs/assets/screenshots/inspect.png" width="920" alt="Flowlight Inspect view showing decrypted requests and a tool call linked to network activity">
+
+### History, reports, and “Worth a look”
+
+Choose ranges from 15 minutes through all retained history, pan or resize the native time navigator, switch among app,
+destination, and IP breakdowns, and export CSV. “Worth a look” compares applications in the selected report and surfaces
+unusual destination counts, unnamed hosts, generated-looking names, upload imbalance, and uncommon protocols without
+labelling them malicious.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/screenshots/reports.png" alt="Flowlight History report with traffic charts"></td>
+<td width="50%"><img src="docs/assets/screenshots/alerts.png" alt="Flowlight explainable alerts"></td>
+</tr>
+<tr>
+<td align="center"><sub>History: ranges, groupings, charts, and exact drill-down</sub></td>
+<td align="center"><sub>Alerts: evidence and remediation per application</sub></td>
+</tr>
+</table>
+
+### Ask without handing over the database
+
+Ask questions such as “What did Claude Code upload yesterday?” or “Which application contacted a new destination?” The
+model receives a fixed set of bounded, read-only query tools—not SQL and not the history database. Flowlight executes each
+query locally and shows the query and result beneath the answer.
+
+Use an on-device model, a local Ollama/LM Studio/llama.cpp endpoint, or your own Anthropic, OpenAI, Gemini, or compatible
+API key. Remote use is disclosed before the request leaves the Mac, and keys live in the login Keychain.
+
+### Channels beyond ordinary internet traffic
+
+Every flow records whether it used ordinary IP, peer-to-peer Wi-Fi, loopback, or a tunnel. Sources can also report camera
+activity without opening a capture session or reading frames, Bluetooth connection state without pretending to know
+per-app bytes, and attached USB/external-storage state without inventing throughput macOS does not expose.
+
+### Export you control
+
+Optional OTLP/HTTP and newline-delimited JSON exports go only to the collector you configure. Flowlight previews the exact
+fields and a real payload first; authentication headers live in Keychain. HTTPS inspection bodies and headers have no
+export representation and are never included.
+
+### Also
+
+- **Focus mode** filters every screen and menu-bar rate to chosen applications or destinations without changing storage.
+- **Background mode** keeps capture running from the menu bar with the Dock icon hidden.
+- **Update recovery** detects an exact app/filter build mismatch, fails open, and offers product-specific reinstall or
+  restart guidance instead of claiming that enforcement is healthy.
+- **108 protocols in 13 families** cover web, email, transfer, remote access, DNS, tunnels, databases, messaging,
+  voice/video, peer-to-peer, and more.
+- **Local ownership lookup** can name public-IP networks; it is independently switchable and never sends private IPs.
+
+## Documentation
+
+<table>
+<tr>
+<td><strong>Use Flowlight</strong></td>
+<td><a href="https://flowlight.xinbetween.com/docs/">Product documentation</a></td>
+<td>Capture, inspection, policies, agents, Ask, and troubleshooting</td>
+</tr>
+<tr>
+<td><strong>Understand the boundary</strong></td>
+<td><a href="https://flowlight.xinbetween.com/threat-model/">Threat model</a></td>
+<td>What Flowlight can defend, what it cannot, and why</td>
+</tr>
+<tr>
+<td><strong>Build and release</strong></td>
+<td><a href="docs/DEVELOPMENT.md">Developer guide</a></td>
+<td>Architecture, project generation, signing, CI, and release mechanics</td>
+</tr>
+<tr>
+<td><strong>Contribute</strong></td>
+<td><a href="CONTRIBUTING.md">Contribution guide</a></td>
+<td>Setup, branch discipline, tests, review, and release boundaries</td>
+</tr>
+<tr>
+<td><strong>Report a vulnerability</strong></td>
+<td><a href="SECURITY.md">Security policy</a></td>
+<td>Supported versions and private reporting</td>
+</tr>
+</table>
 
 ### Build from source
 
 ```sh
 brew install xcodegen  # project regeneration requires exactly 2.46.0
-git clone https://github.com/xinbetween/flowlight.git && cd flowlight
-scripts/check_xcode_project.sh --write  # regenerate the committed shared Xcode project
-scripts/check_xcode_project.sh          # verify it still matches project.yml
-scripts/build-local.sh                  # ad-hoc signed, no Apple account needed
+git clone https://github.com/xinbetween/flowlight.git
+cd flowlight
+scripts/check_xcode_project.sh --write
+scripts/check_xcode_project.sh
+scripts/build-local.sh
 open build/Build/Products/Release/Flowlight.app
-scripts/build-dmg.sh                    # optional: drag-to-install disk image (build/Flowlight.dmg)
-scripts/build-pkg.sh                    # optional: installer package
 ```
 
-Requirements: macOS 15 or later, Xcode 16 or later. Internals and the Network Extension path are in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Requirements: macOS 15 or later and Xcode 16 or later. `scripts/build-dmg.sh` and `scripts/build-pkg.sh` produce local
+installers. An ad-hoc local build does not gain Apple's protected Network Extension entitlement.
 
-## How it works
+## Privacy
 
-```mermaid
-flowchart LR
-    subgraph Capture
-        N[nettop sampler<br/>per-process byte counts, 1 s]
-        E[Network Extension<br/>NEFilterDataProvider, audit tokens]
-    end
-    P[BPF packet capture<br/>DNS answers + TLS SNI only] --> H[Hostname cache]
-    N --> B[Per-second batches<br/>app · host · IP · port · protocol]
-    E --> B
-    H --> B
-    B --> DB[(SQLite<br/>1 s → 1 min → 1 h → 1 day)]
-    B --> A[Anomaly + agent rules]
-    A --> AL[Alerts + notifications]
-    DB --> UI[SwiftUI + Swift Charts]
-```
+Flowlight has no account and no product telemetry. Traffic history, alert evidence, agent attribution, configuration
+inventory, and optional inspection records stay in Flowlight's local database.
 
-Two capture engines produce the same per-second summaries:
+A few optional or user-directed features make ordinary network requests:
 
-| | **nettop sampler** (default) | **Network Extension** |
-|---|---|---|
-| Needs | nothing | The Network Extension entitlement (paid developer account), app in /Applications, your approval |
-| Attribution | process → app bundle | audit token → code-signing identity |
-| Hostnames | TLS SNI + DNS from packet capture, reverse DNS, network owner | SNI, HTTP `Host`, system hostname, DNS |
-| Short-lived flows | a connection that opens *and* closes between two readings is missed entirely | every flow, however brief |
-| Byte counts | exact for anything alive across two readings — it compares running totals, so bursts aren't lost | from the filter's own statistics |
-| Energy | starts a process every second | no polling |
+- Developer releases can check GitHub for updates.
+- Managed packs can check one fixed HTTPS catalog source.
+- Public-IP owner lookup can query Team Cymru DNS and never sends private addresses.
+- Ask can contact the model provider or compatible endpoint you explicitly configure.
+- Export contacts only the collector you configure.
 
-**What the sampler misses is whole connections, not bytes.** It reads macOS's running counters once a second and records the
-difference, so a long transfer is counted exactly however bursty it was. What never appears is anything that starts and finishes
-between two readings — a quick DNS lookup, a fast API call, a script that runs `curl` and exits. For an agent that makes many short
-requests, that is the difference between the two engines. The extension is called as each connection is made, so it sees those;
-in exchange, traffic from before you enabled it isn't there and some system traffic is exempt from content filters.
-
-Storage rolls per-second rows into minute, hour and day tables. Week, month and year views read the daily table,
-so a year of history stays fast.
-
-## Monitoring, not prevention
-
-Flowlight tells you what software on your Mac is sending and where. It is not a defence against an attacker who already
-controls the machine: anything running as root can unload its extension or stop the app. Blocking is real — the Network
-Extension refuses the connection before it is made — but it is control over software you already trust rather than a
-barrier against software you don't, and an agent that can run a shell can do by hand what a refused tool would have done.
-The [threat model](https://flowlight.xinbetween.com/threat-model/) says what is defended, what is not, and why.
-
-## Honest limitations
-
-- **TCP and UDP only.** That covers essentially all app traffic, but ICMP (ping) and other raw-IP protocols aren't attributed.
-- **Per process, not per thread or tool call.** macOS attributes sockets to processes, so Flowlight can say *curl,
-  started by Claude Code* or *the github MCP server*, not which individual tool call inside a long-running server opened it.
-- **Allowlists only block when you ask them to.** Every allowlist warns; turning on *Refuse connections outside the
-  list*, per agent, makes it refuse as well. That needs the Network Extension engine — the sampler can only watch —
-  and it never refuses local traffic, DNS, essential Apple system services or Flowlight's own.
-- **Encrypted payloads stay encrypted by default.** Flowlight reads metadata (hostnames, ports, byte counts). Decryption
-  happens only with HTTPS inspection turned on, only for apps that use its proxy, and never for apps that pin certificates.
-  Inspection speaks HTTP/1.1 to both sides.
-- **Hostname capture follows the primary interface.** Traffic confined to another interface or tunnel may lack names.
-- **QUIC server names** come from DNS rather than the encrypted QUIC handshake.
-- **The Network Extension needs approval.** Installing the content filter asks you to allow it in System Settings and
-  to confirm the filter. Flowlight works without it on the nettop sampler.
-- **Only one content filter runs at a time on macOS.** On a Mac where security software already holds that slot —
-  Palo Alto Networks GlobalProtect, CrowdStrike Falcon and similar — Flowlight's filter installs and connects but is never handed
-  any traffic. Sources › Collector lists the filters it finds and offers the sampler instead, which needs no filter.
+Each path is disclosed where it is configured and has its own controls. Packet capture stores DNS answers and TLS server
+names, not packet bodies. HTTPS inspection is separate, explicit, scoped, and removable. Read the full
+[privacy explanation](https://flowlight.xinbetween.com/privacy/) and
+[threat model](https://flowlight.xinbetween.com/threat-model/).
 
 ## Roadmap
 
 Shipped:
 
-- [x] Traffic visualization: every observed application and its exact destinations, with stable weighted paths,
-  animated direction, exact drill-down, Reduce Motion and an accessible list (0.16.0)
-- [x] Signed and notarized releases (Developer ID, from 0.1.6)
-- [x] Per-agent allowlists ("Claude Code may talk to GitHub and npm, nothing else")
-- [x] Tool and MCP server attribution (which process an agent started opened the socket)
-- [x] Full HTTPS request inspection, as a separate opt-in mode (local proxy with its own certificate authority;
-  metadata and analytics stay the default)
-- [x] Tool calls read from LLM responses, linked to the requests their tools make
-- [x] A Homebrew cask (`brew install --cask xinbetween/tap/flowlight`, from 0.2.1)
-- [x] Focus mode: watch only the apps and destinations you pick (0.2.2, symmetric from 0.3.4)
-- [x] Block connections: an allowlist can refuse as well as warn (from 0.3.0)
-- [x] Rules: block anything, anywhere, for as long as you say, with a violations feed (0.3.5)
-- [x] Agent guardrails: block an MCP server, a tool or a resource (0.3.6)
-- [x] A site that keeps up with the app: counts read from source at build time, balanced columns, motion that
-  never moves the layout (0.3.7)
-- [x] Peer-to-peer Wi-Fi named as its own channel: AirDrop, Handoff, AirPlay, Sidecar, Universal Control (0.4.0)
-- [x] The Rules screen renders (0.4.1 — it came up blank from 0.3.5 to 0.4.0)
-- [x] Bluetooth: which devices are paired and connected, which apps are built to use it (0.4.2)
-- [x] USB and external storage: what is attached, and when each volume arrived and left (0.4.3)
-- [x] Camera activity: which camera is active and when it started or stopped, without reading frames (0.15.12)
-- [x] Ask Flowlight: questions in plain language, answered from the local history (0.5.0)
-- [x] Mock responses in HTTPS inspection (from 0.3.1)
-- [x] Export to OpenTelemetry / SIEM (from 0.3.2)
-- [x] Runs quietly in the background: menu-bar-only mode, window state, a calmer first run (0.2.7 and 0.3.3)
-- [x] Coverage: what Flowlight can't account for, per app (0.9.0)
-- [x] Inspect an app or destination from the row you found it on (0.9.1)
-- [x] A budget for HTTPS inspection: header allowlist, per-app ceilings, a session that expires (0.9.3)
-- [x] Show me what this rule would have done: replay recorded traffic against a rule before it refuses anything (0.9.4)
-- [x] What leaves the Mac, before it leaves: the export discloses its destination, transport and exact fields (0.9.5)
-- [x] Every domain an MCP server reaches, with one-click refusal for the agent or the whole Mac (0.9.6)
-- [x] Relaunch through the proxy when a supervisor, not a terminal, starts your agents (0.9.7)
-- [x] A threat model, a security contact, and fonts served from our own domain (website and documentation;
-  no app release of its own, since the app itself did not change)
-- [x] Build, sign, notarize and publish from CI ([release workflow](.github/workflows/release.yml); see
-  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#releasing-from-ci) for the secrets it needs and what they cost)
-
-- [x] AI visualization: a separate mode for proved agent clients, attributed tools and MCP servers, LLM providers,
-  and every other destination they reached (0.16.0). Tool traffic folds into its parent agent without erasing the
-  selectable tool node; provider grouping keeps exact hosts underneath for honest History, Inspect and Policies
-  navigation. Process lineage is labelled “works for,” never an invocation count without inspected evidence. The
-  full evidence, data, status and acceptance contract lives in [docs/VISUALIZATION.md](docs/VISUALIZATION.md).
+- [x] Application-aware Traffic and AI relationship maps with exact drill-down and accessible list presentation (0.16.0)
+- [x] Native time navigation, atomic graph loading, and persistent filter visibility (0.17.0)
+- [x] Explainable agent inventory, durable alert triage, responsive layouts, and hardened release provenance (0.17.9)
+- [x] Optional HTTPS inspection in both Developer ID and Mac App Store product architectures (0.18.0)
+- [x] Per-agent allowlists, Network Extension blocking, ordinary rules, managed packs, guardrails, mocks, rewrites,
+  Focus, Ask, local model support, and user-controlled export
 
 Planned, in order:
 
-- **1.0 — What an agent did off the network.** Flowlight can say that Claude Code uploaded 40 MB to an
-  unfamiliar host. It cannot say that it read `~/.ssh/id_rsa` first, and that second half is the exfiltration
-  story: a file leaving is a read followed by a send, and only the send is visible today. This would record
-  what an agent's tools opened, wrote and spawned, and line it up against the connections that followed —
-  *read the private key, then talked to paste.example* as one finding rather than two screens.
+- **1.0 — Relate off-network agent actions to network evidence.** The long-term goal is to explain a sequence such as
+  “this agent read a sensitive file, then sent data to a new destination,” subject to Apple's Endpoint Security
+  entitlement review and a substantially stricter local data budget. It is not planned as a generic CPU or resource
+  monitor.
 
-  It is not a resource monitor. CPU, memory and energy per process are Activity Monitor's job, done well and
-  built into the Mac already; the only number of that kind worth having here is "this agent was busy while you
-  were away", which belongs beside the away-activity alert rather than in a tab of its own.
+Later, with no committed version: investigate Linux capture with eBPF/nfnetlink and Windows capture with WFP/ETW while
+keeping the local storage, protocol, attribution, and policy semantics portable.
 
-  **Two things gate it, both stated here rather than discovered later.** Per-process file attribution on macOS
-  needs the EndpointSecurity framework, whose entitlement Apple grants on request and review — not a
-  checkbox — and which only works from a system extension. And it would put far more sensitive material in
-  Flowlight's hands than network metadata ever did, so the inspection budget in 0.9.3 stops being a nicety and
-  becomes the thing that has to exist first. A tool that asks you not to monitor it has to deserve that twice
-  over when it can see every file you open.
+## Community
 
-Later, no version yet:
+Issues, discussions, and pull requests are welcome. Adding a known agent, provider, or protocol is usually a small source
+change plus a focused test; larger work should start with an issue so product and privacy boundaries are explicit.
 
-- **Linux (Ubuntu).** A daemon plus a local web UI, sharing the Swift core (storage, protocol classification, agent
-  rules, MCP and LLM readers). Capture would be rewritten on eBPF or nfnetlink, and process attribution on `/proc`;
-  SwiftUI doesn't exist there.
-- **Windows.** The same core with capture on WFP or ETW and attribution through `GetExtendedTcpTable`. A bigger
-  commitment than Linux: three capture backends to maintain, and a thinner Swift ecosystem.
-
-## Contributing
-
-Issues and PRs are welcome. Adding an agent, an LLM provider or a protocol is a one-line change plus a test. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for local setup and contribution guidance.
+- [Open an issue](https://github.com/xinbetween/flowlight/issues)
+- [Read the contribution guide](CONTRIBUTING.md)
+- [Review recent releases](https://flowlight.xinbetween.com/releases/)
+- Star the repository if Flowlight is useful—it helps other people find an independent macOS network monitor.
 
 ### Release workflow
 
-Releases are deliberately not ordinary merges. `main` represents published software, while a release branch carries the
-new version and generated site until a downloadable, verified build exists. Every release follows this order:
+Published software follows this sequence:
 
 ```text
-feature branch → release branch → reviewed green PR → immutable tag → signed preparation → publish exact bytes and verify → merge to main
+release branch → reviewed green PR → immutable tag → signed preparation → publish exact bytes → verify on a Mac → merge
 ```
 
-1. Branch a feature from `main`, test it, and rebase it onto current `main` rather than merging `main` into it.
-2. Fast-forward finished features into `release/<version>` and make one final release commit containing the version bump,
-   release entry in `site/pages/releases.html`, and regenerated `docs/` website output.
-3. Push the release branch and open a PR to `main`. After reviewing the final head, a login configured in the
-   `RELEASE_REVIEWERS` repository variable must post `Reviewed-Commit: <exact SHA>` as a PR comment. The editable PR
-   body is not review evidence. Do not tag until that authenticated receipt and every required check are green.
-4. The designated release account creates and pushes an annotated `v<version>` tag on that exact release commit; the
-   active ruleset rejects release-tag creation by other write collaborators. Tags are immutable: never retag, move, or
-   force-push one. If it is wrong, issue the next patch release instead.
-5. The tag push builds, signs, notarizes, Gatekeeper-verifies, attests, and retains one immutable preparation artifact;
-   it cannot publish. After it passes, explicitly dispatch publication with that preparation run ID.
-6. Publication verifies the run, archive digest, manifest, checksums, and provenance, then creates and re-downloads a draft
-   before making those exact bytes public. Verify the DMG, PKG, `SHA256SUMS.txt`, and `RELEASE-MANIFEST.json`; only then
-   merge the release PR into `main`, allowing GitHub Pages to advertise the downloadable release.
-
-The full commands, signing prerequisites and CI behavior live in [CONTRIBUTING.md](CONTRIBUTING.md#branches-and-releases)
-and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches).
-
-```
-Shared/              models, XPC contract, protocol classifier + catalog, SNI/HTTP/DNS parsers
-FlowlightExtension/  NEFilterDataProvider system extension
-Flowlight/
-  Capture/           nettop sampler, extension client, installer
-  Enrichment/        BPF packet capture, network-owner lookup
-  Storage/           SQLite store, rollups, queries
-  Analysis/          anomaly engine, AI agent catalog + rules
-  Inspection/        opt-in HTTPS inspection: local CA, proxy, HTTP parser, tool-call reader
-  UI/                Live · AI Agents · History · Alerts · Inspect · Connections · Sources
-FlowlightTests/      105 unit tests: parsers, BPF filter, rollups, charts, agents, MCP, allowlists, inspection, updates
-docs/                website (GitHub Pages) and developer guide
-```
+`main` represents publicly released source. Release branches are rebased, never refreshed by merging `main`; tags never
+move; and a bad immutable release becomes the next patch version. The full signed-release and evidence contract is in
+[CONTRIBUTING.md](CONTRIBUTING.md#branches-and-releases) and
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-branches).
 
 ## License
 
-Flowlight is free software under the [GNU General Public License v3.0](LICENSE). You can use, study, share and modify
-it, and if you distribute a modified version, you must release its source under the same license.
+Flowlight is free software under the [GNU General Public License v3.0](LICENSE). You may use, study, share, and modify it;
+if you distribute a modified version, you must release its source under the same license.
 
-Flowlight isn't affiliated with Apple or with any AI provider named here. Product names are
-trademarks of their owners.
+Flowlight is not affiliated with Apple or with any AI provider or agent named here. Product names are trademarks of
+their respective owners.

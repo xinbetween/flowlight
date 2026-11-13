@@ -81,6 +81,80 @@ final class InspectNavigationTests: XCTestCase {
                           PolicyInventoryID.make(.guardrail, sourceID: source))
     }
 
+    func testPrimaryPolicySectionExpansionUsesStablePersistedKeys() {
+        XCTAssertEqual(PolicySectionExpansion.networkRulesKey,
+                       "policies.sections.network-rules.expanded")
+        XCTAssertEqual(PolicySectionExpansion.agentAllowlistsKey,
+                       "policies.sections.agent-allowlists.expanded")
+        XCTAssertEqual(PolicySectionExpansion.managedPacksKey,
+                       "policies.sections.managed-packs.expanded")
+        XCTAssertEqual(PolicySectionExpansion.catalogDetailsKey,
+                       "policies.sections.managed-packs.catalog-details.expanded")
+        XCTAssertTrue(PolicySectionExpansion.isCollapsible(.networkRule))
+        XCTAssertTrue(PolicySectionExpansion.isCollapsible(.agentAllowlist))
+        XCTAssertTrue(PolicySectionExpansion.isCollapsible(.managedPack))
+        XCTAssertFalse(PolicySectionExpansion.isCollapsible(.guardrail))
+    }
+
+    func testCollapsedPolicySummarySeparatesConfiguredIntentFromCurrentEffect() {
+        let items = [
+            PolicyInventoryItem(kind: .networkRule, sourceID: "effective", title: "", detail: "",
+                                isEnabled: true, effect: .effective, reason: nil, destination: .managedPack(nil)),
+            PolicyInventoryItem(kind: .networkRule, sourceID: "waiting", title: "", detail: "",
+                                isEnabled: true, effect: .waiting, reason: nil, destination: .managedPack(nil)),
+            PolicyInventoryItem(kind: .networkRule, sourceID: "off", title: "", detail: "",
+                                isEnabled: false, effect: .off, reason: nil, destination: .managedPack(nil)),
+        ]
+
+        let summary = PolicySectionSummary(items: items)
+        XCTAssertEqual(summary.enabled, 2)
+        XCTAssertEqual(summary.effective, 1)
+        XCTAssertEqual(summary.reportingOnly, 0)
+        XCTAssertEqual(summary.waiting, 1)
+        XCTAssertEqual(summary.needsReview, 0)
+    }
+
+    func testCollapsedPolicySummaryKeepsAllowlistAndPackActionStateVisible() {
+        let items = [
+            PolicyInventoryItem(kind: .agentAllowlist, sourceID: "enforcing", title: "", detail: "",
+                                isEnabled: true, effect: .effective, reason: nil, destination: .managedPack(nil)),
+            PolicyInventoryItem(kind: .agentAllowlist, sourceID: "reporting", title: "", detail: "",
+                                isEnabled: true, effect: .reportingOnly, reason: nil, destination: .managedPack(nil)),
+            PolicyInventoryItem(kind: .managedPack, sourceID: "review", title: "", detail: "",
+                                isEnabled: true, effect: .needsReview, reason: nil, destination: .managedPack(nil)),
+            PolicyInventoryItem(kind: .managedPack, sourceID: "removed", title: "", detail: "",
+                                isEnabled: true, effect: .unavailable, reason: nil, destination: .managedPack(nil)),
+        ]
+
+        let summary = PolicySectionSummary(items: items)
+        XCTAssertEqual(summary.enabled, 4)
+        XCTAssertEqual(summary.effective, 2)
+        XCTAssertEqual(summary.reportingOnly, 1)
+        XCTAssertEqual(summary.waiting, 0)
+        XCTAssertEqual(summary.needsReview, 2)
+    }
+
+    func testManagedPackFocusWaitsForDefinitionsAndKeepsExactIdentity() throws {
+        let sectionRequest = PolicyRequest(destination: .managedPack(nil))
+        let sectionFocus = try XCTUnwrap(ManagedPackFocusRequest(sectionRequest))
+        XCTAssertFalse(sectionFocus.isReady(availablePackIDs: [], catalogReady: false))
+        XCTAssertTrue(sectionFocus.isReady(availablePackIDs: ["official.trackers"], catalogReady: true))
+        XCTAssertEqual(sectionFocus.targetID, PolicySectionExpansion.managedPacksAnchor)
+
+        let packRequest = PolicyRequest(destination: .managedPack("official.trackers"))
+        let packFocus = try XCTUnwrap(ManagedPackFocusRequest(packRequest))
+        XCTAssertEqual(packFocus.resolution(availablePackIDs: ["official.trackers"], catalogReady: false), .waiting)
+        XCTAssertEqual(packFocus.resolution(availablePackIDs: ["official.telemetry"], catalogReady: true), .missing)
+        XCTAssertEqual(packFocus.resolution(availablePackIDs: ["official.trackers"], catalogReady: true), .found)
+        XCTAssertFalse(packFocus.isReady(availablePackIDs: [], catalogReady: false))
+        XCTAssertFalse(packFocus.isReady(availablePackIDs: ["official.telemetry"], catalogReady: true))
+        XCTAssertTrue(packFocus.isReady(availablePackIDs: ["official.trackers"], catalogReady: true))
+        XCTAssertEqual(packFocus.navigationID, packRequest.id)
+        XCTAssertEqual(packFocus.targetID, "pack:official.trackers")
+
+        XCTAssertNil(ManagedPackFocusRequest(PolicyRequest(destination: .allowlist("agent"))))
+    }
+
     func testCapabilitiesWithoutInspectionHideEveryInspectionPolicyKind() {
         let capabilities = PolicyInventoryCapabilities(
             inspectionPolicies: false,

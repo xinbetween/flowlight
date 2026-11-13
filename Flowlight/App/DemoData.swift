@@ -6,6 +6,37 @@ import Foundation
 enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
     static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
+    static var isUITesting: Bool { isEnabled && UserDefaults.standard.bool(forKey: "FLDemoUITests") }
+    static var forcesExtensionUpdateWarning: Bool {
+        isUITesting && UserDefaults.standard.bool(forKey: "FLDemoExtensionUpdateWarning")
+    }
+    static let uiTestRuleID = UUID(uuidString: "A14DA4C2-7930-45C0-A8B9-3B8CD69C4A4E")!
+    static let appStorage = makeAppStorage(isUITesting: isUITesting)
+
+    static func makeAppStorage(
+        isUITesting: Bool,
+        launchDefaults: UserDefaults = .standard,
+        processIdentifier: Int32 = ProcessInfo.processInfo.processIdentifier
+    ) -> UserDefaults {
+        guard isUITesting else { return launchDefaults }
+        let requested = launchDefaults.string(forKey: "FLDemoUITestDefaultsSuite")
+        let suite = requested?.isEmpty == false
+            ? requested!
+            : "com.flowlight.ui-tests.\(processIdentifier)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    static func prepareUITestDefaults() {
+        guard isUITesting else { return }
+        let defaults = appStorage
+        defaults.set(true, forKey: PolicySectionExpansion.networkRulesKey)
+        defaults.set(true, forKey: PolicySectionExpansion.agentAllowlistsKey)
+        defaults.set(true, forKey: PolicySectionExpansion.managedPacksKey)
+        defaults.set(false, forKey: PolicySectionExpansion.catalogDetailsKey)
+    }
+
     static var pluginReviewURL: URL? {
         guard isEnabled,
               let path = UserDefaults.standard.string(forKey: "FLDemoPluginReview"),
@@ -112,9 +143,8 @@ enum DemoData {
             Flow(host: "zoom.us", ip: "198.51.100.70", port: 8801, proto: "zoom-media", transport: .udp, inRate: 6_000_000, outRate: 4_500_000),
         ]),
         App(bundleID: "claude", name: "claude", path: "/opt/homebrew/bin/claude", weight: 0.9, flows: [
-            Flow(host: "api.anthropic.com", ip: "198.51.100.80", port: 443, proto: "https", inRate: 700_000, outRate: 1_400_000),
-            Flow(host: "registry.npmjs.org", ip: "198.51.100.81", port: 443, proto: "https", inRate: 300_000, outRate: 10_000),
-            Flow(host: "github.com", ip: "198.51.100.11", port: 22, proto: "ssh", inRate: 50_000, outRate: 30_000),
+            Flow(host: "localhost", ip: "127.0.0.1", port: 3425, proto: "http", inRate: 700_000,
+                 outRate: 1_400_000, channel: .loopback),
         ], launcher: ("herdr", "Herdr", "/Users/demo/.local/bin/herdr"),
            upstreamLauncher: ("com.mitchellh.ghostty", "Ghostty", "/Applications/Ghostty.app")),
         App(bundleID: "com.yetone.magpie", name: "magpie", path: "/Applications/magpie.app", weight: 0.9, flows: [
@@ -259,6 +289,17 @@ enum DemoData {
         try seedInspection(db, now: now)
     }
 
+    /// Adds stable controls used by geometry-level UI tests. This only ever writes the disposable demo database.
+    static func seedUITestPolicies(_ db: TrafficDatabase) throws {
+        var rule = Rule()
+        rule.id = uiTestRuleID
+        rule.name = "UI test rule"
+        rule.destination = "example.com"
+        try db.saveRule(rule)
+        try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
+                                      patterns: ["github.com", "npmjs.org"]))
+    }
+
     /// A previously accepted pack whose definition has since changed. Screenshot and acceptance runs use this
     /// disposable state to exercise the same review affordance a catalog update produces, without touching real data.
     static func seedPackReview(_ db: TrafficDatabase) throws {
@@ -272,12 +313,11 @@ enum DemoData {
 
     private static func seedBlockedAttempts(_ db: TrafficDatabase, now: Date) throws {
         let nowTs = Int64(now.timeIntervalSince1970)
-        let ruleID = UUID(uuidString: "A14DA4C2-7930-45C0-A8B9-3B8CD69C4A4E")!
         try db.recordRuleEvents([
-            RuleEvent(at: nowTs - 4 * 60, ruleID: ruleID, action: .block, engine: .flow,
+            RuleEvent(at: nowTs - 4 * 60, ruleID: uiTestRuleID, action: .block, engine: .flow,
                       agentKey: "", agentName: "", appName: "Google Chrome",
                       bundleID: "com.google.Chrome", host: "www.google-analytics.com", ip: "", port: 443),
-            RuleEvent(at: nowTs - 17 * 60, ruleID: ruleID, action: .block, engine: .flow,
+            RuleEvent(at: nowTs - 17 * 60, ruleID: uiTestRuleID, action: .block, engine: .flow,
                       agentKey: "", agentName: "", appName: "Safari",
                       bundleID: "com.apple.Safari", host: "browser.events.data.microsoft.com", ip: "", port: 443)
         ])

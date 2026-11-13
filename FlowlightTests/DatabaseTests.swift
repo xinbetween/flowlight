@@ -643,6 +643,28 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(rows.reduce(Int64(0)) { $0 + $1.counters.total }, 30)
     }
 
+    func testVisualizationProjectionsPreserveExactPortsForGatewayReconciliation() throws {
+        let t0: Int64 = 1_700_000_000
+        var configured = key("claude", "localhost", ip: "127.0.0.1", port: 3425)
+        configured.channel = .loopback
+        var unrelated = configured
+        unrelated.port = 9999
+        try db.insert([TrafficBatch(timestamp: t0, records: [
+            TrafficRecord(key: configured, counters: FlowCounters(bytesOut: 10, flows: 1)),
+            TrafficRecord(key: unrelated, counters: FlowCounters(bytesOut: 20, flows: 1))
+        ])])
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 1))
+        let traffic = try db.appDestinationRows(.second, from: from, to: to)
+        let ai = try db.aiVisualizationRows(.second, from: from, to: to)
+
+        XCTAssertEqual(Set(traffic.map(\.ports)), ["3425", "9999"])
+        XCTAssertEqual(Set(ai.map(\.ports)), ["3425", "9999"])
+        XCTAssertEqual(traffic.reduce(Int64(0)) { $0 + $1.counters.bytesOut }, 30)
+        XCTAssertEqual(ai.reduce(Int64(0)) { $0 + $1.counters.bytesOut }, 30)
+    }
+
     func testReportsBreakdownKeepsApplicationsPastRelationshipDisplayLimit() throws {
         let t0: Int64 = 1_700_000_000
         let records = (0...TrafficDatabase.breakdownLimit).map { index in

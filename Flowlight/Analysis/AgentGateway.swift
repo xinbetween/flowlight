@@ -257,6 +257,94 @@ struct AgentGatewayIdentity: Equatable, Sendable {
     var path: String
 }
 
+struct ResolvedAgentGateway: Equatable, Sendable {
+    var config: AgentGatewayConfig
+    var identity: AgentGatewayIdentity?
+}
+
+/// Removes a localhost row only when it is proved to be the client leg of a configured gateway route. Local traffic is
+/// otherwise ordinary traffic: model servers, collectors, databases, and unrelated listeners must remain visible.
+enum LocalGatewaySupportLegReconciler {
+    struct Result: Sendable {
+        var observed: [BreakdownRow]
+        var support: [BreakdownRow]
+    }
+
+    static func partition(
+        _ rows: [BreakdownRow],
+        gateways: [ResolvedAgentGateway]
+    ) -> Result {
+        let proved = gateways.filter { gateway in
+            guard gateway.config.endpoint.isLocal,
+                  hasExclusiveClientEvidence(for: gateway, rows: rows, gateways: gateways)
+            else { return false }
+            return rows.contains { isDownstream($0, for: gateway) }
+        }
+        guard !proved.isEmpty else { return Result(observed: rows, support: []) }
+        var observed: [BreakdownRow] = []
+        var support: [BreakdownRow] = []
+        for row in rows {
+            let isSupport = proved.contains { isSupport(row, for: $0) }
+            if isSupport {
+                support.append(row)
+            } else {
+                observed.append(row)
+            }
+        }
+        return Result(observed: observed, support: support)
+    }
+
+    static func isSupport(_ row: BreakdownRow, for gateway: ResolvedAgentGateway) -> Bool {
+        source(row, matches: gateway.config.agent)
+            && endpoint(row, matches: gateway.config.endpoint)
+    }
+
+    static func isDownstream(_ row: BreakdownRow, for gateway: ResolvedAgentGateway) -> Bool {
+        guard let identity = gateway.identity else { return false }
+        return row.bundleID == identity.bundleID
+            && !row.counters.isEmpty
+            && !row.routeProxyBundleID.isEmpty
+    }
+
+    private static func hasExclusiveClientEvidence(
+        for gateway: ResolvedAgentGateway,
+        rows: [BreakdownRow],
+        gateways: [ResolvedAgentGateway]
+    ) -> Bool {
+        guard let identity = gateway.identity else { return false }
+        let configuredAgents = gateways.compactMap { candidate -> String? in
+            guard candidate.config.endpoint == gateway.config.endpoint,
+                  candidate.identity?.bundleID == identity.bundleID else { return nil }
+            return candidate.config.agent
+        }
+        guard let firstAgent = configuredAgents.first,
+              configuredAgents.allSatisfy({ AgentCatalog.sameAgentIdentity($0, firstAgent) })
+        else { return false }
+        let clientRows = rows.filter { endpoint($0, matches: gateway.config.endpoint) }
+        return !clientRows.isEmpty && clientRows.allSatisfy {
+            source($0, matches: gateway.config.agent)
+        }
+    }
+
+    private static func source(_ row: BreakdownRow, matches configuredAgent: String) -> Bool {
+        [row.parentAgent, row.bundleID].contains { candidate in
+            !candidate.isEmpty && AgentCatalog.sameAgentIdentity(candidate, configuredAgent)
+        }
+    }
+
+    private static func endpoint(_ row: BreakdownRow, matches endpoint: AgentGatewayConfig.Endpoint) -> Bool {
+        guard endpoint.isLocal, row.channel == .loopback else { return false }
+        let ports = row.ports.split(separator: ",").map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard ports.contains(String(endpoint.port)) else { return false }
+        if !row.remoteIP.isEmpty {
+            return LocalGatewayResolver.address(row.remoteIP, accepts: endpoint.host)
+        }
+        return HostCanonicalizer.host(row.domain) == "localhost"
+    }
+}
+
 /// Resolves a configured localhost endpoint to the process that actually owns the listening socket. A configured URL
 /// still remains configuration evidence; this only supplies the truthful application identity for its endpoint.
 enum LocalGatewayResolver {

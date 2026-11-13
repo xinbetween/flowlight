@@ -262,6 +262,7 @@
 		850653E102AF3CD2C3833524 /* ProcessNaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F3F458498856491A40E88C /* ProcessNaming.swift */; };
 		858D19CFF01AFC9E3FF8F364 /* AskProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59A773537F63761107681A3 /* AskProvider.swift */; };
 		8658DBDD8DE41686E075C7B0 /* DestinationProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C46B9250A6ADDFD915500B /* DestinationProfileTests.swift */; };
+		870422099DB97DC2D8723679 /* PoliciesInteractionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44FA09238F8128A09BE6CA7 /* PoliciesInteractionUITests.swift */; };
 		8753FD9223EF6AE4C892DB9A /* RewriteRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694D30A62FAF11702B7EF605 /* RewriteRuleTests.swift */; };
 		875CEAD8A14432BD5E46F0DF /* AskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67763C99431F26FE1D428EA2 /* AskController.swift */; };
 		87B80FD11BAC558198442507 /* TrafficModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6096AB6A3EF78490BE10DF50 /* TrafficModels.swift */; };
@@ -522,6 +523,13 @@
 			remoteGlobalIDString = 1C9BF0C33D1912981FB4B5AD;
 			remoteInfo = Flowlight;
 		};
+		8DA1FF340AD6188D048A84C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 27052BCDFA1783A148CD45FD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1C9BF0C33D1912981FB4B5AD;
+			remoteInfo = Flowlight;
+		};
 		8E69049BBCF586A050AA927F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 27052BCDFA1783A148CD45FD /* Project object */;
@@ -710,6 +718,7 @@
 		67763C99431F26FE1D428EA2 /* AskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskController.swift; sourceTree = "<group>"; };
 		694D30A62FAF11702B7EF605 /* RewriteRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RewriteRuleTests.swift; sourceTree = "<group>"; };
 		6AF0ACB7FCA10D7758DE177D /* InspectionBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionBudget.swift; sourceTree = "<group>"; };
+		6E227E4AD5DA2373EBC20395 /* FlowlightUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowlightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6E8974956FEBD82934CA1EB5 /* HTTPStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPStream.swift; sourceTree = "<group>"; };
 		6F9EEC138B6EE3479F9F10E0 /* Flowlight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Flowlight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6FC671A9A89894CBF750C52C /* TrafficGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficGraph.swift; sourceTree = "<group>"; };
@@ -774,6 +783,7 @@
 		A15168A448857A6CC759F7BB /* RulePackEventDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackEventDelivery.swift; sourceTree = "<group>"; };
 		A2A5AC7D1719857AE8ED1CFA /* InsightsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsTests.swift; sourceTree = "<group>"; };
 		A30AC102A5B36107D8B6B31F /* RulePackTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackTransfer.swift; sourceTree = "<group>"; };
+		A44FA09238F8128A09BE6CA7 /* PoliciesInteractionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoliciesInteractionUITests.swift; sourceTree = "<group>"; };
 		A55A095537DB24454B007D1B /* PluginStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginStore.swift; sourceTree = "<group>"; };
 		A5A9D356FF073F1DA1C05522 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A617D9483BCC31A0F4200A90 /* SystemExtensionScan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtensionScan.swift; sourceTree = "<group>"; };
@@ -1268,6 +1278,7 @@
 				9341EDA5AB3454E82FECD53A /* FlowlightStoreExtension.appex */,
 				03C397ABDA52AFBC0E285D5B /* FlowlightStoreTests.xctest */,
 				0CBBF571DC526F85E7232F79 /* FlowlightTests.xctest */,
+				6E227E4AD5DA2373EBC20395 /* FlowlightUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1406,10 +1417,19 @@
 				F377D0F1A3D6A6F8C5DC5F1A /* FlowlightResponseScriptHelper */,
 				CD90BDBC1C2A18F3BF63380A /* FlowlightStoreTests */,
 				47D0F2D7B8D7DEDEA845284F /* FlowlightTests */,
+				DDE4472A83C7310EF043A588 /* FlowlightUITests */,
 				8AB062F3019C5E4A8D16A9E9 /* Shared */,
 				ADA9F48B47F7D9E8BA6C8F1C /* Frameworks */,
 				A6B39D870B3CF6E7A6C31AD3 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		DDE4472A83C7310EF043A588 /* FlowlightUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A44FA09238F8128A09BE6CA7 /* PoliciesInteractionUITests.swift */,
+			);
+			path = FlowlightUITests;
 			sourceTree = "<group>";
 		};
 		F377D0F1A3D6A6F8C5DC5F1A /* FlowlightResponseScriptHelper */ = {
@@ -1573,6 +1593,24 @@
 			productReference = D1C046DCF0CB1227CA93DA24 /* FlowlightExtension.systemextension */;
 			productType = "com.apple.product-type.system-extension";
 		};
+		ED89A8CA1609697FCDE129C2 /* FlowlightUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2D9109C7BE4DEE45826F0AFD /* Build configuration list for PBXNativeTarget "FlowlightUITests" */;
+			buildPhases = (
+				4B32C319F1664D51B3F18AEB /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				16A490C77CA93CCE44CA85FE /* PBXTargetDependency */,
+			);
+			name = FlowlightUITests;
+			packageProductDependencies = (
+			);
+			productName = FlowlightUITests;
+			productReference = 6E227E4AD5DA2373EBC20395 /* FlowlightUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1602,6 +1640,10 @@
 					};
 					94D00543044D9B601CDCA877 = {
 						ProvisioningStyle = Automatic;
+					};
+					ED89A8CA1609697FCDE129C2 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 1C9BF0C33D1912981FB4B5AD;
 					};
 				};
 			};
@@ -1635,6 +1677,7 @@
 				0E90A4F6F62FF71E3D3A1786 /* FlowlightAppStore */,
 				891E68D41C13893367C938C8 /* FlowlightStoreTests */,
 				0249194ABEFD25813E6C14AB /* FlowlightTests */,
+				ED89A8CA1609697FCDE129C2 /* FlowlightUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -1718,6 +1761,14 @@
 				BBCAB0EE0D040C8BF3E30556 /* TLSSNIParser.swift in Sources */,
 				668FFA90C24788C66043286B /* TrafficModels.swift in Sources */,
 				45C6C2569D63744568474B91 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B32C319F1664D51B3F18AEB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				870422099DB97DC2D8723679 /* PoliciesInteractionUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2213,6 +2264,11 @@
 			target = 36B21D467163CD9F57115778 /* FlowlightResponseScriptHelper */;
 			targetProxy = 8E69049BBCF586A050AA927F /* PBXContainerItemProxy */;
 		};
+		16A490C77CA93CCE44CA85FE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1C9BF0C33D1912981FB4B5AD /* Flowlight */;
+			targetProxy = 8DA1FF340AD6188D048A84C4 /* PBXContainerItemProxy */;
+		};
 		531D8A14230A1D40ACDD824B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 1C9BF0C33D1912981FB4B5AD /* Flowlight */;
@@ -2387,7 +2443,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 84;
+				CURRENT_PROJECT_VERSION = 85;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2402,7 +2458,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.18.0;
+				MARKETING_VERSION = 0.18.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2448,7 +2504,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 84;
+				CURRENT_PROJECT_VERSION = 85;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 38RJUJHKZS;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2463,7 +2519,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.18.0;
+				MARKETING_VERSION = 0.18.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2547,7 +2603,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 84;
+				CURRENT_PROJECT_VERSION = 85;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -2568,7 +2624,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.18.0;
+				MARKETING_VERSION = 0.18.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2577,6 +2633,24 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		564C84A3DE34EB94E21F2619 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.ui-tests";
+				SDKROOT = macosx;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_TARGET_NAME = Flowlight;
 			};
 			name = Debug;
 		};
@@ -2653,6 +2727,24 @@
 				SDKROOT = macosx;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flowlight.app/Contents/MacOS/Flowlight";
+			};
+			name = Release;
+		};
+		7D045D3BF5CCED094C0B35A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.ui-tests";
+				SDKROOT = macosx;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_TARGET_NAME = Flowlight;
 			};
 			name = Release;
 		};
@@ -2804,6 +2896,24 @@
 			};
 			name = AppStore;
 		};
+		DDD1EABF23CCB6C63EB2BB5E /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.flowlight.app.ui-tests";
+				SDKROOT = macosx;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				TEST_TARGET_NAME = Flowlight;
+			};
+			name = AppStore;
+		};
 		E49C0C89C2E9D3324293BA12 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2848,6 +2958,16 @@
 				2BA4D1560ECB8CD40C5DB361 /* AppStore */,
 				E49C0C89C2E9D3324293BA12 /* Debug */,
 				8DE6CC23E67C44FB5A4DFE4E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = AppStore;
+		};
+		2D9109C7BE4DEE45826F0AFD /* Build configuration list for PBXNativeTarget "FlowlightUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DDD1EABF23CCB6C63EB2BB5E /* AppStore */,
+				564C84A3DE34EB94E21F2619 /* Debug */,
+				7D045D3BF5CCED094C0B35A8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = AppStore;

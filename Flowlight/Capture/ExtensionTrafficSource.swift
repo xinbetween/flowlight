@@ -123,9 +123,12 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// The escalation ladder for a connection that keeps failing. Only touched on the main thread, like
     /// `connection`, because a decision made from two queues at once is no decision at all.
     private var recovery = ExtensionRecovery()
-    /// Asked when redialling has stopped being worth it and the two builds should be compared. The source can't
-    /// do that itself — submitting system extension requests belongs to `ExtensionManager`.
-    var onRepairRequested: (() -> Void)?
+    /// Successful registration proved that the running extension is not the exact build embedded in this app.
+    /// Separate from a generic version probe so connection failures never become false update diagnoses.
+    var onIdentityMismatch: ((ExtensionIdentityMismatch) -> Void)?
+    /// Asked when generic redialling has stopped being worth it and the Developer product should query installed
+    /// system-extension properties. The Store product has no equivalent properties API.
+    var onVersionProbeRequested: (() -> Void)?
     /// The extension isn't going to answer. Whoever owns the source should capture some other way and say so.
     var onGaveUp: ((String) -> Void)?
 
@@ -204,9 +207,10 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                 // version/build is running. Registration reset the old filter to fail-open before this check.
                 let expected = ExtensionManager.expectedExtensionVersion
                 guard Self.acceptsRegisteredVersion(version, expected: expected) else {
-                    self.status?(L("The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has.",
+                    self.status?(L("The installed filter extension is %@ and this app is %@. Restart or reinstall the filter to finish the update.",
                                    version, expected))
-                    self.onRepairRequested?()
+                    self.recovery.identityMismatchDetected()
+                    self.onIdentityMismatch?(ExtensionIdentityMismatch(actual: version, expected: expected))
                     self.scheduleReconnect(L("Trying the filter extension again…"), from: connection)
                     return
                 }
@@ -337,7 +341,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             case .fallBack:
                 self.onGaveUp?(message)
             case .repairVersion(let after):
-                self.onRepairRequested?()
+                self.onVersionProbeRequested?()
                 self.retry(after: after)
             case .redial(let after):
                 self.retry(after: after)

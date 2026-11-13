@@ -64,40 +64,46 @@ enum VisualizeEvidenceScope {
         query: String,
         focus: FocusScope
     ) -> [BreakdownRow] {
+        rows.filter { includes($0, query: query, focus: focus) }
+    }
+
+    static func includes(
+        _ row: BreakdownRow,
+        query: String,
+        focus: FocusScope
+    ) -> Bool {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return rows.filter { row in
-            let matchesQuery = query.isEmpty || [
-                row.appName,
-                row.bundleID,
-                row.appPath,
-                row.domain,
-                row.remoteIP,
-                row.owner,
-                row.parentAgent,
-                row.parentAgentName,
-                row.mcpServer,
-                row.launcherBundleID,
-                row.launcherName,
-                row.launcherPath,
-                row.upstreamLauncherBundleID,
-                row.upstreamLauncherName,
-                row.upstreamLauncherPath,
-                row.routeProxyBundleID,
-                row.routeProxyName,
-                row.routeProxyPath
-            ].contains { $0.lowercased().contains(query) }
-            let matchesFocus = focus.isEmpty
-                || focus.matches(
-                    bundleID: row.bundleID,
-                    domain: row.domain,
-                    remoteIP: row.remoteIP
-                )
-                || focus.matches(bundleID: row.parentAgent, domain: "", remoteIP: "")
-                || focus.matches(bundleID: row.launcherBundleID, domain: "", remoteIP: "")
-                || focus.matches(bundleID: row.upstreamLauncherBundleID, domain: "", remoteIP: "")
-                || focus.matches(bundleID: row.routeProxyBundleID, domain: "", remoteIP: "")
-            return matchesQuery && matchesFocus
-        }
+        let matchesQuery = query.isEmpty || [
+            row.appName,
+            row.bundleID,
+            row.appPath,
+            row.domain,
+            row.remoteIP,
+            row.owner,
+            row.parentAgent,
+            row.parentAgentName,
+            row.mcpServer,
+            row.launcherBundleID,
+            row.launcherName,
+            row.launcherPath,
+            row.upstreamLauncherBundleID,
+            row.upstreamLauncherName,
+            row.upstreamLauncherPath,
+            row.routeProxyBundleID,
+            row.routeProxyName,
+            row.routeProxyPath
+        ].contains { $0.lowercased().contains(query) }
+        let matchesFocus = focus.isEmpty
+            || focus.matches(
+                bundleID: row.bundleID,
+                domain: row.domain,
+                remoteIP: row.remoteIP
+            )
+            || focus.matches(bundleID: row.parentAgent, domain: "", remoteIP: "")
+            || focus.matches(bundleID: row.launcherBundleID, domain: "", remoteIP: "")
+            || focus.matches(bundleID: row.upstreamLauncherBundleID, domain: "", remoteIP: "")
+            || focus.matches(bundleID: row.routeProxyBundleID, domain: "", remoteIP: "")
+        return matchesQuery && matchesFocus
     }
 
     static func blockedAttempts(
@@ -130,6 +136,58 @@ enum VisualizeEvidenceScope {
     }
 }
 
+enum VisualizeGatewayRelationshipScope {
+    struct Result: Sendable {
+        var observed: [BreakdownRow]
+        var support: [BreakdownRow]
+        var gateways: [ResolvedAgentGateway]
+    }
+
+    static func visible(
+        observed: [BreakdownRow],
+        support: [BreakdownRow],
+        gateways: [ResolvedAgentGateway],
+        query: String,
+        focus: FocusScope
+    ) -> Result {
+        let directlyVisibleObserved = VisualizeEvidenceScope.rows(observed, query: query, focus: focus)
+        let directlyVisibleSupport = VisualizeEvidenceScope.rows(support, query: query, focus: focus)
+        let related = gateways.filter { gateway in
+            VisualizeGatewayScope.includes(
+                gateway.config,
+                identity: gateway.identity,
+                query: query,
+                focus: focus
+            )
+                || directlyVisibleSupport.contains {
+                    LocalGatewaySupportLegReconciler.isSupport($0, for: gateway)
+                }
+                || directlyVisibleObserved.contains {
+                    LocalGatewaySupportLegReconciler.isDownstream($0, for: gateway)
+                }
+        }
+        return Result(
+            observed: observed.filter { row in
+                VisualizeEvidenceScope.includes(row, query: query, focus: focus)
+                    || related.contains { LocalGatewaySupportLegReconciler.isDownstream(row, for: $0) }
+            },
+            support: support.filter { row in
+                VisualizeEvidenceScope.includes(row, query: query, focus: focus)
+                    || related.contains { LocalGatewaySupportLegReconciler.isSupport(row, for: $0) }
+            },
+            gateways: gateways.filter { gateway in
+                related.contains(gateway)
+                    || VisualizeGatewayScope.includes(
+                        gateway.config,
+                        identity: gateway.identity,
+                        query: query,
+                        focus: focus
+                    )
+            }
+        )
+    }
+}
+
 enum VisualizeGatewayScope {
     static func includes(
         _ gateway: AgentGatewayConfig,
@@ -157,6 +215,7 @@ enum VisualizeGatewayScope {
         let matchesQuery = query.isEmpty
             || aliases.contains(where: { $0.contains(query) })
             || gateway.endpoint.description.lowercased().contains(query)
+            || gateway.source.lowercased().contains(query)
             || gateway.sourceKey.lowercased().contains(query)
         let matchesFocus = focus.isEmpty
             || !Set(focus.bundleIDs.map { $0.lowercased() }).isDisjoint(with: aliases)
@@ -249,6 +308,7 @@ struct VisualizeView: View {
     @AppStorage("visualize.presentation") private var presentation: Presentation = .map
     @State private var rows: [BreakdownRow] = []
     @State private var blockedAttempts: [BlockedAttemptRow] = []
+    @State private var resolvedGateways: [ResolvedAgentGateway] = []
     @State private var completeSnapshot = TrafficGraphSnapshot.empty
     @State private var mapSnapshot = TrafficGraphSnapshot.empty
     @State private var expandedGroupIDs: Set<TrafficGraphNodeID> = []
@@ -320,7 +380,7 @@ struct VisualizeView: View {
         .task { workspaceStore.refresh(gatewaysOnly: true) }
         .task(id: LoadKey(mode: mode, granularity: granularity, focus: focus.scope,
                           trafficVersion: monitor.dataVersion, ruleVersion: monitor.rules.version,
-                          packVersion: monitor.rulePacks.version)) { await reload() }
+                          packVersion: monitor.rulePacks.version, gatewayVersion: gatewayVersion)) { await reload() }
         .task(id: granularity) {
             guard granularity == .second else { return }
             while !Task.isCancelled {
@@ -329,7 +389,7 @@ struct VisualizeView: View {
             }
         }
         .task(id: RebuildKey(loadID: rebuildID, query: query, mode: mode,
-                             focus: focus.scope, gatewayVersion: gatewayVersion,
+                             focus: focus.scope,
                              selectedSources: selectedSources,
                              selectedDestinations: selectedDestinations,
                              expandedGroupIDs: expandedGroupIDs,
@@ -580,6 +640,17 @@ struct VisualizeView: View {
         if completeSnapshot.nodes.isEmpty { loading = true }
         let granularity = granularity
         let mode = mode
+        let gateways = agentGateways
+        let demo = DemoData.isEnabled
+        let gatewayResolution = Task.detached(priority: .utility) {
+            gateways.map { gateway in
+                ResolvedAgentGateway(
+                    config: gateway,
+                    identity: demo ? DemoData.gatewayIdentity(gateway.endpoint)
+                        : LocalGatewayResolver.resolve(gateway.endpoint)
+                )
+            }
+        }
         let to = Date()
         let from = to.addingTimeInterval(-granularity.defaultWindow)
         do {
@@ -596,6 +667,7 @@ struct VisualizeView: View {
                     return (rows, attempts)
                 }
             }
+            let resolvedGateways = await gatewayResolution.value
             guard ConnectionsRenderPolicy.canCommit(
                 requestID: requestID,
                 currentID: loadID,
@@ -603,6 +675,7 @@ struct VisualizeView: View {
             ) else { return }
             rows = loaded.0
             blockedAttempts = loaded.1
+            self.resolvedGateways = resolvedGateways
             loadedID = requestID
             rebuildID = UUID()
         } catch {
@@ -630,8 +703,7 @@ struct VisualizeView: View {
         let requestID = rebuildID
         let source = rows
         let enforcement = blockedAttempts
-        let gateways = agentGateways
-        let demo = DemoData.isEnabled
+        let resolvedGateways = resolvedGateways
         let mode = mode
         let focusScope = focus.scope
         let expandedGroupIDs = expandedGroupIDs
@@ -642,11 +714,19 @@ struct VisualizeView: View {
         )
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let built = await Task.detached(priority: .userInitiated) {
-            let visibleRows = VisualizeEvidenceScope.rows(
+            let gatewayRows = LocalGatewaySupportLegReconciler.partition(
                 source,
+                gateways: resolvedGateways
+            )
+            let gatewayScope = VisualizeGatewayRelationshipScope.visible(
+                observed: gatewayRows.observed,
+                support: gatewayRows.support,
+                gateways: resolvedGateways,
                 query: query,
                 focus: focusScope
             )
+            let visibleRows = gatewayScope.observed
+            let visibleLineageRows = gatewayScope.support
             let visibleEnforcement = VisualizeEvidenceScope.blockedAttempts(
                 enforcement,
                 query: query,
@@ -662,28 +742,16 @@ struct VisualizeView: View {
                     expandedEdgeGroupIDs: expandedEdgeGroupIDs
                 )
             case .ai:
-                let resolvedGateways = gateways.map { gateway in
-                    (
-                        gateway,
-                        demo ? DemoData.gatewayIdentity(gateway.endpoint)
-                            : LocalGatewayResolver.resolve(gateway.endpoint)
-                    )
-                }
-                let scopedGateways = resolvedGateways.filter { gateway, identity in
-                    VisualizeGatewayScope.includes(
-                        gateway,
-                        identity: identity,
-                        query: query,
-                        focus: focusScope
-                    )
-                }
+                let scopedGateways = gatewayScope.gateways
                 return AITrafficGraphBuilder.buildForPresentation(
-                    rows: source,
+                    rows: gatewayRows.observed,
                     visibleRows: visibleRows,
+                    lineageRows: gatewayRows.support,
+                    visibleLineageRows: visibleLineageRows,
                     blockedAttempts: visibleEnforcement,
-                    gateways: scopedGateways.map(\.0),
+                    gateways: scopedGateways.map(\.config),
                     resolveGateway: { endpoint in
-                        scopedGateways.first { $0.0.endpoint == endpoint }?.1
+                        scopedGateways.first { $0.config.endpoint == endpoint }?.identity
                     },
                     endpointQuery: endpointQuery,
                     expandedGroupIDs: expandedGroupIDs,
@@ -757,6 +825,7 @@ struct VisualizeView: View {
         var trafficVersion: Int
         var ruleVersion: Int
         var packVersion: Int
+        var gatewayVersion: String
     }
 
     private struct RebuildKey: Equatable {
@@ -764,7 +833,6 @@ struct VisualizeView: View {
         var query: String
         var mode: Mode
         var focus: FocusScope
-        var gatewayVersion: String
         var selectedSources: Set<TrafficGraphNodeID>
         var selectedDestinations: Set<TrafficGraphNodeID>
         var expandedGroupIDs: Set<TrafficGraphNodeID>
@@ -1382,7 +1450,9 @@ private struct TrafficGraphCanvas: View {
     private func path(_ curve: TrafficGraphCurve) -> Path {
         Path { path in
             path.move(to: curve.start)
-            path.addCurve(to: curve.end, control1: curve.control1, control2: curve.control2)
+            for segment in curve.segments {
+                path.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
+            }
         }
     }
 
@@ -1391,9 +1461,13 @@ private struct TrafficGraphCanvas: View {
         let bottom = curve.offset(by: offset + width / 2)
         return Path { path in
             path.move(to: top.start)
-            path.addCurve(to: top.end, control1: top.control1, control2: top.control2)
+            for segment in top.segments {
+                path.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
+            }
             path.addLine(to: bottom.end)
-            path.addCurve(to: bottom.start, control1: bottom.control2, control2: bottom.control1)
+            for segment in bottom.segments.reversed() {
+                path.addCurve(to: segment.start, control1: segment.control2, control2: segment.control1)
+            }
             path.closeSubpath()
         }
     }

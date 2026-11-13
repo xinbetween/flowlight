@@ -1134,9 +1134,12 @@ final class RulePackTests: XCTestCase {
             nextEligibleAt: Date(timeIntervalSince1970: 400)
         )
         let store = RulePackStore(definitions: [], currentAppVersion: "0.15.4")
+        XCTAssertFalse(store.catalogReady)
         store.attach(db: db)
         try await waitUntil { store.pendingReviewCount == 1 }
         XCTAssertEqual(store.installCommittedCatalog(omitted, acceptance: acceptance), .installed)
+        XCTAssertTrue(store.catalogReady)
+        XCTAssertEqual(store.unavailableReviewConfigurations.map(\.packID), [definition.id])
 
         var acknowledged: Bool?
         store.acknowledgeUnavailableReview(definition.id) { acknowledged = $0 }

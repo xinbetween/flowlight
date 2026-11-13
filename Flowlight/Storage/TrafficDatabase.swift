@@ -1352,7 +1352,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
-                       '', protocol,
+                       port, protocol,
                        SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows),
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_bundle_id ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN launcher_name ELSE '' END,
@@ -1365,7 +1365,7 @@ final class TrafficDatabase: @unchecked Sendable {
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
                        channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip, protocol, channel, attribution_exact, attribution_epoch,
+                GROUP BY bundle_id, domain, remote_ip, port, protocol, channel, attribution_exact, attribution_epoch,
                          launcher_bundle_id, launcher_name, launcher_path,
                          upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                          route_proxy_bundle_id, route_proxy_name, route_proxy_path
@@ -1392,7 +1392,7 @@ final class TrafficDatabase: @unchecked Sendable {
         return try conn.query("""
             SELECT t.*, COALESCE(o.owner, ''), COALESCE(o.asn, 0) FROM (
                 SELECT bundle_id, MAX(app_name), MAX(app_path), domain, remote_ip,
-                       GROUP_CONCAT(DISTINCT port), protocol,
+                       port, protocol,
                        SUM(bytes_in), SUM(bytes_out), SUM(flows),
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END,
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END,
@@ -1408,7 +1408,7 @@ final class TrafficDatabase: @unchecked Sendable {
                        CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN route_proxy_path ELSE '' END,
                        channel
                 FROM \(granularity.table) WHERE \(clause)
-                GROUP BY bundle_id, domain, remote_ip, attribution_exact, attribution_epoch,
+                GROUP BY bundle_id, domain, remote_ip, port, attribution_exact, attribution_epoch,
                          agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
                          upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
                          route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel, protocol

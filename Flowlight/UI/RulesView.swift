@@ -60,6 +60,93 @@ enum PolicyInventoryID {
     }
 }
 
+enum PolicySectionExpansion {
+    static let networkRulesKey = "policies.sections.network-rules.expanded"
+    static let agentAllowlistsKey = "policies.sections.agent-allowlists.expanded"
+    static let managedPacksKey = "policies.sections.managed-packs.expanded"
+    static let catalogDetailsKey = "policies.sections.managed-packs.catalog-details.expanded"
+    static let managedPacksAnchor = "managed-packs"
+
+    static func isCollapsible(_ kind: PolicyInventoryKind) -> Bool {
+        kind == .networkRule || kind == .agentAllowlist || kind == .managedPack
+    }
+}
+
+struct PolicySectionSummary: Equatable, Sendable {
+    let enabled: Int
+    let effective: Int
+    let reportingOnly: Int
+    let waiting: Int
+    let needsReview: Int
+
+    init(items: [PolicyInventoryItem]) {
+        let counts = items.reduce(
+            into: (enabled: 0, effective: 0, reportingOnly: 0, waiting: 0, needsReview: 0)
+        ) { counts, item in
+            if item.isEnabled { counts.enabled += 1 }
+            if item.effect.isEffective { counts.effective += 1 }
+            if item.effect == .reportingOnly { counts.reportingOnly += 1 }
+            if item.isEnabled && item.effect == .waiting { counts.waiting += 1 }
+            if item.effect == .needsReview || item.effect == .unavailable { counts.needsReview += 1 }
+        }
+        enabled = counts.enabled
+        effective = counts.effective
+        reportingOnly = counts.reportingOnly
+        waiting = counts.waiting
+        needsReview = counts.needsReview
+    }
+
+    @MainActor
+    func localizedText(for kind: PolicyInventoryKind, inForce: Int = 0, resting: Int = 0) -> String {
+        switch kind {
+        case .networkRule:
+            return L("%1$lld in force · %2$lld not in force", inForce, resting)
+        case .agentAllowlist:
+            if waiting > 0 {
+                return L("%1$lld enforcing · %2$lld reporting only · %3$lld waiting",
+                         effective - reportingOnly, reportingOnly, waiting)
+            }
+            return L("%1$lld enforcing · %2$lld reporting only", effective - reportingOnly, reportingOnly)
+        case .managedPack:
+            return L("%1$lld enabled · %2$lld need review", enabled, needsReview)
+        default:
+            return L("%1$lld enabled · %2$lld currently effective", enabled, effective)
+        }
+    }
+}
+
+struct ManagedPackFocusRequest: Equatable, Sendable {
+    enum Resolution: Equatable, Sendable {
+        case waiting
+        case found
+        case missing
+    }
+
+    let navigationID: UUID
+    let packID: String?
+
+    init?(_ request: PolicyRequest) {
+        guard case .managedPack(let packID) = request.destination else { return nil }
+        navigationID = request.id
+        self.packID = packID
+    }
+
+    func resolution(availablePackIDs: [String], catalogReady: Bool) -> Resolution {
+        guard catalogReady else { return .waiting }
+        guard let packID else { return .found }
+        return availablePackIDs.contains(packID) ? .found : .missing
+    }
+
+    func isReady(availablePackIDs: [String], catalogReady: Bool) -> Bool {
+        resolution(availablePackIDs: availablePackIDs, catalogReady: catalogReady) == .found
+    }
+
+    var targetID: String {
+        packID.map { PolicyInventoryID.make(.managedPack, sourceID: $0) }
+            ?? PolicySectionExpansion.managedPacksAnchor
+    }
+}
+
 enum PolicyEffectState: Equatable, Sendable {
     case effective
     case httpOnly
@@ -472,6 +559,15 @@ enum PolicyActivityBuilder {
     }
 }
 
+private func policyStatusTint(_ effect: PolicyEffectState) -> AnyShapeStyle {
+    switch effect {
+    case .effective: return AnyShapeStyle(FL.good)
+    case .httpOnly, .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
+    case .failed, .unavailable: return AnyShapeStyle(FL.critical)
+    case .off: return AnyShapeStyle(.tertiary)
+    }
+}
+
 /// Every policy Flowlight has been given, what each one is doing, and what it has changed.
 ///
 /// The screen answers three questions, in the order people ask them: what have I said, is it actually happening,
@@ -492,6 +588,11 @@ struct RulesView: View {
     @State private var policyEffectSince = Date.distantPast
     @State private var focusPolicyID: String?
     @State private var packSaveErrors: [String: String] = [:]
+    @State private var pendingManagedPackFocus: ManagedPackFocusRequest?
+    @AppStorage(PolicySectionExpansion.networkRulesKey) private var networkRulesExpanded = true
+    @AppStorage(PolicySectionExpansion.agentAllowlistsKey) private var agentAllowlistsExpanded = true
+    @AppStorage(PolicySectionExpansion.managedPacksKey) private var managedPacksExpanded = true
+    @AppStorage(PolicySectionExpansion.catalogDetailsKey) private var catalogDetailsExpanded = false
 
     private static let policyEffectPageSize = 500
 
@@ -554,9 +655,18 @@ struct RulesView: View {
         .onChange(of: templates.pending?.id) { _, _ in takeTemplateRequest() }
         .onChange(of: nav.policyRequest, initial: true) { _, request in
             guard let request else { return }
-            handle(request.destination)
-            nav.policyRequest = nil
+            receivePolicyRequest(request)
         }
+        .onReceive(monitor.rulePacks.$definitions) { _ in
+            resolveManagedPackFocusIfReady()
+        }
+        .onReceive(monitor.rulePacks.$catalogReady) { _ in
+            resolveManagedPackFocusIfReady()
+        }
+        .onReceive(monitor.rulePacks.$configurations) { _ in
+            resolveManagedPackFocusIfReady()
+        }
+        .onDisappear { abandonPendingManagedPackFocus() }
         .task(id: monitor.dataVersion) { await loadPolicySources() }
         .onAppear {
             if let request = nav.ruleRequest {
@@ -601,6 +711,62 @@ struct RulesView: View {
         case .responseTransform(let id):
             nav.showInspectionPolicy(.responseTransforms, policyID: id)
         }
+    }
+
+    private func receivePolicyRequest(_ request: PolicyRequest) {
+        if let focus = ManagedPackFocusRequest(request) {
+            pendingManagedPackFocus = focus
+            managedPacksExpanded = true
+            resolveManagedPackFocusIfReady()
+            return
+        }
+        // A newer request supersedes any catalog focus that was still waiting; it must not reopen later if that pack
+        // returns to the catalog after the person has already navigated elsewhere.
+        pendingManagedPackFocus = nil
+        handle(request.destination)
+        if nav.policyRequest?.id == request.id { nav.policyRequest = nil }
+    }
+
+    private var managedPackFocusIDs: [String] {
+        monitor.rulePacks.definitions.map(\.id)
+            + monitor.rulePacks.unavailableReviewConfigurations.map(\.packID)
+    }
+
+    private func resolveManagedPackFocusIfReady() {
+        guard managedPacksExpanded, let pending = pendingManagedPackFocus else { return }
+        let resolution = pending.resolution(
+            availablePackIDs: managedPackFocusIDs,
+            catalogReady: monitor.rulePacks.catalogReady
+        )
+        guard resolution != .waiting else { return }
+        // The expansion and catalog publication must render before the scroll target and editor are used.
+        DispatchQueue.main.async {
+            guard pendingManagedPackFocus == pending, managedPacksExpanded else { return }
+            let packs = monitor.rulePacks.definitions
+            let resolution = pending.resolution(
+                availablePackIDs: managedPackFocusIDs,
+                catalogReady: monitor.rulePacks.catalogReady
+            )
+            guard resolution != .waiting else { return }
+
+            // A concrete ID removed from the now-ready catalog has a terminal answer: keep the person at the managed
+            // pack section, consume the stale request, and never surprise-open it if that ID appears in a later refresh.
+            focusPolicyID = resolution == .found
+                ? pending.targetID
+                : PolicySectionExpansion.managedPacksAnchor
+            if resolution == .found, let packID = pending.packID,
+               let pack = packs.first(where: { $0.id == packID }) {
+                sheet = .pack(pack, .review)
+            }
+            pendingManagedPackFocus = nil
+            if nav.policyRequest?.id == pending.navigationID { nav.policyRequest = nil }
+        }
+    }
+
+    private func abandonPendingManagedPackFocus() {
+        guard let pending = pendingManagedPackFocus else { return }
+        pendingManagedPackFocus = nil
+        if nav.policyRequest?.id == pending.navigationID { nav.policyRequest = nil }
     }
 
     private func loadPolicySources() async {
@@ -814,17 +980,13 @@ struct RulesView: View {
 
     private func networkRuleSection(items: [PolicyInventoryItem]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 7) {
-                Image(systemName: PolicyInventoryKind.networkRule.symbol)
-                    .font(.caption).foregroundStyle(.tertiary)
-                Text(PolicyInventoryKind.networkRule.sectionTitle)
-                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("\(items.count)").font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
-                Spacer()
+            sectionHeader(.networkRule, items: items)
+            if networkRulesExpanded {
+                ruleGroup(L("In force"), rules: inForce)
+                ruleGroup(L("Not in force"), rules: resting)
             }
-            ruleGroup(L("In force"), rules: inForce)
-            ruleGroup(L("Not in force"), rules: resting)
         }
+        .id("section-\(PolicyInventoryKind.networkRule.rawValue)")
     }
 
     @ViewBuilder
@@ -845,22 +1007,96 @@ struct RulesView: View {
 
     private func inventorySection(_ kind: PolicyInventoryKind, items: [PolicyInventoryItem]) -> some View {
         VStack(alignment: .leading, spacing: 7) {
+            sectionHeader(kind, items: items)
+            if !PolicySectionExpansion.isCollapsible(kind) || isSectionExpanded(kind) {
+                if kind == .managedPack { packCatalogProvenance }
+                VStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        if index > 0 { Divider().padding(.leading, 40) }
+                        inventoryRow(item).id(item.id)
+                    }
+                }
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .id(kind == .managedPack ? PolicySectionExpansion.managedPacksAnchor : "section-\(kind.rawValue)")
+    }
+
+    @ViewBuilder
+    private func sectionHeader(_ kind: PolicyInventoryKind, items: [PolicyInventoryItem]) -> some View {
+        if PolicySectionExpansion.isCollapsible(kind) {
+            HStack(spacing: 8) {
+                collapsibleSectionButton(kind, items: items)
+                if kind == .managedPack { packCatalogControls }
+            }
+        } else {
             HStack(spacing: 7) {
                 Image(systemName: kind.symbol).font(.caption).foregroundStyle(.tertiary)
                 Text(kind.sectionTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Text("\(items.count)").font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
                 Spacer()
-                if kind == .managedPack { packCatalogControls }
             }
-            .id(kind == .managedPack ? "managed-packs" : "section-\(kind.rawValue)")
-            if kind == .managedPack { packCatalogProvenance }
-            VStack(spacing: 0) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    if index > 0 { Divider().padding(.leading, 40) }
-                    inventoryRow(item).id(item.id)
+        }
+    }
+
+    private func collapsibleSectionButton(_ kind: PolicyInventoryKind,
+                                          items: [PolicyInventoryItem]) -> some View {
+        let expanded = isSectionExpanded(kind)
+        let summaryText = expanded ? nil : PolicySectionSummary(items: items).localizedText(
+            for: kind,
+            inForce: kind == .networkRule ? inForce.count : 0,
+            resting: kind == .networkRule ? resting.count : 0
+        )
+        return Button {
+            setSection(kind, expanded: !expanded)
+        } label: {
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                    .frame(width: 10).padding(.top, 2)
+                Image(systemName: kind.symbol).font(.caption).foregroundStyle(.tertiary)
+                    .frame(width: 14).padding(.top, 1)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 7) {
+                        Text(kind.sectionTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text("\(items.count)").font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
+                    }
+                    if let summaryText {
+                        Text(summaryText).font(.caption2).foregroundStyle(.tertiary)
+                    }
                 }
+                Spacer(minLength: 0)
             }
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("policies.section.\(kind.rawValue).toggle")
+        .accessibilityLabel(kind.sectionTitle)
+        .accessibilityValue(expanded
+                            ? L("Expanded")
+                            : [L("Collapsed"), summaryText].compactMap { $0 }.joined(separator: " · "))
+        .accessibilityHint(expanded ? L("Collapse section") : L("Expand section"))
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func isSectionExpanded(_ kind: PolicyInventoryKind) -> Bool {
+        switch kind {
+        case .networkRule: return networkRulesExpanded
+        case .agentAllowlist: return agentAllowlistsExpanded
+        case .managedPack: return managedPacksExpanded
+        default: return true
+        }
+    }
+
+    private func setSection(_ kind: PolicyInventoryKind, expanded: Bool) {
+        switch kind {
+        case .networkRule: networkRulesExpanded = expanded
+        case .agentAllowlist: agentAllowlistsExpanded = expanded
+        case .managedPack:
+            managedPacksExpanded = expanded
+            if expanded { resolveManagedPackFocusIfReady() }
+        default: break
         }
     }
 
@@ -901,15 +1137,8 @@ struct RulesView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    private func policyStatusTint(_ effect: PolicyEffectState) -> AnyShapeStyle {
-        switch effect {
-        case .effective: return AnyShapeStyle(FL.good)
-        case .httpOnly, .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
-        case .failed, .unavailable: return AnyShapeStyle(FL.critical)
-        case .off: return AnyShapeStyle(.tertiary)
+            .accessibilityIdentifier("policies.item.\(item.id).open")
+            .accessibilityLabel(L("Open %@", item.title))
         }
     }
 
@@ -918,61 +1147,105 @@ struct RulesView: View {
         let item = inventoryItems.first { $0.kind == .managedPack && $0.sourceID == pack.id }
         let blocks = monitor.rulePacks.events(for: pack.id).reduce(0) { $0 + $1.count }
         let exceptions = monitor.rulePacks.overrides(for: pack.id).count
-        return HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "shippingbox")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(configuration.enabled ? FL.critical : .secondary)
-                .frame(width: 26, height: 26)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L(pack.manifest.titleKey)).font(.callout.weight(.medium))
-                Text(L("%lld destinations · %@", pack.entries.count,
-                       configuration.scope == .allApps ? L("every app") : L("%lld selected apps", configuration.apps.count)))
-                    .font(.caption).foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    if blocks > 0 { Text(L("%lld blocked", blocks)).foregroundStyle(FL.critical) }
-                    if exceptions > 0 { Text(L("%lld exceptions", exceptions)).foregroundStyle(FL.good) }
+        return ZStack(alignment: .topTrailing) {
+            Button { sheet = .pack(pack, .review) } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "shippingbox")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(configuration.enabled ? FL.critical : .secondary)
+                        .frame(width: 26, height: 26)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L(pack.manifest.titleKey)).font(.callout.weight(.medium))
+                        Text(L("%lld destinations · %@", pack.entries.count,
+                               configuration.scope == .allApps
+                                   ? L("every app") : L("%lld selected apps", configuration.apps.count)))
+                            .font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if blocks > 0 { Text(L("%lld blocked", blocks)).foregroundStyle(FL.critical) }
+                            if exceptions > 0 { Text(L("%lld exceptions", exceptions)).foregroundStyle(FL.good) }
+                        }
+                        .font(.caption2.monospacedDigit())
+                        if let reason = item?.reason {
+                            Text(reason).font(.caption2).foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text(L(pack.manifest.caveatKey)).font(.caption2).foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(monitor.rulePackCatalog.isDownloadedUpdate(pack)
+                             ? L("Official · Verified official update · pack v%@ · %@", pack.manifest.version,
+                                 pack.manifest.license)
+                             : L("Official · Bundled baseline · pack v%@ · %@", pack.manifest.version,
+                                 pack.manifest.license))
+                            .font(.caption2).foregroundStyle(.tertiary)
+                        if let error = packSaveErrors[pack.id] {
+                            Text(error).font(.caption).foregroundStyle(FL.critical)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    if let item {
+                        Text(item.effect.title).font(.caption.weight(.medium))
+                            .foregroundStyle(policyStatusTint(item.effect))
+                    }
                 }
-                .font(.caption2.monospacedDigit())
-                if let reason = item?.reason {
-                    Text(reason).font(.caption2).foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text(L(pack.manifest.caveatKey)).font(.caption2).foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(monitor.rulePackCatalog.isDownloadedUpdate(pack)
-                     ? L("Official · Verified official update · pack v%@ · %@", pack.manifest.version, pack.manifest.license)
-                     : L("Official · Bundled baseline · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
-                    .font(.caption2).foregroundStyle(.tertiary)
-                if let error = packSaveErrors[pack.id] {
-                    Text(error).font(.caption).foregroundStyle(FL.critical)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10).padding(.trailing, 140)
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
-                if let item {
-                    Text(item.effect.title).font(.caption.weight(.medium))
-                        .foregroundStyle(policyStatusTint(item.effect))
-                }
-                HStack(spacing: 8) {
-                    Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
-                        if enabled {
-                            sheet = .pack(pack, .activate)
-                        } else {
-                            var changed = configuration
-                            changed.enabled = false
-                            packSaveErrors[pack.id] = nil
-                            monitor.rulePacks.save(changed) { success in
-                                if !success { packSaveErrors[pack.id] = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Save")) }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("policies.pack.\(pack.id).open")
+            .accessibilityLabel(packAccessibilityLabel(pack, item: item,
+                                                       configuration: configuration,
+                                                       error: packSaveErrors[pack.id]))
+
+            HStack(spacing: 8) {
+                Toggle("", isOn: Binding(get: { configuration.enabled }, set: { enabled in
+                    if enabled {
+                        sheet = .pack(pack, .activate)
+                    } else {
+                        var changed = configuration
+                        changed.enabled = false
+                        packSaveErrors[pack.id] = nil
+                        monitor.rulePacks.save(changed) { success in
+                            if !success {
+                                packSaveErrors[pack.id] = monitor.rulePacks.failureMessage ?? L("Failed: %@", L("Save"))
                             }
                         }
-                    }))
-                    .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                    Button(L("Review…")) { sheet = .pack(pack, .review) }.controlSize(.small)
-                }
+                    }
+                }))
+                .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                .accessibilityIdentifier("policies.pack.\(pack.id).enabled")
+                .accessibilityLabel(L("Enable %@", L(pack.manifest.titleKey)))
+
+                Button(L("Review…")) { sheet = .pack(pack, .review) }
+                    .controlSize(.small)
+                    .accessibilityIdentifier("policies.pack.\(pack.id).review")
             }
+            .padding(.top, 8).padding(.trailing, 10)
         }
-        .padding(.horizontal, 10).padding(.vertical, 8)
+        .accessibilityIdentifier("policies.pack.\(pack.id).card")
+        .accessibilityElement(children: .contain)
+    }
+
+    private func packAccessibilityLabel(
+        _ pack: RulePackDefinition,
+        item: PolicyInventoryItem?,
+        configuration: RulePackConfiguration,
+        error: String?
+    ) -> String {
+        let scope = configuration.scope == .allApps
+            ? L("every app")
+            : L("%lld selected apps", configuration.apps.count)
+        return [
+            L("Review %@", L(pack.manifest.titleKey)),
+            item?.effect.title,
+            L("%lld destinations · %@", pack.entries.count, scope),
+            item?.reason,
+            L(pack.manifest.caveatKey),
+            error,
+        ]
+        .compactMap { $0 }
+        .joined(separator: ". ")
     }
 
     private func unavailablePackRow(_ configuration: RulePackConfiguration) -> some View {
@@ -1007,43 +1280,64 @@ struct RulesView: View {
     }
 
     private var packCatalogProvenance: some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 4) {
-                LabeledContent(L("Source")) {
-                    Text(RulePackCatalogVerifier.sourceURL).font(.caption2.monospaced())
-                        .foregroundStyle(.secondary).textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 0) {
+            Button { catalogDetailsExpanded.toggle() } label: {
+                HStack(spacing: 7) {
+                    Label(L("Official catalog details"), systemImage: "checkmark.seal")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Image(systemName: catalogDetailsExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
                 }
-                if let receipt = monitor.rulePackCatalog.receipt {
-                    LabeledContent(L("Publisher")) {
-                        Text(L("Flowlight · signer %@", receipt.signerKeyID))
-                            .font(.caption2.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
-                    LabeledContent(L("Catalog")) {
-                        Text(L("Sequence %1$lld · digest %2$@", receipt.sequence, String(receipt.digest.prefix(12))))
-                            .font(.caption2.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
-                }
-                if let success = monitor.rulePackCatalog.catalogState.update.lastSuccess {
-                    LabeledContent(L("Last verified")) {
-                        Text(success.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-                if monitor.rulePackCatalog.automaticRefresh,
-                   let next = monitor.rulePackCatalog.catalogState.update.nextEligibleAttempt {
-                    LabeledContent(L("Next check")) {
-                        Text(next.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .contentShape(Rectangle())
             }
-            .padding(.top, 5)
-        } label: {
-            Label(L("Official catalog details"), systemImage: "checkmark.seal")
-                .font(.caption).foregroundStyle(.secondary)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("policies.pack-catalog.details.toggle")
+            .accessibilityLabel(L("Official catalog details"))
+            .accessibilityValue(catalogDetailsExpanded ? L("Expanded") : L("Collapsed"))
+            .accessibilityHint(catalogDetailsExpanded ? L("Collapse details") : L("Expand details"))
+
+            if catalogDetailsExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    LabeledContent(L("Source")) {
+                        Text(RulePackCatalogVerifier.sourceURL).font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    if let receipt = monitor.rulePackCatalog.receipt {
+                        LabeledContent(L("Publisher")) {
+                            Text(L("Flowlight · signer %@", receipt.signerKeyID))
+                                .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        }
+                        LabeledContent(L("Catalog")) {
+                            Text(L("Sequence %1$lld · digest %2$@", receipt.sequence,
+                                   String(receipt.digest.prefix(12))))
+                                .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let success = monitor.rulePackCatalog.catalogState.update.lastSuccess {
+                        LabeledContent(L("Last verified")) {
+                            Text(success.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    if monitor.rulePackCatalog.automaticRefresh,
+                       let next = monitor.rulePackCatalog.catalogState.update.nextEligibleAttempt {
+                        LabeledContent(L("Next check")) {
+                            Text(next.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 10).padding(.bottom, 7)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("policies.pack-catalog.details.content")
+            }
         }
-        .padding(.horizontal, 10).padding(.vertical, 7)
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("policies.pack-catalog.details.card")
+        .accessibilityElement(children: .contain)
     }
 
     private var packCatalogControls: some View {
@@ -1060,6 +1354,8 @@ struct RulesView: View {
                 Image(systemName: "arrow.triangle.2.circlepath")
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .accessibilityIdentifier("policies.pack-catalog.menu")
+            .accessibilityLabel(L("Official pack updates"))
             .help(L("Official pack updates"))
         }
     }
@@ -1335,34 +1631,58 @@ private struct RuleRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                glyph
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        headline.lineLimit(2)
-                        if rule.origin != .typed {
-                            Text(originLabel).font(.caption2)
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(.quaternary, in: Capsule())
-                                .foregroundStyle(.secondary)
+        ZStack(alignment: .topTrailing) {
+            Button(action: edit) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 12) {
+                        glyph
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                headline.lineLimit(2)
+                                if rule.origin != .typed {
+                                    Text(originLabel).font(.caption2)
+                                        .padding(.horizontal, 5).padding(.vertical, 1)
+                                        .background(.quaternary, in: Capsule())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            // Only worth a line of its own where the headline is a name someone chose, which hides it.
+                            if !rule.name.isEmpty {
+                                Text(subject).font(.caption.monospaced()).foregroundStyle(.secondary)
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
+                            meta
                         }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: 8)
+                        Text(effect.title).font(.caption.weight(.medium))
+                            .foregroundStyle(policyStatusTint(effect)).padding(.top, 3)
                     }
-                    // Only worth a line of its own where the headline is a name someone chose, which hides it.
-                    if !rule.name.isEmpty {
-                        Text(subject).font(.caption.monospaced()).foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
+                    if let limitation {
+                        note(limitation, icon: "eye", tint: FL.warning)
+                    } else if let effectReason, rule.isUsable {
+                        note(effectReason, icon: effect == .off ? "power" : "clock", tint: .secondary)
                     }
-                    meta
+                    if !rule.isUsable {
+                        note(L("Used up — a one-off allowance, already spent."),
+                             icon: "checkmark.circle", tint: .secondary)
+                    }
                 }
-                Spacer(minLength: 8)
-                Text(effect.title).font(.caption.weight(.medium)).foregroundStyle(effectTint)
-                    .padding(.top, 3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .padding(.trailing, 74)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("policies.rule.\(rule.id.uuidString.lowercased()).edit")
+            .accessibilityLabel(accessibilitySummary)
+
+            HStack(spacing: 8) {
                 Toggle("", isOn: Binding(get: { rule.enabled }, set: { store.setEnabled(rule, $0) }))
                     .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                    .accessibilityIdentifier("policies.rule.\(rule.id.uuidString.lowercased()).enabled")
                     .accessibilityLabel(L("Enable %@", RuleWords.title(rule)))
-                    .padding(.top, 2)
+
                 Menu {
                     Button(L("Edit…"), action: edit)
                     if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }
@@ -1374,22 +1694,15 @@ private struct RuleRow: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .frame(width: 16)
+                .accessibilityIdentifier("policies.rule.\(rule.id.uuidString.lowercased()).menu")
                 .accessibilityLabel(L("More for %@", RuleWords.title(rule)))
             }
-            if let limitation {
-                note(limitation, icon: "eye", tint: FL.warning)
-            } else if let effectReason, rule.isUsable {
-                note(effectReason, icon: effect == .off ? "power" : "clock", tint: .secondary)
-            }
-            if !rule.isUsable {
-                note(L("Used up — a one-off allowance, already spent."), icon: "checkmark.circle", tint: .secondary)
-            }
+            .padding(.top, 12).padding(.trailing, 12)
         }
         .opacity(rule.enabled ? 1 : 0.55)
-        .padding(12)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-        .contentShape(Rectangle())
-        .onTapGesture(perform: edit)
+        .accessibilityIdentifier("policies.rule.\(rule.id.uuidString.lowercased()).card")
+        .accessibilityElement(children: .contain)
         .contextMenu {
             Button(L("Edit…"), action: edit)
             if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }
@@ -1398,13 +1711,21 @@ private struct RuleRow: View {
         }
     }
 
-    private var effectTint: AnyShapeStyle {
-        switch effect {
-        case .effective: return AnyShapeStyle(FL.good)
-        case .httpOnly, .reportingOnly, .watchingOnly, .waiting, .needsReview: return AnyShapeStyle(FL.warning)
-        case .failed, .unavailable: return AnyShapeStyle(FL.critical)
-        case .off: return AnyShapeStyle(.tertiary)
+    private var accessibilitySummary: String {
+        var parts = [
+            L("Edit %@", RuleWords.title(rule)),
+            effect.title,
+            RuleWords.schedule(rule.schedule, at: now, session: RuleStore.session),
+        ]
+        if let limitation {
+            parts.append(limitation)
+        } else if let effectReason, rule.isUsable {
+            parts.append(effectReason)
         }
+        if !rule.isUsable {
+            parts.append(L("Used up — a one-off allowance, already spent."))
+        }
+        return parts.joined(separator: ". ")
     }
 
     /// The verb, as a symbol. A rule that is only being watched says so here as well as in the strip below, because

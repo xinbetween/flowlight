@@ -192,7 +192,11 @@ enum AgentLineage {
     /// works for itself (no context). `agentName` returns a display name for agents, nil otherwise.
     static func context(for pid: Int32, lookup: (Int32) -> ProcessSnapshot?, agentName: (String, String) -> String?,
                         servers: [MCPServerConfig], maxDepth: Int = 16) -> AgentContext? {
-        guard let start = lookup(pid), agentName(start.bundleID, start.name) == nil else { return nil }
+        guard let start = lookup(pid) else { return nil }
+        // A catalogued agent owns its own traffic even when another agent launched it. A heuristic discovery is weaker:
+        // `curl` or another short-lived tool may have reached an AI host after an earlier lineage lookup missed, so it
+        // must not stop a later, successful walk to the proved parent agent.
+        if AgentCatalog.knownAgent(bundleID: start.bundleID, appName: start.name) != nil { return nil }
         var visited = [start]
         var current = start
         for _ in 0..<maxDepth {

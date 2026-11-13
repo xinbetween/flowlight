@@ -69,6 +69,9 @@ final class RulePackStore: ObservableObject {
     @Published private(set) var status: ApplyStatus = .off
     @Published private(set) var version = 0
     @Published private(set) var definitions: [RulePackDefinition]
+    /// False until bootstrap has installed the verified bundled or cached catalog. `definitions` begins with bundled
+    /// display data, so its non-emptiness alone cannot prove that an asynchronously restored target is absent.
+    @Published private(set) var catalogReady = false
     @Published private(set) var isRecoveringCatalog = false
 
     var onChange: (RulePackSnapshot?) -> Void = { _ in }
@@ -178,6 +181,7 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = []
         definitionsValid = true
+        catalogReady = false
         isRecoveringCatalog = true
         catalogReceipt = nil
         pendingReviewPackIDs = []
@@ -207,6 +211,7 @@ final class RulePackStore: ObservableObject {
         revision += 1
         definitions = catalog.definitions.sorted { $0.id < $1.id }
         definitionsValid = true
+        catalogReady = true
         isRecoveringCatalog = false
         catalogReceipt = acceptance.state.receipt
         pendingReviewPackIDs = acceptance.pendingReviewPackIDs
