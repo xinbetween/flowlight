@@ -1223,8 +1223,6 @@ struct RulesView: View {
             }
             .padding(.top, 8).padding(.trailing, 10)
         }
-        .accessibilityIdentifier("policies.pack.\(pack.id).card")
-        .accessibilityElement(children: .contain)
     }
 
     private func packAccessibilityLabel(
@@ -1336,8 +1334,6 @@ struct RulesView: View {
             }
         }
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 8))
-        .accessibilityIdentifier("policies.pack-catalog.details.card")
-        .accessibilityElement(children: .contain)
     }
 
     private var packCatalogControls: some View {
@@ -1701,8 +1697,6 @@ private struct RuleRow: View {
         }
         .opacity(rule.enabled ? 1 : 0.55)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityIdentifier("policies.rule.\(rule.id.uuidString.lowercased()).card")
-        .accessibilityElement(children: .contain)
         .contextMenu {
             Button(L("Edit…"), action: edit)
             if rule.hits > 0 { Button(L("Reset Count")) { store.resetHits(rule) } }

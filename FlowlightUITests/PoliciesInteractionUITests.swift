@@ -25,10 +25,8 @@ final class PoliciesInteractionUITests: XCTestCase {
 
         let ruleID = "a14da4c2-7930-45c0-a8b9-3b8cd69c4a4e"
         let ruleButton = element("policies.rule.\(ruleID).edit")
-        let ruleCard = element("policies.rule.\(ruleID).card")
         XCTAssertTrue(ruleButton.waitForExistence(timeout: 10))
-        XCTAssertTrue(ruleCard.exists)
-        clickPaintedMargin(of: ruleCard)
+        clickPaintedMargin(of: ruleButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 1))
@@ -57,17 +55,13 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertEqual(packSection.value as? String, "Expanded")
 
         let catalogDetails = element("policies.pack-catalog.details.toggle")
-        let catalogCard = element("policies.pack-catalog.details.card")
         XCTAssertTrue(catalogDetails.waitForExistence(timeout: 10))
-        XCTAssertTrue(catalogCard.exists)
-        clickPaintedMargin(of: catalogCard)
+        clickPaintedMargin(of: catalogDetails)
         XCTAssertEqual(catalogDetails.value as? String, "Expanded")
         XCTAssertTrue(element("policies.pack-catalog.details.content").waitForExistence(timeout: 3))
 
         let packButton = element("policies.pack.official.advertising.open")
-        let packCard = element("policies.pack.official.advertising.card")
         XCTAssertTrue(packButton.waitForExistence(timeout: 10))
-        XCTAssertTrue(packCard.exists)
         let packToggle = element("policies.pack.official.advertising.enabled")
         let packReview = element("policies.pack.official.advertising.review")
         XCTAssertTrue(packToggle.exists)
@@ -83,7 +77,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         app.buttons["Cancel"].click()
         XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 1))
 
-        clickPaintedMargin(of: packCard)
+        clickPaintedMargin(of: packButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
     }
 
@@ -107,14 +101,12 @@ final class PoliciesInteractionUITests: XCTestCase {
         let warning = element("extension-update-warning")
         XCTAssertTrue(warning.waitForExistence(timeout: 10),
                       "the always-present menu-bar scene must present recovery without the main window")
-        XCTAssertTrue(app.staticTexts["0.18.0/84"].exists || app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS %@", "0.18.0/84"
-        )).firstMatch.exists)
+        let message = element("extension-update-warning.message")
+        XCTAssertTrue(message.waitForExistence(timeout: 3))
+        XCTAssertTrue(message.label.contains("0.18.0/84"))
         let expected = expectedExtensionIdentity()
         XCTAssertFalse(expected.isEmpty)
-        XCTAssertTrue(app.staticTexts[expected].exists || app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS %@", expected
-        )).firstMatch.exists)
+        XCTAssertTrue(message.label.contains(expected))
         app.buttons["Later"].click()
         XCTAssertFalse(warning.waitForExistence(timeout: 2))
     }

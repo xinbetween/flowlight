@@ -240,10 +240,12 @@ private struct ExtensionUpdateRecoveryView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(L("The filter update needs attention"))
                         .font(.headline)
+                        .accessibilityIdentifier("extension-update-warning")
                     Text(message)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("extension-update-warning.message")
                 }
             }
             reinstallFeedback
@@ -265,7 +267,6 @@ private struct ExtensionUpdateRecoveryView: View {
         }
         .padding(20)
         .frame(width: 520)
-        .accessibilityIdentifier("extension-update-warning")
         .onChange(of: monitor.extensionUpdateIncident?.id, initial: true) { _, incidentID in
             if incidentID == nil { dismissWindow(id: "extension-recovery") }
         }
