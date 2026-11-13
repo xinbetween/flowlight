@@ -103,12 +103,22 @@ final class PoliciesInteractionUITests: XCTestCase {
                       "the always-present menu-bar scene must present recovery without the main window")
         let message = element("extension-update-warning.message")
         XCTAssertTrue(message.waitForExistence(timeout: 3))
-        XCTAssertTrue(message.label.contains("0.18.0/84"))
+        let warningText = accessibilityText(of: message)
+        XCTAssertTrue(warningText.contains("0.18.0/84"),
+                      "the accessible warning must name the active filter: \(warningText)")
         let expected = expectedExtensionIdentity()
         XCTAssertFalse(expected.isEmpty)
-        XCTAssertTrue(message.label.contains(expected))
+        XCTAssertTrue(warningText.contains(expected),
+                      "the accessible warning must name the installed filter: \(warningText)")
         app.buttons["Later"].click()
         XCTAssertFalse(warning.waitForExistence(timeout: 2))
+    }
+
+    private func accessibilityText(of element: XCUIElement) -> String {
+        [element.label, element.value as? String]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     private func expectedExtensionIdentity() -> String {
