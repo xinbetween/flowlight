@@ -256,7 +256,18 @@ enum TrafficGraphEndpointProjector {
                 }
                 return scoped
             }
-            return rootIDs(for: edge).isDisjoint(with: sourceIDs) ? nil : edge
+            guard !rootIDs(for: edge).isDisjoint(with: sourceIDs) else { return nil }
+            let identities = Set(edge.filter.bundleIDs)
+                .union(edge.filter.bundleID.map { [$0] } ?? [])
+            let matchingIdentities = identities.filter {
+                !rootIDs(for: TrafficFilter(bundleID: $0)).isDisjoint(with: sourceIDs)
+            }
+            guard !matchingIdentities.isEmpty, matchingIdentities.count < identities.count else { return edge }
+            var scoped = edge
+            let sorted = matchingIdentities.sorted()
+            scoped.filter.bundleID = sorted.count == 1 ? sorted[0] : nil
+            scoped.filter.bundleIDs = sorted.count > 1 ? sorted : []
+            return scoped
         }
 
         private func aggregateFilter(
@@ -297,12 +308,12 @@ enum TrafficGraphEndpointProjector {
         ) {
             guard nodeIDs.insert(nodeID).inserted else { return }
             for edge in incomingSupport[nodeID] ?? [] {
-                if !sourceIDs.isEmpty, rootIDs(for: edge).isDisjoint(with: sourceIDs) { continue }
-                edgesByID[edge.id] = edge
-                if edge.trafficVolume != nil {
-                    supportVolumes[edge.id, default: FlowCounters()] += volume
+                guard let scoped = scopedEdge(edge, sourceIDs: sourceIDs) else { continue }
+                edgesByID[edge.id] = scoped
+                if scoped.trafficVolume != nil {
+                    supportVolumes[scoped.id, default: FlowCounters()] += volume
                 }
-                dependency(to: edge.source, sourceIDs: sourceIDs, nodeIDs: &nodeIDs,
+                dependency(to: scoped.source, sourceIDs: sourceIDs, nodeIDs: &nodeIDs,
                            edgesByID: &edgesByID, volume: volume, supportVolumes: &supportVolumes)
             }
         }

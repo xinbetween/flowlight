@@ -110,8 +110,7 @@ struct FlowlightApp: App {
             extensionManager.refresh()
             #if !APP_STORE
             extensionManager.matchExtensionToApp { check in
-                guard check.repairing else { return }
-                Task { @MainActor in monitor.extensionVersionRepairing(check) }
+                Task { @MainActor in monitor.extensionVersionCheckCompleted(check) }
             }
             #endif
             #if !APP_STORE
@@ -123,6 +122,7 @@ struct FlowlightApp: App {
     var body: some Scene {
         WindowGroup("Flowlight", id: "main") {
             ContentView(rulePacks: monitor.rulePacks)
+                .defaultAppStorage(DemoData.appStorage)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(nav)
@@ -174,6 +174,16 @@ struct FlowlightApp: App {
             }
         }
 
+        Window(L("Filter Update Needs Attention"), id: "extension-recovery") {
+            ExtensionUpdateRecoveryView()
+                .environmentObject(monitor)
+                .environmentObject(extensionManager)
+                .environmentObject(nav)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .restorationBehavior(.disabled)
+
         #if !APP_STORE
         Window(L("Software Update"), id: "update") {
             UpdateView().environmentObject(updater)
@@ -214,6 +224,92 @@ struct FlowlightApp: App {
     }
 }
 
+private struct ExtensionUpdateRecoveryView: View {
+    @EnvironmentObject private var monitor: TrafficMonitor
+    @EnvironmentObject private var extensionManager: ExtensionManager
+    @EnvironmentObject private var nav: AppNavigation
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title2)
+                    .foregroundStyle(FL.warning)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(L("The filter update needs attention"))
+                        .font(.headline)
+                        .accessibilityIdentifier("extension-update-warning")
+                    Text(message)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("extension-update-warning.message")
+                }
+            }
+            reinstallFeedback
+            HStack {
+                Button(L("Reinstall Filter")) {
+                    monitor.reinstallExtension(using: extensionManager)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(monitor.extensionReinstallState.isInProgress)
+                Button(L("Open Capture Settings")) {
+                    nav.showSources(.collector)
+                    openWindow(id: "main")
+                    NSApp.activate()
+                    dismissWindow(id: "extension-recovery")
+                }
+                Spacer()
+                Button(L("Later")) { dismissWindow(id: "extension-recovery") }
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+        .onChange(of: monitor.extensionUpdateIncident?.id, initial: true) { _, incidentID in
+            if incidentID == nil { dismissWindow(id: "extension-recovery") }
+        }
+        .onChange(of: monitor.extensionReinstallState, initial: true) { _, state in
+            if state == .started || state == .rebootRequired {
+                dismissWindow(id: "extension-recovery")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var reinstallFeedback: some View {
+        switch monitor.extensionReinstallState {
+        case .reinstalling:
+            Label(L("Reinstalling the filter, then reconnecting…"), systemImage: "arrow.triangle.2.circlepath")
+                .font(.callout).foregroundStyle(.secondary)
+        case .awaitingApproval:
+            Label(L("Approve the filter update in System Settings, then return to Flowlight."),
+                  systemImage: "gearshape.fill")
+                .font(.callout).foregroundStyle(FL.warning)
+        case .failed(let message):
+            Label(L("Could not reinstall the filter: %@", message), systemImage: "xmark.circle.fill")
+                .font(.callout).foregroundStyle(FL.critical)
+                .accessibilityIdentifier("extension-update-reinstall-error")
+        case .idle, .started, .rebootRequired:
+            EmptyView()
+        }
+    }
+
+    private var message: String {
+        guard let incident = monitor.extensionUpdateIncident else {
+            return L("Flowlight is checking the content filter again.")
+        }
+        switch incident.kind {
+        case .identityMismatch:
+            return L("Flowlight %@ is installed, but macOS is still running filter %@. Capture and enforcement are not operating in the selected Network Extension mode. Reinstall the filter now, or restart your Mac to finish the update.",
+                     incident.expected, incident.actual ?? L("unknown"))
+        case .heldCopies:
+            return L("Flowlight %@ is installed, but macOS is still holding an earlier filter copy. Reinstall the filter now, or restart your Mac to finish the update.", incident.expected)
+        }
+    }
+}
+
 struct MenuBarLabel: View {
     @ObservedObject var liveState: TrafficLiveState
     @EnvironmentObject var monitor: TrafficMonitor
@@ -228,6 +324,12 @@ struct MenuBarLabel: View {
         label
             .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
             .onChange(of: backgroundOnly, initial: true) { _, _ in FlowlightApp.windowsChanged() }
+            .onChange(of: monitor.extensionUpdatePresentation?.id, initial: true) { _, incidentID in
+                guard incidentID != nil else { return }
+                openWindow(id: "extension-recovery")
+                NSApp.activate()
+                monitor.consumeExtensionUpdatePresentation()
+            }
             #if !APP_STORE
             // The menu bar item always exists, so a found update opens its window even with the main window closed.
             .onChange(of: updater.showWindow) { _, show in
@@ -236,9 +338,13 @@ struct MenuBarLabel: View {
             #endif
     }
 
+    private var hasFilterNotice: Bool {
+        extensionManager.state.showsMenuBarNotice || monitor.extensionUpdateIncident != nil
+    }
+
     private var label: some View {
         HStack(spacing: 4) {
-            if extensionManager.state.showsMenuBarNotice {
+            if hasFilterNotice {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .accessibilityHidden(true)
             }
@@ -251,10 +357,10 @@ struct MenuBarLabel: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(extensionManager.state.showsMenuBarNotice
-                            ? L("Flowlight, restart required to finish updating the filter")
+        .accessibilityLabel(hasFilterNotice
+                            ? L("Flowlight, filter update needs attention")
                             : L("Flowlight network activity"))
-        .help(extensionManager.state.showsMenuBarNotice
+        .help(hasFilterNotice
               ? L("Restart or reinstall the filter to finish the update")
               : L("Open Flowlight"))
     }

@@ -202,9 +202,13 @@ struct CaptureView: View {
                         .font(.caption.monospaced()).foregroundStyle(.tertiary)
                 }
             }
-            #if !APP_STORE
-            if extensionManager.state == .needsReboot { rebootTip }
-            #endif
+            if monitor.extensionUpdateIncident != nil {
+                extensionUpdateTip
+            } else {
+                #if !APP_STORE
+                if extensionManager.state == .needsReboot { rebootTip }
+                #endif
+            }
             if let blocker = extensionManager.blocker { CaptureNote(text: blocker) }
             if monitor.extensionFellBack {
                 #if APP_STORE
@@ -218,6 +222,28 @@ struct CaptureView: View {
             extensionButtons
         }
         .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 14)
+    }
+
+    private var extensionUpdateTip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("The app updated, but the selected Network Extension mode is not using the current filter."))
+                .fixedSize(horizontal: false, vertical: true)
+            if let incident = monitor.extensionUpdateIncident {
+                Text(incident.actual.map { L("Running %@ · expected %@", $0, incident.expected) }
+                     ?? L("Expected filter %@", incident.expected))
+                    .font(.caption.monospaced()).foregroundStyle(.secondary)
+            }
+            Text(L("Reinstall the filter to finish the update without restarting. If macOS still holds the old copy, restart your Mac."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button(L("Reinstall Filter")) { monitor.reinstallExtension(using: extensionManager) }
+                .buttonStyle(.borderedProminent).controlSize(.small)
+                .disabled(!extensionManager.hasEntitlement)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(FL.warning.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(FL.warning.opacity(0.35)))
+        .accessibilityIdentifier("extension-update-recovery")
     }
 
     #if !APP_STORE

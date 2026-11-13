@@ -95,6 +95,74 @@ final class ExtensionRecoveryTests: XCTestCase {
         XCTAssertEqual(recovery.next(), .redial(after: 5))
     }
 
+    func testAnExactIdentityMismatchFallsBackWithoutAnotherProbeOrRedial() {
+        var recovery = ExtensionRecovery()
+        recovery.identityMismatchDetected()
+        XCTAssertEqual(recovery.next(), .fallBack)
+        XCTAssertTrue(recovery.versionChecked)
+        XCTAssertTrue(recovery.gaveUp)
+    }
+
+    func testActiveUpdateIncidentKeepsEnforcementUnavailableDuringReconnect() {
+        XCTAssertFalse(CaptureEnforcementAvailability.canBlock(
+            mode: .networkExtension,
+            extensionFellBack: false,
+            isEntitled: true,
+            hasCaptureWarning: false,
+            hasUpdateIncident: true,
+            isDemo: false
+        ))
+        XCTAssertTrue(CaptureEnforcementAvailability.canBlock(
+            mode: .networkExtension,
+            extensionFellBack: false,
+            isEntitled: true,
+            hasCaptureWarning: false,
+            hasUpdateIncident: false,
+            isDemo: false
+        ))
+    }
+
+    func testConcurrentVersionCheckWaitersReceiveTheSameAuthoritativeResult() {
+        var waiters = InFlightResultWaiters<Int>()
+        var received: [Int] = []
+        waiters.join { received.append($0) }
+        waiters.join { received.append($0) }
+
+        waiters.finish(with: 85)
+        XCTAssertEqual(received, [85, 85])
+
+        waiters.finish(with: 84)
+        XCTAssertEqual(received, [85, 85], "finishing cannot redeliver stale waiters")
+    }
+
+    func testUpdateIncidentFingerprintsAreStableAndBuildSpecific() {
+        let mismatch = ExtensionUpdateIncident(kind: .identityMismatch, actual: "0.18.0/84", expected: "0.18.1/85")
+        XCTAssertEqual(mismatch.id, "identity:0.18.0/84->0.18.1/85")
+        XCTAssertEqual(ExtensionUpdateIncident(kind: .heldCopies, actual: nil, expected: "0.18.1/85").id,
+                       "held:0.18.1/85")
+    }
+
+    func testUpdateIncidentPresentsOncePerFingerprintAndStaysDismissedAfterRecovery() {
+        let mismatch = ExtensionUpdateIncident(kind: .identityMismatch,
+                                               actual: "0.18.0/84", expected: "0.18.1/85")
+        var state = ExtensionUpdateIncidentState()
+
+        state.publish(mismatch)
+        XCTAssertEqual(state.active, mismatch)
+        XCTAssertEqual(state.presentation, mismatch)
+
+        state.consumePresentation()
+        state.publish(mismatch)
+        XCTAssertEqual(state.active, mismatch)
+        XCTAssertNil(state.presentation)
+
+        state.recovered()
+        XCTAssertNil(state.active)
+        state.publish(mismatch)
+        XCTAssertEqual(state.active, mismatch)
+        XCTAssertNil(state.presentation, "a recovered reconnect must not reopen a warning dismissed this session")
+    }
+
     /// Backing off matters because the failure that gets this far is usually permanent. Hammering a refused
     /// connection twelve times a minute costs power and tells us nothing we didn't know after the second try.
     func testDelaysBackOffAndAreCapped() {

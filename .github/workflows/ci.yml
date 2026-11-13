@@ -334,6 +334,20 @@ jobs:
         timeout-minutes: 40
         run: scripts/run-ci-tests.sh
 
+      # Geometry is the behavior under test: unit tests cannot prove that trailing painted space owns the row action,
+      # or that sibling switches and menus remain independent. Keep this on newest Xcode and make a runner bootstrap
+      # hang fail the required newest-Xcode gate rather than silently accepting source-only coverage.
+      - name: Test Policies interaction geometry
+        timeout-minutes: 20
+        run: |
+          xcodebuild test -project Flowlight.xcodeproj -scheme "Flowlight UI Tests" \
+            -configuration Debug -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/ui-tests" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 180 \
+            -maximum-test-execution-time-allowance 600 \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=
+
   store-execute:
     name: store execution
     needs: [changes, evidence]

@@ -111,7 +111,37 @@
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS 没有启动 Flowlight 的过滤器。它一次只运行一个内容过滤器，而另一个 —— 某个 VPN，或 Palo Alto Networks GlobalProtect、CrowdStrike Falcon 这类安全代理程序 —— 已经占用了那个位置。在这一点改变之前，该扩展无法在这台 Mac 上捕获任何内容。";
 "Starting %@…" = "正在启动 %@…";
 "The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has." = "已安装的过滤器扩展是 %@，而本应用是 %@ —— macOS 正在替换它。替换完成后即恢复捕获。";
-"The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting." = "已安装的过滤器扩展是 %@ 版，而本应用是 %@ —— 正在重新安装该扩展，然后重新连接。";
+"Filter Update Needs Attention" = "过滤器更新需要处理";
+"The filter update needs attention" = "过滤器更新需要处理";
+"Open Capture Settings" = "打开捕获设置";
+"Later" = "稍后";
+"Flowlight is checking the content filter again." = "Flowlight 正在重新检查内容过滤器。";
+"Flowlight %@ is installed, but macOS is still running filter %@. Capture and enforcement are not operating in the selected Network Extension mode. Reinstall the filter now, or restart your Mac to finish the update." = "Flowlight %@ 已安装，但 macOS 仍在运行过滤器 %@。在所选的网络扩展模式下，捕获和规则执行目前未运行。请立即重新安装过滤器，或重新启动 Mac 以完成更新。";
+"Flowlight %@ is installed, but macOS is still holding an earlier filter copy. Reinstall the filter now, or restart your Mac to finish the update." = "Flowlight %@ 已安装，但 macOS 仍保留着较早的过滤器副本。请立即重新安装过滤器，或重新启动 Mac 以完成更新。";
+"The app updated to filter %@, but macOS is still running %@. Reinstall the filter or restart your Mac to finish the update." = "应用已更新到过滤器 %@，但 macOS 仍在运行 %@。请重新安装过滤器或重新启动 Mac 以完成更新。";
+"Reinstalling the filter, then reconnecting…" = "正在重新安装过滤器，然后重新连接…";
+"Approve the filter update in System Settings, then return to Flowlight." = "请在“系统设置”中批准过滤器更新，然后返回 Flowlight。";
+"Restart your Mac to finish replacing the filter." = "请重新启动 Mac 以完成过滤器替换。";
+"Could not reinstall the filter: %@" = "无法重新安装过滤器：%@";
+"Version %@ of the filter is installed, but macOS is still holding the previous version. Reinstall the filter or restart your Mac to finish the update." = "过滤器 %@ 版已安装，但 macOS 仍保留着上一个版本。请重新安装过滤器或重新启动 Mac 以完成更新。";
+"A filter reinstall is already in progress." = "过滤器重新安装已在进行中。";
+"The installed filter extension is %@ and this app is %@. Restart or reinstall the filter to finish the update." = "已安装的过滤器扩展是 %@，而本应用是 %@。请重新启动或重新安装过滤器以完成更新。";
+"The proxy and certificate are ready, but trusted app attribution is unavailable. Enable Flowlight under Content filter, then press Check Setup. App-scoped policies fail open until attribution is available." = "代理和证书已就绪，但可信的应用归属信息不可用。请在“内容过滤器”下启用 Flowlight，然后点按“检查设置”。在归属信息可用之前，应用范围的策略将保持放行。";
+"The app updated, but the selected Network Extension mode is not using the current filter." = "应用已更新，但所选的网络扩展模式并未使用当前过滤器。";
+"Running %@ · expected %@" = "正在运行 %@ · 预期 %@";
+"Expected filter %@" = "预期过滤器 %@";
+"Reinstall the filter to finish the update without restarting. If macOS still holds the old copy, restart your Mac." = "重新安装过滤器即可在不重启的情况下完成更新。如果 macOS 仍保留旧副本，请重新启动 Mac。";
+"%1$lld in force · %2$lld not in force" = "%1$lld 项生效中 · %2$lld 项未生效";
+"%1$lld enforcing · %2$lld reporting only" = "%1$lld 项正在执行 · %2$lld 项仅报告";
+"%1$lld enforcing · %2$lld reporting only · %3$lld waiting" = "%1$lld 项正在执行 · %2$lld 项仅报告 · %3$lld 项等待中";
+"%1$lld enabled · %2$lld need review" = "%1$lld 项已启用 · %2$lld 项需要检查";
+"%1$lld enabled · %2$lld currently effective" = "%1$lld 项已启用 · %2$lld 项当前生效";
+"Expanded" = "已展开";
+"Collapsed" = "已折叠";
+"Collapse section" = "折叠分区";
+"Expand section" = "展开分区";
+"Collapse details" = "折叠详情";
+"Expand details" = "展开详情";
 "not on %@'s allowlist" = "不在 %@ 的允许列表中";
 "the rule \"%@\"" = "规则“%@”";
 "Blocked %@ from connecting to %@:%lld — %@" = "已阻止 %@ 连接 %@:%lld —— %@";
@@ -1466,7 +1496,6 @@
 "Block %@ (MCP)" = "阻止 %@（MCP）";
 "Block %@ for %@ (MCP)" = "阻止 %2$@ 访问 %1$@（MCP）";
 
-"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "过滤器 %@ 版已经安装，但在你重新启动 Mac 之前，macOS 仍然保留着上一个版本。重新启动即可完成更新。在那之前，Flowlight 会用采样器继续捕获。";
 
 /* 0.9.7 relaunch through a supervisor */
 "%@ can't be started again automatically." = "%@ 无法自动重新启动。";
@@ -1837,7 +1866,7 @@
 "All history" = "所有历史记录";
 "Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "拖移所选范围以浏览历史记录，拖移任一边缘以调整范围大小，或使用左、右箭头键。";
 "Flowlight network activity" = "Flowlight 网络活动";
-"Flowlight, restart required to finish updating the filter" = "Flowlight，需要重新启动才能完成过滤器更新";
+"Flowlight, filter update needs attention" = "Flowlight，过滤器更新需要处理";
 "Full history" = "完整历史记录";
 "History" = "历史记录";
 "History overview failed: %@" = "无法显示历史记录概览：%@";

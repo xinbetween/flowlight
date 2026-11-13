@@ -24,6 +24,31 @@ final class DemoDataTests: XCTestCase {
         XCTAssertEqual(DemoData.pluginReviewURL?.path, "/tmp/review-plugin.json")
     }
 
+    func testUITestAppStorageNeverChangesTheNormalPreferenceDomain() throws {
+        let launchSuite = "com.flowlight.tests.launch.\(UUID().uuidString)"
+        let isolatedSuite = "com.flowlight.tests.policies.\(UUID().uuidString)"
+        let launchDefaults = try XCTUnwrap(UserDefaults(suiteName: launchSuite))
+        defer {
+            launchDefaults.removePersistentDomain(forName: launchSuite)
+            launchDefaults.removePersistentDomain(forName: isolatedSuite)
+        }
+        launchDefaults.set(isolatedSuite, forKey: "FLDemoUITestDefaultsSuite")
+        launchDefaults.set(false, forKey: PolicySectionExpansion.networkRulesKey)
+
+        let appStorage = DemoData.makeAppStorage(
+            isUITesting: true,
+            launchDefaults: launchDefaults,
+            processIdentifier: 1
+        )
+        appStorage.set(true, forKey: PolicySectionExpansion.networkRulesKey)
+        appStorage.set(false, forKey: PolicySectionExpansion.managedPacksKey)
+
+        XCTAssertFalse(launchDefaults.bool(forKey: PolicySectionExpansion.networkRulesKey))
+        XCTAssertNil(launchDefaults.object(forKey: PolicySectionExpansion.managedPacksKey))
+        XCTAssertTrue(appStorage.bool(forKey: PolicySectionExpansion.networkRulesKey))
+        XCTAssertFalse(appStorage.bool(forKey: PolicySectionExpansion.managedPacksKey))
+    }
+
     func testSeedingFillsTheRollupsTheViewsRead() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("demo-\(UUID()).sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -48,8 +73,13 @@ final class DemoDataTests: XCTestCase {
         try DemoData.seed(db, now: now)
 
         let rows = try db.aiVisualizationRows(.hour, from: now.addingTimeInterval(-24 * 3600), to: now)
+        let resolved = DemoData.agentGateways.map {
+            ResolvedAgentGateway(config: $0, identity: DemoData.gatewayIdentity($0.endpoint))
+        }
+        let partition = LocalGatewaySupportLegReconciler.partition(rows, gateways: resolved)
         let snapshot = AITrafficGraphBuilder.build(
-            rows: rows,
+            rows: partition.observed,
+            lineageRows: partition.support,
             gateways: DemoData.agentGateways,
             resolveGateway: { endpoint in DemoData.gatewayIdentity(endpoint) },
             limits: .unbounded
@@ -77,6 +107,8 @@ final class DemoDataTests: XCTestCase {
         XCTAssertGreaterThan(route.displayedCounters.total, 1_000_000_000)
         XCTAssertEqual(route.displayedCounters,
                        observed.reduce(into: FlowCounters()) { $0 += $1.counters })
+        XCTAssertFalse(snapshot.nodes.contains { $0.title == "localhost" })
+        XCTAssertFalse(partition.support.isEmpty)
     }
 
     func testAIVisualizationFixtureShowsGhosttyHerdrClaudeLineage() throws {
@@ -87,10 +119,22 @@ final class DemoDataTests: XCTestCase {
         try DemoData.seed(db, now: now)
 
         let rows = try db.aiVisualizationRows(.hour, from: now.addingTimeInterval(-24 * 3600), to: now)
-        let snapshot = AITrafficGraphBuilder.build(rows: rows, limits: .unbounded)
+        let resolved = DemoData.agentGateways.map {
+            ResolvedAgentGateway(config: $0, identity: DemoData.gatewayIdentity($0.endpoint))
+        }
+        let partition = LocalGatewaySupportLegReconciler.partition(rows, gateways: resolved)
+        let snapshot = AITrafficGraphBuilder.build(
+            rows: partition.observed,
+            lineageRows: partition.support,
+            gateways: DemoData.agentGateways,
+            resolveGateway: { DemoData.gatewayIdentity($0) },
+            limits: .unbounded
+        )
         let ghostty = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Ghostty" })
         let herdr = try XCTUnwrap(snapshot.nodes.first { $0.kind == .launcher && $0.title == "Herdr" })
         let claude = try XCTUnwrap(snapshot.nodes.first { $0.kind == .agent && $0.filter.bundleID == "claude" })
+        let magpie = try XCTUnwrap(snapshot.nodes.first { $0.title == "magpie" })
+        let flowlight = try XCTUnwrap(snapshot.nodes.first { $0.title == "Flowlight" })
 
         XCTAssertTrue(snapshot.edges.contains {
             $0.relationship == .launched && $0.source == ghostty.id && $0.target == herdr.id
@@ -98,8 +142,23 @@ final class DemoDataTests: XCTestCase {
         XCTAssertTrue(snapshot.edges.contains {
             $0.relationship == .launched && $0.source == herdr.id && $0.target == claude.id
         })
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .configuredGateway && $0.source == claude.id && $0.target == magpie.id
+        })
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .routedThrough && $0.source == magpie.id && $0.target == flowlight.id
+        })
+        XCTAssertTrue(snapshot.edges.contains {
+            $0.relationship == .observed && $0.source == flowlight.id
+        })
+        XCTAssertFalse(snapshot.nodes.contains { $0.title == "localhost" })
 
-        let map = AITrafficGraphBuilder.build(rows: rows, limits: .standard)
+        let map = AITrafficGraphBuilder.buildForPresentation(
+            rows: partition.observed,
+            lineageRows: partition.support,
+            gateways: DemoData.agentGateways,
+            resolveGateway: { DemoData.gatewayIdentity($0) }
+        ).map
         let mapGhostty = try XCTUnwrap(map.nodes.first { $0.kind == .launcher && $0.title == "Ghostty" })
         let mapHerdr = try XCTUnwrap(map.nodes.first { $0.kind == .launcher && $0.title == "Herdr" })
         let mapClaude = try XCTUnwrap(map.nodes.first { $0.kind == .agent && $0.filter.bundleID == "claude" })

@@ -27,6 +27,14 @@ struct LiveSnapshot: Equatable {
     var isReceiving = false
 }
 
+struct CaptureEnforcementAvailability {
+    static func canBlock(mode: CaptureMode, extensionFellBack: Bool, isEntitled: Bool,
+                         hasCaptureWarning: Bool, hasUpdateIncident: Bool, isDemo: Bool) -> Bool {
+        mode == .networkExtension && !extensionFellBack && isEntitled
+            && !hasCaptureWarning && !hasUpdateIncident && !isDemo
+    }
+}
+
 /// Isolates the one-second live feed from the slower application state. Views that show rates or the live chart
 /// observe this object directly; publishing a new sample must not invalidate every screen that uses TrafficMonitor.
 /// Thread-safe enforcing allowlists for the inspection proxy. The extension remains authoritative for direct traffic;
@@ -97,6 +105,11 @@ final class TrafficMonitor: ObservableObject {
     /// source is still the extension — this is not a preference being rewritten behind someone's back — so it
     /// lasts until they press Refresh, switch source, or relaunch.
     @Published private(set) var extensionFellBack = false
+    /// One source of truth for both the persistent incident and its one-shot foreground presentation.
+    @Published private var extensionUpdateState = ExtensionUpdateIncidentState()
+    var extensionUpdateIncident: ExtensionUpdateIncident? { extensionUpdateState.active }
+    var extensionUpdatePresentation: ExtensionUpdateIncident? { extensionUpdateState.presentation }
+    @Published private(set) var extensionReinstallState: ExtensionReinstallState = .idle
     /// Focus mode's scope, mirrored here so the live pipeline can apply it. Set by `applyFocus`.
     private(set) var focus: FocusScope = .none
     @Published var lastError: String?
@@ -185,6 +198,7 @@ final class TrafficMonitor: ObservableObject {
         AnomalySettings.registerDefaults()
         LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
+        DemoData.prepareUITestDefaults()
         #if APP_STORE
         mode = .networkExtension
         #else
@@ -214,6 +228,9 @@ final class TrafficMonitor: ObservableObject {
         if DemoData.isEnabled && DemoData.showsPackReview {
             do { try DemoData.seedPackReview(db) }
             catch { lastError = L("Could not prepare managed-pack review demo: %@", error.localizedDescription) }
+        }
+        if DemoData.isUITesting {
+            try? DemoData.seedUITestPolicies(db)
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
@@ -277,6 +294,16 @@ final class TrafficMonitor: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        if DemoData.forcesExtensionUpdateWarning {
+            mode = .networkExtension
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.publishExtensionUpdateIncident(.init(
+                    kind: .identityMismatch,
+                    actual: "0.18.0/84",
+                    expected: ExtensionManager.expectedExtensionVersion
+                ))
+            }
+        }
         // A signed build may have an older extension process still enforcing its disconnect grace or holding a
         // buffered finite-rule decision. Reserve the extension as the only counter from process startup, even when
         // this run begins in sampler mode; unavailable claims fail open rather than reusing a bounded allowance.
@@ -521,6 +548,7 @@ final class TrafficMonitor: ObservableObject {
         extensionRetry?.cancel()
         extensionRetryAttempt = 0
         extensionFellBack = false
+        if newMode != .networkExtension { clearExtensionUpdateIncident() }
         UserDefaults.standard.set(newMode.rawValue, forKey: AnomalySettings.Keys.captureMode)
         startSource()
     }
@@ -530,8 +558,14 @@ final class TrafficMonitor: ObservableObject {
     /// A fallback counts as not being on the extension, or the Rules screen would promise enforcement that the
     /// sampler running in its place cannot carry out.
     var canBlock: Bool {
-        mode == .networkExtension && !extensionFellBack && ExtensionManager.isEntitled
-            && captureWarning == nil && !DemoData.isEnabled
+        CaptureEnforcementAvailability.canBlock(
+            mode: mode,
+            extensionFellBack: extensionFellBack,
+            isEntitled: ExtensionManager.isEntitled,
+            hasCaptureWarning: captureWarning != nil,
+            hasUpdateIncident: extensionUpdateIncident != nil,
+            isDemo: DemoData.isEnabled
+        )
     }
 
     /// Passive hostname capture is only needed for the nettop source; the extension sees payloads itself.
@@ -632,9 +666,11 @@ final class TrafficMonitor: ObservableObject {
             #endif
         }
         // Same idea as FLForceCaptureOnboarding: a way to see this state on a Mac where the filter works.
-        captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
-            ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
-            : nil
+        if extensionUpdateIncident == nil {
+            captureWarning = UserDefaults.standard.bool(forKey: "FLForceFilterWarning")
+                ? L("macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes.")
+                : nil
+        }
         if let extensionSource = newSource as? ExtensionTrafficSource {
             #if APP_STORE
             extensionSource.onAttributionReadinessChanged = { [weak self, weak extensionSource] ready in
@@ -649,6 +685,13 @@ final class TrafficMonitor: ObservableObject {
                     guard let self, let extensionSource, self.source === extensionSource,
                           !UserDefaults.standard.bool(forKey: "FLForceFilterWarning") else { return }
                     self.captureWarning = running ? nil : message
+                    if running { self.extensionRecovered() }
+                }
+            }
+            extensionSource.onIdentityMismatch = { [weak self, weak extensionSource] mismatch in
+                Task { @MainActor in
+                    guard let self, let extensionSource, self.source === extensionSource else { return }
+                    self.extensionIdentityMismatch(mismatch)
                 }
             }
             extensionSource.onBlocked = { [weak self] events, reply in
@@ -669,7 +712,7 @@ final class TrafficMonitor: ObservableObject {
                 }
             }
             #if !APP_STORE
-            extensionSource.onRepairRequested = { [weak self] in
+            extensionSource.onVersionProbeRequested = { [weak self] in
                 Task { @MainActor in self?.repairExtensionVersion() }
             }
             #endif
@@ -756,6 +799,69 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    private func extensionIdentityMismatch(_ mismatch: ExtensionIdentityMismatch) {
+        guard mode == .networkExtension else { return }
+        let message = L("The app updated to filter %@, but macOS is still running %@. Reinstall the filter or restart your Mac to finish the update.",
+                        mismatch.expected, mismatch.actual)
+        captureWarning = message
+        status = message
+        publishExtensionUpdateIncident(.init(kind: .identityMismatch,
+                                             actual: mismatch.actual,
+                                             expected: mismatch.expected))
+    }
+
+    private func publishExtensionUpdateIncident(_ incident: ExtensionUpdateIncident) {
+        guard mode == .networkExtension else { return }
+        if extensionUpdateIncident?.id != incident.id { extensionReinstallState = .idle }
+        extensionUpdateState.publish(incident)
+    }
+
+    private func extensionRecovered() {
+        clearExtensionUpdateIncident()
+    }
+
+    /// Clears the persistent diagnosis without forgetting that its dialog was already presented this session. This is
+    /// used both for proven healthy recovery and when the person explicitly leaves Network Extension mode.
+    private func clearExtensionUpdateIncident() {
+        guard extensionUpdateState.active != nil || extensionUpdateState.presentation != nil else { return }
+        extensionUpdateState.recovered()
+        extensionReinstallState = .idle
+    }
+
+    func consumeExtensionUpdatePresentation() {
+        extensionUpdateState.consumePresentation()
+    }
+
+    func reinstallExtension(using manager: ExtensionManager) {
+        guard extensionUpdateIncident != nil, !extensionReinstallState.isInProgress else { return }
+        extensionReinstallState = .reinstalling
+        status = L("Reinstalling the filter, then reconnecting…")
+        manager.reinstall(approvalRequired: { [weak self] in
+            guard let self else { return }
+            self.extensionReinstallState = .awaitingApproval
+            self.status = L("Approve the filter update in System Settings, then return to Flowlight.")
+        }) { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+                switch result {
+                case .started:
+                    self.extensionReinstallState = .started
+                    (self.source as? ExtensionTrafficSource)?.versionRepairStarted()
+                    // Developer recovery may already be sampling after the mismatch; Store recovery may be on its
+                    // unavailable source. Both products need a fresh exact registration immediately.
+                    self.reconnectSource()
+                case .rebootRequired:
+                    self.extensionReinstallState = .rebootRequired
+                    self.status = L("Restart your Mac to finish replacing the filter.")
+                case .failed(let message):
+                    self.extensionReinstallState = .failed(message)
+                    self.status = L("Could not reinstall the filter: %@", message)
+                    self.captureWarning = self.status
+                }
+            }
+        }
+    }
+
     nonisolated private func recordRulePackEvents(
         _ batch: RulePackEventBatch,
         completion: @escaping @Sendable (Bool) -> Void
@@ -780,6 +886,23 @@ final class TrafficMonitor: ObservableObject {
     ///
     /// Asked for once per source, by the ladder in `ExtensionRecovery`, because it can end in a System Settings
     /// prompt. A matching version costs nothing and changes nothing.
+    /// Routes startup and retry-ladder version checks through one decision point. A held-copy scan alone does not
+    /// interrupt someone whose exact extension is registering and filtering; the modal needs both authoritative
+    /// update evidence and an observed outage.
+    func extensionVersionCheckCompleted(_ check: ExtensionManager.VersionCheck, outageProven: Bool = false) {
+        if check.needsRestart {
+            guard outageProven, mode == .networkExtension else { return }
+            status = L("Version %@ of the filter is installed, but macOS is still holding the previous version. Reinstall the filter or restart your Mac to finish the update.",
+                       check.expectedVersion)
+            publishExtensionUpdateIncident(.init(kind: .heldCopies, actual: nil,
+                                                 expected: check.expectedVersion))
+            fallBackToSampler()
+            return
+        }
+        guard check.repairing else { return }
+        extensionVersionRepairing(check)
+    }
+
     /// macOS found the installed extension is a different version from this app — which is what an upgrade
     /// always leaves behind for a moment. Replacing it takes longer than the redial ladder's patience, so the
     /// ladder is reset and the status says what is happening rather than reporting silence.
@@ -789,14 +912,9 @@ final class TrafficMonitor: ObservableObject {
         if let extensionSource = source as? ExtensionTrafficSource {
             extensionSource.versionRepairStarted()
             // Replacing a system extension is macOS's business and takes as long as it takes. Sampling in the
-            // meantime is the difference between a minute of history and a minute of nothing; the retry ladder
-            // brings the extension back once the replacement lands.
+            // meantime is the difference between a minute of history and a minute of nothing; the scheduled outer
+            // retry brings the extension back once the replacement lands. Duplicate coalesced answers stay idempotent.
             fallBackToSampler()
-        } else if mode == .networkExtension, extensionFellBack {
-            // Already on the sampler because the stale extension never answered. The repair is the answer, so
-            // go back to the extension rather than leaving someone to find Refresh on the Capture screen.
-            extensionFellBack = false
-            startSource()
         }
     }
 
@@ -805,19 +923,7 @@ final class TrafficMonitor: ObservableObject {
         manager.matchExtensionToApp { [weak self] check in
             Task { @MainActor in
                 guard let self else { return }
-                // Checked before `repairing`, because this is the case where nothing is stale and nothing will
-                // be repaired: the right build is installed and macOS is holding the previous ones until a
-                // restart. Redialling cannot help, so say what will and stop climbing the ladder.
-                if check.needsRestart {
-                    self.status = L("Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler.",
-                                    check.expectedVersion)
-                    self.fallBackToSampler()
-                    return
-                }
-                guard check.repairing else { return }
-                self.status = L("The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting.",
-                                check.installedDescription, check.expectedVersion)
-                (self.source as? ExtensionTrafficSource)?.versionRepairStarted()
+                self.extensionVersionCheckCompleted(check, outageProven: true)
             }
         }
     }

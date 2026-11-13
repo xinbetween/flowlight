@@ -81,15 +81,11 @@ enum TrafficGraphViewportPolicy {
     }
 }
 
-struct TrafficGraphCurve: Equatable, Sendable {
+struct TrafficGraphCurveSegment: Equatable, Sendable {
     var start: CGPoint
     var control1: CGPoint
     var control2: CGPoint
     var end: CGPoint
-
-    var points: [CGPoint] {
-        (0...24).map { point(at: CGFloat($0) / 24) }
-    }
 
     func point(at progress: CGFloat) -> CGPoint {
         let t = min(1, max(0, progress))
@@ -105,20 +101,62 @@ struct TrafficGraphCurve: Equatable, Sendable {
         return CGPoint(x: x, y: y)
     }
 
-    /// Offsets a ribbon boundary while keeping its node ports flush with card edges.
-    func offset(by distance: CGFloat) -> TrafficGraphCurve {
+    func offset(by distance: CGFloat) -> TrafficGraphCurveSegment {
         let shift = CGPoint(x: 0, y: distance)
-        return TrafficGraphCurve(
+        return TrafficGraphCurveSegment(
             start: CGPoint(x: start.x + shift.x, y: start.y + shift.y),
             control1: CGPoint(x: control1.x + shift.x, y: control1.y + shift.y),
             control2: CGPoint(x: control2.x + shift.x, y: control2.y + shift.y),
             end: CGPoint(x: end.x + shift.x, y: end.y + shift.y)
         )
     }
+}
+
+struct TrafficGraphCurve: Equatable, Sendable {
+    var segments: [TrafficGraphCurveSegment]
+
+    var start: CGPoint { segments.first?.start ?? .zero }
+    var end: CGPoint { segments.last?.end ?? .zero }
+
+    init(start: CGPoint, control1: CGPoint, control2: CGPoint, end: CGPoint) {
+        segments = [TrafficGraphCurveSegment(
+            start: start,
+            control1: control1,
+            control2: control2,
+            end: end
+        )]
+    }
+
+    init(segments: [TrafficGraphCurveSegment]) {
+        precondition(!segments.isEmpty)
+        self.segments = segments
+    }
+
+    var points: [CGPoint] {
+        let count = max(24, segments.count * 24)
+        return (0...count).map { point(at: CGFloat($0) / CGFloat(count)) }
+    }
+
+    func point(at progress: CGFloat) -> CGPoint {
+        let scaled = min(1, max(0, progress)) * CGFloat(segments.count)
+        let index = min(segments.count - 1, Int(scaled))
+        let localProgress = index == segments.count - 1 && scaled == CGFloat(segments.count)
+            ? 1
+            : scaled - CGFloat(index)
+        return segments[index].point(at: localProgress)
+    }
+
+    /// Offsets a ribbon boundary while keeping its node ports flush with card edges.
+    func offset(by distance: CGFloat) -> TrafficGraphCurve {
+        TrafficGraphCurve(segments: segments.map { $0.offset(by: distance) })
+    }
 
     func hitTestSteps(maximumSegmentLength: CGFloat) -> Int {
-        let controlPolygon = start.distance(to: control1) + control1.distance(to: control2)
-            + control2.distance(to: end)
+        let controlPolygon = segments.reduce(CGFloat(0)) { length, segment in
+            length + segment.start.distance(to: segment.control1)
+                + segment.control1.distance(to: segment.control2)
+                + segment.control2.distance(to: segment.end)
+        }
         return max(12, Int(ceil(controlPolygon / maximumSegmentLength)))
     }
 }
@@ -862,7 +900,7 @@ enum TrafficGraphLayout {
     }
 
     private static func controlBounds(_ curve: TrafficGraphCurve) -> CGRect {
-        let points = [curve.start, curve.control1, curve.control2, curve.end]
+        let points = curve.segments.flatMap { [$0.start, $0.control1, $0.control2, $0.end] }
         let minimumX = points.map(\.x).min() ?? 0
         let maximumX = points.map(\.x).max() ?? 0
         let minimumY = points.map(\.y).min() ?? 0
@@ -880,9 +918,10 @@ enum TrafficGraphLayout {
         // made one ordinary 18-edge map take tens of seconds in Debug builds and time out under Xcode 16. Walk the
         // same 160 line segments directly: collision precision and resulting geometry stay identical, while the hot
         // path allocates nothing and can return as soon as any relevant card is hit.
+        let steps = 160 * curve.segments.count
         var previous = curve.start
-        for step in 1...160 {
-            let current = curve.point(at: CGFloat(step) / 160)
+        for step in 1...steps {
+            let current = curve.point(at: CGFloat(step) / CGFloat(steps))
             let minimumX = min(previous.x, current.x)
             let maximumX = max(previous.x, current.x)
             let minimumY = min(previous.y, current.y)
@@ -1069,13 +1108,88 @@ enum TrafficGraphLayout {
             : orderedSmoothProfiles + Array(controlProfiles.dropFirst(3))
         let controlFactors: [CGFloat] = denseSearch ? [1, 2.6] : [1, CGFloat(4.0 / 3.0), 2, 2.6, 3.2]
         func staysInsideCanvas(_ candidate: TrafficGraphCurve) -> Bool {
-            (0...64).allSatisfy { step in
-                let point = candidate.point(at: CGFloat(step) / 64)
+            let steps = 64 * candidate.segments.count
+            return (0...steps).allSatisfy { step in
+                let point = candidate.point(at: CGFloat(step) / CGFloat(steps))
                 return point.y >= minimumY && point.y <= maximumY
             }
         }
         var obstacleClearFallback: TrafficGraphCurve?
         var fallbackOverlap = Int.max
+        func segmentedCurve(routeY: CGFloat, sourceFraction: CGFloat, targetFraction: CGFloat) -> TrafficGraphCurve? {
+            let sourceObstacleX = obstacles.compactMap { obstacle -> CGFloat? in
+                if direction > 0, obstacle.minX > start.x + 1 { return obstacle.minX }
+                if direction < 0, obstacle.maxX < start.x - 1 { return obstacle.maxX }
+                return nil
+            }.min { abs($0 - start.x) < abs($1 - start.x) } ?? end.x
+            let targetObstacleX = obstacles.compactMap { obstacle -> CGFloat? in
+                if direction > 0, obstacle.maxX < end.x - 1 { return obstacle.maxX }
+                if direction < 0, obstacle.minX > end.x + 1 { return obstacle.minX }
+                return nil
+            }.min { abs($0 - end.x) < abs($1 - end.x) } ?? start.x
+            let sourceColumnBoundary = obstacles.compactMap { obstacle -> CGFloat? in
+                guard obstacle.minX < start.x, obstacle.maxX > start.x else { return nil }
+                return direction > 0 ? obstacle.maxX : obstacle.minX
+            }.min { abs($0 - start.x) < abs($1 - start.x) }
+            let targetColumnBoundary = obstacles.compactMap { obstacle -> CGFloat? in
+                guard obstacle.minX < end.x, obstacle.maxX > end.x else { return nil }
+                return direction > 0 ? obstacle.minX : obstacle.maxX
+            }.min { abs($0 - end.x) < abs($1 - end.x) }
+            let rawSourceClearX = (sourceColumnBoundary ?? start.x) + direction * 2
+            let rawTargetClearX = (targetColumnBoundary ?? end.x) - direction * 2
+            let sourceClearX = direction > 0
+                ? min(sourceObstacleX - 2, max(start.x, rawSourceClearX))
+                : max(sourceObstacleX + 2, min(start.x, rawSourceClearX))
+            let targetClearX = direction > 0
+                ? max(targetObstacleX + 2, min(end.x, rawTargetClearX))
+                : min(targetObstacleX - 2, max(end.x, rawTargetClearX))
+            let sourceExitX = sourceClearX + (sourceObstacleX - sourceClearX) * sourceFraction
+            let targetEntryX = targetClearX + (targetObstacleX - targetClearX) * targetFraction
+            guard (sourceExitX - sourceClearX) * direction > 1,
+                  (targetClearX - targetEntryX) * direction > 1,
+                  (targetEntryX - sourceExitX) * direction > 4 else { return nil }
+
+            func straightSegment(from first: CGPoint, to second: CGPoint) -> TrafficGraphCurveSegment {
+                let delta = second.x - first.x
+                return TrafficGraphCurveSegment(
+                    start: first,
+                    control1: CGPoint(x: first.x + delta / 3, y: first.y),
+                    control2: CGPoint(x: first.x + delta * 2 / 3, y: second.y),
+                    end: second
+                )
+            }
+
+            let sourceClear = CGPoint(x: sourceClearX, y: start.y)
+            let sourceExit = CGPoint(x: sourceExitX, y: routeY)
+            let targetEntry = CGPoint(x: targetEntryX, y: routeY)
+            let targetClear = CGPoint(x: targetClearX, y: end.y)
+            let sourceTurnDelta = sourceExitX - sourceClearX
+            let middleDelta = targetEntryX - sourceExitX
+            let targetTurnDelta = targetClearX - targetEntryX
+            return TrafficGraphCurve(segments: [
+                straightSegment(from: start, to: sourceClear),
+                TrafficGraphCurveSegment(
+                    start: sourceClear,
+                    control1: CGPoint(x: sourceClearX + sourceTurnDelta * 0.35, y: start.y),
+                    control2: CGPoint(x: sourceClearX + sourceTurnDelta * 0.65, y: routeY),
+                    end: sourceExit
+                ),
+                TrafficGraphCurveSegment(
+                    start: sourceExit,
+                    control1: CGPoint(x: sourceExitX + middleDelta / 3, y: routeY),
+                    control2: CGPoint(x: sourceExitX + middleDelta * 2 / 3, y: routeY),
+                    end: targetEntry
+                ),
+                TrafficGraphCurveSegment(
+                    start: targetEntry,
+                    control1: CGPoint(x: targetEntryX + targetTurnDelta * 0.35, y: routeY),
+                    control2: CGPoint(x: targetEntryX + targetTurnDelta * 0.65, y: end.y),
+                    end: targetClear
+                ),
+                straightSegment(from: targetClear, to: end)
+            ])
+        }
+
         for routeY in ordered {
             if Task<Never, Never>.isCancelled { return nil }
             for profile in orderedProfiles {
@@ -1143,6 +1257,35 @@ enum TrafficGraphLayout {
                         fallbackOverlap = overlap
                     }
                     if overlap < 8 { return candidate }
+                }
+            }
+        }
+        if !denseSearch {
+            // Keep this escape hatch bounded while retaining enough distinct bands to separate parallel routes. The
+            // old search multiplied every card-edge band by sixteen turn pairs; this tries at most sixteen bands and
+            // four turn pairs (64 candidates), including both guaranteed outer corridors.
+            let outerBands = preferAbove ? [minimumY, maximumY] : [maximumY, minimumY]
+            let segmentedBands = (outerBands + rankedBands).reduce(into: [CGFloat]()) { result, band in
+                guard result.count < 16, !result.contains(band) else { return }
+                result.append(band)
+            }
+            let gapFractions: [CGFloat] = [0.55, 0.9]
+            for routeY in segmentedBands {
+                if Task<Never, Never>.isCancelled { return nil }
+                for sourceFraction in gapFractions {
+                    for targetFraction in gapFractions {
+                        guard let candidate = segmentedCurve(
+                            routeY: routeY,
+                            sourceFraction: sourceFraction,
+                            targetFraction: targetFraction
+                        ), !intersects(candidate, obstacles: obstacles) else { continue }
+                        let overlap = corridorOverlap(candidate, with: avoidingRoutes)
+                        if overlap < fallbackOverlap {
+                            obstacleClearFallback = candidate
+                            fallbackOverlap = overlap
+                        }
+                        if overlap < 8 { return candidate }
+                    }
                 }
             }
         }

@@ -5,9 +5,36 @@ import Security
 import SystemExtensions
 #endif
 
+/// Coalesces callers that ask the same in-flight system question. Every waiter receives the one authoritative reply;
+/// an overlapping retry must not be handed an empty placeholder and consume the only version probe it will make.
+struct InFlightResultWaiters<Value> {
+    private var completions: [(Value) -> Void] = []
+
+    mutating func join(_ completion: @escaping (Value) -> Void) {
+        completions.append(completion)
+    }
+
+    mutating func finish(with value: Value) {
+        let waiting = completions
+        completions.removeAll(keepingCapacity: true)
+        for completion in waiting { completion(value) }
+    }
+}
+
 /// Installs the system extension and enables the content filter configuration.
 @MainActor
 final class ExtensionManager: NSObject, ObservableObject {
+    enum ReinstallResult: Equatable {
+        case started
+        case rebootRequired
+        case failed(String)
+    }
+
+    private enum FilterChangeResult {
+        case succeeded
+        case failed(String)
+    }
+
     enum State: Equatable {
         case unknown, notInstalled, awaitingApproval, installing, enabled, disabled, failed(String)
         /// macOS accepted the replacement but will not perform it until the Mac restarts. Nothing the app does
@@ -72,6 +99,9 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
 
     @Published private(set) var state: State = .unknown
+    #if APP_STORE
+    private var storeReinstalling = false
+    #endif
 
     /// The instance the app owns. Capture has to be able to ask for a version repair when the connection to the
     /// extension keeps being refused, and it doesn't sit in the view tree where this manager is handed around.
@@ -88,11 +118,16 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// and a version check is otherwise indistinguishable from one.
     private var versionCheck: OSSystemExtensionRequest?
     private var versionCheckResult = VersionCheck()
-    private var versionCheckCompletion: ((VersionCheck) -> Void)?
+    private var versionCheckWaiters = InFlightResultWaiters<VersionCheck>()
     /// The in-flight deactivation, so its completion can be told apart from an activation's or a version check's.
     private var deactivation: OSSystemExtensionRequest?
     /// Set while `reinstall()` is deactivating, so the deactivation's completion re-activates instead of stopping.
     private var reinstalling = false
+    /// The activation half of an explicit reinstall. Keeping its identity separate from an ordinary install lets the
+    /// caller hear the actual lifecycle result instead of a hopeful "started" before macOS has answered.
+    private var reinstallActivation: OSSystemExtensionRequest?
+    private var reinstallApprovalRequired: (() -> Void)?
+    private var reinstallCompletion: ((ReinstallResult) -> Void)?
     #endif
 
     /// This app's version — the one the extension it ships was built alongside.
@@ -173,11 +208,11 @@ final class ExtensionManager: NSObject, ObservableObject {
         completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion))
         #else
         guard hasEntitlement, isInApplications else { completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion)); return }
-        // One at a time. The ladder in ExtensionRecovery asks for this once per session, but a user pressing
-        // Refresh while it is in flight shouldn't start a second conversation with the same delegate.
-        guard versionCheck == nil else { completion?(VersionCheck(expectedVersion: Self.expectedExtensionVersion)); return }
+        // One request at a time. Startup, Refresh, and the retry ladder can converge here; every caller waits for
+        // the same authoritative answer instead of receiving an empty placeholder that consumes its only probe.
+        if let completion { versionCheckWaiters.join(completion) }
+        guard versionCheck == nil else { return }
         versionCheckResult = VersionCheck(expectedVersion: Self.expectedExtensionVersion)
-        versionCheckCompletion = completion
         let request = OSSystemExtensionRequest.propertiesRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                  queue: .main)
         request.delegate = self
@@ -187,12 +222,10 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
 
     #if !APP_STORE
-    /// Ends the version check, whichever way it went, and hands the answer back exactly once.
+    /// Ends the one properties request and hands its authoritative answer to every caller that joined it.
     private func finishVersionCheck() {
         versionCheck = nil
-        let completion = versionCheckCompletion
-        versionCheckCompletion = nil
-        completion?(versionCheckResult)
+        versionCheckWaiters.finish(with: versionCheckResult)
     }
     #endif
 
@@ -261,8 +294,8 @@ final class ExtensionManager: NSObject, ObservableObject {
         #if APP_STORE
         setFilterEnabled(false)
         #else
-        setFilterEnabled(false) { [weak self] in
-            guard let self else { return }
+        setFilterEnabled(false) { [weak self] result in
+            guard let self, case .succeeded = result else { return }
             let request = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
                                                                        queue: .main)
             request.delegate = self
@@ -276,21 +309,94 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// after several updates the previous copies sit `terminated waiting to uninstall on reboot`, holding the slot
     /// the current build should have. Deactivating drops those copies; activating brings the current build back —
     /// into the slot this time. It is the alternative to restarting the Mac when it is holding the old filter.
-    func reinstall() {
+    func reinstall(
+        approvalRequired: @escaping () -> Void = {},
+        completion: @escaping (ReinstallResult) -> Void = { _ in }
+    ) {
+        if let blocker { completion(.failed(blocker)); return }
         #if APP_STORE
-        setFilterEnabled(false) { [weak self] in self?.setFilterEnabled(true) }
+        guard !storeReinstalling else {
+            completion(.failed(L("A filter reinstall is already in progress.")))
+            return
+        }
+        state = .installing
+        storeReinstalling = true
+        setFilterEnabled(false) { [weak self] result in
+            guard let self else { return }
+            guard case .succeeded = result else {
+                self.storeReinstalling = false
+                if case .failed(let message) = result { completion(.failed(message)) }
+                return
+            }
+            self.setFilterEnabled(true) { enabledResult in
+                self.storeReinstalling = false
+                switch enabledResult {
+                case .succeeded: completion(.started)
+                case .failed(let message): completion(.failed(message))
+                }
+            }
+        }
         #else
+        guard !reinstalling, deactivation == nil, reinstallActivation == nil else {
+            completion(.failed(L("A filter reinstall is already in progress.")))
+            return
+        }
+        state = .installing
         reinstalling = true
-        deactivate()
+        reinstallApprovalRequired = approvalRequired
+        reinstallCompletion = completion
+        setFilterEnabled(false) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .succeeded:
+                let request = OSSystemExtensionRequest.deactivationRequest(
+                    forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
+                    queue: .main
+                )
+                request.delegate = self
+                self.deactivation = request
+                OSSystemExtensionManager.shared.submitRequest(request)
+            case .failed(let message):
+                self.finishReinstall(.failed(message))
+            }
+        }
         #endif
     }
 
-    func setFilterEnabled(_ enabled: Bool, completion: (() -> Void)? = nil) {
+    #if !APP_STORE
+    private func submitReinstallActivation() {
+        let request = OSSystemExtensionRequest.activationRequest(
+            forExtensionWithIdentifier: FlowlightConstants.extensionBundleIdentifier,
+            queue: .main
+        )
+        request.delegate = self
+        reinstallActivation = request
+        OSSystemExtensionManager.shared.submitRequest(request)
+    }
+
+    private func finishReinstall(_ result: ReinstallResult) {
+        reinstalling = false
+        let completion = reinstallCompletion
+        reinstallApprovalRequired = nil
+        reinstallCompletion = nil
+        completion?(result)
+    }
+    #endif
+
+    func setFilterEnabled(_ enabled: Bool) {
+        setFilterEnabled(enabled, completion: nil)
+    }
+
+    private func setFilterEnabled(_ enabled: Bool, completion: ((FilterChangeResult) -> Void)?) {
         let manager = NEFilterManager.shared()
         manager.loadFromPreferences { [weak self] loadError in
             Task { @MainActor in
                 guard let self else { return }
-                if let loadError { self.state = .failed(loadError.localizedDescription); completion?(); return }
+                if let loadError {
+                    self.state = .failed(loadError.localizedDescription)
+                    completion?(.failed(loadError.localizedDescription))
+                    return
+                }
                 let config = manager.providerConfiguration ?? NEFilterProviderConfiguration()
                 #if APP_STORE
                 config.filterDataProviderBundleIdentifier = FlowlightConstants.extensionBundleIdentifier
@@ -302,9 +408,13 @@ final class ExtensionManager: NSObject, ObservableObject {
                 manager.isEnabled = enabled
                 manager.saveToPreferences { saveError in
                     Task { @MainActor in
-                        if let saveError { self.state = .failed(saveError.localizedDescription) }
-                        else { self.state = enabled ? .enabled : .disabled }
-                        completion?()
+                        if let saveError {
+                            self.state = .failed(saveError.localizedDescription)
+                            completion?(.failed(saveError.localizedDescription))
+                        } else {
+                            self.state = enabled ? .enabled : .disabled
+                            completion?(.succeeded)
+                        }
                     }
                 }
             }
@@ -351,7 +461,16 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
     }
 
     nonisolated func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
-        Task { @MainActor in self.state = .awaitingApproval }
+        Task { @MainActor in
+            self.state = .awaitingApproval
+            if self.reinstallActivation === request || self.deactivation === request {
+                // Approval pauses the same lifecycle; it does not finish it. Report progress once through its own
+                // callback and reserve the completion for exactly one terminal activation, reboot, or failure result.
+                let approvalRequired = self.reinstallApprovalRequired
+                self.reinstallApprovalRequired = nil
+                approvalRequired?()
+            }
+        }
     }
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
@@ -364,8 +483,31 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // immediately followed by activation — that is the no-restart way to free the held content-filter slot.
             if self.deactivation === request {
                 self.deactivation = nil
-                if result == .willCompleteAfterReboot { self.reinstalling = false; self.state = .needsReboot; return }
-                if self.reinstalling { self.reinstalling = false; self.activate() } else { self.refresh() }
+                if result == .willCompleteAfterReboot {
+                    self.state = .needsReboot
+                    self.finishReinstall(.rebootRequired)
+                    return
+                }
+                if self.reinstalling {
+                    self.submitReinstallActivation()
+                } else {
+                    self.refresh()
+                }
+                return
+            }
+            if self.reinstallActivation === request {
+                self.reinstallActivation = nil
+                if result == .willCompleteAfterReboot {
+                    self.state = .needsReboot
+                    self.finishReinstall(.rebootRequired)
+                    return
+                }
+                self.setFilterEnabled(true) { result in
+                    switch result {
+                    case .succeeded: self.finishReinstall(.started)
+                    case .failed(let message): self.finishReinstall(.failed(message))
+                    }
+                }
                 return
             }
             // macOS can accept a replacement and then hold it until the Mac restarts — usually because the
@@ -383,7 +525,14 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
             // Same again: a properties request that fails says nothing about whether the filter is installed and
             // enabled. Reporting it as a failed installation replaced a true "Filter enabled" with a false one.
             if self.versionCheck === request { self.finishVersionCheck(); return }
-            if self.deactivation === request { self.deactivation = nil; self.reinstalling = false }
+            if self.deactivation === request {
+                self.deactivation = nil
+                self.finishReinstall(.failed(error.localizedDescription))
+            }
+            if self.reinstallActivation === request {
+                self.reinstallActivation = nil
+                self.finishReinstall(.failed(error.localizedDescription))
+            }
             self.state = .failed(error.localizedDescription)
         }
     }

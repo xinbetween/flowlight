@@ -111,7 +111,37 @@
 "macOS hasn't started Flowlight's filter. It runs one content filter at a time, and another one — a VPN or a security agent such as Palo Alto Networks GlobalProtect or CrowdStrike Falcon — already has that slot. The extension can't capture anything on this Mac until that changes." = "macOS n'a pas démarré le filtre de Flowlight. Il n'exécute qu'un filtre de contenu à la fois, et un autre — un VPN ou un agent de sécurité comme Palo Alto Networks GlobalProtect ou CrowdStrike Falcon — occupe déjà cette place. L'extension ne peut rien capturer sur ce Mac tant que cela ne change pas.";
 "Starting %@…" = "Démarrage de %@…";
 "The installed filter extension is %@ and this app is %@ — macOS is replacing it. Capture resumes once it has." = "L'extension de filtrage installée est %@ et cette app est %@ — macOS la remplace. La capture reprendra ensuite.";
-"The installed filter extension is version %@ and this app is %@ — reinstalling the extension, then reconnecting." = "L'extension de filtrage installée est en version %@ et cette app est %@ — réinstallation de l'extension, puis reconnexion.";
+"Filter Update Needs Attention" = "La mise à jour du filtre requiert votre attention";
+"The filter update needs attention" = "La mise à jour du filtre requiert votre attention";
+"Open Capture Settings" = "Ouvrir les réglages de capture";
+"Later" = "Plus tard";
+"Flowlight is checking the content filter again." = "Flowlight vérifie à nouveau le filtre de contenu.";
+"Flowlight %@ is installed, but macOS is still running filter %@. Capture and enforcement are not operating in the selected Network Extension mode. Reinstall the filter now, or restart your Mac to finish the update." = "Flowlight %@ est installé, mais macOS exécute toujours le filtre %@. La capture et l'application des règles ne fonctionnent pas dans le mode Extension réseau sélectionné. Réinstallez le filtre ou redémarrez le Mac pour terminer la mise à jour.";
+"Flowlight %@ is installed, but macOS is still holding an earlier filter copy. Reinstall the filter now, or restart your Mac to finish the update." = "Flowlight %@ est installé, mais macOS retient encore une ancienne copie du filtre. Réinstallez le filtre ou redémarrez le Mac pour terminer la mise à jour.";
+"The app updated to filter %@, but macOS is still running %@. Reinstall the filter or restart your Mac to finish the update." = "L'app a été mise à jour vers le filtre %@, mais macOS exécute toujours %@. Réinstallez le filtre ou redémarrez le Mac pour terminer la mise à jour.";
+"Reinstalling the filter, then reconnecting…" = "Réinstallation du filtre, puis reconnexion…";
+"Approve the filter update in System Settings, then return to Flowlight." = "Autorisez la mise à jour du filtre dans Réglages Système, puis revenez dans Flowlight.";
+"Restart your Mac to finish replacing the filter." = "Redémarrez le Mac pour terminer le remplacement du filtre.";
+"Could not reinstall the filter: %@" = "Impossible de réinstaller le filtre : %@";
+"Version %@ of the filter is installed, but macOS is still holding the previous version. Reinstall the filter or restart your Mac to finish the update." = "La version %@ du filtre est installée, mais macOS retient encore la version précédente. Réinstallez le filtre ou redémarrez le Mac pour terminer la mise à jour.";
+"A filter reinstall is already in progress." = "Une réinstallation du filtre est déjà en cours.";
+"The installed filter extension is %@ and this app is %@. Restart or reinstall the filter to finish the update." = "L'extension de filtrage installée est %@ et cette app est %@. Redémarrez ou réinstallez le filtre pour terminer la mise à jour.";
+"The proxy and certificate are ready, but trusted app attribution is unavailable. Enable Flowlight under Content filter, then press Check Setup. App-scoped policies fail open until attribution is available." = "Le proxy et le certificat sont prêts, mais l'attribution fiable des apps est indisponible. Activez Flowlight sous Filtre de contenu, puis cliquez sur Vérifier la configuration. Les règles propres aux apps restent ouvertes jusqu'à ce que l'attribution soit disponible.";
+"The app updated, but the selected Network Extension mode is not using the current filter." = "L'app a été mise à jour, mais le mode Extension réseau sélectionné n'utilise pas le filtre actuel.";
+"Running %@ · expected %@" = "En cours %@ · attendu %@";
+"Expected filter %@" = "Filtre attendu %@";
+"Reinstall the filter to finish the update without restarting. If macOS still holds the old copy, restart your Mac." = "Réinstallez le filtre pour terminer la mise à jour sans redémarrer. Si macOS retient encore l'ancienne copie, redémarrez le Mac.";
+"%1$lld in force · %2$lld not in force" = "%1$lld actives · %2$lld inactives";
+"%1$lld enforcing · %2$lld reporting only" = "%1$lld appliquées · %2$lld en signalement seul";
+"%1$lld enforcing · %2$lld reporting only · %3$lld waiting" = "%1$lld appliquées · %2$lld en signalement seul · %3$lld en attente";
+"%1$lld enabled · %2$lld need review" = "%1$lld activés · %2$lld à examiner";
+"%1$lld enabled · %2$lld currently effective" = "%1$lld activés · %2$lld actuellement effectifs";
+"Expanded" = "Développé";
+"Collapsed" = "Replié";
+"Collapse section" = "Replier la section";
+"Expand section" = "Développer la section";
+"Collapse details" = "Replier les détails";
+"Expand details" = "Développer les détails";
 "not on %@'s allowlist" = "absent de la liste d'autorisation de %@";
 "the rule \"%@\"" = "la règle « %@ »";
 "Blocked %@ from connecting to %@:%lld — %@" = "%@ empêché de se connecter à %@:%lld — %@";
@@ -1467,7 +1497,6 @@
 "Block %@ (MCP)" = "Bloquer %@ (MCP)";
 "Block %@ for %@ (MCP)" = "Bloquer %@ pour %@ (MCP)";
 
-"Version %@ of the filter is installed, but macOS is still holding the previous version until you restart your Mac. Restart to finish the update. Until then, Flowlight is capturing with the sampler." = "La version %@ du filtre est installée, mais macOS retient encore la version précédente jusqu'au redémarrage du Mac. Redémarrer pour terminer la mise à jour. En attendant, Flowlight capture avec l'échantillonneur.";
 
 /* 0.9.7 relaunch through a supervisor */
 "%@ can't be started again automatically." = "%@ ne peut pas être relancé automatiquement.";
@@ -1838,7 +1867,7 @@
 "All history" = "Tout l'historique";
 "Drag the selection to move through history, drag either edge to resize it, or use the Left and Right Arrow keys." = "Faites glisser la sélection pour parcourir l'historique, faites glisser l'un de ses bords pour la redimensionner ou utilisez les touches Flèche gauche et Flèche droite.";
 "Flowlight network activity" = "Activité réseau de Flowlight";
-"Flowlight, restart required to finish updating the filter" = "Flowlight, redémarrage requis pour terminer la mise à jour du filtre";
+"Flowlight, filter update needs attention" = "Flowlight, la mise à jour du filtre nécessite votre attention";
 "Full history" = "Historique complet";
 "History" = "Historique";
 "History overview failed: %@" = "Échec de l'aperçu de l'historique : %@";

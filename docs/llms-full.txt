@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.0, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.1, macOS 15 or later.
 
  On this page
 
@@ -932,7 +932,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.0macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.1macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1684,8 +1684,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.1
+November 12, 2026Latest
+
+ Keep Policies compact without hiding their state. Network Rules, Agent Allowlists, and Managed Packs fold independently, remember their state, and keep useful status counts visible while collapsed.
+
+ Use the whole row. Policy section headers, ordinary-rule cards, managed-pack cards, and Official catalog details respond across their full visible non-control area while switches, menus, and Review remain independent.
+
+ Explain a filter left behind by an update. Exact extension identity mismatch opens one clear recovery window, keeps enforcement fail-open, and preserves persistent reinstall or restart guidance until the current filter is healthy.
+
+ Make reinstall outcomes truthful. Store and Developer recovery stop on lifecycle and preference failures and wait for the product-specific disable, deactivate, activate, approval, reboot, and enable outcomes before reconnecting.
+
+ Show the route instead of a localhost dead end. Connections reconciles an exact configured local-gateway socket only when listener identity, host, port, and downstream evidence agree, then preserves the full launcher → agent → gateway → Flowlight → destination chain without counting local support legs as remote traffic.
+
+ Make the project front door useful again. The README now leads with quick start, supported agents, architecture, a visual feature tour, documentation, privacy, roadmap, and build guidance.
+
  0.18.0
-November 5, 2026Latest
+November 5, 2026
 
  Inspect HTTPS traffic from the Mac App Store edition. The Store product gains a sandbox-safe local inspection path, certificate lifecycle, onboarding and recovery without embedding the Developer system extension, response-script helper or privileged installer.
 
