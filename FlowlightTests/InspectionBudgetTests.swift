@@ -140,6 +140,38 @@ final class InspectionBudgetTests: XCTestCase {
         )
     }
 
+    func testEnabledLegacyInspectionWithoutStoredTimerKeepsEightHourSafetyBound() {
+        let suiteName = "flowlight.budget.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(true, forKey: "inspection.enabled")
+
+        InspectionBudget.registerDefaults(defaults, persistentDomainName: suiteName)
+
+        XCTAssertEqual(InspectionBudget.load(defaults).sessionMinutes, 480)
+        XCTAssertEqual(defaults.object(forKey: InspectionBudget.Keys.sessionMinutes) as? Int, 480)
+    }
+
+    func testNewInstallationPersistsUntilDisabledInspectionDefault() {
+        let suiteName = "flowlight.budget.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+
+        InspectionBudget.registerDefaults(defaults, persistentDomainName: suiteName)
+
+        XCTAssertEqual(InspectionBudget.load(defaults).sessionMinutes, 0)
+        XCTAssertEqual(defaults.object(forKey: InspectionBudget.Keys.sessionMinutes) as? Int, 0)
+    }
+
+    func testExplicitLegacyUntilDisabledChoiceIsNotReplacedByMigration() {
+        let suiteName = "flowlight.budget.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(true, forKey: "inspection.enabled")
+        defaults.set(0, forKey: InspectionBudget.Keys.sessionMinutes)
+
+        InspectionBudget.registerDefaults(defaults, persistentDomainName: suiteName)
+
+        XCTAssertEqual(InspectionBudget.load(defaults).sessionMinutes, 0)
+    }
+
     /// "Allow nothing" is a decision, and the absence of the key is what means "use the defaults" — otherwise
     /// the strictest setting would quietly reset itself on the next launch.
     func testAnEmptyAllowlistIsNotMistakenForUnset() {

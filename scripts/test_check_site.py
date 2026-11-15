@@ -156,6 +156,7 @@ class HomepageInstallationTests(unittest.TestCase):
         for promotion in (
             '<a href="https://apps.apple.com/app/flowlight">Store</a>',
             '<a href="https://www.apple.com/app-store/">Download from Apple</a>',
+            '<a href=https://www.apple.com/app-store/>Download from Apple</a>',
             '<a href="https://example.com/store">Download on the Mac App Store</a>',
             '<img class="app-store-badge" alt="Download on the Mac App Store">',
             "<a href='https://APPS.APPLE.COM/app/flowlight'><img alt='Download on the Mac App Store'></a>",

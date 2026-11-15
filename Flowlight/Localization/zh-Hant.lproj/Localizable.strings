@@ -1790,6 +1790,7 @@
 "Any destination" = "任何目標";
 "Search destinations" = "搜尋目標";
 "Map shows the top 10 sources by traffic. List keeps every exact relationship." = "地圖依流量顯示前 10 個來源。列表保留每個精確關係。";
+"Map could not draw these relationships without crossing another card. List keeps every exact relationship." = "地圖無法在不穿過其他卡片的情況下繪製這些關係。列表保留每個精確關係。";
 "Focused scope shows every connected relationship; large neighborhoods group progressively." = "聚焦範圍顯示每個相連關係；大型鄰域會逐步分組。";
 "Clear scope" = "清除範圍";
 "%lld exact items" = "%lld 個精確項目";

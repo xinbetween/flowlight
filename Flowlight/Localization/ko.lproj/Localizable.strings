@@ -1790,6 +1790,7 @@
 "Any destination" = "모든 목적지";
 "Search destinations" = "목적지 검색";
 "Map shows the top 10 sources by traffic. List keeps every exact relationship." = "지도에는 트래픽 상위 10개 소스가 표시됩니다. 목록에는 모든 정확한 관계가 유지됩니다.";
+"Map could not draw these relationships without crossing another card. List keeps every exact relationship." = "다른 카드와 교차하지 않고는 지도에 이 관계를 그릴 수 없습니다. 목록에는 모든 정확한 관계가 유지됩니다.";
 "Focused scope shows every connected relationship; large neighborhoods group progressively." = "집중 범위에는 연결된 모든 관계가 표시되며 큰 이웃은 점진적으로 그룹화됩니다.";
 "Clear scope" = "범위 지우기";
 "%lld exact items" = "정확한 항목 %lld개";

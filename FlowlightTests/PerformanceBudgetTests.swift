@@ -57,7 +57,8 @@ final class PerformanceBudgetTests: XCTestCase {
             TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
         }
         XCTAssertEqual(layout.nodeFrames.count, snapshot.nodes.count)
-        XCTAssertEqual(layout.edgeCurves.count, snapshot.edges.count)
+        XCTAssertEqual(layout.topologyEdgeIDs, Set(snapshot.edges.map(\.id)))
+        XCTAssertEqual(layout.edgeCurves.count + layout.omittedEdgeIDs.count, snapshot.edges.count)
     }
 
     func testHistoryQueryBudget() throws {

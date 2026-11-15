@@ -164,8 +164,9 @@ def homepage_installation_problems(source, label):
         if marker.lower() in lowered:
             found.append(f"{label}: temporary homepage takedown still contains {description}")
     store_link = False
-    for href in re.findall(r"\bhref\s*=\s*(['\"])(.*?)\1", source, re.I | re.S):
-        parsed = urlsplit(href[1])
+    href_pattern = re.compile(r"\bhref\s*=\s*(?:(['\"])(.*?)\1|([^\s>]+))", re.I | re.S)
+    for match in href_pattern.finditer(source):
+        parsed = urlsplit(match.group(2) if match.group(1) else match.group(3))
         host = (parsed.hostname or "").lower()
         path = parsed.path.lower()
         if host in {"apps.apple.com", "itunes.apple.com"} or (

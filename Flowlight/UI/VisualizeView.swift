@@ -1033,6 +1033,13 @@ private struct TrafficGraphLoadingView: View {
     }
 }
 
+private struct TrafficGraphAnimatedLaneGeometry {
+    var sentPath: Path?
+    var receivedPath: Path?
+    var sentWidth: CGFloat
+    var receivedWidth: CGFloat
+}
+
 private struct TrafficGraphCanvas: View {
     var snapshot: TrafficGraphSnapshot
     @Binding var selectedNode: TrafficGraphNodeID?
@@ -1252,7 +1259,10 @@ private struct TrafficGraphCanvas: View {
     }
 
     private func omittedRoutesNotice(count: Int) -> some View {
-        let explanation = L("Map shows the top 10 sources by traffic. List keeps every exact relationship.")
+        let explanation = L(
+            "Map could not draw these relationships without crossing another card. "
+                + "List keeps every exact relationship."
+        )
         return Label {
             Text("\(count) · \(L("Map")) → \(L("List"))")
         } icon: {
@@ -1369,12 +1379,46 @@ private struct TrafficGraphCanvas: View {
         ) {
             let active = Set(activeEdgeIDs)
             let edgeSpeeds = TrafficGraphFlowDash.speeds(for: activeEdgeIDs)
+            let laneGeometry = Dictionary(uniqueKeysWithValues: snapshot.edges.compactMap {
+                edge -> (TrafficGraphEdgeID, TrafficGraphAnimatedLaneGeometry)? in
+                guard active.contains(edge.id), isEdgeRelated(edge),
+                      let curve = layout.edgeCurves[edge.id],
+                      let width = layout.edgeWidths[edge.id] else { return nil }
+                let lanes = TrafficGraphFlowDash.lanes(
+                    counters: edge.displayedCounters,
+                    totalWidth: width
+                )
+                let sentPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .sent,
+                    preferredWidth: TrafficGraphFlowDash.strokeWidth,
+                    laneWidth: lanes.sent.width
+                )
+                let receivedPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .received,
+                    preferredWidth: TrafficGraphFlowDash.strokeWidth,
+                    laneWidth: lanes.received.width
+                )
+                return (
+                    edge.id,
+                    TrafficGraphAnimatedLaneGeometry(
+                        sentPath: lanes.sent.width > 0
+                            ? path(curve.offset(by: sentPaint.offset))
+                            : nil,
+                        receivedPath: lanes.received.width > 0
+                            ? path(curve.offset(by: receivedPaint.offset))
+                            : nil,
+                        sentWidth: sentPaint.width,
+                        receivedWidth: receivedPaint.width
+                    )
+                )
+            })
             TimelineView(.periodic(from: .now, by: TrafficGraphFlowDash.frameInterval)) { timeline in
                 Canvas { context, _ in
                     let time = timeline.date.timeIntervalSinceReferenceDate
-                    for edge in snapshot.edges where active.contains(edge.id) && isEdgeRelated(edge) {
-                        guard let curve = layout.edgeCurves[edge.id],
-                              let width = layout.edgeWidths[edge.id] else { continue }
+                    for edge in snapshot.edges where active.contains(edge.id) {
+                        guard let geometry = laneGeometry[edge.id] else { continue }
                         let emphasized = TrafficGraphSelection.emphasizes(
                             edge,
                             selectedNode: selectedNode,
@@ -1382,45 +1426,29 @@ private struct TrafficGraphCanvas: View {
                             hoveredEdge: hoveredEdge
                         )
                         let dashOpacity = emphasized ? 0.9 : 0.34
-                        let lanes = TrafficGraphFlowDash.lanes(
-                            counters: edge.displayedCounters,
-                            totalWidth: width
-                        )
-                        let sentPaint = TrafficGraphFlowDash.paintedLane(
-                            totalWidth: width,
-                            direction: .sent,
-                            preferredWidth: TrafficGraphFlowDash.strokeWidth,
-                            laneWidth: lanes.sent.width
-                        )
-                        let receivedPaint = TrafficGraphFlowDash.paintedLane(
-                            totalWidth: width,
-                            direction: .received,
-                            preferredWidth: TrafficGraphFlowDash.strokeWidth,
-                            laneWidth: lanes.received.width
-                        )
-                        if lanes.sent.width > 0 {
+                        if let sentPath = geometry.sentPath {
                             context.stroke(
-                                path(curve.offset(by: sentPaint.offset)),
+                                sentPath,
                                 with: .color(FL.graphSent.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
                                     edgeID: edge.id,
                                     direction: .sent,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: sentPaint.width
+                                    lineWidth: geometry.sentWidth
                                 )
                             )
                         }
-                        if lanes.received.width > 0 {
+                        if let receivedPath = geometry.receivedPath {
                             context.stroke(
-                                path(curve.offset(by: receivedPaint.offset)),
+                                receivedPath,
                                 with: .color(FL.graphReceived.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
                                     edgeID: edge.id,
                                     direction: .received,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: receivedPaint.width
+                                    lineWidth: geometry.receivedWidth
                                 )
                             )
                         }

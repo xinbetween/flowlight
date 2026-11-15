@@ -115,28 +115,33 @@ struct TrafficGraphCurveSegment: Equatable, Sendable {
     }
 
     func offset(by distance: CGFloat, orientation: CGFloat) -> TrafficGraphCurveSegment {
-        func shifted(_ point: CGPoint, at progress: CGFloat) -> CGPoint {
+        func shift(at progress: CGFloat) -> CGVector {
             var tangent = derivative(at: progress)
             var length = hypot(tangent.dx, tangent.dy)
             if length < 0.000_001 {
                 tangent = CGVector(dx: end.x - start.x, dy: end.y - start.y)
                 length = hypot(tangent.dx, tangent.dy)
             }
-            guard length >= 0.000_001 else { return point }
-            let normal = CGVector(
-                dx: -tangent.dy / length * orientation,
-                dy: tangent.dx / length * orientation
-            )
-            return CGPoint(
-                x: point.x + normal.dx * distance,
-                y: point.y + normal.dy * distance
+            guard length >= 0.000_001 else { return .zero }
+            return CGVector(
+                dx: -tangent.dy / length * orientation * distance,
+                dy: tangent.dx / length * orientation * distance
             )
         }
+
+        func shifted(_ point: CGPoint, by shift: CGVector) -> CGPoint {
+            CGPoint(x: point.x + shift.dx, y: point.y + shift.dy)
+        }
+
+        // Moving each endpoint and its adjacent control by the same vector preserves that endpoint's tangent exactly.
+        // Adjacent centerline segments share the same tangent, so they also share one shifted join and remain smooth.
+        let startShift = shift(at: 0)
+        let endShift = shift(at: 1)
         return TrafficGraphCurveSegment(
-            start: shifted(start, at: 0),
-            control1: shifted(control1, at: 1 / 3),
-            control2: shifted(control2, at: 2 / 3),
-            end: shifted(end, at: 1)
+            start: shifted(start, by: startShift),
+            control1: shifted(control1, by: startShift),
+            control2: shifted(control2, by: endShift),
+            end: shifted(end, by: endShift)
         )
     }
 }
@@ -670,6 +675,10 @@ enum TrafficGraphLayout {
         Array(ranked.prefix(obstacleCount > 160 ? 4 : maximumPrimaryRouteBands))
     }
 
+    static func routeClearance(width: CGFloat, obstacleCount _: Int) -> CGFloat {
+        10 + max(0.5, width / 2)
+    }
+
     static func minimumCanvasWidth(for snapshot: TrafficGraphSnapshot) -> CGFloat {
         let nodeLanes = lanes(snapshot: snapshot)
         let activeLanes = Lane.allCases.filter { lane in
@@ -958,7 +967,8 @@ enum TrafficGraphLayout {
             let width = ribbonWidth(counters: edge.displayedCounters)
             guard width > 0 else { return (edge.id, 0) }
             let cap = max(0, caps[edge.id] ?? maximumRibbonWidth)
-            return (edge.id, min(width, cap))
+            let capacityScale = min(1, cap / maximumRibbonWidth)
+            return (edge.id, width * capacityScale)
         })
     }
 
@@ -967,24 +977,31 @@ enum TrafficGraphLayout {
         assignments: [PortKey: [PortAssignment]],
         frames: [TrafficGraphNodeID: CGRect]
     ) -> [TrafficGraphEdgeID: CGFloat] {
-        let rawWidths = Dictionary(uniqueKeysWithValues: edges.map {
-            ($0.id, ribbonWidth(counters: $0.displayedCounters))
+        // A capacity is the largest envelope this topology can paint, not the edge's width at one moment in time.
+        // Using maximum-width envelopes makes live counter refreshes grow inside their reserved ports. Each endpoint
+        // contributes only its own constraint, so a crowded card cannot shrink an unrelated part of the graph.
+        var capacities = Dictionary(uniqueKeysWithValues: edges.map {
+            ($0.id, maximumRibbonWidth)
         })
-        let scale = assignments.reduce(CGFloat(1)) { current, entry in
-            guard let height = frames[entry.key.node]?.height else { return current }
-            let ribbons = entry.value.filter { $0.edge.isTrafficRibbon }
-            guard !ribbons.isEmpty else { return current }
-            let fixedWidth = entry.value.reduce(CGFloat(0)) {
+        for (key, group) in assignments {
+            guard let height = frames[key.node]?.height else { continue }
+            let ribbons = group.filter { $0.edge.isTrafficRibbon }
+            guard !ribbons.isEmpty else { continue }
+            let fixedWidth = group.reduce(CGFloat(0)) {
                 $0 + ($1.edge.isTrafficRibbon ? 0 : relationshipWidth)
             }
-            let gaps = CGFloat(max(0, entry.value.count - 1)) * 2
+            let gaps = CGFloat(max(0, group.count - 1)) * 2
             let available = max(1, height - 12 - fixedWidth - gaps)
-            let rawTotal = ribbons.reduce(CGFloat(0)) {
-                $0 + (rawWidths[$1.edge.id] ?? 0)
+            let maximumTotal = CGFloat(ribbons.count) * maximumRibbonWidth
+            let scale = min(1, available / maximumTotal)
+            for assignment in ribbons {
+                capacities[assignment.edge.id] = min(
+                    capacities[assignment.edge.id] ?? maximumRibbonWidth,
+                    maximumRibbonWidth * scale
+                )
             }
-            return rawTotal > 0 ? min(current, available / rawTotal) : current
         }
-        return rawWidths.mapValues { $0 * min(1, scale) }
+        return capacities
     }
 
     private static func edgeBounds(
@@ -1224,7 +1241,8 @@ enum TrafficGraphLayout {
             end: end
         )
         let denseSearch = obstacles.count > 160
-        let clearance = (denseSearch ? 4 : 10) + max(0.5, width / 2)
+        // Dense graphs search fewer candidates, but they never receive a smaller visual safety halo around cards.
+        let clearance = routeClearance(width: width, obstacleCount: obstacles.count)
         let padded = obstacles.map { $0.insetBy(dx: -clearance, dy: -clearance) }
         let directBounds = controlBounds(direct)
         let routingObstacles = denseSearch
@@ -1341,6 +1359,25 @@ enum TrafficGraphLayout {
         var fallbackOverlap = Int.max
         var obstacleClearShelfFallback: TrafficGraphCurve?
         var shelfFallbackOverlap = Int.max
+
+        func shouldReturn(_ candidate: TrafficGraphCurve) -> Bool {
+            let overlap = corridorOverlap(candidate, with: avoidingRoutes)
+            if candidate.hasLongHorizontalShelf()
+                || candidate.hasLongVerticalShelf()
+                || candidate.hasPinchedVerticalTurn() {
+                if overlap < shelfFallbackOverlap {
+                    obstacleClearShelfFallback = candidate
+                    shelfFallbackOverlap = overlap
+                }
+                return false
+            }
+            if overlap < fallbackOverlap {
+                obstacleClearFallback = candidate
+                fallbackOverlap = overlap
+            }
+            return overlap < 8
+        }
+
         func smoothFallbackCurve(
             routeY: CGFloat,
             sourceFraction: CGFloat,
@@ -1530,21 +1567,7 @@ enum TrafficGraphLayout {
                     primaryCandidatesTried += 1
                     guard staysInsideCanvas(candidate),
                           !intersects(candidate, obstacles: obstacles) else { continue }
-                    let overlap = corridorOverlap(candidate, with: avoidingRoutes)
-                    if candidate.hasLongHorizontalShelf()
-                        || candidate.hasLongVerticalShelf()
-                        || candidate.hasPinchedVerticalTurn() {
-                        if overlap < shelfFallbackOverlap {
-                            obstacleClearShelfFallback = candidate
-                            shelfFallbackOverlap = overlap
-                        }
-                        continue
-                    }
-                    if overlap < fallbackOverlap {
-                        obstacleClearFallback = candidate
-                        fallbackOverlap = overlap
-                    }
-                    if overlap < 8 { return candidate }
+                    if shouldReturn(candidate) { return candidate }
                 }
             }
         }
@@ -1571,21 +1594,7 @@ enum TrafficGraphLayout {
                         targetFraction: targetFraction
                     ), staysInsideCanvas(candidate),
                     !intersects(candidate, obstacles: obstacles) else { continue }
-                    let overlap = corridorOverlap(candidate, with: avoidingRoutes)
-                    if candidate.hasLongHorizontalShelf()
-                        || candidate.hasLongVerticalShelf()
-                        || candidate.hasPinchedVerticalTurn() {
-                        if overlap < shelfFallbackOverlap {
-                            obstacleClearShelfFallback = candidate
-                            shelfFallbackOverlap = overlap
-                        }
-                        continue
-                    }
-                    if overlap < fallbackOverlap {
-                        obstacleClearFallback = candidate
-                        fallbackOverlap = overlap
-                    }
-                    if overlap < 8 { return candidate }
+                    if shouldReturn(candidate) { return candidate }
                 }
             }
         }

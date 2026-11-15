@@ -4411,7 +4411,7 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(alone[megabyte.id], besideLargerTraffic[megabyte.id])
     }
 
-    func testRibbonWidthsNeverExceedCompressedPortCapacity() {
+    func testRibbonWidthsScaleProportionallyInsideReservedPortCapacity() {
         let source = TrafficGraphNodeID(rawValue: "app:source")
         let target = TrafficGraphNodeID(rawValue: "destination:target")
         let bytes = TrafficGraphEdge(
@@ -4443,10 +4443,10 @@ final class TrafficGraphTests: XCTestCase {
         )
         let widths = TrafficGraphLayout.trafficWidths(
             for: snapshot,
-            caps: [bytes.id: 1, flowOnly.id: 0.75, empty.id: 0.5]
+            caps: [bytes.id: 12, flowOnly.id: 12, empty.id: 12]
         )
 
-        XCTAssertEqual(widths[bytes.id], 1)
+        XCTAssertEqual(widths[bytes.id], 1.5)
         XCTAssertEqual(widths[flowOnly.id], 0.75)
         XCTAssertEqual(widths[empty.id], 0)
     }
@@ -4527,6 +4527,11 @@ final class TrafficGraphTests: XCTestCase {
             Array(ranked.prefix(4))
         )
         XCTAssertEqual(TrafficGraphLayout.maximumPrimaryRouteCandidates, 2_048)
+        XCTAssertEqual(
+            TrafficGraphLayout.routeClearance(width: 12, obstacleCount: 160),
+            TrafficGraphLayout.routeClearance(width: 12, obstacleCount: 161)
+        )
+        XCTAssertEqual(TrafficGraphLayout.routeClearance(width: 12, obstacleCount: 161), 16)
     }
 
     func testImpossibleObstacleRoutesNeverRestoreKnownCollidingCurves() {
@@ -4580,6 +4585,30 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(horizontal.point(at: 0.5).y, 10, accuracy: 0.001)
         XCTAssertEqual(vertical.point(at: 0.5).x, -10, accuracy: 0.001)
         XCTAssertEqual(vertical.point(at: 0.5).y, 50, accuracy: 0.001)
+    }
+
+    func testRibbonOffsetsPreserveContinuousTangentsAcrossSegments() {
+        let centerline = TrafficGraphCurve(segments: [
+            TrafficGraphCurveSegment(
+                start: CGPoint(x: 0, y: 0),
+                control1: CGPoint(x: 20, y: 0),
+                control2: CGPoint(x: 50, y: 20),
+                end: CGPoint(x: 60, y: 30)
+            ),
+            TrafficGraphCurveSegment(
+                start: CGPoint(x: 60, y: 30),
+                control1: CGPoint(x: 70, y: 40),
+                control2: CGPoint(x: 90, y: 40),
+                end: CGPoint(x: 100, y: 30)
+            ),
+        ])
+
+        XCTAssertTrue(centerline.hasContinuousTangents())
+        XCTAssertTrue(centerline.offset(by: 10).hasContinuousTangents())
+        XCTAssertEqual(
+            centerline.offset(by: 10).segments[0].end,
+            centerline.offset(by: 10).segments[1].start
+        )
     }
 
     func testContinuousTangentsIgnoreZeroLengthEndpointStubs() {
@@ -5050,20 +5079,66 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(refreshed.nodeFrames, layout.nodeFrames)
         XCTAssertEqual(refreshed.edgeCurves, layout.edgeCurves)
         XCTAssertNotEqual(refreshed.edgeWidths, layout.edgeWidths)
-    }
-
-    func testRibbonWidthsStayGloballyMonotonicAcrossDifferentFanout() {
-        let crowded = (0..<20).map { index in
-            row(
-                app: "crowded",
-                domain: "host\(index).example",
-                ip: "203.0.113.\(index + 1)",
-                bytesIn: index == 0 ? 1_000_000 : 1
+        for edge in snapshot.edges where edge.isTrafficRibbon && edge.displayedCounters.total == 100 {
+            XCTAssertGreaterThan(
+                refreshed.edgeWidths[edge.id] ?? 0,
+                layout.edgeWidths[edge.id] ?? 0,
+                "a live counter increase must grow inside the port capacity reserved by the topology"
             )
         }
-        let snapshot = TrafficGraphBuilder.build(rows: crowded + [
-            row(app: "isolated", domain: "single.example", ip: "198.51.100.1", bytesIn: 1)
-        ], limits: .unbounded)
+    }
+
+    func testCrowdedPortCompressionDoesNotShrinkAnIndependentRibbon() {
+        func node(_ id: String, title: String) -> TrafficGraphNode {
+            TrafficGraphNode(
+                id: TrafficGraphNodeID(rawValue: id),
+                kind: id.hasPrefix("app:") ? .app : .destination,
+                title: title,
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: FlowCounters()
+            )
+        }
+
+        let crowdedSource = node("app:crowded", title: "Crowded")
+        let isolatedSource = node("app:isolated", title: "Isolated")
+        let isolatedTarget = node("destination:isolated", title: "isolated.example")
+        var nodes = [crowdedSource, isolatedSource, isolatedTarget]
+        var edges: [TrafficGraphEdge] = []
+        var total = FlowCounters()
+        for index in 0..<20 {
+            let target = node("destination:crowded-\(index)", title: "host\(index).example")
+            let counters = FlowCounters(
+                bytesIn: index.isMultiple(of: 2)
+                    ? TrafficGraphLayout.trafficScaleFloorBytes
+                    : TrafficGraphLayout.trafficScaleCeilingBytes,
+                flows: 1
+            )
+            nodes.append(target)
+            edges.append(TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: "crowded:\(index)"),
+                source: crowdedSource.id,
+                target: target.id,
+                counters: counters,
+                filter: .none
+            ))
+            total += counters
+        }
+        let isolatedCounters = FlowCounters(
+            bytesIn: TrafficGraphLayout.trafficScaleCeilingBytes,
+            flows: 1
+        )
+        let isolatedEdge = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "isolated"),
+            source: isolatedSource.id,
+            target: isolatedTarget.id,
+            counters: isolatedCounters,
+            filter: .none
+        )
+        edges.append(isolatedEdge)
+        total += isolatedCounters
+        let snapshot = TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: .none)
         let layout = TrafficGraphLayout.layout(
             snapshot: snapshot,
             in: CGRect(
@@ -5073,17 +5148,22 @@ final class TrafficGraphTests: XCTestCase {
                 height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
             )
         )
-        let ordered = snapshot.edges.compactMap { edge -> (Int64, CGFloat)? in
-            guard let width = layout.edgeWidths[edge.id] else { return nil }
-            return (edge.displayedCounters.total, width)
-        }.sorted { left, right in
-            left.0 == right.0 ? left.1 < right.1 : left.0 < right.0
-        }
 
-        for pair in zip(ordered, ordered.dropFirst()) {
-            XCTAssertLessThanOrEqual(pair.0.1, pair.1.1 + 0.0001,
-                                     "less traffic must never render wider because another node has more fanout")
-        }
+        XCTAssertEqual(
+            layout.edgeWidths[isolatedEdge.id] ?? -1,
+            TrafficGraphLayout.maximumRibbonWidth,
+            accuracy: 0.0001
+        )
+        XCTAssertLessThan(
+            layout.edgeWidths[edges[1].id] ?? .infinity,
+            layout.edgeWidths[isolatedEdge.id] ?? 0,
+            "a crowded card must not impose its capacity scale on an independent source"
+        )
+        XCTAssertLessThan(
+            layout.edgeWidths[edges[0].id] ?? .infinity,
+            layout.edgeWidths[edges[1].id] ?? 0,
+            "local compression must preserve the absolute byte ordering at the crowded port"
+        )
     }
 
     func testViewportVisibilityCullsOffscreenGeometryButFitIncludesEverything() {
@@ -5210,7 +5290,12 @@ final class TrafficGraphTests: XCTestCase {
         measure(metrics: [XCTClockMetric()]) {
             let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
             XCTAssertEqual(layout.nodeFrames.count, snapshot.nodes.count)
-            XCTAssertEqual(layout.edgeCurves.count, snapshot.edges.count)
+            XCTAssertEqual(layout.topologyEdgeIDs, Set(snapshot.edges.map(\.id)))
+            XCTAssertEqual(
+                layout.edgeCurves.count + layout.omittedEdgeIDs.count,
+                snapshot.edges.count,
+                "a card-clear route may fail closed, but its exact semantic relationship must remain available"
+            )
         }
     }
 }

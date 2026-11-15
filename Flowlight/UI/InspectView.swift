@@ -732,7 +732,6 @@ private struct InspectionSetup: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .highPriorityGesture(TapGesture().onEnded { showAdvanced.toggle() })
             }
 
             DisclosureGroup(isExpanded: $showMocks) {
@@ -748,7 +747,6 @@ private struct InspectionSetup: View {
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .highPriorityGesture(TapGesture().onEnded { showMocks.toggle() })
             }
 
             DisclosureGroup(isExpanded: $showRewrites) {
@@ -764,7 +762,6 @@ private struct InspectionSetup: View {
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .highPriorityGesture(TapGesture().onEnded { showRewrites.toggle() })
             }
 
             if ProductCapabilities.current.responseTransforms {
@@ -781,7 +778,6 @@ private struct InspectionSetup: View {
                         Spacer(minLength: 0)
                     }
                     .contentShape(Rectangle())
-                    .highPriorityGesture(TapGesture().onEnded { showResponseTransforms.toggle() })
                 }
             }
         }
