@@ -694,6 +694,10 @@ final class TrafficMonitor: ObservableObject {
                     self.extensionIdentityMismatch(mismatch)
                 }
             }
+            extensionSource.onTrafficDelivery = { [weak self] delivery, reply in
+                guard let self else { reply(false); return }
+                self.ingest(delivery, reply: reply)
+            }
             extensionSource.onBlocked = { [weak self] events, reply in
                 guard let self else { reply(false); return }
                 self.recordBlocked(events, reply: reply)
@@ -1036,6 +1040,47 @@ final class TrafficMonitor: ObservableObject {
             Task { @MainActor in self.lastDataAt = Date() }
             return
         }
+        let batches = preparedTraffic(incoming)
+        db.async { [engine] db in
+            try db.insert(batches)
+            try engine.observe(batches)
+        }
+        Task { @MainActor in self.updateLive(with: batches) }
+    }
+
+    nonisolated private func ingest(
+        _ delivery: TrafficDeliveryEnvelope,
+        reply: @escaping @Sendable (Bool) -> Void
+    ) {
+        let batches = preparedTraffic(delivery.batches)
+        let committed = TrafficDeliveryEnvelope(
+            session: delivery.session,
+            firstSequence: delivery.firstSequence,
+            lastSequence: delivery.lastSequence,
+            batches: batches
+        )
+        db.async { [weak self, engine] db in
+            do {
+                let accepted = try db.insert(committed)
+                if accepted {
+                    // Flow rows and their receipt are the exact-once boundary. Alert observation remains best-effort,
+                    // as it was for legacy delivery, and must never make additive traffic retry after its commit.
+                    // Keep a durable diagnostic instead of silently hiding a secondary analyzer failure.
+                    do {
+                        try engine.observe(batches)
+                    } catch {
+                        appLog.error("traffic anomaly observation failed: \(error.localizedDescription, privacy: .public)")
+                    }
+                    Task { @MainActor in self?.updateLive(with: batches) }
+                }
+                reply(true)
+            } catch {
+                reply(false)
+            }
+        }
+    }
+
+    nonisolated private func preparedTraffic(_ incoming: [TrafficBatch]) -> [TrafficBatch] {
         // Tools and MCP servers an agent started are attributed to that agent (demo data carries its own).
         // Traffic through the HTTPS inspection proxy belongs to the app that sent it, not to Flowlight.
         let batches = DemoData.isEnabled ? incoming : AgentAttributor.shared.enrich(ProxyAttribution.shared.rewrite(incoming))
@@ -1045,11 +1090,7 @@ final class TrafficMonitor: ObservableObject {
                 IPOwnerLookup.shared.owner(for: record.key.remoteIP)
             }
         }
-        db.async { [engine] db in
-            try db.insert(batches)
-            try engine.observe(batches)
-        }
-        Task { @MainActor in self.updateLive(with: batches) }
+        return batches
     }
 
     /// Focus changed: the live feed is a running total, so it restarts rather than mixing two scopes together.

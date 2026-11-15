@@ -1019,9 +1019,35 @@ final class InspectionController: ObservableObject {
         enabled = false
         let db = db
         Task.detached { [ca] in
+            var errors: [String] = []
+            #if APP_STORE
+            do {
+                try ca.remove()
+            } catch {
+                errors.append(error.localizedDescription)
+            }
+            #else
             ca.remove()
-            db?.async { try $0.deleteAllExchanges() }
-            await MainActor.run { self.recordedCount = 0; self.refreshStatus(); self.onRecorded() }
+            #endif
+            var deletedRecordedData = db == nil
+            if let db {
+                do {
+                    try await db.asyncResult { try $0.deleteAllExchanges() }
+                    deletedRecordedData = true
+                } catch {
+                    errors.append(error.localizedDescription)
+                }
+            }
+            let didDeleteRecordedData = deletedRecordedData
+            let removalError = errors.isEmpty ? nil : errors.joined(separator: "\n")
+            await MainActor.run {
+                if didDeleteRecordedData {
+                    self.recordedCount = 0
+                    self.onRecorded()
+                }
+                self.lastError = removalError
+                self.refreshStatus()
+            }
         }
     }
 

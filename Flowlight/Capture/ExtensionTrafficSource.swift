@@ -86,13 +86,15 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     /// extension is running — not that it is filtering anything, which is a different failure and looks identical.
     private var sawTraffic = false
     private var version = ""
-    private static let durableEventProtocol = 1
     /// Called when macOS has the extension running but isn't letting it filter — a state the user can only fix by
     /// switching source, so it needs to reach the UI as something more than a line of status text.
     var onFilterUnavailable: ((String) -> Void)?
     /// Every authoritative state reply, including recovery. A successful heartbeat lets the owner clear a prior
     /// unavailable warning without reconnecting the source.
     var onFilterAvailabilityChanged: ((Bool, String?) -> Void)?
+    /// Additive traffic must commit with its stable delivery identity before acknowledgment. Lost replies can then be
+    /// retried without counting the same bytes, flows, anomaly evidence, or live totals twice.
+    var onTrafficDelivery: ((TrafficDeliveryEnvelope, @escaping @Sendable (Bool) -> Void) -> Void)?
     /// Connections the filter refused. The reply returns only after durable evidence and alerts commit, so the
     /// extension can safely retain and retry the same stable event IDs if the connection drops.
     var onBlocked: (([BlockEvent], @escaping @Sendable (Bool) -> Void) -> Void)?
@@ -246,7 +248,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
             scheduleReconnect(L("Extension unreachable: %@", "durable event negotiation"), from: connection)
             return
         }
-        proxy.enableDurableEvents(appProtocol: Self.durableEventProtocol) { [weak self, weak connection] accepted in
+        proxy.enableDurableEvents(appProtocol: FlowlightIPCVersion.durableEvents) { [weak self, weak connection] accepted in
             DispatchQueue.main.async {
                 guard let self, let connection, self.connection === connection else { return }
                 guard accepted else {
@@ -780,6 +782,20 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         guard !events.isEmpty else { reply(true); return }
         guard let onBlocked else { reply(false); return }
         onBlocked(events, reply)
+    }
+
+    func deliverTrafficDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void) {
+        guard let delivery = TrafficCoding.decodeDelivery(payload), delivery.isValid,
+              let onTrafficDelivery else {
+            reply(false)
+            return
+        }
+        if !sawTraffic {
+            sawTraffic = true
+            let version = self.version
+            DispatchQueue.main.async { [weak self] in self?.status?(L("Connected to filter extension %@", version)) }
+        }
+        onTrafficDelivery(delivery, reply)
     }
 
     func deliver(payload: Data, reply: @escaping () -> Void) {

@@ -15,10 +15,52 @@ final class CertificateAuthority: @unchecked Sendable {
     let directory: URL
     private let lock = NSLock()
     private var identities: [String: SecIdentity] = [:]
+    private var didPrunePersistedLeaves = false
+    private var leafRecordCache: [LeafRecord]?
+    /// Overridable only by Store-hosted tests to prove each post-import failure path cleans up its Keychain leaf.
+    var leafManifestWriter: (Data, URL) throws -> Void = { data, url in
+        try data.write(to: url, options: .atomic)
+    }
+    var importedLeafReferenceProvider: (SecCertificate) -> (OSStatus, Data?) = { certificate in
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecClass as String: kSecClassCertificate,
+            kSecValueRef as String: certificate,
+            kSecReturnPersistentRef as String: true,
+        ] as CFDictionary, &result)
+        guard status == errSecSuccess, let result, CFGetTypeID(result) == CFDataGetTypeID() else {
+            return (status, nil)
+        }
+        return (status, unsafeBitCast(result, to: CFData.self) as Data)
+    }
+    var leafIdentityProvider: (SecCertificate) -> (OSStatus, SecIdentity?) = { certificate in
+        var identity: SecIdentity?
+        let status = SecIdentityCreateWithCertificate(nil, certificate, &identity)
+        return (status, identity)
+    }
+    private let bundleValidationLock = NSLock()
+    private var cachedBundleValidation: (stamp: BundleStamp, valid: Bool)?
     private let caTag: Data
     private let leafTag: Data
     private static let leafCertificateLabel = "Flowlight Inspection Leaf"
     private static let maximumLeafIdentities = 128
+    private struct LeafRecord: Codable {
+        var der: Data
+        var persistentReference: Data?
+    }
+    private struct FileStamp: Equatable {
+        var size: Int64
+        var inode: UInt64
+        var modifiedSeconds: Int64
+        var modifiedNanoseconds: Int64
+        var changedSeconds: Int64
+        var changedNanoseconds: Int64
+    }
+    private struct BundleStamp: Equatable {
+        var systemRoots: FileStamp
+        var authority: FileStamp
+        var bundle: FileStamp
+    }
 
     init(directory: URL = CertificateAuthority.defaultDirectory) {
         self.directory = directory
@@ -37,8 +79,16 @@ final class CertificateAuthority: @unchecked Sendable {
 
     var caCertificateURL: URL { directory.appendingPathComponent("flowlight-ca.pem") }
     var bundleURL: URL { directory.appendingPathComponent("ca-bundle.pem") }
+    private var leafManifestURL: URL { directory.appendingPathComponent("leaf-certificates.plist") }
+    #if DEBUG
+    var generatedLeafPersistentReferences: [Data] {
+        ((try? loadLeafRecords()) ?? []).compactMap(\.persistentReference)
+    }
+    #endif
 
-    var exists: Bool {
+    var exists: Bool { hasValidAuthority && hasValidBundle }
+
+    private var hasValidAuthority: Bool {
         guard FileManager.default.fileExists(atPath: caCertificateURL.path),
               let caKey = key(tag: caTag),
               key(tag: leafTag) != nil,
@@ -48,15 +98,61 @@ final class CertificateAuthority: @unchecked Sendable {
         return Self.certificate(certificate, matches: caKey)
     }
 
+    private var hasValidBundle: Bool {
+        guard let stamp = bundleStamp() else { return false }
+        bundleValidationLock.lock()
+        if let cached = cachedBundleValidation, cached.stamp == stamp {
+            bundleValidationLock.unlock()
+            return cached.valid
+        }
+        bundleValidationLock.unlock()
+
+        let valid: Bool
+        if let expected = try? expectedBundle(),
+           let bundle = try? String(contentsOf: bundleURL, encoding: .utf8) {
+            valid = bundle == expected
+        } else {
+            valid = false
+        }
+        bundleValidationLock.lock()
+        cachedBundleValidation = (stamp, valid)
+        bundleValidationLock.unlock()
+        return valid
+    }
+
+    private func bundleStamp() -> BundleStamp? {
+        func stamp(_ url: URL) -> FileStamp? {
+            var info = stat()
+            guard url.path.withCString({ lstat($0, &info) }) == 0 else { return nil }
+            return FileStamp(
+                size: info.st_size,
+                inode: UInt64(info.st_ino),
+                modifiedSeconds: Int64(info.st_mtimespec.tv_sec),
+                modifiedNanoseconds: Int64(info.st_mtimespec.tv_nsec),
+                changedSeconds: Int64(info.st_ctimespec.tv_sec),
+                changedNanoseconds: Int64(info.st_ctimespec.tv_nsec)
+            )
+        }
+        let systemRoots = URL(fileURLWithPath: "/etc/ssl/cert.pem")
+        guard let rootsStamp = stamp(systemRoots),
+              let authorityStamp = stamp(caCertificateURL),
+              let bundleStamp = stamp(bundleURL) else { return nil }
+        return BundleStamp(systemRoots: rootsStamp, authority: authorityStamp, bundle: bundleStamp)
+    }
+
     func ensure() throws {
         lock.lock(); defer { lock.unlock() }
-        if exists { return }
+        if hasValidAuthority {
+            try prunePersistedLeavesIfNeeded()
+            if !hasValidBundle { try writeBundle() }
+            return
+        }
 
         // Recover atomically from an interrupted first run. Only app-owned keys and generated leaf certificates are
         // removed; a CA the user imported into their keychain remains theirs to remove.
-        deleteKey(tag: caTag)
-        deleteKey(tag: leafTag)
-        deleteLeafCertificates()
+        try deleteLeafCertificates()
+        try deleteKey(tag: caTag)
+        try deleteKey(tag: leafTag)
         try? FileManager.default.removeItem(at: directory)
         try FileManager.default.createDirectory(
             at: directory,
@@ -86,9 +182,11 @@ final class CertificateAuthority: @unchecked Sendable {
                 encoding: .utf8
             )
             try writeBundle()
+            didPrunePersistedLeaves = true
         } catch {
-            deleteKey(tag: caTag)
-            deleteKey(tag: leafTag)
+            try? deleteLeafCertificates()
+            try? deleteKey(tag: caTag)
+            try? deleteKey(tag: leafTag)
             try? FileManager.default.removeItem(at: directory)
             throw error
         }
@@ -118,7 +216,7 @@ final class CertificateAuthority: @unchecked Sendable {
 
         if identities.count >= Self.maximumLeafIdentities {
             identities.removeAll()
-            deleteLeafCertificates()
+            try deleteLeafCertificates()
         }
 
         let issuer = try X509.name(from: ca)
@@ -133,6 +231,8 @@ final class CertificateAuthority: @unchecked Sendable {
         guard let certificate = SecCertificateCreateWithData(nil, der as CFData) else {
             throw InspectionError.native("the generated leaf certificate could not be parsed")
         }
+        // A stop between import and manifest update is recovered by the cryptographic sweep in deleteLeafCertificates.
+        // Finalize the ownership record once, after the opaque reference exists, to keep TLS setup off a double-write path.
         let add: [String: Any] = [
             kSecClass as String: kSecClassCertificate,
             kSecValueRef as String: certificate,
@@ -142,10 +242,27 @@ final class CertificateAuthority: @unchecked Sendable {
         guard added == errSecSuccess || added == errSecDuplicateItem else {
             throw InspectionError.native(Self.message(added, fallback: "the leaf certificate could not be stored"))
         }
-        var identity: SecIdentity?
-        let status = SecIdentityCreateWithCertificate(nil, certificate, &identity)
+        let (persistentStatus, persistentReference) = importedLeafReferenceProvider(certificate)
+        guard persistentStatus == errSecSuccess, let persistentReference else {
+            let referenceError = InspectionError.native(
+                persistentStatus == errSecSuccess
+                    ? "the leaf certificate reference had an unexpected representation"
+                    : Self.message(persistentStatus, fallback: "the leaf certificate reference could not be retained")
+            )
+            try cleanupAfterLeafImportFailure(referenceError)
+        }
+        do {
+            try recordLeafCertificate(der, persistentReference: persistentReference)
+        } catch let manifestError {
+            try cleanupAfterLeafImportFailure(manifestError)
+        }
+        let (status, identity) = leafIdentityProvider(certificate)
         guard status == errSecSuccess, let identity else {
-            throw InspectionError.native(Self.message(status, fallback: "the leaf key could not be paired with its certificate"))
+            let pairingError = InspectionError.native(Self.message(
+                status,
+                fallback: "the leaf key could not be paired with its certificate"
+            ))
+            try cleanupAfterLeafImportFailure(pairingError)
         }
         identities[name] = identity
         return identity
@@ -258,13 +375,18 @@ final class CertificateAuthority: @unchecked Sendable {
 
     /// Deletes app-owned private keys, generated leaf certificates and exported files. A CA explicitly imported and
     /// trusted by the user is intentionally not removed from their keychain by the sandboxed Store app.
-    func remove() {
+    func remove() throws {
         lock.lock(); defer { lock.unlock() }
         identities.removeAll()
-        deleteKey(tag: caTag)
-        deleteKey(tag: leafTag)
-        deleteLeafCertificates()
-        try? FileManager.default.removeItem(at: directory)
+        // Do not discard the keys or ownership manifest unless every exact leaf cleanup succeeded. A locked Keychain
+        // remains retryable, and the UI can report the failure instead of claiming that removal completed.
+        try deleteLeafCertificates()
+        try deleteKey(tag: caTag)
+        try deleteKey(tag: leafTag)
+        didPrunePersistedLeaves = false
+        if FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.removeItem(at: directory)
+        }
     }
 
     static func configSafe(_ host: String) -> String {
@@ -323,6 +445,68 @@ final class CertificateAuthority: @unchecked Sendable {
         return certificateBytes == privateBytes
     }
 
+    private struct DERElement {
+        var tag: UInt8
+        var encoded: Range<Int>
+        var content: Range<Int>
+    }
+
+    private static func certificate(_ certificate: SecCertificate, wasSignedBy authority: SecCertificate) -> Bool {
+        let der = SecCertificateCopyData(certificate) as Data
+        var outerIndex = 0
+        guard let outer = derElement(in: der, index: &outerIndex), outer.tag == 0x30,
+              outer.encoded.upperBound == der.count else { return false }
+        var fieldIndex = outer.content.lowerBound
+        guard let tbs = derElement(in: der, index: &fieldIndex), tbs.tag == 0x30,
+              let algorithm = derElement(in: der, index: &fieldIndex), algorithm.tag == 0x30,
+              let signature = derElement(in: der, index: &fieldIndex), signature.tag == 0x03,
+              fieldIndex == outer.content.upperBound,
+              signature.content.count > 1,
+              der[signature.content.lowerBound] == 0,
+              let authorityKey = SecCertificateCopyKey(authority) else { return false }
+        let message = Data(der[tbs.encoded])
+        let signatureBytes = Data(der[der.index(after: signature.content.lowerBound)..<signature.content.upperBound])
+        var error: Unmanaged<CFError>?
+        let verified = SecKeyVerifySignature(
+            authorityKey,
+            .ecdsaSignatureMessageX962SHA256,
+            message as CFData,
+            signatureBytes as CFData,
+            &error
+        )
+        _ = error?.takeRetainedValue()
+        return verified
+    }
+
+    private static func derElement(in data: Data, index: inout Int) -> DERElement? {
+        let start = index
+        guard index < data.count else { return nil }
+        let tag = data[index]
+        index += 1
+        guard index < data.count else { return nil }
+        let firstLength = Int(data[index])
+        index += 1
+        let length: Int
+        if firstLength & 0x80 == 0 {
+            length = firstLength
+        } else {
+            let byteCount = firstLength & 0x7f
+            guard byteCount > 0, byteCount <= MemoryLayout<Int>.size,
+                  index <= data.count - byteCount else { return nil }
+            var decoded = 0
+            for _ in 0..<byteCount {
+                guard decoded <= (Int.max - Int(data[index])) / 256 else { return nil }
+                decoded = decoded * 256 + Int(data[index])
+                index += 1
+            }
+            length = decoded
+        }
+        guard length >= 0, index <= data.count - length else { return nil }
+        let content = index..<(index + length)
+        index += length
+        return DERElement(tag: tag, encoded: start..<index, content: content)
+    }
+
     private static func externalRepresentation(of key: SecKey) -> Data? {
         var error: Unmanaged<CFError>?
         if let bytes = SecKeyCopyExternalRepresentation(key, &error) as Data? {
@@ -332,25 +516,213 @@ final class CertificateAuthority: @unchecked Sendable {
         return nil
     }
 
-    private func deleteKey(tag: Data) {
-        SecItemDelete([
+    private func deleteKey(tag: Data) throws {
+        let status = SecItemDelete([
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: tag,
         ] as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw InspectionError.native(Self.message(
+                status,
+                fallback: "an app-owned inspection key could not be removed"
+            ))
+        }
     }
 
-    private func deleteLeafCertificates() {
-        SecItemDelete([
+    private func prunePersistedLeavesIfNeeded() throws {
+        guard !didPrunePersistedLeaves else { return }
+        identities.removeAll()
+        try deleteLeafCertificates()
+        didPrunePersistedLeaves = true
+    }
+
+    private func loadLeafRecords() throws -> [LeafRecord] {
+        if let leafRecordCache { return leafRecordCache }
+        guard FileManager.default.fileExists(atPath: leafManifestURL.path) else {
+            leafRecordCache = []
+            return []
+        }
+        let data = try Data(contentsOf: leafManifestURL)
+        let records = try PropertyListDecoder().decode([LeafRecord].self, from: data)
+        leafRecordCache = records
+        return records
+    }
+
+    private func recordLeafCertificate(_ der: Data, persistentReference: Data?) throws {
+        var records = try loadLeafRecords()
+        if let index = records.firstIndex(where: { $0.der == der }) {
+            if let persistentReference { records[index].persistentReference = persistentReference }
+        } else {
+            records.append(LeafRecord(der: der, persistentReference: persistentReference))
+        }
+        let data = try PropertyListEncoder().encode(records)
+        try leafManifestWriter(data, leafManifestURL)
+        leafRecordCache = records
+    }
+
+    private func cleanupAfterLeafImportFailure(_ originalError: Error) throws -> Never {
+        identities.removeAll()
+        do {
+            try deleteLeafCertificates()
+            didPrunePersistedLeaves = true
+        } catch let cleanupError {
+            // No later identity attempt may import another leaf until ensure retries and completes this sweep.
+            didPrunePersistedLeaves = false
+            throw InspectionError.native(
+                "\(originalError.localizedDescription); generated-leaf cleanup also failed: "
+                    + cleanupError.localizedDescription
+            )
+        }
+        throw originalError
+    }
+
+    /// The manifest contains only public certificate bytes and opaque Keychain references. A reference is trusted only
+    /// when it still resolves to the recorded DER; stale or migrated references fall back to a DER lookup. The final
+    /// cryptographic sweep also covers a stop after Keychain import but before the one manifest write completes.
+    /// Public metadata is retained unless every owned item was removed or already absent, so failures remain retryable.
+    private func deleteLeafCertificates() throws {
+        let records: [LeafRecord]
+        do {
+            records = try loadLeafRecords()
+        } catch is DecodingError {
+            // A truncated or schema-incompatible manifest cannot identify exact references. Recover through the same
+            // cryptographic ownership boundary as a pre-manifest upgrade, then remove the unusable public metadata.
+            try deleteLegacyLeafCertificates()
+            try FileManager.default.removeItem(at: leafManifestURL)
+            leafRecordCache = []
+            return
+        }
+        for record in records {
+            var removed = false
+            if let persistentReference = record.persistentReference {
+                removed = try deleteCertificate(
+                    persistentReference: persistentReference,
+                    expectedDER: record.der
+                )
+            }
+            if !removed { try deleteCertificate(der: record.der) }
+        }
+        try deleteLegacyLeafCertificates()
+        if FileManager.default.fileExists(atPath: leafManifestURL.path) {
+            try FileManager.default.removeItem(at: leafManifestURL)
+        }
+        leafRecordCache = []
+    }
+
+    /// Certificate-class Keychain items do not reliably retain the label supplied at import. A pre-manifest leaf is
+    /// therefore owned only when both cryptographic boundaries agree: it uses this directory's app-owned leaf key and
+    /// validates to this directory's Flowlight CA. Imported roots and every unrelated certificate fail those checks.
+    private func deleteLegacyLeafCertificates() throws {
+        // Without this app-owned key no certificate can satisfy the first ownership boundary. This also keeps removal
+        // idempotent after the keys were deleted but a later filesystem cleanup failed.
+        guard let leafKey = key(tag: leafTag) else { return }
+        var stored: CFTypeRef?
+        let lookup: [String: Any] = [
             kSecClass as String: kSecClassCertificate,
-            kSecAttrLabel as String: Self.leafCertificateLabel,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnRef as String: true,
+        ]
+        let status = SecItemCopyMatching(lookup as CFDictionary, &stored)
+        if status == errSecItemNotFound { return }
+        guard status == errSecSuccess, let certificates = stored as? [SecCertificate] else {
+            throw InspectionError.native(Self.message(
+                status,
+                fallback: "legacy generated leaf certificates could not be enumerated for cleanup"
+            ))
+        }
+        let candidates = certificates.filter { Self.certificate($0, matches: leafKey) }
+        guard !candidates.isEmpty else { return }
+        guard let authorityKey = key(tag: caTag),
+              let authority = caCertificate(),
+              Self.certificate(authority, matches: authorityKey) else {
+            // The leaf key identifies candidates, but only the original matching CA can prove which certificates
+            // Flowlight generated. Keep every key and public file so restoring that CA can make cleanup retryable.
+            throw InspectionError.native(
+                "the local certificate authority is unavailable, so legacy generated certificates cannot be removed safely"
+            )
+        }
+        for certificate in candidates where Self.certificate(certificate, wasSignedBy: authority) {
+            guard let reference = try persistentReference(for: certificate) else { continue }
+            let der = SecCertificateCopyData(certificate) as Data
+            _ = try deleteCertificate(persistentReference: reference, expectedDER: der)
+        }
+    }
+
+    private func deleteCertificate(der: Data) throws {
+        guard let certificate = SecCertificateCreateWithData(nil, der as CFData) else {
+            throw InspectionError.native("a recorded generated leaf certificate is malformed")
+        }
+        guard let reference = try persistentReference(for: certificate) else { return }
+        _ = try deleteCertificate(persistentReference: reference, expectedDER: der)
+    }
+
+    private func persistentReference(for certificate: SecCertificate) throws -> Data? {
+        var persistentResult: CFTypeRef?
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassCertificate,
+            kSecValueRef as String: certificate,
+            kSecReturnPersistentRef as String: true,
+        ]
+        let status = SecItemCopyMatching(query as CFDictionary, &persistentResult)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let persistentResult,
+              CFGetTypeID(persistentResult) == CFDataGetTypeID() else {
+            throw InspectionError.native(Self.message(
+                status,
+                fallback: "a generated leaf certificate reference could not be recovered"
+            ))
+        }
+        return unsafeBitCast(persistentResult, to: CFData.self) as Data
+    }
+
+    /// Returns false without deleting when a stale reference is absent or resolves to bytes other than the manifest's
+    /// recorded DER. The caller then performs an exact DER lookup, so a migrated reference cannot leak our leaf and a
+    /// reused reference can never delete an unrelated certificate.
+    private func deleteCertificate(persistentReference: Data, expectedDER: Data) throws -> Bool {
+        var stored: CFTypeRef?
+        let lookup: [String: Any] = [
+            kSecValuePersistentRef as String: persistentReference,
+            kSecReturnRef as String: true,
+        ]
+        let lookupStatus = SecItemCopyMatching(lookup as CFDictionary, &stored)
+        if lookupStatus == errSecItemNotFound { return false }
+        guard lookupStatus == errSecSuccess, let stored,
+              CFGetTypeID(stored) == SecCertificateGetTypeID() else {
+            throw InspectionError.native(Self.message(
+                lookupStatus,
+                fallback: "a generated leaf certificate could not be found for cleanup"
+            ))
+        }
+        let certificate = unsafeBitCast(stored, to: SecCertificate.self)
+        guard SecCertificateCopyData(certificate) as Data == expectedDER else { return false }
+        let deleteStatus = SecItemDelete([
+            kSecClass as String: kSecClassCertificate,
+            kSecValueRef as String: certificate,
         ] as CFDictionary)
+        guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
+            throw InspectionError.native(Self.message(
+                deleteStatus,
+                fallback: "a generated leaf certificate could not be removed"
+            ))
+        }
+        return true
     }
 
     private func writeBundle() throws {
-        var roots = (try? String(contentsOfFile: "/etc/ssl/cert.pem", encoding: .utf8)) ?? ""
+        try expectedBundle().write(to: bundleURL, atomically: true, encoding: .utf8)
+        bundleValidationLock.lock()
+        cachedBundleValidation = nil
+        bundleValidationLock.unlock()
+    }
+
+    private func expectedBundle() throws -> String {
+        guard var roots = try? String(contentsOfFile: "/etc/ssl/cert.pem", encoding: .utf8),
+              !roots.isEmpty else {
+            throw InspectionError.native("the macOS system trust store could not be read")
+        }
         if !roots.hasSuffix("\n") { roots += "\n" }
         roots += try String(contentsOf: caCertificateURL, encoding: .utf8)
-        try roots.write(to: bundleURL, atomically: true, encoding: .utf8)
+        return roots
     }
 
     private func pem(_ data: Data, label: String) -> String {

@@ -1693,6 +1693,8 @@ November 15, 2026Latest
 
  Keep release evidence canonical. Signed preparation and its retained-artifact verifier now share the same required-check contract: the successful workflow-bound CodeQL gate remains mandatory while GitHub’s redundant neutral status is ignored, with exact workflow, pull request, reviewer, and commit provenance retained.
 
+ Make capture recovery exact. Retried extension traffic now commits once under a durable delivery identity, stopped Bluetooth and USB channels cannot sample after opt-out, and Store inspection repairs incomplete bundles while pruning only cryptographically owned leaf certificates.
+
  0.18.1
 November 12, 2026
 
