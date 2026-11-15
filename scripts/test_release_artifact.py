@@ -347,6 +347,16 @@ class PreparedBundleTests(unittest.TestCase):
             release_check_contract.GITHUB_AUTHOR_ASSOCIATIONS,
         )
 
+    def test_required_checks_match_evidence_collector(self):
+        self.assertEqual(
+            REQUIRED_REVIEW_CHECKS,
+            set(release_check_contract.REQUIRED_CHECKS),
+        )
+        self.assertNotIn(
+            ("github-advanced-security", "CodeQL"),
+            REQUIRED_REVIEW_CHECKS,
+        )
+
     def test_rejects_changed_or_malformed_bundles(self):
         cases = {
             "changed DMG": lambda: (self.root / "Flowlight.dmg").write_bytes(b"tampered"),
