@@ -283,12 +283,6 @@ enum ConnectionsRenderPolicy {
     }
 }
 
-enum ConnectionsLoadingMotionPolicy {
-    static func animates(reduceMotion: Bool, staticFixture: Bool) -> Bool {
-        !reduceMotion && !staticFixture
-    }
-}
-
 struct VisualizeView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case traffic, ai
@@ -997,7 +991,7 @@ private struct TrafficGraphLoadingView: View {
     @State private var animationGeneration = 0
 
     var body: some View {
-        let animates = ConnectionsLoadingMotionPolicy.animates(
+        let animates = Motion.allowsAnimation(
             reduceMotion: reduceMotion,
             staticFixture: Motion.isStaticFixture
         )
@@ -1011,7 +1005,7 @@ private struct TrafficGraphLoadingView: View {
                     axis: (x: 0, y: 1, z: 0),
                     perspective: 0.55
                 )
-                .animation(animates ? Motion.loadingMark : nil, value: flipped)
+                .motion(Motion.loadingMark, value: flipped)
                 .onAppear { setAnimationRunning(animates) }
                 .onChange(of: animates) { _, allowed in
                     setAnimationRunning(allowed)

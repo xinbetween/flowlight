@@ -30,11 +30,15 @@ enum Motion {
         DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLDisableMotion")
     }
 
+    static func allowsAnimation(reduceMotion: Bool, staticFixture: Bool) -> Bool {
+        !reduceMotion && !staticFixture
+    }
+
     /// Runs an explicit state change with the shared motion policy. Views pass the system preference they read from
     /// the environment so imperative scroll and disclosure changes follow the same Reduce Motion behavior as modifiers.
     @MainActor
     static func perform(_ animation: Animation? = control, reduceMotion: Bool, updates: () -> Void) {
-        if reduceMotion || isStaticFixture {
+        if !allowsAnimation(reduceMotion: reduceMotion, staticFixture: isStaticFixture) {
             updates()
         } else {
             withAnimation(animation, updates)
@@ -66,7 +70,12 @@ private struct MotionModifier<V: Equatable>: ViewModifier {
     let value: V
 
     func body(content: Content) -> some View {
-        content.animation(reduceMotion || Motion.isStaticFixture ? nil : animation, value: value)
+        content.animation(
+            Motion.allowsAnimation(reduceMotion: reduceMotion, staticFixture: Motion.isStaticFixture)
+                ? animation
+                : nil,
+            value: value
+        )
     }
 }
 

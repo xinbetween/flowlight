@@ -732,7 +732,7 @@ private struct InspectionSetup: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .onTapGesture { showAdvanced.toggle() }
+                    .highPriorityGesture(TapGesture().onEnded { showAdvanced.toggle() })
             }
 
             DisclosureGroup(isExpanded: $showMocks) {
@@ -748,7 +748,7 @@ private struct InspectionSetup: View {
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { showMocks.toggle() }
+                .highPriorityGesture(TapGesture().onEnded { showMocks.toggle() })
             }
 
             DisclosureGroup(isExpanded: $showRewrites) {
@@ -764,7 +764,7 @@ private struct InspectionSetup: View {
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { showRewrites.toggle() }
+                .highPriorityGesture(TapGesture().onEnded { showRewrites.toggle() })
             }
 
             if ProductCapabilities.current.responseTransforms {
@@ -781,7 +781,7 @@ private struct InspectionSetup: View {
                         Spacer(minLength: 0)
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { showResponseTransforms.toggle() }
+                    .highPriorityGesture(TapGesture().onEnded { showResponseTransforms.toggle() })
                 }
             }
         }

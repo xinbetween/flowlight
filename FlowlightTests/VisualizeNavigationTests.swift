@@ -123,10 +123,10 @@ final class VisualizeNavigationTests: XCTestCase {
     }
 
     func testConnectionsLoadingLogoAnimatesOnlyWhenMotionIsAllowed() {
-        XCTAssertTrue(ConnectionsLoadingMotionPolicy.animates(reduceMotion: false, staticFixture: false))
-        XCTAssertFalse(ConnectionsLoadingMotionPolicy.animates(reduceMotion: true, staticFixture: false))
-        XCTAssertFalse(ConnectionsLoadingMotionPolicy.animates(reduceMotion: false, staticFixture: true))
-        XCTAssertFalse(ConnectionsLoadingMotionPolicy.animates(reduceMotion: true, staticFixture: true))
+        XCTAssertTrue(Motion.allowsAnimation(reduceMotion: false, staticFixture: false))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: true, staticFixture: false))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: false, staticFixture: true))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: true, staticFixture: true))
     }
 
     func testConnectionsRejectsAStaleAsyncCompletion() {

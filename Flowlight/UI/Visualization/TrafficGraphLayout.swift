@@ -213,30 +213,78 @@ struct TrafficGraphCurve: Equatable, Sendable {
     }
 
     func hasLongVerticalShelf(minimumLength: CGFloat = 80, tolerance: CGFloat = 12) -> Bool {
-        let sampleCount = max(64, segments.count * 64)
-        var runStart = point(at: 0)
-        var previous = runStart
-        var minimumX = runStart.x
-        var maximumX = runStart.x
-        for sample in 1...sampleCount {
-            let current = point(at: CGFloat(sample) / CGFloat(sampleCount))
-            let deltaX = abs(current.x - previous.x)
-            let deltaY = abs(current.y - previous.y)
-            if deltaY > 0.5, deltaX <= max(0.5, deltaY * 0.12) {
-                minimumX = min(minimumX, current.x)
-                maximumX = max(maximumX, current.x)
-                if abs(current.y - runStart.y) >= minimumLength,
-                   maximumX - minimumX <= tolerance {
-                    return true
-                }
-            } else {
-                runStart = current
-                minimumX = current.x
-                maximumX = current.x
-            }
-            previous = current
+        if segments.contains(where: { segment in
+            guard abs(segment.end.y - segment.start.y) >= minimumLength else { return false }
+            let xs = [segment.start.x, segment.control1.x, segment.control2.x, segment.end.x]
+            return (xs.max() ?? 0) - (xs.min() ?? 0) <= tolerance
+        }) {
+            return true
         }
-        return false
+
+        if segments.count > 1 {
+            // Multi-segment curves come only from the separately bounded fallback (at most 64 candidates), so sample
+            // those complete shapes. The much larger primary single-cubic search stays constant-time below.
+            let sampleCount = segments.count * 64
+            var runStart = point(at: 0)
+            var previous = runStart
+            var minimumX = runStart.x
+            var maximumX = runStart.x
+            for sample in 1...sampleCount {
+                let current = point(at: CGFloat(sample) / CGFloat(sampleCount))
+                let deltaX = abs(current.x - previous.x)
+                let deltaY = abs(current.y - previous.y)
+                if deltaY > 0.5, deltaX <= max(0.5, deltaY * 0.12) {
+                    minimumX = min(minimumX, current.x)
+                    maximumX = max(maximumX, current.x)
+                    if abs(current.y - runStart.y) >= minimumLength,
+                       maximumX - minimumX <= tolerance {
+                        return true
+                    }
+                } else {
+                    runStart = current
+                    minimumX = current.x
+                    maximumX = current.x
+                }
+                previous = current
+            }
+            return false
+        }
+
+        // A dominant near-vertical endpoint handle is the single-cubic equivalent of a tall rectangular shelf.
+        guard let segment = segments.first else { return false }
+        let ys = [segment.start.y, segment.control1.y, segment.control2.y, segment.end.y]
+        let verticalRange = (ys.max() ?? 0) - (ys.min() ?? 0)
+        guard verticalRange >= minimumLength else { return false }
+        let dominantHandle = max(minimumLength, verticalRange * 0.60)
+        let startHandleX = abs(segment.control1.x - segment.start.x)
+        let startHandleY = abs(segment.control1.y - segment.start.y)
+        let endHandleX = abs(segment.end.x - segment.control2.x)
+        let endHandleY = abs(segment.end.y - segment.control2.y)
+        let startShelf = startHandleY >= dominantHandle
+            && startHandleX <= max(tolerance, startHandleY * 0.12)
+        let endShelf = endHandleY >= dominantHandle
+            && endHandleX <= max(tolerance, endHandleY * 0.12)
+        return startShelf || endShelf
+    }
+
+    func hasPinchedVerticalTurn(
+        minimumRise: CGFloat = 80,
+        minimumRunRatio: CGFloat = 0.35
+    ) -> Bool {
+        segments.contains { segment in
+            let verticalDistance = abs(segment.end.y - segment.start.y)
+            guard verticalDistance >= minimumRise else { return false }
+
+            let xs = [segment.start.x, segment.control1.x, segment.control2.x, segment.end.x]
+            let horizontalRange = (xs.max() ?? 0) - (xs.min() ?? 0)
+            guard horizontalRange < verticalDistance * minimumRunRatio else { return false }
+
+            let startTangent = segment.derivative(at: 0)
+            let endTangent = segment.derivative(at: 1)
+            let startsHorizontally = abs(startTangent.dx) >= abs(startTangent.dy) * 0.75
+            let endsHorizontally = abs(endTangent.dx) >= abs(endTangent.dy) * 0.75
+            return startsHorizontally || endsHorizontally
+        }
     }
 
     /// Offsets a ribbon boundary while keeping its node ports flush with card edges.
@@ -554,6 +602,8 @@ enum TrafficGraphLayout {
     static let relationshipWidth: CGFloat = 1.5
     static let flowOnlyRibbonWidth: CGFloat = 1.5
     static let maximumRibbonWidth: CGFloat = 24
+    static let trafficScaleFloorBytes: Int64 = 1_024
+    static let trafficScaleCeilingBytes: Int64 = 1_073_741_824
 
     static func minimumCanvasWidth(for snapshot: TrafficGraphSnapshot) -> CGFloat {
         let nodeLanes = lanes(snapshot: snapshot)
@@ -827,12 +877,19 @@ enum TrafficGraphLayout {
         return 0.65 + CGFloat(normalized) * 2.6
     }
 
-    static func ribbonWidth(counters: FlowCounters, maximumBytes: Int64) -> CGFloat {
+    static func ribbonWidth(counters: FlowCounters) -> CGFloat {
         let bytes = counters.total
-        guard bytes > 0, maximumBytes > 0 else {
+        guard bytes > 0 else {
             return counters.flows > 0 ? flowOnlyRibbonWidth : 0
         }
-        let normalized = log10(Double(bytes) + 1) / log10(Double(maximumBytes) + 1)
+        guard bytes > trafficScaleFloorBytes else { return 3 }
+        let logarithmicRange = log10(
+            Double(trafficScaleCeilingBytes) / Double(trafficScaleFloorBytes)
+        )
+        let normalized = min(
+            1,
+            log10(Double(bytes) / Double(trafficScaleFloorBytes)) / logarithmicRange
+        )
         return 3 + CGFloat(normalized) * (maximumRibbonWidth - 3)
     }
 
@@ -840,11 +897,9 @@ enum TrafficGraphLayout {
         for snapshot: TrafficGraphSnapshot,
         caps: [TrafficGraphEdgeID: CGFloat]
     ) -> [TrafficGraphEdgeID: CGFloat] {
-        let ribbons = snapshot.edges.filter(\.isTrafficRibbon)
-        let maximum = max(1, ribbons.map { $0.displayedCounters.total }.max() ?? 1)
-        return Dictionary(uniqueKeysWithValues: snapshot.edges.map { edge in
+        Dictionary(uniqueKeysWithValues: snapshot.edges.map { edge in
             guard edge.isTrafficRibbon else { return (edge.id, relationshipWidth) }
-            let width = ribbonWidth(counters: edge.displayedCounters, maximumBytes: maximum)
+            let width = ribbonWidth(counters: edge.displayedCounters)
             guard width > 0 else { return (edge.id, 0) }
             let cap = max(0, caps[edge.id] ?? maximumRibbonWidth)
             let scale = min(1, cap / maximumRibbonWidth)
@@ -1270,8 +1325,6 @@ enum TrafficGraphLayout {
 
             let sourceClear = CGPoint(x: sourceClearX, y: start.y)
             let targetClear = CGPoint(x: targetClearX, y: end.y)
-            // Keep both turn points close to the proven-safe band, but deliberately give them different heights.
-            // The middle cubic therefore continues one broad sweep instead of drawing a long rectangular shelf.
             let sourceBlend: CGFloat = variation.isMultiple(of: 2) ? 0.90 : 0.96
             let targetBlend: CGFloat = variation.isMultiple(of: 2) ? 0.96 : 0.90
             let sourceExit = CGPoint(
@@ -1285,23 +1338,55 @@ enum TrafficGraphLayout {
             let sourceTurnDelta = sourceExitX - sourceClearX
             let middleDelta = targetEntryX - sourceExitX
             let targetTurnDelta = targetClearX - targetEntryX
+
+            // Bow the long middle leg farther away from the cards instead of holding one flat routing band. Align the
+            // adjacent handles with that arch so all joins retain one tangent and read as one continuous movement.
+            let routesAbove = routeY <= min(start.y, end.y)
+            let archDirection: CGFloat = routesAbove ? -1 : 1
+            let availableArch = routesAbove ? routeY - minimumY : maximumY - routeY
+            let requestedArch = max(24, min(64, abs(middleDelta) * 0.10))
+            let archY = routeY + archDirection * min(requestedArch, max(0, availableArch - 2))
+            let middleControl1 = CGPoint(
+                x: sourceExitX + middleDelta / 3,
+                y: archY
+            )
+            let middleControl2 = CGPoint(
+                x: sourceExitX + middleDelta * 2 / 3,
+                y: archY
+            )
+            let sourceJoinScale = min(
+                0.35,
+                abs(sourceTurnDelta) * 0.45 / max(1, abs(middleControl1.x - sourceExit.x))
+            )
+            let targetJoinScale = min(
+                0.35,
+                abs(targetTurnDelta) * 0.45 / max(1, abs(targetEntry.x - middleControl2.x))
+            )
+            let sourceTurnControl2 = CGPoint(
+                x: sourceExit.x - (middleControl1.x - sourceExit.x) * sourceJoinScale,
+                y: sourceExit.y - (middleControl1.y - sourceExit.y) * sourceJoinScale
+            )
+            let targetTurnControl1 = CGPoint(
+                x: targetEntry.x + (targetEntry.x - middleControl2.x) * targetJoinScale,
+                y: targetEntry.y + (targetEntry.y - middleControl2.y) * targetJoinScale
+            )
             let candidateSegments = [
                 horizontalSegment(from: start, to: sourceClear),
                 TrafficGraphCurveSegment(
                     start: sourceClear,
                     control1: CGPoint(x: sourceClearX + sourceTurnDelta * 0.35, y: start.y),
-                    control2: CGPoint(x: sourceClearX + sourceTurnDelta * 0.65, y: sourceExit.y),
+                    control2: sourceTurnControl2,
                     end: sourceExit
                 ),
                 TrafficGraphCurveSegment(
                     start: sourceExit,
-                    control1: CGPoint(x: sourceExitX + middleDelta / 3, y: sourceExit.y),
-                    control2: CGPoint(x: sourceExitX + middleDelta * 2 / 3, y: targetEntry.y),
+                    control1: middleControl1,
+                    control2: middleControl2,
                     end: targetEntry
                 ),
                 TrafficGraphCurveSegment(
                     start: targetEntry,
-                    control1: CGPoint(x: targetEntryX + targetTurnDelta * 0.35, y: targetEntry.y),
+                    control1: targetTurnControl1,
                     control2: CGPoint(x: targetEntryX + targetTurnDelta * 0.65, y: end.y),
                     end: targetClear
                 ),
@@ -1376,7 +1461,9 @@ enum TrafficGraphLayout {
                     guard staysInsideCanvas(candidate),
                           !intersects(candidate, obstacles: obstacles) else { continue }
                     let overlap = corridorOverlap(candidate, with: avoidingRoutes)
-                    if candidate.hasLongHorizontalShelf() || candidate.hasLongVerticalShelf() {
+                    if candidate.hasLongHorizontalShelf()
+                        || candidate.hasLongVerticalShelf()
+                        || candidate.hasPinchedVerticalTurn() {
                         if overlap < shelfFallbackOverlap {
                             obstacleClearShelfFallback = candidate
                             shelfFallbackOverlap = overlap
@@ -1408,9 +1495,12 @@ enum TrafficGraphLayout {
                             routeY: routeY,
                             sourceFraction: sourceFraction,
                             targetFraction: targetFraction
-                        ), !intersects(candidate, obstacles: obstacles) else { continue }
+                        ), staysInsideCanvas(candidate),
+                        !intersects(candidate, obstacles: obstacles) else { continue }
                         let overlap = corridorOverlap(candidate, with: avoidingRoutes)
-                        if candidate.hasLongHorizontalShelf() || candidate.hasLongVerticalShelf() {
+                        if candidate.hasLongHorizontalShelf()
+                        || candidate.hasLongVerticalShelf()
+                        || candidate.hasPinchedVerticalTurn() {
                             if overlap < shelfFallbackOverlap {
                                 obstacleClearShelfFallback = candidate
                                 shelfFallbackOverlap = overlap
@@ -1509,11 +1599,11 @@ enum TrafficGraphLayout {
     }
 
     private static func columnGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
-        guard !snapshot.nodes.isEmpty else { return 80 }
+        guard !snapshot.nodes.isEmpty else { return 120 }
         let density = CGFloat(snapshot.edges.count) / CGFloat(snapshot.nodes.count)
         // Leave enough horizontal runway for a route to bend around the next lane without becoming a near-vertical
         // shelf immediately after its source card. Denser maps gain a little more separation, but remain bounded.
-        return 80 + min(24, density * 4)
+        return 120 + min(24, density * 4)
     }
 
     private static func nodeGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {

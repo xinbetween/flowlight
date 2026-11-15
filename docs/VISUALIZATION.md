@@ -115,7 +115,7 @@ A small focused neighborhood is shown exactly. A large one groups progressively 
 
 ## 0.18.2 — smooth obstacle routes and volume scale
 
-Observed traffic keeps a bounded logarithmic width from 3 to 24 points relative to the largest visible byte total, so KB, MB, and GB evidence remains ordered without one route dominating the map. A zero-byte observation with a positive connection count receives a 1.5-point semantic minimum. At a crowded card port, all attached ribbons may be proportionally compressed below those semantic minima so drawing, routing clearance, hit bounds, and reserved capacity remain identical; byte ordering is preserved. Lineage, configuration, and enforcement relationships remain fixed 1.5-point support strokes with zero traffic counters.
+Observed traffic keeps a bounded absolute logarithmic width from 3 points at 1 KB or less to 24 points at 1 GB or more, so the same byte total has the same raw width in every graph and KB, MB, and GB evidence remains ordered without one route dominating the map. A zero-byte observation with a positive connection count receives a 1.5-point semantic minimum. At a crowded card port, all attached ribbons may be proportionally compressed below those semantic minima so drawing, routing clearance, hit bounds, and reserved capacity remain identical; byte ordering is preserved. Lineage, configuration, and enforcement relationships remain fixed 1.5-point support strokes with zero traffic counters.
 
 A routed-through support leg may carry `trafficVolume` solely to match the terminal observed ribbon's visual width. Its accounting counters remain zero; only the terminal observed edge contributes bytes and connections to graph totals.
 

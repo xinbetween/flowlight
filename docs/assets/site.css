@@ -222,10 +222,10 @@
   .hero h1 { font-size: clamp(40px, 4.8vw, 58px); font-weight: 800; }
   .hero h1 .flow { color: var(--accent); }
   .hero .lede { margin-top: 20px; }
-  .cta { display: grid; grid-template-columns: max-content minmax(170px, 1fr) max-content; gap: 10px;
+  .cta { display: grid; grid-template-columns: max-content minmax(170px, 1fr); gap: 10px;
          margin-top: 28px; align-items: stretch; max-width: 620px; }
-  /* These wrappers preserve the semantic install groups while their children form one visual grid: Store, direct
-     DMG and source on the first line; the complete Homebrew command on the second. */
+  /* These wrappers preserve the semantic install groups while their children form one visual grid: direct DMG and
+     source on the first line; the complete Homebrew command on the second. */
   .install-choices, .install-utility { display: contents; }
   .install-choice { box-sizing: border-box; justify-content: center; min-height: 44px; height: 44px; }
   .direct-download { border-color: #000; background: #000; color: #fff; box-shadow: none; white-space: nowrap; }
