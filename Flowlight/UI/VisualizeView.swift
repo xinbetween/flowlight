@@ -283,6 +283,12 @@ enum ConnectionsRenderPolicy {
     }
 }
 
+enum ConnectionsLoadingMotionPolicy {
+    static func animates(reduceMotion: Bool, staticFixture: Bool) -> Bool {
+        !reduceMotion && !staticFixture
+    }
+}
+
 struct VisualizeView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case traffic, ai
@@ -986,12 +992,30 @@ private enum GraphSelection {
 }
 
 private struct TrafficGraphLoadingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var flipped = false
+    @State private var animationGeneration = 0
+
     var body: some View {
+        let animates = ConnectionsLoadingMotionPolicy.animates(
+            reduceMotion: reduceMotion,
+            staticFixture: Motion.isStaticFixture
+        )
         VStack(spacing: Spacing.m) {
             Image(nsImage: NSApplication.shared.applicationIconImage)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 52, height: 52)
+                .rotation3DEffect(
+                    .degrees(flipped ? 360 : 0),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.55
+                )
+                .animation(animates ? Motion.loadingMark : nil, value: flipped)
+                .onAppear { setAnimationRunning(animates) }
+                .onChange(of: animates) { _, allowed in
+                    setAnimationRunning(allowed)
+                }
             Text(L("Loading visualization…"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(FL.muted)
@@ -1000,6 +1024,18 @@ private struct TrafficGraphLoadingView: View {
         .background(FL.ground)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("Loading visualization…"))
+    }
+
+    private func setAnimationRunning(_ allowed: Bool) {
+        animationGeneration += 1
+        let generation = animationGeneration
+        flipped = false
+        guard allowed else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard animationGeneration == generation else { return }
+            flipped = true
+        }
     }
 }
 

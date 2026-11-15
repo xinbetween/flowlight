@@ -66,6 +66,7 @@ enum PolicySectionExpansion {
     static let managedPacksKey = "policies.sections.managed-packs.expanded"
     static let catalogDetailsKey = "policies.sections.managed-packs.catalog-details.expanded"
     static let managedPacksAnchor = "managed-packs"
+    static let primaryDefaultExpanded = false
 
     static func isCollapsible(_ kind: PolicyInventoryKind) -> Bool {
         kind == .networkRule || kind == .agentAllowlist || kind == .managedPack
@@ -589,9 +590,12 @@ struct RulesView: View {
     @State private var focusPolicyID: String?
     @State private var packSaveErrors: [String: String] = [:]
     @State private var pendingManagedPackFocus: ManagedPackFocusRequest?
-    @AppStorage(PolicySectionExpansion.networkRulesKey) private var networkRulesExpanded = true
-    @AppStorage(PolicySectionExpansion.agentAllowlistsKey) private var agentAllowlistsExpanded = true
-    @AppStorage(PolicySectionExpansion.managedPacksKey) private var managedPacksExpanded = true
+    @AppStorage(PolicySectionExpansion.networkRulesKey)
+    private var networkRulesExpanded = PolicySectionExpansion.primaryDefaultExpanded
+    @AppStorage(PolicySectionExpansion.agentAllowlistsKey)
+    private var agentAllowlistsExpanded = PolicySectionExpansion.primaryDefaultExpanded
+    @AppStorage(PolicySectionExpansion.managedPacksKey)
+    private var managedPacksExpanded = PolicySectionExpansion.primaryDefaultExpanded
     @AppStorage(PolicySectionExpansion.catalogDetailsKey) private var catalogDetailsExpanded = false
 
     private static let policyEffectPageSize = 500

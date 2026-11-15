@@ -8,10 +8,10 @@ import Foundation
 /// is a secret written to disk under a promise that it wouldn't be.
 ///
 /// So the guess stops being the only defence. Headers are kept because they are on a list, not discarded
-/// because they looked dangerous; the amount recorded per app has a ceiling; and the session ends on its own,
-/// because "until someone remembers" is not a limit. The denylist is still here, because someone reading an
-/// unfamiliar API needs to see headers nobody has thought to allow yet — it is a choice now rather than the
-/// only behaviour.
+/// because they looked dangerous, and the amount recorded per app has a configurable ceiling. Inspection remembers
+/// explicit enablement across launches; an optional session timer remains available for people who want automatic
+/// shutoff. The denylist is still here, because someone reading an unfamiliar API needs to see headers nobody has
+/// thought to allow yet — it is a choice now rather than the only behaviour.
 struct InspectionBudget: Sendable, Equatable {
 
     /// What happens to a header's value before it is written down.
@@ -63,8 +63,8 @@ struct InspectionBudget: Sendable, Equatable {
     var dailyBodyBytesPerApp: Int64 = 0
     /// How long recorded exchanges are kept.
     var retentionDays = 3
-    /// Minutes after which inspection turns itself off. 0 means it runs until switched off by hand.
-    var sessionMinutes = 480
+    /// Minutes after which inspection turns itself off. 0 means it remembers explicit enablement until switched off.
+    var sessionMinutes = 0
 
     /// Headers worth reading that never carry a credential.
     ///
@@ -100,7 +100,7 @@ struct InspectionBudget: Sendable, Equatable {
             Keys.headerPolicy: HeaderPolicy.allowlist.rawValue,
             Keys.dailyBodyMBPerApp: 0,
             Keys.retentionDays: 3,
-            Keys.sessionMinutes: 480,
+            Keys.sessionMinutes: 0,
         ])
     }
 

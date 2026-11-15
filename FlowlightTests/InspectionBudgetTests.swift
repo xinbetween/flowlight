@@ -183,10 +183,10 @@ final class InspectionBudgetTests: XCTestCase {
         XCTAssertEqual(InspectionBudget.duration(minutes: 480), "8 hours")
     }
 
-    /// A session that runs until someone remembers is the failure this feature exists for, so the shipped
-    /// default has to be a bounded one.
-    func testInspectionExpiresByDefault() {
-        XCTAssertGreaterThan(InspectionBudget().sessionMinutes, 0)
+    /// Enabling inspection is an explicit consent choice. It should survive relaunches until the same person turns
+    /// it off; automatic expiry remains available as an optional budget setting.
+    func testInspectionRemembersEnablementByDefault() {
+        XCTAssertEqual(InspectionBudget().sessionMinutes, 0)
     }
 
     func testTheSaferHeaderPolicyIsTheDefault() {

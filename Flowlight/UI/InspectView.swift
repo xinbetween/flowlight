@@ -728,7 +728,11 @@ private struct InspectionSetup: View {
                 }
                 .padding(.top, 10)
             } label: {
-                Text(L("Advanced")).font(.headline)
+                Text(L("Advanced"))
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { showAdvanced.toggle() }
             }
 
             DisclosureGroup(isExpanded: $showMocks) {
@@ -741,7 +745,10 @@ private struct InspectionSetup: View {
                               systemImage: "wand.and.stars")
                             .font(.caption.bold()).foregroundStyle(FL.tool)
                     }
+                    Spacer(minLength: 0)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { showMocks.toggle() }
             }
 
             DisclosureGroup(isExpanded: $showRewrites) {
@@ -754,7 +761,10 @@ private struct InspectionSetup: View {
                               systemImage: "slider.horizontal.3")
                             .font(.caption.bold()).foregroundStyle(FL.tool)
                     }
+                    Spacer(minLength: 0)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { showRewrites.toggle() }
             }
 
             if ProductCapabilities.current.responseTransforms {
@@ -768,7 +778,10 @@ private struct InspectionSetup: View {
                                   systemImage: "arrow.left.arrow.right")
                                 .font(.caption.bold()).foregroundStyle(FL.tool)
                         }
+                        Spacer(minLength: 0)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { showResponseTransforms.toggle() }
                 }
             }
         }

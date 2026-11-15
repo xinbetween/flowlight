@@ -4050,8 +4050,8 @@ final class TrafficGraphTests: XCTestCase {
             .appendingPathComponent("demo-graph-\(UUID().uuidString).sqlite")
         let database = try TrafficDatabase(url: url)
         try DemoData.seed(database, now: now)
-        let from = now.addingTimeInterval(-Granularity.week.defaultWindow)
-        let rows = try database.aiVisualizationRows(.week, from: from, to: now)
+        let from = now.addingTimeInterval(-Granularity.hour.defaultWindow)
+        let rows = try database.aiVisualizationRows(.hour, from: from, to: now)
         let attempts = try database.blockedAttempts(from: from, to: now)
         let resolved = DemoData.agentGateways.map {
             ResolvedAgentGateway(config: $0, identity: DemoData.gatewayIdentity($0.endpoint))
@@ -4075,8 +4075,25 @@ final class TrafficGraphTests: XCTestCase {
             CGRect(origin: .zero, size: size).contains(layout.contentBounds),
             "every routed ribbon must stay inside the canvas so Fit cannot reveal pre-transform clipping: \(layout.contentBounds) in \(size)"
         )
+        var smoothFallbackCount = 0
         for edge in build.map.edges {
             let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+            XCTAssertTrue(curve.hasContinuousTangents(), "route \(edge.id.rawValue) has a visible corner")
+            if curve.segments.count > 1 {
+                smoothFallbackCount += 1
+            }
+            XCTAssertFalse(
+                curve.hasLongHorizontalShelf(),
+                "route \(edge.id.rawValue) falls back to a rounded rectangle shelf: \(curve)"
+            )
+            if let sourceFrame = layout.nodeFrames[edge.source],
+               let targetFrame = layout.nodeFrames[edge.target],
+               abs(sourceFrame.midX - targetFrame.midX) > 1 {
+                XCTAssertFalse(
+                    curve.hasLongVerticalShelf(),
+                    "route \(edge.id.rawValue) forms a tall rectangular detour"
+                )
+            }
             let obstacles = layout.nodeFrames.filter { id, _ in
                 id != edge.source && id != edge.target
             }
@@ -4092,6 +4109,11 @@ final class TrafficGraphTests: XCTestCase {
                 }
             }
         }
+        XCTAssertGreaterThan(
+            smoothFallbackCount,
+            0,
+            "the demo topology must exercise the bounded smooth obstacle fallback"
+        )
         for leftIndex in build.map.edges.indices {
             for rightIndex in build.map.edges.indices where rightIndex > leftIndex {
                 let left = build.map.edges[leftIndex]
@@ -4254,9 +4276,107 @@ final class TrafficGraphTests: XCTestCase {
         let observed = try! XCTUnwrap(snapshot.edges.first { $0.relationship == .observed })
 
         XCTAssertEqual(route.displayedCounters.total, 4_300_000_000)
-        XCTAssertEqual(route.counters.total, 0, "route width metadata must not duplicate graph accounting")
+        XCTAssertEqual(route.counters, FlowCounters(), "route width metadata must not duplicate graph accounting")
+        XCTAssertEqual(route.trafficVolume, observed.counters)
         XCTAssertEqual(layout.edgeWidths[route.id], layout.edgeWidths[observed.id])
+        XCTAssertEqual(snapshot.edges.reduce(Int64(0)) { $0 + $1.counters.total }, observed.counters.total)
         XCTAssertEqual(snapshot.visibleTotal.total, 4_300_000_000)
+    }
+
+    func testProductionRibbonWidthUsesBytesAndKeepsFlowOnlyEvidenceVisible() {
+        let maximum: Int64 = 1_073_741_824
+        let kilobytes = TrafficGraphLayout.ribbonWidth(
+            counters: FlowCounters(bytesIn: 1_024, flows: 1),
+            maximumBytes: maximum
+        )
+        let megabytes = TrafficGraphLayout.ribbonWidth(
+            counters: FlowCounters(bytesIn: 1_048_576, flows: 1),
+            maximumBytes: maximum
+        )
+        let gigabytes = TrafficGraphLayout.ribbonWidth(
+            counters: FlowCounters(bytesIn: maximum, flows: 1),
+            maximumBytes: maximum
+        )
+
+        XCTAssertLessThan(kilobytes, megabytes)
+        XCTAssertLessThan(megabytes, gigabytes)
+        XCTAssertGreaterThanOrEqual(kilobytes, 3)
+        XCTAssertLessThanOrEqual(gigabytes, TrafficGraphLayout.maximumRibbonWidth)
+        XCTAssertEqual(
+            TrafficGraphLayout.ribbonWidth(
+                counters: FlowCounters(flows: 1),
+                maximumBytes: maximum
+            ),
+            TrafficGraphLayout.flowOnlyRibbonWidth
+        )
+        XCTAssertEqual(
+            TrafficGraphLayout.ribbonWidth(counters: FlowCounters(), maximumBytes: maximum),
+            0
+        )
+        XCTAssertEqual(TrafficGraphLayout.relationshipWidth, 1.5)
+    }
+
+    func testRibbonWidthsNeverExceedCompressedPortCapacity() {
+        let source = TrafficGraphNodeID(rawValue: "app:source")
+        let target = TrafficGraphNodeID(rawValue: "destination:target")
+        let bytes = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "bytes"),
+            source: source,
+            target: target,
+            counters: FlowCounters(bytesIn: 1_024, flows: 1),
+            filter: .none
+        )
+        let flowOnly = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "flow-only"),
+            source: source,
+            target: target,
+            counters: FlowCounters(flows: 1),
+            filter: .none
+        )
+        let empty = TrafficGraphEdge(
+            id: TrafficGraphEdgeID(rawValue: "empty"),
+            source: source,
+            target: target,
+            counters: FlowCounters(),
+            filter: .none
+        )
+        let snapshot = TrafficGraphSnapshot(
+            nodes: [],
+            edges: [bytes, flowOnly, empty],
+            total: bytes.counters,
+            hidden: .none
+        )
+        let widths = TrafficGraphLayout.trafficWidths(
+            for: snapshot,
+            caps: [bytes.id: 1, flowOnly.id: 0.75, empty.id: 0.5]
+        )
+
+        XCTAssertEqual(widths[bytes.id], 1)
+        XCTAssertEqual(widths[flowOnly.id], 0.75)
+        XCTAssertEqual(widths[empty.id], 0)
+    }
+
+    func testContinuousTangentsIgnoreZeroLengthEndpointStubs() {
+        let zero = TrafficGraphCurveSegment(
+            start: .zero,
+            control1: .zero,
+            control2: .zero,
+            end: .zero
+        )
+        let first = TrafficGraphCurveSegment(
+            start: .zero,
+            control1: CGPoint(x: 10, y: 0),
+            control2: CGPoint(x: 20, y: 0),
+            end: CGPoint(x: 30, y: 0)
+        )
+        let second = TrafficGraphCurveSegment(
+            start: CGPoint(x: 30, y: 0),
+            control1: CGPoint(x: 40, y: 0),
+            control2: CGPoint(x: 50, y: 10),
+            end: CGPoint(x: 60, y: 10)
+        )
+
+        XCTAssertTrue(TrafficGraphCurve(segments: [zero, first, second, zero]).hasContinuousTangents())
     }
 
     func testSankeyRibbonsStayInsideNodePortsAndScaleWithTraffic() {

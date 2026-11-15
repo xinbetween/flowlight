@@ -710,12 +710,11 @@ final class InspectionController: ObservableObject {
         scheduleSessionExpiry()
     }
 
-    // MARK: The session ends by itself
+    // MARK: Optional automatic session end
 
-    /// Inspection used to run until somebody remembered to turn it off, which meant the most sensitive mode in the
-    /// app was the one most likely to be left on after the reason for it had passed. It now has an end, and the
-    /// end is visible on screen rather than implied — a countdown you can see is a countdown you can extend on
-    /// purpose, where a silent one would just look like inspection breaking.
+    /// Explicit enablement persists until it is switched off. People who choose an automatic session limit still get
+    /// a visible end rather than an implied one — a countdown they can see and deliberately restart, where a silent
+    /// timeout would just look like inspection breaking.
     private func scheduleSessionExpiry() {
         sessionTimer?.invalidate()
         sessionTimer = nil

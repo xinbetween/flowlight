@@ -19,6 +19,8 @@ enum Motion {
     static let value = Animation.easeInOut(duration: 0.45)
     /// A complete Connections generation replacing its loader. Geometry never animates between generations.
     static let graphReveal = Animation.easeOut(duration: 0.18)
+    /// The Flowlight mark turns only while Connections is waiting for its complete generation.
+    static let loadingMark = Animation.easeInOut(duration: 1.05).repeatForever(autoreverses: false)
     /// Something that repeats while a state lasts — a pulse while capture is live.
     static let breathing = Animation.easeInOut(duration: 1.6).repeatForever(autoreverses: true)
 
