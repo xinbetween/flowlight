@@ -871,6 +871,7 @@ final class InspectionController: ObservableObject {
         }
         objectWillChange.send()
         refreshStatus()
+        scheduleSessionExpiry()
     }
 
     /// Starts or stops the proxy to match the setting.

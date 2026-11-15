@@ -165,9 +165,10 @@ def homepage_installation_problems(source, label):
         href_match = re.search(r"\bhref\s*=\s*(['\"])(.*?)\1", anchor, re.I | re.S)
         classes = set(class_match.group(2).lower().split()) if class_match else set()
         href = href_match.group(2) if href_match else ""
-        if {"install-choice", "direct-download"}.issubset(classes) and (
-            href == "{{dmg}}" or href.endswith("/releases/latest/download/Flowlight.dmg")
-        ):
+        if {"install-choice", "direct-download"}.issubset(classes) and href in {
+            "{{dmg}}",
+            "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg",
+        }:
             direct_download = True
             break
     if not direct_download:

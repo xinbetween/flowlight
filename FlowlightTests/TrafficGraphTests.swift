@@ -3882,6 +3882,14 @@ final class TrafficGraphTests: XCTestCase {
             TrafficGraphFlowDash.borderOffset(totalWidth: 20, direction: .sent),
             8.9
         )
+        XCTAssertEqual(
+            TrafficGraphFlowDash.boundedStrokeWidth(preferred: 2.2, laneWidth: 0.025),
+            0.025
+        )
+        XCTAssertEqual(
+            TrafficGraphFlowDash.boundedStrokeWidth(preferred: 1.15, laneWidth: 4),
+            1.15
+        )
     }
 
     func testMotionPolicyCapsAndPrioritizesVisibleFocusedPaths() {
@@ -4148,6 +4156,49 @@ final class TrafficGraphTests: XCTestCase {
         }
     }
 
+    func testDemoAIWeekMapKeepsEveryRelationshipCardClearAndShelfFree() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("demo-week-graph-\(UUID().uuidString).sqlite")
+        let database = try TrafficDatabase(url: url)
+        try DemoData.seed(database, now: now)
+        let from = now.addingTimeInterval(-Granularity.week.defaultWindow)
+        let rows = try database.aiVisualizationRows(.week, from: from, to: now)
+        let attempts = try database.blockedAttempts(from: from, to: now)
+        let resolved = DemoData.agentGateways.map {
+            ResolvedAgentGateway(config: $0, identity: DemoData.gatewayIdentity($0.endpoint))
+        }
+        let partition = LocalGatewaySupportLegReconciler.partition(rows, gateways: resolved)
+        let build = AITrafficGraphBuilder.buildForPresentation(
+            rows: partition.observed,
+            lineageRows: partition.support,
+            blockedAttempts: attempts,
+            gateways: DemoData.agentGateways,
+            resolveGateway: { DemoData.gatewayIdentity($0) }
+        )
+        let size = CGSize(
+            width: max(1_280, TrafficGraphLayout.minimumCanvasWidth(for: build.map)),
+            height: max(800, TrafficGraphLayout.minimumCanvasHeight(for: build.map))
+        )
+        let layout = TrafficGraphLayout.layout(snapshot: build.map, in: CGRect(origin: .zero, size: size))
+
+        XCTAssertEqual(layout.edgeCurves.count, build.map.edges.count)
+        for edge in build.map.edges {
+            let curve = try XCTUnwrap(layout.edgeCurves[edge.id])
+            XCTAssertTrue(curve.hasContinuousTangents(), "week route \(edge.id.rawValue) has a visible corner")
+            XCTAssertFalse(curve.hasLongHorizontalShelf(), "week route \(edge.id.rawValue) has a horizontal shelf")
+            XCTAssertFalse(curve.hasPinchedVerticalTurn(), "week route \(edge.id.rawValue) has a pinched turn")
+            let obstacles = layout.nodeFrames.filter { id, _ in id != edge.source && id != edge.target }
+            for step in 1..<100 {
+                let point = curve.point(at: CGFloat(step) / 100)
+                XCTAssertFalse(
+                    obstacles.values.contains { $0.insetBy(dx: -10, dy: -10).contains(point) },
+                    "week route \(edge.id.rawValue) crosses an unrelated card near \(point)"
+                )
+            }
+        }
+    }
+
     func testDemoTrafficMapFitsTheVisibleCanvasInsteadOfCollapsingToAThumbnail() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let url = FileManager.default.temporaryDirectory
@@ -4394,6 +4445,18 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(widths[bytes.id], 1)
         XCTAssertEqual(widths[flowOnly.id], 0.75)
         XCTAssertEqual(widths[empty.id], 0)
+    }
+
+    func testImpossibleObstacleRouteNeverRestoresTheKnownCollidingDirectCurve() {
+        let route = TrafficGraphLayout.sankeyCurve(
+            start: CGPoint(x: 10, y: 50),
+            end: CGPoint(x: 90, y: 50),
+            avoiding: [CGRect(x: 30, y: -20, width: 40, height: 140)],
+            width: 3,
+            within: CGRect(x: 0, y: 0, width: 100, height: 100)
+        )
+
+        XCTAssertNil(route, "an impossible Map route must not be drawn through an unrelated card")
     }
 
     func testContinuousTangentsIgnoreZeroLengthEndpointStubs() {
@@ -4752,6 +4815,44 @@ final class TrafficGraphTests: XCTestCase {
         let layout = TrafficGraphLayout.layout(snapshot: snapshot, in: bounds)
 
         XCTAssertEqual(TrafficGraphLayout.crossingCount(snapshot: snapshot, layout: layout), 0)
+    }
+
+    func testExtraColumnRunwayIsLimitedToRelationshipsThatSkipAnActiveStage() {
+        let source = TrafficGraphNodeID(rawValue: "agent:source")
+        let tool = TrafficGraphNodeID(rawValue: "tool:child")
+        let target = TrafficGraphNodeID(rawValue: "destination:target")
+        let nodes = [
+            TrafficGraphNode(id: source, kind: .agent, title: "Source", detail: "", appPath: "",
+                             filter: .none, counters: FlowCounters()),
+            TrafficGraphNode(id: tool, kind: .tool, title: "Tool", detail: "", appPath: "",
+                             filter: .none, counters: FlowCounters()),
+            TrafficGraphNode(id: target, kind: .destination, title: "Target", detail: "", appPath: "",
+                             filter: .none, counters: FlowCounters())
+        ]
+        let adjacentEdges = [
+            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "source-tool"), source: source, target: tool,
+                             counters: FlowCounters(), filter: .none, relationship: .runs),
+            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "tool-target"), source: tool, target: target,
+                             counters: FlowCounters(bytesIn: 1, flows: 1), filter: .none)
+        ]
+        let adjacent = TrafficGraphSnapshot(
+            nodes: nodes,
+            edges: adjacentEdges,
+            total: FlowCounters(bytesIn: 1, flows: 1),
+            hidden: .none
+        )
+        let skipped = TrafficGraphSnapshot(
+            nodes: nodes,
+            edges: adjacentEdges + [
+                TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "source-target"), source: source, target: target,
+                                 counters: FlowCounters(bytesIn: 1, flows: 1), filter: .none)
+            ],
+            total: FlowCounters(bytesIn: 2, flows: 2),
+            hidden: .none
+        )
+
+        XCTAssertLessThan(TrafficGraphLayout.columnGap(for: adjacent), 90)
+        XCTAssertGreaterThan(TrafficGraphLayout.columnGap(for: skipped), 120)
     }
 
     func testDensityAwareCanvasKeepsEverySemanticColumnInsideBounds() {

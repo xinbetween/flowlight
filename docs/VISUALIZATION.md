@@ -119,7 +119,7 @@ Observed traffic keeps a bounded absolute logarithmic width from 3 points at 1 K
 
 A routed-through support leg may carry `trafficVolume` solely to match the terminal observed ribbon's visual width. Its accounting counters remain zero; only the terminal observed edge contributes bytes and connections to graph totals.
 
-When one cubic cannot avoid every padded card, the non-dense fallback evaluates at most 64 deterministic route-band/waypoint candidates. It prefers paths with continuous forward tangents and no long horizontal or vertical shelves, stays inside the canvas, and preserves the same obstacle and ribbon-width clearance. Cross-lane spacing supplies enough horizontal runway for these smooth turns. If an extreme topology offers only a shelf-shaped obstacle-clear route, card clearance wins over aesthetics instead of restoring a direct curve through a card. Dense graphs retain their smaller bounded single-cubic search.
+When one cubic cannot avoid every padded card, the non-dense fallback evaluates at most 64 deterministic route-band/waypoint candidates. It prefers paths with continuous forward tangents and no long horizontal or vertical shelves, stays inside the canvas, and preserves card and ribbon-width clearance. Cross-lane spacing supplies enough horizontal runway for these smooth turns. If an extreme topology offers only a shelf-shaped obstacle-clear route, card clearance wins over aesthetics instead of restoring a direct curve through a card. Dense graphs retain their smaller bounded single-cubic search.
 
 ### Acceptance tests
 

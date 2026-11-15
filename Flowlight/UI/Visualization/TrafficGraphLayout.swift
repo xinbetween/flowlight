@@ -406,6 +406,10 @@ enum TrafficGraphFlowDash {
             sent: TrafficGraphFlowDashLane(width: sentWidth, offset: receivedWidth / 2)
         )
     }
+
+    static func boundedStrokeWidth(preferred: CGFloat, laneWidth: CGFloat) -> CGFloat {
+        min(max(0, preferred), max(0, laneWidth))
+    }
 }
 
 enum TrafficGraphMotionPolicy {
@@ -800,7 +804,7 @@ enum TrafficGraphLayout {
                 between: start,
                 and: end
             )
-            let direct: TrafficGraphCurve
+            let direct: TrafficGraphCurve?
             if nodeLanes[edge.source] == nodeLanes[edge.target] {
                 direct = sameLaneCurve(
                     start: start,
@@ -825,7 +829,9 @@ enum TrafficGraphLayout {
                                        routeOffset: fanoutOffset, avoiding: obstacles,
                                        width: width, within: bounds)
             }
-            curves[edge.id] = direct
+            if let direct {
+                curves[edge.id] = direct
+            }
         }
         var widthCaps = capacityWidths
         for edge in snapshot.edges where !edge.isTrafficRibbon {
@@ -1150,7 +1156,7 @@ enum TrafficGraphLayout {
         corridorOverlap(candidate, with: routes) >= 8
     }
 
-    private static func sankeyCurve(
+    static func sankeyCurve(
         start: CGPoint,
         end: CGPoint,
         avoiding obstacles: [CGRect] = [],
@@ -1158,7 +1164,7 @@ enum TrafficGraphLayout {
         within bounds: CGRect,
         variation: Int = 0,
         avoidingRoutes: [TrafficGraphCurve] = []
-    ) -> TrafficGraphCurve {
+    ) -> TrafficGraphCurve? {
         let controlOffset = max(24, abs(end.x - start.x) * 0.42)
         let direction: CGFloat = end.x >= start.x ? 1 : -1
         let direct = TrafficGraphCurve(
@@ -1167,20 +1173,22 @@ enum TrafficGraphLayout {
             control2: CGPoint(x: end.x - controlOffset * direction, y: end.y),
             end: end
         )
-        let clearance = 10 + max(0.5, width / 2)
+        let denseSearch = obstacles.count > 160
+        let clearance = (denseSearch ? 4 : 10) + max(0.5, width / 2)
         let padded = obstacles.map { $0.insetBy(dx: -clearance, dy: -clearance) }
         let directBounds = controlBounds(direct)
-        let routingObstacles = padded.count > 160
+        let routingObstacles = denseSearch
             ? padded.filter { directBounds.intersects($0) }
             : padded
-        guard intersects(direct, obstacles: padded)
+        let directIntersectsObstacle = intersects(direct, obstacles: padded)
+        guard directIntersectsObstacle
                 || sharesCorridor(direct, with: avoidingRoutes) else { return direct }
 
         let above = (padded.map(\.minY).min() ?? min(start.y, end.y)) - 16
         let below = (padded.map(\.maxY).max() ?? max(start.y, end.y)) + 16
         let preferAbove = abs(start.y - above) + abs(end.y - above)
             <= abs(start.y - below) + abs(end.y - below)
-        return routedCurve(
+        if let routed = routedCurve(
             start: start,
             end: end,
             obstacles: padded,
@@ -1190,7 +1198,14 @@ enum TrafficGraphLayout {
             within: bounds,
             variation: variation,
             avoidingRoutes: avoidingRoutes
-        ) ?? direct
+        ) {
+            return routed
+        }
+
+        // Corridor separation is an aesthetic preference, so a card-clear direct route remains truthful when no
+        // separated candidate exists. A route already proved to cross a card is never restored: List retains the exact
+        // relationship while Map omits geometry that would falsely run through an unrelated node.
+        return directIntersectsObstacle ? nil : direct
     }
 
     private static func routedCurve(
@@ -1499,8 +1514,8 @@ enum TrafficGraphLayout {
                         !intersects(candidate, obstacles: obstacles) else { continue }
                         let overlap = corridorOverlap(candidate, with: avoidingRoutes)
                         if candidate.hasLongHorizontalShelf()
-                        || candidate.hasLongVerticalShelf()
-                        || candidate.hasPinchedVerticalTurn() {
+                            || candidate.hasLongVerticalShelf()
+                            || candidate.hasPinchedVerticalTurn() {
                             if overlap < shelfFallbackOverlap {
                                 obstacleClearShelfFallback = candidate
                                 shelfFallbackOverlap = overlap
@@ -1515,6 +1530,12 @@ enum TrafficGraphLayout {
                     }
                 }
             }
+        }
+        if let obstacleClearFallback,
+           let obstacleClearShelfFallback {
+            return fallbackOverlap <= shelfFallbackOverlap
+                ? obstacleClearFallback
+                : obstacleClearShelfFallback
         }
         return obstacleClearFallback ?? obstacleClearShelfFallback
     }
@@ -1598,12 +1619,25 @@ enum TrafficGraphLayout {
         }
     }
 
-    private static func columnGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
-        guard !snapshot.nodes.isEmpty else { return 120 }
+    static func columnGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
+        guard !snapshot.nodes.isEmpty else { return 80 }
+        let nodeLanes = lanes(snapshot: snapshot)
+        let activeLanes = Lane.allCases.filter { lane in
+            snapshot.nodes.contains { nodeLanes[$0.id] == lane }
+        }
+        let laneIndexes = Dictionary(uniqueKeysWithValues: activeLanes.enumerated().map { ($0.element, $0.offset) })
+        let skipsActiveLane = snapshot.edges.contains { edge in
+            guard let sourceLane = nodeLanes[edge.source],
+                  let targetLane = nodeLanes[edge.target],
+                  let sourceIndex = laneIndexes[sourceLane],
+                  let targetIndex = laneIndexes[targetLane] else { return false }
+            return abs(sourceIndex - targetIndex) > 1
+        }
         let density = CGFloat(snapshot.edges.count) / CGFloat(snapshot.nodes.count)
-        // Leave enough horizontal runway for a route to bend around the next lane without becoming a near-vertical
-        // shelf immediately after its source card. Denser maps gain a little more separation, but remain bounded.
-        return 120 + min(24, density * 4)
+        // Only a relationship that skips an occupied stage needs extra runway to curve around that stage. Ordinary
+        // adjacent-stage maps keep the compact spacing; denser maps gain a little more separation, but remain bounded.
+        let base: CGFloat = skipsActiveLane ? 120 : 80
+        return base + min(24, density * 4)
     }
 
     private static func nodeGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {

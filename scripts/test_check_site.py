@@ -162,6 +162,13 @@ class HomepageInstallationTests(unittest.TestCase):
         source = self.clean_home.replace('href="{{dmg}}"', 'href="#"') + '<a href="{{dmg}}">Footer</a>'
         self.assertIn("fixture: direct Developer DMG download is missing", self.problems(source))
 
+    def test_direct_download_rejects_an_untrusted_origin_with_the_same_asset_path(self):
+        source = self.clean_home.replace(
+            'href="{{dmg}}"',
+            'href="https://untrusted.example/releases/latest/download/Flowlight.dmg"',
+        )
+        self.assertIn("fixture: direct Developer DMG download is missing", self.problems(source))
+
 
 if __name__ == "__main__":
     unittest.main()

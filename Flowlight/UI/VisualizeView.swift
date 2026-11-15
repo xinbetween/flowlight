@@ -1286,7 +1286,13 @@ private struct TrafficGraphCanvas: View {
                             direction: .received
                         ))),
                         with: .color(FL.graphReceived.opacity(laneOpacity)),
-                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
+                        style: StrokeStyle(
+                            lineWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                preferred: GraphStyle.staticLaneWidth,
+                                laneWidth: lanes.received.width
+                            ),
+                            lineCap: .round
+                        )
                     )
                     if emphasized {
                         context.fill(
@@ -1302,7 +1308,13 @@ private struct TrafficGraphCanvas: View {
                             direction: .sent
                         ))),
                         with: .color(FL.graphSent.opacity(laneOpacity)),
-                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
+                        style: StrokeStyle(
+                            lineWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                preferred: GraphStyle.staticLaneWidth,
+                                laneWidth: lanes.sent.width
+                            ),
+                            lineCap: .round
+                        )
                     )
                     if emphasized {
                         context.fill(
@@ -1363,7 +1375,10 @@ private struct TrafficGraphCanvas: View {
                                     edgeID: edge.id,
                                     direction: .sent,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                    lineWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                        preferred: TrafficGraphFlowDash.strokeWidth,
+                                        laneWidth: lanes.sent.width
+                                    )
                                 )
                             )
                         }
@@ -1379,7 +1394,10 @@ private struct TrafficGraphCanvas: View {
                                     edgeID: edge.id,
                                     direction: .received,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                    lineWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                        preferred: TrafficGraphFlowDash.strokeWidth,
+                                        laneWidth: lanes.received.width
+                                    )
                                 )
                             )
                         }
