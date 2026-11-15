@@ -185,6 +185,7 @@ class ReleaseCheckTests(unittest.TestCase):
 
     def test_requires_stable_codeql_gate_instead_of_optional_analyzers(self):
         self.assertIn(("github-actions", "CodeQL / gate"), REQUIRED_CHECKS)
+        self.assertNotIn(("github-advanced-security", "CodeQL"), REQUIRED_CHECKS)
         for language in ("swift", "python", "actions"):
             self.assertNotIn(("github-actions", f"analyze ({language})"), REQUIRED_CHECKS)
 
@@ -202,6 +203,33 @@ class ReleaseCheckTests(unittest.TestCase):
             })
         errors, _, _ = run_verify(checks=checks, runs=runs_document)
         self.assertTrue(any("CodeQL / gate" in error for error in errors))
+
+    def test_redundant_github_advanced_security_check_may_be_neutral(self):
+        checks, runs = successful_evidence()
+        checks[0]["check_runs"].append({
+            "id": 999,
+            "name": "CodeQL",
+            "status": "completed",
+            "conclusion": "neutral",
+            "details_url": f"https://github.com/{REPO}/runs/999",
+            "app": {"slug": "github-advanced-security"},
+        })
+
+        errors, _, _ = run_verify(checks=checks, runs=runs)
+
+        self.assertEqual(errors, [])
+
+    def test_neutral_canonical_codeql_gate_is_still_rejected(self):
+        checks, runs = successful_evidence()
+        gate = next(
+            check for check in checks[0]["check_runs"]
+            if check["name"] == "CodeQL / gate"
+        )
+        gate["conclusion"] = "neutral"
+
+        errors, _, _ = run_verify(checks=checks, runs=runs)
+
+        self.assertTrue(any("CodeQL / gate" in error and "not successful" in error for error in errors))
 
     def test_newer_failure_cannot_hide_behind_older_success(self):
         checks, runs = successful_evidence()

@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.2, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.3, macOS 15 or later.
 
  On this page
 
@@ -932,7 +932,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.2macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.3macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1676,8 +1676,8 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.18.2
-November 14, 2026Latest
+ 0.18.3
+November 15, 2026Latest
 
  Show Connections loading again. The Flowlight mark restores its lightweight flip while data and final graph geometry load, stays still with Reduce Motion, and remains deterministic in screenshot fixtures.
 
@@ -1690,6 +1690,8 @@ November 14, 2026Latest
  Open Policies as a compact overview. Network rules, Agent allowlists, and Managed packs now start folded independently while retaining their status summaries and full-row controls.
 
  Keep public installation choices truthful. The homepage keeps the Developer download, GitHub, and Homebrew paths while temporarily withholding Mac App Store promotion until Apple approves the intended current Store version.
+
+ Keep release evidence canonical. Signed preparation trusts the successful CodeQL workflow gate and ignores GitHub’s redundant neutral status check, while retaining exact workflow, pull request, reviewer, and commit provenance.
 
  0.18.1
 November 12, 2026
