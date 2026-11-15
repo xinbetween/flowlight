@@ -93,6 +93,7 @@ struct InspectionBudget: Sendable, Equatable {
         static let dailyBodyMBPerApp = "inspection.dailyBodyMBPerApp"
         static let retentionDays = "inspection.retentionDays"
         static let sessionMinutes = "inspection.sessionMinutes"
+        static let persistentSessionMigration = "inspection.persistentSessionMigration.0182"
     }
 
     static func registerDefaults() {
@@ -117,6 +118,16 @@ struct InspectionBudget: Sendable, Equatable {
         budget.extraRedactionPatterns = (defaults.array(forKey: Keys.extraRedactionPatterns) as? [String]) ?? []
         budget.dailyBodyBytesPerApp = Int64(max(0, defaults.integer(forKey: Keys.dailyBodyMBPerApp))) * 1_000_000
         budget.retentionDays = max(1, defaults.integer(forKey: Keys.retentionDays))
+        if !defaults.bool(forKey: Keys.persistentSessionMigration) {
+            // 0.18.1 saved its eight-hour default whenever any budget field changed. That value cannot be
+            // distinguished from an explicit eight-hour choice, so migrate it once; choosing eight hours again after
+            // this release remains an explicit persistent timer.
+            if let stored = defaults.object(forKey: Keys.sessionMinutes) as? NSNumber,
+               stored.intValue == 480 {
+                defaults.set(0, forKey: Keys.sessionMinutes)
+            }
+            defaults.set(true, forKey: Keys.persistentSessionMigration)
+        }
         budget.sessionMinutes = max(0, defaults.integer(forKey: Keys.sessionMinutes))
         return budget
     }

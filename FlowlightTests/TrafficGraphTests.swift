@@ -3883,6 +3883,14 @@ final class TrafficGraphTests: XCTestCase {
             8.9
         )
         XCTAssertEqual(
+            TrafficGraphFlowDash.borderOffset(
+                totalWidth: 20,
+                direction: .received,
+                paintedWidth: 0.025
+            ),
+            -9.9875
+        )
+        XCTAssertEqual(
             TrafficGraphFlowDash.boundedStrokeWidth(preferred: 2.2, laneWidth: 0.025),
             0.025
         )
@@ -4447,16 +4455,37 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(widths[empty.id], 0)
     }
 
-    func testImpossibleObstacleRouteNeverRestoresTheKnownCollidingDirectCurve() {
-        let route = TrafficGraphLayout.sankeyCurve(
+    func testImpossibleObstacleRoutesNeverRestoreKnownCollidingCurves() {
+        let bounds = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let crossLaneWall = CGRect(x: 30, y: -20, width: 40, height: 140)
+        let crossLaneTraffic = TrafficGraphLayout.sankeyCurve(
             start: CGPoint(x: 10, y: 50),
             end: CGPoint(x: 90, y: 50),
-            avoiding: [CGRect(x: 30, y: -20, width: 40, height: 140)],
+            avoiding: [crossLaneWall],
             width: 3,
-            within: CGRect(x: 0, y: 0, width: 100, height: 100)
+            within: bounds
+        )
+        let crossLaneRelationship = TrafficGraphLayout.parallelCurve(
+            start: CGPoint(x: 10, y: 50),
+            end: CGPoint(x: 90, y: 50),
+            fanout: 0,
+            routeOffset: 0,
+            avoiding: [crossLaneWall],
+            width: 1.5,
+            within: bounds
+        )
+        let sameLane = TrafficGraphLayout.sameLaneCurve(
+            start: CGPoint(x: 50, y: 10),
+            end: CGPoint(x: 50, y: 90),
+            side: .right,
+            avoiding: [CGRect(x: -20, y: 30, width: 140, height: 40)],
+            width: 1.5,
+            within: bounds
         )
 
-        XCTAssertNil(route, "an impossible Map route must not be drawn through an unrelated card")
+        XCTAssertNil(crossLaneTraffic)
+        XCTAssertNil(crossLaneRelationship)
+        XCTAssertNil(sameLane)
     }
 
     func testContinuousTangentsIgnoreZeroLengthEndpointStubs() {
@@ -4683,16 +4712,16 @@ final class TrafficGraphTests: XCTestCase {
         }
     }
 
-    func testSameLaneRelationshipTriesTheClearOppositeSide() {
+    func testSameLaneRelationshipTriesTheClearOppositeSide() throws {
         let obstacle = CGRect(x: 170, y: 0, width: 360, height: 400)
-        let curve = TrafficGraphLayout.sameLaneCurve(
+        let curve = try XCTUnwrap(TrafficGraphLayout.sameLaneCurve(
             start: CGPoint(x: 150, y: 50),
             end: CGPoint(x: 150, y: 350),
             side: .right,
             avoiding: [obstacle],
             width: 1.5,
             within: CGRect(x: 0, y: 0, width: 600, height: 400)
-        )
+        ))
         let padded = obstacle.insetBy(dx: -10.75, dy: -10.75)
 
         XCTAssertLessThan(curve.point(at: 0.5).x, 150)
@@ -4817,22 +4846,32 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(TrafficGraphLayout.crossingCount(snapshot: snapshot, layout: layout), 0)
     }
 
-    func testExtraColumnRunwayIsLimitedToRelationshipsThatSkipAnActiveStage() {
+    func testExtraColumnRunwayIsLimitedToTheSkippedRelationshipCorridor() {
+        let launcher = TrafficGraphNodeID(rawValue: "launcher:terminal")
         let source = TrafficGraphNodeID(rawValue: "agent:source")
         let tool = TrafficGraphNodeID(rawValue: "tool:child")
+        let gateway = TrafficGraphNodeID(rawValue: "proxy:gateway")
         let target = TrafficGraphNodeID(rawValue: "destination:target")
         let nodes = [
+            TrafficGraphNode(id: launcher, kind: .launcher, title: "Terminal", detail: "", appPath: "",
+                             filter: .none, counters: FlowCounters()),
             TrafficGraphNode(id: source, kind: .agent, title: "Source", detail: "", appPath: "",
                              filter: .none, counters: FlowCounters()),
             TrafficGraphNode(id: tool, kind: .tool, title: "Tool", detail: "", appPath: "",
+                             filter: .none, counters: FlowCounters()),
+            TrafficGraphNode(id: gateway, kind: .proxy, title: "Gateway", detail: "", appPath: "",
                              filter: .none, counters: FlowCounters()),
             TrafficGraphNode(id: target, kind: .destination, title: "Target", detail: "", appPath: "",
                              filter: .none, counters: FlowCounters())
         ]
         let adjacentEdges = [
+            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "launcher-source"), source: launcher, target: source,
+                             counters: FlowCounters(), filter: .none, relationship: .launched),
             TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "source-tool"), source: source, target: tool,
                              counters: FlowCounters(), filter: .none, relationship: .runs),
-            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "tool-target"), source: tool, target: target,
+            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "tool-gateway"), source: tool, target: gateway,
+                             counters: FlowCounters(), filter: .none, relationship: .configuredGateway),
+            TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "gateway-target"), source: gateway, target: target,
                              counters: FlowCounters(bytesIn: 1, flows: 1), filter: .none)
         ]
         let adjacent = TrafficGraphSnapshot(
@@ -4844,15 +4883,23 @@ final class TrafficGraphTests: XCTestCase {
         let skipped = TrafficGraphSnapshot(
             nodes: nodes,
             edges: adjacentEdges + [
-                TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "source-target"), source: source, target: target,
-                                 counters: FlowCounters(bytesIn: 1, flows: 1), filter: .none)
+                TrafficGraphEdge(id: TrafficGraphEdgeID(rawValue: "source-gateway"),
+                                 source: source, target: gateway, counters: FlowCounters(),
+                                 filter: .none, relationship: .configuredGateway)
             ],
-            total: FlowCounters(bytesIn: 2, flows: 2),
+            total: FlowCounters(bytesIn: 1, flows: 1),
             hidden: .none
         )
 
-        XCTAssertLessThan(TrafficGraphLayout.columnGap(for: adjacent), 90)
-        XCTAssertGreaterThan(TrafficGraphLayout.columnGap(for: skipped), 120)
+        let adjacentGaps = TrafficGraphLayout.columnGaps(for: adjacent)
+        let skippedGaps = TrafficGraphLayout.columnGaps(for: skipped)
+        XCTAssertEqual(adjacentGaps.count, 4)
+        XCTAssertTrue(adjacentGaps.allSatisfy { $0 < 90 })
+        XCTAssertEqual(skippedGaps.count, 4)
+        XCTAssertLessThan(skippedGaps[0], 90, "launcher/source spacing is unrelated to the skipped stage")
+        XCTAssertGreaterThan(skippedGaps[1], 120)
+        XCTAssertGreaterThan(skippedGaps[2], 120)
+        XCTAssertLessThan(skippedGaps[3], 90, "gateway/destination spacing is unrelated to the skipped stage")
     }
 
     func testDensityAwareCanvasKeepsEverySemanticColumnInsideBounds() {
@@ -4996,6 +5043,23 @@ final class TrafficGraphTests: XCTestCase {
 
         XCTAssertTrue(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: snapshot, previous: layout))
         XCTAssertFalse(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: focused, previous: layout))
+    }
+
+    func testUnroutableGeometryDoesNotMasqueradeAsATopologyChange() {
+        let snapshot = TrafficGraphBuilder.build(rows: [
+            row(app: "app", domain: "blocked-wall.example", ip: "203.0.113.8", bytesOut: 10)
+        ], limits: .unbounded)
+        let frames = Dictionary(uniqueKeysWithValues: snapshot.nodes.enumerated().map { index, node in
+            (node.id, CGRect(x: CGFloat(index) * 200, y: 0, width: 100, height: 50))
+        })
+        let layout = TrafficGraphLayoutSnapshot(
+            nodeFrames: frames,
+            edgeCurves: [:],
+            semanticEdgeIDs: Set(snapshot.edges.map(\.id))
+        )
+
+        XCTAssertTrue(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: snapshot, previous: layout))
+        XCTAssertTrue(layout.visibleRegion(in: CGRect(x: 0, y: 0, width: 500, height: 500)).edgeIDs.isEmpty)
     }
 
     func testCancelledLargeLayoutDoesNotPublishPartialGeometry() async {

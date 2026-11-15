@@ -129,6 +129,21 @@ final class InspectionBudgetTests: XCTestCase {
         XCTAssertEqual(InspectionBudget.load(defaults), budget)
     }
 
+    func testLegacyPersistedEightHourDefaultMigratesToPersistentEnablementOnce() {
+        let defaults = UserDefaults(suiteName: "flowlight.budget.tests.\(UUID().uuidString)")!
+        defaults.set(480, forKey: InspectionBudget.Keys.sessionMinutes)
+
+        XCTAssertEqual(InspectionBudget.load(defaults).sessionMinutes, 0)
+        XCTAssertTrue(defaults.bool(forKey: InspectionBudget.Keys.persistentSessionMigration))
+
+        defaults.set(480, forKey: InspectionBudget.Keys.sessionMinutes)
+        XCTAssertEqual(
+            InspectionBudget.load(defaults).sessionMinutes,
+            480,
+            "an eight-hour timer chosen after migration must remain explicit"
+        )
+    }
+
     /// "Allow nothing" is a decision, and the absence of the key is what means "use the defaults" — otherwise
     /// the strictest setting would quietly reset itself on the next launch.
     func testAnEmptyAllowlistIsNotMistakenForUnset() {

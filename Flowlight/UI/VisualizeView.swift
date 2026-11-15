@@ -1283,7 +1283,11 @@ private struct TrafficGraphCanvas: View {
                     context.stroke(
                         path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
                             totalWidth: width,
-                            direction: .received
+                            direction: .received,
+                            paintedWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                preferred: GraphStyle.staticLaneWidth,
+                                laneWidth: lanes.received.width
+                            )
                         ))),
                         with: .color(FL.graphReceived.opacity(laneOpacity)),
                         style: StrokeStyle(
@@ -1305,7 +1309,11 @@ private struct TrafficGraphCanvas: View {
                     context.stroke(
                         path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
                             totalWidth: width,
-                            direction: .sent
+                            direction: .sent,
+                            paintedWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                preferred: GraphStyle.staticLaneWidth,
+                                laneWidth: lanes.sent.width
+                            )
                         ))),
                         with: .color(FL.graphSent.opacity(laneOpacity)),
                         style: StrokeStyle(
@@ -1367,7 +1375,11 @@ private struct TrafficGraphCanvas: View {
                             context.stroke(
                                 path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
                                     totalWidth: width,
-                                    direction: .sent
+                                    direction: .sent,
+                                    paintedWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                        preferred: TrafficGraphFlowDash.strokeWidth,
+                                        laneWidth: lanes.sent.width
+                                    )
                                 ))),
                                 with: .color(FL.graphSent.opacity(dashOpacity)),
                                 style: flowDashStyle(
@@ -1386,7 +1398,11 @@ private struct TrafficGraphCanvas: View {
                             context.stroke(
                                 path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
                                     totalWidth: width,
-                                    direction: .received
+                                    direction: .received,
+                                    paintedWidth: TrafficGraphFlowDash.boundedStrokeWidth(
+                                        preferred: TrafficGraphFlowDash.strokeWidth,
+                                        laneWidth: lanes.received.width
+                                    )
                                 ))),
                                 with: .color(FL.graphReceived.opacity(dashOpacity)),
                                 style: flowDashStyle(

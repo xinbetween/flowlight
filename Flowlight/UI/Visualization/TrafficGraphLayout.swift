@@ -77,7 +77,7 @@ enum TrafficGraphViewportPolicy {
         previous: TrafficGraphLayoutSnapshot
     ) -> Bool {
         Set(snapshot.nodes.map(\.id)) == Set(previous.nodeFrames.keys)
-            && Set(snapshot.edges.map(\.id)) == Set(previous.edgeCurves.keys)
+            && Set(snapshot.edges.map(\.id)) == previous.topologyEdgeIDs
     }
 }
 
@@ -381,9 +381,13 @@ enum TrafficGraphFlowDash {
         TrafficGraphStableHash.fnv1a(edgeID.rawValue)
     }
 
-    static func borderOffset(totalWidth: CGFloat, direction: TrafficGraphFlowDirection) -> CGFloat {
+    static func borderOffset(
+        totalWidth: CGFloat,
+        direction: TrafficGraphFlowDirection,
+        paintedWidth: CGFloat = strokeWidth
+    ) -> CGFloat {
         let width = max(0, totalWidth)
-        let inset = min(strokeWidth / 2, width / 2)
+        let inset = min(max(0, paintedWidth) / 2, width / 2)
         switch direction {
         case .received: return -width / 2 + inset
         case .sent: return width / 2 - inset
@@ -495,9 +499,16 @@ struct TrafficGraphVisibleRegion: Equatable, Sendable {
 struct TrafficGraphLayoutSnapshot: Sendable {
     var nodeFrames: [TrafficGraphNodeID: CGRect]
     var edgeCurves: [TrafficGraphEdgeID: TrafficGraphCurve]
+    /// Complete semantic topology, including an edge whose geometry cannot be drawn without crossing a card.
+    /// Older focused tests and synthetic snapshots infer it from their drawable curves.
+    var semanticEdgeIDs: Set<TrafficGraphEdgeID> = []
     var edgeWidths: [TrafficGraphEdgeID: CGFloat] = [:]
     var edgeWidthCaps: [TrafficGraphEdgeID: CGFloat] = [:]
     var edgeBounds: [TrafficGraphEdgeID: CGRect] = [:]
+
+    var topologyEdgeIDs: Set<TrafficGraphEdgeID> {
+        semanticEdgeIDs.isEmpty ? Set(edgeCurves.keys) : semanticEdgeIDs
+    }
 
     var contentBounds: CGRect {
         let nodes = nodeFrames.values.reduce(CGRect.null) { $0.union($1) }
@@ -615,7 +626,7 @@ enum TrafficGraphLayout {
             snapshot.nodes.contains { nodeLanes[$0.id] == lane }
         }
         let cards = activeLanes.reduce(CGFloat(0)) { $0 + size(for: $1).width }
-        let gaps = CGFloat(max(0, activeLanes.count - 1)) * columnGap(for: snapshot)
+        let gaps = columnGaps(for: snapshot).reduce(CGFloat(0), +)
         return max(900, cards + gaps + 48)
     }
 
@@ -655,7 +666,7 @@ enum TrafficGraphLayout {
         let columns = columnPositions(
             for: activeLanes,
             in: insetBounds,
-            minimumGap: columnGap(for: snapshot)
+            minimumGaps: columnGaps(for: snapshot)
         )
         var frames: [TrafficGraphNodeID: CGRect] = [:]
 
@@ -841,6 +852,7 @@ enum TrafficGraphLayout {
         return TrafficGraphLayoutSnapshot(
             nodeFrames: frames,
             edgeCurves: curves,
+            semanticEdgeIDs: Set(snapshot.edges.map(\.id)),
             edgeWidths: widths,
             edgeWidthCaps: widthCaps,
             edgeBounds: boundsByEdge
@@ -1000,14 +1012,13 @@ enum TrafficGraphLayout {
         avoiding obstacles: [CGRect],
         width: CGFloat,
         within bounds: CGRect
-    ) -> TrafficGraphCurve {
+    ) -> TrafficGraphCurve? {
         let halfWidth = max(0.5, width / 2)
         let clearance = 10 + halfWidth
         let padded = obstacles.map { $0.insetBy(dx: -clearance, dy: -clearance) }
         let baseOffset = max(36 + halfWidth, min(180, abs(end.y - start.y) * 0.35))
         let minimumX = bounds.minX + halfWidth + 2
         let maximumX = bounds.maxX - halfWidth - 2
-        var fallback: TrafficGraphCurve?
         for candidateSide in [side, side.opposite] {
             let direction: CGFloat = candidateSide == .left ? -1 : 1
             for multiplier: CGFloat in [1, 1.35, 1.75, 2.25] {
@@ -1018,14 +1029,13 @@ enum TrafficGraphLayout {
                     control2: CGPoint(x: detourX, y: end.y),
                     end: end
                 )
-                if fallback == nil { fallback = candidate }
                 if !intersects(candidate, obstacles: padded) { return candidate }
             }
         }
-        return fallback ?? TrafficGraphCurve(start: start, control1: start, control2: end, end: end)
+        return nil
     }
 
-    private static func parallelCurve(
+    static func parallelCurve(
         start: CGPoint,
         end: CGPoint,
         fanout: CGFloat,
@@ -1033,7 +1043,7 @@ enum TrafficGraphLayout {
         avoiding obstacles: [CGRect],
         width: CGFloat,
         within bounds: CGRect
-    ) -> TrafficGraphCurve {
+    ) -> TrafficGraphCurve? {
         let controlOffset = max(24, abs(end.x - start.x) * 0.42)
         let direction: CGFloat = end.x >= start.x ? 1 : -1
         // Both cubic controls contribute 75% of their shared shift at t = 0.5. Compensate so the midpoint keeps the
@@ -1060,7 +1070,7 @@ enum TrafficGraphLayout {
             preferAbove: preferAbove,
             width: width,
             within: bounds
-        ) ?? direct
+        )
     }
 
     private static func controlBounds(_ curve: TrafficGraphCurve) -> CGRect {
@@ -1531,12 +1541,8 @@ enum TrafficGraphLayout {
                 }
             }
         }
-        if let obstacleClearFallback,
-           let obstacleClearShelfFallback {
-            return fallbackOverlap <= shelfFallbackOverlap
-                ? obstacleClearFallback
-                : obstacleClearShelfFallback
-        }
+        // A shelf is the last card-clear escape hatch only. Corridor overlap must not reintroduce the rounded
+        // rectangle geometry this router is specifically required to remove whenever any smooth route exists.
         return obstacleClearFallback ?? obstacleClearShelfFallback
     }
 
@@ -1619,25 +1625,33 @@ enum TrafficGraphLayout {
         }
     }
 
-    static func columnGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
-        guard !snapshot.nodes.isEmpty else { return 80 }
+    static func columnGaps(for snapshot: TrafficGraphSnapshot) -> [CGFloat] {
+        guard !snapshot.nodes.isEmpty else { return [] }
         let nodeLanes = lanes(snapshot: snapshot)
         let activeLanes = Lane.allCases.filter { lane in
             snapshot.nodes.contains { nodeLanes[$0.id] == lane }
         }
+        guard activeLanes.count > 1 else { return [] }
         let laneIndexes = Dictionary(uniqueKeysWithValues: activeLanes.enumerated().map { ($0.element, $0.offset) })
-        let skipsActiveLane = snapshot.edges.contains { edge in
+        var widenedGapIndexes: Set<Int> = []
+        for edge in snapshot.edges {
             guard let sourceLane = nodeLanes[edge.source],
                   let targetLane = nodeLanes[edge.target],
                   let sourceIndex = laneIndexes[sourceLane],
-                  let targetIndex = laneIndexes[targetLane] else { return false }
-            return abs(sourceIndex - targetIndex) > 1
+                  let targetIndex = laneIndexes[targetLane] else { continue }
+            let lower = min(sourceIndex, targetIndex)
+            let upper = max(sourceIndex, targetIndex)
+            guard upper - lower > 1 else { continue }
+            // A skipped stage needs runway across its own semantic corridor. Widening every graph gap made one long
+            // edge shrink unrelated columns under automatic Fit, while widening only the corridor endpoints pinched
+            // longer routes back into shelf-shaped fallbacks between the intermediate stages.
+            widenedGapIndexes.formUnion(lower..<upper)
         }
         let density = CGFloat(snapshot.edges.count) / CGFloat(snapshot.nodes.count)
-        // Only a relationship that skips an occupied stage needs extra runway to curve around that stage. Ordinary
-        // adjacent-stage maps keep the compact spacing; denser maps gain a little more separation, but remain bounded.
-        let base: CGFloat = skipsActiveLane ? 120 : 80
-        return base + min(24, density * 4)
+        let densityBonus = min(24, density * 4)
+        return (0..<(activeLanes.count - 1)).map { index in
+            (widenedGapIndexes.contains(index) ? CGFloat(120) : 80) + densityBonus
+        }
     }
 
     private static func nodeGap(for snapshot: TrafficGraphSnapshot) -> CGFloat {
@@ -1649,14 +1663,16 @@ enum TrafficGraphLayout {
     private static func columnPositions(
         for lanes: [Lane],
         in bounds: CGRect,
-        minimumGap: CGFloat
+        minimumGaps: [CGFloat]
     ) -> [Lane: CGFloat] {
         guard let first = lanes.first else { return [:] }
         if lanes.count == 1 { return [first: bounds.midX] }
         var minimum: [CGFloat] = [bounds.minX + size(for: first).width / 2]
-        for (left, right) in zip(lanes, lanes.dropFirst()) {
+        for (index, pair) in zip(lanes, lanes.dropFirst()).enumerated() {
+            let (left, right) = pair
+            let gap = minimumGaps.indices.contains(index) ? minimumGaps[index] : 80
             minimum.append(minimum.last! + size(for: left).width / 2
-                           + minimumGap + size(for: right).width / 2)
+                           + gap + size(for: right).width / 2)
         }
         let last = lanes[lanes.count - 1]
         let availableRight = bounds.maxX - size(for: last).width / 2
