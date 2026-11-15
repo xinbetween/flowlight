@@ -137,9 +137,26 @@ class HomepageInstallationTests(unittest.TestCase):
     def test_clean_developer_installation_without_store_promotion_passes(self):
         self.assertEqual(self.problems(self.clean_home), [])
 
+    def test_mobile_homebrew_control_must_span_both_installation_columns(self):
+        clean = """
+        @media (max-width: 640px) {
+          .cta .brew { grid-column: 1 / -1; width: 100%; }
+        }
+        @media (max-width: 520px) {}
+        """
+        broken = clean.replace("grid-column: 1 / -1", "grid-column: auto")
+
+        self.assertEqual(check_site.installation_css_problems(clean), [])
+        self.assertIn(
+            "site/site.css: mobile Homebrew control does not span the installation grid",
+            check_site.installation_css_problems(broken),
+        )
+
     def test_app_store_url_or_badge_fails(self):
         for promotion in (
             '<a href="https://apps.apple.com/app/flowlight">Store</a>',
+            '<a href="https://www.apple.com/app-store/">Download from Apple</a>',
+            '<a href="https://example.com/store">Download on the Mac App Store</a>',
             '<img class="app-store-badge" alt="Download on the Mac App Store">',
             "<a href='https://APPS.APPLE.COM/app/flowlight'><img alt='Download on the Mac App Store'></a>",
         ):

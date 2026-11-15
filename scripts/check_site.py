@@ -9,6 +9,7 @@ roadmap still advertising what you can already download. None of that stops the 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
 import re, sys, pathlib, collections, hashlib, json, subprocess, time
+from urllib.parse import urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -143,6 +144,18 @@ def pages_workflow_problems(source):
     return found
 
 
+def installation_css_problems(source):
+    """The two-button mobile row must leave the complete Homebrew command on its own full-width row."""
+    found = []
+    mobile_start = source.find("@media (max-width: 640px)")
+    mobile_end = source.find("@media (max-width: 520px)", mobile_start)
+    mobile = source[mobile_start:mobile_end] if mobile_start >= 0 and mobile_end > mobile_start else ""
+    brew = re.search(r"\.cta\s+\.brew\s*\{([^}]*)\}", mobile, re.S)
+    if brew is None or not re.search(r"grid-column\s*:\s*1\s*/\s*-1", brew.group(1)):
+        found.append("site/site.css: mobile Homebrew control does not span the installation grid")
+    return found
+
+
 def homepage_installation_problems(source, label):
     """Keep Developer installation paths while public Store promotion is paused."""
     found = []
@@ -150,6 +163,21 @@ def homepage_installation_problems(source, label):
     for marker, description in HOMEPAGE_FORBIDDEN_PROMOTION.items():
         if marker.lower() in lowered:
             found.append(f"{label}: temporary homepage takedown still contains {description}")
+    store_link = False
+    for href in re.findall(r"\bhref\s*=\s*(['\"])(.*?)\1", source, re.I | re.S):
+        parsed = urlsplit(href[1])
+        host = (parsed.hostname or "").lower()
+        path = parsed.path.lower()
+        if host in {"apps.apple.com", "itunes.apple.com"} or (
+            (host == "apple.com" or host.endswith(".apple.com"))
+            and re.search(r"(?:^|/)(?:mac-)?app-store(?:/|$)|(?:^|/)app(?:/|$)", path)
+        ):
+            store_link = True
+            break
+    if store_link:
+        found.append(f"{label}: temporary homepage takedown still contains an Apple Store destination")
+    if re.search(r"<a\b[^>]*>.*?(?:mac\s+)?app\s+store.*?</a>", source, re.I | re.S):
+        found.append(f"{label}: App Store promotional link text is still present")
     if re.search(r"\balt\s*=\s*(['\"])[^'\"]*(?:mac )?app store[^'\"]*\1", source, re.I):
         found.append(f"{label}: App Store download alt text is still present")
     if re.search(
@@ -644,6 +672,7 @@ def problems():
             found.append(f"{home_path.relative_to(ROOT)}: home page has recurring JavaScript animation")
 
     site_css = (ROOT / "site/site.css").read_text()
+    found.extend(installation_css_problems(site_css))
     brew_rule = re.search(r"\.brew code\s*\{([^}]*)\}", site_css, re.DOTALL)
     if brew_rule is None or "overflow: hidden" not in brew_rule.group(1):
         found.append("site/site.css: Homebrew command is not compactly clipped")

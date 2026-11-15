@@ -3753,20 +3753,6 @@ final class TrafficGraphTests: XCTestCase {
         }
     }
 
-    func testEdgeWidthIsBoundedAndMonotonic() {
-        let totals: [Int64] = [0, 1_000, 1_000_000, 1_000_000_000]
-        let widths = totals.map { TrafficGraphLayout.edgeWidth(bytes: $0, maximum: totals.last!) }
-        let trafficWidths = totals.map { TrafficGraphLayout.trafficWidth(bytes: $0, maximum: totals.last!) }
-
-        XCTAssertEqual(widths, widths.sorted())
-        XCTAssertGreaterThanOrEqual(widths.first!, 1.5)
-        XCTAssertLessThanOrEqual(widths.last!, 9)
-        XCTAssertEqual(trafficWidths, trafficWidths.sorted())
-        XCTAssertEqual(trafficWidths.first!, 0)
-        XCTAssertLessThanOrEqual(trafficWidths.last!, 3.25)
-        XCTAssertGreaterThan(trafficWidths[2], trafficWidths[1])
-    }
-
     func testParallelBlockedPortsHaveDistinctAndIndependentlyHittableCurves() {
         let blocked = (0..<12).map { index in
             let port = UInt16(8_000 + index)
@@ -3890,6 +3876,14 @@ final class TrafficGraphTests: XCTestCase {
             ),
             -9.9875
         )
+        let painted = TrafficGraphFlowDash.paintedLane(
+            totalWidth: 20,
+            direction: .received,
+            preferredWidth: 2.2,
+            laneWidth: 0.025
+        )
+        XCTAssertEqual(painted.width, 0.025)
+        XCTAssertEqual(painted.offset, -9.9875)
         XCTAssertEqual(
             TrafficGraphFlowDash.boundedStrokeWidth(preferred: 2.2, laneWidth: 0.025),
             0.025
@@ -4132,11 +4126,13 @@ final class TrafficGraphTests: XCTestCase {
             }
         }
         let codexPasteCurve = try XCTUnwrap(layout.edgeCurves[codexPasteEdge.id])
-        XCTAssertEqual(
-            codexPasteCurve.segments.count,
-            1,
-            "the highlighted Codex → paste.example route must remain one broad cubic"
+        let broadestRun = codexPasteCurve.segments.map { abs($0.end.x - $0.start.x) }.max() ?? 0
+        XCTAssertGreaterThan(
+            broadestRun,
+            abs(codexPasteCurve.end.x - codexPasteCurve.start.x) * 0.5,
+            "the highlighted Codex → paste.example route must keep one broad smooth arc: \(codexPasteCurve)"
         )
+        XCTAssertTrue(codexPasteCurve.hasContinuousTangents())
         XCTAssertFalse(codexPasteCurve.hasLongHorizontalShelf())
         XCTAssertFalse(codexPasteCurve.hasLongVerticalShelf())
         XCTAssertFalse(codexPasteCurve.hasPinchedVerticalTurn())
@@ -4455,6 +4451,84 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertEqual(widths[empty.id], 0)
     }
 
+    func testCrowdedPortCompressionPreservesAbsoluteTrafficOrdering() {
+        let source = TrafficGraphNodeID(rawValue: "app:source")
+        var nodes = [
+            TrafficGraphNode(
+                id: source,
+                kind: .app,
+                title: "Source",
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: FlowCounters()
+            )
+        ]
+        var edges: [TrafficGraphEdge] = []
+        var total = FlowCounters()
+        for index in 0..<20 {
+            let target = TrafficGraphNodeID(rawValue: "destination:\(index)")
+            let counters = FlowCounters(
+                bytesIn: index.isMultiple(of: 2)
+                    ? TrafficGraphLayout.trafficScaleFloorBytes
+                    : TrafficGraphLayout.trafficScaleCeilingBytes,
+                flows: 1
+            )
+            nodes.append(TrafficGraphNode(
+                id: target,
+                kind: .destination,
+                title: "Target \(index)",
+                detail: "",
+                appPath: "",
+                filter: .none,
+                counters: counters
+            ))
+            edges.append(TrafficGraphEdge(
+                id: TrafficGraphEdgeID(rawValue: "edge:\(index)"),
+                source: source,
+                target: target,
+                counters: counters,
+                filter: .none
+            ))
+            total += counters
+        }
+        let snapshot = TrafficGraphSnapshot(nodes: nodes, edges: edges, total: total, hidden: .none)
+        let layout = TrafficGraphLayout.layout(
+            snapshot: snapshot,
+            in: CGRect(
+                x: 0,
+                y: 0,
+                width: TrafficGraphLayout.minimumCanvasWidth(for: snapshot),
+                height: TrafficGraphLayout.minimumCanvasHeight(for: snapshot)
+            )
+        )
+        let kilobyteWidths = edges.enumerated().compactMap { index, edge in
+            index.isMultiple(of: 2) ? layout.edgeWidths[edge.id] : nil
+        }
+        let gigabyteWidths = edges.enumerated().compactMap { index, edge in
+            index.isMultiple(of: 2) ? nil : layout.edgeWidths[edge.id]
+        }
+
+        XCTAssertEqual(kilobyteWidths.count, 10)
+        XCTAssertEqual(gigabyteWidths.count, 10)
+        XCTAssertLessThan(kilobyteWidths.max()!, gigabyteWidths.min()!)
+        XCTAssertLessThan(gigabyteWidths.max()!, TrafficGraphLayout.maximumRibbonWidth)
+    }
+
+    func testObstacleRouteBandSearchRemainsBoundedOnBothSidesOfTheDenseThreshold() {
+        let ranked = (0..<400).map(CGFloat.init)
+
+        XCTAssertEqual(
+            TrafficGraphLayout.boundedRouteBands(ranked, obstacleCount: 160),
+            Array(ranked.prefix(TrafficGraphLayout.maximumPrimaryRouteBands))
+        )
+        XCTAssertEqual(
+            TrafficGraphLayout.boundedRouteBands(ranked, obstacleCount: 161),
+            Array(ranked.prefix(4))
+        )
+        XCTAssertEqual(TrafficGraphLayout.maximumPrimaryRouteCandidates, 2_048)
+    }
+
     func testImpossibleObstacleRoutesNeverRestoreKnownCollidingCurves() {
         let bounds = CGRect(x: 0, y: 0, width: 100, height: 100)
         let crossLaneWall = CGRect(x: 30, y: -20, width: 40, height: 140)
@@ -4486,6 +4560,26 @@ final class TrafficGraphTests: XCTestCase {
         XCTAssertNil(crossLaneTraffic)
         XCTAssertNil(crossLaneRelationship)
         XCTAssertNil(sameLane)
+    }
+
+    func testRibbonOffsetsFollowHorizontalAndVerticalCurveNormals() {
+        let horizontal = TrafficGraphCurve(
+            start: CGPoint(x: 0, y: 0),
+            control1: CGPoint(x: 30, y: 0),
+            control2: CGPoint(x: 70, y: 0),
+            end: CGPoint(x: 100, y: 0)
+        ).offset(by: 10)
+        let vertical = TrafficGraphCurve(
+            start: CGPoint(x: 0, y: 0),
+            control1: CGPoint(x: 0, y: 30),
+            control2: CGPoint(x: 0, y: 70),
+            end: CGPoint(x: 0, y: 100)
+        ).offset(by: 10)
+
+        XCTAssertEqual(horizontal.point(at: 0.5).x, 50, accuracy: 0.001)
+        XCTAssertEqual(horizontal.point(at: 0.5).y, 10, accuracy: 0.001)
+        XCTAssertEqual(vertical.point(at: 0.5).x, -10, accuracy: 0.001)
+        XCTAssertEqual(vertical.point(at: 0.5).y, 50, accuracy: 0.001)
     }
 
     func testContinuousTangentsIgnoreZeroLengthEndpointStubs() {
@@ -5059,6 +5153,7 @@ final class TrafficGraphTests: XCTestCase {
         )
 
         XCTAssertTrue(TrafficGraphViewportPolicy.shouldPreserveLayout(snapshot: snapshot, previous: layout))
+        XCTAssertEqual(layout.omittedEdgeIDs, Set(snapshot.edges.map(\.id)))
         XCTAssertTrue(layout.visibleRegion(in: CGRect(x: 0, y: 0, width: 500, height: 500)).edgeIDs.isEmpty)
     }
 

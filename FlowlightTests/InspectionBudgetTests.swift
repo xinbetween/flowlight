@@ -129,18 +129,14 @@ final class InspectionBudgetTests: XCTestCase {
         XCTAssertEqual(InspectionBudget.load(defaults), budget)
     }
 
-    func testLegacyPersistedEightHourDefaultMigratesToPersistentEnablementOnce() {
+    func testLegacyEightHourTimerIsNeverSilentlyExtendedToIndefiniteInspection() {
         let defaults = UserDefaults(suiteName: "flowlight.budget.tests.\(UUID().uuidString)")!
         defaults.set(480, forKey: InspectionBudget.Keys.sessionMinutes)
 
-        XCTAssertEqual(InspectionBudget.load(defaults).sessionMinutes, 0)
-        XCTAssertTrue(defaults.bool(forKey: InspectionBudget.Keys.persistentSessionMigration))
-
-        defaults.set(480, forKey: InspectionBudget.Keys.sessionMinutes)
         XCTAssertEqual(
             InspectionBudget.load(defaults).sessionMinutes,
             480,
-            "an eight-hour timer chosen after migration must remain explicit"
+            "an ambiguous legacy timer must remain bounded because it may have been an explicit safety choice"
         )
     }
 
