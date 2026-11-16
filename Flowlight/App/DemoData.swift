@@ -7,8 +7,15 @@ enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
     static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
     static var isUITesting: Bool { isEnabled && UserDefaults.standard.bool(forKey: "FLDemoUITests") }
+    static var shouldSeedBulkHistory: Bool {
+        shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting)
+    }
     static var forcesExtensionUpdateWarning: Bool {
         isUITesting && UserDefaults.standard.bool(forKey: "FLDemoExtensionUpdateWarning")
+    }
+
+    static func shouldSeedBulkHistory(isEnabled: Bool, isUITesting: Bool) -> Bool {
+        isEnabled && !isUITesting
     }
     static let uiTestRuleID = UUID(uuidString: "A14DA4C2-7930-45C0-A8B9-3B8CD69C4A4E")!
     static let appStorage = makeAppStorage(isUITesting: isUITesting)

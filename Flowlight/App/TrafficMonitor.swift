@@ -319,6 +319,10 @@ final class TrafficMonitor: ObservableObject {
             IPOwnerLookup.shared.isEnabled = { false }
             IPOwnerLookup.shared.preload(DemoData.owners())
             UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+        }
+        // Geometry-level UI tests seed only the exact policy controls they exercise. The full 90-day demo fixture
+        // would otherwise occupy the shared SQLite queue while those tests save a managed-pack review.
+        if DemoData.shouldSeedBulkHistory {
             db.async { [weak self] db in
                 try DemoData.seed(db)
                 Task { @MainActor in self?.dataVersion += 1; self?.refreshAlertCount() }
