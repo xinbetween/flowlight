@@ -295,11 +295,27 @@ final class RulePackCatalogTests: XCTestCase {
                                                now: now, currentAppVersion: "0.15.3")
         }
 
-        let escapedDuplicate = Data(#"{"format":1,"format":1,"payload":{},"signatures":[]}"#.utf8)
+        let quote = String(decoding: [0x22], as: UTF8.self)
+        let escapedFormat = String(decoding: [0x5C], as: UTF8.self) + "u0066ormat"
+        let escapedUnique = Data(("{" + quote + escapedFormat + quote + ":1}").utf8)
+        XCTAssertNoThrow(try RulePackCatalogVerifier.validateStrictJSONSyntax(escapedUnique))
+        let escapedDuplicate = Data((
+            "{" + quote + "format" + quote + ":1," + quote + escapedFormat + quote + ":2}"
+        ).utf8)
         assertError(.invalidEnvelope) {
-            try RulePackCatalogVerifier.verify(data: escapedDuplicate, trustedSigners: [signer(key: key)],
-                                               now: now, currentAppVersion: "0.15.3")
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(escapedDuplicate)
         }
+
+        let nestedDuplicate = Data(#"{"outer":{"value":1,"value":2},"sibling":{"value":3}}"#.utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(nestedDuplicate)
+        }
+        let duplicateAfterNestedDescent = Data(#"{"outer":{"value":1},"outer":2}"#.utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(duplicateAfterNestedDescent)
+        }
+        let reusedDepth = Data(#"{"outer":{"value":1},"sibling":{"value":2}}"#.utf8)
+        XCTAssertNoThrow(try RulePackCatalogVerifier.validateStrictJSONSyntax(reusedDepth))
 
         let malformedString = Data(#"{"value":"\q"}"#.utf8)
         assertError(.invalidEnvelope) {
@@ -322,6 +338,16 @@ final class RulePackCatalogTests: XCTestCase {
                                             String(repeating: "]", count: rejectedNesting)).utf8)
         assertError(.invalidEnvelope) {
             try RulePackCatalogVerifier.validateStrictJSONSyntax(rejectedEmptyNestedJSON)
+        }
+
+        let objectPrefix = #"{"value":"#
+        let acceptedNestedObject = Data((String(repeating: objectPrefix, count: acceptedNesting) + "0" +
+                                         String(repeating: "}", count: acceptedNesting)).utf8)
+        XCTAssertNoThrow(try RulePackCatalogVerifier.validateStrictJSONSyntax(acceptedNestedObject))
+        let rejectedNestedObject = Data((String(repeating: objectPrefix, count: rejectedNesting) + "0" +
+                                         String(repeating: "}", count: rejectedNesting)).utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(rejectedNestedObject)
         }
     }
 

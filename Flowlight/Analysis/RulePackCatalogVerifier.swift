@@ -499,6 +499,11 @@ enum RulePackCatalogVerifier {
     private struct StrictJSONScanner {
         private let bytes: [UInt8]
         private var index = 0
+        // JSON can contain many sibling objects at the same nesting depth. Reusing one key set per depth avoids
+        // allocating a Set for every catalog entry while preserving exact decoded-key duplicate detection and
+        // bounded lookup time for an untrusted object with many fields.
+        private var objectKeysByDepth: [Set<String>] = []
+        private let stringDecoder = JSONDecoder()
 
         init(data: Data) { bytes = Array(data) }
 
@@ -528,15 +533,18 @@ enum RulePackCatalogVerifier {
             guard depth <= RulePackCatalogVerifier.maximumJSONNestingDepth else {
                 throw RulePackCatalogVerificationError.invalidEnvelope
             }
+            while objectKeysByDepth.count <= depth { objectKeysByDepth.append([]) }
+            objectKeysByDepth[depth].removeAll(keepingCapacity: true)
             index += 1
             skipWhitespace()
             if consume(0x7D) { return }
-            var keys = Set<String>()
             while true {
                 guard let key = try parseString(decode: true) else {
                     throw RulePackCatalogVerificationError.invalidEnvelope
                 }
-                guard keys.insert(key).inserted else { throw RulePackCatalogVerificationError.invalidEnvelope }
+                guard objectKeysByDepth[depth].insert(key).inserted else {
+                    throw RulePackCatalogVerificationError.invalidEnvelope
+                }
                 skipWhitespace()
                 guard consume(0x3A) else { throw RulePackCatalogVerificationError.invalidEnvelope }
                 skipWhitespace()
@@ -580,7 +588,10 @@ enum RulePackCatalogVerifier {
                         }
                         index += 5
                     } else {
-                        guard [0x22, 0x5C, 0x2F, 0x62, 0x66, 0x6E, 0x72, 0x74].contains(byte) else {
+                        switch byte {
+                        case 0x22, 0x5C, 0x2F, 0x62, 0x66, 0x6E, 0x72, 0x74:
+                            break
+                        default:
                             throw RulePackCatalogVerificationError.invalidEnvelope
                         }
                         index += 1
@@ -604,7 +615,7 @@ enum RulePackCatalogVerifier {
                         return decoded
                     }
                     let quoted = Data(bytes[(start - 1)...end])
-                    guard let decoded = try? JSONDecoder().decode(String.self, from: quoted) else {
+                    guard let decoded = try? stringDecoder.decode(String.self, from: quoted) else {
                         throw RulePackCatalogVerificationError.invalidEnvelope
                     }
                     return decoded
@@ -645,12 +656,12 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func consumeLiteral(_ literal: String) throws {
-            let expected = Array(literal.utf8)
-            guard index + expected.count <= bytes.count,
-                  Array(bytes[index..<(index + expected.count)]) == expected else {
-                throw RulePackCatalogVerificationError.invalidEnvelope
+            for expected in literal.utf8 {
+                guard index < bytes.count, bytes[index] == expected else {
+                    throw RulePackCatalogVerificationError.invalidEnvelope
+                }
+                index += 1
             }
-            index += expected.count
         }
 
         private mutating func consume(_ byte: UInt8) -> Bool {
@@ -660,7 +671,14 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func skipWhitespace() {
-            while index < bytes.count, [0x20, 0x09, 0x0A, 0x0D].contains(bytes[index]) { index += 1 }
+            while index < bytes.count {
+                switch bytes[index] {
+                case 0x20, 0x09, 0x0A, 0x0D:
+                    index += 1
+                default:
+                    return
+                }
+            }
         }
 
         private func isHex(_ byte: UInt8) -> Bool {
