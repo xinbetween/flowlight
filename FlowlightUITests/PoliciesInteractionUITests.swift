@@ -19,9 +19,9 @@ final class PoliciesInteractionUITests: XCTestCase {
         let ruleSectionID = "policies.section.rule.toggle"
         XCTAssertTrue(element(ruleSectionID).waitForExistence(timeout: 15))
         clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: ruleSectionID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Collapsed", identifier: ruleSectionID, timeout: 3))
         clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: ruleSectionID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Expanded", identifier: ruleSectionID, timeout: 3))
 
         let ruleID = "a14da4c2-7930-45c0-a8b9-3b8cd69c4a4e"
         let ruleButton = element("policies.rule.\(ruleID).edit")
@@ -45,19 +45,19 @@ final class PoliciesInteractionUITests: XCTestCase {
         let allowlistSectionID = "policies.section.allowlist.toggle"
         XCTAssertTrue(element(allowlistSectionID).waitForExistence(timeout: 10))
         clickTrailingBlankArea(of: element(allowlistSectionID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: allowlistSectionID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Collapsed", identifier: allowlistSectionID, timeout: 3))
 
         let packSectionID = "policies.section.pack.toggle"
         XCTAssertTrue(element(packSectionID).waitForExistence(timeout: 15))
         clickTrailingBlankArea(of: element(packSectionID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: packSectionID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Collapsed", identifier: packSectionID, timeout: 3))
         clickTrailingBlankArea(of: element(packSectionID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: packSectionID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Expanded", identifier: packSectionID, timeout: 3))
 
         let catalogDetailsID = "policies.pack-catalog.details.toggle"
         XCTAssertTrue(element(catalogDetailsID).waitForExistence(timeout: 10))
         clickPaintedMargin(of: element(catalogDetailsID))
-        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: catalogDetailsID, timeout: 3))
+        XCTAssertTrue(waitForDisclosureState("Expanded", identifier: catalogDetailsID, timeout: 3))
         XCTAssertTrue(element("policies.pack-catalog.details.content").waitForExistence(timeout: 3))
 
         let packButton = element("policies.pack.official.advertising.open")
@@ -211,6 +211,26 @@ final class PoliciesInteractionUITests: XCTestCase {
                 if let value = element.value as? String { return value == expected }
                 if let value = element.value as? NSNumber { return value.stringValue == expected }
                 return false
+            },
+            object: element(identifier)
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForDisclosureState(
+        _ expected: String,
+        identifier: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                guard let element = object as? XCUIElement,
+                      element.exists,
+                      let value = element.value as? String else { return false }
+                if expected == "Collapsed" {
+                    return value == expected || value.hasPrefix(expected + " · ")
+                }
+                return value == expected
             },
             object: element(identifier)
         )
