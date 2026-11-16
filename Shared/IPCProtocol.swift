@@ -1,5 +1,10 @@
 import Foundation
 
+/// App and extension ship as one exact build and negotiate this shared durable-delivery ABI before sending events.
+enum FlowlightIPCVersion {
+    static let durableEvents = 2
+}
+
 #if APP_STORE
 /// A source identity observed by the content filter for one client connection to the local inspection proxy.
 ///
@@ -165,6 +170,10 @@ enum ProxyClientIdentityResolver {
     /// `payload` is `TrafficCoding.encode([TrafficBatch])`. The app calls `reply` once the batches
     /// are accepted; the extension keeps them queued until then.
     func deliver(payload: Data, reply: @escaping () -> Void)
+
+    /// Exact-once traffic delivery negotiated only after the app verifies the extension's exact build. The envelope
+    /// carries a stable extension-session sequence range; true is returned after its additive rows commit durably.
+    func deliverTrafficDurably(payload: Data, reply: @escaping @Sendable (Bool) -> Void)
 
     /// Legacy delivery selectors retained unchanged for mixed-version upgrades. Current extensions wait for
     /// `enableDurableEvents` and then use the durable selectors below.

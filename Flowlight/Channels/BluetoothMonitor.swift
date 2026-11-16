@@ -1,5 +1,13 @@
 import Foundation
 
+protocol PeripheralMonitoring: AnyObject {
+    var onDevices: ([PeripheralDevice], UInt64) -> Void { get set }
+    var onEvents: ([DeviceEvent], UInt64) -> Void { get set }
+    func start(generation: UInt64)
+    func stop()
+    func refresh()
+}
+
 /// What is paired to this Mac over Bluetooth, and when that changes.
 ///
 /// **What this can and can't say.** macOS keeps no per-app byte accounting for Bluetooth: there is no equivalent of
@@ -10,57 +18,75 @@ import Foundation
 /// It reads `system_profiler SPBluetoothDataType`, which needs no entitlement and no permission prompt, and covers
 /// both Classic and Low Energy devices. That costs a subprocess of a second or so, which is why it is polled every
 /// half minute rather than continuously, and only while the feature is switched on.
-final class BluetoothMonitor: @unchecked Sendable {
+final class BluetoothMonitor: PeripheralMonitoring, @unchecked Sendable {
     /// Called with the current devices whenever the list is re-read, and separately with anything that changed.
-    var onDevices: ([PeripheralDevice]) -> Void = { _ in }
-    var onEvents: ([DeviceEvent]) -> Void = { _ in }
+    var onDevices: ([PeripheralDevice], UInt64) -> Void = { _, _ in }
+    var onEvents: ([DeviceEvent], UInt64) -> Void = { _, _ in }
 
     private let queue = DispatchQueue(label: "flowlight.bluetooth", qos: .utility)
+    private let lifecycle = PeripheralMonitorLifecycle()
     private var timer: DispatchSourceTimer?
     private var known: [PeripheralDevice] = []
     private var sawAnything = false
+    private var running = false
+    private var generation: UInt64 = 0
 
     var interval: TimeInterval = 30
-    /// Overridable for tests.
-    var read: () -> Data? = { BluetoothMonitor.runSystemProfiler() }
+    /// Overridable for tests. Production reads use the cancellable subprocess owned by `lifecycle`.
+    var read: (() -> Data?)?
 
-    func start() {
-        stop()
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: interval, leeway: .seconds(5))
-        timer.setEventHandler { [weak self] in self?.sample() }
-        timer.resume()
-        self.timer = timer
+    func start(generation: UInt64) {
+        lifecycle.requestStart(generation: generation)
+        queue.async { [weak self] in
+            guard let self, self.lifecycle.isCurrent(generation) else { return }
+            self.stopLocked()
+            self.generation = generation
+            self.running = true
+            let timer = DispatchSource.makeTimerSource(queue: self.queue)
+            timer.schedule(deadline: .now(), repeating: self.interval, leeway: .seconds(5))
+            timer.setEventHandler { [weak self] in self?.sample() }
+            timer.resume()
+            self.timer = timer
+        }
     }
 
     func stop() {
+        lifecycle.requestStop()
+        queue.async { [self] in stopLocked() }
+    }
+
+    private func stopLocked() {
+        running = false
         timer?.cancel()
         timer = nil
+        known = []
+        sawAnything = false
     }
 
     /// Re-reads now, for the button that says so.
     func refresh() { queue.async { [weak self] in self?.sample() } }
 
     private func sample() {
-        guard let data = read(), let devices = Self.parse(data) else { return }
+        let sampleGeneration = generation
+        guard running, lifecycle.isCurrent(sampleGeneration) else { return }
+        let data: Data?
+        if let read {
+            data = read()
+        } else {
+            data = lifecycle.runSystemProfiler(
+                arguments: ["SPBluetoothDataType", "-json"],
+                generation: sampleGeneration
+            )
+        }
+        guard running,
+              lifecycle.isCurrent(sampleGeneration),
+              let data,
+              let devices = Self.parse(data) else { return }
         let events = DeviceDiff.events(from: known, to: devices, firstSighting: !sawAnything)
         known = devices
         sawAnything = true
-        onDevices(devices)
-        if !events.isEmpty { onEvents(events) }
-    }
-
-    private static func runSystemProfiler() -> Data? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        process.arguments = ["SPBluetoothDataType", "-json"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? data : nil
+        onDevices(devices, sampleGeneration)
+        if !events.isEmpty { onEvents(events, sampleGeneration) }
     }
 
     // MARK: Reading what it said

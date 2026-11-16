@@ -1,6 +1,6 @@
-# Traffic visualization — 0.16.x
+# Traffic visualization
 
-Flowlight 0.16.x introduces one native visualization shell with two evidence-preserving modes. Both modes use the same system-adaptive canvas, deterministic layout, inspector, exact drill-down actions, and accessible list.
+Flowlight 0.16.x introduced one native visualization shell with two evidence-preserving modes. Both modes use the same system-adaptive canvas, deterministic layout, inspector, exact drill-down actions, and accessible list.
 
 ## 0.16.0 — Traffic
 
@@ -112,6 +112,14 @@ The default Map is a bounded overview rather than a picture of the entire topolo
 Two searchable optional selectors narrow the evidence by source application or AI agent and by exact destination. They support any source to any destination, one source to any destination, any source to one destination, and one source to one destination. Each selection filters the opposite selector to endpoints with observed or blocked evidence, while Any remains available; Reset returns both selectors to Any. A focused Map carries every connected semantic dependency required to explain the selected observed or blocked relationships, including launcher, lineage, tool/MCP, configured gateway, observed route, Flowlight proxy, and destination stages.
 
 A small focused neighborhood is shown exactly. A large one groups progressively only after the focused evidence exceeds the Map bounds, and every group retains its exact represented node and relationship IDs. The complete scoped snapshot still backs List and Reports, so every relationship remains searchable and exact totals never depend on what the Map can draw comfortably.
+
+## 0.18.2 — smooth obstacle routes and volume scale
+
+Observed traffic keeps a bounded absolute logarithmic width from 3 points at 1 KB or less to 24 points at 1 GB or more, so the same byte total has the same raw width in every graph and KB, MB, and GB evidence remains ordered without one route dominating the map. A zero-byte observation with a positive connection count receives a 1.5-point semantic minimum. At a crowded card port, all attached ribbons may be proportionally compressed below those semantic minima so drawing, routing clearance, hit bounds, and reserved capacity remain identical; byte ordering is preserved. Lineage, configuration, and enforcement relationships remain fixed 1.5-point support strokes with zero traffic counters.
+
+A routed-through support leg may carry `trafficVolume` solely to match the terminal observed ribbon's visual width. Its accounting counters remain zero; only the terminal observed edge contributes bytes and connections to graph totals.
+
+When one cubic cannot avoid every padded card, the non-dense fallback evaluates at most 64 deterministic route-band/waypoint candidates. It prefers paths with continuous forward tangents and no long horizontal or vertical shelves, stays inside the canvas, and preserves card and ribbon-width clearance. Cross-lane spacing supplies enough horizontal runway for these smooth turns. If an extreme topology offers only a shelf-shaped obstacle-clear route, card clearance wins over aesthetics instead of restoring a direct curve through a card. Dense graphs retain their smaller bounded single-cubic search.
 
 ### Acceptance tests
 

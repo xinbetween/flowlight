@@ -94,6 +94,10 @@ final class InspectNavigationTests: XCTestCase {
         XCTAssertTrue(PolicySectionExpansion.isCollapsible(.agentAllowlist))
         XCTAssertTrue(PolicySectionExpansion.isCollapsible(.managedPack))
         XCTAssertFalse(PolicySectionExpansion.isCollapsible(.guardrail))
+        XCTAssertFalse(
+            PolicySectionExpansion.primaryDefaultExpanded,
+            "primary policy sections should open folded so the overview remains compact"
+        )
     }
 
     func testCollapsedPolicySummarySeparatesConfiguredIntentFromCurrentEffect() {

@@ -40,6 +40,30 @@ final class ExtensionSourceTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testDurableTrafficDeliveryRequiresAValidEnvelopeAndHandler() {
+        let source = ExtensionTrafficSource()
+        let handled = expectation(description: "durable traffic handled")
+        let acknowledged = expectation(description: "durable traffic acknowledged")
+        let delivery = TrafficDeliveryEnvelope(
+            session: UUID(),
+            firstSequence: 1,
+            lastSequence: 1,
+            batches: [TrafficBatch(timestamp: 100, records: [])]
+        )
+        source.onTrafficDelivery = { received, reply in
+            XCTAssertEqual(received.id, delivery.id)
+            handled.fulfill()
+            reply(true)
+        }
+
+        source.deliverTrafficDurably(payload: TrafficCoding.encode(delivery: delivery)) { committed in
+            XCTAssertTrue(committed)
+            acknowledged.fulfill()
+        }
+
+        wait(for: [handled, acknowledged], timeout: 2)
+    }
+
     func testRulePublicationRequiresTheExactExtensionBuildIdentity() {
         XCTAssertTrue(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4/27", expected: "0.15.4/27"))
         XCTAssertFalse(ExtensionTrafficSource.acceptsRegisteredVersion("0.15.4", expected: "0.15.4/27"))
@@ -104,5 +128,11 @@ final class ExtensionSourceTests: XCTestCase {
                       "every registration must reset synchronization even before the old client invalidates")
         XCTAssertTrue(source.contains("clientGeneration == generation"),
                       "durable replies must be bound to the exact registered client generation")
+        XCTAssertTrue(source.contains("deliverTrafficDurably"),
+                      "traffic retries require the exact-once app selector negotiated by the current build")
+        XCTAssertTrue(source.contains("scheduleTrafficTimeoutLocked"),
+                      "an alive XPC connection with no reply must not stall traffic forever")
+        XCTAssertTrue(source.contains("scheduleTrafficRetryLocked()"),
+                      "a failed idle traffic delivery must retry without waiting for unrelated traffic")
     }
 }

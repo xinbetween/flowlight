@@ -25,7 +25,6 @@ REQUIRED_REVIEW_CHECKS = {
     ("github-actions", "unit (newest Xcode)"),
     ("github-actions", "Review / gate"),
     ("github-actions", "CodeQL / gate"),
-    ("github-advanced-security", "CodeQL"),
 }
 REVIEW_WORKFLOWS = {
     ("github-actions", "changes"): ".github/workflows/ci.yml",

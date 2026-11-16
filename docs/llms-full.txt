@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.1, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.4, macOS 15 or later.
 
  On this page
 
@@ -932,7 +932,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.1macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.4macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1395,14 +1395,6 @@ Questions
 
  Yes. It's free software under the GPL-3.0: no paid tier, no data collection.
 
- Know what leaves your Mac.
-
- Free software for macOS 15 and later.
-
- Download for macOS
- View source
- brew install --cask xinbetween/tap/flowlightCopy
-
 ---
 
 # Flowlight plugins
@@ -1684,8 +1676,27 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.4
+November 15, 2026Latest
+
+ Show Connections loading again. The Flowlight mark restores its lightweight flip while data and final graph geometry load, stays still with Reduce Motion, and remains deterministic in screenshot fixtures.
+
+ Draw routes as one smooth movement. Difficult obstacle detours now keep continuous tangents without the long horizontal or vertical shelves that made paths look like rounded rectangles, while preserving card clearance and bounded routing work.
+
+ Let traffic volume read at a glance. Observed ribbons scale monotonically from KB through MB and GB with bounded logarithmic width, flow-only evidence remains visible, and relationship-only support edges never acquire traffic counters.
+
+ Make inspection setup stay out of the way. Advanced, mock, request-modification, and response-modification disclosure labels toggle across their full row, and explicit HTTPS inspection enablement now remains on across relaunches until it is explicitly turned off; optional automatic timers remain available.
+
+ Open Policies as a compact overview. Network rules, Agent allowlists, and Managed packs now start folded independently while retaining their status summaries and full-row controls.
+
+ Keep public installation choices truthful. The homepage keeps the Developer download, GitHub, and Homebrew paths while temporarily withholding Mac App Store promotion until Apple approves the intended current Store version.
+
+ Keep release evidence canonical. Signed preparation and its retained-artifact verifier now share the same required-check contract: the successful workflow-bound CodeQL gate remains mandatory while GitHub’s redundant neutral status is ignored, with exact workflow, pull request, reviewer, and commit provenance retained.
+
+ Make capture recovery exact. Retried extension traffic now commits once under a durable delivery identity, stopped Bluetooth and USB channels cannot sample after opt-out, and Store inspection repairs incomplete bundles while pruning only cryptographically owned leaf certificates.
+
  0.18.1
-November 12, 2026Latest
+November 12, 2026
 
  Keep Policies compact without hiding their state. Network Rules, Agent Allowlists, and Managed Packs fold independently, remember their state, and keep useful status counts visible while collapsed.
 

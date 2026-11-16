@@ -67,7 +67,7 @@
   (function () {
     var reduced = matchMedia("(prefers-reduced-motion: reduce)");
     if (reduced.matches || !("IntersectionObserver" in window)) return;
-    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap, .final .wrap");
+    var targets = document.querySelectorAll("section.band > .wrap, .shot .wrap");
     if (!targets.length) return;
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {

@@ -1791,6 +1791,7 @@
 "Any destination" = "Cualquier destino";
 "Search destinations" = "Buscar destinos";
 "Map shows the top 10 sources by traffic. List keeps every exact relationship." = "El mapa muestra las 10 fuentes con más tráfico. La lista conserva cada relación exacta.";
+"Map could not draw these relationships without crossing another card. List keeps every exact relationship." = "El mapa no pudo dibujar estas relaciones sin cruzar otra tarjeta. La lista conserva cada relación exacta.";
 "Focused scope shows every connected relationship; large neighborhoods group progressively." = "El alcance enfocado muestra cada relación conectada; los vecindarios grandes se agrupan progresivamente.";
 "Clear scope" = "Borrar alcance";
 "%lld exact items" = "%lld elementos exactos";

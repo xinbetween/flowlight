@@ -710,12 +710,11 @@ final class InspectionController: ObservableObject {
         scheduleSessionExpiry()
     }
 
-    // MARK: The session ends by itself
+    // MARK: Optional automatic session end
 
-    /// Inspection used to run until somebody remembered to turn it off, which meant the most sensitive mode in the
-    /// app was the one most likely to be left on after the reason for it had passed. It now has an end, and the
-    /// end is visible on screen rather than implied — a countdown you can see is a countdown you can extend on
-    /// purpose, where a silent one would just look like inspection breaking.
+    /// Explicit enablement persists until it is switched off. People who choose an automatic session limit still get
+    /// a visible end rather than an implied one — a countdown they can see and deliberately restart, where a silent
+    /// timeout would just look like inspection breaking.
     private func scheduleSessionExpiry() {
         sessionTimer?.invalidate()
         sessionTimer = nil
@@ -872,6 +871,7 @@ final class InspectionController: ObservableObject {
         }
         objectWillChange.send()
         refreshStatus()
+        scheduleSessionExpiry()
     }
 
     /// Starts or stops the proxy to match the setting.
@@ -1019,9 +1019,35 @@ final class InspectionController: ObservableObject {
         enabled = false
         let db = db
         Task.detached { [ca] in
+            var errors: [String] = []
+            #if APP_STORE
+            do {
+                try ca.remove()
+            } catch {
+                errors.append(error.localizedDescription)
+            }
+            #else
             ca.remove()
-            db?.async { try $0.deleteAllExchanges() }
-            await MainActor.run { self.recordedCount = 0; self.refreshStatus(); self.onRecorded() }
+            #endif
+            var deletedRecordedData = db == nil
+            if let db {
+                do {
+                    try await db.asyncResult { try $0.deleteAllExchanges() }
+                    deletedRecordedData = true
+                } catch {
+                    errors.append(error.localizedDescription)
+                }
+            }
+            let didDeleteRecordedData = deletedRecordedData
+            let removalError = errors.isEmpty ? nil : errors.joined(separator: "\n")
+            await MainActor.run {
+                if didDeleteRecordedData {
+                    self.recordedCount = 0
+                    self.onRecorded()
+                }
+                self.lastError = removalError
+                self.refreshStatus()
+            }
         }
     }
 

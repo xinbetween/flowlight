@@ -117,5 +117,76 @@ class PagesProvenanceTests(unittest.TestCase):
         )
 
 
+class HomepageInstallationTests(unittest.TestCase):
+    clean_home = """
+    <main>
+      <div class="install-choices">
+        <a class="btn install-choice direct-download" href="{{dmg}}">Download</a>
+      </div>
+      <div class="install-utility">
+        <a class="github-link" href="https://github.com/xinbetween/flowlight">GitHub</a>
+        <p><code>brew install --cask xinbetween/tap/flowlight</code>
+          <button data-copy="brew install --cask xinbetween/tap/flowlight">Copy</button></p>
+      </div>
+    </main>
+    """
+
+    def problems(self, source):
+        return check_site.homepage_installation_problems(source, "fixture")
+
+    def test_clean_developer_installation_without_store_promotion_passes(self):
+        self.assertEqual(self.problems(self.clean_home), [])
+
+    def test_mobile_homebrew_control_must_span_both_installation_columns(self):
+        clean = """
+        @media (max-width: 640px) {
+          .cta .brew { grid-column: 1 / -1; width: 100%; }
+        }
+        @media (max-width: 520px) {}
+        """
+        broken = clean.replace("grid-column: 1 / -1", "grid-column: auto")
+
+        self.assertEqual(check_site.installation_css_problems(clean), [])
+        self.assertIn(
+            "site/site.css: mobile Homebrew control does not span the installation grid",
+            check_site.installation_css_problems(broken),
+        )
+
+    def test_app_store_url_or_badge_fails(self):
+        for promotion in (
+            '<a href="https://apps.apple.com/app/flowlight">Store</a>',
+            '<a href="https://www.apple.com/app-store/">Download from Apple</a>',
+            '<a href=https://www.apple.com/app-store/>Download from Apple</a>',
+            '<a href="https://example.com/store">Download on the Mac App Store</a>',
+            '<img class="app-store-badge" alt="Download on the Mac App Store">',
+            "<a href='https://APPS.APPLE.COM/app/flowlight'><img alt='Download on the Mac App Store'></a>",
+        ):
+            with self.subTest(promotion=promotion):
+                self.assertTrue(self.problems(self.clean_home + promotion))
+
+    def test_bottom_final_section_fails(self):
+        for section in (
+            '<section class="final"></section>',
+            "<section id='cta' class='band final highlighted'></section>",
+        ):
+            with self.subTest(section=section):
+                self.assertTrue(self.problems(self.clean_home + section))
+
+    def test_missing_direct_developer_download_fails(self):
+        source = self.clean_home.replace("install-choice direct-download", "install-choice")
+        self.assertIn("fixture: direct Developer DMG download is missing", self.problems(source))
+
+    def test_direct_download_class_does_not_borrow_a_dmg_url_elsewhere(self):
+        source = self.clean_home.replace('href="{{dmg}}"', 'href="#"') + '<a href="{{dmg}}">Footer</a>'
+        self.assertIn("fixture: direct Developer DMG download is missing", self.problems(source))
+
+    def test_direct_download_rejects_an_untrusted_origin_with_the_same_asset_path(self):
+        source = self.clean_home.replace(
+            'href="{{dmg}}"',
+            'href="https://untrusted.example/releases/latest/download/Flowlight.dmg"',
+        )
+        self.assertIn("fixture: direct Developer DMG download is missing", self.problems(source))
+
+
 if __name__ == "__main__":
     unittest.main()

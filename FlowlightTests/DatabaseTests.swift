@@ -219,6 +219,77 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(bounds.upperBound, Date(timeIntervalSince1970: TimeInterval(last)))
     }
 
+    func testRetryingTheSameTrafficDeliveryDoesNotDoubleCount() throws {
+        let timestamp: Int64 = 1_700_000_000
+        let delivery = TrafficDeliveryEnvelope(
+            session: UUID(),
+            firstSequence: 41,
+            lastSequence: 42,
+            batches: [TrafficBatch(timestamp: timestamp, records: [
+                TrafficRecord(
+                    key: key("com.example.app", "api.example.com"),
+                    counters: FlowCounters(bytesIn: 10, bytesOut: 20, flows: 1)
+                )
+            ])]
+        )
+
+        XCTAssertTrue(try db.insert(delivery))
+        XCTAssertFalse(try db.insert(delivery), "a lost acknowledgment must make an exact retry a no-op")
+
+        let totals = try db.raw(
+            "SELECT bytes_in, bytes_out, flows FROM flows_1s",
+            map: { ($0.int(0), $0.int(1), $0.int(2)) }
+        )
+        XCTAssertEqual(totals.count, 1)
+        XCTAssertEqual(totals.first?.0, 10)
+        XCTAssertEqual(totals.first?.1, 20)
+        XCTAssertEqual(totals.first?.2, 1)
+        XCTAssertTrue(try db.raw(
+            "PRAGMA index_list(traffic_delivery_receipts)",
+            map: { $0.text(1) }
+        ).contains("traffic_delivery_receipts_received"),
+        "bounded receipt maintenance must use its received-time index")
+    }
+
+    func testTrafficDeliveryGateRejectsStaleCallbacksAndRetainsExactRetryEnvelope() throws {
+        var gate = TrafficDeliveryGate()
+        let session = UUID()
+        let original = TrafficDeliveryEnvelope(
+            session: session,
+            firstSequence: 10,
+            lastSequence: 20,
+            batches: [TrafficBatch(timestamp: 100, records: [])]
+        )
+        let overlappingNewest = TrafficDeliveryEnvelope(
+            session: session,
+            firstSequence: 15,
+            lastSequence: 30,
+            batches: [TrafficBatch(timestamp: 200, records: [])]
+        )
+        let first = try XCTUnwrap(gate.begin(clientGeneration: 7, candidate: original))
+        XCTAssertNil(gate.begin(clientGeneration: 7, candidate: overlappingNewest))
+        XCTAssertNil(gate.complete(token: UUID(), clientGeneration: 7, committed: false))
+        XCTAssertNil(gate.complete(token: first.token, clientGeneration: 8, committed: false))
+        XCTAssertEqual(
+            gate.complete(token: first.token, clientGeneration: 7, committed: false),
+            first
+        )
+
+        let retry = try XCTUnwrap(gate.begin(clientGeneration: 7, candidate: overlappingNewest))
+        XCTAssertNotEqual(retry.token, first.token)
+        XCTAssertEqual(retry.firstSequence, first.firstSequence)
+        XCTAssertEqual(retry.lastSequence, first.lastSequence)
+        XCTAssertEqual(gate.envelope?.id, original.id,
+                       "traffic arriving after a timeout must not change or overlap the retried delivery identity")
+        gate.reset()
+        XCTAssertNil(gate.active)
+        XCTAssertEqual(gate.envelope?.id, original.id,
+                       "a reconnect must retry the exact ambiguous envelope")
+        let reconnect = try XCTUnwrap(gate.begin(clientGeneration: 8, candidate: overlappingNewest))
+        XCTAssertNotNil(gate.complete(token: reconnect.token, clientGeneration: 8, committed: true))
+        XCTAssertNil(gate.envelope)
+    }
+
     func testVersionedNameRepairMergesCollidingIdentityState() throws {
         let timestamp: Int64 = 1_700_000_000
         var versioned = key("2.1.260", "api.example.com")

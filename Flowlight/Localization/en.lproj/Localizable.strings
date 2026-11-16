@@ -1790,6 +1790,7 @@
 "Any destination" = "Any destination";
 "Search destinations" = "Search destinations";
 "Map shows the top 10 sources by traffic. List keeps every exact relationship." = "Map shows the top 10 sources by traffic. List keeps every exact relationship.";
+"Map could not draw these relationships without crossing another card. List keeps every exact relationship." = "Map could not draw these relationships without crossing another card. List keeps every exact relationship.";
 "Focused scope shows every connected relationship; large neighborhoods group progressively." = "Focused scope shows every connected relationship; large neighborhoods group progressively.";
 "Clear scope" = "Clear scope";
 "%lld exact items" = "%lld exact items";

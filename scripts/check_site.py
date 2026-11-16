@@ -9,6 +9,7 @@ roadmap still advertising what you can already download. None of that stops the 
     python3 scripts/check_site.py        # after scripts/build_site.py
 """
 import re, sys, pathlib, collections, hashlib, json, subprocess, time
+from urllib.parse import urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs"
@@ -24,8 +25,13 @@ OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-p
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
 OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
 PAGES_WORKFLOW = ROOT / ".github/workflows/pages.yml"
-APP_STORE_URL = "https://apps.apple.com/us/app/flowlight-network-monitor/id6826130038?mt=12"
 APP_STORE_BADGE = OUT / "assets/app-store-badge.svg"
+HOMEPAGE_FORBIDDEN_PROMOTION = {
+    "apps.apple.com": "App Store URL",
+    "itunes.apple.com": "legacy App Store URL",
+    "app-store-badge": "App Store badge",
+    "store-download": "Store download control",
+}
 PROJECT = (ROOT / "project.yml").read_text()
 APP_VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', PROJECT).group(1)
 
@@ -135,6 +141,76 @@ def pages_workflow_problems(source):
     permissions = permission_block.group(1) if permission_block else ""
     if permissions.strip().splitlines() != ["pages: write", "      id-token: write"]:
         found.append("Pages deploy permissions are not limited to pages and id-token write")
+    return found
+
+
+def installation_css_problems(source):
+    """The two-button mobile row must leave the complete Homebrew command on its own full-width row."""
+    found = []
+    mobile_start = source.find("@media (max-width: 640px)")
+    mobile_end = source.find("@media (max-width: 520px)", mobile_start)
+    mobile = source[mobile_start:mobile_end] if mobile_start >= 0 and mobile_end > mobile_start else ""
+    brew = re.search(r"\.cta\s+\.brew\s*\{([^}]*)\}", mobile, re.S)
+    if brew is None or not re.search(r"grid-column\s*:\s*1\s*/\s*-1", brew.group(1)):
+        found.append("site/site.css: mobile Homebrew control does not span the installation grid")
+    return found
+
+
+def homepage_installation_problems(source, label):
+    """Keep Developer installation paths while public Store promotion is paused."""
+    found = []
+    lowered = source.lower()
+    for marker, description in HOMEPAGE_FORBIDDEN_PROMOTION.items():
+        if marker.lower() in lowered:
+            found.append(f"{label}: temporary homepage takedown still contains {description}")
+    store_link = False
+    href_pattern = re.compile(r"\bhref\s*=\s*(?:(['\"])(.*?)\1|([^\s>]+))", re.I | re.S)
+    for match in href_pattern.finditer(source):
+        parsed = urlsplit(match.group(2) if match.group(1) else match.group(3))
+        host = (parsed.hostname or "").lower()
+        path = parsed.path.lower()
+        if host in {"apps.apple.com", "itunes.apple.com"} or (
+            (host == "apple.com" or host.endswith(".apple.com"))
+            and re.search(r"(?:^|/)(?:mac-)?app-store(?:/|$)|(?:^|/)app(?:/|$)", path)
+        ):
+            store_link = True
+            break
+    if store_link:
+        found.append(f"{label}: temporary homepage takedown still contains an Apple Store destination")
+    if re.search(r"<a\b[^>]*>.*?(?:mac\s+)?app\s+store.*?</a>", source, re.I | re.S):
+        found.append(f"{label}: App Store promotional link text is still present")
+    if re.search(r"\balt\s*=\s*(['\"])[^'\"]*(?:mac )?app store[^'\"]*\1", source, re.I):
+        found.append(f"{label}: App Store download alt text is still present")
+    if re.search(
+        r"<section\b[^>]*\bclass\s*=\s*(['\"])[^'\"]*\bfinal\b[^'\"]*\1",
+        source,
+        re.I | re.S,
+    ):
+        found.append(f"{label}: temporary homepage takedown still contains bottom final CTA")
+
+    direct_download = False
+    for anchor in re.findall(r"<a\b[^>]*>", source, re.I | re.S):
+        class_match = re.search(r"\bclass\s*=\s*(['\"])(.*?)\1", anchor, re.I | re.S)
+        href_match = re.search(r"\bhref\s*=\s*(['\"])(.*?)\1", anchor, re.I | re.S)
+        classes = set(class_match.group(2).lower().split()) if class_match else set()
+        href = href_match.group(2) if href_match else ""
+        if {"install-choice", "direct-download"}.issubset(classes) and href in {
+            "{{dmg}}",
+            "https://github.com/xinbetween/flowlight/releases/latest/download/Flowlight.dmg",
+        }:
+            direct_download = True
+            break
+    if not direct_download:
+        found.append(f"{label}: direct Developer DMG download is missing")
+    if source.count('class="install-choices"') != 1:
+        found.append(f"{label}: installation-choice group is missing or duplicated")
+    if source.count('class="install-utility"') != 1:
+        found.append(f"{label}: compact installation utility row is missing or duplicated")
+    if 'class="github-link"' not in source:
+        found.append(f"{label}: GitHub is not presented as a secondary link")
+    command = "brew install --cask xinbetween/tap/flowlight"
+    if f'data-copy="{command}"' not in source or f"<code>{command}</code>" not in source:
+        found.append(f"{label}: complete copyable Homebrew command is missing")
     return found
 
 
@@ -579,33 +655,25 @@ def problems():
     if "Sitemap: https://flowlight.xinbetween.com/sitemap.xml" not in robots:
         found.append("docs/robots.txt: missing or incorrect sitemap declaration")
 
-    # 15. The Mac App Store is a distinct signed product, not a replacement for the direct DMG. Every localized
-    #     home must expose Apple's unmodified badge and exact listing while retaining the existing direct download.
-    if not APP_STORE_BADGE.is_file():
-        found.append("docs/assets/app-store-badge.svg: official Mac App Store badge is missing")
-    for source in sorted((ROOT / "site/pages").glob("**/index.html")):
-        source_text = source.read_text()
-        label = str(source.relative_to(ROOT))
-        if APP_STORE_URL not in source_text or "assets/app-store-badge.svg" not in source_text:
-            found.append(f"{label}: Mac App Store badge or exact listing URL is missing")
-        if "{{dmg}}" not in source_text:
-            found.append(f"{label}: direct DMG download was removed while adding the Store badge")
-        if source_text.count('class="install-choices"') != 1:
-            found.append(f"{label}: peer installation-choice group is missing or duplicated")
-        if 'install-choice direct-download' not in source_text or 'install-choice store-download' not in source_text:
-            found.append(f"{label}: direct download and Mac App Store are not peer installation choices")
-        if source_text.count('class="install-utility"') != 1:
-            found.append(f"{label}: compact installation utility row is missing or duplicated")
-        if 'class="github-link"' not in source_text:
-            found.append(f"{label}: GitHub is not presented as a secondary link")
-        if 'data-copy="brew install --cask xinbetween/tap/flowlight"' not in source_text:
-            found.append(f"{label}: Homebrew Copy action does not retain the full command")
+    # 15. Public Store promotion is intentionally paused until Apple approves the intended current version.
+    #     Enforce that pause in source and generated homes without disturbing the Store product or Developer paths.
+    if APP_STORE_BADGE.exists():
+        found.append("docs/assets/app-store-badge.svg: orphaned App Store badge must be absent")
+    source_homes = sorted((ROOT / "site/pages").glob("**/index.html"))
+    generated_homes = [OUT / "index.html"] + [OUT / lang / "index.html" for lang in LANGS]
+    for home_path in source_homes + generated_homes:
+        label = str(home_path.relative_to(ROOT))
+        found.extend(homepage_installation_problems(home_path.read_text(), label))
 
-        # The home is intentionally static/lightweight. A loop here has previously caused real-machine jank.
+    # Authored home content is intentionally static/lightweight. Generated pages also include the footer's one-shot
+    # Copy-label reset, so inspect source homes here rather than mistaking that timeout for a recurring animation.
+    for home_path in source_homes:
+        source_text = home_path.read_text()
         if re.search(r"\b(setInterval|setTimeout|requestAnimationFrame)\s*\(", source_text):
-            found.append(f"{label}: home page has recurring JavaScript animation")
+            found.append(f"{home_path.relative_to(ROOT)}: home page has recurring JavaScript animation")
 
     site_css = (ROOT / "site/site.css").read_text()
+    found.extend(installation_css_problems(site_css))
     brew_rule = re.search(r"\.brew code\s*\{([^}]*)\}", site_css, re.DOTALL)
     if brew_rule is None or "overflow: hidden" not in brew_rule.group(1):
         found.append("site/site.css: Homebrew command is not compactly clipped")

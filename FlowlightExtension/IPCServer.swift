@@ -10,7 +10,8 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var clientGeneration: UInt64 = 0
     private var pending: [(seq: UInt64, batch: TrafficBatch)] = []
     private var nextSeq: UInt64 = 0
-    private var inFlight = false
+    private let trafficDeliverySession = UUID()
+    private var trafficDelivery = TrafficDeliveryGate()
     /// Refused connections waiting to be recorded by the app, on their own queue so they never wait behind an
     /// hour of buffered traffic. Evidence is never evicted before durable acknowledgment; a persistent write failure
     /// starts the normal fail-open grace so new refusals stop while the retained queue retries.
@@ -66,7 +67,6 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     private var durableHealth = DurableDeliveryHealth<DurableChannel>()
     private var durableEventsEnabled = false
     private var enforcementSynchronized = false
-    private static let durableEventProtocol = 1
     private var droppedPackHits: Int64 = 0
     private var droppedPackKeys: Int64 = 0
     private var packTransfer = RulePackTransferBuffer()
@@ -121,7 +121,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
                 guard let self, self.client === connection else { return }
                 self.client = nil
                 self.clientGeneration &+= 1
-                self.inFlight = false
+                self.trafficDelivery.reset()
                 self.blocks.resetDelivery()
                 self.decisions.resetDelivery()
                 self.packEventsInFlight = false
@@ -150,7 +150,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         queue.async {
             self.client = connection
             self.clientGeneration &+= 1
-            self.inFlight = false
+            self.trafficDelivery.reset()
             self.blocks.resetDelivery()
             self.decisions.resetDelivery()
             self.packEventsInFlight = false
@@ -167,8 +167,7 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
             _ = BlockEnforcer.shared.apply(RuleSet())
             _ = BlockEnforcer.shared.clearPacks()
             BlockEnforcer.shared.appConnectionChanged(connected: false)
-            self.flushLocked()
-            // Durable evidence waits for an exact-build app to opt in. Calling a new reply-block ABI before the
+            // Traffic and durable evidence wait for an exact-build app to opt in. Calling a new reply-block ABI before the
             // registration version check would make a mixed-version upgrade lose its connection and possibly backlog.
             // Registration is the synchronization barrier: the app may publish rules only after this reset is done.
             let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -181,11 +180,12 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
         guard let connection = NSXPCConnection.current() else { reply(false); return }
         queue.async {
             guard self.client === connection,
-                  appProtocol == Self.durableEventProtocol else {
+                  appProtocol == FlowlightIPCVersion.durableEvents else {
                 reply(false)
                 return
             }
             self.durableEventsEnabled = true
+            self.flushLocked()
             self.flushBlocksLocked()
             self.flushDecisionsLocked()
             self.flushPackEventsLocked()
@@ -621,22 +621,89 @@ final class IPCServer: NSObject, NSXPCListenerDelegate, FlowlightProviderXPC, @u
     /// its live view is made of — and the backlog behind it is history, which is just as useful arriving second.
     /// Sending oldest-first instead meant a long gap had to drain completely before anything current appeared.
     private func flushLocked() {
-        guard !inFlight, let client, !pending.isEmpty else { return }
-        let chunk = Array(pending.suffix(chunkSize))
-        let firstSeq = chunk.first!.seq, lastSeq = chunk.last!.seq
+        guard durableEventsEnabled, trafficDelivery.active == nil, let client else { return }
+        let candidate: TrafficDeliveryEnvelope
+        if let retained = trafficDelivery.envelope {
+            candidate = retained
+        } else {
+            guard !pending.isEmpty else { return }
+            let chunk = Array(pending.suffix(chunkSize))
+            candidate = TrafficDeliveryEnvelope(
+                session: trafficDeliverySession,
+                firstSequence: chunk.first!.seq,
+                lastSequence: chunk.last!.seq,
+                batches: chunk.map(\.batch)
+            )
+        }
+        guard let delivery = trafficDelivery.begin(
+            clientGeneration: clientGeneration,
+            candidate: candidate
+        ), let envelope = trafficDelivery.envelope else { return }
         let proxy = client.remoteObjectProxyWithErrorHandler { [weak self] error in
-            extensionLog.error("deliver failed: \(error.localizedDescription, privacy: .public)")
-            self?.queue.async { self?.inFlight = false }
-        } as? FlowlightAppXPC
-        guard let proxy else { return }
-        inFlight = true
-        proxy.deliver(payload: TrafficCoding.encode(chunk.map(\.batch))) { [weak self] in
+            extensionLog.error("deliverTrafficDurably failed: \(error.localizedDescription, privacy: .public)")
             self?.queue.async {
-                guard let self else { return }
-                self.inFlight = false
-                self.pending.removeAll { $0.seq >= firstSeq && $0.seq <= lastSeq }
-                self.flushLocked()
+                guard let self,
+                      self.clientGeneration == delivery.clientGeneration,
+                      self.trafficDelivery.complete(
+                        token: delivery.token,
+                        clientGeneration: delivery.clientGeneration,
+                        committed: false
+                      ) != nil else { return }
+                self.scheduleTrafficRetryLocked()
             }
+        } as? FlowlightAppXPC
+        guard let proxy else {
+            _ = trafficDelivery.complete(
+                token: delivery.token,
+                clientGeneration: delivery.clientGeneration,
+                committed: false
+            )
+            scheduleTrafficRetryLocked()
+            return
+        }
+        scheduleTrafficTimeoutLocked(delivery)
+        proxy.deliverTrafficDurably(payload: TrafficCoding.encode(delivery: envelope)) { [weak self] committed in
+            self?.queue.async {
+                guard let self,
+                      self.clientGeneration == delivery.clientGeneration,
+                      self.trafficDelivery.complete(
+                        token: delivery.token,
+                        clientGeneration: delivery.clientGeneration,
+                        committed: committed
+                      ) != nil else { return }
+                if committed {
+                    self.pending.removeAll {
+                        $0.seq >= delivery.firstSequence && $0.seq <= delivery.lastSequence
+                    }
+                    self.flushLocked()
+                } else {
+                    self.scheduleTrafficRetryLocked()
+                }
+            }
+        }
+    }
+
+    private func scheduleTrafficTimeoutLocked(_ delivery: TrafficDeliveryAttempt) {
+        queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self,
+                  self.clientGeneration == delivery.clientGeneration,
+                  self.trafficDelivery.complete(
+                    token: delivery.token,
+                    clientGeneration: delivery.clientGeneration,
+                    committed: false
+                  ) != nil else { return }
+            extensionLog.error("deliverTrafficDurably timed out")
+            self.scheduleTrafficRetryLocked()
+        }
+    }
+
+    private func scheduleTrafficRetryLocked() {
+        let generation = clientGeneration
+        queue.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self,
+                  self.clientGeneration == generation,
+                  self.trafficDelivery.active == nil else { return }
+            self.flushLocked()
         }
     }
 }

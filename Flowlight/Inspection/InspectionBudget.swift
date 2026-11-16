@@ -8,10 +8,10 @@ import Foundation
 /// is a secret written to disk under a promise that it wouldn't be.
 ///
 /// So the guess stops being the only defence. Headers are kept because they are on a list, not discarded
-/// because they looked dangerous; the amount recorded per app has a ceiling; and the session ends on its own,
-/// because "until someone remembers" is not a limit. The denylist is still here, because someone reading an
-/// unfamiliar API needs to see headers nobody has thought to allow yet — it is a choice now rather than the
-/// only behaviour.
+/// because they looked dangerous, and the amount recorded per app has a configurable ceiling. Inspection remembers
+/// explicit enablement across launches; an optional session timer remains available for people who want automatic
+/// shutoff. The denylist is still here, because someone reading an unfamiliar API needs to see headers nobody has
+/// thought to allow yet — it is a choice now rather than the only behaviour.
 struct InspectionBudget: Sendable, Equatable {
 
     /// What happens to a header's value before it is written down.
@@ -63,8 +63,8 @@ struct InspectionBudget: Sendable, Equatable {
     var dailyBodyBytesPerApp: Int64 = 0
     /// How long recorded exchanges are kept.
     var retentionDays = 3
-    /// Minutes after which inspection turns itself off. 0 means it runs until switched off by hand.
-    var sessionMinutes = 480
+    /// Minutes after which inspection turns itself off. 0 means it remembers explicit enablement until switched off.
+    var sessionMinutes = 0
 
     /// Headers worth reading that never carry a credential.
     ///
@@ -93,14 +93,41 @@ struct InspectionBudget: Sendable, Equatable {
         static let dailyBodyMBPerApp = "inspection.dailyBodyMBPerApp"
         static let retentionDays = "inspection.retentionDays"
         static let sessionMinutes = "inspection.sessionMinutes"
+        static let persistentSessionDefaultMigration =
+            "inspection.persistentSessionDefaultMigration.0182"
     }
 
-    static func registerDefaults() {
-        UserDefaults.standard.register(defaults: [
+    static func registerDefaults(
+        _ defaults: UserDefaults = .standard,
+        persistentDomainName: String? = Bundle.main.bundleIdentifier
+    ) {
+        // 0.18.1 registered an eight-hour default without persisting it. An already-enabled installation can
+        // therefore have no sessionMinutes object at all, which is different from a new installation choosing the
+        // new persistent default. Resolve that ambiguity once, before registering zero: active legacy sessions keep
+        // their bounded safety timer, while new and disabled installations persist the new until-disabled choice.
+        if !defaults.bool(forKey: Keys.persistentSessionDefaultMigration) {
+            let storedSessionMinutes = persistentDomainName.flatMap {
+                defaults.persistentDomain(forName: $0)?[Keys.sessionMinutes]
+            }
+            if storedSessionMinutes == nil {
+                let hadActiveLegacySession = [
+                    "inspection.enabled",
+                    "inspection.store.enabled",
+                ].contains { defaults.bool(forKey: $0) }
+                    || [
+                        "inspection.sessionStarted",
+                        "inspection.store.sessionStarted",
+                    ].contains { defaults.object(forKey: $0) != nil }
+                defaults.set(hadActiveLegacySession ? 480 : 0, forKey: Keys.sessionMinutes)
+            }
+            defaults.set(true, forKey: Keys.persistentSessionDefaultMigration)
+        }
+
+        defaults.register(defaults: [
             Keys.headerPolicy: HeaderPolicy.allowlist.rawValue,
             Keys.dailyBodyMBPerApp: 0,
             Keys.retentionDays: 3,
-            Keys.sessionMinutes: 480,
+            Keys.sessionMinutes: 0,
         ])
     }
 
@@ -117,6 +144,9 @@ struct InspectionBudget: Sendable, Equatable {
         budget.extraRedactionPatterns = (defaults.array(forKey: Keys.extraRedactionPatterns) as? [String]) ?? []
         budget.dailyBodyBytesPerApp = Int64(max(0, defaults.integer(forKey: Keys.dailyBodyMBPerApp))) * 1_000_000
         budget.retentionDays = max(1, defaults.integer(forKey: Keys.retentionDays))
+        // A stored 0.18.1 value of 480 may be either that release's default or an explicitly selected eight-hour
+        // safety timer. They are indistinguishable on disk, so never turn the ambiguous timer into indefinite
+        // inspection. registerDefaults resolves the separate no-stored-value upgrade case before registering zero.
         budget.sessionMinutes = max(0, defaults.integer(forKey: Keys.sessionMinutes))
         return budget
     }

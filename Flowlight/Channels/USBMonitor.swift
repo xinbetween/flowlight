@@ -10,68 +10,85 @@ import Foundation
 /// be polled; volumes come from `NSWorkspace`, which says the moment one is mounted or ejected. A drive appearing
 /// is the event people actually care about, so it is the one that arrives immediately rather than up to half a
 /// minute late.
-final class USBMonitor: @unchecked Sendable {
-    var onDevices: ([PeripheralDevice]) -> Void = { _ in }
-    var onEvents: ([DeviceEvent]) -> Void = { _ in }
+final class USBMonitor: PeripheralMonitoring, @unchecked Sendable {
+    var onDevices: ([PeripheralDevice], UInt64) -> Void = { _, _ in }
+    var onEvents: ([DeviceEvent], UInt64) -> Void = { _, _ in }
 
     private let queue = DispatchQueue(label: "flowlight.usb", qos: .utility)
+    private let lifecycle = PeripheralMonitorLifecycle()
     private var timer: DispatchSourceTimer?
     private var known: [PeripheralDevice] = []
     private var sawAnything = false
+    private var running = false
+    private var generation: UInt64 = 0
     private var observers: [NSObjectProtocol] = []
 
     var interval: TimeInterval = 30
-    /// Overridable for tests.
-    var read: () -> Data? = { USBMonitor.runSystemProfiler() }
+    /// Overridable for tests. Production reads use the cancellable subprocess owned by `lifecycle`.
+    var read: (() -> Data?)?
     var readVolumes: () -> [PeripheralDevice] = { USBMonitor.mountedVolumes() }
 
-    func start() {
-        stop()
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: interval, leeway: .seconds(5))
-        timer.setEventHandler { [weak self] in self?.sample() }
-        timer.resume()
-        self.timer = timer
-        // A drive appearing is the event worth knowing about at once, and NSWorkspace says so immediately.
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.queue.async { self?.sample() }
-            })
+    func start(generation: UInt64) {
+        lifecycle.requestStart(generation: generation)
+        queue.async { [weak self] in
+            guard let self, self.lifecycle.isCurrent(generation) else { return }
+            self.stopLocked()
+            self.generation = generation
+            self.running = true
+            let timer = DispatchSource.makeTimerSource(queue: self.queue)
+            timer.schedule(deadline: .now(), repeating: self.interval, leeway: .seconds(5))
+            timer.setEventHandler { [weak self] in self?.sample() }
+            timer.resume()
+            self.timer = timer
+            // A drive appearing is the event worth knowing about at once, and NSWorkspace says so immediately.
+            let center = NSWorkspace.shared.notificationCenter
+            for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
+                self.observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    self?.queue.async { self?.sample() }
+                })
+            }
         }
     }
 
     func stop() {
+        lifecycle.requestStop()
+        queue.async { [self] in stopLocked() }
+    }
+
+    private func stopLocked() {
+        running = false
         timer?.cancel()
         timer = nil
         observers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         observers.removeAll()
+        known = []
+        sawAnything = false
     }
 
     func refresh() { queue.async { [weak self] in self?.sample() } }
 
     private func sample() {
+        let sampleGeneration = generation
+        guard running, lifecycle.isCurrent(sampleGeneration) else { return }
         var devices = readVolumes()
-        if let data = read(), let usb = Self.parse(data) { devices += usb }
+        guard lifecycle.isCurrent(sampleGeneration) else { return }
+        let data: Data?
+        if let read {
+            data = read()
+        } else {
+            data = lifecycle.runSystemProfiler(
+                arguments: ["SPUSBDataType", "-json"],
+                generation: sampleGeneration
+            )
+        }
+        guard running, lifecycle.isCurrent(sampleGeneration) else { return }
+        if let data, let usb = Self.parse(data) { devices += usb }
         devices.sort { ($0.kind.rawValue, $0.name.lowercased()) < ($1.kind.rawValue, $1.name.lowercased()) }
         let events = DeviceDiff.events(from: known, to: devices, firstSighting: !sawAnything)
         known = devices
         sawAnything = true
-        onDevices(devices)
-        if !events.isEmpty { onEvents(events) }
-    }
-
-    private static func runSystemProfiler() -> Data? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        process.arguments = ["SPUSBDataType", "-json"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? data : nil
+        onDevices(devices, sampleGeneration)
+        if !events.isEmpty { onEvents(events, sampleGeneration) }
     }
 
     // MARK: USB

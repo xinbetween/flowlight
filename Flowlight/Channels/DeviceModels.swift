@@ -1,5 +1,68 @@
 import Foundation
 
+/// Immediate opt-out state shared by the peripheral monitors. Their serial queues may be blocked inside
+/// `system_profiler`, so stop/start intent cannot itself wait on those queues. A new request terminates the exact
+/// subprocess in flight and every sample revalidates its generation after each potentially blocking read.
+final class PeripheralMonitorLifecycle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requestedGeneration: UInt64?
+    private var activeProcess: Process?
+
+    func requestStart(generation: UInt64) {
+        updateRequest(generation)
+    }
+
+    func requestStop() {
+        updateRequest(nil)
+    }
+
+    func isCurrent(_ generation: UInt64) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return requestedGeneration == generation
+    }
+
+    func runSystemProfiler(arguments: [String], generation: UInt64) -> Data? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        lock.lock()
+        guard requestedGeneration == generation else {
+            lock.unlock()
+            return nil
+        }
+        activeProcess = process
+        do {
+            // Holding the lock closes the launch/stop gap: once requestStop can observe this process, it is running.
+            try process.run()
+        } catch {
+            activeProcess = nil
+            lock.unlock()
+            return nil
+        }
+        lock.unlock()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        lock.lock()
+        if activeProcess === process { activeProcess = nil }
+        let accepted = requestedGeneration == generation
+        lock.unlock()
+        return accepted && process.terminationStatus == 0 ? data : nil
+    }
+
+    private func updateRequest(_ generation: UInt64?) {
+        lock.lock()
+        requestedGeneration = generation
+        let process = activeProcess
+        lock.unlock()
+        if process?.isRunning == true { process?.terminate() }
+    }
+}
+
 /// A device attached to this Mac by something other than the network: a Bluetooth peripheral, a USB device, a
 /// volume that appeared.
 ///

@@ -19,6 +19,8 @@ enum Motion {
     static let value = Animation.easeInOut(duration: 0.45)
     /// A complete Connections generation replacing its loader. Geometry never animates between generations.
     static let graphReveal = Animation.easeOut(duration: 0.18)
+    /// The Flowlight mark turns only while Connections is waiting for its complete generation.
+    static let loadingMark = Animation.easeInOut(duration: 1.05).repeatForever(autoreverses: false)
     /// Something that repeats while a state lasts — a pulse while capture is live.
     static let breathing = Animation.easeInOut(duration: 1.6).repeatForever(autoreverses: true)
 
@@ -28,11 +30,15 @@ enum Motion {
         DemoData.isEnabled && UserDefaults.standard.bool(forKey: "FLDisableMotion")
     }
 
+    static func allowsAnimation(reduceMotion: Bool, staticFixture: Bool) -> Bool {
+        !reduceMotion && !staticFixture
+    }
+
     /// Runs an explicit state change with the shared motion policy. Views pass the system preference they read from
     /// the environment so imperative scroll and disclosure changes follow the same Reduce Motion behavior as modifiers.
     @MainActor
     static func perform(_ animation: Animation? = control, reduceMotion: Bool, updates: () -> Void) {
-        if reduceMotion || isStaticFixture {
+        if !allowsAnimation(reduceMotion: reduceMotion, staticFixture: isStaticFixture) {
             updates()
         } else {
             withAnimation(animation, updates)
@@ -64,7 +70,12 @@ private struct MotionModifier<V: Equatable>: ViewModifier {
     let value: V
 
     func body(content: Content) -> some View {
-        content.animation(reduceMotion || Motion.isStaticFixture ? nil : animation, value: value)
+        content.animation(
+            Motion.allowsAnimation(reduceMotion: reduceMotion, staticFixture: Motion.isStaticFixture)
+                ? animation
+                : nil,
+            value: value
+        )
     }
 }
 

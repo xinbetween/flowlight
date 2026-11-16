@@ -807,7 +807,7 @@ final class StoreInspectionTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("flowlight-store-ca-\(UUID().uuidString)", isDirectory: true)
         let authority = CertificateAuthority(directory: directory)
-        defer { authority.remove() }
+        defer { try? authority.remove() }
 
         try authority.ensure()
         XCTAssertTrue(authority.exists)
@@ -820,6 +820,267 @@ final class StoreInspectionTests: XCTestCase {
         let first = try authority.identity(for: "api.example.com")
         let second = try authority.identity(for: "api.example.com")
         XCTAssertTrue(first === second, "a host identity should be reused for the app session")
+    }
+
+    func testNativeCertificateAuthorityRebuildsAMissingBundleWithoutRotatingTheCA() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-bundle-\(UUID().uuidString)", isDirectory: true)
+        let authority = CertificateAuthority(directory: directory)
+        defer { try? authority.remove() }
+
+        try authority.ensure()
+        let originalRoot = SecCertificateCopyData(try XCTUnwrap(authority.caCertificate())) as Data
+        try FileManager.default.removeItem(at: authority.bundleURL)
+
+        XCTAssertFalse(authority.exists, "a missing SSL_CERT_FILE target is incomplete installation state")
+        try authority.ensure()
+
+        XCTAssertTrue(authority.exists)
+        XCTAssertEqual(SecCertificateCopyData(try XCTUnwrap(authority.caCertificate())) as Data, originalRoot,
+                       "repairing only the bundle must preserve the user-trusted CA identity")
+        var bundle = try String(contentsOf: authority.bundleURL, encoding: .utf8)
+        let rootPEM = try String(contentsOf: authority.caCertificateURL, encoding: .utf8)
+        XCTAssertTrue(bundle.contains(rootPEM))
+
+        try rootPEM.write(to: authority.bundleURL, atomically: true, encoding: .utf8)
+        XCTAssertFalse(authority.exists, "a root-only bundle omits the system trust store")
+        try authority.ensure()
+        bundle = try String(contentsOf: authority.bundleURL, encoding: .utf8)
+        XCTAssertTrue(bundle.hasPrefix(try String(contentsOfFile: "/etc/ssl/cert.pem", encoding: .utf8)))
+        XCTAssertTrue(bundle.hasSuffix(rootPEM))
+    }
+
+    func testNativeCertificateAuthorityInvalidatesBundleCacheWhenContentChangesWithSameSizeAndMTime() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-bundle-stamp-\(UUID().uuidString)", isDirectory: true)
+        let authority = CertificateAuthority(directory: directory)
+        defer { try? authority.remove() }
+
+        try authority.ensure()
+        XCTAssertTrue(authority.exists, "prime the validated bundle stamp")
+        let attributes = try FileManager.default.attributesOfItem(atPath: authority.bundleURL.path)
+        let modified = try XCTUnwrap(attributes[.modificationDate] as? Date)
+        var corrupted = try Data(contentsOf: authority.bundleURL)
+        corrupted[corrupted.startIndex] ^= 0x01
+        let handle = try FileHandle(forWritingTo: authority.bundleURL)
+        try handle.write(contentsOf: corrupted)
+        try handle.synchronize()
+        try handle.close()
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: authority.bundleURL.path)
+
+        XCTAssertFalse(authority.exists,
+                       "ctime and inode metadata must invalidate same-size replacements with a restored mtime")
+        try authority.ensure()
+        XCTAssertTrue(authority.exists)
+    }
+
+    func testNativeCertificateAuthorityPrunesPersistedLeavesAcrossLaunches() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-leaves-\(UUID().uuidString)", isDirectory: true)
+        var firstLaunch: CertificateAuthority? = CertificateAuthority(directory: directory)
+        try firstLaunch?.remove()
+        defer { try? CertificateAuthority(directory: directory).remove() }
+
+        try firstLaunch?.ensure()
+        _ = try XCTUnwrap(firstLaunch).identity(for: "first.example")
+        let firstReferences = try XCTUnwrap(firstLaunch).generatedLeafPersistentReferences
+        XCTAssertEqual(firstReferences.count, 1)
+        XCTAssertTrue(firstReferences.allSatisfy { keychainContains(persistentReference: $0) })
+        firstLaunch = nil
+
+        let secondLaunch = CertificateAuthority(directory: directory)
+        try secondLaunch.ensure()
+        XCTAssertTrue(firstReferences.allSatisfy { !keychainContains(persistentReference: $0) },
+                      "a fresh process must prune generated leaves retained by the previous process")
+        _ = try secondLaunch.identity(for: "second.example")
+        XCTAssertEqual(secondLaunch.generatedLeafPersistentReferences.count, 1)
+    }
+
+    func testNativeCertificateAuthorityPrunesLeavesCreatedBeforeTheOwnershipManifest() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-legacy-leaves-\(UUID().uuidString)", isDirectory: true)
+        var firstLaunch: CertificateAuthority? = CertificateAuthority(directory: directory)
+        try firstLaunch?.remove()
+        defer { try? CertificateAuthority(directory: directory).remove() }
+
+        try firstLaunch?.ensure()
+        _ = try XCTUnwrap(firstLaunch).identity(for: "legacy.example")
+        let references = try XCTUnwrap(firstLaunch).generatedLeafPersistentReferences
+        let reference = try XCTUnwrap(references.first)
+        try FileManager.default.removeItem(at: directory.appendingPathComponent("leaf-certificates.plist"))
+        firstLaunch = nil
+
+        try CertificateAuthority(directory: directory).ensure()
+
+        XCTAssertFalse(keychainContains(persistentReference: reference),
+                       "an upgrade must prune only legacy leaves matching Flowlight's exact label and leaf key")
+    }
+
+    func testNativeCertificateAuthorityRetainsLegacyOwnershipEvidenceWhenTheCAFileIsMissing() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-missing-legacy-ca-\(UUID().uuidString)", isDirectory: true)
+        var firstLaunch: CertificateAuthority? = CertificateAuthority(directory: directory)
+        try firstLaunch?.remove()
+        defer { try? CertificateAuthority(directory: directory).remove() }
+
+        try firstLaunch?.ensure()
+        _ = try XCTUnwrap(firstLaunch).identity(for: "legacy-missing-ca.example")
+        let reference = try XCTUnwrap(firstLaunch?.generatedLeafPersistentReferences.first)
+        let authorityPEM = try Data(contentsOf: XCTUnwrap(firstLaunch).caCertificateURL)
+        try FileManager.default.removeItem(at: directory.appendingPathComponent("leaf-certificates.plist"))
+        try FileManager.default.removeItem(at: XCTUnwrap(firstLaunch).caCertificateURL)
+        firstLaunch = nil
+
+        let recovery = CertificateAuthority(directory: directory)
+        XCTAssertThrowsError(try recovery.ensure(),
+                             "without the original CA, Flowlight must retain the leaf key needed for later cleanup")
+        XCTAssertTrue(keychainContains(persistentReference: reference))
+
+        try authorityPEM.write(to: recovery.caCertificateURL, options: .atomic)
+        try recovery.ensure()
+        XCTAssertFalse(keychainContains(persistentReference: reference),
+                       "restoring the original CA must make the retained cryptographic cleanup boundary usable")
+        XCTAssertTrue(recovery.exists)
+    }
+
+    func testNativeCertificateAuthorityPrunesALeafImportedBeforeItsReferenceWasRecorded() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-interrupted-leaf-\(UUID().uuidString)", isDirectory: true)
+        var firstLaunch: CertificateAuthority? = CertificateAuthority(directory: directory)
+        try firstLaunch?.remove()
+        defer { try? CertificateAuthority(directory: directory).remove() }
+
+        try firstLaunch?.ensure()
+        _ = try XCTUnwrap(firstLaunch).identity(for: "interrupted.example")
+        let references = try XCTUnwrap(firstLaunch).generatedLeafPersistentReferences
+        let reference = try XCTUnwrap(references.first)
+        let manifestURL = directory.appendingPathComponent("leaf-certificates.plist")
+        let data = try Data(contentsOf: manifestURL)
+        var records = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]]
+        )
+        records[0].removeValue(forKey: "persistentReference")
+        try PropertyListSerialization.data(fromPropertyList: records, format: .binary, options: 0)
+            .write(to: manifestURL, options: .atomic)
+        firstLaunch = nil
+
+        try CertificateAuthority(directory: directory).ensure()
+
+        XCTAssertFalse(keychainContains(persistentReference: reference),
+                       "DER-only crash recovery must remove the exact imported certificate")
+    }
+
+    func testNativeCertificateAuthorityRemovesImportedLeafWhenManifestWriteFails() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-manifest-failure-\(UUID().uuidString)", isDirectory: true)
+        let authority = CertificateAuthority(directory: directory)
+        defer { try? authority.remove() }
+
+        try authority.ensure()
+        let before = keychainCertificateDERs()
+        authority.leafManifestWriter = { _, _ in
+            throw NSError(domain: "StoreInspectionTests", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "synthetic manifest failure"])
+        }
+
+        XCTAssertThrowsError(try authority.identity(for: "manifest-failure.example"))
+        XCTAssertEqual(keychainCertificateDERs(), before,
+                       "a failed ownership write must immediately remove the just-imported leaf")
+
+        authority.leafManifestWriter = { data, url in try data.write(to: url, options: .atomic) }
+        _ = try authority.identity(for: "manifest-recovered.example")
+        XCTAssertEqual(authority.generatedLeafPersistentReferences.count, 1)
+    }
+
+    func testNativeCertificateAuthoritySweepsImportedLeafWhenReferenceLookupFails() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-reference-failure-\(UUID().uuidString)", isDirectory: true)
+        let authority = CertificateAuthority(directory: directory)
+        defer { try? authority.remove() }
+
+        try authority.ensure()
+        let before = keychainCertificateDERs()
+        authority.importedLeafReferenceProvider = { _ in (errSecInteractionNotAllowed, nil) }
+
+        XCTAssertThrowsError(try authority.identity(for: "reference-failure.example"))
+        XCTAssertEqual(keychainCertificateDERs(), before,
+                       "reference lookup failure must cryptographically sweep the untracked import")
+        XCTAssertTrue(authority.generatedLeafPersistentReferences.isEmpty)
+    }
+
+    func testNativeCertificateAuthoritySweepsImportedLeafWhenIdentityPairingFails() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-pairing-failure-\(UUID().uuidString)", isDirectory: true)
+        let authority = CertificateAuthority(directory: directory)
+        defer { try? authority.remove() }
+
+        try authority.ensure()
+        let before = keychainCertificateDERs()
+        authority.leafIdentityProvider = { _ in (errSecInteractionNotAllowed, nil) }
+
+        XCTAssertThrowsError(try authority.identity(for: "pairing-failure.example"))
+        XCTAssertEqual(keychainCertificateDERs(), before,
+                       "identity pairing failure must remove the imported and manifested certificate")
+        XCTAssertTrue(authority.generatedLeafPersistentReferences.isEmpty)
+    }
+
+    func testNativeCertificateAuthorityRejectsAReferenceToDifferentCertificateAndFallsBackToDER() throws {
+        let container = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-stale-reference-\(UUID().uuidString)", isDirectory: true)
+        let ownedDirectory = container.appendingPathComponent("owned", isDirectory: true)
+        let foreignDirectory = container.appendingPathComponent("foreign", isDirectory: true)
+        var owned: CertificateAuthority? = CertificateAuthority(directory: ownedDirectory)
+        let foreign = CertificateAuthority(directory: foreignDirectory)
+        defer {
+            try? CertificateAuthority(directory: ownedDirectory).remove()
+            try? foreign.remove()
+            try? FileManager.default.removeItem(at: container)
+        }
+
+        try owned?.ensure()
+        try foreign.ensure()
+        _ = try XCTUnwrap(owned).identity(for: "owned.example")
+        _ = try foreign.identity(for: "foreign.example")
+        let ownedReference = try XCTUnwrap(owned?.generatedLeafPersistentReferences.first)
+        let foreignReference = try XCTUnwrap(foreign.generatedLeafPersistentReferences.first)
+        let manifestURL = ownedDirectory.appendingPathComponent("leaf-certificates.plist")
+        let data = try Data(contentsOf: manifestURL)
+        var records = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]]
+        )
+        records[0]["persistentReference"] = foreignReference
+        try PropertyListSerialization.data(fromPropertyList: records, format: .binary, options: 0)
+            .write(to: manifestURL, options: .atomic)
+        owned = nil
+
+        try CertificateAuthority(directory: ownedDirectory).ensure()
+
+        XCTAssertFalse(keychainContains(persistentReference: ownedReference),
+                       "a migrated reference must fall back to the manifest's exact DER")
+        XCTAssertTrue(keychainContains(persistentReference: foreignReference),
+                      "a stale reference must never delete a different certificate")
+    }
+
+    func testNativeCertificateAuthorityRecoversAMalformedLeafManifestCryptographically() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-store-ca-corrupt-leaves-\(UUID().uuidString)", isDirectory: true)
+        var firstLaunch: CertificateAuthority? = CertificateAuthority(directory: directory)
+        try firstLaunch?.remove()
+        let manifestURL = directory.appendingPathComponent("leaf-certificates.plist")
+        defer { try? CertificateAuthority(directory: directory).remove() }
+
+        try firstLaunch?.ensure()
+        _ = try XCTUnwrap(firstLaunch).identity(for: "corrupt.example")
+        let reference = try XCTUnwrap(firstLaunch?.generatedLeafPersistentReferences.first)
+        try Data("not a property list".utf8).write(to: manifestURL, options: .atomic)
+        firstLaunch = nil
+
+        let secondLaunch = CertificateAuthority(directory: directory)
+        try secondLaunch.ensure()
+        XCTAssertTrue(secondLaunch.exists)
+        XCTAssertFalse(keychainContains(persistentReference: reference))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifestURL.path),
+                       "unusable public metadata is removed only after cryptographic leaf cleanup succeeds")
     }
 
     func testStoreCertificateAuthorityUsesAProductSpecificDirectory() {
@@ -849,8 +1110,8 @@ final class StoreInspectionTests: XCTestCase {
         let authority = CertificateAuthority(directory: container.appendingPathComponent("owned", isDirectory: true))
         let foreign = CertificateAuthority(directory: container.appendingPathComponent("foreign", isDirectory: true))
         defer {
-            authority.remove()
-            foreign.remove()
+            try? authority.remove()
+            try? foreign.remove()
             try? FileManager.default.removeItem(at: container)
         }
 
@@ -891,7 +1152,7 @@ final class StoreInspectionTests: XCTestCase {
                     kSecValueRef as String: importedRoot,
                 ] as CFDictionary)
             }
-            authority.remove()
+            try? authority.remove()
         }
 
         try authority.ensure()
@@ -903,7 +1164,7 @@ final class StoreInspectionTests: XCTestCase {
         XCTAssertEqual(SecItemAdd(add as CFDictionary, nil), errSecSuccess)
         importedRoot = root
 
-        authority.remove()
+        try? authority.remove()
 
         var retained: CFTypeRef?
         let lookup: [String: Any] = [
@@ -923,9 +1184,30 @@ final class StoreInspectionTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("flowlight-store-ca-invalid-\(UUID().uuidString)", isDirectory: true)
         let authority = CertificateAuthority(directory: directory)
-        defer { authority.remove() }
+        defer { try? authority.remove() }
 
         XCTAssertThrowsError(try authority.identity(for: "example.com\nsubjectAltName=DNS:attacker.example"))
+    }
+
+    private func keychainCertificateDERs() -> Set<Data> {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecClass as String: kSecClassCertificate,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnRef as String: true,
+        ] as CFDictionary, &result)
+        if status == errSecItemNotFound { return [] }
+        guard status == errSecSuccess, let certificates = result as? [SecCertificate] else { return [] }
+        return Set(certificates.map { SecCertificateCopyData($0) as Data })
+    }
+
+    private func keychainContains(persistentReference: Data) -> Bool {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecValuePersistentRef as String: persistentReference,
+            kSecReturnRef as String: true,
+        ] as CFDictionary, &result)
+        return status == errSecSuccess && result != nil
     }
 
     private func authorize(

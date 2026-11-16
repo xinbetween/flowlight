@@ -371,6 +371,9 @@ final class TrafficDatabase: @unchecked Sendable {
     let queue = DispatchQueue(label: "flowlight.db", qos: .userInitiated)
     private let conn: SQLiteConnection
     let url: URL
+    /// Receipt cleanup is maintenance, not part of every one-second delivery. An indexed hourly pass keeps the
+    /// two-day exact-retry window bounded without repeatedly scanning or rewriting the receipt table.
+    private var nextTrafficReceiptPrune: Int64 = 0
     /// App-lifetime, credential-free provider settings. The writer queue replaces this whole value atomically.
     private var runtimeProviderProfiles: [ProviderRuntimeProfile] = []
 
@@ -819,6 +822,11 @@ final class TrafficDatabase: @unchecked Sendable {
         CREATE TABLE IF NOT EXISTS durable_event_watermarks (
             channel TEXT NOT NULL, delivery_session TEXT NOT NULL, highest_sequence INTEGER NOT NULL,
             updated INTEGER NOT NULL, PRIMARY KEY(channel, delivery_session));
+        -- Traffic ranges arrive newest-first, so a monotonic watermark cannot deduplicate them. Retain bounded exact
+        -- delivery receipts long enough to cover the extension's one-hour queue and delayed XPC retries.
+        CREATE TABLE IF NOT EXISTS traffic_delivery_receipts (
+            delivery_id TEXT PRIMARY KEY, received INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS traffic_delivery_receipts_received ON traffic_delivery_receipts(received);
         CREATE TABLE IF NOT EXISTS allowlist_events (id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_id TEXT NOT NULL UNIQUE, ts INTEGER NOT NULL, bundle_id TEXT NOT NULL, app_name TEXT NOT NULL,
             agent TEXT NOT NULL, agent_name TEXT NOT NULL, host TEXT NOT NULL, ip TEXT NOT NULL,
@@ -937,6 +945,38 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Ingest
 
     func insert(_ batches: [TrafficBatch]) throws {
+        try conn.transaction { try insertTrafficRows(batches) }
+    }
+
+    /// Commits one additive extension delivery exactly once. Sequence ranges arrive newest-first, so the opaque range
+    /// identity—not a highest-sequence watermark—is the durable deduplication boundary.
+    func insert(_ delivery: TrafficDeliveryEnvelope) throws -> Bool {
+        guard delivery.isValid else { return false }
+        let now = Int64(Date().timeIntervalSince1970)
+        let shouldPrune = now >= nextTrafficReceiptPrune
+        var accepted = false
+        var pruned = false
+        try conn.transaction {
+            try conn.run(
+                "INSERT OR IGNORE INTO traffic_delivery_receipts (delivery_id, received) VALUES (?, ?)",
+                [.text(delivery.id), .int(now)]
+            )
+            guard conn.changes == 1 else { return }
+            try insertTrafficRows(delivery.batches)
+            if shouldPrune {
+                try conn.run(
+                    "DELETE FROM traffic_delivery_receipts WHERE received < ?",
+                    [.int(now - 2 * 24 * 60 * 60)]
+                )
+                pruned = true
+            }
+            accepted = true
+        }
+        if pruned { nextTrafficReceiptPrune = now + 60 * 60 }
+        return accepted
+    }
+
+    private func insertTrafficRows(_ batches: [TrafficBatch]) throws {
         let sql = """
         INSERT INTO flows_1s (ts, pid, bundle_id, app_name, app_path, remote_ip, domain, port, transport, protocol, bytes_in, bytes_out, flows,
                               agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
@@ -950,21 +990,19 @@ final class TrafficDatabase: @unchecked Sendable {
                     attribution_exact, attribution_epoch) DO UPDATE SET
             bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, flows = flows + excluded.flows
         """
-        try conn.transaction {
-            for batch in batches {
-                for r in batch.records {
-                    let k = r.key
-                    try conn.run(sql, [.int(batch.timestamp), .int(Int64(k.pid)), .text(k.bundleID), .text(k.appName),
-                                       .text(k.appPath), .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)),
-                                       .text(k.transport.rawValue), .text(k.appProtocol), .int(r.counters.bytesIn),
-                                       .int(r.counters.bytesOut), .int(r.counters.flows),
-                                       .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
-                                       .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
-                                       .text(k.upstreamLauncherBundleID ?? ""), .text(k.upstreamLauncherName ?? ""),
-                                       .text(k.upstreamLauncherPath ?? ""),
-                                       .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
-                                       .text(k.channel.rawValue)])
-                }
+        for batch in batches {
+            for r in batch.records {
+                let k = r.key
+                try conn.run(sql, [.int(batch.timestamp), .int(Int64(k.pid)), .text(k.bundleID), .text(k.appName),
+                                   .text(k.appPath), .text(k.remoteIP), .text(k.domain), .int(Int64(k.port)),
+                                   .text(k.transport.rawValue), .text(k.appProtocol), .int(r.counters.bytesIn),
+                                   .int(r.counters.bytesOut), .int(r.counters.flows),
+                                   .text(k.parentAgent ?? ""), .text(k.parentAgentName ?? ""), .text(k.mcpServer ?? ""),
+                                   .text(k.launcherBundleID ?? ""), .text(k.launcherName ?? ""), .text(k.launcherPath ?? ""),
+                                   .text(k.upstreamLauncherBundleID ?? ""), .text(k.upstreamLauncherName ?? ""),
+                                   .text(k.upstreamLauncherPath ?? ""),
+                                   .text(k.routeProxyBundleID ?? ""), .text(k.routeProxyName ?? ""), .text(k.routeProxyPath ?? ""),
+                                   .text(k.channel.rawValue)])
             }
         }
     }

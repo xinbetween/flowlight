@@ -122,6 +122,13 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertFalse(ConnectionsRenderPolicy.showsLoading(isLoading: false, hasSnapshot: false))
     }
 
+    func testConnectionsLoadingLogoAnimatesOnlyWhenMotionIsAllowed() {
+        XCTAssertTrue(Motion.allowsAnimation(reduceMotion: false, staticFixture: false))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: true, staticFixture: false))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: false, staticFixture: true))
+        XCTAssertFalse(Motion.allowsAnimation(reduceMotion: true, staticFixture: true))
+    }
+
     func testConnectionsRejectsAStaleAsyncCompletion() {
         let current = UUID()
         XCTAssertTrue(ConnectionsRenderPolicy.canCommit(requestID: current, currentID: current, cancelled: false))

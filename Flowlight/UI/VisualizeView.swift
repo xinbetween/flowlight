@@ -986,12 +986,30 @@ private enum GraphSelection {
 }
 
 private struct TrafficGraphLoadingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var flipped = false
+    @State private var animationGeneration = 0
+
     var body: some View {
+        let animates = Motion.allowsAnimation(
+            reduceMotion: reduceMotion,
+            staticFixture: Motion.isStaticFixture
+        )
         VStack(spacing: Spacing.m) {
             Image(nsImage: NSApplication.shared.applicationIconImage)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 52, height: 52)
+                .rotation3DEffect(
+                    .degrees(flipped ? 360 : 0),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.55
+                )
+                .motion(Motion.loadingMark, value: flipped)
+                .onAppear { setAnimationRunning(animates) }
+                .onChange(of: animates) { _, allowed in
+                    setAnimationRunning(allowed)
+                }
             Text(L("Loading visualization…"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(FL.muted)
@@ -1001,6 +1019,25 @@ private struct TrafficGraphLoadingView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("Loading visualization…"))
     }
+
+    private func setAnimationRunning(_ allowed: Bool) {
+        animationGeneration += 1
+        let generation = animationGeneration
+        flipped = false
+        guard allowed else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard animationGeneration == generation else { return }
+            flipped = true
+        }
+    }
+}
+
+private struct TrafficGraphAnimatedLaneGeometry {
+    var sentPath: Path?
+    var receivedPath: Path?
+    var sentWidth: CGFloat
+    var receivedWidth: CGFloat
 }
 
 private struct TrafficGraphCanvas: View {
@@ -1034,6 +1071,7 @@ private struct TrafficGraphCanvas: View {
             let layoutKey = renderKey.layout
             let layout = cachedLayout.updatingTrafficWidths(for: snapshot)
             let layoutIsReady = renderedLayoutKey == layoutKey && !layout.nodeFrames.isEmpty
+            let omittedEdgeCount = layout.omittedEdgeIDs.count
             let screenBounds = CGRect(origin: .zero, size: geometry.size)
             let visible = layout.visibleRegion(
                 in: viewport.visibleGraphRect(in: screenBounds),
@@ -1049,6 +1087,9 @@ private struct TrafficGraphCanvas: View {
                     .allowsHitTesting(layoutIsReady)
                 if layoutIsReady {
                     viewportControls(layout: layout, in: screenBounds)
+                    if omittedEdgeCount > 0 {
+                        omittedRoutesNotice(count: omittedEdgeCount)
+                    }
                 } else {
                     TrafficGraphLoadingView()
                         .transition(.opacity)
@@ -1217,6 +1258,28 @@ private struct TrafficGraphCanvas: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
+    private func omittedRoutesNotice(count: Int) -> some View {
+        let explanation = L(
+            "Map could not draw these relationships without crossing another card. "
+                + "List keeps every exact relationship."
+        )
+        return Label {
+            Text("\(count) · \(L("Map")) → \(L("List"))")
+        } icon: {
+            Image(systemName: "eye.slash")
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(FL.muted)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(FL.surface, in: RoundedRectangle(cornerRadius: Radius.chip))
+        .overlay(RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(FL.line))
+        .padding(Spacing.m)
+        .help(explanation)
+        .accessibilityLabel("\(count). \(explanation)")
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func edgeLayer(
         _ layout: TrafficGraphLayoutSnapshot,
         visible: TrafficGraphVisibleRegion
@@ -1248,15 +1311,27 @@ private struct TrafficGraphCanvas: View {
                 guard counters.total > 0 else { continue }
 
                 let lanes = TrafficGraphFlowDash.lanes(counters: counters, totalWidth: width)
+                let receivedPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .received,
+                    preferredWidth: GraphStyle.staticLaneWidth,
+                    laneWidth: lanes.received.width
+                )
+                let sentPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .sent,
+                    preferredWidth: GraphStyle.staticLaneWidth,
+                    laneWidth: lanes.sent.width
+                )
                 let laneOpacity = emphasized ? 0.88 : related ? 0.30 : 0.06
                 if lanes.received.width > 0 {
                     context.stroke(
-                        path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
-                            totalWidth: width,
-                            direction: .received
-                        ))),
+                        path(curve.offset(by: receivedPaint.offset)),
                         with: .color(FL.graphReceived.opacity(laneOpacity)),
-                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
+                        style: StrokeStyle(
+                            lineWidth: receivedPaint.width,
+                            lineCap: .round
+                        )
                     )
                     if emphasized {
                         context.fill(
@@ -1267,12 +1342,12 @@ private struct TrafficGraphCanvas: View {
                 }
                 if lanes.sent.width > 0 {
                     context.stroke(
-                        path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
-                            totalWidth: width,
-                            direction: .sent
-                        ))),
+                        path(curve.offset(by: sentPaint.offset)),
                         with: .color(FL.graphSent.opacity(laneOpacity)),
-                        style: StrokeStyle(lineWidth: GraphStyle.staticLaneWidth, lineCap: .round)
+                        style: StrokeStyle(
+                            lineWidth: sentPaint.width,
+                            lineCap: .round
+                        )
                     )
                     if emphasized {
                         context.fill(
@@ -1304,12 +1379,46 @@ private struct TrafficGraphCanvas: View {
         ) {
             let active = Set(activeEdgeIDs)
             let edgeSpeeds = TrafficGraphFlowDash.speeds(for: activeEdgeIDs)
+            let laneGeometry = Dictionary(uniqueKeysWithValues: snapshot.edges.compactMap {
+                edge -> (TrafficGraphEdgeID, TrafficGraphAnimatedLaneGeometry)? in
+                guard active.contains(edge.id), isEdgeRelated(edge),
+                      let curve = layout.edgeCurves[edge.id],
+                      let width = layout.edgeWidths[edge.id] else { return nil }
+                let lanes = TrafficGraphFlowDash.lanes(
+                    counters: edge.displayedCounters,
+                    totalWidth: width
+                )
+                let sentPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .sent,
+                    preferredWidth: TrafficGraphFlowDash.strokeWidth,
+                    laneWidth: lanes.sent.width
+                )
+                let receivedPaint = TrafficGraphFlowDash.paintedLane(
+                    totalWidth: width,
+                    direction: .received,
+                    preferredWidth: TrafficGraphFlowDash.strokeWidth,
+                    laneWidth: lanes.received.width
+                )
+                return (
+                    edge.id,
+                    TrafficGraphAnimatedLaneGeometry(
+                        sentPath: lanes.sent.width > 0
+                            ? path(curve.offset(by: sentPaint.offset))
+                            : nil,
+                        receivedPath: lanes.received.width > 0
+                            ? path(curve.offset(by: receivedPaint.offset))
+                            : nil,
+                        sentWidth: sentPaint.width,
+                        receivedWidth: receivedPaint.width
+                    )
+                )
+            })
             TimelineView(.periodic(from: .now, by: TrafficGraphFlowDash.frameInterval)) { timeline in
                 Canvas { context, _ in
                     let time = timeline.date.timeIntervalSinceReferenceDate
-                    for edge in snapshot.edges where active.contains(edge.id) && isEdgeRelated(edge) {
-                        guard let curve = layout.edgeCurves[edge.id],
-                              let width = layout.edgeWidths[edge.id] else { continue }
+                    for edge in snapshot.edges where active.contains(edge.id) {
+                        guard let geometry = laneGeometry[edge.id] else { continue }
                         let emphasized = TrafficGraphSelection.emphasizes(
                             edge,
                             selectedNode: selectedNode,
@@ -1317,39 +1426,29 @@ private struct TrafficGraphCanvas: View {
                             hoveredEdge: hoveredEdge
                         )
                         let dashOpacity = emphasized ? 0.9 : 0.34
-                        let lanes = TrafficGraphFlowDash.lanes(
-                            counters: edge.displayedCounters,
-                            totalWidth: width
-                        )
-                        if lanes.sent.width > 0 {
+                        if let sentPath = geometry.sentPath {
                             context.stroke(
-                                path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
-                                    totalWidth: width,
-                                    direction: .sent
-                                ))),
+                                sentPath,
                                 with: .color(FL.graphSent.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
                                     edgeID: edge.id,
                                     direction: .sent,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                    lineWidth: geometry.sentWidth
                                 )
                             )
                         }
-                        if lanes.received.width > 0 {
+                        if let receivedPath = geometry.receivedPath {
                             context.stroke(
-                                path(curve.offset(by: TrafficGraphFlowDash.borderOffset(
-                                    totalWidth: width,
-                                    direction: .received
-                                ))),
+                                receivedPath,
                                 with: .color(FL.graphReceived.opacity(dashOpacity)),
                                 style: flowDashStyle(
                                     at: time,
                                     edgeID: edge.id,
                                     direction: .received,
                                     speed: edgeSpeeds[edge.id],
-                                    lineWidth: TrafficGraphFlowDash.strokeWidth
+                                    lineWidth: geometry.receivedWidth
                                 )
                             )
                         }

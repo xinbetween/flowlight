@@ -68,6 +68,64 @@ struct TrafficBatch: Codable, Sendable {
     var records: [TrafficRecord]
 }
 
+/// One retryable extension delivery. Its identity is stable across XPC errors and timeouts, allowing the app to
+/// commit the additive traffic rows exactly once before acknowledging them.
+struct TrafficDeliveryEnvelope: Codable, Sendable {
+    var session: UUID
+    var firstSequence: UInt64
+    var lastSequence: UInt64
+    var batches: [TrafficBatch]
+
+    var id: String { "\(session.uuidString):\(firstSequence):\(lastSequence)" }
+    var isValid: Bool { firstSequence <= lastSequence && !batches.isEmpty }
+}
+
+struct TrafficDeliveryAttempt: Equatable, Sendable {
+    var token: UUID
+    var clientGeneration: UInt64
+    var firstSequence: UInt64
+    var lastSequence: UInt64
+}
+
+/// Owns one retryable envelope and one in-flight attempt. Every callback and timeout must complete the exact token and
+/// registered client generation. A failed or interrupted attempt retains the original bytes and sequence range, so
+/// traffic arriving during the retry window cannot change the receipt identity or overlap an already committed range.
+struct TrafficDeliveryGate: Sendable {
+    private(set) var active: TrafficDeliveryAttempt?
+    private(set) var envelope: TrafficDeliveryEnvelope?
+
+    mutating func begin(clientGeneration: UInt64, candidate: TrafficDeliveryEnvelope)
+        -> TrafficDeliveryAttempt? {
+        guard active == nil, candidate.isValid else { return nil }
+        if envelope == nil { envelope = candidate }
+        guard let envelope else { return nil }
+        let attempt = TrafficDeliveryAttempt(
+            token: UUID(),
+            clientGeneration: clientGeneration,
+            firstSequence: envelope.firstSequence,
+            lastSequence: envelope.lastSequence
+        )
+        active = attempt
+        return attempt
+    }
+
+    @discardableResult
+    mutating func complete(
+        token: UUID,
+        clientGeneration: UInt64,
+        committed: Bool
+    ) -> TrafficDeliveryAttempt? {
+        guard let active, active.token == token, active.clientGeneration == clientGeneration else { return nil }
+        self.active = nil
+        if committed { envelope = nil }
+        return active
+    }
+
+    /// A disconnected client leaves the delivery outcome ambiguous. Drop only callback ownership and retain the exact
+    /// envelope for the next registered client, whose durable receipt makes an already committed retry a no-op.
+    mutating func reset() { active = nil }
+}
+
 enum TrafficCoding {
     static func encode(_ batches: [TrafficBatch]) -> Data {
         (try? PropertyListEncoder.binary.encode(batches)) ?? Data()
@@ -75,6 +133,14 @@ enum TrafficCoding {
 
     static func decode(_ data: Data) -> [TrafficBatch] {
         (try? PropertyListDecoder().decode([TrafficBatch].self, from: data)) ?? []
+    }
+
+    static func encode(delivery: TrafficDeliveryEnvelope) -> Data {
+        (try? PropertyListEncoder.binary.encode(delivery)) ?? Data()
+    }
+
+    static func decodeDelivery(_ data: Data) -> TrafficDeliveryEnvelope? {
+        try? PropertyListDecoder().decode(TrafficDeliveryEnvelope.self, from: data)
     }
 }
 
