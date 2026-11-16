@@ -72,12 +72,12 @@ final class PoliciesInteractionUITests: XCTestCase {
         app.buttons["Cancel"].click()
         XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 1))
 
-        packReview.click()
+        element("policies.pack.official.advertising.review").click()
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.buttons["Cancel"].click()
         XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 1))
 
-        clickPaintedMargin(of: packButton)
+        clickPaintedMargin(of: element("policies.pack.official.advertising.open"))
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
     }
 
