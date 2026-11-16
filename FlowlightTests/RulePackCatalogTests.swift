@@ -91,6 +91,34 @@ final class RulePackCatalogTests: XCTestCase {
         }
     }
 
+    func testSignerSequenceAuthorizationBoundsAreEnforced() throws {
+        let key = P256.Signing.PrivateKey()
+
+        var sequenceTwo = unsignedEnvelope()
+        sequenceTwo.payload.sequence = 2
+        sequenceTwo = try signed(sequenceTwo, key: key)
+
+        var v1Signer = signer(key: key)
+        v1Signer.maximumSequence = 2
+        XCTAssertNoThrow(try verify(sequenceTwo, signers: [v1Signer]))
+
+        for sequence in [Int64(3), 4] {
+            var laterEnvelope = unsignedEnvelope()
+            laterEnvelope.payload.sequence = sequence
+            laterEnvelope = try signed(laterEnvelope, key: key)
+            assertError(.wrongSignerScope) { try verify(laterEnvelope, signers: [v1Signer]) }
+        }
+
+        var v2Signer = signer(key: key)
+        v2Signer.minimumSequence = 3
+        assertError(.wrongSignerScope) { try verify(sequenceTwo, signers: [v2Signer]) }
+
+        var sequenceThree = unsignedEnvelope()
+        sequenceThree.payload.sequence = 3
+        sequenceThree = try signed(sequenceThree, key: key)
+        XCTAssertNoThrow(try verify(sequenceThree, signers: [v2Signer]))
+    }
+
     func testMalformedAlgorithmAndSignatureAreRejected() throws {
         let key = P256.Signing.PrivateKey()
         var envelope = try signedEnvelope(key: key)
@@ -267,6 +295,17 @@ final class RulePackCatalogTests: XCTestCase {
                                                now: now, currentAppVersion: "0.15.3")
         }
 
+        let escapedDuplicate = Data(#"{"format":1,"format":1,"payload":{},"signatures":[]}"#.utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.verify(data: escapedDuplicate, trustedSigners: [signer(key: key)],
+                                               now: now, currentAppVersion: "0.15.3")
+        }
+
+        let malformedString = Data(#"{"value":"\q"}"#.utf8)
+        assertError(.invalidEnvelope) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(malformedString)
+        }
+
         let acceptedNesting = RulePackCatalogVerifier.maximumJSONNestingDepth
         let acceptedNestedJSON = Data((String(repeating: "[", count: acceptedNesting) + "0" +
                                        String(repeating: "]", count: acceptedNesting)).utf8)
@@ -338,20 +377,37 @@ final class RulePackCatalogTests: XCTestCase {
         }
     }
 
-    func testProductionFixtureMatchesBundledBaseline() throws {
+    func testProductionFixtureMatchesReviewedCatalog() throws {
+        XCTAssertEqual(
+            RulePackCatalogVerifier.productionTrustedSigners.map(\.keyID),
+            ["flowlight-rule-packs-2026-01", "flowlight-rule-packs-2026-11"]
+        )
+        XCTAssertEqual(RulePackCatalogVerifier.productionTrustedSigners[0].maximumSequence, 2)
+        XCTAssertEqual(RulePackCatalogVerifier.productionTrustedSigners[1].minimumSequence, 3)
         let fixture = try XCTUnwrap(Bundle.main.url(forResource: "official", withExtension: "json"))
         let data = try Data(contentsOf: fixture)
         let verified = try RulePackCatalogVerifier.verify(
             data: data,
             now: 1_800_000_000,
-            currentAppVersion: "0.15.3"
+            currentAppVersion: "0.18.5"
         )
-        XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-01")
-        XCTAssertEqual(verified.sequence, 2)
-        XCTAssertEqual(verified.digest, "2d8694c6874cb7458e2f22aa419f1cc3eb592e4541da77801c503aec53759eaf")
+        XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-11")
+        XCTAssertEqual(verified.sequence, 3)
+        XCTAssertEqual(verified.digest, "7e8db8dc7dbce8d323532da25a35ebe05134707a77dab559f0798ad1ca6f25ff")
+        let definitions = verified.definitions.sorted { $0.id < $1.id }
+        XCTAssertEqual(definitions.map(\.id), BuiltInRulePacks.all.map(\.id).sorted())
+        XCTAssertEqual(definitions.reduce(0) { $0 + $1.entries.count }, 84_892)
         XCTAssertEqual(
-            verified.definitions.sorted { $0.id < $1.id },
-            BuiltInRulePacks.all.sorted { $0.id < $1.id }
+            definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID }?.entries.count,
+            42_384
+        )
+        XCTAssertEqual(
+            definitions.first { $0.id == AdvertisingPackTierPolicy.aggressiveID }?.entries.count,
+            42_433
+        )
+        XCTAssertNotEqual(
+            definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID },
+            BuiltInRulePacks.advertising
         )
     }
 

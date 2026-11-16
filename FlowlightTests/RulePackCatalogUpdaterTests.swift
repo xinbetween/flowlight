@@ -4,6 +4,7 @@ import XCTest
 
 final class RulePackCatalogUpdaterTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private let productionAppVersion = "0.18.5"
 
     @MainActor
     func testBootstrapAcceptsBundledCatalogWithoutNetwork() async throws {
@@ -13,7 +14,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         final class Counter: @unchecked Sendable { var calls = 0 }
         let counter = Counter()
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture },
             transport: { _ in counter.calls += 1; throw URLError(.badServerResponse) },
             now: { self.now }
@@ -22,11 +23,16 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         await updater.bootstrap()
 
         XCTAssertEqual(counter.calls, 0)
-        XCTAssertEqual(updater.receipt?.sequence, 2)
+        XCTAssertEqual(updater.receipt?.sequence, 3)
         XCTAssertEqual(updater.status, .current)
-        XCTAssertEqual(store.definitions, BuiltInRulePacks.all.sorted { $0.id < $1.id })
-        XCTAssertFalse(updater.isDownloadedUpdate(BuiltInRulePacks.advertising))
-        XCTAssertNotNil(store.reviewReceipt(for: BuiltInRulePacks.advertising))
+        XCTAssertEqual(store.definitions.map(\.id), BuiltInRulePacks.all.map(\.id).sorted())
+        XCTAssertEqual(store.definitions.reduce(0) { $0 + $1.entries.count }, 84_892)
+        let balanced = try XCTUnwrap(
+            store.definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID }
+        )
+        XCTAssertEqual(balanced.entries.count, 42_384)
+        XCTAssertTrue(updater.isDownloadedUpdate(balanced))
+        XCTAssertNotNil(store.reviewReceipt(for: balanced))
     }
 
     @MainActor
@@ -41,7 +47,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
             statusCode: 304, httpVersion: nil, headerFields: nil
         )!
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture },
             transport: { request in capture.request = request; return (Data(), response) },
             now: { self.now }
@@ -57,7 +63,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "If-None-Match"), #""catalog-1""#)
         XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "If-Modified-Since"),
                        "Mon, 19 Oct 2026 00:00:00 GMT")
-        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "User-Agent"), "Flowlight/0.15.4")
+        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "User-Agent"), "Flowlight/0.18.5")
         XCTAssertEqual(updater.status, .current)
         XCTAssertEqual(updater.catalogState.update.lastStatus, "not-modified")
         XCTAssertEqual(updater.catalogState.update.nextEligibleAttempt,
@@ -107,7 +113,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
             statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/html"]
         )!
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture }, transport: { _ in (fixture, response) },
             now: { self.now }
         )
@@ -185,7 +191,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         let clock = Clock(now)
         let counter = Counter()
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture },
             transport: { _ in counter.calls += 1; throw URLError(.notConnectedToInternet) },
             now: { clock.date }
@@ -224,7 +230,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
             statusCode: 304, httpVersion: nil, headerFields: nil
         )!
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture }, transport: { _ in
                 gate.calls += 1
                 started.fulfill()
@@ -249,7 +255,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         let db = try database("refresh-preference")
         let store = RulePackStore()
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture }, now: { self.now }
         )
         await updater.bootstrap()
@@ -258,7 +264,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
 
         XCTAssertFalse(updater.automaticRefresh)
         let reloaded = RulePackCatalogUpdater(
-            db: db, store: RulePackStore(), currentAppVersion: "0.15.4",
+            db: db, store: RulePackStore(), currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture }, now: { self.now }
         )
         await reloaded.bootstrap()
@@ -273,7 +279,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         final class Counter: @unchecked Sendable { var calls = 0 }
         let counter = Counter()
         let updater = RulePackCatalogUpdater(
-            db: db, store: store, currentAppVersion: "0.15.4",
+            db: db, store: store, currentAppVersion: productionAppVersion,
             bundledCatalog: { fixture },
             transport: { _ in counter.calls += 1; throw URLError(.notConnectedToInternet) },
             now: { self.now }

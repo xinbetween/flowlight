@@ -26,7 +26,7 @@ final class RulePackCatalogUpdater: ObservableObject {
             case .wrongOrigin: return "The official catalog redirected outside its trusted HTTPS origin."
             case .badStatus(let code): return "The official catalog returned HTTP \(code)."
             case .wrongMIME(let value): return "The official catalog returned an unsupported content type: \(value)."
-            case .responseTooLarge: return "The official catalog exceeded the 8 MiB size limit."
+            case .responseTooLarge: return "The official catalog exceeded the 16 MiB size limit."
             case .missingCache: return "The server reported no change, but no verified cached catalog is available."
             case .rejectedCatalogInstall: return "The committed official catalog could not be installed."
             }
@@ -104,12 +104,11 @@ final class RulePackCatalogUpdater: ObservableObject {
                     return
                 }
                 do {
-                    let verified = try verify(
+                    let composed = try await verifyAndCompose(
                         cache.rawEnvelope,
                         receipt: receipt,
                         allowExpiredLastKnownGood: true
                     )
-                    let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
                     let reconciled = try await db.asyncResult {
                         try $0.reconcileRulePackCatalogBootstrap(
                             bootstrap,
@@ -118,19 +117,26 @@ final class RulePackCatalogUpdater: ObservableObject {
                     }
                     store.installCommittedCatalog(composed, acceptance: reconciled)
                     recoveryNeeded = false
-                    status = verified.stale ? .stale : .current
+                    status = composed.stale ? .stale : .current
                 } catch {
                     enterRecovery("The accepted official catalog cache could not be verified: \(error)")
                 }
                 return
             }
 
-            let verified = try verify(try bundledCatalog(), receipt: nil, allowExpiredLastKnownGood: false)
-            let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
+            let loadBundledCatalog = bundledCatalog
+            let bundledData = try await Task.detached(priority: .userInitiated) {
+                try loadBundledCatalog()
+            }.value
+            let composed = try await verifyAndCompose(
+                bundledData,
+                receipt: nil,
+                allowExpiredLastKnownGood: false
+            )
             let checkedAt = now()
             let acceptance = try await db.asyncResult {
                 try $0.acceptVerifiedRulePackCatalog(
-                    composed,
+                    composed.catalog,
                     checkedAt: checkedAt,
                     nextEligibleAt: checkedAt.addingTimeInterval(Self.healthyInterval)
                 )
@@ -138,7 +144,7 @@ final class RulePackCatalogUpdater: ObservableObject {
             catalogState = acceptance.state
             store.installCommittedCatalog(composed, acceptance: acceptance)
             recoveryNeeded = false
-            status = verified.stale ? .stale : .current
+            status = composed.stale ? .stale : .current
         } catch {
             enterRecovery("The bundled official catalog could not be established: \(error)")
         }
@@ -205,12 +211,15 @@ final class RulePackCatalogUpdater: ObservableObject {
             case 200:
                 try validateJSONResponse(http, data: data)
                 let prior = catalogState.receipt
-                let verified = try verify(data, receipt: prior, allowExpiredLastKnownGood: false)
-                let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
+                let composed = try await verifyAndCompose(
+                    data,
+                    receipt: prior,
+                    allowExpiredLastKnownGood: false
+                )
                 let storeRevision = store.catalogInstallRevision
                 var acceptance = try await db.asyncResult {
                     try $0.acceptVerifiedRulePackCatalog(
-                        composed,
+                        composed.catalog,
                         etag: http.value(forHTTPHeaderField: "ETag"),
                         lastModified: http.value(forHTTPHeaderField: "Last-Modified"),
                         checkedAt: attempt,
@@ -233,12 +242,11 @@ final class RulePackCatalogUpdater: ObservableObject {
                 guard !recoveryNeeded,
                       let receipt = catalogState.receipt,
                       let cache = catalogState.cache else { throw UpdateError.missingCache }
-                let verified = try verify(
+                let composed = try await verifyAndCompose(
                     cache.rawEnvelope,
                     receipt: receipt,
                     allowExpiredLastKnownGood: true
                 )
-                let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: currentAppVersion)
                 let storeRevision = store.catalogInstallRevision
                 try await db.asyncResult {
                     try $0.recordRulePackCatalogNotModified(
@@ -261,7 +269,7 @@ final class RulePackCatalogUpdater: ObservableObject {
                           generation: generation
                       ) else { return }
                 catalogState = installed.state
-                status = verified.stale ? .stale : .current
+                status = composed.stale ? .stale : .current
 
             default:
                 throw UpdateError.badStatus(http.statusCode)
@@ -275,7 +283,7 @@ final class RulePackCatalogUpdater: ObservableObject {
     }
 
     private func installCommittedCatalog(
-        _ catalog: VerifiedRulePackCatalog,
+        _ catalog: ValidatedRulePackCatalog,
         acceptance initialAcceptance: RulePackCatalogAcceptance,
         expectedRevision initialRevision: Int,
         generation: Int
@@ -331,17 +339,28 @@ final class RulePackCatalogUpdater: ObservableObject {
         guard mime == "application/json" else { throw UpdateError.wrongMIME(mime) }
     }
 
-    private func verify(_ data: Data, receipt: RulePackCatalogReceipt?,
-                        allowExpiredLastKnownGood: Bool) throws -> VerifiedRulePackCatalog {
-        try RulePackCatalogVerifier.verify(
-            data: data,
-            trustedSigners: trustedSigners,
-            now: Int64(now().timeIntervalSince1970),
-            currentAppVersion: currentAppVersion,
-            priorSequence: receipt?.sequence,
-            priorDigest: receipt?.digest,
-            allowExpiredLastKnownGood: allowExpiredLastKnownGood
-        )
+    private func verifyAndCompose(_ data: Data, receipt: RulePackCatalogReceipt?,
+                                  allowExpiredLastKnownGood: Bool) async throws -> ValidatedRulePackCatalog {
+        let signers = trustedSigners
+        let timestamp = Int64(now().timeIntervalSince1970)
+        let appVersion = currentAppVersion
+        let priorSequence = receipt?.sequence
+        let priorDigest = receipt?.digest
+        return try await Task.detached(priority: .userInitiated) {
+            let verified = try RulePackCatalogVerifier.verify(
+                data: data,
+                trustedSigners: signers,
+                now: timestamp,
+                currentAppVersion: appVersion,
+                priorSequence: priorSequence,
+                priorDigest: priorDigest,
+                allowExpiredLastKnownGood: allowExpiredLastKnownGood
+            )
+            return try RulePackCatalogComposition.composeVerified(
+                verified,
+                currentAppVersion: appVersion
+            )
+        }.value
     }
 
     private func transport(_ request: URLRequest) async throws -> (Data, URLResponse) {

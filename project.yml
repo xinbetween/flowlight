@@ -15,8 +15,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.18.4"
-    CURRENT_PROJECT_VERSION: "88"
+    MARKETING_VERSION: "0.18.5"
+    CURRENT_PROJECT_VERSION: "89"
   configs:
     AppStore:
       DEVELOPMENT_TEAM: 38RJUJHKZS
@@ -158,6 +158,8 @@ targets:
       - path: docs/docs/index.html
         buildPhase: resources
       - path: FlowlightTests/Fixtures/IPCServer.txt
+        buildPhase: resources
+      - path: rule-packs/official-source.json
         buildPhase: resources
     settings:
       base:

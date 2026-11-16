@@ -2089,3 +2089,26 @@
 "In force" = "生效中";
 "Not in force" = "未生效";
 "Nothing is being refused until %@." = "在 %@ 之前不会阻止任何内容。";
+
+/* 广告级别 */
+"Enabling this pack replaces %@. The two Advertising tiers never stack." = "启用此规则包会替换 %@。两个广告级别绝不会叠加。";
+"Hostname-layer blocking refuses every connection to a matched host; it cannot remove same-origin YouTube or Meta ads, page gaps, or browser overlays." = "主机名层级拦截会拒绝所有与匹配主机的连接；它无法移除同源的 YouTube 或 Meta 广告、页面空白或浏览器叠加层。";
+"Reviewed product, login, dashboard, and media surfaces stay reachable unless a dedicated advertising hostname is independently evidenced." = "除非有独立证据表明某个主机名专用于广告，否则已审查的产品、登录、仪表板和媒体界面仍可访问。";
+"Signed pack provenance" = "已签名规则包溯源";
+"Source: %@" = "来源：%@";
+"Content digest: %@" = "内容摘要：%@";
+"Official · pack v%@ · %@" = "官方 · 规则包 v%@ · %@";
+"Catalog sequence %lld · digest %@" = "目录序列 %lld · 摘要 %@";
+"Replace %@?" = "替换 %@？";
+"Enable aggressive blocking?" = "启用强力拦截？";
+"Aggressive coverage can break video, sign-in, checkout, or other content. Flowlight protects reviewed product surfaces, but hostname blocking cannot distinguish paths on a shared host." = "强力覆盖可能导致视频、登录、结账或其他内容无法使用。Flowlight 会保护已审查的产品界面，但主机名拦截无法区分共享主机上的路径。";
+"Replace %@" = "替换 %@";
+"Enable aggressive blocking" = "启用强力拦截";
+"Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app." = "推荐的平衡方案。主机名拦截无法移除页面布局空白、同源广告或浏览器及应用绘制的叠加层。";
+"Advertising — Aggressive" = "广告 — 强力";
+"Broader advertising hostname coverage for users who accept a higher risk of broken content." = "为愿意承担更高内容故障风险的用户提供更广泛的广告主机名覆盖。";
+"Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it." = "可选，内容故障风险更高。此级别会替换“广告”，不会与之叠加。";
+"Recommended · Balanced" = "推荐 · 均衡";
+"Opt-in · Higher breakage" = "可选 · 故障风险更高";
+"Attribution: %@" = "署名：%@";
+"Source licenses: %@" = "来源许可证：%@";

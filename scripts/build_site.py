@@ -18,13 +18,17 @@ from site/i18n), {{langpicker}}, {{repo}}, {{dmg}}, {{version}}, {{year}}, {{age
 active nav link). Also writes sitemap.xml, robots.txt, llms.txt, llms-full.txt and 404.html, and
 build/site-preview/index.html (self-contained home page).
 """
-import os, re, sys, html, json, pathlib, hashlib, subprocess
+import os, re, sys, html, json, pathlib, hashlib, subprocess, tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE, OUT = ROOT / "site", ROOT / "docs"
 OFFICIAL_PACK_SOURCE = SITE / "packs/v1/official.json"
 OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
+OFFICIAL_PACK_PROVENANCE_SOURCE = SITE / "packs/v1/provenance"
+OFFICIAL_PACK_PROVENANCE_OUTPUT = OUT / "packs/v1/provenance"
 DOMAIN = "https://flowlight.xinbetween.com"
+OFFICIAL_PACK_PROVENANCE_URL = f"{DOMAIN}/packs/v1/provenance/"
+REQUIRED_PROVENANCE_PACK_IDS = {"official.advertising", "official.advertising-aggressive"}
 REPO = os.environ.get("GITHUB_REPO", "xinbetween/flowlight")
 DMG = f"https://github.com/{REPO}/releases/latest/download/Flowlight.dmg"
 VERSION = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', (ROOT / "project.yml").read_text()).group(1)
@@ -36,6 +40,186 @@ release_match = re.search(
 if not release_match:
     sys.exit(f"site/pages/releases.html has no dated release entry for {VERSION}")
 SOURCE_DATE = release_match.group(1)
+
+
+def provenance_publication_files(directory):
+    if not directory.is_dir():
+        return set()
+    return {
+        path.relative_to(directory).as_posix()
+        for path in directory.rglob("*")
+        if path.is_file() or path.is_symlink()
+    }
+
+
+def stale_provenance_paths(directory, expected_names):
+    return [
+        directory / name
+        for name in sorted(provenance_publication_files(directory) - expected_names)
+    ]
+
+
+def display_path(path, root=ROOT):
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return path
+
+
+def prepare_official_pack_publication(
+    catalog_source=OFFICIAL_PACK_SOURCE,
+    catalog_output=OFFICIAL_PACK_OUTPUT,
+    provenance_source=OFFICIAL_PACK_PROVENANCE_SOURCE,
+    provenance_output=OFFICIAL_PACK_PROVENANCE_OUTPUT,
+    root=ROOT,
+):
+    """Read and validate every signed-catalog output before publication starts."""
+    if catalog_source.is_symlink() or not catalog_source.is_file():
+        sys.exit(f"{display_path(catalog_source, root)} is missing or is not a regular file")
+    official_pack = catalog_source.read_bytes()
+
+    try:
+        catalog = json.loads(official_pack)
+        packs = catalog["payload"]["packs"]
+        sources_by_id = {
+            pack["manifest"]["id"]: pack["manifest"]["source"]
+            for pack in packs
+        }
+    except (KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError) as error:
+        sys.exit(f"{display_path(catalog_source, root)} has no readable provenance references: {error}")
+    missing = REQUIRED_PROVENANCE_PACK_IDS - set(sources_by_id)
+    if missing:
+        sys.exit(
+            f"{display_path(catalog_source, root)} is missing provenance-bound Advertising packs: "
+            + ", ".join(sorted(missing))
+        )
+    unbound = sorted(
+        pack_id for pack_id in REQUIRED_PROVENANCE_PACK_IDS
+        if not isinstance(sources_by_id[pack_id], str)
+        or not sources_by_id[pack_id].startswith(OFFICIAL_PACK_PROVENANCE_URL)
+    )
+    if unbound:
+        sys.exit(
+            f"{display_path(catalog_source, root)} has Advertising packs without content-addressed provenance: "
+            + ", ".join(unbound)
+        )
+    provenance_names = {
+        source.removeprefix(OFFICIAL_PACK_PROVENANCE_URL)
+        for source in sources_by_id.values()
+        if isinstance(source, str) and source.startswith(OFFICIAL_PACK_PROVENANCE_URL)
+    }
+    invalid_names = sorted(name for name in provenance_names if not re.fullmatch(r"[0-9a-f]{64}\.json", name))
+    if invalid_names:
+        sys.exit(
+            f"{display_path(catalog_source, root)} has unsafe provenance paths: "
+            + ", ".join(invalid_names)
+        )
+
+    if catalog_output.is_symlink() or (catalog_output.exists() and not catalog_output.is_file()):
+        sys.exit(f"{display_path(catalog_output, root)} is not a regular file")
+    for directory in (catalog_output.parent, provenance_output):
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            sys.exit(f"{display_path(directory, root)} is not a regular directory")
+    if provenance_source.is_symlink() or not provenance_source.is_dir():
+        sys.exit(f"{display_path(provenance_source, root)} is missing or is not a regular directory")
+
+    stale_source = stale_provenance_paths(provenance_source, provenance_names)
+    if stale_source:
+        paths = "\n".join(f"  {display_path(path, root)}" for path in stale_source)
+        sys.exit("stale source provenance must be removed explicitly before rebuilding:\n" + paths)
+
+    stale_output = stale_provenance_paths(provenance_output, provenance_names)
+    for retained in stale_output:
+        relative = retained.relative_to(provenance_output)
+        if (len(relative.parts) != 1 or retained.is_symlink() or not retained.is_file()
+                or not re.fullmatch(r"[0-9a-f]{64}\.json", retained.name)):
+            sys.exit(f"{display_path(retained, root)} is not retained content-addressed provenance")
+        content = retained.read_bytes()
+        if hashlib.sha256(content).hexdigest() != retained.stem:
+            sys.exit(f"{display_path(retained, root)} does not match its content-addressed filename")
+        try:
+            json.loads(content)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            sys.exit(f"{display_path(retained, root)} is not readable JSON: {error}")
+
+    provenance_bytes = {}
+    for name in sorted(provenance_names):
+        source = provenance_source / name
+        if source.is_symlink() or not source.is_file():
+            sys.exit(f"{display_path(source, root)} is missing or is not a regular file")
+        content = source.read_bytes()
+        if hashlib.sha256(content).hexdigest() != source.stem:
+            sys.exit(f"{display_path(source, root)} does not match its content-addressed filename")
+        try:
+            json.loads(content)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            sys.exit(f"{display_path(source, root)} is not readable JSON: {error}")
+
+        target = provenance_output / name
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            sys.exit(f"{display_path(target, root)} is not a regular file")
+        provenance_bytes[name] = content
+
+    return official_pack, provenance_bytes, stale_output
+
+
+def fsync_directory(directory):
+    descriptor = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def atomic_publish(publications, replace=os.replace):
+    """Stage every file beside its destination, then replace each destination atomically."""
+    staged = []
+    try:
+        for target, content in publications:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+            staged.append((pathlib.Path(temporary), target))
+            with os.fdopen(descriptor, "wb") as output:
+                os.fchmod(output.fileno(), (target.stat().st_mode & 0o777) if target.exists() else 0o644)
+                output.write(content)
+                output.flush()
+                os.fsync(output.fileno())
+
+        for temporary, target in staged:
+            replace(temporary, target)
+        for directory in {target.parent for _, target in staged}:
+            fsync_directory(directory)
+    finally:
+        for temporary, _ in staged:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def publish_official_pack_outputs(
+    catalog_source=OFFICIAL_PACK_SOURCE,
+    catalog_output=OFFICIAL_PACK_OUTPUT,
+    provenance_source=OFFICIAL_PACK_PROVENANCE_SOURCE,
+    provenance_output=OFFICIAL_PACK_PROVENANCE_OUTPUT,
+    root=ROOT,
+    replace=os.replace,
+):
+    official_pack, provenance_bytes, stale_output = prepare_official_pack_publication(
+        catalog_source, catalog_output, provenance_source, provenance_output, root
+    )
+    # Retain the old content-addressed files until the new catalog is durably visible. If the catalog swap fails,
+    # the previous catalog can still resolve every provenance reference; newly copied provenance is harmless.
+    atomic_publish(
+        [(provenance_output / name, content) for name, content in provenance_bytes.items()],
+        replace=replace,
+    )
+    atomic_publish([(catalog_output, official_pack)], replace=replace)
+    for stale in stale_output:
+        stale.unlink()
+    if stale_output:
+        fsync_directory(provenance_output)
+    return official_pack, provenance_bytes
 
 
 def counts():
@@ -340,11 +524,7 @@ def picker(langs, table, current, targets):
 
 
 def build():
-    if not OFFICIAL_PACK_SOURCE.is_file():
-        sys.exit("site/packs/v1/official.json is missing — sign rule-packs/official-source.json before building the site.")
-    official_pack = OFFICIAL_PACK_SOURCE.read_bytes()
-    OFFICIAL_PACK_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OFFICIAL_PACK_OUTPUT.write_bytes(official_pack)
+    official_pack, provenance_bytes = publish_official_pack_outputs()
 
     css = (SITE / "site.css").read_text()
     # The stylesheet is one URL that never changes name, so a browser and the Pages CDN both keep serving the
@@ -456,6 +636,8 @@ def build():
     print(f"  + 404.html, sitemap.xml, robots.txt, llms.txt, llms-full.txt · version {VERSION} · "
           f"{len(pages)} pages in {len(order)} language(s)")
     print(f"  /packs/v1/official.json → {OFFICIAL_PACK_OUTPUT.relative_to(ROOT)} ({len(official_pack)} bytes)")
+    print(f"  /packs/v1/provenance/ → {OFFICIAL_PACK_PROVENANCE_OUTPUT.relative_to(ROOT)} "
+          f"({len(provenance_bytes)} content-addressed file(s))")
 
 
 class Strings(dict):

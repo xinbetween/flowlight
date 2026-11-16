@@ -124,7 +124,7 @@ final class TrafficMonitor: ObservableObject {
     /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
     let rulePacks: RulePackStore
     /// The exact extension-committed generation, readable from the inspection proxy's queue.
-    private let liveRulePacks = LiveRulePacks()
+    private let liveRulePacks: LiveRulePacks
     /// Enforcing allowlists mirrored for proxied traffic, whose two extension-visible relay legs are exempt.
     private let liveAgentPolicies = LiveAgentPolicies()
     /// The active extension is the one atomic authority for bounded rules across direct and proxied flows.
@@ -193,8 +193,11 @@ final class TrafficMonitor: ObservableObject {
 
     init(databaseURL: URL? = nil,
          catalogTransport: HTTPDataTransport? = nil,
+         bundledRulePackCatalog: (@Sendable () throws -> Data)? = nil,
+         rulePackCatalogTrustedSigners: [RulePackCatalogTrustedSigner] = RulePackCatalogVerifier.productionTrustedSigners,
          trafficSourceFactory: (() -> TrafficSource)? = nil,
-         policyLoader: @escaping @Sendable (TrafficDatabase) throws -> [String: AgentPolicy] = { try $0.loadPolicies() }) {
+         policyLoader: @escaping @Sendable (TrafficDatabase) throws -> [String: AgentPolicy] = { try $0.loadPolicies() },
+         liveRulePacks: LiveRulePacks = LiveRulePacks()) {
         AnomalySettings.registerDefaults()
         LocalRiskSettings.registerDefaults()
         InspectionBudget.registerDefaults()
@@ -206,6 +209,7 @@ final class TrafficMonitor: ObservableObject {
         #endif
         self.trafficSourceFactory = trafficSourceFactory
         self.policyLoader = policyLoader
+        self.liveRulePacks = liveRulePacks
         catalogTransportInjected = catalogTransport != nil
         rulePacks = RulePackStore(currentAppVersion: ExtensionManager.appVersion)
         do {
@@ -251,13 +255,14 @@ final class TrafficMonitor: ObservableObject {
             db: db,
             store: rulePacks,
             currentAppVersion: ExtensionManager.appVersion,
-            bundledCatalog: {
+            bundledCatalog: bundledRulePackCatalog ?? {
                 guard let url = Bundle.main.url(forResource: "official", withExtension: "json") else {
                     throw RulePackCatalogPersistenceError.invalidReceipt
                 }
                 return try Data(contentsOf: url)
             },
-            transport: catalogTransport
+            transport: catalogTransport,
+            trustedSigners: rulePackCatalogTrustedSigners
         )
         IPOwnerLookup.shared.onResolved = { [db] ip, owner in
             db.async { try $0.saveOwner(ip: ip, owner) }
@@ -762,7 +767,7 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
-    private func updateRulePackStatus(_ result: RulePackApplyResult) {
+    func updateRulePackStatus(_ result: RulePackApplyResult) {
         switch result.status {
         case .accepted:
             liveRulePacks.replace(snapshot: nil)
@@ -771,17 +776,32 @@ final class TrafficMonitor: ObservableObject {
             rulePacks.updateStatus(.applying)
         case .committed:
             let desired = rulePacks.snapshot
-            liveRulePacks.commit(snapshot: desired, activeDigest: result.activeDigest)
-            if desired?.digest == result.activeDigest {
-                inspectionRulePacksReady = true
-                attachInspectionWhenPolicyStateIsReady()
-                rulePacks.updateStatus(.enforcing)
-            } else {
-                inspectionRulePacksReady = false
-                attachInspectionWhenPolicyStateIsReady()
-                let message = "The filter acknowledged a different rule pack snapshot."
-                inspection.lastError = L("The filter acknowledged a different rule pack snapshot.")
-                rulePacks.updateStatus(.failed(message))
+            if desired?.digest == result.activeDigest,
+               liveRulePacks.activeDigest == result.activeDigest,
+               inspectionRulePacksReady,
+               rulePacks.status == .enforcing {
+                return
+            }
+            inspectionRulePacksReady = false
+            attachInspectionWhenPolicyStateIsReady()
+            rulePacks.updateStatus(.applying)
+            liveRulePacks.prepareCommit(snapshot: desired, activeDigest: result.activeDigest) { [weak self] preparation in
+                Task { @MainActor in
+                    guard let self,
+                          self.rulePacks.snapshot?.generation == desired?.generation,
+                          preparation != .superseded else { return }
+                    if preparation == .prepared, desired?.digest == result.activeDigest {
+                        self.inspectionRulePacksReady = true
+                        self.attachInspectionWhenPolicyStateIsReady()
+                        self.rulePacks.updateStatus(.enforcing)
+                    } else {
+                        self.inspectionRulePacksReady = false
+                        self.attachInspectionWhenPolicyStateIsReady()
+                        let message = "The filter acknowledged a different rule pack snapshot."
+                        self.inspection.lastError = L("The filter acknowledged a different rule pack snapshot.")
+                        self.rulePacks.updateStatus(.failed(message))
+                    }
+                }
             }
         case .cleared:
             liveRulePacks.replace(snapshot: nil)

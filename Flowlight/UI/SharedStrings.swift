@@ -15,7 +15,23 @@ private var builtInRulePackLocalizationAnchors: [String] {
     [
         L("Advertising"),
         L("Known advertising delivery and auction hosts across apps."),
-        L("Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app."),
+        L("Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app."),
+        L("Advertising — Aggressive"),
+        L("Broader advertising hostname coverage for users who accept a higher risk of broken content."),
+        L("Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it."),
+        L("Recommended · Balanced"),
+        L("Opt-in · Higher breakage"),
+        L("Enabling this pack replaces %@. The two Advertising tiers never stack."),
+        L("Enable aggressive blocking?"),
+        L("Aggressive coverage can break video, sign-in, checkout, or other content. Flowlight protects reviewed product surfaces, but hostname blocking cannot distinguish paths on a shared host."),
+        L("Replace %@"),
+        L("Enable aggressive blocking"),
+        L("Hostname-layer blocking refuses every connection to a matched host; it cannot remove same-origin YouTube or Meta ads, page gaps, or browser overlays."),
+        L("Reviewed product, login, dashboard, and media surfaces stay reachable unless a dedicated advertising hostname is independently evidenced."),
+        L("Signed pack provenance"),
+        L("Source: %@"),
+        L("Content digest: %@"),
+        L("Catalog sequence %lld · digest %@"),
         L("Cross-site tracking"),
         L("Common analytics, session replay, and cross-site measurement hosts."),
         L("Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable."),
@@ -23,6 +39,16 @@ private var builtInRulePackLocalizationAnchors: [String] {
         L("Crash reporting, install attribution, and audited Apple advertising and analytics hosts."),
         L("Crash reports help developers fix failures. Essential Apple account, push, update, certificate, and iCloud traffic stays allowed."),
     ]
+}
+
+extension AdvertisingPackTierPolicy {
+    static func localizedBadge(for packID: String) -> String? {
+        switch risk(for: packID) {
+        case .balanced: return L("Recommended · Balanced")
+        case .aggressive: return L("Opt-in · Higher breakage")
+        case nil: return nil
+        }
+    }
 }
 
 extension Guardrail {

@@ -1,0 +1,4 @@
+# Vendored upstream legal and attribution texts are retained byte-for-byte.
+# Their original trailing spaces are not first-party whitespace defects.
+rule-packs/advertising/licenses/** whitespace=-trailing-space
+rule-packs/advertising/notices/** whitespace=-trailing-space

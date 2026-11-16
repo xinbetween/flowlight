@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Utiliser Flowlight</h1>
-    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.18.4, macOS 15 ou version ultérieure.</p>
+    <p class="lede">Tout, du premier lancement au réglage des règles des agents. Flowlight 0.18.5, macOS 15 ou version ultérieure.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="Sur cette page">
@@ -461,7 +461,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         d’historique a été testée sur deux heures d’historique.</p>
 
       <h3 id="managed-packs">Packs gérés de publicité et de traqueurs</h3>
-      <p><strong>Politiques › Packs gérés</strong> contient trois listes officielles de noms d’hôte : <strong>Publicité</strong>, <strong>Suivi intersites</strong> et <strong>Confidentialité et télémétrie</strong>. Elles sont visibles dès le départ et toutes désactivées par défaut. Le blocage nécessite l’Extension réseau ; l’échantillonneur nettop ne peut qu’observer.</p>
+      <p><strong>Politiques › Packs gérés</strong> contient quatre listes officielles de noms d’hôte : <strong>Publicité</strong>, <strong>Publicité — Agressive</strong>, <strong>Suivi intersites</strong> et <strong>Confidentialité et télémétrie</strong>. Elles sont visibles dès le départ et toutes désactivées par défaut. Le blocage nécessite l’Extension réseau ; l’échantillonneur nettop ne peut qu’observer.</p>
       <p><strong>Uniquement des mises à jour officielles et signées.</strong> Flowlight consulte une source HTTPS fixe unique pour rechercher des catalogues plus récents signés par l’éditeur. Les vérifications automatiques sont activées par défaut et peuvent être désactivées ici. Une signature authentifie le contenu, mais ne l’active pas : un nouveau pack reste désactivé et, si les destinations changent, l’application d’un pack activé est suspendue jusqu’à ce que vous examiniez la nouvelle version exacte et appuyiez sur Enregistrer. Pendant une panne, le contenu accepté peut rester disponible comme dernière version valide connue, visiblement signalée comme obsolète. Il s’agit de blocages réseau au niveau des noms d’hôte : ils ne peuvent pas supprimer les vides dans le DOM ou la mise en page, les superpositions du navigateur, les fenêtres contextuelles générées par des scripts ni les fenêtres d’applications natives.</p>
       <p>Quand l’inspection HTTPS achemine une app par le proxy de Flowlight, celui-ci décide des règles de destination ordinaires et des packs gérés activés d’après l’identité d’origine de l’app, avant d’ouvrir toute connexion au serveur d’origine. Pour les tunnels CONNECT épinglés ou jamais déchiffrés, cela fonctionne par nom d’hôte&nbsp;; les listes d’autorisation des agents restent limitées au chemin direct par l’Extension réseau. Si le propriétaire ou le nom d’hôte est inconnu, la connexion est autorisée.</p>
 
@@ -766,7 +766,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Les contributeurs de Flowlight. Flowlight est un logiciel libre, publié sous la <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.18.4 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
+      <span>Version 0.18.5 · Sans lien avec Apple ni avec aucun fournisseur d’IA cité sur ce site.</span>
     </div>
   </div>
 </footer>

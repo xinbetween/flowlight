@@ -15,8 +15,8 @@ final class PerformanceBudgetTests: XCTestCase {
         let source = BudgetTrafficSource()
 
         let monitor: TrafficMonitor = try await assertBudget(
-            "launch startup", fixture: "\(recordCount) retained traffic rows",
-            budgetMilliseconds: 1_000
+            "launch startup", fixture: "\(recordCount) retained traffic rows + 84,892 catalog entries",
+            budgetMilliseconds: 4_000
         ) {
             let monitor = TrafficMonitor(databaseURL: url, trafficSourceFactory: { source })
             monitor.start()
@@ -172,6 +172,145 @@ final class PerformanceBudgetTests: XCTestCase {
         XCTAssertGreaterThan(findingCount, evaluationCount)
     }
 
+    func testGeneratedAdvertisingCatalogBudgets() throws {
+        let testBundle = Bundle(for: Self.self)
+        let sourceURL = try XCTUnwrap(
+            testBundle.url(forResource: "official-source", withExtension: "json"),
+            "the generated catalog fixture must be copied into the test bundle"
+        )
+        let source = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+        XCTAssertLessThanOrEqual(source.count, RulePackCatalogVerifier.maximumDataBytes)
+
+        let signedURL = try XCTUnwrap(
+            Bundle.main.url(forResource: "official", withExtension: "json"),
+            "the signed production catalog must be copied into the app test host"
+        )
+        let signedSource = try Data(contentsOf: signedURL, options: .mappedIfSafe)
+        try assertBudget(
+            "rule-pack strict JSON scan",
+            fixture: "\(signedSource.count) signed JSON bytes",
+            budgetMilliseconds: 2_000
+        ) {
+            try RulePackCatalogVerifier.validateStrictJSONSyntax(signedSource)
+        }
+        let verified = try assertBudget(
+            "rule-pack signed verification",
+            fixture: "\(signedSource.count) signed JSON bytes",
+            budgetMilliseconds: 4_000
+        ) {
+            try RulePackCatalogVerifier.verify(
+                data: signedSource,
+                now: 1_800_000_000,
+                currentAppVersion: "0.18.5"
+            )
+        }
+        XCTAssertEqual(verified.sequence, 3)
+        XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-11")
+
+        let envelope: RulePackCatalogEnvelope = try assertBudget(
+            "rule-pack catalog decode",
+            fixture: "\(source.count) JSON bytes",
+            budgetMilliseconds: 2_000
+        ) {
+            try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: source)
+        }
+        let totalEntries = envelope.payload.packs.reduce(0) { $0 + $1.entries.count }
+        XCTAssertEqual(totalEntries, 84_892)
+
+        let canonical = try assertBudget(
+            "rule-pack canonicalization",
+            fixture: "\(totalEntries) entries",
+            budgetMilliseconds: 2_000
+        ) {
+            try RulePackCatalogVerifier.canonicalPayload(for: envelope)
+        }
+        XCTAssertLessThanOrEqual(canonical.count, RulePackCatalogVerifier.maximumDataBytes)
+
+        let definitions = envelope.payload.packs.map(rulePackDefinition)
+        let activeDefinitions = definitions.filter { $0.id != AdvertisingPackTierPolicy.balancedID }
+        let configurations = activeDefinitions.map { definition in
+            RulePackConfiguration(
+                packID: definition.id,
+                enabled: true,
+                consentedVersion: definition.manifest.version,
+                consentedContentSHA256: definition.manifest.contentSHA256
+            )
+        }
+        let snapshot = RulePackSnapshot.make(
+            definitions: activeDefinitions,
+            configurations: configurations,
+            overrides: []
+        )
+        let matcher = try assertBudget(
+            "rule-pack trie construction",
+            fixture: "\(activeDefinitions.reduce(0) { $0 + $1.entries.count }) active entries",
+            budgetMilliseconds: 4_000
+        ) {
+            try RulePackMatcher(snapshot: snapshot)
+        }
+        XCTAssertEqual(matcher.matches(host: "cdn.pubadx.one", bundleID: "com.example.app").first?.entry.id, 15)
+
+        let encoded = assertBudget(
+            "rule-pack snapshot encoding",
+            fixture: "\(snapshot.definitions.count) packs",
+            budgetMilliseconds: 4_000
+        ) {
+            BlockCoding.encode(snapshot)
+        }
+        XCTAssertFalse(encoded.isEmpty)
+        XCTAssertLessThanOrEqual(encoded.count, 32 * 1_024 * 1_024)
+        let decoded: RulePackSnapshot? = assertBudget(
+            "rule-pack snapshot decoding",
+            fixture: "\(encoded.count) binary plist bytes",
+            budgetMilliseconds: 4_000
+        ) {
+            BlockCoding.decode(RulePackSnapshot.self, from: encoded)
+        }
+        XCTAssertEqual(decoded?.digest, snapshot.digest)
+
+        let chunkSize = 64 * 1_024
+        let chunks = stride(from: 0, to: encoded.count, by: chunkSize).map {
+            encoded.subdata(in: $0..<min(encoded.count, $0 + chunkSize))
+        }
+        let header = RulePackTransferHeader(
+            protocolVersion: RulePackSnapshot.protocolVersion,
+            generation: snapshot.generation,
+            digest: snapshot.digest,
+            totalBytes: encoded.count,
+            chunks: chunks.count,
+            expectedActiveGeneration: nil
+        )
+        let active = RulePackHandshake(
+            protocolVersion: RulePackSnapshot.protocolVersion,
+            activeGeneration: nil,
+            activeDigest: ""
+        )
+        var transfer = RulePackTransferBuffer()
+        XCTAssertEqual(transfer.begin(header, active: active).status, .accepted)
+        let reassembled: Data = assertBudget(
+            "rule-pack IPC assembly",
+            fixture: "\(chunks.count) chunks",
+            budgetMilliseconds: 1_000
+        ) {
+            for (index, chunk) in chunks.enumerated() {
+                XCTAssertTrue(transfer.append(
+                    generation: snapshot.generation.uuidString,
+                    index: index,
+                    payload: chunk
+                ))
+            }
+            guard case .payload(let data, _) = transfer.commit(
+                generation: snapshot.generation.uuidString,
+                active: active
+            ) else {
+                XCTFail("the generated snapshot transfer must commit")
+                return Data()
+            }
+            return data
+        }
+        XCTAssertEqual(reassembled, encoded)
+    }
+
     func testBudgetGateRejectsDeliberateRegression() {
         let failure = budgetFailure(
             name: "deliberate regression", fixture: "42 generated records",
@@ -185,6 +324,27 @@ final class PerformanceBudgetTests: XCTestCase {
             name: "passing fixture", fixture: "42 generated records",
             observedMilliseconds: 99, budgetMilliseconds: 100
         ))
+    }
+
+    private func rulePackDefinition(_ pack: RulePackCatalogWirePack) -> RulePackDefinition {
+        RulePackDefinition(
+            manifest: RulePackManifest(
+                id: pack.manifest.id,
+                version: pack.manifest.version,
+                generatedAt: Date(timeIntervalSince1970: TimeInterval(pack.manifest.generatedAt)),
+                entryCount: Int(pack.manifest.entryCount),
+                contentSHA256: pack.manifest.contentSHA256,
+                minimumAppVersion: pack.manifest.minimumAppVersion,
+                minimumExtensionProtocol: pack.manifest.minimumExtensionProtocol,
+                titleKey: pack.manifest.titleKey,
+                summaryKey: pack.manifest.summaryKey,
+                caveatKey: pack.manifest.caveatKey,
+                source: pack.manifest.source,
+                license: pack.manifest.license,
+                format: pack.manifest.format
+            ),
+            entries: pack.entries
+        )
     }
 
     private var fixedTimestamp: Int64 { 1_700_000_000 }

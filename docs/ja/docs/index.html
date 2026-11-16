@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">ドキュメント</p>
     <h1>Flowlight の使い方</h1>
-    <p class="lede">初回起動からエージェントのルールの調整まで、すべてここに。Flowlight 0.18.4、macOS 15 以降。</p>
+    <p class="lede">初回起動からエージェントのルールの調整まで、すべてここに。Flowlight 0.18.5、macOS 15 以降。</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="このページの内容">
@@ -437,7 +437,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
         履歴でテストしたルールは、2 時間分の履歴でテストしたということです。</p>
 
       <h3 id="managed-packs">管理対象の広告・トラッカーパック</h3>
-      <p><strong>ポリシー › 管理対象パック</strong>には、<strong>広告</strong>、<strong>サイト横断トラッキング</strong>、<strong>プライバシーとテレメトリ</strong>という3つの公式ホスト名リストがあります。これらは最初から表示され、すべてデフォルトでオフになっています。ブロックにはネットワーク機能拡張が必要です。nettop サンプラーは監視のみ可能です。</p>
+      <p><strong>ポリシー › 管理対象パック</strong>には、<strong>広告</strong>、<strong>広告 — 強力</strong>、<strong>サイト横断トラッキング</strong>、<strong>プライバシーとテレメトリ</strong>という4つの公式ホスト名リストがあります。これらは最初から表示され、すべてデフォルトでオフになっています。ブロックにはネットワーク機能拡張が必要です。nettop サンプラーは監視のみ可能です。</p>
       <p><strong>公式の署名付きアップデートのみ。</strong> Flowlight は、公開元が署名した新しいカタログがないか、1つの固定 HTTPS ソースを確認します。自動確認はデフォルトでオンになっており、ここでオフにできます。署名はコンテンツを認証しますが、有効化はしません。新しいパックはオフのままで、宛先が変更された場合は、正確な新バージョンを確認して保存を押すまで、有効なパックの適用が停止されます。障害中も、承認済みコンテンツが、古いことを明示した既知の正常な最終版として保持される場合があります。これらはホスト名単位のネットワークブロックです。DOM やレイアウトの空白、ブラウザのオーバーレイ、スクリプトによるポップアップ、ネイティブアプリのウインドウは除去できません。</p>
       <p>HTTPS インスペクションがアプリを Flowlight のプロキシ経由にすると、接続先の通常ルールと有効な管理対象パックは、接続先サーバへの接続が開かれる前に、元のアプリの識別情報を使って判定されます。証明書がピン留めされている、または復号されない CONNECT トンネルでも、ホスト名によって判定できます。エージェントの許可リストは引き続き、ネットワーク機能拡張を直接通る経路だけに適用されます。所有者またはホスト名が不明な場合は、接続を許可します。</p>
 
@@ -721,7 +721,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     </div>
     <div class="legal">
       <span>© 2026 Flowlight コントリビューター。Flowlight は <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a> のもとで公開されている自由ソフトウェアです。</span>
-      <span>バージョン 0.18.4 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
+      <span>バージョン 0.18.5 · Apple および本サイトに挙げた AI プロバイダとは関係ありません。</span>
     </div>
   </div>
 </footer>

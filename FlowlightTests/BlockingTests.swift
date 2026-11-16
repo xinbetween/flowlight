@@ -100,6 +100,27 @@ final class BlockingTests: XCTestCase {
         XCTAssertEqual(try db.alerts().first?.kind, "Connection blocked")
     }
 
+    func testBlockedTenantAllowActionDoesNotBroadenToThePrivateSuffix() throws {
+        let db = try TrafficDatabase(
+            url: FileManager.default.temporaryDirectory.appendingPathComponent("blocked-tenant-\(UUID()).sqlite")
+        )
+
+        for (index, host, expected) in [
+            (0, "cdn.customer.github.io", "customer.github.io"),
+            (1, "assets.project.pages.dev", "project.pages.dev"),
+        ] {
+            _ = try db.addAlert(
+                kind: AnomalyEngine.Kind.blockedConnection.rawValue,
+                bundleID: "agent-\(index)",
+                appName: "Agent \(index)",
+                detail: "Blocked it",
+                severity: 3,
+                allowPattern: AnomalyEngine.registrableDomain(host)
+            )
+            XCTAssertEqual(try db.alerts().first { $0.bundleID == "agent-\(index)" }?.allowPattern, expected)
+        }
+    }
+
     func testDurableQueueRemovesOnlyTheAcknowledgedEventIDs() {
         struct Event: Equatable { var id: UUID }
         let first = Event(id: UUID())

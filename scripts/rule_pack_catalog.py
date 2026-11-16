@@ -20,7 +20,7 @@ import sys
 import tempfile
 
 
-MAX_FILE_BYTES = 8 * 1024 * 1024
+MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_PACKS = 16
 MAX_ENTRIES = 250_000
 MAX_STRING_BYTES = 16 * 1024
@@ -42,6 +42,9 @@ ENTRY_FIELDS = {"id", "host", "match", "category"}
 SIGNATURE_FIELDS = {"algorithm", "keyID", "value"}
 PACK_ID = re.compile(r"official\.[A-Za-z0-9.-]+\Z")
 HEX_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+PSL_RULES_PATH = pathlib.Path(__file__).resolve().parent.parent / "rule-packs/advertising/public-suffix-rules.generated.json"
+ADVERTISING_BALANCED_ID = "official.advertising"
+ADVERTISING_AGGRESSIVE_ID = "official.advertising-aggressive"
 
 # official.tracking is deliberately an evidence-backed allowlist. Hostname filtering cannot separate a provider's
 # product/control plane from collection paths on the same host, so every accepted entry must be a dedicated collector
@@ -165,6 +168,64 @@ def canonical_host(value, where):
     return host
 
 
+def load_public_suffix_rules():
+    try:
+        value = json.loads(PSL_RULES_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        fail(f"cannot load generated Public Suffix List rules: {error}")
+    if not isinstance(value, dict) or value.get("format") != 1:
+        fail("generated Public Suffix List rules have an unsupported format")
+    result = {}
+    for name in ("exact", "wildcard", "exception"):
+        rules = value.get(name)
+        if not isinstance(rules, list) or any(not isinstance(rule, str) for rule in rules):
+            fail(f"generated Public Suffix List {name} rules are invalid")
+        if rules != sorted(set(rules)):
+            fail(f"generated Public Suffix List {name} rules are not sorted and unique")
+        result[name] = set(rules)
+    return result
+
+
+PUBLIC_SUFFIX_RULES = load_public_suffix_rules()
+
+
+def public_suffix(host):
+    labels = host.split(".")
+    exceptions = [value for value in (".".join(labels[index:]) for index in range(len(labels)))
+                  if value in PUBLIC_SUFFIX_RULES["exception"]]
+    if exceptions:
+        rule = max(exceptions, key=lambda value: len(value.split(".")))
+        return ".".join(rule.split(".")[1:])
+    best_count = 1
+    for index in range(len(labels)):
+        candidate = ".".join(labels[index:])
+        if candidate in PUBLIC_SUFFIX_RULES["exact"]:
+            best_count = max(best_count, len(labels) - index)
+        if index > 0 and candidate in PUBLIC_SUFFIX_RULES["wildcard"]:
+            best_count = max(best_count, len(labels) - index + 1)
+    return ".".join(labels[-best_count:])
+
+
+def suffix_entry_is_safe(host):
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        return public_suffix(host) != host
+
+
+def advertising_entry_covers(entry, host):
+    if entry["match"] == "exact":
+        return entry["host"] == host
+    return entry["host"] == host or host.endswith("." + entry["host"])
+
+
+def advertising_entry_semantically_covers(candidate, required):
+    if candidate["match"] == "exact":
+        return required["match"] == "exact" and candidate["host"] == required["host"]
+    return candidate["host"] == required["host"] or required["host"].endswith("." + candidate["host"])
+
+
 def entry_digest(entries):
     canonical = "".join(
         f"{entry['id']}\t{entry['host']}\t{entry['match']}\t{entry['category']}\n"
@@ -235,6 +296,7 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
     if not isinstance(packs, list) or not 1 <= len(packs) <= MAX_PACKS:
         fail(f"catalog.payload.packs must contain 1...{MAX_PACKS} packs")
     pack_ids = []
+    packs_by_id = {}
     total_entries = 0
     for pack_index, pack in enumerate(packs):
         pack_where = f"catalog.payload.packs[{pack_index}]"
@@ -245,6 +307,7 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
         if not PACK_ID.fullmatch(pack_id):
             fail(f"{pack_where}.manifest.id must be in the official. namespace")
         pack_ids.append(pack_id)
+        packs_by_id[pack_id] = pack
         string(manifest["version"], f"{pack_where}.manifest.version")
         integer(manifest["generatedAt"], f"{pack_where}.manifest.generatedAt", 0, MAX_INT64)
         entry_count = integer(manifest["entryCount"], f"{pack_where}.manifest.entryCount", 0, MAX_ENTRIES)
@@ -281,6 +344,8 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
             match = string(entry["match"], f"{entry_where}.match")
             if match not in ("exact", "suffix"):
                 fail(f"{entry_where}.match must be exact or suffix")
+            if match == "suffix" and not suffix_entry_is_safe(host):
+                fail(f"{entry_where}.host is a public suffix or address and cannot use suffix matching")
             if (enforce_tracking_policy and pack_id == "official.tracking"
                     and (host, match) not in TRACKING_ALLOWED_ENTRIES):
                 fail(f"{entry_where}.host is not an approved dedicated tracking endpoint: "
@@ -294,6 +359,8 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
                 fail(f"{entry_where}.category is unsupported")
             if pack_id == "official.tracking" and category != "tracking":
                 fail(f"{entry_where}.category must be tracking for official.tracking")
+            if pack_id in (ADVERTISING_BALANCED_ID, ADVERTISING_AGGRESSIVE_ID) and category != "advertising":
+                fail(f"{entry_where}.category must be advertising for {pack_id}")
             if previous_key is not None and previous_key >= host_key:
                 fail(f"{pack_where}.entries are not strictly sorted by host|match")
             previous_key = host_key
@@ -304,6 +371,73 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
         fail("catalog.payload.packs are not sorted by manifest.id")
     if len(pack_ids) != len(set(pack_ids)):
         fail("catalog.payload.packs contains duplicate manifest.id values")
+
+    balanced = packs_by_id.get(ADVERTISING_BALANCED_ID)
+    aggressive = packs_by_id.get(ADVERTISING_AGGRESSIVE_ID)
+    two_tier_catalog = aggressive is not None or (
+        balanced is not None and version_tuple(
+            balanced["manifest"]["minimumAppVersion"],
+            "official.advertising minimumAppVersion",
+        ) >= (0, 18, 5)
+    )
+    if two_tier_catalog:
+        if balanced is None or aggressive is None:
+            fail("0.18.5 advertising catalogs must contain both exclusive tiers")
+        balanced_entries = balanced["entries"]
+        aggressive_entries = aggressive["entries"]
+        balanced_keys = {(entry["host"], entry["match"]) for entry in balanced_entries}
+        aggressive_keys = {(entry["host"], entry["match"]) for entry in aggressive_entries}
+        for required in (("platform.pubadx.one", "exact"), ("imp9.pubadx.one", "exact")):
+            if required not in balanced_keys:
+                fail(f"official.advertising is missing required exact PubADX entry {required[0]}")
+        if ("pubadx.one", "suffix") in balanced_keys:
+            fail("official.advertising must not contain pubadx.one suffix coverage")
+        if ("pubadx.one", "suffix") not in aggressive_keys:
+            fail("official.advertising-aggressive must contain pubadx.one suffix coverage")
+        for pack_id, entries in (
+            (ADVERTISING_BALANCED_ID, balanced_entries),
+            (ADVERTISING_AGGRESSIVE_ID, aggressive_entries),
+        ):
+            if any(advertising_entry_covers(entry, "pubadx.com") for entry in entries):
+                fail(f"{pack_id} must not match pubadx.com")
+        aggressive_by_key = {
+            (entry["host"], entry["match"]): entry
+            for entry in aggressive_entries
+        }
+        balanced_by_key = {
+            (entry["host"], entry["match"]): entry
+            for entry in balanced_entries
+        }
+        key_by_stable_id = {}
+        for entry in balanced_entries + aggressive_entries:
+            key = (entry["host"], entry["match"])
+            previous = key_by_stable_id.setdefault(entry["id"], key)
+            if previous != key:
+                fail("advertising tiers reuse stable ID "
+                     f"{entry['id']} for both {previous[0]}|{previous[1]} and {key[0]}|{key[1]}")
+        for shared_key in sorted(balanced_keys & aggressive_keys):
+            if balanced_by_key[shared_key]["id"] != aggressive_by_key[shared_key]["id"]:
+                fail("advertising tiers assign different stable IDs to shared entry "
+                     f"{shared_key[0]}|{shared_key[1]}")
+        for required in balanced_entries:
+            labels = required["host"].split(".")
+            candidates = [
+                candidate
+                for index in range(len(labels))
+                if (candidate := aggressive_by_key.get(
+                    (".".join(labels[index:]), "suffix")
+                )) is not None
+            ]
+            if required["match"] == "exact":
+                exact = aggressive_by_key.get((required["host"], "exact"))
+                if exact is not None:
+                    candidates.append(exact)
+            if not any(
+                advertising_entry_semantically_covers(candidate, required)
+                for candidate in candidates
+            ):
+                fail("official.advertising-aggressive is not a semantic superset of "
+                     f"official.advertising at {required['host']}|{required['match']}")
 
     signatures = catalog["signatures"]
     if not isinstance(signatures, list) or len(signatures) > 16:

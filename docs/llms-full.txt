@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.4, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.5, macOS 15 or later.
 
  On this page
 
@@ -536,16 +536,19 @@ open build/Build/Products/Release/Flowlight.app
 
  Managed ad and tracker packs
 
- Policies › Managed packs contains three official lists built into Flowlight: Advertising covers known
- advertising delivery and auction hosts; Cross-site tracking covers common analytics, session replay and
- cross-site measurement hosts; and Privacy and telemetry covers crash reporting, install attribution, and
- audited Apple advertising and analytics hosts. The packs are visible from the start and all are off by default.
+ Policies › Managed packs contains four official lists built into Flowlight: the recommended
+ Advertising tier and opt-in Advertising — Aggressive tier are mutually exclusive;
+ Cross-site tracking covers common analytics, session replay and cross-site measurement hosts; and
+ Privacy and telemetry covers crash reporting, install attribution, and audited Apple advertising and analytics
+ hosts. The packs are visible from the start and all are off by default.
 
- Official-only, signed updates. Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs.
- Automatic checks are on by default and can be switched off here. A signature authenticates content but does not enable it:
- a new pack stays off, and changed destinations remove an enabled pack from enforcement until you review the exact new version
- and press Save. If content changes while its editor is open, the stale Save is refused. An accepted catalog may remain available
- as visibly stale last-known-good during an outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.
+ Official-only, signed updates. Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs; it
+ never downloads raw GitHub, EasyList, HaGeZi, or Public Suffix List data. Every release bundles the exact signed catalog, and an
+ accepted update is retained byte-for-byte as the verified last-known-good cache. A feed or GitHub Pages outage therefore delays
+ updates without removing active enforcement or leaving a fresh install empty. Automatic checks are on by default and can be
+ switched off here. A signature authenticates content but does not enable it: a new pack stays off, and changed destinations remove
+ an enabled pack from enforcement until you review the exact new version and press Save. If content changes while its editor is open,
+ the stale Save is refused. Rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.
 
  Each pack has its own scope. Apply it globally to every app, or only to selected applications. Blocking needs
  the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. When HTTPS
@@ -932,7 +935,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.4macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.5macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1676,8 +1679,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.18.4
+ 0.18.5
 November 15, 2026Latest
+
+ Choose balanced or aggressive Advertising coverage. Advertising remains the recommended lower-breakage tier, while Advertising — Aggressive is an explicit opt-in semantic superset; enabling either atomically replaces the other instead of stacking.
+
+ Review substantially broader, evidence-backed destinations. Deterministic offline generation derives 42,384 balanced and 42,433 aggressive entries from immutable EasyList and HaGeZi snapshots, protected by stable IDs, reviewed product surfaces, and Public Suffix List boundaries.
+
+ Cover PubADX without overclaiming. Balanced blocks the observed platform.pubadx.one and imp9.pubadx.one hosts exactly, Aggressive covers the pubadx.one suffix, and pubadx.com remains reachable without any ownership or affiliation claim.
+
+ Keep hostname blocking honest. Policies explains that a match refuses every connection to that host but cannot remove same-origin YouTube or Meta ads, browser overlays, layout gaps, or path-specific resources on shared hosts.
+
+ Make generated policy reviewable. Pack review exposes the signed catalog sequence and digest, content digest, license, complete destination list, and content-addressed provenance backed by pinned source revisions, hashes, notices, and license texts.
+
+ Fail closed and stay bounded. Corrupt dual-enabled state disables both tiers for review, first-switch exceptions move without losing either tier’s saved state, and measured decode, matcher, snapshot, and IPC gates cover the full 84,892-entry catalog.
+
+ 0.18.4
+November 15, 2026
 
  Show Connections loading again. The Flowlight mark restores its lightweight flip while data and final graph geometry load, stays still with Reduce Motion, and remains deterministic in screenshot fixtures.
 

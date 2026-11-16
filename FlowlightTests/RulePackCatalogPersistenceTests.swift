@@ -18,8 +18,13 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
 
         let composed = try RulePackCatalogComposition.compose(catalog, currentAppVersion: "0.15.4")
 
-        XCTAssertEqual(composed.definitions.map(\.id),
-                       ["official.added", "official.advertising", "official.telemetry", "official.tracking"])
+        XCTAssertEqual(composed.definitions.map(\.id), [
+            "official.added",
+            "official.advertising",
+            "official.advertising-aggressive",
+            "official.telemetry",
+            "official.tracking",
+        ])
         XCTAssertEqual(composed.definitions.first { $0.id == replacement.id }?.manifest.version, "2")
         XCTAssertEqual(composed.definitions.first { $0.id == BuiltInRulePacks.telemetry.id },
                        BuiltInRulePacks.telemetry)
@@ -280,6 +285,373 @@ final class RulePackCatalogPersistenceTests: XCTestCase {
         configuration.enabled = false
         XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: nil))
         XCTAssertNoThrow(try db.saveRulePackConfiguration(configuration, reviewed: current))
+    }
+
+    func testDisablingPackIgnoresUnrelatedMalformedOverrideJSON() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-disable-malformed-override"))
+        var active = RulePackConfiguration(packID: BuiltInRulePacks.advertising.id, enabled: true)
+        active.consentedVersion = BuiltInRulePacks.advertising.manifest.version
+        active.consentedContentSHA256 = BuiltInRulePacks.advertising.manifest.contentSHA256
+        try db.saveRulePackConfiguration(active)
+        _ = try db.raw(
+            "INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)",
+            [.text(UUID().uuidString), .text("{malformed"), .int(1)]
+        ) { _ in 0 }
+
+        var disabled = active
+        disabled.enabled = false
+        let write = try db.saveRulePackConfiguration(disabled)
+
+        XCTAssertEqual(write.configurations, [disabled])
+        XCTAssertTrue(write.overrides.isEmpty)
+        XCTAssertEqual(try db.loadRulePackConfigurations(), [disabled])
+        XCTAssertEqual(
+            try db.raw("SELECT COUNT(*) FROM rule_pack_overrides", map: { $0.int(0) }),
+            [1],
+            "a tolerant refresh must not mutate or silently repair the malformed unrelated row"
+        )
+    }
+
+    func testFirstAdvertisingSwitchStillRejectsMalformedOverrideJSON() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-malformed-override"))
+        let catalog = verifiedCatalog(sequence: 6, digest: String(repeating: "6", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = RulePackConfiguration(packID: balancedDefinition.id, enabled: true)
+        balanced.consentedVersion = balancedDefinition.manifest.version
+        balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(balanced)
+        _ = try db.raw(
+            "INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)",
+            [.text(UUID().uuidString), .text("{malformed"), .int(1)]
+        ) { _ in 0 }
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        var aggressive = RulePackConfiguration(packID: aggressiveDefinition.id, enabled: true)
+        aggressive.consentedVersion = aggressiveDefinition.manifest.version
+        aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+        let receipt = RulePackReviewReceipt(
+            packID: aggressiveDefinition.id,
+            version: aggressiveDefinition.manifest.version,
+            contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        XCTAssertThrowsError(try db.saveRulePackConfiguration(
+            aggressive,
+            reviewed: receipt,
+            expectedExclusivePeer: balanced
+        ))
+        XCTAssertEqual(
+            try db.loadRulePackConfigurations(),
+            [balanced],
+            "first-switch exception copying must roll back instead of omitting malformed saved state"
+        )
+    }
+
+    func testReviewedAdvertisingSaveRejectsPeerEnabledAfterExpectedStateWasCaptured() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-peer-cas"))
+        let catalog = verifiedCatalog(sequence: 6, digest: String(repeating: "6", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        var aggressive = RulePackConfiguration(packID: aggressiveDefinition.id, enabled: true)
+        aggressive.consentedVersion = aggressiveDefinition.manifest.version
+        aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+        let receipt = RulePackReviewReceipt(
+            packID: aggressiveDefinition.id,
+            version: aggressiveDefinition.manifest.version,
+            contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = RulePackConfiguration(packID: balancedDefinition.id, enabled: true)
+        balanced.consentedVersion = balancedDefinition.manifest.version
+        balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(balanced)
+
+        XCTAssertThrowsError(try db.saveRulePackConfiguration(
+            aggressive,
+            reviewed: receipt,
+            expectedExclusivePeer: nil
+        )) { error in
+            XCTAssertEqual(
+                error as? RulePackConfigurationSaveError,
+                .exclusivePeerChanged(balanced)
+            )
+        }
+        XCTAssertEqual(try db.loadRulePackConfigurations(), [balanced])
+    }
+
+    func testReviewedAdvertisingSaveAtomicallyDisablesPeerAndPreservesItsState() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-replacement"))
+        let catalog = verifiedCatalog(sequence: 6, digest: String(repeating: "6", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = RulePackConfiguration(
+            packID: balancedDefinition.id,
+            enabled: true,
+            scope: .selectedApps,
+            apps: ["com.apple.Safari"]
+        )
+        balanced.consentedVersion = balancedDefinition.manifest.version
+        balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(balanced)
+        let override = RulePackOverride(
+            packID: balanced.packID,
+            app: "com.apple.Safari",
+            host: "example.com"
+        )
+        try db.saveRulePackOverride(override)
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        var aggressive = RulePackConfiguration(packID: aggressiveDefinition.id, enabled: true)
+        aggressive.consentedVersion = aggressiveDefinition.manifest.version
+        aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+        let receipt = RulePackReviewReceipt(
+            packID: aggressiveDefinition.id,
+            version: aggressiveDefinition.manifest.version,
+            contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        let write = try db.saveRulePackConfiguration(
+            aggressive,
+            reviewed: receipt,
+            expectedExclusivePeer: balanced
+        )
+
+        var disabledBalanced = balanced
+        disabledBalanced.enabled = false
+        XCTAssertEqual(write.configurations, [disabledBalanced, aggressive].sorted { $0.packID < $1.packID })
+        XCTAssertEqual(
+            try db.loadRulePackConfigurations().sorted { $0.packID < $1.packID },
+            [disabledBalanced, aggressive].sorted { $0.packID < $1.packID }
+        )
+        let overrides = write.overrides.sorted { $0.packID < $1.packID }
+        XCTAssertEqual(overrides.count, 2)
+        XCTAssertEqual(overrides.first { $0.packID == balanced.packID }, override)
+        let copied = try XCTUnwrap(overrides.first { $0.packID == aggressive.packID })
+        XCTAssertNotEqual(copied.id, override.id)
+        XCTAssertEqual(copied.app, override.app)
+        XCTAssertEqual(copied.host, override.host)
+        XCTAssertEqual(copied.match, override.match)
+        XCTAssertEqual(copied.created, override.created)
+        XCTAssertEqual(try db.loadRulePackOverrides().sorted { $0.packID < $1.packID }, overrides)
+    }
+
+    func testAdvertisingReplacementCopiesOnlyMissingOverridesOnFirstSwitch() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-override-copy"))
+        let catalog = verifiedCatalog(sequence: 7, digest: String(repeating: "7", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = RulePackConfiguration(packID: balancedDefinition.id, enabled: true)
+        balanced.consentedVersion = balancedDefinition.manifest.version
+        balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(balanced)
+        let balancedOverride = RulePackOverride(
+            packID: balanced.packID,
+            app: "com.apple.Safari",
+            host: "example.com"
+        )
+        try db.saveRulePackOverride(balancedOverride)
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        let existingAggressiveOverride = RulePackOverride(
+            packID: aggressiveDefinition.id,
+            app: "com.google.Chrome",
+            host: "ads.example"
+        )
+        try db.saveRulePackOverride(existingAggressiveOverride)
+        var aggressive = RulePackConfiguration(packID: aggressiveDefinition.id, enabled: true)
+        aggressive.consentedVersion = aggressiveDefinition.manifest.version
+        aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+        let aggressiveReceipt = RulePackReviewReceipt(
+            packID: aggressiveDefinition.id,
+            version: aggressiveDefinition.manifest.version,
+            contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        let firstSwitch = try db.saveRulePackConfiguration(
+            aggressive,
+            reviewed: aggressiveReceipt,
+            expectedExclusivePeer: balanced
+        )
+        let aggressiveOverrides = firstSwitch.overrides.filter { $0.packID == aggressive.packID }
+        XCTAssertEqual(aggressiveOverrides.count, 2)
+        XCTAssertTrue(aggressiveOverrides.contains(existingAggressiveOverride))
+        let copiedBalanced = try XCTUnwrap(aggressiveOverrides.first { $0.host == balancedOverride.host })
+        XCTAssertNotEqual(copiedBalanced.id, balancedOverride.id)
+        XCTAssertEqual(copiedBalanced.app, balancedOverride.app)
+        XCTAssertEqual(copiedBalanced.match, balancedOverride.match)
+
+        let laterAggressiveOverride = RulePackOverride(
+            packID: aggressive.packID,
+            app: "org.mozilla.firefox",
+            host: "later.example"
+        )
+        try db.saveRulePackOverride(laterAggressiveOverride)
+        var reenabledBalanced = balanced
+        reenabledBalanced.enabled = true
+        let balancedReceipt = RulePackReviewReceipt(
+            packID: balancedDefinition.id,
+            version: balancedDefinition.manifest.version,
+            contentSHA256: balancedDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        let switchBack = try db.saveRulePackConfiguration(
+            reenabledBalanced,
+            reviewed: balancedReceipt,
+            expectedExclusivePeer: aggressive
+        )
+        XCTAssertEqual(
+            switchBack.overrides.filter { $0.packID == balanced.packID },
+            [balancedOverride]
+        )
+        XCTAssertTrue(switchBack.overrides.contains(laterAggressiveOverride))
+    }
+
+    func testAdvertisingReplacementCopiesOverridesForIncompletePriorConsentRows() throws {
+        let incompleteConsentPairs: [(version: String?, digest: String?)] = [
+            (nil, nil),
+            ("", nil),
+            (nil, ""),
+            ("1.0.0", nil),
+            (nil, String(repeating: "a", count: 64)),
+            ("1.0.0", ""),
+            ("1.0.0", "not-a-sha256-digest"),
+        ]
+
+        for (index, pair) in incompleteConsentPairs.enumerated() {
+            let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-partial-consent-\(index)"))
+            let catalog = verifiedCatalog(sequence: 7, digest: String(repeating: "7", count: 64))
+            _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+            let balancedDefinition = BuiltInRulePacks.advertising
+            var balanced = RulePackConfiguration(packID: balancedDefinition.id, enabled: true)
+            balanced.consentedVersion = balancedDefinition.manifest.version
+            balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+            try db.saveRulePackConfiguration(balanced)
+            let peerOverride = RulePackOverride(
+                packID: balanced.packID,
+                app: "com.apple.Safari",
+                host: "example.com"
+            )
+            try db.saveRulePackOverride(peerOverride)
+
+            let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+            var priorAggressive = RulePackConfiguration(packID: aggressiveDefinition.id)
+            priorAggressive.consentedVersion = pair.version
+            priorAggressive.consentedContentSHA256 = pair.digest
+            try db.saveRulePackConfiguration(priorAggressive)
+
+            var aggressive = priorAggressive
+            aggressive.enabled = true
+            aggressive.consentedVersion = aggressiveDefinition.manifest.version
+            aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+            let receipt = RulePackReviewReceipt(
+                packID: aggressiveDefinition.id,
+                version: aggressiveDefinition.manifest.version,
+                contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+                catalogSequence: catalog.sequence,
+                catalogDigest: catalog.digest
+            )
+
+            let write = try db.saveRulePackConfiguration(
+                aggressive,
+                reviewed: receipt,
+                expectedExclusivePeer: balanced
+            )
+            let copied = try XCTUnwrap(
+                write.overrides.first { $0.packID == aggressive.packID },
+                "incomplete consent pair \(index) must still be treated as the first real tier switch"
+            )
+            XCTAssertEqual(copied.app, peerOverride.app)
+            XCTAssertEqual(copied.host, peerOverride.host)
+            XCTAssertEqual(copied.match, peerOverride.match)
+        }
+    }
+
+    func testAdvertisingReplacementRollsBackTargetWhenPeerDisableFails() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-rollback"))
+        let catalog = verifiedCatalog(sequence: 7, digest: String(repeating: "7", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = RulePackConfiguration(packID: balancedDefinition.id, enabled: true)
+        balanced.consentedVersion = balancedDefinition.manifest.version
+        balanced.consentedContentSHA256 = balancedDefinition.manifest.contentSHA256
+        try db.saveRulePackConfiguration(balanced)
+        _ = try db.raw("""
+            CREATE TRIGGER reject_balanced_disable
+            BEFORE UPDATE ON rule_packs
+            WHEN NEW.pack_id = 'official.advertising'
+            BEGIN SELECT RAISE(ABORT, 'injected peer write failure'); END
+            """) { _ in 0 }
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        var aggressive = RulePackConfiguration(packID: aggressiveDefinition.id, enabled: true)
+        aggressive.consentedVersion = aggressiveDefinition.manifest.version
+        aggressive.consentedContentSHA256 = aggressiveDefinition.manifest.contentSHA256
+        let receipt = RulePackReviewReceipt(
+            packID: aggressiveDefinition.id,
+            version: aggressiveDefinition.manifest.version,
+            contentSHA256: aggressiveDefinition.manifest.contentSHA256,
+            catalogSequence: catalog.sequence,
+            catalogDigest: catalog.digest
+        )
+
+        XCTAssertThrowsError(try db.saveRulePackConfiguration(
+            aggressive,
+            reviewed: receipt,
+            expectedExclusivePeer: balanced
+        ))
+        XCTAssertEqual(try db.loadRulePackConfigurations(), [balanced])
+    }
+
+    func testCatalogReconciliationDisablesBothAdvertisingTiersAndRequiresReview() throws {
+        let db = try TrafficDatabase(url: temporaryDatabaseURL("catalog-tier-repair"))
+        let catalog = verifiedCatalog(sequence: 8, digest: String(repeating: "8", count: 64))
+        _ = try db.acceptVerifiedRulePackCatalog(catalog, checkedAt: acceptedAt, nextEligibleAt: nextCheck)
+
+        func enabledConfiguration(for definition: RulePackDefinition) -> RulePackConfiguration {
+            var configuration = RulePackConfiguration(packID: definition.id, enabled: true)
+            configuration.consentedVersion = definition.manifest.version
+            configuration.consentedContentSHA256 = definition.manifest.contentSHA256
+            return configuration
+        }
+        let balanced = enabledConfiguration(for: BuiltInRulePacks.advertising)
+        let aggressive = enabledConfiguration(for: BuiltInRulePacks.advertisingAggressive)
+        for configuration in [balanced, aggressive] {
+            let json = String(decoding: try JSONEncoder().encode(configuration), as: UTF8.self)
+            _ = try db.raw(
+                "INSERT INTO rule_packs (pack_id, configuration, updated) VALUES (?,?,?)",
+                [.text(configuration.packID), .text(json), .int(1)]
+            ) { _ in 0 }
+        }
+
+        let repaired = try db.reconcileRulePackCatalogBootstrap(
+            db.loadRulePackCatalogBootstrap(catalogID: catalogID),
+            definitions: catalog.definitions
+        )
+
+        XCTAssertEqual(
+            repaired.pendingReviewPackIDs,
+            Set([AdvertisingPackTierPolicy.balancedID, AdvertisingPackTierPolicy.aggressiveID])
+        )
+        XCTAssertTrue(repaired.configurations.allSatisfy { !$0.enabled })
+        XCTAssertTrue(try db.loadRulePackConfigurations().allSatisfy { !$0.enabled })
     }
 
     func testAsyncResultReturnsValuesAndPropagatesErrors() async throws {

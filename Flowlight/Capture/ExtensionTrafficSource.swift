@@ -2,6 +2,13 @@ import Foundation
 
 /// Serializes access to the extension's one mutable transfer buffer. Repeating the active epoch is redundant; a newer
 /// epoch is coalesced and starts only after the active attempt reaches a terminal callback.
+private struct EncodedRulePackSnapshot: Sendable {
+    var generation: UUID
+    var digest: String
+    var totalBytes: Int
+    var chunks: [Data]
+}
+
 struct RulePackPushGate {
     private(set) var activeEpoch: UInt64?
     private var hasPendingNewerEpoch = false
@@ -118,6 +125,8 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
     var onRulePackEvents: ((RulePackEventBatch, @escaping @Sendable (Bool) -> Void) -> Void)?
     var onRulePackStatus: ((RulePackApplyResult) -> Void)?
     private var rulePackSnapshot: RulePackSnapshot?
+    /// Encoding and chunk copies happen off the main queue. Publication waits for bytes from the exact generation.
+    private var encodedRulePackSnapshot: EncodedRulePackSnapshot?
     /// Invalidates every callback from a superseded desired snapshot or XPC connection.
     private var rulePackPushEpoch: UInt64 = 0
     /// The extension owns one mutable transfer buffer, so overlapping handshakes must never race to reset it.
@@ -552,13 +561,42 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.rulePackSnapshot = snapshot
+            self.encodedRulePackSnapshot = nil
             self.rulePackPushEpoch &+= 1
-            self.pushRulePacks()
+            let epoch = self.rulePackPushEpoch
+            guard let snapshot else {
+                self.pushRulePacks()
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let payload = BlockCoding.encode(snapshot)
+                let chunkSize = 64 * 1_024
+                let chunks = stride(from: 0, to: payload.count, by: chunkSize).map {
+                    payload.subdata(in: $0..<min(payload.count, $0 + chunkSize))
+                }
+                let encoded = EncodedRulePackSnapshot(
+                    generation: snapshot.generation,
+                    digest: snapshot.digest,
+                    totalBytes: payload.count,
+                    chunks: chunks
+                )
+                DispatchQueue.main.async {
+                    guard let self,
+                          self.rulePackPushEpoch == epoch,
+                          self.rulePackSnapshot?.generation == snapshot.generation else { return }
+                    self.encodedRulePackSnapshot = encoded
+                    self.pushRulePacks()
+                }
+            }
         }
     }
 
     private func pushRulePacks() {
         guard let connection else { return }
+        if let snapshot = rulePackSnapshot,
+           encodedRulePackSnapshot?.generation != snapshot.generation {
+            return
+        }
         let epoch = rulePackPushEpoch
         guard rulePackPushGate.begin(epoch: epoch) else { return }
         let desiredGeneration = rulePackSnapshot?.generation
@@ -632,14 +670,15 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                     )
                     return
                 }
-                let payload = BlockCoding.encode(snapshot)
-                let chunkSize = 64 * 1_024
-                let chunks = stride(from: 0, to: payload.count, by: chunkSize).map {
-                    payload.subdata(in: $0..<min(payload.count, $0 + chunkSize))
+                guard let encoded = self.encodedRulePackSnapshot,
+                      encoded.generation == snapshot.generation,
+                      encoded.digest == snapshot.digest else {
+                    self.finishRulePackPush(epoch: epoch)
+                    return
                 }
                 let header = RulePackTransferHeader(protocolVersion: RulePackSnapshot.protocolVersion,
                                                     generation: snapshot.generation, digest: snapshot.digest,
-                                                    totalBytes: payload.count, chunks: chunks.count,
+                                                    totalBytes: encoded.totalBytes, chunks: encoded.chunks.count,
                                                     expectedActiveGeneration: handshake.activeGeneration)
                 proxy.beginRulePack(payload: BlockCoding.encode(header)) { [weak self, weak connection] reply in
                     DispatchQueue.main.async {
@@ -653,7 +692,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                             self.finishRulePackPush(epoch: epoch, statusData: reply)
                             return
                         }
-                        self.appendPackChunks(chunks, index: 0, snapshot: snapshot, epoch: epoch,
+                        self.appendPackChunks(encoded.chunks, index: 0, snapshot: snapshot, epoch: epoch,
                                               connection: connection, proxy: proxy)
                     }
                 }

@@ -81,6 +81,66 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
     }
 
+    func testAdvertisingTiersAreOrderedRiskLabeledAndReplaceAtomically() {
+        launchPolicies()
+
+        let balancedRow = element("policies.pack.official.advertising.open")
+        let aggressiveRow = element("policies.pack.official.advertising-aggressive.open")
+        XCTAssertTrue(balancedRow.waitForExistence(timeout: 15))
+        XCTAssertTrue(aggressiveRow.waitForExistence(timeout: 15))
+        XCTAssertLessThan(balancedRow.frame.minY, aggressiveRow.frame.minY)
+        XCTAssertTrue(accessibilityText(of: balancedRow).contains("Recommended · Balanced"))
+        XCTAssertTrue(accessibilityText(of: aggressiveRow).contains("Opt-in · Higher breakage"))
+
+        let balancedToggle = element("policies.pack.official.advertising.enabled")
+        let aggressiveToggle = element("policies.pack.official.advertising-aggressive.enabled")
+        XCTAssertTrue(balancedToggle.exists)
+        XCTAssertTrue(aggressiveToggle.exists)
+        XCTAssertNotEqual(balancedToggle.identifier, aggressiveToggle.identifier)
+
+        balancedToggle.click()
+        XCTAssertTrue(element("rule-pack-editor.official.advertising.save").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("rule-pack-editor.official.advertising.badge").exists)
+        XCTAssertTrue(element("rule-pack-editor.official.advertising.limitations").exists)
+        let balancedProvenance = element("rule-pack-editor.official.advertising.provenance")
+        XCTAssertTrue(balancedProvenance.exists)
+        XCTAssertTrue(accessibilityText(of: balancedProvenance).contains("The EasyList authors"))
+        XCTAssertTrue(accessibilityText(of: balancedProvenance).contains("GPL-3.0-or-later · GPL-3.0 · MPL-2.0"))
+        element("rule-pack-editor.official.advertising.save").click()
+        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(balancedToggle.value as? String, "1")
+        XCTAssertEqual(aggressiveToggle.value as? String, "0")
+        XCTAssertTrue(accessibilityText(of: aggressiveRow).contains("replaces Advertising"))
+
+        aggressiveToggle.click()
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.save").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.badge").exists)
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.limitations").exists)
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.provenance").exists)
+        element("rule-pack-editor.official.advertising-aggressive.save").click()
+        XCTAssertTrue(app.buttons["Replace Advertising"].waitForExistence(timeout: 3))
+        app.buttons["Replace Advertising"].click()
+        XCTAssertTrue(app.buttons["Enable aggressive blocking"].waitForExistence(timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.cancel").exists)
+        element("rule-pack-editor.official.advertising-aggressive.cancel").click()
+        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(balancedToggle.value as? String, "1", "cancelling must preserve balanced enforcement")
+        XCTAssertEqual(aggressiveToggle.value as? String, "0", "cancelling must not enable aggressive enforcement")
+
+        aggressiveToggle.click()
+        XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.save").waitForExistence(timeout: 5))
+        element("rule-pack-editor.official.advertising-aggressive.save").click()
+        XCTAssertTrue(app.buttons["Replace Advertising"].waitForExistence(timeout: 3))
+        app.buttons["Replace Advertising"].click()
+        XCTAssertTrue(app.buttons["Enable aggressive blocking"].waitForExistence(timeout: 3))
+        app.buttons["Enable aggressive blocking"].click()
+        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(balancedToggle.value as? String, "0")
+        XCTAssertEqual(aggressiveToggle.value as? String, "1")
+        XCTAssertTrue(accessibilityText(of: balancedRow).contains("replaces Advertising — Aggressive"))
+    }
+
     func testUpdateWarningOpensAfterTheMainWindowCloses() {
         app.launchArguments = [
             "-FLDemo", "YES",
