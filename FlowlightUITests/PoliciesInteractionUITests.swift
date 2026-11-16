@@ -16,12 +16,12 @@ final class PoliciesInteractionUITests: XCTestCase {
     func testPolicyHeadersAndPaintedRowsUseTheirWholeVisibleTarget() {
         launchPolicies()
 
-        let ruleSection = element("policies.section.rule.toggle")
-        XCTAssertTrue(ruleSection.waitForExistence(timeout: 15))
-        clickTrailingBlankArea(of: ruleSection)
-        XCTAssertTrue((ruleSection.value as? String)?.contains("Collapsed") == true)
-        clickTrailingBlankArea(of: ruleSection)
-        XCTAssertEqual(ruleSection.value as? String, "Expanded")
+        let ruleSectionID = "policies.section.rule.toggle"
+        XCTAssertTrue(element(ruleSectionID).waitForExistence(timeout: 15))
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: ruleSectionID, timeout: 3))
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: ruleSectionID, timeout: 3))
 
         let ruleID = "a14da4c2-7930-45c0-a8b9-3b8cd69c4a4e"
         let ruleButton = element("policies.rule.\(ruleID).edit")
@@ -42,22 +42,22 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(app.menuItems["Edit…"].waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
 
-        let allowlistSection = element("policies.section.allowlist.toggle")
-        XCTAssertTrue(allowlistSection.waitForExistence(timeout: 10))
-        clickTrailingBlankArea(of: allowlistSection)
-        XCTAssertTrue((allowlistSection.value as? String)?.contains("Collapsed") == true)
+        let allowlistSectionID = "policies.section.allowlist.toggle"
+        XCTAssertTrue(element(allowlistSectionID).waitForExistence(timeout: 10))
+        clickTrailingBlankArea(of: element(allowlistSectionID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: allowlistSectionID, timeout: 3))
 
-        let packSection = element("policies.section.pack.toggle")
-        XCTAssertTrue(packSection.waitForExistence(timeout: 15))
-        clickTrailingBlankArea(of: packSection)
-        XCTAssertTrue((packSection.value as? String)?.contains("Collapsed") == true)
-        clickTrailingBlankArea(of: packSection)
-        XCTAssertEqual(packSection.value as? String, "Expanded")
+        let packSectionID = "policies.section.pack.toggle"
+        XCTAssertTrue(element(packSectionID).waitForExistence(timeout: 15))
+        clickTrailingBlankArea(of: element(packSectionID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Collapsed", identifier: packSectionID, timeout: 3))
+        clickTrailingBlankArea(of: element(packSectionID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: packSectionID, timeout: 3))
 
-        let catalogDetails = element("policies.pack-catalog.details.toggle")
-        XCTAssertTrue(catalogDetails.waitForExistence(timeout: 10))
-        clickPaintedMargin(of: catalogDetails)
-        XCTAssertEqual(catalogDetails.value as? String, "Expanded")
+        let catalogDetailsID = "policies.pack-catalog.details.toggle"
+        XCTAssertTrue(element(catalogDetailsID).waitForExistence(timeout: 10))
+        clickPaintedMargin(of: element(catalogDetailsID))
+        XCTAssertTrue(waitForAccessibilityText(containing: "Expanded", identifier: catalogDetailsID, timeout: 3))
         XCTAssertTrue(element("policies.pack-catalog.details.content").waitForExistence(timeout: 3))
 
         let packButton = element("policies.pack.official.advertising.open")
@@ -206,7 +206,12 @@ final class PoliciesInteractionUITests: XCTestCase {
 
     private func waitForValue(_ expected: String, identifier: String, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", expected),
+            predicate: NSPredicate { object, _ in
+                guard let element = object as? XCUIElement, element.exists else { return false }
+                if let value = element.value as? String { return value == expected }
+                if let value = element.value as? NSNumber { return value.stringValue == expected }
+                return false
+            },
             object: element(identifier)
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
@@ -218,7 +223,10 @@ final class PoliciesInteractionUITests: XCTestCase {
         timeout: TimeInterval
     ) -> Bool {
         let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", expected, expected),
+            predicate: NSPredicate { object, _ in
+                guard let element = object as? XCUIElement, element.exists else { return false }
+                return self.accessibilityText(of: element).contains(expected)
+            },
             object: element(identifier)
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
