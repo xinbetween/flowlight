@@ -311,6 +311,11 @@ private struct RulePacksContent: View {
 }
 
 struct RulePackEditor: View {
+    private struct DeferredConfirmationAction {
+        let action: RulePackEditorDraft.SaveAction?
+        let expectedExclusivePeer: RulePackConfiguration?
+    }
+
     let pack: RulePackDefinition
     let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor
@@ -327,6 +332,7 @@ struct RulePackEditor: View {
     @State private var saveError: String?
     @State private var pendingConfirmation: RulePackEditorDraft.Confirmation?
     @State private var pendingExclusivePeer: RulePackConfiguration?
+    @State private var deferredConfirmationAction: DeferredConfirmationAction?
     @State private var saving = false
 
     init(pack: RulePackDefinition, receipt: RulePackReviewReceipt?, saved: RulePackConfiguration,
@@ -401,23 +407,20 @@ struct RulePackEditor: View {
             isPresented: Binding(
                 get: { pendingConfirmation != nil },
                 set: {
-                    if !$0 {
-                        pendingConfirmation = nil
-                        pendingExclusivePeer = nil
-                    }
+                    if !$0 { confirmationDidDismiss() }
                 }
             )
         ) {
             if let confirmation = pendingConfirmation {
                 let expectedPeer = pendingExclusivePeer
                 Button(confirmationButtonTitle(confirmation), role: .destructive) {
-                    advance(confirmation, expectedExclusivePeer: expectedPeer)
+                    deferAdvanceUntilDismissal(
+                        confirmation,
+                        expectedExclusivePeer: expectedPeer
+                    )
                 }
             }
-            Button(L("Cancel"), role: .cancel) {
-                pendingConfirmation = nil
-                pendingExclusivePeer = nil
-            }
+            Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(confirmationMessage)
         }
@@ -599,14 +602,34 @@ struct RulePackEditor: View {
         )
     }
 
-    private func advance(_ confirmation: RulePackEditorDraft.Confirmation,
-                         expectedExclusivePeer: RulePackConfiguration?) {
-        pendingConfirmation = nil
-        pendingExclusivePeer = nil
-        handle(
-            draft.confirm(confirmation, exclusivePeerConfiguration: expectedExclusivePeer),
+    private func deferAdvanceUntilDismissal(
+        _ confirmation: RulePackEditorDraft.Confirmation,
+        expectedExclusivePeer: RulePackConfiguration?
+    ) {
+        deferredConfirmationAction = DeferredConfirmationAction(
+            action: draft.confirm(
+                confirmation,
+                exclusivePeerConfiguration: expectedExclusivePeer
+            ),
             expectedExclusivePeer: expectedExclusivePeer
         )
+        // SwiftUI may dismiss before or after invoking the action. Whichever callback runs second drains once.
+        if pendingConfirmation == nil { confirmationDidDismiss() }
+    }
+
+    private func confirmationDidDismiss() {
+        let deferred = deferredConfirmationAction
+        pendingConfirmation = nil
+        pendingExclusivePeer = nil
+        deferredConfirmationAction = nil
+
+        guard let deferred else { return }
+        DispatchQueue.main.async {
+            handle(
+                deferred.action,
+                expectedExclusivePeer: deferred.expectedExclusivePeer
+            )
+        }
     }
 
     private func handle(_ action: RulePackEditorDraft.SaveAction?,
