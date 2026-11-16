@@ -29,7 +29,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         clickPaintedMargin(of: ruleButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 1))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 1))
 
         let ruleToggle = element("policies.rule.\(ruleID).enabled")
         XCTAssertTrue(ruleToggle.exists)
@@ -70,12 +70,12 @@ final class PoliciesInteractionUITests: XCTestCase {
         packToggle.click()
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.buttons["Cancel"].click()
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 1))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 1))
 
         packReview.click()
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.buttons["Cancel"].click()
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 1))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 1))
 
         clickPaintedMargin(of: packButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
@@ -107,7 +107,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(accessibilityText(of: balancedProvenance).contains("The EasyList authors"))
         XCTAssertTrue(accessibilityText(of: balancedProvenance).contains("GPL-3.0-or-later · GPL-3.0 · MPL-2.0"))
         element("rule-pack-editor.official.advertising.save").click()
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 3))
         XCTAssertEqual(balancedToggle.value as? String, "1")
         XCTAssertEqual(aggressiveToggle.value as? String, "0")
         XCTAssertTrue(accessibilityText(of: aggressiveRow).contains("replaces Advertising"))
@@ -124,7 +124,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(element("rule-pack-editor.official.advertising-aggressive.cancel").exists)
         element("rule-pack-editor.official.advertising-aggressive.cancel").click()
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 3))
         XCTAssertEqual(balancedToggle.value as? String, "1", "cancelling must preserve balanced enforcement")
         XCTAssertEqual(aggressiveToggle.value as? String, "0", "cancelling must not enable aggressive enforcement")
 
@@ -135,7 +135,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         app.buttons["Replace Advertising"].click()
         XCTAssertTrue(app.buttons["Enable aggressive blocking"].waitForExistence(timeout: 3))
         app.buttons["Enable aggressive blocking"].click()
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 5))
         XCTAssertEqual(balancedToggle.value as? String, "0")
         XCTAssertEqual(aggressiveToggle.value as? String, "1")
         XCTAssertTrue(accessibilityText(of: balancedRow).contains("replaces Advertising — Aggressive"))
@@ -171,7 +171,21 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(warningText.contains(expected),
                       "the accessible warning must name the installed filter: \(warningText)")
         app.buttons["Later"].click()
-        XCTAssertFalse(warning.waitForExistence(timeout: 2))
+        XCTAssertTrue(waitForDisappearance(warning, timeout: 2))
+    }
+
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        guard element.waitForNonExistence(timeout: timeout) else { return false }
+
+        let remaining = deadline.timeIntervalSinceNow
+        guard remaining > 0 else { return !element.exists }
+        let reappearance = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true"),
+            object: element
+        )
+        reappearance.isInverted = true
+        return XCTWaiter.wait(for: [reappearance], timeout: remaining) == .completed
     }
 
     private func accessibilityText(of element: XCUIElement) -> String {
