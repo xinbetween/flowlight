@@ -111,13 +111,11 @@ final class AnomalyEngine: @unchecked Sendable {
         loaded = true
     }
 
-    /// Collapses a hostname to an approximate registrable domain so CDN hostnames do not churn.
+    /// Collapses a hostname to its PSL registrable domain so CDN hostnames do not churn without merging tenants on
+    /// private suffixes. Inputs that cannot have a registrable domain retain their safest canonical representation.
     static func registrableDomain(_ host: String) -> String {
-        let labels = host.split(separator: ".")
-        guard labels.count > 2 else { return host }
-        let secondLevel = labels[labels.count - 2]
-        let keep = secondLevel.count <= 3 && labels.last!.count == 2 ? 3 : 2 // e.g. co.uk, com.au
-        return labels.suffix(keep).joined(separator: ".")
+        guard let canonical = HostCanonicalizer.canonicalHost(host) else { return host }
+        return PublicSuffixRules.registrableDomain(canonicalHost: canonical) ?? canonical.value
     }
 
     static func isLocal(_ ip: String) -> Bool {

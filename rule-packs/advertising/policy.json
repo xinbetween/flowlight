@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "catalogSequence": 3,
+  "generatedAt": 1794787199,
+  "minimumAppVersion": "0.18.5",
+  "balanced": {
+    "id": "official.advertising",
+    "version": "2",
+    "title": "Advertising",
+    "summary": "Known advertising delivery and auction hosts across apps.",
+    "caveat": "Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app."
+  },
+  "aggressive": {
+    "id": "official.advertising-aggressive",
+    "version": "1",
+    "title": "Advertising — Aggressive",
+    "summary": "Broader advertising hostname coverage for users who accept a higher risk of broken content.",
+    "caveat": "Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it."
+  },
+  "protectedHosts": [
+    "accounts.google.com",
+    "adsmanager.facebook.com",
+    "analytics.google.com",
+    "business.facebook.com",
+    "dashboard.twitch.tv",
+    "developers.facebook.com",
+    "facebook.com",
+    "google.com",
+    "instagram.com",
+    "login.twitch.tv",
+    "meta.com",
+    "open.spotify.com",
+    "spotify.com",
+    "studio.youtube.com",
+    "twitch.tv",
+    "web.whatsapp.com",
+    "whatsapp.com",
+    "youtube.com"
+  ],
+  "forbiddenHosts": [
+    "pubadx.com"
+  ],
+  "balancedForbiddenSuffixes": [
+    "pubadx.one"
+  ],
+  "manualEntries": {
+    "balanced": [
+      {
+        "host": "platform.pubadx.one",
+        "match": "exact",
+        "evidence": "Observed advertising-related loader endpoint under pubadx.one; no pubadx.com ownership claim."
+      },
+      {
+        "host": "imp9.pubadx.one",
+        "match": "exact",
+        "evidence": "Observed advertising-related impression endpoint under pubadx.one; no pubadx.com ownership claim."
+      }
+    ],
+    "aggressive": [
+      {
+        "host": "pubadx.one",
+        "match": "suffix",
+        "evidence": "EasyList and HaGeZi corroborate the pubadx.one registrable domain; no pubadx.com ownership claim."
+      }
+    ]
+  }
+}

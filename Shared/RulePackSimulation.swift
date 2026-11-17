@@ -10,7 +10,10 @@ enum RulePackSimulation {
         let before = matcher(definitions: definitions, configurations: configurations, overrides: overrides)
         var enabled = candidate
         enabled.enabled = true
-        let afterConfigurations = configurations.filter { $0.packID != candidate.packID } + [enabled]
+        let excludedPackIDs = Set(
+            [candidate.packID, AdvertisingPackTierPolicy.exclusivePeer(of: candidate.packID)].compactMap { $0 }
+        )
+        let afterConfigurations = configurations.filter { !excludedPackIDs.contains($0.packID) } + [enabled]
         let after = matcher(definitions: definitions, configurations: afterConfigurations, overrides: overrides)
 
         var result = RuleSimulation.Result()

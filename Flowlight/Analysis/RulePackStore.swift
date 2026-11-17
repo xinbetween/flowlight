@@ -13,13 +13,28 @@ extension RulePackOverride {
 /// Matcher publication and pause checks share one lock so a proxy decision cannot cross a pause transition with stale state;
 /// applying, fallback, and failure clear the matcher so the UI cannot say Blocking while the proxy uses stale policy.
 final class LiveRulePacks: @unchecked Sendable {
+    enum PreparationResult: Equatable, Sendable {
+        case prepared
+        case invalid
+        case superseded
+    }
+
     private let lock = NSLock()
+    private let preparationScheduler: @Sendable (@escaping @Sendable () -> Void) -> Void
     private var digest = ""
     private var matcher: RulePackMatcher?
+    private var publicationRevision: UInt64 = 0
+
+    init(preparationScheduler: @escaping @Sendable (@escaping @Sendable () -> Void) -> Void = { work in
+        DispatchQueue.global(qos: .userInitiated).async(execute: work)
+    }) {
+        self.preparationScheduler = preparationScheduler
+    }
 
     func replace(snapshot: RulePackSnapshot?) {
         let next = snapshot.flatMap { try? RulePackMatcher(snapshot: $0) }
         lock.lock(); defer { lock.unlock() }
+        publicationRevision &+= 1
         digest = next == nil ? "" : (snapshot?.digest ?? "")
         matcher = next
     }
@@ -27,6 +42,43 @@ final class LiveRulePacks: @unchecked Sendable {
     func commit(snapshot: RulePackSnapshot?, activeDigest: String) {
         guard let snapshot, snapshot.digest == activeDigest else { replace(snapshot: nil); return }
         replace(snapshot: snapshot)
+    }
+
+    /// Building a large reverse-label trie is CPU work, not UI work. Clear first so inspection fails open while the
+    /// exact extension-committed generation is prepared, and publish only if no newer clear or preparation token
+    /// superseded it. Supersession is distinct from invalid input so a stale completion cannot report a newer success
+    /// as a failure.
+    func prepareCommit(snapshot: RulePackSnapshot?, activeDigest: String,
+                       completion: @escaping @Sendable (PreparationResult) -> Void) {
+        guard let snapshot, snapshot.digest == activeDigest else {
+            replace(snapshot: nil)
+            completion(.invalid)
+            return
+        }
+        lock.lock()
+        publicationRevision &+= 1
+        let token = publicationRevision
+        digest = ""
+        matcher = nil
+        lock.unlock()
+
+        preparationScheduler { [weak self] in
+            let next = try? RulePackMatcher(snapshot: snapshot)
+            guard let self else {
+                completion(.superseded)
+                return
+            }
+            self.lock.lock()
+            guard self.publicationRevision == token else {
+                self.lock.unlock()
+                completion(.superseded)
+                return
+            }
+            self.digest = next == nil ? "" : snapshot.digest
+            self.matcher = next
+            self.lock.unlock()
+            completion(next == nil ? .invalid : .prepared)
+        }
     }
 
     func match(host: String, bundleID: String) -> RulePackMatch? {
@@ -51,6 +103,7 @@ final class RulePackStore: ObservableObject {
     enum SaveResult: Equatable, Sendable {
         case saved
         case staleReview
+        case exclusivePeerChanged(RulePackConfiguration?)
         case failed(String)
 
         var succeeded: Bool { self == .saved }
@@ -87,7 +140,9 @@ final class RulePackStore: ObservableObject {
 
     init(definitions: [RulePackDefinition] = BuiltInRulePacks.all,
          currentAppVersion: String = ExtensionManager.appVersion) {
-        self.definitions = definitions.sorted { $0.id < $1.id }
+        self.definitions = definitions.sorted {
+            AdvertisingPackTierPolicy.sortsBefore($0.id, $1.id)
+        }
         self.currentAppVersion = currentAppVersion
         do { try RulePackValidator.validate(self.definitions, currentAppVersion: currentAppVersion) }
         catch {
@@ -116,6 +171,11 @@ final class RulePackStore: ObservableObject {
 
     func configuration(for packID: String) -> RulePackConfiguration {
         configurations.first { $0.packID == packID } ?? RulePackConfiguration(packID: packID)
+    }
+
+    func enabledExclusivePeer(for packID: String) -> RulePackConfiguration? {
+        guard let peerID = AdvertisingPackTierPolicy.exclusivePeer(of: packID) else { return nil }
+        return configurations.first { $0.packID == peerID && $0.enabled }
     }
 
     func overrides(for packID: String) -> [RulePackOverride] {
@@ -191,17 +251,46 @@ final class RulePackStore: ObservableObject {
         publish()
     }
 
-    /// Installs definitions only after `acceptVerifiedRulePackCatalog` committed them. The optional revision is a
-    /// compare-and-swap guard: a local save that publishes while catalog I/O is suspended makes captured state stale.
+    /// Installs a manually constructed or otherwise untrusted catalog only after validating every definition. The
+    /// optional revision is a compare-and-swap guard: a local save that publishes while catalog I/O is suspended makes
+    /// captured state stale.
     @discardableResult
     func installCommittedCatalog(_ catalog: VerifiedRulePackCatalog,
                                  acceptance: RulePackCatalogAcceptance,
                                  expectedRevision: Int? = nil) -> CatalogInstallResult {
+        installCommittedCatalog(
+            catalog,
+            acceptance: acceptance,
+            expectedRevision: expectedRevision,
+            validateDefinitions: true
+        )
+    }
+
+    /// Updater catalogs already crossed validation off the main actor during signature verification and composition.
+    /// Keeping that proof in a distinct type avoids hashing all 84,892 entries again while installing UI state.
+    @discardableResult
+    func installCommittedCatalog(_ catalog: ValidatedRulePackCatalog,
+                                 acceptance: RulePackCatalogAcceptance,
+                                 expectedRevision: Int? = nil) -> CatalogInstallResult {
+        installCommittedCatalog(
+            catalog.catalog,
+            acceptance: acceptance,
+            expectedRevision: expectedRevision,
+            validateDefinitions: false
+        )
+    }
+
+    private func installCommittedCatalog(_ catalog: VerifiedRulePackCatalog,
+                                         acceptance: RulePackCatalogAcceptance,
+                                         expectedRevision: Int?,
+                                         validateDefinitions: Bool) -> CatalogInstallResult {
         guard expectedRevision == nil || expectedRevision == revision else { return .staleRevision }
-        do { try RulePackValidator.validate(catalog.definitions, currentAppVersion: currentAppVersion) }
-        catch {
-            status = .failed("Verified pack validation failed: \(error)")
-            return .rejected
+        if validateDefinitions {
+            do { try RulePackValidator.validate(catalog.definitions, currentAppVersion: currentAppVersion) }
+            catch {
+                status = .failed("Verified pack validation failed: \(error)")
+                return .rejected
+            }
         }
         guard acceptance.state.receipt?.sequence == catalog.sequence,
               acceptance.state.receipt?.digest == catalog.digest else {
@@ -209,7 +298,9 @@ final class RulePackStore: ObservableObject {
             return .rejected
         }
         revision += 1
-        definitions = catalog.definitions.sorted { $0.id < $1.id }
+        definitions = catalog.definitions.sorted {
+            AdvertisingPackTierPolicy.sortsBefore($0.id, $1.id)
+        }
         definitionsValid = true
         catalogReady = true
         isRecoveringCatalog = false
@@ -254,6 +345,20 @@ final class RulePackStore: ObservableObject {
               reviewedDefinition: RulePackDefinition?,
               receipt: RulePackReviewReceipt?,
               completion: ((SaveResult) -> Void)? = nil) {
+        save(
+            configuration,
+            reviewedDefinition: reviewedDefinition,
+            receipt: receipt,
+            expectedExclusivePeer: enabledExclusivePeer(for: configuration.packID),
+            completion: completion
+        )
+    }
+
+    func save(_ configuration: RulePackConfiguration,
+              reviewedDefinition: RulePackDefinition?,
+              receipt: RulePackReviewReceipt?,
+              expectedExclusivePeer: RulePackConfiguration?,
+              completion: ((SaveResult) -> Void)? = nil) {
         guard let current = definitions.first(where: { $0.id == configuration.packID }) else {
             completion?(.failed("Rule pack is no longer available."))
             return
@@ -282,28 +387,45 @@ final class RulePackStore: ObservableObject {
 
         let committed = cleaned
         let committedReceipt = durableReceipt
-        persist({ try $0.saveRulePackConfiguration(committed, reviewed: committedReceipt) }, then: { [weak self] in
-            guard let self else {
-                completion?(.failed("Rule pack storage is unavailable."))
-                return
-            }
-            self.revision += 1
-            if let index = self.configurations.firstIndex(where: { $0.packID == committed.packID }) {
-                self.configurations[index] = committed
-            } else {
-                self.configurations.append(committed)
+        persistConfigurationWrite(
+            {
+                try $0.saveRulePackConfiguration(
+                    committed,
+                    reviewed: committedReceipt,
+                    expectedExclusivePeer: expectedExclusivePeer
+                )
+            },
+            then: { [weak self] write in
+                guard let self else {
+                    completion?(.failed("Rule pack storage is unavailable."))
+                    return
+                }
+                self.revision += 1
+                for changed in write.configurations {
+                    if let index = self.configurations.firstIndex(where: { $0.packID == changed.packID }) {
+                        self.configurations[index] = changed
+                    } else {
+                        self.configurations.append(changed)
+                    }
+                }
                 self.configurations.sort { $0.packID < $1.packID }
+                let knownPackIDs = Set(self.definitions.map(\.id))
+                self.overrides = write.overrides.filter { knownPackIDs.contains($0.packID) }
+                if committedReceipt != nil { self.pendingReviewPackIDs.remove(committed.packID) }
+                self.publish()
+                completion?(.saved)
+            },
+            onFailure: { error in
+                if error as? RulePackCatalogPersistenceError == .staleReview {
+                    completion?(.staleReview)
+                } else if let saveError = error as? RulePackConfigurationSaveError,
+                          case .exclusivePeerChanged(let peer) = saveError {
+                    completion?(.exclusivePeerChanged(peer))
+                } else {
+                    completion?(.failed(String(describing: error)))
+                }
             }
-            if committedReceipt != nil { self.pendingReviewPackIDs.remove(committed.packID) }
-            self.publish()
-            completion?(.saved)
-        }, onFailure: { error in
-            if error as? RulePackCatalogPersistenceError == .staleReview {
-                completion?(.staleReview)
-            } else {
-                completion?(.failed(String(describing: error)))
-            }
-        })
+        )
     }
 
     func setEnabled(_ packID: String, _ enabled: Bool) {
@@ -443,6 +565,36 @@ final class RulePackStore: ObservableObject {
         return values.sorted { $0.packID < $1.packID }
     }
 
+    private func persistConfigurationWrite(
+        _ write: @escaping @Sendable (TrafficDatabase) throws -> RulePackConfigurationWrite,
+        then commit: @escaping @MainActor (RulePackConfigurationWrite) -> Void,
+        onFailure: (@MainActor (Error) -> Void)? = nil
+    ) {
+        guard let db else {
+            let error = RulePackCatalogPersistenceError.invalidReceipt
+            status = .failed("Rule pack storage is unavailable.")
+            onFailure?(error)
+            return
+        }
+        Task { [weak self, weak db] in
+            guard let db else {
+                let error = RulePackCatalogPersistenceError.invalidReceipt
+                self?.status = .failed("Rule pack storage is unavailable.")
+                onFailure?(error)
+                return
+            }
+            do {
+                let committedWrite = try await db.asyncResult { db in try write(db) }
+                commit(committedWrite)
+            } catch {
+                if !(error is RulePackConfigurationSaveError) {
+                    self?.status = .failed("Could not save the rule pack change: \(String(describing: error))")
+                }
+                onFailure?(error)
+            }
+        }
+    }
+
     private func persist(_ write: @escaping @Sendable (TrafficDatabase) throws -> Void,
                          then commit: @escaping @MainActor () -> Void,
                          onFailure: (@MainActor (Error) -> Void)? = nil) {
@@ -478,6 +630,10 @@ final class RulePackStore: ObservableObject {
         let active = configurations.filter { configuration in
             configuration.enabled
                 && definitionsByID[configuration.packID].map(configuration.isConsented(to:)) == true
+        }
+        guard !AdvertisingPackTierPolicy.hasDualEnabled(active) else {
+            committedSnapshot = nil
+            return
         }
         guard !active.isEmpty else {
             committedSnapshot = nil

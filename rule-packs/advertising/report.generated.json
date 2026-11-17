@@ -1,0 +1,30 @@
+{
+  "aggressiveEntries": 42433,
+  "balancedEntries": 42384,
+  "catalogPacksSHA256": "93971b59f87a213affa5c927ec9647ddb9c3d818f58bce5e587aa3f73484e6db",
+  "catalogSequence": 3,
+  "easyListUniqueCandidates": 44520,
+  "easyListUniqueExceptions": 250,
+  "format": 1,
+  "generatedAt": 1794787199,
+  "hageziProDomains": 238185,
+  "hageziProPlusDomains": 260625,
+  "parser": {
+    "candidates": 44528,
+    "exceptions": 257,
+    "invalidHost": 104,
+    "metadata": 276,
+    "scopedExceptions": 257,
+    "unsupportedNetwork": 7480,
+    "unsupportedOther": 26159
+  },
+  "provenanceSHA256": "2c80182d6ca7699d44e9305328b7eff10248031140ca3d9c1c0a95dadc1579e4",
+  "rejected": {
+    "exceptionOverlap": 39,
+    "notCorroborated-aggressive": 2044,
+    "notCorroborated-balanced": 2094
+  },
+  "sourceBytes": 13925759,
+  "sourceCount": 75,
+  "stableIDHighWatermark": 42472
+}

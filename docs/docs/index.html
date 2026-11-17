@@ -76,7 +76,7 @@
   <section class="page-head"><div class="wrap">
     <p class="eyebrow">Documentation</p>
     <h1>Using Flowlight</h1>
-    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.18.4, macOS 15 or later.</p>
+    <p class="lede">Everything from the first launch to tuning the agent rules. Flowlight 0.18.5, macOS 15 or later.</p>
   </div></section>
   <div class="wrap prose-wrap">
     <nav class="toc" aria-label="On this page">
@@ -477,15 +477,18 @@ open build/Build/Products/Release/Flowlight.app</pre>
         history has been tested against two hours of history.</p>
 
       <h3 id="managed-packs">Managed ad and tracker packs</h3>
-      <p><strong>Policies › Managed packs</strong> contains three official lists built into Flowlight: <strong>Advertising</strong> covers known
-        advertising delivery and auction hosts; <strong>Cross-site tracking</strong> covers common analytics, session replay and
-        cross-site measurement hosts; and <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and
-        audited Apple advertising and analytics hosts. The packs are visible from the start and <strong>all are off by default</strong>.</p>
-      <p><strong>Official-only, signed updates.</strong> Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs.
-        Automatic checks are on by default and can be switched off here. A signature authenticates content but does not enable it:
-        a new pack stays off, and changed destinations remove an enabled pack from enforcement until you review the exact new version
-        and press Save. If content changes while its editor is open, the stale Save is refused. An accepted catalog may remain available
-        as visibly stale last-known-good during an outage; rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.</p>
+      <p><strong>Policies › Managed packs</strong> contains four official lists built into Flowlight: the recommended
+        <strong>Advertising</strong> tier and opt-in <strong>Advertising — Aggressive</strong> tier are mutually exclusive;
+        <strong>Cross-site tracking</strong> covers common analytics, session replay and cross-site measurement hosts; and
+        <strong>Privacy and telemetry</strong> covers crash reporting, install attribution, and audited Apple advertising and analytics
+        hosts. The packs are visible from the start and <strong>all are off by default</strong>.</p>
+      <p><strong>Official-only, signed updates.</strong> Flowlight checks one fixed HTTPS source for newer publisher-signed catalogs; it
+        never downloads raw GitHub, EasyList, HaGeZi, or Public Suffix List data. Every release bundles the exact signed catalog, and an
+        accepted update is retained byte-for-byte as the verified last-known-good cache. A feed or GitHub Pages outage therefore delays
+        updates without removing active enforcement or leaving a fresh install empty. Automatic checks are on by default and can be
+        switched off here. A signature authenticates content but does not enable it: a new pack stays off, and changed destinations remove
+        an enabled pack from enforcement until you review the exact new version and press Save. If content changes while its editor is open,
+        the stale Save is refused. Rollback, equivocation, revoked trust, or corrupt cached bytes fail closed.</p>
       <p><strong>Each pack has its own scope.</strong> Apply it globally to every app, or only to selected applications. Blocking needs
         the Network Extension: the nettop sampler can record traffic, but it cannot sit in a connection's path and refuse it. When HTTPS
         inspection routes an app through Flowlight's proxy, enabled packs and ordinary destination rules are decided against that original
@@ -824,7 +827,7 @@ open build/Build/Products/Release/Flowlight.app</pre>
     <div class="legal">
       <span>© 2026 The Flowlight contributors. Flowlight is free software, released under the
         <a href="https://github.com/xinbetween/flowlight/blob/main/LICENSE">GNU General Public License v3.0</a>.</span>
-      <span>Version 0.18.4 · Not affiliated with Apple or any AI provider named on this site.</span>
+      <span>Version 0.18.5 · Not affiliated with Apple or any AI provider named on this site.</span>
     </div>
   </div>
 </footer>

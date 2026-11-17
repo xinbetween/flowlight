@@ -338,6 +338,15 @@ struct BlockedAttemptRow: Sendable, Hashable {
     var detail: String
 }
 
+struct RulePackConfigurationWrite: Equatable, Sendable {
+    var configurations: [RulePackConfiguration]
+    var overrides: [RulePackOverride]
+}
+
+enum RulePackConfigurationSaveError: Error, Equatable, Sendable {
+    case exclusivePeerChanged(RulePackConfiguration?)
+}
+
 struct RulePackEventRecord: Identifiable, Sendable, Hashable {
     var id: Int64
     var bucket: Date
@@ -1948,8 +1957,23 @@ final class TrafficDatabase: @unchecked Sendable {
         return try rows.map { try JSONDecoder().decode(RulePackConfiguration.self, from: Data($0.utf8)) }
     }
 
-    func saveRulePackConfiguration(_ configuration: RulePackConfiguration) throws {
-        try writeRulePackConfiguration(configuration, updatedAt: Date())
+    @discardableResult
+    func saveRulePackConfiguration(_ configuration: RulePackConfiguration) throws -> RulePackConfigurationWrite {
+        var changed: [RulePackConfiguration] = []
+        var committedOverrides: [RulePackOverride] = []
+        try conn.transaction {
+            changed = try writeRulePackConfigurationReplacingExclusivePeer(
+                configuration,
+                updatedAt: Date(),
+                expectedExclusivePeer: nil,
+                compareExclusivePeer: false
+            )
+            committedOverrides = try loadRulePackOverrides()
+        }
+        return RulePackConfigurationWrite(
+            configurations: changed.sorted { $0.packID < $1.packID },
+            overrides: committedOverrides
+        )
     }
 
     func setRulePackReviewRequired(_ required: Bool, packID: String) throws {
@@ -1970,8 +1994,12 @@ final class TrafficDatabase: @unchecked Sendable {
 
     /// Compare-and-save for an editor that may have remained open across a catalog refresh. A receipt is optional only
     /// for narrowing enforcement. Enabling or acknowledging reviewed content rechecks the durable catalog watermark.
+    @discardableResult
     func saveRulePackConfiguration(_ configuration: RulePackConfiguration,
-                                   reviewed receipt: RulePackReviewReceipt?) throws {
+                                   reviewed receipt: RulePackReviewReceipt?,
+                                   expectedExclusivePeer: RulePackConfiguration? = nil) throws -> RulePackConfigurationWrite {
+        var changed: [RulePackConfiguration] = []
+        var committedOverrides: [RulePackOverride] = []
         try conn.transaction {
             if let receipt {
                 guard receipt.packID == configuration.packID,
@@ -1985,9 +2013,103 @@ final class TrafficDatabase: @unchecked Sendable {
             } else if configuration.enabled {
                 throw RulePackCatalogPersistenceError.staleReview
             }
-            try writeRulePackConfiguration(configuration, updatedAt: Date())
+            changed = try writeRulePackConfigurationReplacingExclusivePeer(
+                configuration,
+                updatedAt: Date(),
+                expectedExclusivePeer: expectedExclusivePeer,
+                compareExclusivePeer: true
+            )
             if receipt != nil { try setRulePackReviewRequired(false, packID: configuration.packID) }
+            committedOverrides = try loadRulePackOverrides()
         }
+        return RulePackConfigurationWrite(
+            configurations: changed.sorted { $0.packID < $1.packID },
+            overrides: committedOverrides
+        )
+    }
+
+    private func writeRulePackConfigurationReplacingExclusivePeer(
+        _ configuration: RulePackConfiguration,
+        updatedAt: Date,
+        expectedExclusivePeer: RulePackConfiguration?,
+        compareExclusivePeer: Bool
+    ) throws -> [RulePackConfiguration] {
+        let savedTarget = try loadRulePackConfigurationStrictly(packID: configuration.packID)
+        let isFirstSwitch = savedTarget?.hasEstablishedConsent != true
+        let activePeer: RulePackConfiguration?
+        if configuration.enabled,
+           let peerID = AdvertisingPackTierPolicy.exclusivePeer(of: configuration.packID),
+           let peer = try loadRulePackConfigurationStrictly(packID: peerID),
+           peer.enabled {
+            activePeer = peer
+        } else {
+            activePeer = nil
+        }
+        if compareExclusivePeer, configuration.enabled, activePeer != expectedExclusivePeer {
+            throw RulePackConfigurationSaveError.exclusivePeerChanged(activePeer)
+        }
+
+        try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
+        var changed = [configuration]
+        guard var peer = activePeer else { return changed }
+        if isFirstSwitch {
+            try copyMissingRulePackOverrides(
+                from: peer.packID,
+                to: configuration.packID,
+                updatedAt: updatedAt
+            )
+        }
+        peer.enabled = false
+        try writeRulePackConfiguration(peer, updatedAt: updatedAt)
+        changed.append(peer)
+        return changed
+    }
+
+    private func copyMissingRulePackOverrides(
+        from sourcePackID: String,
+        to targetPackID: String,
+        updatedAt: Date
+    ) throws {
+        // This is the one configuration-save path where omission broadens blocking: a malformed exception must roll
+        // the first tier switch back instead of disappearing while the peer is disabled.
+        let existing = try loadRulePackOverridesStrictly()
+        var copiedScopes = Set(existing.lazy.filter { $0.packID == targetPackID }.map {
+            [$0.app.lowercased(), $0.host.lowercased(), $0.match.rawValue].joined(separator: "\u{0}")
+        })
+        let sourceOverrides = existing
+            .filter { $0.packID == sourcePackID }
+            .sorted {
+                if $0.created != $1.created { return $0.created < $1.created }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+        for source in sourceOverrides {
+            let scope = [source.app.lowercased(), source.host.lowercased(), source.match.rawValue]
+                .joined(separator: "\u{0}")
+            guard copiedScopes.insert(scope).inserted else { continue }
+            let copy = RulePackOverride(
+                packID: targetPackID,
+                app: source.app,
+                host: source.host,
+                match: source.match,
+                created: source.created
+            )
+            let json = String(decoding: try JSONEncoder().encode(copy), as: UTF8.self)
+            try conn.run(
+                "INSERT INTO rule_pack_overrides (id, override, updated) VALUES (?,?,?)",
+                [.text(copy.id.uuidString), .text(json), .int(Int64(updatedAt.timeIntervalSince1970))]
+            )
+        }
+    }
+
+    private func loadRulePackConfigurationStrictly(packID: String) throws -> RulePackConfiguration? {
+        guard let json = try conn.query(
+            "SELECT configuration FROM rule_packs WHERE pack_id = ?",
+            [.text(packID)],
+            map: { $0.text(0) }
+        ).first else { return nil }
+        let configuration = try JSONDecoder().decode(RulePackConfiguration.self, from: Data(json.utf8))
+        guard configuration.packID == packID else { throw RulePackCatalogPersistenceError.invalidReceipt }
+        return configuration
     }
 
     private func writeRulePackConfiguration(_ configuration: RulePackConfiguration, updatedAt: Date) throws {
@@ -2076,19 +2198,26 @@ final class TrafficDatabase: @unchecked Sendable {
         let saved = try conn.query(
             "SELECT configuration FROM rule_packs ORDER BY pack_id"
         ) { $0.text(0) }
-        var reconciled: [RulePackConfiguration] = []
-        for json in saved {
-            var configuration = try JSONDecoder().decode(
-                RulePackConfiguration.self,
-                from: Data(json.utf8)
-            )
+        var reconciled = try saved.map {
+            try JSONDecoder().decode(RulePackConfiguration.self, from: Data($0.utf8))
+        }
+
+        if AdvertisingPackTierPolicy.hasDualEnabled(reconciled) {
+            for index in reconciled.indices where AdvertisingPackTierPolicy.contains(reconciled[index].packID) {
+                reconciled[index].enabled = false
+                try writeRulePackConfiguration(reconciled[index], updatedAt: updatedAt)
+                try setRulePackReviewRequired(true, packID: reconciled[index].packID)
+            }
+        }
+
+        for index in reconciled.indices {
+            let configuration = reconciled[index]
             let consentIsCurrent = definitionsByID[configuration.packID].map(configuration.isConsented(to:)) == true
             if configuration.enabled && !consentIsCurrent {
-                configuration.enabled = false
-                try writeRulePackConfiguration(configuration, updatedAt: updatedAt)
+                reconciled[index].enabled = false
+                try writeRulePackConfiguration(reconciled[index], updatedAt: updatedAt)
                 try setRulePackReviewRequired(true, packID: configuration.packID)
             }
-            reconciled.append(configuration)
         }
         return reconciled
     }
@@ -2260,6 +2389,11 @@ final class TrafficDatabase: @unchecked Sendable {
         try conn.query("SELECT override FROM rule_pack_overrides ORDER BY updated") { $0.text(0) }.compactMap {
             try? JSONDecoder().decode(RulePackOverride.self, from: Data($0.utf8))
         }
+    }
+
+    private func loadRulePackOverridesStrictly() throws -> [RulePackOverride] {
+        let rows = try conn.query("SELECT override FROM rule_pack_overrides ORDER BY updated") { $0.text(0) }
+        return try rows.map { try JSONDecoder().decode(RulePackOverride.self, from: Data($0.utf8)) }
     }
 
     func saveRulePackOverride(_ override: RulePackOverride) throws {

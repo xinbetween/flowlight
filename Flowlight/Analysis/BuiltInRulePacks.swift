@@ -3,18 +3,57 @@ import Foundation
 /// Official lists shipped inside the signed app. They are deliberately small and reviewed in 0.15.0; later remote
 /// subscriptions use the same manifest/snapshot boundary but do not change what these built-ins mean.
 enum BuiltInRulePacks {
-    static let all: [RulePackDefinition] = [advertising, tracking, telemetry]
+    static let all: [RulePackDefinition] = [advertising, advertisingAggressive, tracking, telemetry]
 
     static let advertising = definition(
-        id: "official.advertising",
+        id: AdvertisingPackTierPolicy.balancedID,
+        version: "2",
+        generatedAt: 1_794_787_199,
         title: "Advertising",
         summary: "Known advertising delivery and auction hosts across apps.",
-        caveat: "Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app.",
-        category: .advertising,
-        hosts: [
-            "adnxs.com", "adsrvr.org", "adservice.google.com", "casalemedia.com", "criteo.com", "criteo.net",
-            "doubleclick.net", "googleadservices.com", "googlesyndication.com", "openx.net", "pubmatic.com",
-            "rubiconproject.com",
+        caveat: "Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app.",
+        source: "https://flowlight.xinbetween.com/packs/v1/provenance/2c80182d6ca7699d44e9305328b7eff10248031140ca3d9c1c0a95dadc1579e4.json",
+        license: "GPL-3.0-or-later",
+        entries: [
+            entry(1, "adnxs.com", match: .suffix, category: .advertising),
+            entry(2, "adservice.google.com", match: .suffix, category: .advertising),
+            entry(3, "adsrvr.org", match: .suffix, category: .advertising),
+            entry(4, "casalemedia.com", match: .suffix, category: .advertising),
+            entry(5, "criteo.com", match: .suffix, category: .advertising),
+            entry(6, "criteo.net", match: .suffix, category: .advertising),
+            entry(7, "doubleclick.net", match: .suffix, category: .advertising),
+            entry(8, "googleadservices.com", match: .suffix, category: .advertising),
+            entry(9, "googlesyndication.com", match: .suffix, category: .advertising),
+            entry(13, "imp9.pubadx.one", category: .advertising),
+            entry(10, "openx.net", match: .suffix, category: .advertising),
+            entry(14, "platform.pubadx.one", category: .advertising),
+            entry(11, "pubmatic.com", match: .suffix, category: .advertising),
+            entry(12, "rubiconproject.com", match: .suffix, category: .advertising),
+        ])
+
+    static let advertisingAggressive = definition(
+        id: AdvertisingPackTierPolicy.aggressiveID,
+        version: "1",
+        generatedAt: 1_794_787_199,
+        title: "Advertising — Aggressive",
+        summary: "Broader advertising hostname coverage for users who accept a higher risk of broken content.",
+        caveat: "Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it.",
+        source: "https://flowlight.xinbetween.com/packs/v1/provenance/2c80182d6ca7699d44e9305328b7eff10248031140ca3d9c1c0a95dadc1579e4.json",
+        license: "GPL-3.0-or-later",
+        entries: [
+            entry(1, "adnxs.com", match: .suffix, category: .advertising),
+            entry(2, "adservice.google.com", match: .suffix, category: .advertising),
+            entry(3, "adsrvr.org", match: .suffix, category: .advertising),
+            entry(4, "casalemedia.com", match: .suffix, category: .advertising),
+            entry(5, "criteo.com", match: .suffix, category: .advertising),
+            entry(6, "criteo.net", match: .suffix, category: .advertising),
+            entry(7, "doubleclick.net", match: .suffix, category: .advertising),
+            entry(8, "googleadservices.com", match: .suffix, category: .advertising),
+            entry(9, "googlesyndication.com", match: .suffix, category: .advertising),
+            entry(10, "openx.net", match: .suffix, category: .advertising),
+            entry(15, "pubadx.one", match: .suffix, category: .advertising),
+            entry(11, "pubmatic.com", match: .suffix, category: .advertising),
+            entry(12, "rubiconproject.com", match: .suffix, category: .advertising),
         ])
 
     static let tracking = definition(
@@ -90,17 +129,20 @@ enum BuiltInRulePacks {
 
     private static func definition(id: String, version: String, generatedAt: TimeInterval,
                                    title: String, summary: String, caveat: String,
+                                   source: String = "Flowlight curated built-in list",
+                                   license: String = "GPL-3.0",
                                    entries: [RulePackEntry]) -> RulePackDefinition {
         let manifest = RulePackManifest(
             id: id, version: version, generatedAt: Date(timeIntervalSince1970: generatedAt),
             entryCount: entries.count, contentSHA256: RulePackValidator.digest(entries),
             titleKey: title, summaryKey: summary, caveatKey: caveat,
-            source: "Flowlight curated built-in list", license: "GPL-3.0")
+            source: source, license: license)
         return RulePackDefinition(manifest: manifest, entries: entries)
     }
 
     private static func entry(_ id: UInt32, _ host: String,
-                              match: RulePackEntry.Match = .exact) -> RulePackEntry {
-        RulePackEntry(id: id, host: host, match: match, category: .tracking)
+                              match: RulePackEntry.Match = .exact,
+                              category: RulePackEntry.Category = .tracking) -> RulePackEntry {
+        RulePackEntry(id: id, host: host, match: match, category: category)
     }
 }

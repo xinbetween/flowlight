@@ -25,6 +25,10 @@ final class RulePackEventDeliveryTests: XCTestCase {
         XCTAssertEqual(captured[0].deliverySession, captured[1].deliverySession)
         XCTAssertEqual(captured[0].sequence, captured[1].sequence)
         XCTAssertEqual(captured[0].events, captured[1].events)
+        XCTAssertEqual(captured[0].events.map(\.packID), [AdvertisingPackTierPolicy.balancedID])
+        XCTAssertEqual(captured[0].events.map(\.packVersion), [BuiltInRulePacks.advertising.manifest.version])
+        XCTAssertEqual(captured[0].events.map(\.entryID), [7])
+        XCTAssertEqual(captured[0].events.map(\.matchedHost), ["doubleclick.net"])
     }
 
     func testClaimCanCrossAQueueBoundaryAndCommit() {
@@ -141,8 +145,8 @@ final class RulePackEventDeliveryTests: XCTestCase {
     private func event() -> RulePackEvent {
         RulePackEvent(
             bucket: 1_700_000_000,
-            packID: "official.ads",
-            packVersion: "1",
+            packID: AdvertisingPackTierPolicy.balancedID,
+            packVersion: BuiltInRulePacks.advertising.manifest.version,
             entryID: 7,
             category: .advertising,
             action: .block,
@@ -153,8 +157,8 @@ final class RulePackEventDeliveryTests: XCTestCase {
             appName: "Google Chrome",
             agentKey: "com.google.Chrome",
             agentName: "Google Chrome",
-            host: "ads.example",
-            matchedHost: "ads.example",
+            host: "ad.doubleclick.net",
+            matchedHost: "doubleclick.net",
             port: 443
         )
     }

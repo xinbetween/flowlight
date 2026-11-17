@@ -2090,3 +2090,26 @@
 "In force" = "In vigore";
 "Not in force" = "Non in vigore";
 "Nothing is being refused until %@." = "Non verrà bloccato nulla fino a %@.";
+
+/* Livelli pubblicitari */
+"Enabling this pack replaces %@. The two Advertising tiers never stack." = "L’attivazione di questo pacchetto sostituisce %@. I due livelli Pubblicità non si sommano mai.";
+"Hostname-layer blocking refuses every connection to a matched host; it cannot remove same-origin YouTube or Meta ads, page gaps, or browser overlays." = "Il blocco a livello di nome host rifiuta ogni connessione a un host corrispondente; non può rimuovere annunci YouTube o Meta della stessa origine, spazi vuoti nelle pagine o sovrapposizioni del browser.";
+"Reviewed product, login, dashboard, and media surfaces stay reachable unless a dedicated advertising hostname is independently evidenced." = "Le superfici esaminate di prodotti, accesso, dashboard e contenuti multimediali restano raggiungibili, salvo prove indipendenti di un nome host pubblicitario dedicato.";
+"Signed pack provenance" = "Provenienza firmata del pacchetto";
+"Source: %@" = "Fonte: %@";
+"Content digest: %@" = "Digest del contenuto: %@";
+"Official · pack v%@ · %@" = "Ufficiale · pacchetto v%@ · %@";
+"Catalog sequence %lld · digest %@" = "Sequenza catalogo %lld · digest %@";
+"Replace %@?" = "Sostituire %@?";
+"Enable aggressive blocking?" = "Attivare il blocco aggressivo?";
+"Aggressive coverage can break video, sign-in, checkout, or other content. Flowlight protects reviewed product surfaces, but hostname blocking cannot distinguish paths on a shared host." = "La copertura aggressiva può compromettere video, accesso, pagamento o altri contenuti. Flowlight protegge le superfici di prodotto esaminate, ma il blocco per nome host non può distinguere i percorsi su un host condiviso.";
+"Replace %@" = "Sostituisci %@";
+"Enable aggressive blocking" = "Attiva blocco aggressivo";
+"Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app." = "Equilibrio consigliato. Il blocco per nome host non può rimuovere spazi vuoti nel layout, annunci della stessa origine o sovrapposizioni create da un browser o un’app.";
+"Advertising — Aggressive" = "Pubblicità — Aggressiva";
+"Broader advertising hostname coverage for users who accept a higher risk of broken content." = "Copertura più ampia dei nomi host pubblicitari per chi accetta un rischio maggiore di contenuti non funzionanti.";
+"Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it." = "Facoltativo e con maggiore rischio di malfunzionamenti. Questo livello sostituisce Pubblicità; non si somma ad esso.";
+"Recommended · Balanced" = "Consigliato · Bilanciato";
+"Opt-in · Higher breakage" = "Facoltativo · Più rischio di guasti";
+"Attribution: %@" = "Attribuzione: %@";
+"Source licenses: %@" = "Licenze delle fonti: %@";

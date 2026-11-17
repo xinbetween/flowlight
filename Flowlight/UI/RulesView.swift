@@ -1151,6 +1151,10 @@ struct RulesView: View {
         let item = inventoryItems.first { $0.kind == .managedPack && $0.sourceID == pack.id }
         let blocks = monitor.rulePacks.events(for: pack.id).reduce(0) { $0 + $1.count }
         let exceptions = monitor.rulePacks.overrides(for: pack.id).count
+        let activePeerName: String? = AdvertisingPackTierPolicy.exclusivePeer(of: pack.id).flatMap { peerID in
+            guard monitor.rulePacks.configuration(for: peerID).enabled else { return nil }
+            return monitor.rulePacks.definitions.first { $0.id == peerID }.map { L($0.manifest.titleKey) } ?? peerID
+        }
         return ZStack(alignment: .topTrailing) {
             Button { sheet = .pack(pack, .review) } label: {
                 HStack(alignment: .top, spacing: 10) {
@@ -1160,7 +1164,14 @@ struct RulesView: View {
                         .frame(width: 26, height: 26)
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L(pack.manifest.titleKey)).font(.callout.weight(.medium))
+                        HStack(spacing: 6) {
+                            Text(L(pack.manifest.titleKey)).font(.callout.weight(.medium))
+                            if let badge = AdvertisingPackTierPolicy.localizedBadge(for: pack.id) {
+                                Text(badge).font(.caption2.weight(.semibold))
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(FL.accent.opacity(0.12), in: Capsule())
+                            }
+                        }
                         Text(L("%lld destinations · %@", pack.entries.count,
                                configuration.scope == .allApps
                                    ? L("every app") : L("%lld selected apps", configuration.apps.count)))
@@ -1172,6 +1183,11 @@ struct RulesView: View {
                         .font(.caption2.monospacedDigit())
                         if let reason = item?.reason {
                             Text(reason).font(.caption2).foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let activePeerName {
+                            Text(L("Enabling this pack replaces %@. The two Advertising tiers never stack.", activePeerName))
+                                .font(.caption2).foregroundStyle(FL.warning)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Text(L(pack.manifest.caveatKey)).font(.caption2).foregroundStyle(.tertiary)
@@ -1238,10 +1254,18 @@ struct RulesView: View {
         let scope = configuration.scope == .allApps
             ? L("every app")
             : L("%lld selected apps", configuration.apps.count)
+        let activePeerName: String? = AdvertisingPackTierPolicy.exclusivePeer(of: pack.id).flatMap { peerID in
+            guard monitor.rulePacks.configuration(for: peerID).enabled else { return nil }
+            return monitor.rulePacks.definitions.first { $0.id == peerID }.map { L($0.manifest.titleKey) } ?? peerID
+        }
         return [
             L("Review %@", L(pack.manifest.titleKey)),
+            AdvertisingPackTierPolicy.localizedBadge(for: pack.id),
             item?.effect.title,
             L("%lld destinations · %@", pack.entries.count, scope),
+            activePeerName.map {
+                L("Enabling this pack replaces %@. The two Advertising tiers never stack.", $0)
+            },
             item?.reason,
             L(pack.manifest.caveatKey),
             error,

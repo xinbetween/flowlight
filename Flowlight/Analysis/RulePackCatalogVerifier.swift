@@ -9,6 +9,8 @@ struct RulePackCatalogTrustedSigner: Equatable, Sendable {
     var publicKeyPEM: String
     var validFrom: Int64
     var validUntil: Int64
+    var minimumSequence: Int64 = 1
+    var maximumSequence: Int64 = .max
     var revoked: Bool
 }
 
@@ -134,7 +136,7 @@ enum RulePackCatalogVerifier {
     static let signatureAlgorithm = "p256-sha256"
     static let signatureDomain = "flowlight-rule-pack-catalog-signature-v1"
 
-    static let maximumDataBytes = 8 * 1024 * 1024
+    static let maximumDataBytes = 16 * 1024 * 1024
     static let maximumPacks = 16
     static let maximumTotalEntries = 250_000
     static let maximumStringBytes = 16 * 1024
@@ -142,10 +144,17 @@ enum RulePackCatalogVerifier {
     static let maximumFutureIssueSkew: Int64 = 5 * 60
 
     // Public material only. Embedding it keeps trust independent from resource-bundle selection in test hosts.
-    private static let productionPublicKeyPEM = """
+    private static let legacyProductionPublicKeyPEM = """
     -----BEGIN PUBLIC KEY-----
     MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdUePgJD0obTUDpM5Pa/4MzikIB0p
     hr50v5rS+wl+ofiaCFXHXFN9Sd70U4k3YYCEPuave7l7YRk3zRJCJxP9Cg==
+    -----END PUBLIC KEY-----
+    """
+
+    private static let productionPublicKeyPEM = """
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECI2N5ukmD/okkVEiLNdUQ+U/ZTvg
+    dKHh03BEljPc8aKgQBwEOd2FleNdlM9QjqmGl8Dvx2hQIx92k6Py6sZ/LA==
     -----END PUBLIC KEY-----
     """
 
@@ -155,9 +164,21 @@ enum RulePackCatalogVerifier {
             publisher: publisher,
             catalogID: catalogID,
             packIDPrefix: "official.",
-            publicKeyPEM: productionPublicKeyPEM,
+            publicKeyPEM: legacyProductionPublicKeyPEM,
             validFrom: 1_767_225_600, // 2026-01-01T00:00:00Z
             validUntil: 1_893_456_000, // 2030-01-01T00:00:00Z
+            maximumSequence: 2,
+            revoked: false
+        ),
+        RulePackCatalogTrustedSigner(
+            keyID: "flowlight-rule-packs-2026-11",
+            publisher: publisher,
+            catalogID: catalogID,
+            packIDPrefix: "official.",
+            publicKeyPEM: productionPublicKeyPEM,
+            validFrom: 1_794_700_800, // 2026-11-15T00:00:00Z
+            validUntil: 1_956_528_000, // 2032-01-01T00:00:00Z
+            minimumSequence: 3,
             revoked: false
         ),
     ]
@@ -374,6 +395,8 @@ enum RulePackCatalogVerifier {
             }
             guard signer.publisher == payload.publisher,
                   signer.catalogID == payload.catalogID,
+                  payload.sequence >= signer.minimumSequence,
+                  payload.sequence <= signer.maximumSequence,
                   !signer.packIDPrefix.isEmpty,
                   payload.packs.allSatisfy({ $0.manifest.id.hasPrefix(signer.packIDPrefix) }) else {
                 sawWrongScope = true
@@ -400,13 +423,21 @@ enum RulePackCatalogVerifier {
     }
 
     static func validateStrictJSONSyntax(_ data: Data) throws {
-        var scanner = StrictJSONScanner(data: data)
-        try scanner.validate()
+        do {
+            var scanner = StrictJSONScanner(data: data)
+            try scanner.validate()
+            _ = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        } catch let error as RulePackCatalogVerificationError {
+            throw error
+        } catch {
+            throw RulePackCatalogVerificationError.invalidEnvelope
+        }
     }
 
     private static func strictDecode(_ data: Data) throws -> RulePackCatalogEnvelope {
         do {
-            try validateStrictJSONSyntax(data)
+            var scanner = StrictJSONScanner(data: data)
+            try scanner.validate()
             let object = try JSONSerialization.jsonObject(with: data)
             try StrictSchema.validateEnvelope(object)
             return try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: data)
@@ -468,6 +499,11 @@ enum RulePackCatalogVerifier {
     private struct StrictJSONScanner {
         private let bytes: [UInt8]
         private var index = 0
+        // JSON can contain many sibling objects at the same nesting depth. Reusing one key set per depth avoids
+        // allocating a Set for every catalog entry while preserving exact decoded-key duplicate detection and
+        // bounded lookup time for an untrusted object with many fields.
+        private var objectKeysByDepth: [Set<String>] = []
+        private let stringDecoder = JSONDecoder()
 
         init(data: Data) { bytes = Array(data) }
 
@@ -484,7 +520,7 @@ enum RulePackCatalogVerifier {
             switch bytes[index] {
             case 0x7B: try parseObject(depth: depth + 1)
             case 0x5B: try parseArray(depth: depth + 1)
-            case 0x22: _ = try parseString()
+            case 0x22: _ = try parseString(decode: false)
             case 0x74: try consumeLiteral("true")
             case 0x66: try consumeLiteral("false")
             case 0x6E: try consumeLiteral("null")
@@ -497,13 +533,18 @@ enum RulePackCatalogVerifier {
             guard depth <= RulePackCatalogVerifier.maximumJSONNestingDepth else {
                 throw RulePackCatalogVerificationError.invalidEnvelope
             }
+            while objectKeysByDepth.count <= depth { objectKeysByDepth.append([]) }
+            objectKeysByDepth[depth].removeAll(keepingCapacity: true)
             index += 1
             skipWhitespace()
             if consume(0x7D) { return }
-            var keys = Set<String>()
             while true {
-                let key = try parseString()
-                guard keys.insert(key).inserted else { throw RulePackCatalogVerificationError.invalidEnvelope }
+                guard let key = try parseString(decode: true) else {
+                    throw RulePackCatalogVerificationError.invalidEnvelope
+                }
+                guard objectKeysByDepth[depth].insert(key).inserted else {
+                    throw RulePackCatalogVerificationError.invalidEnvelope
+                }
                 skipWhitespace()
                 guard consume(0x3A) else { throw RulePackCatalogVerificationError.invalidEnvelope }
                 skipWhitespace()
@@ -531,10 +572,11 @@ enum RulePackCatalogVerifier {
             }
         }
 
-        private mutating func parseString() throws -> String {
+        private mutating func parseString(decode: Bool) throws -> String? {
             guard consume(0x22) else { throw RulePackCatalogVerificationError.invalidEnvelope }
             let start = index
             var escaped = false
+            var containsEscape = false
             while index < bytes.count {
                 let byte = bytes[index]
                 if escaped {
@@ -546,19 +588,34 @@ enum RulePackCatalogVerifier {
                         }
                         index += 5
                     } else {
-                        guard [0x22, 0x5C, 0x2F, 0x62, 0x66, 0x6E, 0x72, 0x74].contains(byte) else {
+                        switch byte {
+                        case 0x22, 0x5C, 0x2F, 0x62, 0x66, 0x6E, 0x72, 0x74:
+                            break
+                        default:
                             throw RulePackCatalogVerificationError.invalidEnvelope
                         }
                         index += 1
                     }
                     continue
                 }
-                if byte == 0x5C { escaped = true; index += 1; continue }
+                if byte == 0x5C {
+                    escaped = true
+                    containsEscape = true
+                    index += 1
+                    continue
+                }
                 if byte == 0x22 {
                     let end = index
                     index += 1
+                    guard decode else { return nil }
+                    if !containsEscape {
+                        guard let decoded = String(bytes: bytes[start..<end], encoding: .utf8) else {
+                            throw RulePackCatalogVerificationError.invalidEnvelope
+                        }
+                        return decoded
+                    }
                     let quoted = Data(bytes[(start - 1)...end])
-                    guard let decoded = try? JSONDecoder().decode(String.self, from: quoted) else {
+                    guard let decoded = try? stringDecoder.decode(String.self, from: quoted) else {
                         throw RulePackCatalogVerificationError.invalidEnvelope
                     }
                     return decoded
@@ -599,12 +656,12 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func consumeLiteral(_ literal: String) throws {
-            let expected = Array(literal.utf8)
-            guard index + expected.count <= bytes.count,
-                  Array(bytes[index..<(index + expected.count)]) == expected else {
-                throw RulePackCatalogVerificationError.invalidEnvelope
+            for expected in literal.utf8 {
+                guard index < bytes.count, bytes[index] == expected else {
+                    throw RulePackCatalogVerificationError.invalidEnvelope
+                }
+                index += 1
             }
-            index += expected.count
         }
 
         private mutating func consume(_ byte: UInt8) -> Bool {
@@ -614,7 +671,14 @@ enum RulePackCatalogVerifier {
         }
 
         private mutating func skipWhitespace() {
-            while index < bytes.count, [0x20, 0x09, 0x0A, 0x0D].contains(bytes[index]) { index += 1 }
+            while index < bytes.count {
+                switch bytes[index] {
+                case 0x20, 0x09, 0x0A, 0x0D:
+                    index += 1
+                default:
+                    return
+                }
+            }
         }
 
         private func isHex(_ byte: UInt8) -> Bool {

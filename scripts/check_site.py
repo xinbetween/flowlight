@@ -21,9 +21,13 @@ OFFICIAL_PACK_REVIEWED_SOURCE = ROOT / "rule-packs/official-source.json"
 OFFICIAL_PACK_SOURCE = ROOT / "site/packs/v1/official.json"
 OFFICIAL_PACK_BUNDLED = ROOT / "Flowlight/Resources/RulePacks/official.json"
 OFFICIAL_PACK_OUTPUT = OUT / "packs/v1/official.json"
-OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem"
-OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-01"
+OFFICIAL_PACK_PROVENANCE_SOURCE = ROOT / "site/packs/v1/provenance"
+OFFICIAL_PACK_PROVENANCE_OUTPUT = OUT / "packs/v1/provenance"
+OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-packs-v2-public.pem"
+OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-11"
 OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
+OFFICIAL_PACK_PROVENANCE_URL = "https://flowlight.xinbetween.com/packs/v1/provenance/"
+REQUIRED_PROVENANCE_PACK_IDS = {"official.advertising", "official.advertising-aggressive"}
 PAGES_WORKFLOW = ROOT / ".github/workflows/pages.yml"
 APP_STORE_BADGE = OUT / "assets/app-store-badge.svg"
 HOMEPAGE_FORBIDDEN_PROMOTION = {
@@ -60,6 +64,84 @@ JSON_LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S
 
 def version_key(text):
     return tuple(int(part) for part in text.split("."))
+
+
+def catalog_provenance_names(catalog_bytes):
+    try:
+        catalog = json.loads(catalog_bytes)
+        packs = catalog["payload"]["packs"]
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"catalog has no readable pack manifests: {error}") from error
+    if not isinstance(packs, list):
+        raise ValueError("catalog packs are not an array")
+
+    names = set()
+    required_seen = set()
+    for pack in packs:
+        try:
+            manifest = pack["manifest"]
+            pack_id = manifest["id"]
+            source = manifest["source"]
+        except (KeyError, TypeError) as error:
+            raise ValueError("catalog pack has no readable identity or source") from error
+        if not isinstance(pack_id, str) or not isinstance(source, str):
+            raise ValueError("catalog pack identity or source is not a string")
+        if pack_id in REQUIRED_PROVENANCE_PACK_IDS:
+            required_seen.add(pack_id)
+            if not source.startswith(OFFICIAL_PACK_PROVENANCE_URL):
+                raise ValueError(f"{pack_id} does not use content-addressed provenance")
+        if "://" in source and not source.startswith(OFFICIAL_PACK_PROVENANCE_URL):
+            raise ValueError(f"catalog pack uses an unpinned provenance origin: {source}")
+        if source.startswith(OFFICIAL_PACK_PROVENANCE_URL):
+            name = source.removeprefix(OFFICIAL_PACK_PROVENANCE_URL)
+            if not re.fullmatch(r"[0-9a-f]{64}\.json", name):
+                raise ValueError(f"catalog pack uses an unsafe provenance path: {name}")
+            names.add(name)
+    missing = REQUIRED_PROVENANCE_PACK_IDS - required_seen
+    if missing:
+        raise ValueError("catalog is missing provenance-bound Advertising packs: " + ", ".join(sorted(missing)))
+    return names
+
+
+def provenance_publication_files(directory):
+    if not directory.is_dir():
+        return set()
+    return {
+        path.relative_to(directory).as_posix()
+        for path in directory.rglob("*")
+        if path.is_file() or path.is_symlink()
+    }
+
+
+def official_pack_provenance_problems(catalog_bytes, source_dir=OFFICIAL_PACK_PROVENANCE_SOURCE,
+                                      output_dir=OFFICIAL_PACK_PROVENANCE_OUTPUT):
+    try:
+        referenced = catalog_provenance_names(catalog_bytes)
+    except ValueError as error:
+        return [f"site/packs/v1/official.json: {error}"]
+
+    source_names = provenance_publication_files(source_dir)
+    output_names = provenance_publication_files(output_dir)
+    found = []
+    if source_names != referenced:
+        found.append("site/packs/v1/provenance: files do not exactly match the signed catalog references")
+    if output_names != referenced:
+        found.append("docs/packs/v1/provenance: files do not exactly match the signed catalog references")
+
+    for name in sorted(referenced):
+        source = source_dir / name
+        output = output_dir / name
+        if source.is_symlink() or not source.is_file():
+            found.append(f"site/packs/v1/provenance/{name}: is not a regular file")
+            continue
+        content = source.read_bytes()
+        if hashlib.sha256(content).hexdigest() != source.stem:
+            found.append(f"site/packs/v1/provenance/{name}: content digest does not match its filename")
+        if output.is_symlink():
+            found.append(f"docs/packs/v1/provenance/{name}: is not a regular file")
+        elif output.is_file() and output.read_bytes() != content:
+            found.append(f"docs/packs/v1/provenance/{name}: differs from the site provenance source")
+    return found
 
 
 def sidebar_order(source):
@@ -228,12 +310,13 @@ def problems():
         found.append("docs/packs/v1/official.json: generated signed catalog is missing — run scripts/build_site.py after signing")
     if OFFICIAL_PACK_SOURCE.is_file() and OFFICIAL_PACK_OUTPUT.is_file():
         source_bytes = OFFICIAL_PACK_SOURCE.read_bytes()
+        found.extend(official_pack_provenance_problems(source_bytes))
         if source_bytes != OFFICIAL_PACK_OUTPUT.read_bytes():
             found.append("docs/packs/v1/official.json: differs from site/packs/v1/official.json")
         if OFFICIAL_PACK_BUNDLED.is_file() and source_bytes != OFFICIAL_PACK_BUNDLED.read_bytes():
             found.append("Flowlight/Resources/RulePacks/official.json: differs from site/packs/v1/official.json")
         if not OFFICIAL_PACK_PUBLIC_KEY.is_file():
-            found.append("Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem: public verification key is missing")
+            found.append(f"{OFFICIAL_PACK_PUBLIC_KEY.relative_to(ROOT)}: public verification key is missing")
         else:
             catalog_tool = str(ROOT / "scripts/rule_pack_catalog.py")
             compared = subprocess.run(

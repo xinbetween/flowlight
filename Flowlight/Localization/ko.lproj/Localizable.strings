@@ -2089,3 +2089,26 @@
 "In force" = "적용 중";
 "Not in force" = "적용되지 않음";
 "Nothing is being refused until %@." = "%@까지는 아무것도 차단되지 않습니다.";
+
+/* 광고 단계 */
+"Enabling this pack replaces %@. The two Advertising tiers never stack." = "이 팩을 활성화하면 %@이(가) 대체됩니다. 두 광고 단계는 함께 적용되지 않습니다.";
+"Hostname-layer blocking refuses every connection to a matched host; it cannot remove same-origin YouTube or Meta ads, page gaps, or browser overlays." = "호스트 이름 수준 차단은 일치하는 호스트로의 모든 연결을 거부합니다. 동일 출처의 YouTube 또는 Meta 광고, 페이지 여백, 브라우저 오버레이는 제거할 수 없습니다.";
+"Reviewed product, login, dashboard, and media surfaces stay reachable unless a dedicated advertising hostname is independently evidenced." = "전용 광고 호스트 이름에 대한 독립적인 증거가 없는 한, 검토된 제품, 로그인, 대시보드 및 미디어 화면은 계속 연결할 수 있습니다.";
+"Signed pack provenance" = "서명된 팩 출처";
+"Source: %@" = "소스: %@";
+"Content digest: %@" = "콘텐츠 다이제스트: %@";
+"Official · pack v%@ · %@" = "공식 · 팩 v%@ · %@";
+"Catalog sequence %lld · digest %@" = "카탈로그 시퀀스 %lld · 다이제스트 %@";
+"Replace %@?" = "%@을(를) 대체하시겠습니까?";
+"Enable aggressive blocking?" = "강력한 차단을 활성화하시겠습니까?";
+"Aggressive coverage can break video, sign-in, checkout, or other content. Flowlight protects reviewed product surfaces, but hostname blocking cannot distinguish paths on a shared host." = "강력한 적용 범위는 동영상, 로그인, 결제 또는 기타 콘텐츠를 중단시킬 수 있습니다. Flowlight는 검토된 제품 화면을 보호하지만 호스트 이름 차단은 공유 호스트의 경로를 구분할 수 없습니다.";
+"Replace %@" = "%@ 대체";
+"Enable aggressive blocking" = "강력한 차단 활성화";
+"Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app." = "권장 균형입니다. 호스트 이름 차단은 페이지 레이아웃 여백, 동일 출처 광고 또는 브라우저나 앱이 그린 오버레이를 제거할 수 없습니다.";
+"Advertising — Aggressive" = "광고 — 강력";
+"Broader advertising hostname coverage for users who accept a higher risk of broken content." = "콘텐츠가 중단될 위험이 더 높은 것을 감수하는 사용자를 위한 더 넓은 광고 호스트 이름 범위입니다.";
+"Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it." = "선택 사항이며 중단 위험이 더 높습니다. 이 단계는 광고를 대체하며 함께 적용되지 않습니다.";
+"Recommended · Balanced" = "권장 · 균형";
+"Opt-in · Higher breakage" = "선택 · 더 높은 중단 위험";
+"Attribution: %@" = "저작자 표시: %@";
+"Source licenses: %@" = "소스 라이선스: %@";

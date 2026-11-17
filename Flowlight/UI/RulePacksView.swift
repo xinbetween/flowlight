@@ -166,12 +166,21 @@ private struct RulePacksContent: View {
         let blocks = events.reduce(0) { $0 + $1.count }
         let exceptions = packs.overrides(for: pack.id)
         let isSaving = saves.contains(pack.id)
+        let activePeerName: String? = AdvertisingPackTierPolicy.exclusivePeer(of: pack.id).flatMap { peerID in
+            guard packs.configuration(for: peerID).enabled else { return nil }
+            return packs.definitions.first { $0.id == peerID }.map { L($0.manifest.titleKey) } ?? peerID
+        }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: symbol(pack)).font(.title3).foregroundStyle(configuration.enabled ? FL.critical : .secondary)
                     .frame(width: 34, height: 34).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(L(pack.manifest.titleKey)).font(.body.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Text(L(pack.manifest.titleKey)).font(.body.weight(.semibold))
+                        if let badge = AdvertisingPackTierPolicy.localizedBadge(for: pack.id) {
+                            pill(badge, tint: FL.accent)
+                        }
+                    }
                     Text(L(pack.manifest.summaryKey)).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -211,6 +220,10 @@ private struct RulePacksContent: View {
             if let saveError = saveErrors[pack.id] {
                 Label(saveError, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(FL.critical)
+            }
+            if let activePeerName {
+                Text(L("Enabling this pack replaces %@. The two Advertising tiers never stack.", activePeerName))
+                    .font(.caption).foregroundStyle(FL.warning)
             }
             Text(L(pack.manifest.caveatKey)).font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -298,6 +311,11 @@ private struct RulePacksContent: View {
 }
 
 struct RulePackEditor: View {
+    private struct DeferredConfirmationAction {
+        let action: RulePackEditorDraft.SaveAction?
+        let expectedExclusivePeer: RulePackConfiguration?
+    }
+
     let pack: RulePackDefinition
     let receipt: RulePackReviewReceipt?
     @EnvironmentObject var monitor: TrafficMonitor
@@ -312,7 +330,9 @@ struct RulePackEditor: View {
     @State private var previewing = false
     @State private var previewError: String?
     @State private var saveError: String?
-    @State private var confirmBroadening = false
+    @State private var pendingConfirmation: RulePackEditorDraft.Confirmation?
+    @State private var pendingExclusivePeer: RulePackConfiguration?
+    @State private var deferredConfirmationAction: DeferredConfirmationAction?
     @State private var saving = false
 
     init(pack: RulePackDefinition, receipt: RulePackReviewReceipt?, saved: RulePackConfiguration,
@@ -321,14 +341,26 @@ struct RulePackEditor: View {
         self.receipt = receipt
         self.packs = packs
         self.rules = rules
-        _draft = State(initialValue: RulePackEditorDraft(saved: saved, intent: intent,
-                                                        reviewedDefinition: pack, reviewReceipt: receipt))
+        _draft = State(initialValue: RulePackEditorDraft(
+            saved: saved,
+            intent: intent,
+            reviewedDefinition: pack,
+            reviewReceipt: receipt
+        ))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(L(pack.manifest.titleKey)).font(.title3.weight(.semibold))
+                HStack(spacing: 8) {
+                    Text(L(pack.manifest.titleKey)).font(.title3.weight(.semibold))
+                    if let badge = AdvertisingPackTierPolicy.localizedBadge(for: pack.id) {
+                        Text(badge).font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(FL.accent.opacity(0.12), in: Capsule())
+                            .accessibilityIdentifier("rule-pack-editor.\(pack.id).badge")
+                    }
+                }
                 Text(L(pack.manifest.summaryKey)).font(.callout).foregroundStyle(.secondary)
             }.padding(Measure.gutter)
             Divider()
@@ -336,6 +368,7 @@ struct RulePackEditor: View {
                 VStack(alignment: .leading, spacing: 18) {
                     scope
                     caveat
+                    provenance
                     previewSection
                     destinations
                     exceptions
@@ -353,9 +386,12 @@ struct RulePackEditor: View {
                     .disabled(previewing || saving)
                 if previewing { ProgressView().controlSize(.small) }
                 Spacer()
-                Button(L("Cancel")) { dismiss() }.disabled(saving)
+                Button(L("Cancel")) { dismiss() }
+                    .disabled(saving)
+                    .accessibilityIdentifier("rule-pack-editor.\(pack.id).cancel")
                 Button(L("Save")) { save() }
                     .disabled(!draft.canSave || saving)
+                    .accessibilityIdentifier("rule-pack-editor.\(pack.id).save")
             }.padding(Measure.gutter)
         }
         .frame(width: Measure.prose)
@@ -366,13 +402,27 @@ struct RulePackEditor: View {
         .onChange(of: rules.version) { _, _ in invalidatePreview() }
         .onChange(of: monitor.dataVersion) { _, _ in invalidatePreview() }
         .onAppear { loadApps() }
-        .confirmationDialog(L("Apply this pack to every app?"), isPresented: $confirmBroadening) {
-            Button(L("Apply to every app"), role: .destructive) {
-                commit(draft.configuration, receipt: draft.reviewReceipt)
+        .confirmationDialog(
+            confirmationTitle,
+            isPresented: Binding(
+                get: { pendingConfirmation != nil },
+                set: {
+                    if !$0 { confirmationDidDismiss() }
+                }
+            )
+        ) {
+            if let confirmation = pendingConfirmation {
+                let expectedPeer = pendingExclusivePeer
+                Button(confirmationButtonTitle(confirmation), role: .destructive) {
+                    deferAdvanceUntilDismissal(
+                        confirmation,
+                        expectedExclusivePeer: expectedPeer
+                    )
+                }
             }
             Button(L("Cancel"), role: .cancel) {}
         } message: {
-            Text(L("This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed."))
+            Text(confirmationMessage)
         }
     }
 
@@ -427,9 +477,36 @@ struct RulePackEditor: View {
     }
 
     private var caveat: some View {
-        Label(L(pack.manifest.caveatKey), systemImage: "exclamationmark.circle")
-            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            .padding(10).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 6) {
+            Label(L(pack.manifest.caveatKey), systemImage: "exclamationmark.circle")
+            if AdvertisingPackTierPolicy.contains(pack.id) {
+                Text(L("Hostname-layer blocking refuses every connection to a matched host; it cannot remove same-origin YouTube or Meta ads, page gaps, or browser overlays."))
+                Text(L("Reviewed product, login, dashboard, and media surfaces stay reachable unless a dedicated advertising hostname is independently evidenced."))
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        .padding(10).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("rule-pack-editor.\(pack.id).limitations")
+    }
+
+    private var provenance: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(L("Signed pack provenance")).font(.headline)
+            Text(L("Source: %@", pack.manifest.source))
+            Text(L("Content digest: %@", pack.manifest.contentSHA256))
+            Text(L("Official · pack v%@ · %@", pack.manifest.version, pack.manifest.license))
+            if AdvertisingPackTierPolicy.contains(pack.id) {
+                Text(L("Attribution: %@", "The EasyList authors · HaGeZi · Public Suffix List contributors"))
+                Text(L("Source licenses: %@", "GPL-3.0-or-later · GPL-3.0 · MPL-2.0"))
+            }
+            if let receipt {
+                Text(L("Catalog sequence %lld · digest %@", receipt.catalogSequence, receipt.catalogDigest))
+            }
+        }
+        .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+        .textSelection(.enabled)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("rule-pack-editor.\(pack.id).provenance")
     }
 
     @ViewBuilder private var previewSection: some View {
@@ -518,25 +595,113 @@ struct RulePackEditor: View {
 
     private func save() {
         saveError = nil
-        switch draft.requestSave() {
-        case .commit(let configuration, let receipt): commit(configuration, receipt: receipt)
-        case .confirmBroadening: confirmBroadening = true
-        case nil: break
+        let peer = packs.enabledExclusivePeer(for: pack.id)
+        handle(
+            draft.requestSave(exclusivePeerConfiguration: peer),
+            expectedExclusivePeer: peer
+        )
+    }
+
+    private func deferAdvanceUntilDismissal(
+        _ confirmation: RulePackEditorDraft.Confirmation,
+        expectedExclusivePeer: RulePackConfiguration?
+    ) {
+        deferredConfirmationAction = DeferredConfirmationAction(
+            action: draft.confirm(
+                confirmation,
+                exclusivePeerConfiguration: expectedExclusivePeer
+            ),
+            expectedExclusivePeer: expectedExclusivePeer
+        )
+        // SwiftUI may dismiss before or after invoking the action. Whichever callback runs second drains once.
+        if pendingConfirmation == nil { confirmationDidDismiss() }
+    }
+
+    private func confirmationDidDismiss() {
+        let deferred = deferredConfirmationAction
+        pendingConfirmation = nil
+        pendingExclusivePeer = nil
+        deferredConfirmationAction = nil
+
+        guard let deferred else { return }
+        DispatchQueue.main.async {
+            handle(
+                deferred.action,
+                expectedExclusivePeer: deferred.expectedExclusivePeer
+            )
         }
     }
 
+    private func handle(_ action: RulePackEditorDraft.SaveAction?,
+                        expectedExclusivePeer: RulePackConfiguration?) {
+        switch action {
+        case .commit(let configuration, let receipt):
+            commit(configuration, receipt: receipt, expectedExclusivePeer: expectedExclusivePeer)
+        case .confirm(let confirmation):
+            pendingConfirmation = confirmation
+            pendingExclusivePeer = expectedExclusivePeer
+        case nil:
+            break
+        }
+    }
+
+    private var confirmationTitle: String {
+        switch pendingConfirmation {
+        case .replacement(let peerID): return L("Replace %@?", peerName(peerID))
+        case .aggressiveRisk: return L("Enable aggressive blocking?")
+        case .broadening: return L("Apply this pack to every app?")
+        case nil: return ""
+        }
+    }
+
+    private var confirmationMessage: String {
+        switch pendingConfirmation {
+        case .replacement(let peerID):
+            return L("Enabling this pack replaces %@. The two Advertising tiers never stack.", peerName(peerID))
+        case .aggressiveRisk:
+            return L("Aggressive coverage can break video, sign-in, checkout, or other content. Flowlight protects reviewed product surfaces, but hostname blocking cannot distinguish paths on a shared host.")
+        case .broadening:
+            return L("This broadens blocking from selected apps to every app on this Mac. Essential system traffic remains allowed.")
+        case nil:
+            return ""
+        }
+    }
+
+    private func confirmationButtonTitle(_ confirmation: RulePackEditorDraft.Confirmation) -> String {
+        switch confirmation {
+        case .replacement(let peerID): return L("Replace %@", peerName(peerID))
+        case .aggressiveRisk: return L("Enable aggressive blocking")
+        case .broadening: return L("Apply to every app")
+        }
+    }
+
+    private func peerName(_ packID: String) -> String {
+        packs.definitions.first { $0.id == packID }.map { L($0.manifest.titleKey) } ?? packID
+    }
+
     private func commit(_ configuration: RulePackConfiguration? = nil,
-                        receipt: RulePackReviewReceipt? = nil) {
+                        receipt: RulePackReviewReceipt? = nil,
+                        expectedExclusivePeer: RulePackConfiguration?) {
         saving = true
         saveError = nil
         let value = configuration ?? draft.configuration
-        packs.save(value, reviewedDefinition: pack, receipt: receipt) { result in
+        packs.save(
+            value,
+            reviewedDefinition: pack,
+            receipt: receipt,
+            expectedExclusivePeer: expectedExclusivePeer
+        ) { result in
             saving = false
             switch result {
             case .saved:
                 dismiss()
             case .staleReview:
                 saveError = L("This pack changed while it was open. Reopen it to review the new content before saving.")
+            case .exclusivePeerChanged(let peer):
+                handle(
+                    draft.requestSave(exclusivePeerConfiguration: peer),
+                    expectedExclusivePeer: peer
+                )
             case .failed(let message):
                 saveError = message
             }
@@ -566,11 +731,23 @@ struct RulePackEditor: View {
                   packVersion == packs.version,
                   ruleVersion == rules.version,
                   dataVersion == monitor.dataVersion else { return }
-            preview = RulePackSimulation.run(candidate: candidate, definitions: packs.definitions,
-                                             configurations: packs.configurations,
-                                             overrides: packs.overrides, rules: rules.rules,
-                                             policies: input.1, paused: rules.isPaused,
-                                             flows: input.0, session: RuleStore.session)
+            let definitions = packs.definitions
+            let configurations = packs.configurations
+            let overrides = packs.overrides
+            let activeRules = rules.rules
+            let paused = rules.isPaused
+            let session = RuleStore.session
+            let result = await Task.detached(priority: .userInitiated) {
+                RulePackSimulation.run(candidate: candidate, definitions: definitions,
+                                       configurations: configurations, overrides: overrides,
+                                       rules: activeRules, policies: input.1, paused: paused,
+                                       flows: input.0, session: session)
+            }.value
+            guard candidate == draft.configuration,
+                  packVersion == packs.version,
+                  ruleVersion == rules.version,
+                  dataVersion == monitor.dataVersion else { return }
+            preview = result
         } catch {
             guard candidate == draft.configuration,
                   packVersion == packs.version,

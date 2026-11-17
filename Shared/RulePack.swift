@@ -58,6 +58,58 @@ struct RulePackConfiguration: Codable, Equatable, Sendable, Identifiable {
         consentedVersion == definition.manifest.version
             && consentedContentSHA256 == definition.manifest.contentSHA256
     }
+
+    /// Older or interrupted writes may leave only one consent field, an empty value, or a non-SHA-256 digest. None
+    /// proves that this tier was previously reviewed, so the first real switch must still inherit the active peer's
+    /// exceptions. A complete pair for an older definition does prove prior review and deliberately remains established.
+    var hasEstablishedConsent: Bool {
+        guard let consentedVersion,
+              !consentedVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let consentedContentSHA256,
+              consentedContentSHA256.utf8.count == 64 else { return false }
+        return consentedContentSHA256.utf8.allSatisfy { byte in
+            (48...57).contains(byte) || (65...70).contains(byte) || (97...102).contains(byte)
+        }
+    }
+}
+
+/// Advertising packs are separate reviewed products, but only one may enforce at a time. Keep this relationship in
+/// Shared so the app, persistence, simulation, and extension-facing matcher cannot drift or infer it from pack names.
+enum AdvertisingPackTierPolicy {
+    enum Risk: Equatable, Sendable { case balanced, aggressive }
+
+    static let balancedID = "official.advertising"
+    static let aggressiveID = "official.advertising-aggressive"
+    static let displayOrder = [balancedID, aggressiveID]
+
+    static func contains(_ packID: String) -> Bool { displayOrder.contains(packID) }
+
+    static func sortsBefore(_ lhs: String, _ rhs: String) -> Bool {
+        let leftRank = displayOrder.firstIndex(of: lhs) ?? Int.max
+        let rightRank = displayOrder.firstIndex(of: rhs) ?? Int.max
+        return leftRank == rightRank ? lhs < rhs : leftRank < rightRank
+    }
+
+    static func risk(for packID: String) -> Risk? {
+        switch packID {
+        case balancedID: .balanced
+        case aggressiveID: .aggressive
+        default: nil
+        }
+    }
+
+    static func exclusivePeer(of packID: String) -> String? {
+        switch packID {
+        case balancedID: aggressiveID
+        case aggressiveID: balancedID
+        default: nil
+        }
+    }
+
+    static func hasDualEnabled(_ configurations: [RulePackConfiguration]) -> Bool {
+        let enabled = Set(configurations.lazy.filter(\.enabled).map(\.packID))
+        return enabled.contains(balancedID) && enabled.contains(aggressiveID)
+    }
 }
 
 struct RulePackOverride: Codable, Equatable, Sendable, Identifiable {
@@ -105,7 +157,11 @@ struct RulePackSnapshot: Codable, Equatable, Sendable {
 
     private static func contentDigest(definitions: [RulePackDefinition], configurations: [RulePackConfiguration],
                                       overrides: [RulePackOverride]) -> String {
-        let envelope = DigestEnvelope(definitions: definitions, configurations: configurations, overrides: overrides)
+        // Each validated manifest binds its complete entry array through contentSHA256. Hashing the manifests here
+        // keeps an enable or exception save proportional to the number of packs instead of serializing tens of
+        // thousands of entries again; the receiving matcher still recomputes every manifest content digest.
+        let envelope = DigestEnvelope(manifests: definitions.map(\.manifest),
+                                      configurations: configurations, overrides: overrides)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = (try? encoder.encode(envelope)) ?? Data()
@@ -113,7 +169,7 @@ struct RulePackSnapshot: Codable, Equatable, Sendable {
     }
 
     private struct DigestEnvelope: Encodable {
-        var definitions: [RulePackDefinition]
+        var manifests: [RulePackManifest]
         var configurations: [RulePackConfiguration]
         var overrides: [RulePackOverride]
     }
@@ -234,6 +290,7 @@ enum RulePackValidationError: Error, Equatable {
     case unsortedEntries(String)
     case countMismatch(String)
     case digestMismatch(String)
+    case exclusivePackConflict(String, String)
 }
 
 enum RulePackValidator {
@@ -269,8 +326,11 @@ enum RulePackValidator {
                 guard entryIDs.insert(entry.id).inserted else {
                     throw RulePackValidationError.duplicateEntry(manifest.id, entry.id)
                 }
-                guard let canonical = HostCanonicalizer.host(entry.host), canonical == entry.host else {
+                guard let canonical = HostCanonicalizer.canonicalHost(entry.host), canonical.value == entry.host else {
                     throw RulePackValidationError.nonCanonicalHost(manifest.id, entry.host)
+                }
+                if entry.match == .suffix, !PublicSuffixRules.allowsSuffixEntry(canonicalHost: canonical) {
+                    throw RulePackValidationError.invalidEntry(manifest.id, entry.id)
                 }
                 let hostKey = "\(entry.host)|\(entry.match.rawValue)"
                 guard hosts.insert(hostKey).inserted else {
@@ -329,6 +389,12 @@ final class RulePackMatcher: @unchecked Sendable {
         }
         guard snapshot.hasValidDigest else { throw RulePackValidationError.digestMismatch("snapshot") }
         try RulePackValidator.validate(snapshot.definitions)
+        guard !AdvertisingPackTierPolicy.hasDualEnabled(snapshot.configurations) else {
+            throw RulePackValidationError.exclusivePackConflict(
+                AdvertisingPackTierPolicy.balancedID,
+                AdvertisingPackTierPolicy.aggressiveID
+            )
+        }
         configurations = Dictionary(snapshot.configurations.map { ($0.packID, $0) }, uniquingKeysWith: { _, latest in latest })
         overrides = snapshot.overrides
         for definition in snapshot.definitions where configurations[definition.id]?.enabled == true {
@@ -347,6 +413,14 @@ final class RulePackMatcher: @unchecked Sendable {
             decisions.append(contentsOf: nodes[nodeIndex].suffix)
         }
         decisions.append(contentsOf: nodes[nodeIndex].exact.filter { $0.entry.host == canonical })
+        decisions.sort { lhs, rhs in
+            let leftDepth = lhs.entry.host.split(separator: ".").count
+            let rightDepth = rhs.entry.host.split(separator: ".").count
+            if leftDepth != rightDepth { return leftDepth > rightDepth }
+            if lhs.entry.match != rhs.entry.match { return lhs.entry.match == .exact }
+            if lhs.packID != rhs.packID { return lhs.packID < rhs.packID }
+            return lhs.entry.id < rhs.entry.id
+        }
         return decisions.compactMap { decision in
             guard configurations[decision.packID]?.applies(to: bundleID) == true else { return nil }
             if overrides.contains(where: {

@@ -232,6 +232,14 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(AnomalyEngine.registrableDomain("a.b.example.com"), "example.com")
         XCTAssertEqual(AnomalyEngine.registrableDomain("www.bbc.co.uk"), "bbc.co.uk")
         XCTAssertEqual(AnomalyEngine.registrableDomain("example.com"), "example.com")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("CDN.Tenant.GitHub.IO."), "tenant.github.io")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("asset.tenant.pages.dev"), "tenant.pages.dev")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("cdn.test.ck"), "cdn.test.ck", "PSL wildcard")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("cdn.www.ck"), "www.ck", "PSL exception")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("192.0.2.1"), "192.0.2.1")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("2001:0db8::1"), "2001:db8::1")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("LOCALHOST"), "localhost")
+        XCTAssertEqual(AnomalyEngine.registrableDomain("two..dots.example"), "two..dots.example")
     }
 }
 

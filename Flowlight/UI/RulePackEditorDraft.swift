@@ -14,9 +14,15 @@ struct RulePackEditorDraft {
         case added(String)
     }
 
+    enum Confirmation: Equatable, Hashable {
+        case replacement(String)
+        case aggressiveRisk
+        case broadening
+    }
+
     enum SaveAction: Equatable {
         case commit(RulePackConfiguration, RulePackReviewReceipt?)
-        case confirmBroadening
+        case confirm(Confirmation)
     }
 
     let originalConfiguration: RulePackConfiguration
@@ -24,6 +30,7 @@ struct RulePackEditorDraft {
     let reviewReceipt: RulePackReviewReceipt?
     var configuration: RulePackConfiguration
     var typedApp = ""
+    private var confirmed: Set<Confirmation> = []
 
     init(saved: RulePackConfiguration, intent: Intent,
          reviewedDefinition: RulePackDefinition? = nil,
@@ -61,13 +68,43 @@ struct RulePackEditorDraft {
         return .added(target.value)
     }
 
-    func requestSave() -> SaveAction? {
+    func requestSave(exclusivePeerConfiguration: RulePackConfiguration? = nil) -> SaveAction? {
         guard canSave else { return nil }
-        if originalConfiguration.enabled,
-           originalConfiguration.scope == .selectedApps,
-           configuration.scope == .allApps {
-            return .confirmBroadening
+        for confirmation in requiredConfirmations(exclusivePeerConfiguration: exclusivePeerConfiguration)
+        where !confirmed.contains(confirmation) {
+            return .confirm(confirmation)
         }
         return .commit(configuration, reviewReceipt)
+    }
+
+    mutating func confirm(_ confirmation: Confirmation,
+                          exclusivePeerConfiguration: RulePackConfiguration? = nil) -> SaveAction? {
+        let required = requiredConfirmations(exclusivePeerConfiguration: exclusivePeerConfiguration)
+        guard required.contains(confirmation) else {
+            return requestSave(exclusivePeerConfiguration: exclusivePeerConfiguration)
+        }
+        confirmed.insert(confirmation)
+        return requestSave(exclusivePeerConfiguration: exclusivePeerConfiguration)
+    }
+
+    private func requiredConfirmations(
+        exclusivePeerConfiguration: RulePackConfiguration?
+    ) -> [Confirmation] {
+        guard configuration.enabled else { return [] }
+        var result: [Confirmation] = []
+        if let peer = exclusivePeerConfiguration,
+           peer.enabled,
+           AdvertisingPackTierPolicy.exclusivePeer(of: configuration.packID) == peer.packID {
+            result.append(.replacement(peer.packID))
+        }
+        if configuration.packID == AdvertisingPackTierPolicy.aggressiveID,
+           !originalConfiguration.enabled {
+            result.append(.aggressiveRisk)
+        }
+        if originalConfiguration.scope == .selectedApps,
+           configuration.scope == .allApps {
+            result.append(.broadening)
+        }
+        return result
     }
 }

@@ -360,16 +360,34 @@ Add a rule when something slips past this list; that is cheaper than finding it 
 
 `rule-packs/official-source.json` is the reviewed, unsigned source for the official catalog. The signed catalog is
 `site/packs/v1/official.json`; `build_site.py` copies it byte-for-byte to `docs/packs/v1/official.json`, which Pages
-serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. CI and Pages validate the catalog and verify its
-P-256 signature against `Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem`. They never sign it and have
-no private key.
+serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. The build also copies every content-addressed
+provenance document referenced by the signed catalog from `site/packs/v1/provenance/` to the matching `docs` path;
+CI rejects missing, extra, digest-mismatched, cross-origin, or byte-different provenance. CI and Pages validate the
+catalog and verify its P-256 signature against `Flowlight/Resources/RulePacks/official-rule-packs-v2-public.pem`. The v1 public key remains
+embedded for historical sequence-2 verification. CI and Pages never sign catalogs and have no private key.
+
+Advertising content is derived offline from the immutable bundle documented in
+`rule-packs/advertising/README.md`. `sources.lock.json` binds every EasyList, HaGeZi, and Public Suffix List input by
+revision, URL, byte count, and SHA-256 digest. Keep the bundled GPL-3.0-or-later, GPL-3.0, and MPL-2.0 license texts,
+upstream notices, generator source, preferred generated source, attribution, and modification date with every
+redistribution. The app must never fetch those upstream lists or raw GitHub files directly.
+
+GitHub stores the immutable review inputs, not the runtime trust source. A release bundles the exact signed official
+catalog, and every accepted update is retained as a byte-identical verified last-known-good cache. If GitHub Pages or
+the public feed is unavailable, a fresh install bootstraps from the bundled signature while an existing install keeps
+its accepted catalog and active enforcement; only update availability pauses, with bounded retry backoff. Never fall
+back to mutable upstream data. A future secondary first-party origin must serve the same signed bytes and be added as
+an explicitly pinned origin rather than accepted through cross-origin redirects.
 
 Validate edits before asking the offline signer to sign them. The catalog validator also enforces an explicit,
 evidence-backed allowlist for `official.tracking`: dedicated collection, replay and tracker-bootstrap hosts are allowed,
-while product/shared domains fail before signing. Add a new endpoint only with vendor documentation and regression
-coverage showing both its collector behavior and the product surfaces that must remain reachable.
+while product/shared domains fail before signing. Advertising validation separately enforces safe Public Suffix List
+boundaries, stable IDs, protected product surfaces, the balanced/aggressive semantic-superset relationship, and the
+reviewed PubADX scope. Add a new endpoint only with vendor documentation and regression coverage showing both its
+collector behavior and the product surfaces that must remain reachable.
 
 ```sh
+python3 -I scripts/generate_advertising_packs.py
 scripts/test-rule-pack-policy.sh
 python3 -I scripts/rule_pack_catalog.py validate rule-packs/official-source.json
 python3 -I scripts/rule_pack_catalog.py digest rule-packs/official-source.json
@@ -382,8 +400,8 @@ the result directly to the site source without printing or copying key material:
 
 ```sh
 python3 -I scripts/rule_pack_catalog.py sign rule-packs/official-source.json site/packs/v1/official.json \
-  --private-key /offline/path/official-rule-packs-private.pem \
-  --key-id flowlight-rule-packs-2026-01
+  --private-key /offline/path/official-rule-packs-2026-11-private.pem \
+  --key-id flowlight-rule-packs-2026-11
 python3 -I scripts/rule_pack_catalog.py compare \
   rule-packs/official-source.json site/packs/v1/official.json
 python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.json \
@@ -391,21 +409,28 @@ python3 -I scripts/rule_pack_catalog.py compare-previous site/packs/v1/official.
 # Use `verify --historical` only for an immutable prior catalog; it still verifies structure and signature but does
 # not retroactively apply today's endpoint allowlist to content published before that policy existed.
 python3 -I scripts/rule_pack_catalog.py verify site/packs/v1/official.json \
-  --public-key Flowlight/Resources/RulePacks/official-rule-packs-v1-public.pem \
-  --expected-key-id flowlight-rule-packs-2026-01
+  --public-key Flowlight/Resources/RulePacks/official-rule-packs-v2-public.pem \
+  --expected-key-id flowlight-rule-packs-2026-11
 python3 scripts/build_site.py
 python3 scripts/check_site.py
 ```
 
-For key rotation, first release an app that trusts both the old and new public keys. During that overlap, sign the
-same canonical payload once with each key; `sign` replaces only the named key's signature and preserves the other.
+For planned key rotation, first release an app that trusts both the old and new public keys. During that overlap, sign
+the same canonical payload once with each key; `sign` replaces only the named key's signature and preserves the other.
 Add both `--expected-key-id`/`--public-key` pairs to the CI and Pages verification commands for the entire overlap so
 neither signature can disappear unnoticed. Publish the dual-signed feed, wait for the trusting app release to
-propagate, then a later app release may remove the old key. A compromised or retired key is revoked by an app release
-that removes it from the trust set; the feed
-cannot revoke its own signing authority. If compromise is suspected, stop publishing, ship the trust change, and
-resume with a higher sequence signed by a trusted key. Clients reject rollback by sequence, so restoring an older
-catalog always means republishing its contents under a new, higher sequence.
+propagate, then a later app release may remove the old key.
+
+If the old private key is lost, it cannot produce the overlap signature. Keep its public key in the app so historical
+catalogs remain verifiable, add the replacement public key, and sign the next higher sequence only with the replacement.
+Clients that have not upgraded cannot accept the new signature; they must retain their verified last-known-good catalog
+until they install the app containing the replacement trust anchor. Record this break-glass transition in the release
+audit and never claim it was a normal dual-signed rotation.
+
+A compromised or retired key is revoked by an app release that removes it from the trust set; the feed cannot revoke
+its own signing authority. If compromise is suspected, stop publishing, ship the trust change, and resume with a higher
+sequence signed by a trusted key. Clients reject rollback by sequence, so restoring an older catalog always means
+republishing its contents under a new, higher sequence.
 
 ### Consuming the official rule-pack feed
 

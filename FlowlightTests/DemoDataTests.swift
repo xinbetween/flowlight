@@ -24,6 +24,12 @@ final class DemoDataTests: XCTestCase {
         XCTAssertEqual(DemoData.pluginReviewURL?.path, "/tmp/review-plugin.json")
     }
 
+    func testUITestLaunchSkipsBulkHistorySeeding() {
+        XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: false, isUITesting: false))
+        XCTAssertTrue(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: false))
+        XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: true))
+    }
+
     func testUITestAppStorageNeverChangesTheNormalPreferenceDomain() throws {
         let launchSuite = "com.flowlight.tests.launch.\(UUID().uuidString)"
         let isolatedSuite = "com.flowlight.tests.policies.\(UUID().uuidString)"

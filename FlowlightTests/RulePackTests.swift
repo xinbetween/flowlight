@@ -10,6 +10,123 @@ final class RulePackTests: XCTestCase {
         XCTAssertNil(HostCanonicalizer.host("two..dots.example"))
     }
 
+    func testPublicSuffixRulesRejectUnsafeSuffixBoundaries() throws {
+        XCTAssertTrue(PublicSuffixRules.allowsSuffixEntry("example.com"))
+        XCTAssertTrue(PublicSuffixRules.allowsSuffixEntry("www.ck"), "PSL exception rules must be honored")
+        XCTAssertTrue(PublicSuffixRules.allowsSuffixEntry("tenant.github.io"))
+        XCTAssertTrue(PublicSuffixRules.allowsSuffixEntry("tenant.pages.dev"))
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("Example.COM"), "unchecked callers still require canonical input")
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("com"))
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("co.uk"))
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("github.io"), "private PSL boundaries must be honored")
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("pages.dev"), "private PSL boundaries must be honored")
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("test.ck"), "PSL wildcard rules must be honored")
+        XCTAssertFalse(PublicSuffixRules.allowsSuffixEntry("192.0.2.1"))
+        XCTAssertEqual(PublicSuffixRules.registrableDomain("cdn.example.co.uk"), "example.co.uk")
+        XCTAssertEqual(PublicSuffixRules.registrableDomain("cdn.tenant.github.io"), "tenant.github.io")
+        XCTAssertEqual(PublicSuffixRules.registrableDomain("cdn.tenant.pages.dev"), "tenant.pages.dev")
+        XCTAssertEqual(PublicSuffixRules.registrableDomain("a.test.ck"), "a.test.ck", "wildcard rules must be honored")
+        XCTAssertEqual(PublicSuffixRules.registrableDomain("a.www.ck"), "www.ck", "exception rules must be honored")
+
+        let publicSuffix = pack(entries: [
+            RulePackEntry(id: 1, host: "co.uk", match: .suffix, category: .advertising),
+        ])
+        XCTAssertThrowsError(try RulePackValidator.validate([publicSuffix])) {
+            XCTAssertEqual($0 as? RulePackValidationError, .invalidEntry(publicSuffix.id, 1))
+        }
+    }
+
+    func testAdvertisingTierPolicyIsExplicitAndSymmetric() {
+        XCTAssertEqual(
+            AdvertisingPackTierPolicy.displayOrder,
+            [AdvertisingPackTierPolicy.balancedID, AdvertisingPackTierPolicy.aggressiveID]
+        )
+        XCTAssertEqual(AdvertisingPackTierPolicy.risk(for: AdvertisingPackTierPolicy.balancedID), .balanced)
+        XCTAssertEqual(AdvertisingPackTierPolicy.risk(for: AdvertisingPackTierPolicy.aggressiveID), .aggressive)
+        XCTAssertEqual(
+            AdvertisingPackTierPolicy.exclusivePeer(of: AdvertisingPackTierPolicy.balancedID),
+            AdvertisingPackTierPolicy.aggressiveID
+        )
+        XCTAssertEqual(
+            AdvertisingPackTierPolicy.exclusivePeer(of: AdvertisingPackTierPolicy.aggressiveID),
+            AdvertisingPackTierPolicy.balancedID
+        )
+        XCTAssertNil(AdvertisingPackTierPolicy.exclusivePeer(of: "official.tracking"))
+    }
+
+    func testOfficialAdvertisingPreservesStableIDsAndPubADXBoundaries() throws {
+        let stableBalancedIDs = Dictionary(
+            uniqueKeysWithValues: BuiltInRulePacks.advertising.entries
+                .filter { $0.id <= 12 }
+                .map { ($0.host, $0.id) }
+        )
+        XCTAssertEqual(stableBalancedIDs, [
+            "adnxs.com": 1,
+            "adservice.google.com": 2,
+            "adsrvr.org": 3,
+            "casalemedia.com": 4,
+            "criteo.com": 5,
+            "criteo.net": 6,
+            "doubleclick.net": 7,
+            "googleadservices.com": 8,
+            "googlesyndication.com": 9,
+            "openx.net": 10,
+            "pubmatic.com": 11,
+            "rubiconproject.com": 12,
+        ])
+
+        let balanced = try RulePackMatcher(snapshot: snapshot(BuiltInRulePacks.advertising))
+        XCTAssertEqual(balanced.matches(host: "platform.pubadx.one", bundleID: "app").map(\.entry.id), [14])
+        XCTAssertEqual(balanced.matches(host: "imp9.pubadx.one", bundleID: "app").map(\.entry.id), [13])
+        XCTAssertTrue(balanced.matches(host: "cdn.platform.pubadx.one", bundleID: "app").isEmpty)
+        XCTAssertTrue(balanced.matches(host: "pubadx.one", bundleID: "app").isEmpty)
+
+        let aggressive = try RulePackMatcher(snapshot: snapshot(BuiltInRulePacks.advertisingAggressive))
+        for host in ["pubadx.one", "platform.pubadx.one", "imp9.pubadx.one", "cdn.platform.pubadx.one"] {
+            XCTAssertEqual(aggressive.matches(host: host, bundleID: "app").map(\.entry.id), [15])
+        }
+        for host in ["pubadx.com", "pubadx.one.example", "notpubadx.one", "pubаdx.one"] {
+            XCTAssertTrue(aggressive.matches(host: host, bundleID: "app").isEmpty, host)
+        }
+    }
+
+    func testMatcherRejectsDualEnabledAdvertisingTiers() {
+        let snapshot = RulePackSnapshot.make(
+            definitions: [BuiltInRulePacks.advertising, BuiltInRulePacks.advertisingAggressive],
+            configurations: [
+                RulePackConfiguration(packID: AdvertisingPackTierPolicy.balancedID, enabled: true),
+                RulePackConfiguration(packID: AdvertisingPackTierPolicy.aggressiveID, enabled: true),
+            ],
+            overrides: []
+        )
+        XCTAssertThrowsError(try RulePackMatcher(snapshot: snapshot)) {
+            XCTAssertEqual(
+                $0 as? RulePackValidationError,
+                .exclusivePackConflict(
+                    AdvertisingPackTierPolicy.balancedID,
+                    AdvertisingPackTierPolicy.aggressiveID
+                )
+            )
+        }
+    }
+
+    func testMatcherOrdersBySpecificityThenMatchKindAndIdentity() throws {
+        let broad = pack(id: "z.broad", entries: [
+            RulePackEntry(id: 9, host: "example.com", match: .suffix, category: .advertising),
+        ])
+        let suffix = pack(id: "a.suffix", entries: [
+            RulePackEntry(id: 8, host: "ads.example.com", match: .suffix, category: .advertising),
+        ])
+        let exact = pack(id: "z.exact", entries: [
+            RulePackEntry(id: 7, host: "ads.example.com", match: .exact, category: .advertising),
+        ])
+        let matcher = try RulePackMatcher(snapshot: snapshot(broad, suffix, exact))
+
+        let matches = matcher.matches(host: "ads.example.com", bundleID: "app")
+        XCTAssertEqual(matches.map(\.packID), ["z.exact", "a.suffix", "z.broad"])
+        XCTAssertEqual(matches.map(\.entry.id), [7, 8, 9])
+    }
+
     func testSuffixAndExactEntriesHaveDifferentReach() throws {
         let definition = pack(entries: [
             RulePackEntry(id: 1, host: "ads.example", match: .suffix, category: .advertising),
@@ -127,6 +244,52 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(live.activeDigest, "")
     }
 
+    func testProxyMatcherPreparesCommittedDigestOffThread() async throws {
+        let definition = pack(entries: [
+            RulePackEntry(id: 1, host: "ads.example", category: .advertising),
+        ])
+        let value = snapshot(definition)
+        let live = LiveRulePacks()
+        let prepared = expectation(description: "proxy matcher prepared")
+
+        live.prepareCommit(snapshot: value, activeDigest: value.digest) { result in
+            XCTAssertEqual(result, .prepared)
+            prepared.fulfill()
+        }
+        await fulfillment(of: [prepared], timeout: 2)
+
+        XCTAssertEqual(live.match(host: "cdn.ads.example", bundleID: "com.example.app")?.packID, definition.id)
+        XCTAssertEqual(live.activeDigest, value.digest)
+    }
+
+    func testProxyMatcherReportsReverseCompletionAsSupersededWithoutOverwritingSuccess() {
+        let definition = pack(entries: [
+            RulePackEntry(id: 1, host: "ads.example", category: .advertising),
+        ])
+        let value = snapshot(definition)
+        let scheduler = ControlledPreparationScheduler()
+        let live = LiveRulePacks(preparationScheduler: { job in scheduler.schedule(job) })
+        let completionOrder = LockedPreparationResults()
+
+        live.prepareCommit(snapshot: value, activeDigest: value.digest) { result in
+            completionOrder.append(result)
+        }
+        live.prepareCommit(snapshot: value, activeDigest: value.digest) { result in
+            completionOrder.append(result)
+        }
+        XCTAssertEqual(scheduler.count, 2)
+
+        scheduler.run(at: 1)
+        XCTAssertEqual(completionOrder.values, [.prepared])
+        XCTAssertEqual(live.activeDigest, value.digest)
+        XCTAssertEqual(live.match(host: "cdn.ads.example", bundleID: "com.example.app")?.packID, definition.id)
+
+        scheduler.run(at: 0)
+        XCTAssertEqual(completionOrder.values, [.prepared, .superseded])
+        XCTAssertEqual(live.activeDigest, value.digest)
+        XCTAssertEqual(live.match(host: "cdn.ads.example", bundleID: "com.example.app")?.packID, definition.id)
+    }
+
     func testValidatorRejectsTamperDuplicateAndProtocolMismatch() throws {
         let valid = pack(entries: [RulePackEntry(id: 1, host: "ads.example", category: .advertising)])
         XCTAssertNoThrow(try RulePackValidator.validate([valid]))
@@ -134,6 +297,12 @@ final class RulePackTests: XCTestCase {
         var tampered = valid
         tampered.entries[0].host = "changed.example"
         XCTAssertThrowsError(try RulePackValidator.validate([tampered])) {
+            XCTAssertEqual($0 as? RulePackValidationError, .digestMismatch(valid.id))
+        }
+
+        var tamperedSnapshot = snapshot(valid)
+        tamperedSnapshot.definitions[0].entries[0].host = "changed.example"
+        XCTAssertThrowsError(try RulePackMatcher(snapshot: tamperedSnapshot)) {
             XCTAssertEqual($0 as? RulePackValidationError, .digestMismatch(valid.id))
         }
 
@@ -172,6 +341,31 @@ final class RulePackTests: XCTestCase {
         let unchanged = RulePackSimulation.run(candidate: candidate, definitions: [definition], configurations: [],
                                                overrides: [], rules: [alreadyBlocked], flows: [flow])
         XCTAssertTrue(unchanged.isEmpty)
+    }
+
+    func testSimulationReplacesAdvertisingPeerInsteadOfStacking() throws {
+        let balanced = pack(id: AdvertisingPackTierPolicy.balancedID, entries: [
+            RulePackEntry(id: 1, host: "balanced.example", category: .advertising),
+        ])
+        let aggressive = pack(id: AdvertisingPackTierPolicy.aggressiveID, entries: [
+            RulePackEntry(id: 2, host: "aggressive.example", category: .advertising),
+        ])
+        let active = RulePackConfiguration(packID: balanced.id, enabled: true)
+        let candidate = RulePackConfiguration(packID: aggressive.id)
+        let flow = RuleSimulation.Flow(
+            when: Date(), agentKey: "com.apple.Safari", bundleID: "com.apple.Safari",
+            appName: "Safari", host: "balanced.example", ip: "203.0.113.7", port: 443,
+            bytes: 50, connections: 2
+        )
+
+        let result = RulePackSimulation.run(
+            candidate: candidate,
+            definitions: [balanced, aggressive],
+            configurations: [active], overrides: [], rules: [], flows: [flow]
+        )
+
+        XCTAssertEqual(result.permits.count, 1)
+        XCTAssertEqual(result.permits.first?.connections, 2)
     }
 
     func testSimulationIncludesOtherEnabledPacksInBaseline() {
@@ -426,7 +620,7 @@ final class RulePackTests: XCTestCase {
         let definitionCount = store.definitions.count
         let enabledCount = store.enabledCount
         let snapshot = store.snapshot
-        XCTAssertEqual(definitionCount, 3)
+        XCTAssertEqual(definitionCount, 4)
         XCTAssertEqual(enabledCount, 0)
         XCTAssertNil(snapshot)
     }
@@ -453,6 +647,103 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(saved[0].consentedVersion, BuiltInRulePacks.advertising.manifest.version)
         XCTAssertEqual(saved[0].consentedContentSHA256, BuiltInRulePacks.advertising.manifest.contentSHA256)
         XCTAssertEqual(publications[0]?.configurations, saved)
+    }
+
+    @MainActor
+    func testStoreFullyValidatesManuallyConstructedCatalogBeforeInstall() throws {
+        var tampered = BuiltInRulePacks.advertising
+        tampered.entries[0].host = "tampered.example"
+        let catalog = VerifiedRulePackCatalog(
+            definitions: [tampered],
+            sequence: 1,
+            digest: String(repeating: "1", count: 64),
+            signerKeyID: "test-key",
+            stale: false,
+            rawEnvelope: Data("manually-constructed".utf8)
+        )
+        let db = try TrafficDatabase(url: FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-untrusted-install-\(UUID().uuidString).sqlite"))
+        let acceptance = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: Date(timeIntervalSince1970: 100),
+            nextEligibleAt: Date(timeIntervalSince1970: 200)
+        )
+        let store = RulePackStore()
+        let originalDefinitions = store.definitions
+
+        XCTAssertEqual(store.installCommittedCatalog(catalog, acceptance: acceptance), .rejected)
+        XCTAssertEqual(store.definitions, originalDefinitions)
+        XCTAssertNotNil(store.failureMessage)
+    }
+
+    @MainActor
+    func testStorePublishesReplacementAndCopiedOverridesTogether() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowlight-pack-tier-store-\(UUID().uuidString).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let catalog = VerifiedRulePackCatalog(
+            definitions: BuiltInRulePacks.all,
+            sequence: 3,
+            digest: String(repeating: "3", count: 64),
+            signerKeyID: "test-key",
+            stale: false,
+            rawEnvelope: Data("tier-store-catalog".utf8)
+        )
+        let acceptance = try db.acceptVerifiedRulePackCatalog(
+            catalog,
+            checkedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            nextEligibleAt: Date(timeIntervalSince1970: 1_800_086_400)
+        )
+        let store = RulePackStore()
+        XCTAssertEqual(store.installCommittedCatalog(catalog, acceptance: acceptance), .installed)
+        store.attach(db: db)
+        try await waitUntil { store.configurations.count == store.definitions.count }
+
+        let balancedDefinition = BuiltInRulePacks.advertising
+        var balanced = store.configuration(for: balancedDefinition.id)
+        balanced.enabled = true
+        var balancedSave: RulePackStore.SaveResult?
+        store.save(
+            balanced,
+            reviewedDefinition: balancedDefinition,
+            receipt: try XCTUnwrap(store.reviewReceipt(for: balancedDefinition))
+        ) { balancedSave = $0 }
+        try await waitUntil { balancedSave != nil }
+        XCTAssertEqual(balancedSave, .saved)
+
+        let balancedOverride = RulePackOverride(
+            packID: balancedDefinition.id,
+            app: "com.apple.Safari",
+            host: "doubleclick.net"
+        )
+        var overrideSaved: Bool?
+        store.addOverride(balancedOverride) { overrideSaved = $0 }
+        try await waitUntil { overrideSaved != nil }
+        XCTAssertEqual(overrideSaved, true)
+
+        let aggressiveDefinition = BuiltInRulePacks.advertisingAggressive
+        var aggressive = store.configuration(for: aggressiveDefinition.id)
+        aggressive.enabled = true
+        var aggressiveSave: RulePackStore.SaveResult?
+        store.save(
+            aggressive,
+            reviewedDefinition: aggressiveDefinition,
+            receipt: try XCTUnwrap(store.reviewReceipt(for: aggressiveDefinition))
+        ) { aggressiveSave = $0 }
+        try await waitUntil { aggressiveSave != nil }
+        XCTAssertEqual(aggressiveSave, .saved)
+
+        XCTAssertFalse(store.configuration(for: balancedDefinition.id).enabled)
+        XCTAssertTrue(store.configuration(for: aggressiveDefinition.id).enabled)
+        XCTAssertEqual(store.snapshot?.configurations.map(\.packID), [aggressiveDefinition.id])
+        let copied = try XCTUnwrap(store.snapshot?.overrides.first)
+        XCTAssertEqual(store.snapshot?.overrides.count, 1)
+        XCTAssertEqual(copied.packID, aggressiveDefinition.id)
+        XCTAssertNotEqual(copied.id, balancedOverride.id)
+        XCTAssertEqual(copied.app, balancedOverride.app)
+        XCTAssertEqual(copied.host, balancedOverride.host)
+        XCTAssertEqual(copied.match, balancedOverride.match)
+        XCTAssertTrue(store.overrides.contains(balancedOverride))
     }
 
     @MainActor
@@ -1337,12 +1628,77 @@ final class RulePackTests: XCTestCase {
         XCTAssertEqual(draft.requestSave(), .commit(selected, nil))
 
         draft.configuration.scope = .allApps
-        XCTAssertEqual(draft.requestSave(), .confirmBroadening)
+        XCTAssertEqual(draft.requestSave(), .confirm(.broadening))
 
         selected.apps = []
         let invalid = RulePackEditorDraft(saved: selected, intent: .review)
         XCTAssertNil(invalid.requestSave())
         XCTAssertFalse(invalid.canSave)
+    }
+
+    func testAggressiveEditorPreservesReplacementRiskAndBroadeningConfirmations() {
+        let saved = RulePackConfiguration(
+            packID: AdvertisingPackTierPolicy.aggressiveID,
+            enabled: false,
+            scope: .selectedApps,
+            apps: ["com.apple.Safari"]
+        )
+        let peer = RulePackConfiguration(
+            packID: AdvertisingPackTierPolicy.balancedID,
+            enabled: true
+        )
+        var draft = RulePackEditorDraft(saved: saved, intent: .activate)
+        draft.configuration.scope = .allApps
+
+        XCTAssertEqual(
+            draft.requestSave(exclusivePeerConfiguration: peer),
+            .confirm(.replacement(peer.packID))
+        )
+        XCTAssertEqual(
+            draft.confirm(.replacement(peer.packID), exclusivePeerConfiguration: peer),
+            .confirm(.aggressiveRisk)
+        )
+        XCTAssertEqual(
+            draft.confirm(.aggressiveRisk, exclusivePeerConfiguration: peer),
+            .confirm(.broadening)
+        )
+        XCTAssertEqual(
+            draft.confirm(.broadening, exclusivePeerConfiguration: peer),
+            .commit(draft.configuration, nil)
+        )
+    }
+
+    func testBalancedEditorRequiresReplacementButNotAggressiveRisk() {
+        let saved = RulePackConfiguration(packID: AdvertisingPackTierPolicy.balancedID)
+        let peer = RulePackConfiguration(packID: AdvertisingPackTierPolicy.aggressiveID, enabled: true)
+        var draft = RulePackEditorDraft(saved: saved, intent: .activate)
+
+        XCTAssertEqual(
+            draft.requestSave(exclusivePeerConfiguration: peer),
+            .confirm(.replacement(peer.packID))
+        )
+        XCTAssertEqual(
+            draft.confirm(.replacement(peer.packID), exclusivePeerConfiguration: peer),
+            .commit(draft.configuration, nil)
+        )
+    }
+
+    func testEditorReevaluatesReplacementFromCurrentPeerState() {
+        let saved = RulePackConfiguration(packID: AdvertisingPackTierPolicy.balancedID)
+        let peer = RulePackConfiguration(packID: AdvertisingPackTierPolicy.aggressiveID, enabled: true)
+        var draft = RulePackEditorDraft(saved: saved, intent: .activate)
+
+        XCTAssertEqual(draft.requestSave(), .commit(draft.configuration, nil))
+        XCTAssertEqual(
+            draft.requestSave(exclusivePeerConfiguration: peer),
+            .confirm(.replacement(peer.packID)),
+            "a peer enabled after the editor opened must introduce a replacement confirmation"
+        )
+        XCTAssertEqual(
+            draft.confirm(.replacement(peer.packID)),
+            .commit(draft.configuration, nil),
+            "a peer disabled before confirmation must no longer be replaced"
+        )
     }
 
     func testActivityKeepsPackProvenanceSeparateAndReceiptAfterPrune() throws {
@@ -1468,9 +1824,9 @@ final class RulePackTests: XCTestCase {
         let fixture = try XCTUnwrap(Bundle.main.url(forResource: "official", withExtension: "json"))
         let data = try Data(contentsOf: fixture)
         let verified = try RulePackCatalogVerifier.verify(
-            data: data, now: 1_800_000_000, currentAppVersion: "0.15.4"
+            data: data, now: 1_800_000_000, currentAppVersion: "0.18.5"
         )
-        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.15.4")
+        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.18.5")
         _ = try db.acceptVerifiedRulePackCatalog(
             composed,
             checkedAt: Date(timeIntervalSince1970: 1_800_000_000),
@@ -1523,6 +1879,47 @@ private final class LockedBool: @unchecked Sendable {
     func set(_ value: Bool) {
         lock.lock()
         stored = value
+        lock.unlock()
+    }
+}
+
+private final class ControlledPreparationScheduler: @unchecked Sendable {
+    private let lock = NSLock()
+    private var jobs: [@Sendable () -> Void] = []
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return jobs.count
+    }
+
+    func schedule(_ job: @escaping @Sendable () -> Void) {
+        lock.lock()
+        jobs.append(job)
+        lock.unlock()
+    }
+
+    func run(at index: Int) {
+        lock.lock()
+        let job = jobs.remove(at: index)
+        lock.unlock()
+        job()
+    }
+}
+
+private final class LockedPreparationResults: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [LiveRulePacks.PreparationResult] = []
+
+    var values: [LiveRulePacks.PreparationResult] {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func append(_ value: LiveRulePacks.PreparationResult) {
+        lock.lock()
+        stored.append(value)
         lock.unlock()
     }
 }
