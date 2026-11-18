@@ -163,6 +163,9 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLDemoUITests", "YES",
             "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
             "-FLDemoExtensionUpdateWarning", "YES",
+            // Keep this test independent of a prior background-only launch. The warning is expected to recover a
+            // normally visible main window after it closes; background-only suppression is covered by AppKit tests.
+            "-app.backgroundOnly", "NO",
             "-FLScreen", "live",
             "-AppleLanguages", "(en)",
         ]
@@ -196,7 +199,10 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLDemoUITests", "YES",
             "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
             "-FLDemoAlertReview", "YES",
-            "-app.backgroundOnly", "YES",
+            // Start with a visible scene so this test can exercise both minimize and close before using the
+            // production menu-bar presentation path. Background-only launch suppression is covered separately by
+            // the focused AppKit lifecycle test and the real isolated demo acceptance.
+            "-app.backgroundOnly", "NO",
             "-FLScreen", "live",
             "-AppleLanguages", "(en)",
         ]
@@ -339,6 +345,8 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLDemoUITests", "YES",
             "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
             "-FLDemoPackReview", "YES",
+            // Explicitly reset the shared UserDefaults key after any background-only lifecycle test.
+            "-app.backgroundOnly", "NO",
             "-FLScreen", "rules",
             "-FLRulesTab", "rules",
             "-FLPinScreenshotScreen", "YES",
