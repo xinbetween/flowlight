@@ -15,7 +15,7 @@ final class PerformanceBudgetTests: XCTestCase {
         let source = BudgetTrafficSource()
 
         let monitor: TrafficMonitor = try await assertBudget(
-            "launch startup", fixture: "\(recordCount) retained traffic rows + 84,892 catalog entries",
+            "launch startup", fixture: "\(recordCount) retained traffic rows + 84,895 catalog entries",
             budgetMilliseconds: 4_000
         ) {
             let monitor = TrafficMonitor(databaseURL: url, trafficSourceFactory: { source })
