@@ -360,9 +360,10 @@ Add a rule when something slips past this list; that is cheaper than finding it 
 
 `rule-packs/official-source.json` is the reviewed, unsigned source for the official catalog. The signed catalog is
 `site/packs/v1/official.json`; `build_site.py` copies it byte-for-byte to `docs/packs/v1/official.json`, which Pages
-serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. The build also copies every content-addressed
-provenance document referenced by the signed catalog from `site/packs/v1/provenance/` to the matching `docs` path;
-CI rejects missing, extra, digest-mismatched, cross-origin, or byte-different provenance. CI and Pages validate the
+serves at `https://flowlight.xinbetween.com/packs/v1/official.json`. The build also copies the complete append-only,
+content-addressed provenance archive from `site/packs/v1/provenance/` to the matching `docs` path. Prior files remain
+available for installed, cached, and historical signed catalogs; CI rejects a missing current reference, an unsafe or
+digest-mismatched archive member, or byte/set drift between the source and generated archives. CI and Pages validate the
 catalog and verify its P-256 signature against `Flowlight/Resources/RulePacks/official-rule-packs-v2-public.pem`. The v1 public key remains
 embedded for historical sequence-2 verification. CI and Pages never sign catalogs and have no private key.
 

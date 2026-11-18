@@ -1281,7 +1281,6 @@
 "%lld unacknowledged alerts" = "%lld unacknowledged alerts";
 "Open Flowlight" = "Open Flowlight";
 "Show Dock Icon" = "Show Dock Icon";
-"Review Alerts…" = "Review Alerts…";
 "Update Available: Flowlight %@…" = "Update Available: Flowlight %@…";
 "Quit" = "Quit";
 "Check for updates automatically" = "Check for updates automatically";
@@ -1310,7 +1309,6 @@
 /* UI/SharedStrings.swift */
 "Advertising" = "Advertising";
 "Known advertising delivery and auction hosts across apps." = "Known advertising delivery and auction hosts across apps.";
-"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app.";
 "Cross-site tracking" = "Cross-site tracking";
 "Common analytics, session replay, and cross-site measurement hosts." = "Common analytics, session replay, and cross-site measurement hosts.";
 "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable.";
@@ -2112,3 +2110,21 @@
 "Opt-in · Higher breakage" = "Opt-in · Higher breakage";
 "Attribution: %@" = "Attribution: %@";
 "Source licenses: %@" = "Source licenses: %@";
+
+/* 0.18.6 alert review and enforcement diagnostics */
+"%lld new" = "%lld new";
+"Capture source" = "Capture source";
+"Configured packs" = "Configured packs";
+"Desired snapshot" = "Desired snapshot";
+"Enforcement diagnostics" = "Enforcement diagnostics";
+"Filter acknowledgement" = "Filter acknowledgement";
+"Flowlight, %lld new alerts" = "Flowlight, %lld new alerts";
+"Flowlight, 1 new alert" = "Flowlight, 1 new alert";
+"Flowlight, filter update needs attention, %lld new alerts" = "Flowlight, filter update needs attention, %lld new alerts";
+"Flowlight, filter update needs attention, 1 new alert" = "Flowlight, filter update needs attention, 1 new alert";
+"Inspection matcher" = "Inspection matcher";
+"No capture source" = "No capture source";
+"No new alerts match the current Focus scope." = "No new alerts match the current Focus scope.";
+"Review new alerts in Flowlight" = "Review new alerts in Flowlight";
+"Runtime" = "Runtime";
+"The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest.";

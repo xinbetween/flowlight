@@ -382,7 +382,7 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
     )
     if two_tier_catalog:
         if balanced is None or aggressive is None:
-            fail("0.18.5 advertising catalogs must contain both exclusive tiers")
+            fail("0.18.5 and later advertising catalogs must contain both exclusive tiers")
         balanced_entries = balanced["entries"]
         aggressive_entries = aggressive["entries"]
         balanced_keys = {(entry["host"], entry["match"]) for entry in balanced_entries}
@@ -438,6 +438,41 @@ def validate(catalog, *, require_signature=False, enforce_tracking_policy=True):
             ):
                 fail("official.advertising-aggressive is not a semantic superset of "
                      f"official.advertising at {required['host']}|{required['match']}")
+
+        if payload["sequence"] >= 4:
+            required_balanced = {
+                ("pagead2.googlesyndication.com", "suffix"): 42470,
+                ("jo.cashooshut.com", "exact"): 42474,
+            }
+            required_aggressive = {
+                **required_balanced,
+                ("googleleadservices.com", "suffix"): 42473,
+            }
+            for key, entry_id in required_balanced.items():
+                if balanced_by_key.get(key, {}).get("id") != entry_id:
+                    fail(f"sequence 4 balanced Advertising entry is missing or unstable: {key[0]}|{key[1]}")
+            for key, entry_id in required_aggressive.items():
+                if aggressive_by_key.get(key, {}).get("id") != entry_id:
+                    fail(f"sequence 4 aggressive Advertising entry is missing or unstable: {key[0]}|{key[1]}")
+            if any(advertising_entry_covers(entry, "googleleadservices.com") for entry in balanced_entries):
+                fail("sequence 4 balanced Advertising must not cover googleleadservices.com")
+            for host in ("cashooshut.com", "cdn.cashooshut.com", "sub.jo.cashooshut.com"):
+                for pack_id, entries in (
+                    (ADVERTISING_BALANCED_ID, balanced_entries),
+                    (ADVERTISING_AGGRESSIVE_ID, aggressive_entries),
+                ):
+                    if any(advertising_entry_covers(entry, host) for entry in entries):
+                        fail(f"{pack_id} broadens exact cashooshut scope to {host}")
+            for host in (
+                "googlevideo.com", "video.googlevideo.com", "ytimg.com", "i.ytimg.com",
+                "fbcdn.net", "static.fbcdn.net", "youtube.com", "facebook.com", "meta.com",
+            ):
+                for pack_id, entries in (
+                    (ADVERTISING_BALANCED_ID, balanced_entries),
+                    (ADVERTISING_AGGRESSIVE_ID, aggressive_entries),
+                ):
+                    if any(advertising_entry_covers(entry, host) for entry in entries):
+                        fail(f"{pack_id} covers protected shared product or media surface {host}")
 
     signatures = catalog["signatures"]
     if not isinstance(signatures, list) or len(signatures) > 16:

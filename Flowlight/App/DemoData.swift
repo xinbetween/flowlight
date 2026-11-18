@@ -6,6 +6,10 @@ import Foundation
 enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
     static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
+    static var showsAlertReview: Bool { isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAlertReview") }
+    static var autoReviewsAlerts: Bool {
+        isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAutoReviewAlerts")
+    }
     static var isUITesting: Bool { isEnabled && UserDefaults.standard.bool(forKey: "FLDemoUITests") }
     static var shouldSeedBulkHistory: Bool {
         shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting)
@@ -305,6 +309,36 @@ enum DemoData {
         try db.saveRule(rule)
         try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
                                       patterns: ["github.com", "npmjs.org"]))
+    }
+
+    /// Stable, disposable rows for menu-bar alert-review lifecycle coverage. IDs are deterministic because UI-test
+    /// demo databases are reset before this fixture runs; the acknowledged row proves the New filter is exact.
+    static func seedAlertReview(_ db: TrafficDatabase, now: Date = Date()) throws {
+        _ = try db.addAlert(
+            kind: AnomalyEngine.Kind.firstContact.rawValue,
+            bundleID: "com.example.older",
+            appName: "Older New Alert",
+            detail: "Older deterministic UI-test alert",
+            severity: 1,
+            at: now.addingTimeInterval(-120)
+        )
+        _ = try db.addAlert(
+            kind: AnomalyEngine.Kind.nonStandardPort.rawValue,
+            bundleID: "com.example.newest",
+            appName: "Newest New Alert",
+            detail: "Newest deterministic UI-test alert",
+            severity: 2,
+            at: now.addingTimeInterval(-60)
+        )
+        let acknowledged = try db.addAlert(
+            kind: AnomalyEngine.Kind.volumeSpike.rawValue,
+            bundleID: "com.example.acknowledged",
+            appName: "Acknowledged Alert",
+            detail: "Acknowledged deterministic UI-test alert",
+            severity: 3,
+            at: now
+        )
+        try db.setAlertTriageState(.acknowledged, ids: [acknowledged.id], at: now)
     }
 
     /// A previously accepted pack whose definition has since changed. Screenshot and acceptance runs use this

@@ -71,6 +71,41 @@ final class FlowJudgementTests: XCTestCase {
         XCTAssertEqual(TLSSNIParser.serverName(in: hello), "www.google-analytics.com")
     }
 
+    func testSplitAdSenseHelloReachesPackMatchAndStableRefusalEvent() throws {
+        let hello = clientHello(host: "pagead2.googlesyndication.com", paddingBefore: 1600)
+        let firstSegment = Data(hello.prefix(1460))
+        XCTAssertNil(TLSSNIParser.serverName(in: firstSegment))
+        XCTAssertTrue(BlockRules.nameMayStillArrive(port: 443, looksLikeTLS: true, named: false,
+                                                    outboundCallbacks: 1, inboundCallbacks: 0))
+
+        let entry = RulePackEntry(id: 42470, host: "pagead2.googlesyndication.com",
+                                  match: .suffix, category: .advertising)
+        let definition = RulePackDefinition(manifest: RulePackManifest(
+            id: AdvertisingPackTierPolicy.balancedID, version: "3", generatedAt: Date(timeIntervalSince1970: 1),
+            entryCount: 1, contentSHA256: RulePackValidator.digest([entry]),
+            titleKey: "Advertising", summaryKey: "", caveatKey: "", source: "test", license: "test"
+        ), entries: [entry])
+        let snapshot = RulePackSnapshot.make(
+            definitions: [definition],
+            configurations: [RulePackConfiguration(packID: definition.id, enabled: true)],
+            overrides: []
+        )
+        let matcher = try RulePackMatcher(snapshot: snapshot)
+        let host = try XCTUnwrap(TLSSNIParser.serverName(in: hello))
+        let match = try XCTUnwrap(matcher.matches(host: host, bundleID: "com.apple.Safari").first)
+        let event = RulePackEvent.refusal(match: match, at: 125, bundleID: "com.apple.Safari",
+                                          appName: "Safari", agentKey: "com.apple.Safari",
+                                          agentName: "Safari", port: 443)
+
+        XCTAssertEqual(event.bucket, 120)
+        XCTAssertEqual(event.packID, AdvertisingPackTierPolicy.balancedID)
+        XCTAssertEqual(event.packVersion, "3")
+        XCTAssertEqual(event.entryID, 42470)
+        XCTAssertEqual(event.host, "pagead2.googlesyndication.com")
+        XCTAssertEqual(event.matchedHost, "pagead2.googlesyndication.com")
+        XCTAssertEqual(event.action, .block)
+    }
+
     func testAHelloThatFitsOneSegmentIsStillReadStraightAway() {
         let hello = clientHello(host: "api.github.com", paddingBefore: 0)
         XCTAssertEqual(TLSSNIParser.serverName(in: hello), "api.github.com")

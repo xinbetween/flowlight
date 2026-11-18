@@ -14,6 +14,11 @@ let extensionLog = Logger(subsystem: FlowlightConstants.extensionBundleIdentifie
 final class FilterDataProvider: NEFilterDataProvider {
     private let tracker = FlowTracker()
     private var flushTimer: DispatchSourceTimer?
+    private let reevaluationQueue = DispatchQueue(label: "com.flowlight.filter.reevaluation", qos: .utility)
+    private let reevaluationLock = NSLock()
+    private var pendingReevaluationRevision: UInt64?
+    private var reevaluationScheduled = false
+    private var reevaluationRunning = false
 
     /// Set once macOS has asked this provider to start and the settings applied.
     static let filterStarted = OSAllocatedUnfairLock(
@@ -21,6 +26,12 @@ final class FilterDataProvider: NEFilterDataProvider {
     )
 
     override func startFilter(completionHandler: @escaping (Error?) -> Void) {
+        reevaluationLock.lock()
+        reevaluationRunning = true
+        reevaluationLock.unlock()
+        BlockEnforcer.shared.setFlowReevaluationHandler { [weak self] revision in
+            self?.scheduleReevaluation(for: revision)
+        }
         #if APP_STORE
         IPCServer.shared.attach(tracker: tracker)
         IPCServer.shared.startListener()
@@ -68,6 +79,11 @@ final class FilterDataProvider: NEFilterDataProvider {
 
     override func stopFilter(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         extensionLog.info("Filter stopped: \(reason.rawValue)")
+        BlockEnforcer.shared.setFlowReevaluationHandler(nil)
+        reevaluationLock.lock()
+        reevaluationRunning = false
+        pendingReevaluationRevision = nil
+        reevaluationLock.unlock()
         flushTimer?.cancel()
         flushTimer = nil
         let batches = tracker.aggregator.drain(before: .max)
@@ -106,6 +122,47 @@ final class FilterDataProvider: NEFilterDataProvider {
         }
         timer.resume()
         flushTimer = timer
+    }
+
+    /// Queue reevaluation away from the IPC/data callback that published the new snapshot. Coalesce bursts of
+    /// durable synchronization callbacks to the newest revision so a large flow table cannot delay the handshake.
+    private func scheduleReevaluation(for revision: UInt64) {
+        reevaluationLock.lock()
+        guard reevaluationRunning else {
+            reevaluationLock.unlock()
+            return
+        }
+        pendingReevaluationRevision = max(pendingReevaluationRevision ?? 0, revision)
+        guard !reevaluationScheduled else {
+            reevaluationLock.unlock()
+            return
+        }
+        reevaluationScheduled = true
+        reevaluationLock.unlock()
+        reevaluationQueue.async { [weak self] in self?.drainReevaluationQueue() }
+    }
+
+    private func drainReevaluationQueue() {
+        while true {
+            reevaluationLock.lock()
+            let revision = pendingReevaluationRevision
+            pendingReevaluationRevision = nil
+            if revision == nil { reevaluationScheduled = false }
+            reevaluationLock.unlock()
+            guard let revision else { return }
+            rearmAllowedFlows(for: revision)
+        }
+    }
+
+    /// A terminal `.allow()` ends data callbacks for that direction. When enforcement changes, use the provider's
+    /// out-of-band update API to ask for one next byte in both directions from every socket decided under an older
+    /// revision. Either direction can be the only one that receives more data for a long-lived connection.
+    private func rearmAllowedFlows(for revision: UInt64) {
+        let verdict = NEFilterDataVerdict(passBytes: 0, peekBytes: 1)
+        for flow in tracker.flowsNeedingReevaluation(for: revision) {
+            update(flow, using: verdict, for: .outbound)
+            update(flow, using: verdict, for: .inbound)
+        }
     }
 
     // MARK: Flow callbacks

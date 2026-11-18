@@ -234,14 +234,14 @@ struct MenuBarContent: View {
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
+    @EnvironmentObject var mainWindowPresenter: MainWindowPresenter
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         if extensionManager.state.showsMenuBarNotice {
             Button {
                 nav.showSources(.collector)
-                openWindow(id: "main")
-                NSApp.activate()
+                mainWindowPresenter.present { openWindow(id: "main") }
             } label: {
                 Label(L("Restart or reinstall the filter to finish the update"),
                       systemImage: "exclamationmark.triangle.fill")
@@ -257,15 +257,22 @@ struct MenuBarContent: View {
         }
         if monitor.unacknowledgedAlerts > 0 {
             Divider()
-            // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of a
-            // noun is not a suffix in most of the languages Flowlight speaks.
-            Text(monitor.unacknowledgedAlerts == 1 ? L("%lld unacknowledged alert", monitor.unacknowledgedAlerts)
-                                                   : L("%lld unacknowledged alerts", monitor.unacknowledgedAlerts))
+            Button {
+                reviewNewAlerts()
+            } label: {
+                // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of
+                // a noun is not a suffix in most of the languages Flowlight speaks.
+                Label(monitor.unacknowledgedAlerts == 1
+                      ? L("%lld unacknowledged alert", monitor.unacknowledgedAlerts)
+                      : L("%lld unacknowledged alerts", monitor.unacknowledgedAlerts),
+                      systemImage: "exclamationmark.triangle.fill")
+            }
+            .accessibilityIdentifier("menu.review-new-alerts")
+            .help(L("Review new alerts in Flowlight"))
         }
         Divider()
         Button(L("Open Flowlight")) {
-            openWindow(id: "main")
-            NSApp.activate()
+            mainWindowPresenter.present { openWindow(id: "main") }
         }
         .keyboardShortcut("o")
         if backgroundOnly {
@@ -273,13 +280,6 @@ struct MenuBarContent: View {
         }
         if !focus.targets.isEmpty {
             Button(focus.isOn ? L("Turn Focus Off") : L("Turn Focus On")) { focus.isOn.toggle() }
-        }
-        if monitor.unacknowledgedAlerts > 0 {
-            Button(L("Review Alerts…")) {
-                nav.showAlerts()
-                openWindow(id: "main")
-                NSApp.activate()
-            }
         }
         #if !APP_STORE
         if let update = updater.pendingUpdate {
@@ -292,6 +292,11 @@ struct MenuBarContent: View {
         }
         #endif
         Button(L("Quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+
+    private func reviewNewAlerts() {
+        nav.reviewAlerts(.new)
+        mainWindowPresenter.present { openWindow(id: "main") }
     }
 }
 

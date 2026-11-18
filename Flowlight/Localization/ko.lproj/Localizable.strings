@@ -1372,7 +1372,6 @@
 "%lld unacknowledged alerts" = "확인하지 않은 알림 %lld건";
 "Open Flowlight" = "Flowlight 열기";
 "Show Dock Icon" = "Dock 아이콘 표시";
-"Review Alerts…" = "알림 검토…";
 "Update Available: Flowlight %@…" = "업데이트 사용 가능: Flowlight %@…";
 "Quit" = "종료";
 "Check for updates automatically" = "자동으로 업데이트 확인";
@@ -1401,7 +1400,6 @@
 /* UI/SharedStrings.swift */
 "Advertising" = "광고";
 "Known advertising delivery and auction hosts across apps." = "여러 앱에서 사용되는 알려진 광고 전송 및 경매 호스트입니다.";
-"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "연결 차단으로는 페이지 레이아웃의 빈 공간, 자사 광고, 브라우저나 앱이 표시하는 오버레이를 제거할 수 없습니다.";
 "Cross-site tracking" = "사이트 간 추적";
 "Common analytics, session replay, and cross-site measurement hosts." = "일반적인 분석, 세션 재생 및 사이트 간 측정 호스트입니다.";
 "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "일부 앱은 기능 플래그에도 같은 제공업체를 사용합니다. 호스트를 사용할 수 없으면 내장 기본값으로 대체될 수 있습니다.";
@@ -2112,3 +2110,21 @@
 "Opt-in · Higher breakage" = "선택 · 더 높은 중단 위험";
 "Attribution: %@" = "저작자 표시: %@";
 "Source licenses: %@" = "소스 라이선스: %@";
+
+/* 0.18.6 alert review and enforcement diagnostics */
+"%lld new" = "신규 %lld개";
+"Capture source" = "캡처 소스";
+"Configured packs" = "설정된 팩";
+"Desired snapshot" = "원하는 스냅샷";
+"Enforcement diagnostics" = "적용 진단";
+"Filter acknowledgement" = "필터 확인 응답";
+"Flowlight, %lld new alerts" = "Flowlight, 새 알림 %lld개";
+"Flowlight, 1 new alert" = "Flowlight, 새 알림 1개";
+"Flowlight, filter update needs attention, %lld new alerts" = "Flowlight, 필터 업데이트에 주의 필요, 새 알림 %lld개";
+"Flowlight, filter update needs attention, 1 new alert" = "Flowlight, 필터 업데이트에 주의 필요, 새 알림 1개";
+"Inspection matcher" = "검사 매처";
+"No capture source" = "캡처 소스 없음";
+"No new alerts match the current Focus scope." = "현재 집중 범위와 일치하는 새 알림이 없습니다.";
+"Review new alerts in Flowlight" = "Flowlight에서 새 알림 검토";
+"Runtime" = "런타임";
+"The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "선택한 팩이 설정되었지만 Network Extension과 검사 매처가 정확한 대상 다이제스트를 모두 확인할 때까지 차단하지 않습니다.";

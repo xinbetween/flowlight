@@ -6,6 +6,26 @@ enum AlertRuleSelection {
     }
 }
 
+enum AlertReviewBehavior {
+    static func filter(for target: AlertReviewTarget) -> AlertTriageFilter {
+        switch target {
+        case .new: return .new
+        case .alert: return .open
+        }
+    }
+
+    static func selection(for target: AlertReviewTarget, in alerts: [AlertRecord]) -> AlertRecord.ID? {
+        if case .alert(let id) = target,
+           alerts.contains(where: { $0.id == id }) {
+            return id
+        }
+        return alerts.max {
+            if $0.timestamp == $1.timestamp { return $0.id < $1.id }
+            return $0.timestamp < $1.timestamp
+        }?.id
+    }
+}
+
 struct AlertsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
@@ -26,6 +46,7 @@ struct AlertsView: View {
         var focus: FocusScope
         var tab: AlertsTab
         var filter: AlertTriageFilter
+        var reviewRequestID: UUID?
     }
 
     private var visible: [AlertRecord] {
@@ -60,8 +81,12 @@ struct AlertsView: View {
         .navigationTitle(L("Alerts"))
         .navigationSubtitle(nav.alertsTab == .detection ? L("Detection") : alertSubtitle)
         .toolbar { toolbar }
+        .onChange(of: nav.alertReviewRequest?.id, initial: true) { _, _ in
+            prepareAlertReview()
+        }
         .task(id: LoadKey(version: monitor.dataVersion, newAlerts: monitor.unacknowledgedAlerts,
-                          focus: focus.scope, tab: nav.alertsTab, filter: triageFilter)) {
+                          focus: focus.scope, tab: nav.alertsTab, filter: triageFilter,
+                          reviewRequestID: nav.alertReviewRequest?.id)) {
             await load()
         }
         .sheet(item: $noteAlert) { alert in noteEditor(alert) }
@@ -106,8 +131,11 @@ struct AlertsView: View {
                         Image(systemName: "note.text").foregroundStyle(.secondary).help(a.note)
                     }
                 }
+                .accessibilityIdentifier("alerts.row.\(a.id)")
+                .accessibilityValue(selection.contains(a.id) ? L("Selected") : "")
             }
         }
+        .accessibilityIdentifier("alerts.table")
         .contextMenu(forSelectionType: AlertRecord.ID.self) { ids in
             triageActions(ids)
             Divider()
@@ -168,6 +196,7 @@ struct AlertsView: View {
                                                                : "line.3.horizontal.decrease.circle")
                 }
                 .labelStyle(.titleAndIcon)
+                .accessibilityIdentifier("alerts.filter")
                 .help(L("Filter which alerts are listed"))
 
                 Menu {
@@ -258,6 +287,7 @@ struct AlertsView: View {
     private var alertSubtitle: String {
         guard !visible.isEmpty else { return "" }
         switch triageFilter {
+        case .new: return L("%lld new", visible.count)
         case .open:
             let newCount = visible.filter { $0.state == .new }.count
             return newCount == 0 ? L("%lld open, no new", visible.count)
@@ -270,6 +300,7 @@ struct AlertsView: View {
 
     private var emptyDescription: String {
         switch triageFilter {
+        case .new: return L("No new alerts match the current Focus scope.")
         case .open: return L("No open alerts match the current Focus scope.")
         case .investigating: return L("No alerts are being investigated in the current Focus scope.")
         case .resolved: return L("No resolved alerts match the current Focus scope.")
@@ -291,16 +322,46 @@ struct AlertsView: View {
                        end: alert.timestamp.addingTimeInterval(10 * 60))
     }
 
+    private func prepareAlertReview() {
+        guard let request = nav.alertReviewRequest else { return }
+        nav.alertsTab = .alerts
+        triageFilter = AlertReviewBehavior.filter(for: request.target)
+        rule = ""
+        selection.removeAll()
+    }
+
     private func load() async {
         guard nav.alertsTab == .alerts else { return }
         let scope = focus.scope
         let filter = triageFilter
-        let loaded = (try? await monitor.read { try $0.alerts(focus: scope, triageFilter: filter) }) ?? []
+        let reviewRequest = nav.alertReviewRequest
+        let loaded: [AlertRecord]
+        do {
+            loaded = try await monitor.read { try $0.alerts(focus: scope, triageFilter: filter) }
+        } catch {
+            // Keep the request alive when SQLite is temporarily locked or unavailable. Consuming it here would make
+            // the badge action appear to succeed while leaving the person with an empty, non-reviewable screen.
+            return
+        }
         guard !Task.isCancelled, nav.alertsTab == .alerts,
               focus.scope == scope, triageFilter == filter else { return }
+        if let reviewRequest {
+            guard nav.alertReviewRequest?.id == reviewRequest.id else { return }
+        } else {
+            guard nav.alertReviewRequest == nil else { return }
+        }
         rule = AlertRuleSelection.retained(rule, in: loaded)
         alerts = loaded
-        selection.formIntersection(alerts.map(\.id))
+        if let reviewRequest {
+            if let id = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded) {
+                selection = [id]
+            } else {
+                selection.removeAll()
+            }
+            nav.consumeAlertReviewRequest(id: reviewRequest.id)
+        } else {
+            selection.formIntersection(alerts.map(\.id))
+        }
     }
 }
 
@@ -330,6 +391,7 @@ private extension AlertDisposition {
 private extension AlertTriageFilter {
     var title: String {
         switch self {
+        case .new: return L("New")
         case .open: return L("Open")
         case .investigating: return L("Investigating")
         case .resolved: return L("Resolved")

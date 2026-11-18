@@ -245,6 +245,18 @@ struct ReportRequest: Equatable {
     var id = UUID()
 }
 
+enum AlertReviewTarget: Equatable, Sendable {
+    case new
+    case alert(AlertRecord.ID)
+}
+
+/// A one-shot request to show the alert list in a reviewable state. The identity is as important as the target:
+/// database loads finish asynchronously, so an older load must never consume a newer click from the menu bar.
+struct AlertReviewRequest: Equatable, Sendable {
+    var target: AlertReviewTarget
+    var id = UUID()
+}
+
 /// Shared navigation state so screens can link to each other (Live/Alerts → Reports).
 @MainActor
 final class AppNavigation: ObservableObject {
@@ -275,6 +287,7 @@ final class AppNavigation: ObservableObject {
             ? PolicyRequest(destination: .managedPack(nil)) : nil
     }()
     @Published var agentPolicyRequest: AgentPolicyRequest?
+    @Published private(set) var alertReviewRequest: AlertReviewRequest?
 
     private struct TrailEntry {
         var item: SidebarItem
@@ -325,6 +338,16 @@ final class AppNavigation: ObservableObject {
 
     func showAlerts() {
         show(.alerts)
+    }
+
+    func reviewAlerts(_ target: AlertReviewTarget = .new) {
+        alertReviewRequest = AlertReviewRequest(target: target)
+        show(.alerts)
+    }
+
+    func consumeAlertReviewRequest(id: UUID) {
+        guard alertReviewRequest?.id == id else { return }
+        alertReviewRequest = nil
     }
 
     func showRules() {

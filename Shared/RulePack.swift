@@ -233,6 +233,15 @@ struct RulePackEvent: Codable, Equatable, Sendable {
     var host: String
     var matchedHost: String
     var port: UInt16
+
+    static func refusal(match: RulePackMatch, at: Int64, bundleID: String, appName: String,
+                        agentKey: String, agentName: String, port: UInt16) -> RulePackEvent {
+        RulePackEvent(bucket: at / 60 * 60, packID: match.packID, packVersion: match.packVersion,
+                      entryID: match.entry.id, category: match.entry.category, match: match.entry.match,
+                      action: .block, count: 1, firstAt: at, lastAt: at, bundleID: bundleID,
+                      appName: appName, agentKey: agentKey, agentName: agentName,
+                      host: match.matchedHost, matchedHost: match.entry.host, port: port)
+    }
 }
 
 /// One immutable delivery. Its ID makes an uncertain acknowledgement safe to retry without double-counting.
@@ -364,6 +373,29 @@ enum RulePackValidator {
     }
 }
 
+enum EnforcementRevisionGate {
+    static func shouldEvaluate(lastJudgedRevision: UInt64?, currentRevision: UInt64) -> Bool {
+        lastJudgedRevision != currentRevision
+    }
+
+    static func shouldRearmTerminalFlow(lastJudgedRevision: UInt64?, currentRevision: UInt64) -> Bool {
+        guard let lastJudgedRevision else { return false }
+        return lastJudgedRevision != currentRevision
+    }
+
+    static func shouldAdvanceConnection(from oldValue: Bool, to newValue: Bool) -> Bool {
+        oldValue != newValue
+    }
+}
+
+enum RulePackEvaluation: Equatable, Sendable {
+    case invalidHostname
+    case noMatch
+    case appScopeExcluded
+    case allowedByOverride
+    case matched([RulePackMatch])
+}
+
 /// Immutable after construction. Matching walks reversed labels (`com → example → ads`) and therefore depends on
 /// hostname depth, not on the number of entries in the installed packs.
 final class RulePackMatcher: @unchecked Sendable {
@@ -403,7 +435,40 @@ final class RulePackMatcher: @unchecked Sendable {
     }
 
     func matches(host: String, bundleID: String) -> [RulePackMatch] {
-        guard let canonical = HostCanonicalizer.host(host) else { return [] }
+        guard case .matched(let matches) = evaluate(host: host, bundleID: bundleID) else { return [] }
+        return matches
+    }
+
+    /// Explains a hostname-only decision without retaining the hostname. Callers can expose this bounded reason while
+    /// keeping destinations and payloads out of diagnostics.
+    func evaluate(host: String, bundleID: String) -> RulePackEvaluation {
+        guard let canonical = HostCanonicalizer.host(host) else { return .invalidHostname }
+        let decisions = candidateDecisions(for: canonical)
+        guard !decisions.isEmpty else { return .noMatch }
+        var scopeExcluded = false
+        var overridden = false
+        var matches = [RulePackMatch]()
+        for decision in decisions {
+            guard configurations[decision.packID]?.applies(to: bundleID) == true else {
+                scopeExcluded = true
+                continue
+            }
+            if overrides.contains(where: {
+                $0.matches(packID: decision.packID, bundleID: bundleID, host: canonical)
+            }) {
+                overridden = true
+                continue
+            }
+            matches.append(RulePackMatch(packID: decision.packID, packVersion: decision.packVersion,
+                                         entry: decision.entry, matchedHost: canonical))
+        }
+        if !matches.isEmpty { return .matched(matches) }
+        if overridden { return .allowedByOverride }
+        if scopeExcluded { return .appScopeExcluded }
+        return .noMatch
+    }
+
+    private func candidateDecisions(for canonical: String) -> [Decision] {
         let labels = canonical.split(separator: ".").reversed()
         var nodeIndex = 0
         var decisions: [Decision] = []
@@ -421,14 +486,7 @@ final class RulePackMatcher: @unchecked Sendable {
             if lhs.packID != rhs.packID { return lhs.packID < rhs.packID }
             return lhs.entry.id < rhs.entry.id
         }
-        return decisions.compactMap { decision in
-            guard configurations[decision.packID]?.applies(to: bundleID) == true else { return nil }
-            if overrides.contains(where: {
-                $0.matches(packID: decision.packID, bundleID: bundleID, host: canonical)
-            }) { return nil }
-            return RulePackMatch(packID: decision.packID, packVersion: decision.packVersion,
-                                 entry: decision.entry, matchedHost: canonical)
-        }
+        return decisions
     }
 
     private func insert(_ entry: RulePackEntry, pack: RulePackDefinition) {

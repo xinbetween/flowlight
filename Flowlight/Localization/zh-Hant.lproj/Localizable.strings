@@ -1372,7 +1372,6 @@
 "%lld unacknowledged alerts" = "%lld 則未確認的警示";
 "Open Flowlight" = "開啟 Flowlight";
 "Show Dock Icon" = "顯示 Dock 圖像";
-"Review Alerts…" = "檢視警示…";
 "Update Available: Flowlight %@…" = "有可用更新：Flowlight %@…";
 "Quit" = "結束";
 "Check for updates automatically" = "自動檢查更新";
@@ -1401,7 +1400,6 @@
 /* UI/SharedStrings.swift */
 "Advertising" = "廣告";
 "Known advertising delivery and auction hosts across apps." = "各個 App 使用的已知廣告投放與競價主機。";
-"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "封鎖連線無法移除頁面配置空白、第一方廣告，或瀏覽器和 App 顯示的浮層。";
 "Cross-site tracking" = "跨網站追蹤";
 "Common analytics, session replay, and cross-site measurement hosts." = "常見的分析、工作階段重播和跨網站衡量主機。";
 "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "部分 App 也使用相同供應商來管理功能旗標。主機無法使用時，它們可能會退回內建預設值。";
@@ -2112,3 +2110,21 @@
 "Opt-in · Higher breakage" = "可選 · 故障風險較高";
 "Attribution: %@" = "署名：%@";
 "Source licenses: %@" = "來源授權：%@";
+
+/* 0.18.6 alert review and enforcement diagnostics */
+"%lld new" = "%lld 個新警示";
+"Capture source" = "擷取來源";
+"Configured packs" = "已設定套件";
+"Desired snapshot" = "目標快照";
+"Enforcement diagnostics" = "強制執行診斷";
+"Filter acknowledgement" = "過濾器確認";
+"Flowlight, %lld new alerts" = "Flowlight，%lld 個新警示";
+"Flowlight, 1 new alert" = "Flowlight，1 個新警示";
+"Flowlight, filter update needs attention, %lld new alerts" = "Flowlight，過濾器更新需要處理，%lld 個新警示";
+"Flowlight, filter update needs attention, 1 new alert" = "Flowlight，過濾器更新需要處理，1 個新警示";
+"Inspection matcher" = "檢查比對器";
+"No capture source" = "沒有擷取來源";
+"No new alerts match the current Focus scope." = "沒有符合目前聚焦範圍的新警示。";
+"Review new alerts in Flowlight" = "在 Flowlight 中檢視新警示";
+"Runtime" = "執行階段";
+"The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "所選套件已設定，但在網路擴充功能和檢查比對器均確認完全一致的目標摘要之前不會執行封鎖。";

@@ -1346,13 +1346,15 @@ final class InspectionController: ObservableObject {
         }
         if let match = rulePackMatch(host, owner.bundleID) {
             let now = Int64(Date().timeIntervalSince1970)
-            let event = RulePackEvent(bucket: now / 60 * 60, packID: match.packID,
-                                      packVersion: match.packVersion, entryID: match.entry.id,
-                                      category: match.entry.category, match: match.entry.match, action: .block,
-                                      count: 1, firstAt: now, lastAt: now, bundleID: owner.bundleID,
-                                      appName: owner.appName, agentKey: facts.agentKey,
-                                      agentName: owner.agentName ?? owner.appName, host: match.matchedHost,
-                                      matchedHost: match.entry.host, port: facts.port)
+            let event = RulePackEvent.refusal(
+                match: match,
+                at: now,
+                bundleID: owner.bundleID,
+                appName: owner.appName,
+                agentKey: facts.agentKey,
+                agentName: owner.agentName ?? owner.appName,
+                port: facts.port
+            )
             onRulePackRefusal(event) { [weak self] committed in
                 guard !committed else { answer(false, nil); return }
                 self?.authorizeProxyAllowlist(facts: facts, owner: owner) { allowed in

@@ -1372,7 +1372,6 @@
 "%lld unacknowledged alerts" = "%lld alertas não confirmados";
 "Open Flowlight" = "Abrir o Flowlight";
 "Show Dock Icon" = "Mostrar o ícone na Dock";
-"Review Alerts…" = "Rever os alertas…";
 "Update Available: Flowlight %@…" = "Atualização disponível: Flowlight %@…";
 "Quit" = "Sair";
 "Check for updates automatically" = "Procurar atualizações automaticamente";
@@ -1401,7 +1400,6 @@
 /* UI/SharedStrings.swift */
 "Advertising" = "Publicidade";
 "Known advertising delivery and auction hosts across apps." = "Anfitriões conhecidos de distribuição e leilão de publicidade em várias apps.";
-"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "O bloqueio de ligações não consegue remover espaços vazios no esquema das páginas, anúncios próprios ou sobreposições apresentadas por um navegador ou uma app.";
 "Cross-site tracking" = "Rastreio entre sites";
 "Common analytics, session replay, and cross-site measurement hosts." = "Anfitriões comuns de análise, reprodução de sessões e medição entre sites.";
 "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "Algumas apps usam os mesmos fornecedores para sinalizadores de funcionalidades. Podem recorrer aos valores predefinidos integrados quando um anfitrião não está disponível.";
@@ -2112,3 +2110,21 @@
 "Opt-in · Higher breakage" = "Opcional · Maior risco de falhas";
 "Attribution: %@" = "Atribuição: %@";
 "Source licenses: %@" = "Licenças das fontes: %@";
+
+/* 0.18.6 alert review and enforcement diagnostics */
+"%lld new" = "%lld novos";
+"Capture source" = "Origem de captura";
+"Configured packs" = "Pacotes configurados";
+"Desired snapshot" = "Snapshot pretendido";
+"Enforcement diagnostics" = "Diagnóstico de aplicação";
+"Filter acknowledgement" = "Confirmação do filtro";
+"Flowlight, %lld new alerts" = "Flowlight, %lld novos alertas";
+"Flowlight, 1 new alert" = "Flowlight, 1 novo alerta";
+"Flowlight, filter update needs attention, %lld new alerts" = "Flowlight, a atualização do filtro requer atenção, %lld novos alertas";
+"Flowlight, filter update needs attention, 1 new alert" = "Flowlight, a atualização do filtro requer atenção, 1 novo alerta";
+"Inspection matcher" = "Correspondência de inspeção";
+"No capture source" = "Sem origem de captura";
+"No new alerts match the current Focus scope." = "Nenhum novo alerta corresponde ao âmbito de Foco atual.";
+"Review new alerts in Flowlight" = "Rever novos alertas no Flowlight";
+"Runtime" = "Execução";
+"The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "O pacote selecionado está configurado, mas não bloqueia até a extensão de rede e a correspondência de inspeção confirmarem o resumo exato pretendido.";

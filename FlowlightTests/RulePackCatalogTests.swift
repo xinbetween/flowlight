@@ -415,21 +415,21 @@ final class RulePackCatalogTests: XCTestCase {
         let verified = try RulePackCatalogVerifier.verify(
             data: data,
             now: 1_800_000_000,
-            currentAppVersion: "0.18.5"
+            currentAppVersion: "0.18.6"
         )
         XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-11")
-        XCTAssertEqual(verified.sequence, 3)
-        XCTAssertEqual(verified.digest, "7e8db8dc7dbce8d323532da25a35ebe05134707a77dab559f0798ad1ca6f25ff")
+        XCTAssertEqual(verified.sequence, 4)
+        XCTAssertEqual(verified.digest, "726cf540d8fbb39f47fb7b8edbcf9a33722d5c85775b86e5390708bb1b3096c5")
         let definitions = verified.definitions.sorted { $0.id < $1.id }
         XCTAssertEqual(definitions.map(\.id), BuiltInRulePacks.all.map(\.id).sorted())
-        XCTAssertEqual(definitions.reduce(0) { $0 + $1.entries.count }, 84_892)
+        XCTAssertEqual(definitions.reduce(0) { $0 + $1.entries.count }, 84_895)
         XCTAssertEqual(
             definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID }?.entries.count,
-            42_384
+            42_385
         )
         XCTAssertEqual(
             definitions.first { $0.id == AdvertisingPackTierPolicy.aggressiveID }?.entries.count,
-            42_433
+            42_435
         )
         XCTAssertNotEqual(
             definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID },

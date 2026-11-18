@@ -55,6 +55,154 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Owns the actual main AppKit window so menu-bar actions can restore it without guessing by title. Opening a
+/// SwiftUI scene and activating the process are separate operations; activation is deliberately last so a restored
+/// background-only app has a real key window by the time it becomes active.
+@MainActor
+final class MainWindowPresenter: ObservableObject {
+    private final class WindowReference {
+        weak var value: NSWindow?
+
+        init(_ value: NSWindow) {
+            self.value = value
+        }
+    }
+
+    private var windows: [ObjectIdentifier: WindowReference] = [:]
+    private var registrationOrder: [ObjectIdentifier] = []
+    private var primaryWindowID: ObjectIdentifier?
+    private let suppressInitialPresentation: () -> Bool
+    private var didHandleInitialRegistration = false
+    private(set) var presentationPending = false
+
+    init(suppressInitialPresentation: @escaping () -> Bool = { false }) {
+        self.suppressInitialPresentation = suppressInitialPresentation
+    }
+
+    func register(_ window: NSWindow) {
+        removeReleasedWindows()
+        let identifier = ObjectIdentifier(window)
+        window.isReleasedWhenClosed = false
+        if !didHandleInitialRegistration {
+            didHandleInitialRegistration = true
+            if !presentationPending, suppressInitialPresentation() {
+                window.orderOut(nil)
+            }
+        }
+        if windows[identifier] == nil {
+            windows[identifier] = WindowReference(window)
+            registrationOrder.append(identifier)
+        }
+        if primaryWindowID == nil || !primaryWindowIsDirectlyPresentable {
+            // SwiftUI may replace a transient hidden window while constructing one scene. Until one is visibly
+            // canonical, prefer the latest registration; presentation retires the superseded objects.
+            primaryWindowID = identifier
+        }
+        if presentationPending {
+            primaryWindowID = identifier
+            retireOtherWindows(keeping: window)
+            focus(window)
+        }
+    }
+
+    func unregister(_ window: NSWindow) {
+        let identifier = ObjectIdentifier(window)
+        windows.removeValue(forKey: identifier)
+        registrationOrder.removeAll { $0 == identifier }
+        if primaryWindowID == identifier {
+            primaryWindowID = registrationOrder.first
+        }
+    }
+
+    func present(openWindow: () -> Void) {
+        presentationPending = true
+        if !FlowlightApp.runningTests {
+            NSApp.setActivationPolicy(.regular)
+        }
+        if let window = preferredWindow() {
+            primaryWindowID = ObjectIdentifier(window)
+            retireOtherWindows(keeping: window)
+            focus(window)
+            return
+        }
+
+        openWindow()
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  self.presentationPending,
+                  let window = self.preferredWindow() else { return }
+            self.primaryWindowID = ObjectIdentifier(window)
+            self.retireOtherWindows(keeping: window)
+            self.focus(window)
+        }
+    }
+
+    private func canPresentDirectly(_ window: NSWindow) -> Bool {
+        window.isVisible || window.isMiniaturized
+    }
+
+    private var primaryWindowIsDirectlyPresentable: Bool {
+        guard let primaryWindowID,
+              let window = windows[primaryWindowID]?.value else { return false }
+        return canPresentDirectly(window)
+    }
+
+    private func preferredWindow() -> NSWindow? {
+        removeReleasedWindows()
+        let registered = registrationOrder.compactMap { windows[$0]?.value }
+        if let active = registered.first(where: { $0.isKeyWindow || $0.isMainWindow }) {
+            return active
+        }
+        if let primaryWindowID,
+           let primary = windows[primaryWindowID]?.value,
+           canPresentDirectly(primary) {
+            return primary
+        }
+        if let visible = registered.first(where: canPresentDirectly) {
+            return visible
+        }
+        if let primaryWindowID,
+           let primary = windows[primaryWindowID]?.value {
+            return primary
+        }
+        return registered.first
+    }
+
+    private func retireOtherWindows(keeping window: NSWindow) {
+        let identifier = ObjectIdentifier(window)
+        guard let reference = windows[identifier] else { return }
+        let duplicates = registrationOrder.compactMap { candidate -> NSWindow? in
+            guard candidate != identifier else { return nil }
+            return windows[candidate]?.value
+        }
+        windows = [identifier: reference]
+        registrationOrder = [identifier]
+        primaryWindowID = identifier
+        duplicates.forEach { $0.close() }
+    }
+
+    private func removeReleasedWindows() {
+        let released = windows.compactMap { identifier, reference in
+            reference.value == nil ? identifier : nil
+        }
+        guard !released.isEmpty else { return }
+        for identifier in released {
+            windows.removeValue(forKey: identifier)
+        }
+        registrationOrder.removeAll { released.contains($0) }
+        if let primaryWindowID, released.contains(primaryWindowID) {
+            self.primaryWindowID = registrationOrder.first
+        }
+    }
+
+    private func focus(_ window: NSWindow) {
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
+        if !FlowlightApp.runningTests { NSApp.activate() }
+        presentationPending = false
+    }
+}
+
 @main
 struct FlowlightApp: App {
     /// True while the XCTest bundle is being hosted by this app.
@@ -88,6 +236,7 @@ struct FlowlightApp: App {
     @StateObject private var nav: AppNavigation
     @StateObject private var updater: UpdateChecker
     @StateObject private var focus: FocusStore
+    @StateObject private var mainWindowPresenter: MainWindowPresenter
 
     init() {
         let monitor = TrafficMonitor()
@@ -95,11 +244,15 @@ struct FlowlightApp: App {
         let nav = AppNavigation()
         let updater = UpdateChecker()
         let focus = FocusStore()
+        let mainWindowPresenter = MainWindowPresenter {
+            UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly)
+        }
         _monitor = StateObject(wrappedValue: monitor)
         _extensionManager = StateObject(wrappedValue: extensionManager)
         _nav = StateObject(wrappedValue: nav)
         _updater = StateObject(wrappedValue: updater)
         _focus = StateObject(wrappedValue: focus)
+        _mainWindowPresenter = StateObject(wrappedValue: mainWindowPresenter)
 
         // SwiftUI may restore a background-only launch with no window and without rendering the menu-bar label yet.
         // Core services belong to the application lifecycle, not to either presentation path.
@@ -120,6 +273,10 @@ struct FlowlightApp: App {
     }
 
     var body: some Scene {
+        // Flowlight owns one app-wide navigation model and one main-window presenter. Keep WindowGroup's reliable
+        // scene construction, but opt the main scene out of macOS restoration so legacy copies and stale sidebar
+        // state cannot compete with menu-bar deep links. The scene is always created; the presenter orders it out at
+        // background launch so menu actions retain a real AppKit window they can foreground without scene reopening.
         WindowGroup("Flowlight", id: "main") {
             ContentView(rulePacks: monitor.rulePacks)
                 .defaultAppStorage(DemoData.appStorage)
@@ -128,12 +285,15 @@ struct FlowlightApp: App {
                 .environmentObject(nav)
                 .environmentObject(updater)
                 .environmentObject(focus)
+                .environmentObject(mainWindowPresenter)
                 .frame(minWidth: 1000, minHeight: 660)
                 .onChange(of: backgroundOnly, initial: true) { _, on in Self.applyActivationPolicy(backgroundOnly: on) }
                 .onAppear { Self.windowsChanged() }
                 .onDisappear { Self.windowsChanged() }
         }
         .windowToolbarStyle(.unified)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.presented)
         .commands {
             SidebarCommands()
             CommandGroup(replacing: .appInfo) {
@@ -210,12 +370,15 @@ struct FlowlightApp: App {
                 .environmentObject(nav)
                 .environmentObject(updater)
                 .environmentObject(focus)
+                .environmentObject(mainWindowPresenter)
         } label: {
             MenuBarLabel(liveState: monitor.liveState)
                 .environmentObject(monitor)
                 .environmentObject(extensionManager)
                 .environmentObject(updater)
                 .environmentObject(focus)
+                .environmentObject(nav)
+                .environmentObject(mainWindowPresenter)
         }
 
         Settings {
@@ -316,12 +479,31 @@ struct MenuBarLabel: View {
     @EnvironmentObject var extensionManager: ExtensionManager
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
+    @EnvironmentObject var nav: AppNavigation
+    @EnvironmentObject var mainWindowPresenter: MainWindowPresenter
     @Environment(\.openWindow) private var openWindow
     @AppStorage(AnomalySettings.Keys.backgroundOnly) private var backgroundOnly = false
     @AppStorage(AnomalySettings.Keys.menuBarRates) private var showRates = true
+    @State private var didAutoReviewAlerts = false
 
     var body: some View {
         label
+            .onAppear {
+                guard DemoData.autoReviewsAlerts, !didAutoReviewAlerts else { return }
+                didAutoReviewAlerts = true
+                reviewNewAlerts()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didMiniaturizeNotification)) { note in
+                guard DemoData.autoReviewsAlerts,
+                      (note.object as? NSWindow)?.canBecomeMain == true else { return }
+                reviewNewAlerts()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+                guard DemoData.autoReviewsAlerts,
+                      (note.object as? NSWindow)?.canBecomeMain == true else { return }
+                // Let AppKit finish ordering out the retained window before presenting it again.
+                DispatchQueue.main.async { reviewNewAlerts() }
+            }
             .onChange(of: focus.scope) { _, scope in monitor.applyFocus(scope) }
             .onChange(of: backgroundOnly, initial: true) { _, _ in FlowlightApp.windowsChanged() }
             .onChange(of: monitor.extensionUpdatePresentation?.id, initial: true) { _, incidentID in
@@ -338,13 +520,18 @@ struct MenuBarLabel: View {
             #endif
     }
 
+    private func reviewNewAlerts() {
+        nav.reviewAlerts(.new)
+        mainWindowPresenter.present { openWindow(id: "main") }
+    }
+
     private var hasFilterNotice: Bool {
         extensionManager.state.showsMenuBarNotice || monitor.extensionUpdateIncident != nil
     }
 
     private var label: some View {
         HStack(spacing: 4) {
-            if hasFilterNotice {
+            if hasFilterNotice || monitor.unacknowledgedAlerts > 0 {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .accessibilityHidden(true)
             }
@@ -357,12 +544,28 @@ struct MenuBarLabel: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(hasFilterNotice
-                            ? L("Flowlight, filter update needs attention")
-                            : L("Flowlight network activity"))
-        .help(hasFilterNotice
-              ? L("Restart or reinstall the filter to finish the update")
-              : L("Open Flowlight"))
+        .accessibilityIdentifier("menu.status")
+        .accessibilityLabel(accessibilityTitle)
+        .help(helpTitle)
+    }
+
+    private var accessibilityTitle: String {
+        let count = monitor.unacknowledgedAlerts
+        switch (hasFilterNotice, count) {
+        case (true, 1): return L("Flowlight, filter update needs attention, 1 new alert")
+        case (true, let count) where count > 1:
+            return L("Flowlight, filter update needs attention, %lld new alerts", count)
+        case (true, _): return L("Flowlight, filter update needs attention")
+        case (false, 1): return L("Flowlight, 1 new alert")
+        case (false, let count) where count > 1: return L("Flowlight, %lld new alerts", count)
+        default: return L("Flowlight network activity")
+        }
+    }
+
+    private var helpTitle: String {
+        if hasFilterNotice { return L("Restart or reinstall the filter to finish the update") }
+        if monitor.unacknowledgedAlerts > 0 { return L("Review new alerts in Flowlight") }
+        return L("Open Flowlight")
     }
 }
 

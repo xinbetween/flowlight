@@ -61948,6 +61948,10 @@
       "firstSeenVersion": "0.18.5",
       "id": 15491
     },
+    "googleleadservices.com|suffix": {
+      "firstSeenVersion": "0.18.6",
+      "id": 42473
+    },
     "googlesyndication.com|suffix": {
       "firstSeenVersion": "0.15.0",
       "id": 9
@@ -77423,6 +77427,10 @@
     "jnzzlhxhvnqso.online|suffix": {
       "firstSeenVersion": "0.18.5",
       "id": 19358
+    },
+    "jo.cashooshut.com|exact": {
+      "firstSeenVersion": "0.18.6",
+      "id": 42474
     },
     "joachimsoddens.com|suffix": {
       "firstSeenVersion": "0.18.5",
@@ -169890,7 +169898,7 @@
     }
   },
   "format": 2,
-  "nextID": 42473,
+  "nextID": 42475,
   "tombstones": [
     {
       "firstSeenVersion": "0.15.0",

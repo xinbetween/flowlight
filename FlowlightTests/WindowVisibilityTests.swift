@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import XCTest
 @testable import Flowlight
@@ -9,6 +10,14 @@ import XCTest
 final class WindowVisibilityTests: XCTestCase {
     /// Stand-in for an NSWindow. Only identity is ever used.
     private final class FakeWindow {}
+
+    private final class TrackingWindow: NSWindow {
+        private(set) var didClose = false
+
+        override func close() {
+            didClose = true
+        }
+    }
 
     func testNothingIsVisibleUntilAWindowSaysSo() {
         var windows = WindowVisibility()
@@ -112,5 +121,116 @@ final class WindowVisibilityTests: XCTestCase {
         XCTAssertEqual(windows.update(b, isVisible: false), .unchanged)
         XCTAssertEqual(windows.update(a, isVisible: false), .becameHidden)
         XCTAssertFalse(windows.isVisible)
+    }
+
+    @MainActor
+    func testMainWindowPresentationWaitsForRegistrationAndReusesExactWindow() {
+        let presenter = MainWindowPresenter()
+        var openCount = 0
+
+        presenter.present { openCount += 1 }
+        XCTAssertEqual(openCount, 1)
+        XCTAssertTrue(presenter.presentationPending)
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                              styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        presenter.register(window)
+        XCTAssertFalse(presenter.presentationPending)
+        XCTAssertTrue(window.isVisible)
+
+        presenter.present { openCount += 1 }
+        XCTAssertEqual(openCount, 1, "a registered main window must be restored instead of opening another scene")
+        presenter.unregister(window)
+        presenter.present { openCount += 1 }
+        XCTAssertEqual(openCount, 2)
+        window.orderOut(nil)
+    }
+
+    @MainActor
+    func testBackgroundLaunchRetainsButHidesMainWindowUntilPresentation() {
+        let presenter = MainWindowPresenter(suppressInitialPresentation: { true })
+        var openCount = 0
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                              styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        window.orderFront(nil)
+
+        presenter.register(window)
+        XCTAssertFalse(window.isVisible,
+                       "background launch must hide the guaranteed main scene")
+        presenter.present { openCount += 1 }
+
+        XCTAssertEqual(openCount, 0)
+        XCTAssertTrue(window.isVisible,
+                      "menu presentation must foreground the retained main scene")
+        window.orderOut(nil)
+    }
+
+    @MainActor
+    func testClosedRegisteredWindowReopensDirectlyWithoutSceneAction() {
+        let presenter = MainWindowPresenter()
+        var openCount = 0
+        let closedWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                                    styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        presenter.register(closedWindow)
+        XCTAssertFalse(closedWindow.isReleasedWhenClosed)
+        closedWindow.orderFront(nil)
+        closedWindow.close()
+        XCTAssertFalse(closedWindow.isVisible)
+
+        presenter.present { openCount += 1 }
+
+        XCTAssertEqual(openCount, 0,
+                       "a retained main window must not depend on SwiftUI's inactive-scene open action")
+        XCTAssertTrue(closedWindow.isVisible)
+        closedWindow.orderOut(nil)
+    }
+
+    @MainActor
+    func testBackgroundSuppressionAppliesOnlyToInitialRegistration() {
+        let presenter = MainWindowPresenter(suppressInitialPresentation: { true })
+        let initial = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                               styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        initial.orderFront(nil)
+        presenter.register(initial)
+        XCTAssertFalse(initial.isVisible)
+
+        presenter.present {}
+        XCTAssertTrue(initial.isVisible)
+
+        let replacement = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                                    styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        replacement.orderFront(nil)
+        presenter.register(replacement)
+        XCTAssertTrue(replacement.isVisible,
+                      "a replacement registered after presentation must not be hidden as a second launch")
+        initial.orderOut(nil)
+        replacement.orderOut(nil)
+    }
+
+    @MainActor
+    func testDuplicateRestoredRegistrationClosesTheDuplicateAndKeepsThePrimary() {
+        let presenter = MainWindowPresenter()
+        var openCount = 0
+        let primary = TrackingWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                                     styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+        let staleDuplicate = TrackingWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                                            styleMask: [.titled, .miniaturizable], backing: .buffered, defer: false)
+
+        presenter.register(primary)
+        presenter.register(staleDuplicate)
+        primary.orderFront(nil)
+        presenter.present { openCount += 1 }
+
+        XCTAssertEqual(openCount, 0)
+        XCTAssertTrue(primary.isVisible, "the first registered main scene remains canonical")
+        XCTAssertFalse(primary.didClose)
+        XCTAssertTrue(staleDuplicate.didClose,
+                      "a legacy restored scene must be retired instead of competing with app-wide navigation")
+
+        presenter.unregister(primary)
+        presenter.present { openCount += 1 }
+        XCTAssertEqual(openCount, 1,
+                       "a retired duplicate must not be reused after the canonical window unregisters")
+        primary.orderOut(nil)
     }
 }

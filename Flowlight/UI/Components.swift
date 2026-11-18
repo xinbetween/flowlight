@@ -99,9 +99,48 @@ enum TrafficColors {
 /// that macOS restores whatever size the person chose.
 /// Sizes the main window on a first run, then remembers where it was left.
 ///
-/// `setFrameAutosaveName` looks like the answer and quietly isn't: SwiftUI's `WindowGroup` owns the window's
+/// `setFrameAutosaveName` looks like the answer and quietly isn't: SwiftUI owns the scene window's
 /// restoration, so the name is rejected and nothing is ever written. Watching the window and storing the frame
 /// is a few more lines and actually works.
+/// Registers the AppKit window that actually hosts the main scene. This avoids title matching and gives menu-bar
+/// actions a stable way to restore a closed or minimized background window.
+struct MainWindowReporter: NSViewRepresentable {
+    @ObservedObject var presenter: MainWindowPresenter
+
+    func makeCoordinator() -> Coordinator { Coordinator(presenter: presenter) }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { context.coordinator.attach(to: view.window) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        if view.window !== context.coordinator.window {
+            DispatchQueue.main.async { context.coordinator.attach(to: view.window) }
+        }
+    }
+
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        coordinator.attach(to: nil)
+    }
+
+    @MainActor
+    final class Coordinator {
+        private(set) weak var window: NSWindow?
+        private let presenter: MainWindowPresenter
+
+        init(presenter: MainWindowPresenter) { self.presenter = presenter }
+
+        func attach(to window: NSWindow?) {
+            guard window !== self.window else { return }
+            if let oldWindow = self.window { presenter.unregister(oldWindow) }
+            self.window = window
+            if let window { presenter.register(window) }
+        }
+    }
+}
+
 /// Reports whether the hosting window is actually on screen.
 ///
 /// `onAppear`/`onDisappear` track the view's lifecycle, which says nothing about whether anyone can see the

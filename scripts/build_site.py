@@ -123,24 +123,30 @@ def prepare_official_pack_publication(
     if provenance_source.is_symlink() or not provenance_source.is_dir():
         sys.exit(f"{display_path(provenance_source, root)} is missing or is not a regular directory")
 
-    stale_source = stale_provenance_paths(provenance_source, provenance_names)
-    if stale_source:
-        paths = "\n".join(f"  {display_path(path, root)}" for path in stale_source)
-        sys.exit("stale source provenance must be removed explicitly before rebuilding:\n" + paths)
+    referenced_names = provenance_names
+    source_names = provenance_publication_files(provenance_source)
+    missing_source = referenced_names - source_names
+    if missing_source:
+        paths = "\n".join(f"  {name}" for name in sorted(missing_source))
+        sys.exit("signed catalog provenance is missing from the immutable source archive:\n" + paths)
 
+    # Content-addressed provenance is an append-only public archive. Old signed and cached catalogs keep referring to
+    # earlier names, so a new catalog may add a file but must never require deleting an older valid file.
+    provenance_names = source_names
+    invalid_archive_names = sorted(
+        name for name in provenance_names
+        if not re.fullmatch(r"[0-9a-f]{64}\.json", name)
+    )
+    if invalid_archive_names:
+        sys.exit(
+            f"{display_path(provenance_source, root)} has unsafe archive paths: "
+            + ", ".join(invalid_archive_names)
+        )
     stale_output = stale_provenance_paths(provenance_output, provenance_names)
-    for retained in stale_output:
-        relative = retained.relative_to(provenance_output)
-        if (len(relative.parts) != 1 or retained.is_symlink() or not retained.is_file()
-                or not re.fullmatch(r"[0-9a-f]{64}\.json", retained.name)):
-            sys.exit(f"{display_path(retained, root)} is not retained content-addressed provenance")
-        content = retained.read_bytes()
-        if hashlib.sha256(content).hexdigest() != retained.stem:
-            sys.exit(f"{display_path(retained, root)} does not match its content-addressed filename")
-        try:
-            json.loads(content)
-        except (json.JSONDecodeError, UnicodeDecodeError) as error:
-            sys.exit(f"{display_path(retained, root)} is not readable JSON: {error}")
+    if stale_output:
+        paths = "\n".join(f"  {display_path(path, root)}" for path in stale_output)
+        sys.exit("docs provenance exists outside the immutable source archive; restore or audit it before rebuilding:\n"
+                 + paths)
 
     provenance_bytes = {}
     for name in sorted(provenance_names):
@@ -205,20 +211,16 @@ def publish_official_pack_outputs(
     root=ROOT,
     replace=os.replace,
 ):
-    official_pack, provenance_bytes, stale_output = prepare_official_pack_publication(
+    official_pack, provenance_bytes, _ = prepare_official_pack_publication(
         catalog_source, catalog_output, provenance_source, provenance_output, root
     )
-    # Retain the old content-addressed files until the new catalog is durably visible. If the catalog swap fails,
-    # the previous catalog can still resolve every provenance reference; newly copied provenance is harmless.
+    # Publish the complete append-only provenance archive before the catalog. If the catalog swap fails, the previous
+    # catalog still resolves; if it succeeds, both current and historical catalog references remain available.
     atomic_publish(
         [(provenance_output / name, content) for name, content in provenance_bytes.items()],
         replace=replace,
     )
     atomic_publish([(catalog_output, official_pack)], replace=replace)
-    for stale in stale_output:
-        stale.unlink()
-    if stale_output:
-        fsync_directory(provenance_output)
     return official_pack, provenance_bytes
 
 

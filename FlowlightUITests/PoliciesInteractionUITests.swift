@@ -190,6 +190,64 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(waitForDisappearance(warning, timeout: 2))
     }
 
+    func testMenuBarAlertReviewRestoresMinimizedAndClosedBackgroundWindow() {
+        app.launchArguments = [
+            "-FLDemo", "YES",
+            "-FLDemoUITests", "YES",
+            "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
+            "-FLDemoAlertReview", "YES",
+            "-app.backgroundOnly", "YES",
+            "-FLScreen", "live",
+            "-AppleLanguages", "(en)",
+        ]
+        app.launch()
+
+        let liveWindow = app.windows["Live"]
+        XCTAssertTrue(liveWindow.waitForExistence(timeout: 10))
+        let minimize = liveWindow.buttons[XCUIIdentifierMinimizeWindow]
+        XCTAssertTrue(minimize.exists)
+        minimize.click()
+
+        reviewNewAlertsFromMenuBar()
+        assertNewAlertReview()
+        XCTAssertEqual(app.windows.count, 1,
+                       "restoring alert review must not revive duplicate main scenes")
+
+        let alertWindow = app.windows["Alerts"]
+        XCTAssertTrue(alertWindow.exists)
+        let close = alertWindow.buttons[XCUIIdentifierCloseWindow]
+        XCTAssertTrue(close.exists)
+        close.click()
+        XCTAssertTrue(alertWindow.waitForNonExistence(timeout: 3))
+
+        reviewNewAlertsFromMenuBar()
+        assertNewAlertReview()
+        XCTAssertEqual(app.windows.count, 1,
+                       "reopening alert review must reuse the one main scene")
+    }
+
+    private func reviewNewAlertsFromMenuBar() {
+        let statusItem = app.descendants(matching: .statusItem)["menu.status"]
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
+        XCTAssertTrue(accessibilityText(of: statusItem).contains("new alert"))
+        statusItem.click()
+
+        let review = element("menu.review-new-alerts")
+        XCTAssertTrue(review.waitForExistence(timeout: 3))
+        review.click()
+    }
+
+    private func assertNewAlertReview() {
+        XCTAssertTrue(app.windows["Alerts"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("alerts.table").waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForAccessibilityText(containing: "New", identifier: "alerts.filter", timeout: 3))
+        XCTAssertTrue(waitForValue("Selected", identifier: "alerts.row.2", timeout: 3),
+                      "the newest New alert must receive keyboard selection")
+        XCTAssertTrue(element("alerts.row.1").exists)
+        XCTAssertFalse(element("alerts.row.3").exists,
+                       "an acknowledged alert must not appear in the New-only review")
+    }
+
     private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         guard element.waitForNonExistence(timeout: timeout) else { return false }

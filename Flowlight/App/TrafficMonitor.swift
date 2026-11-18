@@ -125,6 +125,8 @@ final class TrafficMonitor: ObservableObject {
     let rulePacks: RulePackStore
     /// The exact extension-committed generation, readable from the inspection proxy's queue.
     private let liveRulePacks: LiveRulePacks
+    /// Last extension acknowledgement, retained only for privacy-safe runtime diagnostics.
+    private var latestRulePackApplyResult: RulePackApplyResult?
     /// Enforcing allowlists mirrored for proxied traffic, whose two extension-visible relay legs are exempt.
     private let liveAgentPolicies = LiveAgentPolicies()
     /// The active extension is the one atomic authority for bounded rules across direct and proxied flows.
@@ -235,6 +237,9 @@ final class TrafficMonitor: ObservableObject {
         }
         if DemoData.isUITesting {
             try? DemoData.seedUITestPolicies(db)
+            if DemoData.showsAlertReview {
+                try? DemoData.seedAlertReview(db)
+            }
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
@@ -349,12 +354,14 @@ final class TrafficMonitor: ObservableObject {
         }
         rulePacks.onChange = { [weak self] snapshot in
             guard let self else { return }
+            self.latestRulePackApplyResult = nil
             self.liveRulePacks.replace(snapshot: nil)
             self.inspectionRulePacksReady = snapshot == nil
             self.attachInspectionWhenPolicyStateIsReady()
             if self.source is ExtensionTrafficSource { self.rulePacks.markApplying() }
             else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
             self.source?.setRulePacks(snapshot)
+            self.refreshRulePackRuntimeDiagnostics()
         }
         // The proxy reads one lock-backed publication for rules and one for the extension-committed pack generation.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
@@ -740,6 +747,7 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         source = newSource
+        latestRulePackApplyResult = nil
         let extensionSource = newSource as? ExtensionTrafficSource
         #if APP_STORE
         extensionSource?.setInspectionProxyPort(inspection.port)
@@ -769,9 +777,12 @@ final class TrafficMonitor: ObservableObject {
             inspection.lastError = L("HTTPS inspection is waiting for the filter to commit the enabled managed policies.")
             rulePacks.updateStatus(.watchingOnly)
         }
+        refreshRulePackRuntimeDiagnostics()
     }
 
     func updateRulePackStatus(_ result: RulePackApplyResult) {
+        latestRulePackApplyResult = result
+        defer { refreshRulePackRuntimeDiagnostics() }
         switch result.status {
         case .accepted:
             liveRulePacks.replace(snapshot: nil)
@@ -780,7 +791,8 @@ final class TrafficMonitor: ObservableObject {
             rulePacks.updateStatus(.applying)
         case .committed:
             let desired = rulePacks.snapshot
-            if desired?.digest == result.activeDigest,
+            if desired?.generation == result.generation,
+               desired?.digest == result.activeDigest,
                liveRulePacks.activeDigest == result.activeDigest,
                inspectionRulePacksReady,
                rulePacks.status == .enforcing {
@@ -794,16 +806,20 @@ final class TrafficMonitor: ObservableObject {
                     guard let self,
                           self.rulePacks.snapshot?.generation == desired?.generation,
                           preparation != .superseded else { return }
-                    if preparation == .prepared, desired?.digest == result.activeDigest {
+                    if preparation == .prepared,
+                       desired?.generation == result.generation,
+                       desired?.digest == result.activeDigest {
                         self.inspectionRulePacksReady = true
                         self.attachInspectionWhenPolicyStateIsReady()
                         self.rulePacks.updateStatus(.enforcing)
+                        self.refreshRulePackRuntimeDiagnostics()
                     } else {
                         self.inspectionRulePacksReady = false
                         self.attachInspectionWhenPolicyStateIsReady()
                         let message = "The filter acknowledged a different rule pack snapshot."
                         self.inspection.lastError = L("The filter acknowledged a different rule pack snapshot.")
                         self.rulePacks.updateStatus(.failed(message))
+                        self.refreshRulePackRuntimeDiagnostics()
                     }
                 }
             }
@@ -825,6 +841,23 @@ final class TrafficMonitor: ObservableObject {
             inspection.lastError = result.detail
             rulePacks.updateStatus(.failed(result.detail))
         }
+    }
+
+    private func refreshRulePackRuntimeDiagnostics() {
+        let desired = rulePacks.snapshot
+        let extensionResult = latestRulePackApplyResult
+        rulePacks.updateRuntimeDiagnostics(.init(
+            captureSource: source?.displayName ?? L("No capture source"),
+            configuredPackIDs: rulePacks.configurations.filter(\.enabled).map(\.packID).sorted(),
+            desiredGeneration: desired?.generation,
+            desiredDigest: desired?.digest ?? "",
+            extensionStatus: extensionResult?.status,
+            extensionGeneration: extensionResult?.generation,
+            extensionDigest: extensionResult?.activeDigest ?? "",
+            proxyDigest: liveRulePacks.activeDigest,
+            runtimeStatus: rulePacks.status,
+            detail: extensionResult?.detail ?? ""
+        ))
     }
 
     private func extensionIdentityMismatch(_ mismatch: ExtensionIdentityMismatch) {
@@ -970,6 +1003,7 @@ final class TrafficMonitor: ObservableObject {
         liveRuleClaims.replace(nil)
         liveRulePacks.replace(snapshot: nil)
         if rulePacks.hasEnabledPacks { rulePacks.updateStatus(.watchingOnly) }
+        refreshRulePackRuntimeDiagnostics()
         status = note
         unavailable.start(sink: { _ in }, status: { _ in })
     }

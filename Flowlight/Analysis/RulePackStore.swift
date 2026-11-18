@@ -100,6 +100,28 @@ final class RulePackStore: ObservableObject {
         case off, ready, applying, enforcing, watchingOnly, incompatible(String), failed(String)
     }
 
+    struct RuntimeDiagnostics: Equatable, Sendable {
+        var captureSource = ""
+        var configuredPackIDs: [String] = []
+        var desiredGeneration: UUID?
+        var desiredDigest = ""
+        var extensionStatus: RulePackApplyResult.Status?
+        var extensionGeneration: UUID?
+        var extensionDigest = ""
+        var proxyDigest = ""
+        var runtimeStatus: ApplyStatus = .off
+        var detail = ""
+
+        var isEnforcingDesiredDigest: Bool {
+            runtimeStatus == .enforcing
+                && desiredGeneration != nil
+                && extensionGeneration == desiredGeneration
+                && !desiredDigest.isEmpty
+                && extensionDigest == desiredDigest
+                && proxyDigest == desiredDigest
+        }
+    }
+
     enum SaveResult: Equatable, Sendable {
         case saved
         case staleReview
@@ -120,6 +142,7 @@ final class RulePackStore: ObservableObject {
     @Published private(set) var events: [RulePackEventRecord] = []
     @Published private(set) var deliveryStats = RulePackDeliveryStats(droppedHits: 0, droppedKeys: 0)
     @Published private(set) var status: ApplyStatus = .off
+    @Published private(set) var runtimeDiagnostics = RuntimeDiagnostics()
     @Published private(set) var version = 0
     @Published private(set) var definitions: [RulePackDefinition]
     /// False until bootstrap has installed the verified bundled or cached catalog. `definitions` begins with bundled
@@ -480,6 +503,10 @@ final class RulePackStore: ObservableObject {
     }
 
     func updateStatus(_ newStatus: ApplyStatus) { status = newStatus }
+
+    func updateRuntimeDiagnostics(_ diagnostics: RuntimeDiagnostics) {
+        runtimeDiagnostics = diagnostics
+    }
 
     func markApplying() {
         guard definitionsValid else { return }

@@ -123,23 +123,34 @@ def official_pack_provenance_problems(catalog_bytes, source_dir=OFFICIAL_PACK_PR
     source_names = provenance_publication_files(source_dir)
     output_names = provenance_publication_files(output_dir)
     found = []
-    if source_names != referenced:
-        found.append("site/packs/v1/provenance: files do not exactly match the signed catalog references")
-    if output_names != referenced:
-        found.append("docs/packs/v1/provenance: files do not exactly match the signed catalog references")
+    missing = referenced - source_names
+    if missing:
+        found.append(
+            "site/packs/v1/provenance: missing signed catalog references: "
+            + ", ".join(sorted(missing))
+        )
+    if output_names != source_names:
+        found.append("docs/packs/v1/provenance: archive does not exactly match the site provenance archive")
 
-    for name in sorted(referenced):
+    for name in sorted(source_names):
         source = source_dir / name
         output = output_dir / name
+        if not re.fullmatch(r"[0-9a-f]{64}\.json", name):
+            found.append(f"site/packs/v1/provenance/{name}: is not a flat content-addressed JSON path")
+            continue
         if source.is_symlink() or not source.is_file():
             found.append(f"site/packs/v1/provenance/{name}: is not a regular file")
             continue
         content = source.read_bytes()
         if hashlib.sha256(content).hexdigest() != source.stem:
             found.append(f"site/packs/v1/provenance/{name}: content digest does not match its filename")
-        if output.is_symlink():
+        try:
+            json.loads(content)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            found.append(f"site/packs/v1/provenance/{name}: is not readable JSON: {error}")
+        if output.is_symlink() or not output.is_file():
             found.append(f"docs/packs/v1/provenance/{name}: is not a regular file")
-        elif output.is_file() and output.read_bytes() != content:
+        elif output.read_bytes() != content:
             found.append(f"docs/packs/v1/provenance/{name}: differs from the site provenance source")
     return found
 

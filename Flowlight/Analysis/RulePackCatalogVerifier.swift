@@ -61,7 +61,7 @@ struct RulePackCatalogWirePack: Codable, Equatable, Sendable {
     var manifest: RulePackCatalogWireManifest
     var entries: [RulePackEntry]
 
-    fileprivate var definition: RulePackDefinition { manifest.definition(entries: entries) }
+    var definition: RulePackDefinition { manifest.definition(entries: entries) }
 }
 
 struct RulePackCatalogPayload: Codable, Equatable, Sendable {
