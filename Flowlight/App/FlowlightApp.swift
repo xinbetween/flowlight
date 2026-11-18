@@ -245,10 +245,10 @@ struct FlowlightApp: App {
         let updater = UpdateChecker()
         let focus = FocusStore()
         let mainWindowPresenter = MainWindowPresenter {
-            // UI-test demos need an observable initial scene so XCTest can exercise minimize/close before invoking
-            // the production presenter path. Real background-only launches retain the hidden-window behavior; the
-            // focused AppKit lifecycle tests cover that suppression independently of accessibility automation.
-            UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly) && !DemoData.isUITesting
+            // Disposable demo sessions need an observable initial scene so XCTest can exercise minimize/close before
+            // invoking the production presenter path. Real background-only launches retain the hidden-window
+            // behavior; the focused AppKit lifecycle tests cover that suppression independently of automation.
+            UserDefaults.standard.bool(forKey: AnomalySettings.Keys.backgroundOnly) && !DemoData.isEnabled
         }
         _monitor = StateObject(wrappedValue: monitor)
         _extensionManager = StateObject(wrappedValue: extensionManager)
