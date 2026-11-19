@@ -563,7 +563,8 @@ struct MenuBarLabel: View {
     }
 
     private var accessibilityTitle: String {
-        let count = monitor.unacknowledgedAlerts
+        let count = max(monitor.unacknowledgedAlerts,
+                        DemoData.showsAlertReview ? DemoData.alertReviewNewCount : 0)
         switch (hasFilterNotice, count) {
         case (true, 1): return L("Flowlight, filter update needs attention, 1 new alert")
         case (true, let count) where count > 1:

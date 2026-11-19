@@ -237,6 +237,11 @@ struct MenuBarContent: View {
     @EnvironmentObject var mainWindowPresenter: MainWindowPresenter
     @Environment(\.openWindow) private var openWindow
 
+    private var reviewAlertCount: Int {
+        max(monitor.unacknowledgedAlerts,
+            DemoData.showsAlertReview ? DemoData.alertReviewNewCount : 0)
+    }
+
     var body: some View {
         if extensionManager.state.showsMenuBarNotice {
             Button {
@@ -255,16 +260,16 @@ struct MenuBarContent: View {
         ForEach(liveState.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
         }
-        if monitor.unacknowledgedAlerts > 0 {
+        if reviewAlertCount > 0 {
             Divider()
             Button {
                 reviewNewAlerts()
             } label: {
                 // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of
                 // a noun is not a suffix in most of the languages Flowlight speaks.
-                Label(monitor.unacknowledgedAlerts == 1
-                      ? L("%lld unacknowledged alert", monitor.unacknowledgedAlerts)
-                      : L("%lld unacknowledged alerts", monitor.unacknowledgedAlerts),
+                Label(reviewAlertCount == 1
+                      ? L("%lld unacknowledged alert", reviewAlertCount)
+                      : L("%lld unacknowledged alerts", reviewAlertCount),
                       systemImage: "exclamationmark.triangle.fill")
             }
             .accessibilityIdentifier("menu.review-new-alerts")

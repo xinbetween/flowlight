@@ -1074,6 +1074,10 @@ struct RulesView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
+        // Apply the hit region to the Button itself, not only its label content. SwiftUI can otherwise keep the
+        // accessibility frame wide while routing a trailing click to the surrounding scroll view on macOS.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
         .accessibilityIdentifier("policies.section.\(kind.rawValue).toggle")
         .accessibilityLabel(kind.sectionTitle)
