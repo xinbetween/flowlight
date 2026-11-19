@@ -284,7 +284,7 @@ export representation and are never included.
 ### Build from source
 
 ```sh
-brew install xcodegen  # project regeneration requires exactly 2.47.0
+brew install xcodegen  # project regeneration supports 2.46.0 and 2.47.0
 git clone https://github.com/xinbetween/flowlight.git
 cd flowlight
 scripts/check_xcode_project.sh --write
