@@ -18,20 +18,31 @@ final class PoliciesInteractionUITests: XCTestCase {
 
         let ruleSectionID = "policies.section.rule.toggle"
         XCTAssertTrue(element(ruleSectionID).waitForExistence(timeout: 15))
-        // The isolated UI defaults should start this section expanded, but normalize a restored host state before
-        // exercising the trailing hit target so an earlier test process cannot turn the first click into an expansion.
-        if accessibilityText(of: element(ruleSectionID)).hasPrefix("Collapsed") {
-            clickTrailingBlankArea(of: element(ruleSectionID))
-            XCTAssertTrue(waitForDisclosureState("Expanded", identifier: ruleSectionID, timeout: 3))
-        }
-        clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForDisclosureState("Collapsed", identifier: ruleSectionID, timeout: 3))
-        clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForDisclosureState("Expanded", identifier: ruleSectionID, timeout: 3))
-
         let ruleID = "a14da4c2-7930-45c0-a8b9-3b8cd69c4a4e"
         let ruleButton = element("policies.rule.\(ruleID).edit")
-        XCTAssertTrue(ruleButton.waitForExistence(timeout: 10))
+        let initiallyExpanded = ruleButton.waitForExistence(timeout: 3)
+
+        // The macOS SwiftUI bridge does not consistently expose accessibilityValue after a coordinate click. Use the
+        // row that the disclosure actually inserts/removes as the observable contract, while still clicking the
+        // trailing 90% of the full visible header. This also normalizes a restored host state without trusting stale
+        // accessibility metadata.
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        if initiallyExpanded {
+            XCTAssertTrue(ruleButton.waitForNonExistence(timeout: 3),
+                          "a trailing click must collapse the network-rules content")
+        } else {
+            XCTAssertTrue(ruleButton.waitForExistence(timeout: 3),
+                          "a trailing click must expand the network-rules content")
+        }
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        if initiallyExpanded {
+            XCTAssertTrue(ruleButton.waitForExistence(timeout: 3),
+                          "a trailing click must expand the network-rules content")
+        } else {
+            XCTAssertTrue(ruleButton.waitForNonExistence(timeout: 3),
+                          "a trailing click must collapse the network-rules content")
+        }
+
         clickPaintedMargin(of: ruleButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
@@ -250,8 +261,16 @@ final class PoliciesInteractionUITests: XCTestCase {
         // verifies the behavior users need even when macOS's status-item accessibility label is stale.
         statusItem.click()
 
-        let review = element("menu.review-new-alerts")
-        XCTAssertTrue(review.waitForExistence(timeout: 3))
+        // MenuBarExtra promotes SwiftUI Buttons into native NSMenuItems. On the newest Xcode host the item keeps its
+        // visible label but drops the SwiftUI identifier, so query the user-facing action as a menu item first and
+        // retain the identifier path for hosts that preserve it.
+        let identified = element("menu.review-new-alerts")
+        let labeled = app.menuItems.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "unacknowledged alert")
+        ).firstMatch
+        let review = identified.waitForExistence(timeout: 1) ? identified : labeled
+        XCTAssertTrue(review.waitForExistence(timeout: 3),
+                      "the open menu must expose the actionable unacknowledged-alert item")
         review.click()
     }
 

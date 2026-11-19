@@ -4,8 +4,16 @@ import Foundation
 /// Suspicious destinations use reserved documentation addresses (203.0.113.0/24, *.example) so no
 /// real service is depicted as malicious.
 enum DemoData {
-    static var isEnabled: Bool { launchFlag("FLDemo") }
+    /// Newer Xcode UI hosts preserve the documented screen selector but can drop custom boolean launch arguments.
+    /// Restrict this fallback to an XCTest-hosted process so a real launch with `FLScreen` can never opt into demo data.
+    private static var recognizedUITestScreen: Bool {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil else { return false }
+        return ["live", "rules"].contains(UserDefaults.standard.string(forKey: "FLScreen") ?? "")
+    }
+
+    static var isEnabled: Bool { launchFlag("FLDemo") || recognizedUITestScreen }
     static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
+
     /// The alert fixture is independently opt-in so its badge cannot disappear when a UI host drops the broader
     /// test-mode argument. The live UI screen is also a recognized test launch contract; it keeps this fixture
     /// deterministic on Xcode hosts that strip one custom boolean argument while retaining the demo-mode guard.
@@ -19,7 +27,7 @@ enum DemoData {
     static var autoReviewsAlerts: Bool {
         isUITesting && launchFlag("FLDemoAutoReviewAlerts")
     }
-    static var isUITesting: Bool { isEnabled && launchFlag("FLDemoUITests") }
+    static var isUITesting: Bool { isEnabled && (launchFlag("FLDemoUITests") || recognizedUITestScreen) }
 
     static func launchFlag(
         _ key: String,
