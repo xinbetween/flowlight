@@ -251,14 +251,14 @@ final class TrafficMonitor: ObservableObject {
                 }
             }
         }
+        // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Read the seeded
+        // count synchronously during construction; an asynchronous weak callback can run before StateObject retains
+        // this monitor in the newest Xcode UI host.
+        if DemoData.showsAlertReview {
+            unacknowledgedAlerts = (try? db.newAlertCount()) ?? 0
+        }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
-        // The menu-bar lifecycle fixture asserts the published new-alert affordance before capture startup. Publish
-        // its seeded count immediately; ordinary launches retain the post-start refresh below so startup work stays
-        // outside the capture readiness path.
-        if DemoData.showsAlertReview {
-            refreshAlertCount()
-        }
         providerProfiles.installRuntimeSink { [weak db] profiles in
             db?.async { $0.replaceProviderProfiles(profiles) }
         }
