@@ -206,6 +206,11 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLScreen", "live",
             "-AppleLanguages", "(en)",
         ]
+        // Newer Xcode hosts do not consistently forward every custom launch argument into the app process. Keep
+        // the disposable alert fixture explicit through the launch environment as well as the documented arguments.
+        app.launchEnvironment["FLDemo"] = "YES"
+        app.launchEnvironment["FLDemoUITests"] = "YES"
+        app.launchEnvironment["FLDemoAlertReview"] = "YES"
         app.launch()
 
         let liveWindow = waitForMainWindow(timeout: 10)

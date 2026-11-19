@@ -1255,7 +1255,10 @@ enum TrafficGraphLayout {
         let routingObstacles = denseSearch
             ? padded.filter { directBounds.intersects($0) }
             : padded
-        let directIntersectsObstacle = intersects(direct, obstacles: padded)
+        // The direct curve can only hit cards inside its control bounds. Reuse the dense-graph spatial filter here;
+        // scanning every padded card for the initial test otherwise dominates the 600-edge fixture before routing even
+        // begins. For ordinary graphs this remains the same padded collection and therefore preserves geometry.
+        let directIntersectsObstacle = intersects(direct, obstacles: routingObstacles)
         guard directIntersectsObstacle
                 || sharesCorridor(direct, with: avoidingRoutes) else { return direct }
 

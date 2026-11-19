@@ -37,6 +37,13 @@ final class DemoDataTests: XCTestCase {
         XCTAssertFalse(DemoData.launchFlag(
             "FLDemoAlertReview",
             arguments: ["Flowlight", "-FLDemoAlertReview", "NO"],
+            environment: [:],
+            defaults: defaults
+        ))
+        XCTAssertTrue(DemoData.launchFlag(
+            "FLDemoAlertReview",
+            arguments: ["Flowlight"],
+            environment: ["FLDemoAlertReview": "YES"],
             defaults: defaults
         ))
     }

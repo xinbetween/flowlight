@@ -18,9 +18,13 @@ enum DemoData {
     static func launchFlag(
         _ key: String,
         arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
         defaults: UserDefaults = .standard
     ) -> Bool {
         if defaults.bool(forKey: key) { return true }
+        if environment[key]?.caseInsensitiveCompare("YES") == .orderedSame {
+            return true
+        }
         guard let index = arguments.firstIndex(of: "-\(key)"), arguments.indices.contains(arguments.index(after: index)) else {
             return false
         }
