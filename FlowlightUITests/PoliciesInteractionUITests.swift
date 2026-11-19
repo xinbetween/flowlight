@@ -235,7 +235,9 @@ final class PoliciesInteractionUITests: XCTestCase {
     private func reviewNewAlertsFromMenuBar() {
         let statusItem = app.descendants(matching: .statusItem)["menu.status"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
-        XCTAssertTrue(accessibilityText(of: statusItem).contains("new alert"))
+        // Alert fixtures are seeded synchronously, but the monitor publishes the count after its serial database
+        // refresh. Wait for the published accessibility contract instead of racing the menu-bar scene.
+        XCTAssertTrue(waitForAccessibilityText(containing: "new alert", identifier: "menu.status", timeout: 10))
         statusItem.click()
 
         let review = element("menu.review-new-alerts")
