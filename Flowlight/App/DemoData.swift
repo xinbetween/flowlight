@@ -11,10 +11,16 @@ enum DemoData {
         return ["live", "rules"].contains(UserDefaults.standard.string(forKey: "FLScreen") ?? "")
     }
 
+    /// Xcode can strip the UI-test-only boolean flags while retaining the explicit demo flag. Requiring both the
+    /// XCTest host marker and `FLDemo` keeps this fallback impossible for an ordinary user launch.
+    private static var xctestDemoHarness: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil && launchFlag("FLDemo")
+    }
+
     /// The alert fixture is itself an explicit demo opt-in. Treat it as enabling the isolated demo database so a
     /// newer Xcode host that drops the broader boolean arguments cannot leave the menu badge without its fixture.
     static var isEnabled: Bool {
-        launchFlag("FLDemo") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen
+        launchFlag("FLDemo") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen || xctestDemoHarness
     }
     static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
 
@@ -22,6 +28,7 @@ enum DemoData {
     /// hosts that strip one custom boolean argument while retaining the demo-mode guard.
     static var showsAlertReview: Bool {
         launchFlag("FLDemoAlertReview")
+            || xctestDemoHarness
             || (isUITesting && UserDefaults.standard.string(forKey: "FLScreen") == "live")
     }
     /// The alert-review fixture always contains two rows in `new` state; keeping this contract explicit lets the
@@ -31,7 +38,7 @@ enum DemoData {
         isUITesting && launchFlag("FLDemoAutoReviewAlerts")
     }
     static var isUITesting: Bool {
-        isEnabled && (launchFlag("FLDemoUITests") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen)
+        isEnabled && (launchFlag("FLDemoUITests") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen || xctestDemoHarness)
     }
 
     static func launchFlag(
