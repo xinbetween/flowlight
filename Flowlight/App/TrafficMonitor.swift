@@ -253,6 +253,12 @@ final class TrafficMonitor: ObservableObject {
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
+        // The menu-bar lifecycle fixture asserts the published new-alert affordance before capture startup. Publish
+        // its seeded count immediately; ordinary launches retain the post-start refresh below so startup work stays
+        // outside the capture readiness path.
+        if DemoData.showsAlertReview {
+            refreshAlertCount()
+        }
         providerProfiles.installRuntimeSink { [weak db] profiles in
             db?.async { $0.replaceProviderProfiles(profiles) }
         }
