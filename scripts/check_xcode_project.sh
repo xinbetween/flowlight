@@ -4,17 +4,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 command -v xcodegen >/dev/null || {
-  echo "xcodegen 2.46.0 or 2.47.0 is required — install a supported version before regenerating the project." >&2
+  echo "xcodegen 2.47.0 is required — install that version before regenerating the project." >&2
   exit 1
 }
 xcodegen_version=$(xcodegen --version | sed -n 's/^Version: //p')
-case "$xcodegen_version" in
-  2.46.0|2.47.0) ;;
-  *)
-    echo "xcodegen 2.46.0 or 2.47.0 is required, found ${xcodegen_version:-unknown}." >&2
-    exit 1
-    ;;
-esac
+if [[ "$xcodegen_version" != 2.47.0 ]]; then
+  echo "xcodegen 2.47.0 is required, found ${xcodegen_version:-unknown}." >&2
+  exit 1
+fi
 
 mode=${1:-check}
 if [[ "$mode" != check && "$mode" != --write ]]; then
@@ -87,28 +84,6 @@ copy_shared "$working_source/Flowlight.xcodeproj" "$working_expected"
 copy_shared Flowlight.xcodeproj "$working_committed"
 copy_shared "$index_source/Flowlight.xcodeproj" "$index_expected"
 
-# XcodeGen 2.46 and 2.47 emit equivalent Xcode metadata with different editor-version fields. Canonicalize only those
-# tool-owned fields before comparison; all target, build-setting, file, phase, and scheme behavior remains checked exactly.
-canonicalize_tool_metadata() {
-  local root=$1
-  python3 -I - "$root" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-root = Path(sys.argv[1])
-project = root / "project.pbxproj"
-if project.exists():
-    text = project.read_text()
-    text = re.sub(r"LastUpgradeCheck = \d+;", "LastUpgradeCheck = 0;", text)
-    project.write_text(text)
-for scheme in (root / "xcshareddata" / "xcschemes").glob("*.xcscheme"):
-    text = scheme.read_text()
-    text = re.sub(r'LastUpgradeVersion = "\d+"', 'LastUpgradeVersion = "0"', text)
-    text = re.sub(r'^\s*buildArchitectures = "Automatic"\n', "", text, flags=re.MULTILINE)
-    scheme.write_text(text)
-PY
-}
 if [[ "$mode" == --write ]]; then
   for file in project.pbxproj project.xcworkspace/contents.xcworkspacedata; do
     copy_parent Flowlight.xcodeproj "$file"
@@ -130,11 +105,6 @@ if [[ "$mode" == --write ]]; then
   echo "Stage project.yml and Flowlight.xcodeproj, then run this check again."
   exit 0
 fi
-
-canonicalize_tool_metadata "$working_expected"
-canonicalize_tool_metadata "$working_committed"
-canonicalize_tool_metadata "$index_expected"
-canonicalize_tool_metadata "$index_committed"
 
 changed=0
 if ! diff -qr "$working_committed" "$working_expected" >/dev/null; then
