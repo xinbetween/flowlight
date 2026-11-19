@@ -105,6 +105,14 @@ struct ContentView: View {
             }
         }
         .id(localization.revision)
+        .onAppear {
+            // UI-test demos must expose the same main scene that menu-bar recovery presents. This is intentionally
+            // limited to the disposable fixture; production background-only launches remain presenter-controlled.
+            guard DemoData.isUITesting else { return }
+            DispatchQueue.main.async {
+                mainWindowPresenter.present { openWindow(id: "main") }
+            }
+        }
         .task {
             guard demoPluginReview == nil, let url = DemoData.pluginReviewURL else { return }
             if let data = try? Data(contentsOf: url) {

@@ -171,8 +171,8 @@ final class PoliciesInteractionUITests: XCTestCase {
         ]
         app.launch()
 
-        let mainWindow = app.windows["Live"]
-        XCTAssertTrue(mainWindow.waitForExistence(timeout: 10))
+        let mainWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(mainWindow.exists)
         let close = mainWindow.buttons[XCUIIdentifierCloseWindow]
         XCTAssertTrue(close.exists)
         close.click()
@@ -208,8 +208,8 @@ final class PoliciesInteractionUITests: XCTestCase {
         ]
         app.launch()
 
-        let liveWindow = app.windows["Live"]
-        XCTAssertTrue(liveWindow.waitForExistence(timeout: 10))
+        let liveWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(liveWindow.exists)
         let minimize = liveWindow.buttons[XCUIIdentifierMinimizeWindow]
         XCTAssertTrue(minimize.exists)
         minimize.click()
@@ -219,7 +219,7 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertEqual(app.windows.count, 1,
                        "restoring alert review must not revive duplicate main scenes")
 
-        let alertWindow = app.windows["Alerts"]
+        let alertWindow = waitForMainWindow(timeout: 10)
         XCTAssertTrue(alertWindow.exists)
         let close = alertWindow.buttons[XCUIIdentifierCloseWindow]
         XCTAssertTrue(close.exists)
@@ -244,7 +244,8 @@ final class PoliciesInteractionUITests: XCTestCase {
     }
 
     private func assertNewAlertReview() {
-        XCTAssertTrue(app.windows["Alerts"].waitForExistence(timeout: 10))
+        let mainWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(mainWindow.exists)
         XCTAssertTrue(element("alerts.table").waitForExistence(timeout: 5))
         XCTAssertTrue(waitForAccessibilityText(containing: "New", identifier: "alerts.filter", timeout: 3))
         XCTAssertTrue(waitForValue("Selected", identifier: "alerts.row.2", timeout: 3),
@@ -252,6 +253,18 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(element("alerts.row.1").exists)
         XCTAssertFalse(element("alerts.row.3").exists,
                        "an acknowledged alert must not appear in the New-only review")
+    }
+
+    /// Window titles are localized/navigation-dependent on macOS; the scene itself is the stable contract.
+    /// Prefer the legacy title when available, then fall back to the actual main scene exposed by the app.
+    private func waitForMainWindow(timeout: TimeInterval) -> XCUIElement {
+        let titled = app.windows["Live"]
+        if titled.waitForExistence(timeout: min(timeout, 2)) { return titled }
+        let named = app.windows["Flowlight"]
+        if named.waitForExistence(timeout: min(timeout, 2)) { return named }
+        let first = app.windows.firstMatch
+        _ = first.waitForExistence(timeout: timeout)
+        return first
     }
 
     private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

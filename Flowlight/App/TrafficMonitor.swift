@@ -236,9 +236,19 @@ final class TrafficMonitor: ObservableObject {
             catch { lastError = L("Could not prepare managed-pack review demo: %@", error.localizedDescription) }
         }
         if DemoData.isUITesting {
-            try? DemoData.seedUITestPolicies(db)
+            do { try DemoData.seedUITestPolicies(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo policy fixture failed: \(error)")
+                #endif
+            }
             if DemoData.showsAlertReview {
-                try? DemoData.seedAlertReview(db)
+                do { try DemoData.seedAlertReview(db) }
+                catch {
+                    #if DEBUG
+                    print("Flowlight UI demo alert fixture failed: \(error)")
+                    #endif
+                }
             }
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
@@ -349,8 +359,17 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         rules.attach(db: db) { [weak self] in
-            self?.inspectionRulesReady = true
-            self?.attachInspectionWhenPolicyStateIsReady()
+            guard let self else { return }
+            // The disposable UI fixture is written before attach, but a second read after the first published
+            // snapshot keeps newest-Xcode scene construction from retaining an empty pre-seed snapshot.
+            if DemoData.isUITesting {
+                #if DEBUG
+                print("Flowlight UI demo rules after attach: \(self.rules.rules.count)")
+                #endif
+                self.rules.reload()
+            }
+            self.inspectionRulesReady = true
+            self.attachInspectionWhenPolicyStateIsReady()
         }
         rulePacks.onChange = { [weak self] snapshot in
             guard let self else { return }
