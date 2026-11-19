@@ -1051,13 +1051,14 @@ enum TrafficGraphLayout {
         and end: CGPoint
     ) -> [CGRect] {
         let horizontalRange = min(start.x, end.x)...max(start.x, end.x)
+        let portTolerance: CGFloat = 1
         return frames.compactMap { id, frame in
-            // Sibling cards in the endpoint columns cannot be treated as obstacles: every route has to leave and
-            // enter those columns inside their padded horizontal span. Only cards wholly between the attachment
-            // points can block the route; those are the cards a cable can otherwise visibly pass through.
+            // A route starts half a point inside its endpoint card so a sibling card whose edge is flush with the
+            // port can still overlap the first curve sample. Keep that narrow boundary band, while rejecting cards
+            // wholly outside the endpoint-to-endpoint span; this avoids the dense-graph all-frames scan.
             guard id != edge.source, id != edge.target,
-                  frame.minX > horizontalRange.lowerBound,
-                  frame.maxX < horizontalRange.upperBound else { return nil }
+                  frame.maxX >= horizontalRange.lowerBound - portTolerance,
+                  frame.minX <= horizontalRange.upperBound + portTolerance else { return nil }
             return frame
         }
     }

@@ -232,22 +232,25 @@ final class RulePackStore: ObservableObject {
         Task { [weak self, weak db] in
             guard let db else { return }
             do {
+                // Configuration, overrides, the verified catalog receipt, and review state are the enforcement-critical
+                // portion of startup. Activity history is UI-only and is loaded after the completion barrier so a
+                // large event table cannot delay the first capture source.
                 let loaded = try await db.asyncResult { db in
                     (try db.loadRulePackConfigurations(), try db.loadRulePackOverrides(),
-                     try db.rulePackEvents(limit: 300), try db.rulePackDeliveryStats(),
                      try db.loadRulePackCatalogState(catalogID: RulePackCatalogVerifier.catalogID).receipt,
                      try db.loadRulePackReviewPackIDs())
                 }
                 guard let self else { return }
                 if self.revision == expectedRevision {
-                    self.catalogReceipt = loaded.4
-                    self.pendingReviewPackIDs = loaded.5
+                    self.catalogReceipt = loaded.2
+                    self.pendingReviewPackIDs = loaded.3
                     self.applyLoaded(configurations: loaded.0, overrides: loaded.1,
-                                     events: loaded.2, deliveryStats: loaded.3)
+                                     events: [], deliveryStats: .init(droppedHits: 0, droppedKeys: 0))
                 }
                 // A concurrent clear or save supersedes these loaded values, not startup readiness. The caller still
                 // needs its one completion so capture can start from the newer in-memory publication.
                 completion?()
+                self.reloadActivity(after: expectedRevision)
             } catch {
                 guard let self else { return }
                 if self.revision == expectedRevision {
@@ -570,6 +573,25 @@ final class RulePackStore: ObservableObject {
     func clearPublishedActivityAfterDurableDeletion() {
         beginActivityClear()
         finishActivityClear(succeeded: true)
+    }
+
+    private func reloadActivity(after expectedRevision: Int) {
+        guard let db else { return }
+        Task { [weak self, weak db] in
+            guard let db else { return }
+            do {
+                let loaded = try await db.asyncResult { db in
+                    (try db.rulePackEvents(limit: 300), try db.rulePackDeliveryStats())
+                }
+                guard let self, self.revision == expectedRevision else { return }
+                let known = Set(self.definitions.map(\.id))
+                self.events = loaded.0.filter { known.contains($0.packID) }
+                self.deliveryStats = loaded.1
+                self.version += 1
+            } catch {
+                appLog.error("rule pack activity refresh failed: \(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     private func applyLoaded(configurations saved: [RulePackConfiguration],
