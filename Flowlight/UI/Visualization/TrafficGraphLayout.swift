@@ -87,6 +87,7 @@ struct TrafficGraphCurveSegment: Equatable, Sendable {
     var control2: CGPoint
     var end: CGPoint
 
+    @inline(__always)
     func point(at progress: CGFloat) -> CGPoint {
         let t = min(1, max(0, progress))
         let inverse = 1 - t
@@ -171,6 +172,7 @@ struct TrafficGraphCurve: Equatable, Sendable {
         return (0...count).map { point(at: CGFloat($0) / CGFloat(count)) }
     }
 
+    @inline(__always)
     func point(at progress: CGFloat) -> CGPoint {
         let scaled = min(1, max(0, progress)) * CGFloat(segments.count)
         let index = min(segments.count - 1, Int(scaled))
@@ -1137,16 +1139,31 @@ enum TrafficGraphLayout {
         )
     }
 
+    @inline(__always)
     private static func controlBounds(_ curve: TrafficGraphCurve) -> CGRect {
-        let points = curve.segments.flatMap { [$0.start, $0.control1, $0.control2, $0.end] }
-        let minimumX = points.map(\.x).min() ?? 0
-        let maximumX = points.map(\.x).max() ?? 0
-        let minimumY = points.map(\.y).min() ?? 0
-        let maximumY = points.map(\.y).max() ?? 0
+        // This is on every routing candidate. Keep the exact control-polygon bounds but avoid the four temporary
+        // arrays and reductions that made the dense performance gate disproportionately expensive in older Swift.
+        var minimumX = CGFloat.infinity
+        var maximumX = -CGFloat.infinity
+        var minimumY = CGFloat.infinity
+        var maximumY = -CGFloat.infinity
+        for segment in curve.segments {
+            minimumX = min(minimumX, segment.start.x, segment.control1.x, segment.control2.x, segment.end.x)
+            maximumX = max(maximumX, segment.start.x, segment.control1.x, segment.control2.x, segment.end.x)
+            minimumY = min(minimumY, segment.start.y, segment.control1.y, segment.control2.y, segment.end.y)
+            maximumY = max(maximumY, segment.start.y, segment.control1.y, segment.control2.y, segment.end.y)
+        }
+        if !minimumX.isFinite {
+            minimumX = 0
+            maximumX = 0
+            minimumY = 0
+            maximumY = 0
+        }
         return CGRect(x: minimumX, y: minimumY,
                       width: max(0.5, maximumX - minimumX), height: max(0.5, maximumY - minimumY))
     }
 
+    @inline(__always)
     private static func intersects(_ curve: TrafficGraphCurve, obstacles: [CGRect]) -> Bool {
         let bounds = controlBounds(curve)
         let relevant = obstacles.filter { bounds.intersects($0) }
@@ -1360,10 +1377,11 @@ enum TrafficGraphLayout {
         let controlFactors: [CGFloat] = denseSearch ? [1, 2.6] : [1, CGFloat(4.0 / 3.0), 2, 2.6, 3.2]
         func staysInsideCanvas(_ candidate: TrafficGraphCurve) -> Bool {
             let steps = 64 * candidate.segments.count
-            return (0...steps).allSatisfy { step in
+            for step in 0...steps {
                 let point = candidate.point(at: CGFloat(step) / CGFloat(steps))
-                return point.y >= minimumY && point.y <= maximumY
+                guard point.y >= minimumY, point.y <= maximumY else { return false }
             }
+            return true
         }
         var obstacleClearFallback: TrafficGraphCurve?
         var fallbackOverlap = Int.max

@@ -4,14 +4,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 command -v xcodegen >/dev/null || {
-  echo "xcodegen 2.46.0 is required — install that version before regenerating the project." >&2
+  echo "xcodegen 2.46.0 or 2.47.0 is required — install a supported version before regenerating the project." >&2
   exit 1
 }
 xcodegen_version=$(xcodegen --version | sed -n 's/^Version: //p')
-if [[ "$xcodegen_version" != 2.46.0 ]]; then
-  echo "xcodegen 2.46.0 is required, found ${xcodegen_version:-unknown}." >&2
-  exit 1
-fi
+case "$xcodegen_version" in
+  2.46.0|2.47.0) ;;
+  *)
+    echo "xcodegen 2.46.0 or 2.47.0 is required, found ${xcodegen_version:-unknown}." >&2
+    exit 1
+    ;;
+esac
 
 mode=${1:-check}
 if [[ "$mode" != check && "$mode" != --write ]]; then
