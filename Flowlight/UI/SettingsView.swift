@@ -239,7 +239,7 @@ struct MenuBarContent: View {
 
     private var reviewAlertCount: Int {
         max(monitor.unacknowledgedAlerts,
-            DemoData.showsAlertReview ? DemoData.alertReviewNewCount : 0)
+            DemoData.isUITesting ? DemoData.alertReviewNewCount : 0)
     }
 
     var body: some View {

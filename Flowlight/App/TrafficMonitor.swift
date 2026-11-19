@@ -242,8 +242,6 @@ final class TrafficMonitor: ObservableObject {
                 print("Flowlight UI demo policy fixture failed: \(error)")
                 #endif
             }
-        }
-        if DemoData.isEnabled && DemoData.showsAlertReview {
             do { try DemoData.seedAlertReview(db) }
             catch {
                 #if DEBUG
