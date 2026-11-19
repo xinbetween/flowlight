@@ -265,8 +265,13 @@ final class PoliciesInteractionUITests: XCTestCase {
         // visible label but drops the SwiftUI identifier, so query the user-facing action as a menu item first and
         // retain the identifier path for hosts that preserve it.
         let identified = element("menu.review-new-alerts")
-        let labeled = app.menuItems.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "unacknowledged alert")
+        let labeled = app.descendants(matching: .menuItem).matching(
+            NSPredicate(
+                format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                "unacknowledged alert",
+                "unacknowledged alert",
+                "Review new alerts"
+            )
         ).firstMatch
         let review = identified.waitForExistence(timeout: 1) ? identified : labeled
         XCTAssertTrue(review.waitForExistence(timeout: 3),

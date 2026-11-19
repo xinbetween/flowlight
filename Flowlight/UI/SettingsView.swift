@@ -273,6 +273,9 @@ struct MenuBarContent: View {
                       systemImage: "exclamationmark.triangle.fill")
             }
             .accessibilityIdentifier("menu.review-new-alerts")
+            // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
+            // SwiftUI's identifier during that promotion; the count remains visible in the menu title.
+            .accessibilityLabel(L("Review new alerts in Flowlight"))
             .help(L("Review new alerts in Flowlight"))
         }
         Divider()
