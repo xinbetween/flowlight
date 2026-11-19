@@ -6,7 +6,9 @@ import Foundation
 enum DemoData {
     static var isEnabled: Bool { launchFlag("FLDemo") }
     static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
-    static var showsAlertReview: Bool { isUITesting && launchFlag("FLDemoAlertReview") }
+    /// The alert fixture is independently opt-in so its badge cannot disappear when a UI host drops the broader
+    /// test-mode argument. The caller still requires demo mode before touching the disposable database.
+    static var showsAlertReview: Bool { launchFlag("FLDemoAlertReview") }
     /// The alert-review fixture always contains two rows in `new` state; keeping this contract explicit lets the
     /// menu-bar badge be initialized before asynchronous database work begins.
     static let alertReviewNewCount = 2

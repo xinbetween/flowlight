@@ -242,13 +242,13 @@ final class TrafficMonitor: ObservableObject {
                 print("Flowlight UI demo policy fixture failed: \(error)")
                 #endif
             }
-            if DemoData.showsAlertReview {
-                do { try DemoData.seedAlertReview(db) }
-                catch {
-                    #if DEBUG
-                    print("Flowlight UI demo alert fixture failed: \(error)")
-                    #endif
-                }
+        }
+        if DemoData.isEnabled && DemoData.showsAlertReview {
+            do { try DemoData.seedAlertReview(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo alert fixture failed: \(error)")
+                #endif
             }
         }
         // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Its row count is
