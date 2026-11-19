@@ -1320,6 +1320,14 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func refreshAlertCount() {
+        // The UI alert fixture is deterministic and is seeded before startup work begins. Keep its badge stable while
+        // the disposable database queue catches up; a transient pre-seed read must not remove the menu action that
+        // the lifecycle test is about to exercise.
+        if DemoData.showsAlertReview {
+            unacknowledgedAlerts = DemoData.alertReviewNewCount
+            return
+        }
+
         let scope = focus
         db.async { [weak self] db in
             let count = try db.newAlertCount(focus: scope)
