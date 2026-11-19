@@ -260,24 +260,25 @@ struct MenuBarContent: View {
         ForEach(liveState.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
         }
-        if reviewAlertCount > 0 {
-            Divider()
-            Button {
-                reviewNewAlerts()
-            } label: {
-                // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of
-                // a noun is not a suffix in most of the languages Flowlight speaks.
-                Label(reviewAlertCount == 1
-                      ? L("%lld unacknowledged alert", reviewAlertCount)
-                      : L("%lld unacknowledged alerts", reviewAlertCount),
-                      systemImage: "exclamationmark.triangle.fill")
-            }
-            .accessibilityIdentifier("menu.review-new-alerts")
-            // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
-            // SwiftUI's identifier during that promotion; the count remains visible in the menu title.
-            .accessibilityLabel(L("Review new alerts in Flowlight"))
-            .help(L("Review new alerts in Flowlight"))
+        Divider()
+        Button {
+            reviewNewAlerts()
+        } label: {
+            // Keep the review affordance present even when the count is zero. The warning/status item is still the
+            // visual signal for new work, but an always-available menu action is more reliable across asynchronous
+            // count refreshes and lets a user open the New filter without waiting for the badge to settle.
+            let title = reviewAlertCount == 0
+                ? L("Review new alerts in Flowlight")
+                : reviewAlertCount == 1
+                    ? L("%lld unacknowledged alert", reviewAlertCount)
+                    : L("%lld unacknowledged alerts", reviewAlertCount)
+            Label(title, systemImage: "exclamationmark.triangle.fill")
         }
+        .accessibilityIdentifier("menu.review-new-alerts")
+        // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
+        // SwiftUI's identifier during that promotion; the count remains visible in the menu title.
+        .accessibilityLabel(L("Review new alerts in Flowlight"))
+        .help(L("Review new alerts in Flowlight"))
         Divider()
         Button(L("Open Flowlight")) {
             mainWindowPresenter.present { openWindow(id: "main") }
