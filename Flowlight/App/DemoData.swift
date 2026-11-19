@@ -4,16 +4,28 @@ import Foundation
 /// Suspicious destinations use reserved documentation addresses (203.0.113.0/24, *.example) so no
 /// real service is depicted as malicious.
 enum DemoData {
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
-    static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
-    static var showsAlertReview: Bool { isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAlertReview") }
+    static var isEnabled: Bool { launchFlag("FLDemo") }
+    static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
+    static var showsAlertReview: Bool { isUITesting && launchFlag("FLDemoAlertReview") }
     /// The alert-review fixture always contains two rows in `new` state; keeping this contract explicit lets the
     /// menu-bar badge be initialized before asynchronous database work begins.
     static let alertReviewNewCount = 2
     static var autoReviewsAlerts: Bool {
-        isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAutoReviewAlerts")
+        isUITesting && launchFlag("FLDemoAutoReviewAlerts")
     }
-    static var isUITesting: Bool { isEnabled && UserDefaults.standard.bool(forKey: "FLDemoUITests") }
+    static var isUITesting: Bool { isEnabled && launchFlag("FLDemoUITests") }
+
+    static func launchFlag(
+        _ key: String,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        if defaults.bool(forKey: key) { return true }
+        guard let index = arguments.firstIndex(of: "-\(key)"), arguments.indices.contains(arguments.index(after: index)) else {
+            return false
+        }
+        return arguments[arguments.index(after: index)].caseInsensitiveCompare("YES") == .orderedSame
+    }
     static var shouldSeedBulkHistory: Bool {
         shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting)
     }
