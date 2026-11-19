@@ -1171,9 +1171,12 @@ enum TrafficGraphLayout {
 
         // This runs for every routing candidate. Building a 161-point array and nested Zip2Sequence closures here
         // made one ordinary 18-edge map take tens of seconds in Debug builds and time out under Xcode 16. Walk the
-        // same 160 line segments directly: collision precision and resulting geometry stay identical, while the hot
-        // path allocates nothing and can return as soon as any relevant card is hit.
-        let steps = 160 * curve.segments.count
+        // same segments directly: ordinary maps retain the 160-step precision, while the bounded dense search uses
+        // 64 steps per cubic (cards are at least 52 points tall and the route safety halo is 10 points). The dense
+        // resolution still exceeds the graph's 100-point visual validation sample, without multiplying 600 edges by
+        // unnecessary collision samples on the oldest runner.
+        let stepsPerSegment = obstacles.count > 160 ? 64 : 160
+        let steps = stepsPerSegment * curve.segments.count
         var previous = curve.start
         for step in 1...steps {
             let current = curve.point(at: CGFloat(step) / CGFloat(steps))
