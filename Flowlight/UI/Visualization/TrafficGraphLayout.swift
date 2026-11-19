@@ -1050,8 +1050,14 @@ enum TrafficGraphLayout {
         between start: CGPoint,
         and end: CGPoint
     ) -> [CGRect] {
-        return frames.compactMap { id, frame -> CGRect? in
-            guard id != edge.source, id != edge.target else { return nil }
+        let horizontalRange = min(start.x, end.x)...max(start.x, end.x)
+        return frames.compactMap { id, frame in
+            // Sibling cards in the endpoint columns cannot be treated as obstacles: every route has to leave and
+            // enter those columns inside their padded horizontal span. Only cards wholly between the attachment
+            // points can block the route; those are the cards a cable can otherwise visibly pass through.
+            guard id != edge.source, id != edge.target,
+                  frame.minX > horizontalRange.lowerBound,
+                  frame.maxX < horizontalRange.upperBound else { return nil }
             return frame
         }
     }

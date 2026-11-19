@@ -496,15 +496,8 @@ final class TrafficMonitor: ObservableObject {
                 let mayUseNetwork = self.catalogTransportInjected
                     || !DemoData.isEnabled && !FlowlightApp.runningTests
                 self.rulePackCatalog.startScheduling(networkingEnabled: mayUseNetwork)
+                self.schedulePostStartDatabaseWork()
             }
-        }
-        db.async { [engine] db in
-            IPOwnerLookup.shared.preload(try db.loadOwners())
-            for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) { IPOwnerLookup.shared.owner(for: ip) }
-            let agents = try db.appDestinations(since: Date().addingTimeInterval(-7 * 86400))
-                .filter { AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil && !AgentCatalog.isBrowser($0.bundleID) }
-                .map(\.bundleID)
-            engine.seedDiscoveredAgents(Set(agents))
         }
         #if !APP_STORE
         updatePacketCapture()
@@ -515,7 +508,6 @@ final class TrafficMonitor: ObservableObject {
             MainActor.assumeIsolated { self?.offerCaptureSetupIfNeeded() }
         })
         #endif
-        refreshAlertCount()
         timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tickLive() }
         })
@@ -531,6 +523,26 @@ final class TrafficMonitor: ObservableObject {
                 #endif
             }
         })
+    }
+
+    /// Runs non-critical database work only after capture has crossed its startup readiness boundary. The source-start
+    /// performance budget measures until `startSource()` reports readiness; catalog and enforcement setup remain before
+    /// that call, while inventory hydration, alert counts, and retention maintenance cannot delay first capture.
+    private func schedulePostStartDatabaseWork() {
+        db.async { [engine] db in
+            IPOwnerLookup.shared.preload(try db.loadOwners())
+            for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) {
+                IPOwnerLookup.shared.owner(for: ip)
+            }
+            let agents = try db.appDestinations(since: Date().addingTimeInterval(-7 * 86400))
+                .filter {
+                    AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil
+                        && !AgentCatalog.isBrowser($0.bundleID)
+                }
+                .map(\.bundleID)
+            engine.seedDiscoveredAgents(Set(agents))
+        }
+        refreshAlertCount()
         runMaintenance()
     }
 
