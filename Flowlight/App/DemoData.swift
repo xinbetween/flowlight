@@ -11,12 +11,15 @@ enum DemoData {
         return ["live", "rules"].contains(UserDefaults.standard.string(forKey: "FLScreen") ?? "")
     }
 
-    static var isEnabled: Bool { launchFlag("FLDemo") || recognizedUITestScreen }
+    /// The alert fixture is itself an explicit demo opt-in. Treat it as enabling the isolated demo database so a
+    /// newer Xcode host that drops the broader boolean arguments cannot leave the menu badge without its fixture.
+    static var isEnabled: Bool {
+        launchFlag("FLDemo") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen
+    }
     static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
 
-    /// The alert fixture is independently opt-in so its badge cannot disappear when a UI host drops the broader
-    /// test-mode argument. The live UI screen is also a recognized test launch contract; it keeps this fixture
-    /// deterministic on Xcode hosts that strip one custom boolean argument while retaining the demo-mode guard.
+    /// The live UI screen is also a recognized test launch contract; it keeps this fixture deterministic on Xcode
+    /// hosts that strip one custom boolean argument while retaining the demo-mode guard.
     static var showsAlertReview: Bool {
         launchFlag("FLDemoAlertReview")
             || (isUITesting && UserDefaults.standard.string(forKey: "FLScreen") == "live")
@@ -27,7 +30,9 @@ enum DemoData {
     static var autoReviewsAlerts: Bool {
         isUITesting && launchFlag("FLDemoAutoReviewAlerts")
     }
-    static var isUITesting: Bool { isEnabled && (launchFlag("FLDemoUITests") || recognizedUITestScreen) }
+    static var isUITesting: Bool {
+        isEnabled && (launchFlag("FLDemoUITests") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen)
+    }
 
     static func launchFlag(
         _ key: String,
