@@ -237,6 +237,7 @@ struct FlowlightApp: App {
     @StateObject private var updater: UpdateChecker
     @StateObject private var focus: FocusStore
     @StateObject private var mainWindowPresenter: MainWindowPresenter
+    @Environment(\.openWindow) private var openWindow
 
     init() {
         let monitor = TrafficMonitor()
@@ -382,6 +383,15 @@ struct FlowlightApp: App {
                 .environmentObject(focus)
                 .environmentObject(nav)
                 .environmentObject(mainWindowPresenter)
+                .onAppear {
+                    // The newest Xcode UI host does not always honor WindowGroup's presented launch behavior for a
+                    // menu-bar app. The disposable UI fixture must still expose the real main scene before tests
+                    // exercise close/minimize recovery; production launches remain presenter-controlled.
+                    guard DemoData.isUITesting else { return }
+                    DispatchQueue.main.async {
+                        mainWindowPresenter.present { openWindow(id: "main") }
+                    }
+                }
         }
 
         Settings {
