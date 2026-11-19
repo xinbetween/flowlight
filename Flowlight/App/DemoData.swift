@@ -7,6 +7,9 @@ enum DemoData {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
     static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
     static var showsAlertReview: Bool { isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAlertReview") }
+    /// The alert-review fixture always contains two rows in `new` state; keeping this contract explicit lets the
+    /// menu-bar badge be initialized before asynchronous database work begins.
+    static let alertReviewNewCount = 2
     static var autoReviewsAlerts: Bool {
         isUITesting && UserDefaults.standard.bool(forKey: "FLDemoAutoReviewAlerts")
     }

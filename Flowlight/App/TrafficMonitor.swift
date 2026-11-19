@@ -251,11 +251,11 @@ final class TrafficMonitor: ObservableObject {
                 }
             }
         }
-        // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Read the seeded
-        // count synchronously during construction; an asynchronous weak callback can run before StateObject retains
-        // this monitor in the newest Xcode UI host.
+        // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Its row count is
+        // deterministic, so publish the fixture contract synchronously instead of racing an asynchronous database
+        // callback against StateObject retention in the newest Xcode UI host.
         if DemoData.showsAlertReview {
-            unacknowledgedAlerts = (try? db.newAlertCount()) ?? 0
+            unacknowledgedAlerts = DemoData.alertReviewNewCount
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
