@@ -32,8 +32,8 @@ struct AlertsView: View {
     @EnvironmentObject var focus: FocusStore
     @State private var alerts: [AlertRecord] = []
     @State private var selection = Set<AlertRecord.ID>()
-    /// The review target remains an accessibility fallback while AppKit finishes bridging Table selection. Once the
-    /// native binding reports a selection, the binding remains authoritative.
+    /// The review target remains an accessibility fallback until AppKit reports that same Table selection. A
+    /// transient native selection for a different row must not hide the requested row from assistive technology.
     @State private var reviewSelectionID: AlertRecord.ID?
     @State private var sortOrder = [KeyPathComparator(\AlertRecord.timestamp, order: .reverse)]
     @State private var triageFilter: AlertTriageFilter = .open
@@ -144,7 +144,7 @@ struct AlertsView: View {
                         .foregroundStyle(rowStyle(a))
                         .accessibilityIdentifier("alerts.row.\(a.id)")
                         .accessibilityValue(
-                            selection.contains(a.id) || (selection.isEmpty && reviewSelectionID == a.id)
+                            selection.contains(a.id) || reviewSelectionID == a.id
                                 ? L("Selected") : ""
                         )
                     if !a.note.isEmpty {
