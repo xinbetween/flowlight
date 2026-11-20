@@ -135,18 +135,22 @@ struct AlertsView: View {
             .width(min: 140, ideal: 190)
             TableColumn(L("Detail"), value: \.detail) { a in
                 HStack(spacing: 6) {
-                    Text(a.detail).lineLimit(2).help(a.detail).foregroundStyle(rowStyle(a))
+                    // Table's accessibility bridge exposes the detail Text as the identified StaticText, not the
+                    // containing HStack. Publish the review selection on that same element so XCTest observes the
+                    // fallback while AppKit finishes propagating the native Table binding.
+                    Text(a.detail)
+                        .lineLimit(2)
+                        .help(a.detail)
+                        .foregroundStyle(rowStyle(a))
+                        .accessibilityIdentifier("alerts.row.\(a.id)")
+                        .accessibilityValue(
+                            selection.contains(a.id) || (selection.isEmpty && reviewSelectionID == a.id)
+                                ? L("Selected") : ""
+                        )
                     if !a.note.isEmpty {
                         Image(systemName: "note.text").foregroundStyle(.secondary).help(a.note)
                     }
                 }
-                .accessibilityIdentifier("alerts.row.\(a.id)")
-                // SwiftUI's Table can delay propagating a programmatic selection to its cell accessibility tree. Keep
-                // the request target observable until the native selection binding reports a non-empty selection.
-                .accessibilityValue(
-                    selection.contains(a.id) || (selection.isEmpty && reviewSelectionID == a.id)
-                        ? L("Selected") : ""
-                )
             }
         }
         .accessibilityIdentifier("alerts.table")
