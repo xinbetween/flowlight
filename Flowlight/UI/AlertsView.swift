@@ -380,17 +380,22 @@ struct AlertsView: View {
         rule = AlertRuleSelection.retained(rule, in: loaded)
         alerts = loaded
         if let reviewRequest {
-            // AppKit's Table needs one main-queue turn after its rows receive new data before a programmatic
-            // selection becomes an accessibility selection. Keep the request UUID until that turn so a newer menu
-            // request cannot be consumed by this older asynchronous load.
+            // Publish the fallback before yielding to AppKit. The native Table needs one main-queue turn after its
+            // rows receive new data before its binding becomes keyboard selection, but a view or scene replacement
+            // must not lose the identity-bound target while that bridge catches up.
             let selectedID = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded)
+            reviewSelectionID = selectedID
+            if let selectedID {
+                selection = [selectedID]
+                nav.publishAlertReviewSelection(selectedID, for: reviewRequest.id)
+            } else {
+                selection.removeAll()
+            }
             DispatchQueue.main.async {
                 guard nav.alertReviewRequest?.id == reviewRequest.id,
                       nav.alertsTab == .alerts else { return }
-                reviewSelectionID = selectedID
                 if let selectedID {
                     selection = [selectedID]
-                    nav.publishAlertReviewSelection(selectedID, for: reviewRequest.id)
                 } else {
                     selection.removeAll()
                 }
