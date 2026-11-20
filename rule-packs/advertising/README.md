@@ -4,7 +4,7 @@ This directory is the preferred, editable source for Flowlight's generated Adver
 
 ## Pinned inputs
 
-The bundle was last modified on 2026-11-15 and is bound byte-for-byte by `sources.lock.json`.
+The bundle was last modified on 2026-11-17 and is bound byte-for-byte by `sources.lock.json`.
 
 - EasyList and EasyPrivacy: `easylist/easylist` commit `0fd01f73f94db975f4ce922c2771069289616294`, attributed to the EasyList authors, under GPL-3.0-or-later for this redistribution route.
 - HaGeZi Multi PRO and Multi PRO++: `hagezi/dns-blocklists` commit `b4ad77c48a0a185dbfacb86c97950bc3f77963e5`, attributed to HaGeZi, under GPL-3.0.
@@ -35,6 +35,12 @@ Hostname blocking cannot remove same-origin ads, page-layout gaps, or browser/ap
 
 The reviewed evidence supports exact balanced entries for `platform.pubadx.one` and `imp9.pubadx.one`, and an aggressive suffix entry for `pubadx.one`. `pubadx.com` is deliberately not covered. This repository makes no ownership, affiliation, or technical-linkage claim between `pubadx.one` and `pubadx.com`.
 
+## 0.18.6 reviewed boundaries
+
+Both tiers add exact coverage for the observed `jo.cashooshut.com` advertising iframe. The pinned HaGeZi Pro and Pro++ snapshots independently list the parent `cashooshut.com`; Flowlight deliberately narrows that evidence to the exact observed iframe host, leaving the parent, siblings, and children of `jo.cashooshut.com` outside the policy. Aggressive alone adds suffix coverage for `googleleadservices.com`, which is present only in the higher-risk pinned Pro++ evidence.
+
+The existing `pagead2.googlesyndication.com` suffix identity remains stable as entry 42470 in both tiers. Shared media and product roots—including `googlevideo.com`, `ytimg.com`, `fbcdn.net`, `youtube.com`, `facebook.com`, and `meta.com`—are protected from generated and manual coverage.
+
 ## Reproduce and review
 
 Run from the repository root:
@@ -54,4 +60,4 @@ The generator's check mode byte-compares the committed outputs. Use `--write` on
 - `Shared/PublicSuffixRules.generated.swift`
 - the Advertising definitions in `rule-packs/official-source.json`
 
-`provenance.generated.json` is published at the content-addressed URL recorded in each Advertising manifest. The official catalog must remain unsigned until source, policy, localization, tests, and generated output are final. Signing uses the separate offline release procedure documented in `docs/DEVELOPMENT.md`; the private key is never stored here or in CI.
+`provenance.generated.json` is published at the content-addressed URL recorded in each Advertising manifest. That publication directory is append-only: prior valid content-addressed files remain available because installed, cached, and historical signed catalogs keep their immutable URLs. The official catalog must remain unsigned until source, policy, localization, tests, and generated output are final. Signing uses the separate offline release procedure documented in `docs/DEVELOPMENT.md`; the private key is never stored here or in CI.

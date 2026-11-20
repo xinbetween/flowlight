@@ -125,6 +125,8 @@ final class TrafficMonitor: ObservableObject {
     let rulePacks: RulePackStore
     /// The exact extension-committed generation, readable from the inspection proxy's queue.
     private let liveRulePacks: LiveRulePacks
+    /// Last extension acknowledgement, retained only for privacy-safe runtime diagnostics.
+    private var latestRulePackApplyResult: RulePackApplyResult?
     /// Enforcing allowlists mirrored for proxied traffic, whose two extension-visible relay legs are exempt.
     private let liveAgentPolicies = LiveAgentPolicies()
     /// The active extension is the one atomic authority for bounded rules across direct and proxied flows.
@@ -234,7 +236,24 @@ final class TrafficMonitor: ObservableObject {
             catch { lastError = L("Could not prepare managed-pack review demo: %@", error.localizedDescription) }
         }
         if DemoData.isUITesting {
-            try? DemoData.seedUITestPolicies(db)
+            do { try DemoData.seedUITestPolicies(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo policy fixture failed: \(error)")
+                #endif
+            }
+            do { try DemoData.seedAlertReview(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo alert fixture failed: \(error)")
+                #endif
+            }
+        }
+        // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Its row count is
+        // deterministic, so publish the fixture contract synchronously instead of racing an asynchronous database
+        // callback against StateObject retention in the newest Xcode UI host.
+        if DemoData.isUITesting {
+            unacknowledgedAlerts = DemoData.alertReviewNewCount
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         engine = AnomalyEngine(db: db, activity: activity)
@@ -344,17 +363,28 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         rules.attach(db: db) { [weak self] in
-            self?.inspectionRulesReady = true
-            self?.attachInspectionWhenPolicyStateIsReady()
+            guard let self else { return }
+            // The disposable UI fixture is written before attach, but a second read after the first published
+            // snapshot keeps newest-Xcode scene construction from retaining an empty pre-seed snapshot.
+            if DemoData.isUITesting {
+                #if DEBUG
+                print("Flowlight UI demo rules after attach: \(self.rules.rules.count)")
+                #endif
+                self.rules.reload()
+            }
+            self.inspectionRulesReady = true
+            self.attachInspectionWhenPolicyStateIsReady()
         }
         rulePacks.onChange = { [weak self] snapshot in
             guard let self else { return }
+            self.latestRulePackApplyResult = nil
             self.liveRulePacks.replace(snapshot: nil)
             self.inspectionRulePacksReady = snapshot == nil
             self.attachInspectionWhenPolicyStateIsReady()
             if self.source is ExtensionTrafficSource { self.rulePacks.markApplying() }
             else { self.rulePacks.updateStatus(self.rulePacks.hasEnabledPacks ? .watchingOnly : .off) }
             self.source?.setRulePacks(snapshot)
+            self.refreshRulePackRuntimeDiagnostics()
         }
         // The proxy reads one lock-backed publication for rules and one for the extension-committed pack generation.
         inspection.requestRules = { [live = rules.live] in live.requestRules() }
@@ -470,15 +500,8 @@ final class TrafficMonitor: ObservableObject {
                 let mayUseNetwork = self.catalogTransportInjected
                     || !DemoData.isEnabled && !FlowlightApp.runningTests
                 self.rulePackCatalog.startScheduling(networkingEnabled: mayUseNetwork)
+                self.schedulePostStartDatabaseWork()
             }
-        }
-        db.async { [engine] db in
-            IPOwnerLookup.shared.preload(try db.loadOwners())
-            for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) { IPOwnerLookup.shared.owner(for: ip) }
-            let agents = try db.appDestinations(since: Date().addingTimeInterval(-7 * 86400))
-                .filter { AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil && !AgentCatalog.isBrowser($0.bundleID) }
-                .map(\.bundleID)
-            engine.seedDiscoveredAgents(Set(agents))
         }
         #if !APP_STORE
         updatePacketCapture()
@@ -489,7 +512,6 @@ final class TrafficMonitor: ObservableObject {
             MainActor.assumeIsolated { self?.offerCaptureSetupIfNeeded() }
         })
         #endif
-        refreshAlertCount()
         timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tickLive() }
         })
@@ -505,6 +527,26 @@ final class TrafficMonitor: ObservableObject {
                 #endif
             }
         })
+    }
+
+    /// Runs non-critical database work only after capture has crossed its startup readiness boundary. The source-start
+    /// performance budget measures until `startSource()` reports readiness; catalog and enforcement setup remain before
+    /// that call, while inventory hydration, alert counts, and retention maintenance cannot delay first capture.
+    private func schedulePostStartDatabaseWork() {
+        db.async { [engine] db in
+            IPOwnerLookup.shared.preload(try db.loadOwners())
+            for ip in try db.unownedIPs(since: Date().addingTimeInterval(-86400)) {
+                IPOwnerLookup.shared.owner(for: ip)
+            }
+            let agents = try db.appDestinations(since: Date().addingTimeInterval(-7 * 86400))
+                .filter {
+                    AgentCatalog.provider(domain: $0.domain, owner: $0.owner) != nil
+                        && !AgentCatalog.isBrowser($0.bundleID)
+                }
+                .map(\.bundleID)
+            engine.seedDiscoveredAgents(Set(agents))
+        }
+        refreshAlertCount()
         runMaintenance()
     }
 
@@ -740,6 +782,7 @@ final class TrafficMonitor: ObservableObject {
             }
         }
         source = newSource
+        latestRulePackApplyResult = nil
         let extensionSource = newSource as? ExtensionTrafficSource
         #if APP_STORE
         extensionSource?.setInspectionProxyPort(inspection.port)
@@ -769,9 +812,12 @@ final class TrafficMonitor: ObservableObject {
             inspection.lastError = L("HTTPS inspection is waiting for the filter to commit the enabled managed policies.")
             rulePacks.updateStatus(.watchingOnly)
         }
+        refreshRulePackRuntimeDiagnostics()
     }
 
     func updateRulePackStatus(_ result: RulePackApplyResult) {
+        latestRulePackApplyResult = result
+        defer { refreshRulePackRuntimeDiagnostics() }
         switch result.status {
         case .accepted:
             liveRulePacks.replace(snapshot: nil)
@@ -780,7 +826,8 @@ final class TrafficMonitor: ObservableObject {
             rulePacks.updateStatus(.applying)
         case .committed:
             let desired = rulePacks.snapshot
-            if desired?.digest == result.activeDigest,
+            if desired?.generation == result.generation,
+               desired?.digest == result.activeDigest,
                liveRulePacks.activeDigest == result.activeDigest,
                inspectionRulePacksReady,
                rulePacks.status == .enforcing {
@@ -794,16 +841,20 @@ final class TrafficMonitor: ObservableObject {
                     guard let self,
                           self.rulePacks.snapshot?.generation == desired?.generation,
                           preparation != .superseded else { return }
-                    if preparation == .prepared, desired?.digest == result.activeDigest {
+                    if preparation == .prepared,
+                       desired?.generation == result.generation,
+                       desired?.digest == result.activeDigest {
                         self.inspectionRulePacksReady = true
                         self.attachInspectionWhenPolicyStateIsReady()
                         self.rulePacks.updateStatus(.enforcing)
+                        self.refreshRulePackRuntimeDiagnostics()
                     } else {
                         self.inspectionRulePacksReady = false
                         self.attachInspectionWhenPolicyStateIsReady()
                         let message = "The filter acknowledged a different rule pack snapshot."
                         self.inspection.lastError = L("The filter acknowledged a different rule pack snapshot.")
                         self.rulePacks.updateStatus(.failed(message))
+                        self.refreshRulePackRuntimeDiagnostics()
                     }
                 }
             }
@@ -825,6 +876,23 @@ final class TrafficMonitor: ObservableObject {
             inspection.lastError = result.detail
             rulePacks.updateStatus(.failed(result.detail))
         }
+    }
+
+    private func refreshRulePackRuntimeDiagnostics() {
+        let desired = rulePacks.snapshot
+        let extensionResult = latestRulePackApplyResult
+        rulePacks.updateRuntimeDiagnostics(.init(
+            captureSource: source?.displayName ?? L("No capture source"),
+            configuredPackIDs: rulePacks.configurations.filter(\.enabled).map(\.packID).sorted(),
+            desiredGeneration: desired?.generation,
+            desiredDigest: desired?.digest ?? "",
+            extensionStatus: extensionResult?.status,
+            extensionGeneration: extensionResult?.generation,
+            extensionDigest: extensionResult?.activeDigest ?? "",
+            proxyDigest: liveRulePacks.activeDigest,
+            runtimeStatus: rulePacks.status,
+            detail: extensionResult?.detail ?? ""
+        ))
     }
 
     private func extensionIdentityMismatch(_ mismatch: ExtensionIdentityMismatch) {
@@ -970,6 +1038,7 @@ final class TrafficMonitor: ObservableObject {
         liveRuleClaims.replace(nil)
         liveRulePacks.replace(snapshot: nil)
         if rulePacks.hasEnabledPacks { rulePacks.updateStatus(.watchingOnly) }
+        refreshRulePackRuntimeDiagnostics()
         status = note
         unavailable.start(sink: { _ in }, status: { _ in })
     }
@@ -1251,6 +1320,14 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func refreshAlertCount() {
+        // The UI alert fixture is deterministic and is seeded before startup work begins. Keep its badge stable while
+        // the disposable database queue catches up; a transient pre-seed read must not remove the menu action that
+        // the lifecycle test is about to exercise.
+        if DemoData.showsAlertReview {
+            unacknowledgedAlerts = DemoData.alertReviewNewCount
+            return
+        }
+
         let scope = focus
         db.async { [weak self] db in
             let count = try db.newAlertCount(focus: scope)

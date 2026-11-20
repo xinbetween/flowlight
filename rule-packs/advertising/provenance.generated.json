@@ -417682,6 +417682,29 @@
       "decision": "included",
       "evidence": [
         {
+          "detail": "The locked HaGeZi Pro++ snapshot identifies this destination; it is limited to the explicit higher-breakage tier.",
+          "source": "manual"
+        },
+        {
+          "source": "hagezi",
+          "tiers": [
+            "aggressive"
+          ]
+        }
+      ],
+      "firstSeenVersion": "0.18.6",
+      "host": "googleleadservices.com",
+      "id": 42473,
+      "match": "suffix",
+      "policyFormat": 1,
+      "tiers": [
+        "aggressive"
+      ]
+    },
+    {
+      "decision": "included",
+      "evidence": [
+        {
           "line": 14644,
           "path": "rule-packs/advertising/snapshots/easylist/easylist/easylist_adservers.txt",
           "rule": "||googletagservices.com^",
@@ -522072,6 +522095,31 @@
       "host": "jnzzlhxhvnqso.online",
       "id": 19358,
       "match": "suffix",
+      "policyFormat": 1,
+      "tiers": [
+        "balanced",
+        "aggressive"
+      ]
+    },
+    {
+      "decision": "included",
+      "evidence": [
+        {
+          "detail": "Observed iframe advertising endpoint on 69shuba.com; the locked HaGeZi Pro and Pro++ snapshots independently list cashooshut.com, while Flowlight narrows enforcement to this exact observed host.",
+          "source": "manual"
+        },
+        {
+          "source": "hagezi",
+          "tiers": [
+            "balanced",
+            "aggressive"
+          ]
+        }
+      ],
+      "firstSeenVersion": "0.18.6",
+      "host": "jo.cashooshut.com",
+      "id": 42474,
+      "match": "exact",
       "policyFormat": 1,
       "tiers": [
         "balanced",
@@ -1145694,7 +1145742,7 @@
     }
   ],
   "format": 1,
-  "generatedAt": 1794787199,
+  "generatedAt": 1794904639,
   "sourceDigests": {
     "rule-packs/advertising/licenses/EasyList-COPYING.rst": "d23065e9e15f8090009b49f6174f327e3e0febb633749d59af6a6f0adf4bcb47",
     "rule-packs/advertising/licenses/HaGeZi-GPL-3.0.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",

@@ -902,11 +902,24 @@ def publication_files(directory):
     }
 
 
-def stale_publication_paths(directory, expected_name):
-    return [
-        directory / name
-        for name in sorted(publication_files(directory) - {expected_name})
-    ]
+def invalid_publication_paths(directory):
+    invalid = []
+    for name in sorted(publication_files(directory)):
+        path = directory / name
+        relative = pathlib.PurePosixPath(name)
+        if (len(relative.parts) != 1 or path.is_symlink() or not path.is_file()
+                or not re.fullmatch(r"[0-9a-f]{64}\.json", name)):
+            invalid.append(path)
+            continue
+        try:
+            content = path.read_bytes()
+            json.loads(content)
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            invalid.append(path)
+            continue
+        if sha256(content) != path.stem:
+            invalid.append(path)
+    return invalid
 
 
 def write_outputs(generated, skip_psl_swift=False):
@@ -922,22 +935,21 @@ def write_outputs(generated, skip_psl_swift=False):
     if publish_path.is_symlink():
         fail(f"refusing to overwrite generated output symlink: {publish_path.relative_to(ROOT)}")
     publish_path.write_bytes(generated["provenance_publish"])
-    expected_name = publish_path.name
     publication_dirs = (
         publish_path.parent,
         ROOT / "docs" / "packs" / "v1" / "provenance",
     )
-    stale = [
+    invalid = [
         path
         for directory in publication_dirs
-        for path in stale_publication_paths(directory, expected_name)
+        for path in invalid_publication_paths(directory)
     ]
-    for path in stale:
+    for path in invalid:
         print(
-            f"stale generated provenance; remove explicitly after catalog publication: {path.relative_to(ROOT)}",
+            f"invalid generated provenance archive: {path.relative_to(ROOT)}",
             file=sys.stderr,
         )
-    return stale
+    return invalid
 
 
 def check_outputs(generated):
@@ -954,10 +966,17 @@ def check_outputs(generated):
             failed = True
     publish_path = generated["provenance_publish_path"]
     published = publication_files(publish_path.parent)
-    if published != {publish_path.name}:
+    if publish_path.name not in published:
         print(
-            "generated provenance publication set drift: "
-            + ", ".join(sorted(published ^ {publish_path.name})),
+            f"generated provenance publication is missing: {publish_path.name}",
+            file=sys.stderr,
+        )
+        failed = True
+    invalid = invalid_publication_paths(publish_path.parent)
+    if invalid:
+        print(
+            "generated provenance archive contains invalid paths: "
+            + ", ".join(str(path.relative_to(ROOT)) for path in invalid),
             file=sys.stderr,
         )
         failed = True
@@ -989,10 +1008,10 @@ def main():
         parser.error("--skip-psl-swift requires --write")
     generated, report = build()
     if args.write:
-        stale = write_outputs(generated, skip_psl_swift=args.skip_psl_swift)
-        if stale:
+        invalid = write_outputs(generated, skip_psl_swift=args.skip_psl_swift)
+        if invalid:
             print(
-                "advertising pack generation failed: stale generated provenance paths remain",
+                "advertising pack generation failed: invalid generated provenance archive paths remain",
                 file=sys.stderr,
             )
             return 1

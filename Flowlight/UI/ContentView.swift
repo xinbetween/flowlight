@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
+    @EnvironmentObject var mainWindowPresenter: MainWindowPresenter
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var demoPluginReview: PluginPackageReview?
@@ -104,6 +105,14 @@ struct ContentView: View {
             }
         }
         .id(localization.revision)
+        .onAppear {
+            // UI-test demos must expose the same main scene that menu-bar recovery presents. This is intentionally
+            // limited to the disposable fixture; production background-only launches remain presenter-controlled.
+            guard DemoData.isUITesting else { return }
+            DispatchQueue.main.async {
+                mainWindowPresenter.present { openWindow(id: "main") }
+            }
+        }
         .task {
             guard demoPluginReview == nil, let url = DemoData.pluginReviewURL else { return }
             if let data = try? Data(contentsOf: url) {
@@ -117,6 +126,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .flowlightOpenUpdate)) { _ in openWindow(id: "update") }
         #endif
         .background(WindowSizer())
+        .background(MainWindowReporter(presenter: mainWindowPresenter))
         .background(WindowVisibilityReporter { window, visible in
             monitor.windowVisibility(window, isVisible: visible)
         })

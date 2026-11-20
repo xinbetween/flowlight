@@ -37,12 +37,55 @@ def covers(entry, host):
     return entry["host"] == host or (
         entry["match"] == "suffix" and host.endswith("." + entry["host"])
     )
-for pack in catalog["payload"]["packs"]:
+packs = {pack["manifest"]["id"]: pack for pack in catalog["payload"]["packs"]}
+for pack in packs.values():
     if pack["manifest"]["id"] not in ("official.advertising", "official.advertising-aggressive"):
         continue
     for protected in protected_by_scoped_exceptions:
         if any(covers(entry, protected) for entry in pack["entries"]):
             raise SystemExit(f"scoped EasyList exception did not conservatively protect {protected}")
+
+if catalog["payload"].get("sequence") != 4:
+    raise SystemExit("0.18.6 catalog must use sequence 4")
+balanced = packs["official.advertising"]
+aggressive = packs["official.advertising-aggressive"]
+if (balanced["manifest"]["version"], aggressive["manifest"]["version"]) != ("3", "2"):
+    raise SystemExit("0.18.6 Advertising tier versions drifted")
+if any(pack["manifest"]["minimumAppVersion"] != "0.18.6" for pack in (balanced, aggressive)):
+    raise SystemExit("0.18.6 Advertising packs have the wrong minimum app version")
+
+def entries(pack, host, match=None):
+    return [entry for entry in pack["entries"]
+            if entry["host"] == host and (match is None or entry["match"] == match)]
+
+for pack in (balanced, aggressive):
+    pagead = entries(pack, "pagead2.googlesyndication.com", "suffix")
+    if [entry["id"] for entry in pagead] != [42470]:
+        raise SystemExit("existing AdSense entry 42470 changed or left an Advertising tier")
+    cashooshut = entries(pack, "jo.cashooshut.com", "exact")
+    if [entry["id"] for entry in cashooshut] != [42474]:
+        raise SystemExit("reviewed jo.cashooshut.com exact entry is missing or unstable")
+
+if any(covers(entry, "googleleadservices.com") for entry in balanced["entries"]):
+    raise SystemExit("googleleadservices.com must remain outside the balanced tier")
+if [entry["id"] for entry in entries(aggressive, "googleleadservices.com", "suffix")] != [42473]:
+    raise SystemExit("aggressive googleleadservices.com entry is missing or unstable")
+for host in ("cashooshut.com", "cdn.cashooshut.com", "sub.jo.cashooshut.com"):
+    for pack in (balanced, aggressive):
+        if any(covers(entry, host) for entry in pack["entries"]):
+            raise SystemExit(f"exact cashooshut scope broadened to {host}")
+for host in ("googlevideo.com", "video.googlevideo.com", "ytimg.com", "i.ytimg.com",
+             "fbcdn.net", "static.fbcdn.net", "youtube.com", "facebook.com", "meta.com"):
+    for pack in (balanced, aggressive):
+        if any(covers(entry, host) for entry in pack["entries"]):
+            raise SystemExit(f"shared product or media surface is covered: {host}")
+for key, expected in {
+    "googleleadservices.com|suffix": {"id": 42473, "firstSeenVersion": "0.18.6"},
+    "jo.cashooshut.com|exact": {"id": 42474, "firstSeenVersion": "0.18.6"},
+}.items():
+    if stable["entries"].get(key) != expected:
+        raise SystemExit(f"new Advertising stable identity drifted: {key}")
+
 required_source_fields = {
     "attribution", "bytes", "commit", "fetchURL", "homepage", "license", "licenseURL",
     "localPath", "role", "sha256", "sourceID", "upstreamVersion",
@@ -177,6 +220,21 @@ aggressive_by_key[(shared["host"], shared["match"])]["id"] = 4294967295
 refresh(stable_id_mismatch, "official.advertising-aggressive")
 write("stable-id-mismatch.json", stable_id_mismatch)
 
+balanced_googlelead = copy.deepcopy(source)
+balanced = pack(balanced_googlelead, "official.advertising")
+balanced["entries"].append({"id": 42473, "host": "googleleadservices.com", "match": "suffix",
+                            "category": "advertising"})
+refresh(balanced_googlelead, "official.advertising")
+write("balanced-googlelead.json", balanced_googlelead)
+
+shared_media = copy.deepcopy(source)
+for pack_id in ("official.advertising", "official.advertising-aggressive"):
+    selected = pack(shared_media, pack_id)
+    selected["entries"].append({"id": 4294967294, "host": "googlevideo.com", "match": "suffix",
+                                "category": "advertising"})
+    refresh(shared_media, pack_id)
+write("shared-media.json", shared_media)
+
 stable_id_reuse = copy.deepcopy(source)
 balanced = pack(stable_id_reuse, "official.advertising")
 aggressive = pack(stable_id_reuse, "official.advertising-aggressive")
@@ -223,6 +281,12 @@ assert_rejected "$temporary/public-suffix.json" \
 assert_rejected "$temporary/non-superset.json" \
   "official.advertising-aggressive is not a semantic superset" \
   "non-superset aggressive tier"
+assert_rejected "$temporary/balanced-googlelead.json" \
+  "sequence 4 balanced Advertising must not cover googleleadservices.com" \
+  "balanced googleleadservices coverage"
+assert_rejected "$temporary/shared-media.json" \
+  "covers protected shared product or media surface googlevideo.com" \
+  "shared Google video coverage"
 assert_rejected "$temporary/stable-id-mismatch.json" \
   "advertising tiers assign different stable IDs to shared entry" \
   "cross-tier stable ID mismatch"
@@ -467,13 +531,15 @@ else:
 
 publication = repository / "site/packs/v1/provenance"
 publication.mkdir(parents=True)
-(publication / "current.json").write_bytes(b"current")
+current = b'{"fixture":"current"}\n'
+current_name = hashlib.sha256(current).hexdigest() + ".json"
+(publication / current_name).write_bytes(current)
 (publication / "nested").mkdir()
 (publication / "nested/extra.bin").write_bytes(b"extra")
-if module.publication_files(publication) != {"current.json", "nested/extra.bin"}:
+if module.publication_files(publication) != {current_name, "nested/extra.bin"}:
     raise SystemExit("nested provenance publication extras were not detected")
-if module.stale_publication_paths(publication, "current.json") != [publication / "nested/extra.bin"]:
-    raise SystemExit("stale provenance paths were not reported exactly")
+if module.invalid_publication_paths(publication) != [publication / "nested/extra.bin"]:
+    raise SystemExit("invalid provenance archive paths were not reported exactly")
 
 exit_repository = repository / "exit-status"
 site_publication = exit_repository / "site/packs/v1/provenance"
@@ -483,6 +549,7 @@ docs_publication.mkdir(parents=True)
 (site_publication / "old-site.json").write_bytes(b"site transition")
 (docs_publication / "old-docs.json").write_bytes(b"docs transition")
 driver = r'''\
+import hashlib
 import importlib.util
 import pathlib
 import sys
@@ -494,9 +561,10 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 module.ROOT = root
 module.OUTPUTS = {}
-publish_path = root / "site/packs/v1/provenance/current.json"
+current = b'{"fixture":"current provenance"}\n'
+publish_path = root / "site/packs/v1/provenance" / (hashlib.sha256(current).hexdigest() + ".json")
 module.build = lambda: ({
-    "provenance_publish": b"current provenance",
+    "provenance_publish": current,
     "provenance_publish_path": publish_path,
 }, {
     "balancedEntries": 1,
@@ -518,19 +586,19 @@ for relative in (
     "site/packs/v1/provenance/old-site.json",
     "docs/packs/v1/provenance/old-docs.json",
 ):
-    warning = (
-        "stale generated provenance; remove explicitly after catalog publication: " + relative
-    )
+    warning = "invalid generated provenance archive: " + relative
     if warning not in result.stderr:
-        raise SystemExit(f"stale --write fixture omitted warning for {relative}")
-if "stale generated provenance paths remain" not in result.stderr:
-    raise SystemExit("stale --write fixture omitted its failure reason")
+        raise SystemExit(f"invalid --write fixture omitted warning for {relative}")
+if "invalid generated provenance archive paths remain" not in result.stderr:
+    raise SystemExit("invalid --write fixture omitted its failure reason")
 if (site_publication / "old-site.json").read_bytes() != b"site transition":
     raise SystemExit("stale --write fixture removed the site transitional file")
 if (docs_publication / "old-docs.json").read_bytes() != b"docs transition":
     raise SystemExit("stale --write fixture removed the docs transitional file")
-if (site_publication / "current.json").read_bytes() != b"current provenance":
-    raise SystemExit("stale --write fixture did not write the current provenance")
+current = b'{"fixture":"current provenance"}\n'
+current_path = site_publication / (hashlib.sha256(current).hexdigest() + ".json")
+if current_path.read_bytes() != current:
+    raise SystemExit("invalid --write fixture did not write the current provenance")
 
 class AcceptingPSL:
     @staticmethod
@@ -549,4 +617,4 @@ else:
     raise SystemExit("manual protected-host entry was not rejected")
 PY
 
-echo "Rule-pack policy fixtures passed: immutable inputs, scoped exceptions, protected hosts, PSL boundaries, PubADX scope, tier superset, and reviewed collectors are enforced."
+echo "Rule-pack policy fixtures passed: immutable inputs, scoped exceptions, protected hosts, PSL boundaries, reviewed ad targets, tier boundaries, stable identities, and supersets are enforced."

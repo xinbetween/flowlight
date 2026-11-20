@@ -3,8 +3,8 @@
   "payload": {
     "catalogID": "flowlight.official",
     "channel": "official",
-    "expiresAt": 1826323199,
-    "issuedAt": 1794787199,
+    "expiresAt": 1826440639,
+    "issuedAt": 1794904639,
     "packs": [
       {
         "entries": [
@@ -115855,6 +115855,12 @@
             "host": "jnzzlhxhvnqso.online",
             "id": 19358,
             "match": "suffix"
+          },
+          {
+            "category": "advertising",
+            "host": "jo.cashooshut.com",
+            "id": 42474,
+            "match": "exact"
           },
           {
             "category": "advertising",
@@ -254315,18 +254321,18 @@
         ],
         "manifest": {
           "caveatKey": "Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app.",
-          "contentSHA256": "1b157f2edd83350c533ab99d067a5244dd911399561f03892f8acfebb633ea68",
-          "entryCount": 42384,
+          "contentSHA256": "09d4fcc6607d91aa08526a29602d8401a1e9e94a6494abf034aea19e7dd14911",
+          "entryCount": 42385,
           "format": 1,
-          "generatedAt": 1794787199,
+          "generatedAt": 1794904639,
           "id": "official.advertising",
           "license": "GPL-3.0-or-later",
-          "minimumAppVersion": "0.18.5",
+          "minimumAppVersion": "0.18.6",
           "minimumExtensionProtocol": 1,
-          "source": "https://flowlight.xinbetween.com/packs/v1/provenance/2c80182d6ca7699d44e9305328b7eff10248031140ca3d9c1c0a95dadc1579e4.json",
+          "source": "https://flowlight.xinbetween.com/packs/v1/provenance/099b005c5b31615ac92345f84b9dac415251fb8814712af6f1e89594f684e5a3.json",
           "summaryKey": "Known advertising delivery and auction hosts across apps.",
           "titleKey": "Advertising",
-          "version": "2"
+          "version": "3"
         }
       },
       {
@@ -347159,6 +347165,12 @@
           },
           {
             "category": "advertising",
+            "host": "googleleadservices.com",
+            "id": 42473,
+            "match": "suffix"
+          },
+          {
+            "category": "advertising",
             "host": "googletagservices.com",
             "id": 15492,
             "match": "suffix"
@@ -370352,6 +370364,12 @@
             "host": "jnzzlhxhvnqso.online",
             "id": 19358,
             "match": "suffix"
+          },
+          {
+            "category": "advertising",
+            "host": "jo.cashooshut.com",
+            "id": 42474,
+            "match": "exact"
           },
           {
             "category": "advertising",
@@ -508932,18 +508950,18 @@
         ],
         "manifest": {
           "caveatKey": "Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it.",
-          "contentSHA256": "39010c77eb06d06e6e052a313e8b5fd125c5ac104a372d83d5f83504834d7d72",
-          "entryCount": 42433,
+          "contentSHA256": "15418eb1d2bb3d287faa37687d1aecda24c7e4be0fd86f3d74c37f80790856e3",
+          "entryCount": 42435,
           "format": 1,
-          "generatedAt": 1794787199,
+          "generatedAt": 1794904639,
           "id": "official.advertising-aggressive",
           "license": "GPL-3.0-or-later",
-          "minimumAppVersion": "0.18.5",
+          "minimumAppVersion": "0.18.6",
           "minimumExtensionProtocol": 1,
-          "source": "https://flowlight.xinbetween.com/packs/v1/provenance/2c80182d6ca7699d44e9305328b7eff10248031140ca3d9c1c0a95dadc1579e4.json",
+          "source": "https://flowlight.xinbetween.com/packs/v1/provenance/099b005c5b31615ac92345f84b9dac415251fb8814712af6f1e89594f684e5a3.json",
           "summaryKey": "Broader advertising hostname coverage for users who accept a higher risk of broken content.",
           "titleKey": "Advertising — Aggressive",
-          "version": "1"
+          "version": "2"
         }
       },
       {
@@ -509436,7 +509454,7 @@
       }
     ],
     "publisher": "Flowlight",
-    "sequence": 3,
+    "sequence": 4,
     "sourceURL": "https://flowlight.xinbetween.com/packs/v1/official.json"
   },
   "signatures": []

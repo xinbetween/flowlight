@@ -234,14 +234,19 @@ struct MenuBarContent: View {
     @EnvironmentObject var nav: AppNavigation
     @EnvironmentObject var updater: UpdateChecker
     @EnvironmentObject var focus: FocusStore
+    @EnvironmentObject var mainWindowPresenter: MainWindowPresenter
     @Environment(\.openWindow) private var openWindow
+
+    private var reviewAlertCount: Int {
+        max(monitor.unacknowledgedAlerts,
+            DemoData.showsAlertReview ? DemoData.alertReviewNewCount : 0)
+    }
 
     var body: some View {
         if extensionManager.state.showsMenuBarNotice {
             Button {
                 nav.showSources(.collector)
-                openWindow(id: "main")
-                NSApp.activate()
+                mainWindowPresenter.present { openWindow(id: "main") }
             } label: {
                 Label(L("Restart or reinstall the filter to finish the update"),
                       systemImage: "exclamationmark.triangle.fill")
@@ -255,17 +260,32 @@ struct MenuBarContent: View {
         ForEach(liveState.talkers.prefix(5)) { t in
             Text("\(t.name): ↓ \(ByteFormat.rate(t.rateIn))  ↑ \(ByteFormat.rate(t.rateOut))")
         }
-        if monitor.unacknowledgedAlerts > 0 {
-            Divider()
-            // Singular and plural are whole sentences rather than a stem with an "s" bolted on: the plural of a
-            // noun is not a suffix in most of the languages Flowlight speaks.
-            Text(monitor.unacknowledgedAlerts == 1 ? L("%lld unacknowledged alert", monitor.unacknowledgedAlerts)
-                                                   : L("%lld unacknowledged alerts", monitor.unacknowledgedAlerts))
+        Divider()
+        Button {
+            reviewNewAlerts()
+        } label: {
+            // Keep the review affordance present even when the count is zero. The warning/status item is still the
+            // visual signal for new work, but an always-available menu action is more reliable across asynchronous
+            // count refreshes and lets a user open the New filter without waiting for the badge to settle.
+            let title = reviewAlertCount == 0
+                ? L("Review new alerts in Flowlight")
+                : reviewAlertCount == 1
+                    ? L("%lld unacknowledged alert", reviewAlertCount)
+                    : L("%lld unacknowledged alerts", reviewAlertCount)
+            Label(title, systemImage: "exclamationmark.triangle.fill")
+                .accessibilityIdentifier("menu.review-new-alerts.label")
         }
+        // Combine the Label into the action element before MenuBarExtra bridges it to AppKit. Without this, some
+        // Xcode/macOS hosts expose only a non-clickable text child and discard the Button's identifier.
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("menu.review-new-alerts")
+        // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
+        // SwiftUI's identifier during that promotion; the count remains visible in the menu title.
+        .accessibilityLabel(L("Review new alerts in Flowlight"))
+        .help(L("Review new alerts in Flowlight"))
         Divider()
         Button(L("Open Flowlight")) {
-            openWindow(id: "main")
-            NSApp.activate()
+            mainWindowPresenter.present { openWindow(id: "main") }
         }
         .keyboardShortcut("o")
         if backgroundOnly {
@@ -273,13 +293,6 @@ struct MenuBarContent: View {
         }
         if !focus.targets.isEmpty {
             Button(focus.isOn ? L("Turn Focus Off") : L("Turn Focus On")) { focus.isOn.toggle() }
-        }
-        if monitor.unacknowledgedAlerts > 0 {
-            Button(L("Review Alerts…")) {
-                nav.showAlerts()
-                openWindow(id: "main")
-                NSApp.activate()
-            }
         }
         #if !APP_STORE
         if let update = updater.pendingUpdate {
@@ -292,6 +305,11 @@ struct MenuBarContent: View {
         }
         #endif
         Button(L("Quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+
+    private func reviewNewAlerts() {
+        nav.reviewAlerts(.new)
+        mainWindowPresenter.present { openWindow(id: "main") }
     }
 }
 

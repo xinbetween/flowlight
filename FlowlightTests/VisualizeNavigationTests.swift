@@ -211,10 +211,45 @@ final class VisualizeNavigationTests: XCTestCase {
         nav.show(.alerts)
         nav.alertsTab = .detection
 
-        nav.showAlerts()
+        nav.reviewAlerts()
 
         XCTAssertEqual(nav.selection, .alerts)
         XCTAssertEqual(nav.alertsTab, .alerts)
+        XCTAssertEqual(nav.alertReviewRequest?.target, .new)
+    }
+
+    func testRepeatedAlertReviewsReplaceIdentityAndStaleConsumptionIsHarmless() throws {
+        let nav = AppNavigation()
+        nav.reviewAlerts()
+        let first = try XCTUnwrap(nav.alertReviewRequest)
+
+        nav.reviewAlerts(.alert(42))
+        let second = try XCTUnwrap(nav.alertReviewRequest)
+
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(second.target, .alert(42))
+        nav.consumeAlertReviewRequest(id: first.id)
+        XCTAssertEqual(nav.alertReviewRequest, second,
+                       "an older asynchronous load must not consume the newer menu action")
+        nav.consumeAlertReviewRequest(id: second.id)
+        XCTAssertNil(nav.alertReviewRequest)
+    }
+
+    func testAlertReviewSelectionUsesExactTargetThenNewestFallback() {
+        let older = AlertRecord(id: 1, timestamp: Date(timeIntervalSince1970: 100), kind: "older",
+                                bundleID: "a", appName: "A", detail: "older", severity: 1)
+        let newest = AlertRecord(id: 2, timestamp: Date(timeIntervalSince1970: 200), kind: "newest",
+                                 bundleID: "b", appName: "B", detail: "newest", severity: 2)
+        let sameTimeHigherID = AlertRecord(id: 3, timestamp: newest.timestamp, kind: "newest",
+                                           bundleID: "c", appName: "C", detail: "newest", severity: 2)
+
+        XCTAssertEqual(AlertReviewBehavior.filter(for: .new), .new)
+        XCTAssertEqual(AlertReviewBehavior.filter(for: .alert(1)), .open)
+        XCTAssertEqual(AlertReviewBehavior.selection(for: .alert(1), in: [newest, older]), 1)
+        XCTAssertEqual(AlertReviewBehavior.selection(for: .alert(99), in: [older, newest]), 2)
+        XCTAssertEqual(AlertReviewBehavior.selection(for: .new, in: [older, newest]), 2)
+        XCTAssertEqual(AlertReviewBehavior.selection(for: .new, in: [newest, sameTimeHigherID]), 3)
+        XCTAssertNil(AlertReviewBehavior.selection(for: .new, in: []))
     }
 
     func testExactInspectNavigationCarriesExactMemberScope() {

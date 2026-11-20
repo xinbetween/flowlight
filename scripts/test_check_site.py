@@ -115,6 +115,7 @@ class SiteBuildProvenanceTests(unittest.TestCase):
                 {"manifest": {"id": "official.advertising-aggressive", "source": old_url}},
             ]}}) + "\n"
         ).encode()
+        (fixture[2] / old_name).write_bytes(old_provenance)
         (fixture[4] / fixture[5]).unlink()
         (fixture[4] / old_name).write_bytes(old_provenance)
         fixture[3].write_bytes(old_catalog)
@@ -140,16 +141,20 @@ class SiteBuildProvenanceTests(unittest.TestCase):
             (fixture[6], {fixture[5]: self.provenance}),
         )
 
-    def test_success_prunes_retained_old_provenance_after_catalog_swap(self):
+    def test_success_retains_immutable_historical_provenance_after_catalog_swap(self):
         fixture = self.fixture()
         old_provenance = b'{"fixture":"previous"}\n'
         old_name = f"{hashlib.sha256(old_provenance).hexdigest()}.json"
+        (fixture[2] / old_name).write_bytes(old_provenance)
         (fixture[4] / fixture[5]).unlink()
         (fixture[4] / old_name).write_bytes(old_provenance)
         self.publish(fixture)
         self.assertEqual(
             self.snapshot(fixture[3], fixture[4]),
-            (fixture[6], {fixture[5]: self.provenance}),
+            (fixture[6], {
+                fixture[5]: self.provenance,
+                old_name: old_provenance,
+            }),
         )
 
     def test_stale_paths_include_nested_publication_extras(self):
@@ -264,6 +269,28 @@ class OfficialPackProvenanceTests(unittest.TestCase):
                 [],
             )
 
+    def test_valid_historical_content_addressed_provenance_remains_public(self):
+        current = b'{"fixture":"current"}\n'
+        historical = b'{"fixture":"historical"}\n'
+        current_name = f"{hashlib.sha256(current).hexdigest()}.json"
+        historical_name = f"{hashlib.sha256(historical).hexdigest()}.json"
+        source_url = check_site.OFFICIAL_PACK_PROVENANCE_URL + current_name
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            source_dir = root / "site"
+            output_dir = root / "docs"
+            source_dir.mkdir()
+            output_dir.mkdir()
+            for directory in (source_dir, output_dir):
+                (directory / current_name).write_bytes(current)
+                (directory / historical_name).write_bytes(historical)
+            self.assertEqual(
+                check_site.official_pack_provenance_problems(
+                    self.catalog(source_url), source_dir, output_dir
+                ),
+                [],
+            )
+
     def test_missing_generated_provenance_fails(self):
         content = b'{"fixture":"reviewed"}\n'
         name = f"{hashlib.sha256(content).hexdigest()}.json"
@@ -276,7 +303,7 @@ class OfficialPackProvenanceTests(unittest.TestCase):
             output_dir.mkdir()
             (source_dir / name).write_bytes(content)
             self.assertIn(
-                "docs/packs/v1/provenance: files do not exactly match the signed catalog references",
+                "docs/packs/v1/provenance: archive does not exactly match the site provenance archive",
                 check_site.official_pack_provenance_problems(
                     self.catalog(source_url), source_dir, output_dir
                 ),
@@ -303,11 +330,11 @@ class OfficialPackProvenanceTests(unittest.TestCase):
                 self.catalog(source_url), source_dir, output_dir
             )
             self.assertIn(
-                "site/packs/v1/provenance: files do not exactly match the signed catalog references",
+                "site/packs/v1/provenance/nested/extra.bin: is not a flat content-addressed JSON path",
                 problems,
             )
             self.assertIn(
-                "docs/packs/v1/provenance: files do not exactly match the signed catalog references",
+                "docs/packs/v1/provenance: archive does not exactly match the site provenance archive",
                 problems,
             )
 

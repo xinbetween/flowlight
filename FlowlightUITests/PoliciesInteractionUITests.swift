@@ -18,14 +18,31 @@ final class PoliciesInteractionUITests: XCTestCase {
 
         let ruleSectionID = "policies.section.rule.toggle"
         XCTAssertTrue(element(ruleSectionID).waitForExistence(timeout: 15))
-        clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForDisclosureState("Collapsed", identifier: ruleSectionID, timeout: 3))
-        clickTrailingBlankArea(of: element(ruleSectionID))
-        XCTAssertTrue(waitForDisclosureState("Expanded", identifier: ruleSectionID, timeout: 3))
-
         let ruleID = "a14da4c2-7930-45c0-a8b9-3b8cd69c4a4e"
         let ruleButton = element("policies.rule.\(ruleID).edit")
-        XCTAssertTrue(ruleButton.waitForExistence(timeout: 10))
+        let initiallyExpanded = ruleButton.waitForExistence(timeout: 3)
+
+        // The macOS SwiftUI bridge does not consistently expose accessibilityValue after a coordinate click. Use the
+        // row that the disclosure actually inserts/removes as the observable contract, while still clicking the
+        // trailing 90% of the full visible header. This also normalizes a restored host state without trusting stale
+        // accessibility metadata.
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        if initiallyExpanded {
+            XCTAssertTrue(ruleButton.waitForNonExistence(timeout: 3),
+                          "a trailing click must collapse the network-rules content")
+        } else {
+            XCTAssertTrue(ruleButton.waitForExistence(timeout: 3),
+                          "a trailing click must expand the network-rules content")
+        }
+        clickTrailingBlankArea(of: element(ruleSectionID))
+        if initiallyExpanded {
+            XCTAssertTrue(ruleButton.waitForExistence(timeout: 3),
+                          "a trailing click must expand the network-rules content")
+        } else {
+            XCTAssertTrue(ruleButton.waitForNonExistence(timeout: 3),
+                          "a trailing click must collapse the network-rules content")
+        }
+
         clickPaintedMargin(of: ruleButton)
         XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
@@ -163,13 +180,16 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLDemoUITests", "YES",
             "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
             "-FLDemoExtensionUpdateWarning", "YES",
+            // Keep this test independent of a prior background-only launch. The warning is expected to recover a
+            // normally visible main window after it closes; background-only suppression is covered by AppKit tests.
+            "-app.backgroundOnly", "NO",
             "-FLScreen", "live",
             "-AppleLanguages", "(en)",
         ]
         app.launch()
 
-        let mainWindow = app.windows["Live"]
-        XCTAssertTrue(mainWindow.waitForExistence(timeout: 10))
+        let mainWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(mainWindow.exists)
         let close = mainWindow.buttons[XCUIIdentifierCloseWindow]
         XCTAssertTrue(close.exists)
         close.click()
@@ -188,6 +208,114 @@ final class PoliciesInteractionUITests: XCTestCase {
                       "the accessible warning must name the installed filter: \(warningText)")
         app.buttons["Later"].click()
         XCTAssertTrue(waitForDisappearance(warning, timeout: 2))
+    }
+
+    func testMenuBarAlertReviewRestoresMinimizedAndClosedBackgroundWindow() {
+        app.launchArguments = [
+            "-FLDemo", "YES",
+            "-FLDemoUITests", "YES",
+            "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
+            "-FLDemoAlertReview", "YES",
+            // Start with a visible scene so this test can exercise both minimize and close before using the
+            // production menu-bar presentation path. Background-only launch suppression is covered separately by
+            // the focused AppKit lifecycle test and the real isolated demo acceptance.
+            "-app.backgroundOnly", "NO",
+            "-FLScreen", "live",
+            "-AppleLanguages", "(en)",
+        ]
+        // Newer Xcode hosts do not consistently forward every custom launch argument into the app process. Keep
+        // the disposable alert fixture explicit through the launch environment as well as the documented arguments.
+        app.launchEnvironment["FLDemo"] = "YES"
+        app.launchEnvironment["FLDemoUITests"] = "YES"
+        app.launchEnvironment["FLDemoAlertReview"] = "YES"
+        app.launch()
+
+        let liveWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(liveWindow.exists)
+        let minimize = liveWindow.buttons[XCUIIdentifierMinimizeWindow]
+        XCTAssertTrue(minimize.exists)
+        minimize.click()
+
+        reviewNewAlertsFromMenuBar()
+        assertNewAlertReview()
+        XCTAssertEqual(app.windows.count, 1,
+                       "restoring alert review must not revive duplicate main scenes")
+
+        let alertWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(alertWindow.exists)
+        let close = alertWindow.buttons[XCUIIdentifierCloseWindow]
+        XCTAssertTrue(close.exists)
+        close.click()
+        XCTAssertTrue(alertWindow.waitForNonExistence(timeout: 3))
+
+        reviewNewAlertsFromMenuBar()
+        assertNewAlertReview()
+        XCTAssertEqual(app.windows.count, 1,
+                       "reopening alert review must reuse the one main scene")
+    }
+
+    private func reviewNewAlertsFromMenuBar() {
+        let statusItem = app.descendants(matching: .statusItem)["menu.status"]
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
+        statusItem.click()
+
+        // MenuBarExtra promotes SwiftUI Buttons into a host-native accessibility element. Newer Xcode hosts can expose
+        // that element as either a MenuItem or Button and can drop the SwiftUI identifier. Keep every query narrow:
+        // a broad `.any` query can make AX snapshot evaluation hit XCTest's 120-second timeout on this menu.
+        let predicate = NSPredicate(
+            format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR title CONTAINS[c] %@",
+            "unacknowledged alert",
+            "unacknowledged alert",
+            "Review new alerts"
+        )
+        let candidates = [
+            // Xcode 26.3 exposes the promoted SwiftUI Button as an NSMenuItem whose AX title is the rendered
+            // count-bearing label; its SwiftUI identifier and label/value fields are not retained.
+            app.menuItems["2 unacknowledged alerts"],
+            app.menuItems["menu.review-new-alerts"],
+            app.buttons["menu.review-new-alerts"],
+            app.menuItems.matching(predicate).firstMatch,
+            app.buttons.matching(predicate).firstMatch,
+        ]
+        guard let review = candidates.first(where: { $0.waitForExistence(timeout: 1) }) else {
+            // Keep the failure actionable on hosts that bridge MenuBarExtra through an unexpected AX role. The
+            // type-scoped descriptions avoid the unbounded `.any` predicate that previously hid the real failure.
+            let diagnostics = [
+                "menus:\n\(app.menus.debugDescription)",
+                "menuItems:\n\(app.menuItems.debugDescription)",
+                "buttons:\n\(app.buttons.debugDescription)",
+                "staticTexts:\n\(app.staticTexts.debugDescription)",
+                "otherElements:\n\(app.otherElements.debugDescription)",
+            ].joined(separator: "\n")
+            XCTFail("the open menu must expose the actionable unacknowledged-alert item\n\(diagnostics)")
+            return
+        }
+        review.click()
+    }
+
+    private func assertNewAlertReview() {
+        let mainWindow = waitForMainWindow(timeout: 10)
+        XCTAssertTrue(mainWindow.exists)
+        XCTAssertTrue(element("alerts.table").waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue("New", identifier: "alerts.filter", timeout: 3),
+                      "the alert review request must select the New filter")
+        XCTAssertTrue(waitForValue("Selected", identifier: "alerts.row.2", timeout: 3),
+                      "the newest New alert must receive keyboard selection")
+        XCTAssertTrue(element("alerts.row.1").exists)
+        XCTAssertFalse(element("alerts.row.3").exists,
+                       "an acknowledged alert must not appear in the New-only review")
+    }
+
+    /// Window titles are localized/navigation-dependent on macOS; the scene itself is the stable contract.
+    /// Prefer the legacy title when available, then fall back to the actual main scene exposed by the app.
+    private func waitForMainWindow(timeout: TimeInterval) -> XCUIElement {
+        let titled = app.windows["Live"]
+        if titled.waitForExistence(timeout: min(timeout, 2)) { return titled }
+        let named = app.windows["Flowlight"]
+        if named.waitForExistence(timeout: min(timeout, 2)) { return named }
+        let first = app.windows.firstMatch
+        _ = first.waitForExistence(timeout: timeout)
+        return first
     }
 
     private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
@@ -281,6 +409,8 @@ final class PoliciesInteractionUITests: XCTestCase {
             "-FLDemoUITests", "YES",
             "-FLDemoUITestDefaultsSuite", uiTestDefaultsSuite(),
             "-FLDemoPackReview", "YES",
+            // Explicitly reset the shared UserDefaults key after any background-only lifecycle test.
+            "-app.backgroundOnly", "NO",
             "-FLScreen", "rules",
             "-FLRulesTab", "rules",
             "-FLPinScreenshotScreen", "YES",

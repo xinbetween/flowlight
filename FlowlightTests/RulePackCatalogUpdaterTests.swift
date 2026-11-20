@@ -4,7 +4,7 @@ import XCTest
 
 final class RulePackCatalogUpdaterTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
-    private let productionAppVersion = "0.18.5"
+    private let productionAppVersion = "0.18.6"
 
     @MainActor
     func testBootstrapAcceptsBundledCatalogWithoutNetwork() async throws {
@@ -23,14 +23,14 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         await updater.bootstrap()
 
         XCTAssertEqual(counter.calls, 0)
-        XCTAssertEqual(updater.receipt?.sequence, 3)
+        XCTAssertEqual(updater.receipt?.sequence, 4)
         XCTAssertEqual(updater.status, .current)
         XCTAssertEqual(store.definitions.map(\.id), BuiltInRulePacks.all.map(\.id).sorted())
-        XCTAssertEqual(store.definitions.reduce(0) { $0 + $1.entries.count }, 84_892)
+        XCTAssertEqual(store.definitions.reduce(0) { $0 + $1.entries.count }, 84_895)
         let balanced = try XCTUnwrap(
             store.definitions.first { $0.id == AdvertisingPackTierPolicy.balancedID }
         )
-        XCTAssertEqual(balanced.entries.count, 42_384)
+        XCTAssertEqual(balanced.entries.count, 42_385)
         XCTAssertTrue(updater.isDownloadedUpdate(balanced))
         XCTAssertNotNil(store.reviewReceipt(for: balanced))
     }
@@ -63,7 +63,7 @@ final class RulePackCatalogUpdaterTests: XCTestCase {
         XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "If-None-Match"), #""catalog-1""#)
         XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "If-Modified-Since"),
                        "Mon, 19 Oct 2026 00:00:00 GMT")
-        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "User-Agent"), "Flowlight/0.18.5")
+        XCTAssertEqual(capture.request?.value(forHTTPHeaderField: "User-Agent"), "Flowlight/0.18.6")
         XCTAssertEqual(updater.status, .current)
         XCTAssertEqual(updater.catalogState.update.lastStatus, "not-modified")
         XCTAssertEqual(updater.catalogState.update.nextEligibleAttempt,

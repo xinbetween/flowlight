@@ -24,6 +24,30 @@ final class DemoDataTests: XCTestCase {
         XCTAssertEqual(DemoData.pluginReviewURL?.path, "/tmp/review-plugin.json")
     }
 
+    func testLaunchFlagsReadArgumentsWhenDefaultsAreNotPopulated() {
+        let suite = "com.flowlight.tests.flags.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertTrue(DemoData.launchFlag(
+            "FLDemoAlertReview",
+            arguments: ["Flowlight", "-FLDemoAlertReview", "YES"],
+            defaults: defaults
+        ))
+        XCTAssertFalse(DemoData.launchFlag(
+            "FLDemoAlertReview",
+            arguments: ["Flowlight", "-FLDemoAlertReview", "NO"],
+            environment: [:],
+            defaults: defaults
+        ))
+        XCTAssertTrue(DemoData.launchFlag(
+            "FLDemoAlertReview",
+            arguments: ["Flowlight"],
+            environment: ["FLDemoAlertReview": "YES"],
+            defaults: defaults
+        ))
+    }
+
     func testUITestLaunchSkipsBulkHistorySeeding() {
         XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: false, isUITesting: false))
         XCTAssertTrue(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: false))

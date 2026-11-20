@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.5, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.6, macOS 15 or later.
 
  On this page
 
@@ -935,7 +935,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.5macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.6macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1679,8 +1679,23 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.6
+November 17, 2026Latest
+
+ Review new alerts from the menu bar. The visible alert count now restores Flowlight’s exact main window, opens the New-only alert list under the current Focus scope, clears stale rule filtering, and selects the newest row without letting an older asynchronous load consume a newer click.
+
+ Know when a pack is actually blocking. Privacy-safe enforcement diagnostics distinguish configured packs from the desired snapshot, Network Extension acknowledgement, inspection matcher digest, capture source, and final runtime state.
+
+ Apply changed policy to existing connections. A long-lived multiplexed connection is reconsidered once for each newly committed enforcement publication, closing the activation gap without repeatedly judging every packet.
+
+ Block the observed Cashooshut iframe exactly. Both tiers add exact entry jo.cashooshut.com; its parent, siblings, and subdomains remain reachable.
+
+ Add Google lead-service coverage only to Aggressive. googleleadservices.com joins the explicit higher-breakage tier while Balanced retains its lower-risk boundary.
+
+ Keep shared media and products reachable. YouTube, Facebook, Meta, googlevideo.com, ytimg.com, and fbcdn.net remain protected; response-type and cosmetic blocking are still outside Flowlight’s hostname policy boundary.
+
  0.18.5
-November 15, 2026Latest
+November 15, 2026
 
  Choose balanced or aggressive Advertising coverage. Advertising remains the recommended lower-breakage tier, while Advertising — Aggressive is an explicit opt-in semantic superset; enabling either atomically replaces the other instead of stacking.
 

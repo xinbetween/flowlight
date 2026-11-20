@@ -4,9 +4,58 @@ import Foundation
 /// Suspicious destinations use reserved documentation addresses (203.0.113.0/24, *.example) so no
 /// real service is depicted as malicious.
 enum DemoData {
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "FLDemo") }
-    static var showsPackReview: Bool { UserDefaults.standard.bool(forKey: "FLDemoPackReview") }
-    static var isUITesting: Bool { isEnabled && UserDefaults.standard.bool(forKey: "FLDemoUITests") }
+    /// Newer Xcode UI hosts preserve the documented screen selector but can drop custom boolean launch arguments.
+    /// Restrict this fallback to an XCTest-hosted process so a real launch with `FLScreen` can never opt into demo data.
+    private static var recognizedUITestScreen: Bool {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil else { return false }
+        return ["live", "rules"].contains(UserDefaults.standard.string(forKey: "FLScreen") ?? "")
+    }
+
+    /// Xcode can strip the UI-test-only boolean flags while retaining the explicit demo flag. Requiring both the
+    /// XCTest host marker and `FLDemo` keeps this fallback impossible for an ordinary user launch.
+    private static var xctestDemoHarness: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil && launchFlag("FLDemo")
+    }
+
+    /// The alert fixture is itself an explicit demo opt-in. Treat it as enabling the isolated demo database so a
+    /// newer Xcode host that drops the broader boolean arguments cannot leave the menu badge without its fixture.
+    static var isEnabled: Bool {
+        launchFlag("FLDemo") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen || xctestDemoHarness
+    }
+    static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
+
+    /// The live UI screen is also a recognized test launch contract; it keeps this fixture deterministic on Xcode
+    /// hosts that strip one custom boolean argument while retaining the demo-mode guard.
+    static var showsAlertReview: Bool {
+        launchFlag("FLDemoAlertReview")
+            || xctestDemoHarness
+            || (isUITesting && UserDefaults.standard.string(forKey: "FLScreen") == "live")
+    }
+    /// The alert-review fixture always contains two rows in `new` state; keeping this contract explicit lets the
+    /// menu-bar badge be initialized before asynchronous database work begins.
+    static let alertReviewNewCount = 2
+    static var autoReviewsAlerts: Bool {
+        isUITesting && launchFlag("FLDemoAutoReviewAlerts")
+    }
+    static var isUITesting: Bool {
+        isEnabled && (launchFlag("FLDemoUITests") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen || xctestDemoHarness)
+    }
+
+    static func launchFlag(
+        _ key: String,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        if defaults.bool(forKey: key) { return true }
+        if environment[key]?.caseInsensitiveCompare("YES") == .orderedSame {
+            return true
+        }
+        guard let index = arguments.firstIndex(of: "-\(key)"), arguments.indices.contains(arguments.index(after: index)) else {
+            return false
+        }
+        return arguments[arguments.index(after: index)].caseInsensitiveCompare("YES") == .orderedSame
+    }
     static var shouldSeedBulkHistory: Bool {
         shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting)
     }
@@ -305,6 +354,36 @@ enum DemoData {
         try db.saveRule(rule)
         try db.savePolicy(AgentPolicy(agentID: "claude", enabled: true, allowAIProviders: true,
                                       patterns: ["github.com", "npmjs.org"]))
+    }
+
+    /// Stable, disposable rows for menu-bar alert-review lifecycle coverage. IDs are deterministic because UI-test
+    /// demo databases are reset before this fixture runs; the acknowledged row proves the New filter is exact.
+    static func seedAlertReview(_ db: TrafficDatabase, now: Date = Date()) throws {
+        _ = try db.addAlert(
+            kind: AnomalyEngine.Kind.firstContact.rawValue,
+            bundleID: "com.example.older",
+            appName: "Older New Alert",
+            detail: "Older deterministic UI-test alert",
+            severity: 1,
+            at: now.addingTimeInterval(-120)
+        )
+        _ = try db.addAlert(
+            kind: AnomalyEngine.Kind.nonStandardPort.rawValue,
+            bundleID: "com.example.newest",
+            appName: "Newest New Alert",
+            detail: "Newest deterministic UI-test alert",
+            severity: 2,
+            at: now.addingTimeInterval(-60)
+        )
+        let acknowledged = try db.addAlert(
+            kind: AnomalyEngine.Kind.volumeSpike.rawValue,
+            bundleID: "com.example.acknowledged",
+            appName: "Acknowledged Alert",
+            detail: "Acknowledged deterministic UI-test alert",
+            severity: 3,
+            at: now
+        )
+        try db.setAlertTriageState(.acknowledged, ids: [acknowledged.id], at: now)
     }
 
     /// A previously accepted pack whose definition has since changed. Screenshot and acceptance runs use this

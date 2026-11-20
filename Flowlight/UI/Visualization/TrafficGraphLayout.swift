@@ -87,6 +87,7 @@ struct TrafficGraphCurveSegment: Equatable, Sendable {
     var control2: CGPoint
     var end: CGPoint
 
+    @inline(__always)
     func point(at progress: CGFloat) -> CGPoint {
         let t = min(1, max(0, progress))
         let inverse = 1 - t
@@ -171,6 +172,7 @@ struct TrafficGraphCurve: Equatable, Sendable {
         return (0...count).map { point(at: CGFloat($0) / CGFloat(count)) }
     }
 
+    @inline(__always)
     func point(at progress: CGFloat) -> CGPoint {
         let scaled = min(1, max(0, progress)) * CGFloat(segments.count)
         let index = min(segments.count - 1, Int(scaled))
@@ -1050,8 +1052,15 @@ enum TrafficGraphLayout {
         between start: CGPoint,
         and end: CGPoint
     ) -> [CGRect] {
-        return frames.compactMap { id, frame -> CGRect? in
-            guard id != edge.source, id != edge.target else { return nil }
+        let horizontalRange = min(start.x, end.x)...max(start.x, end.x)
+        let portTolerance: CGFloat = 1
+        return frames.compactMap { id, frame in
+            // A route starts half a point inside its endpoint card so a sibling card whose edge is flush with the
+            // port can still overlap the first curve sample. Keep that narrow boundary band, while rejecting cards
+            // wholly outside the endpoint-to-endpoint span; this avoids the dense-graph all-frames scan.
+            guard id != edge.source, id != edge.target,
+                  frame.maxX >= horizontalRange.lowerBound - portTolerance,
+                  frame.minX <= horizontalRange.upperBound + portTolerance else { return nil }
             return frame
         }
     }
@@ -1130,16 +1139,31 @@ enum TrafficGraphLayout {
         )
     }
 
+    @inline(__always)
     private static func controlBounds(_ curve: TrafficGraphCurve) -> CGRect {
-        let points = curve.segments.flatMap { [$0.start, $0.control1, $0.control2, $0.end] }
-        let minimumX = points.map(\.x).min() ?? 0
-        let maximumX = points.map(\.x).max() ?? 0
-        let minimumY = points.map(\.y).min() ?? 0
-        let maximumY = points.map(\.y).max() ?? 0
+        // This is on every routing candidate. Keep the exact control-polygon bounds but avoid the four temporary
+        // arrays and reductions that made the dense performance gate disproportionately expensive in older Swift.
+        var minimumX = CGFloat.infinity
+        var maximumX = -CGFloat.infinity
+        var minimumY = CGFloat.infinity
+        var maximumY = -CGFloat.infinity
+        for segment in curve.segments {
+            minimumX = min(minimumX, segment.start.x, segment.control1.x, segment.control2.x, segment.end.x)
+            maximumX = max(maximumX, segment.start.x, segment.control1.x, segment.control2.x, segment.end.x)
+            minimumY = min(minimumY, segment.start.y, segment.control1.y, segment.control2.y, segment.end.y)
+            maximumY = max(maximumY, segment.start.y, segment.control1.y, segment.control2.y, segment.end.y)
+        }
+        if !minimumX.isFinite {
+            minimumX = 0
+            maximumX = 0
+            minimumY = 0
+            maximumY = 0
+        }
         return CGRect(x: minimumX, y: minimumY,
                       width: max(0.5, maximumX - minimumX), height: max(0.5, maximumY - minimumY))
     }
 
+    @inline(__always)
     private static func intersects(_ curve: TrafficGraphCurve, obstacles: [CGRect]) -> Bool {
         let bounds = controlBounds(curve)
         let relevant = obstacles.filter { bounds.intersects($0) }
@@ -1147,9 +1171,12 @@ enum TrafficGraphLayout {
 
         // This runs for every routing candidate. Building a 161-point array and nested Zip2Sequence closures here
         // made one ordinary 18-edge map take tens of seconds in Debug builds and time out under Xcode 16. Walk the
-        // same 160 line segments directly: collision precision and resulting geometry stay identical, while the hot
-        // path allocates nothing and can return as soon as any relevant card is hit.
-        let steps = 160 * curve.segments.count
+        // same segments directly: ordinary maps retain the 160-step precision, while the bounded dense search uses
+        // 64 steps per cubic (cards are at least 52 points tall and the route safety halo is 10 points). The dense
+        // resolution still exceeds the graph's 100-point visual validation sample, without multiplying 600 edges by
+        // unnecessary collision samples on the oldest runner.
+        let stepsPerSegment = obstacles.count > 160 ? 64 : 160
+        let steps = stepsPerSegment * curve.segments.count
         var previous = curve.start
         for step in 1...steps {
             let current = curve.point(at: CGFloat(step) / CGFloat(steps))
@@ -1248,7 +1275,10 @@ enum TrafficGraphLayout {
         let routingObstacles = denseSearch
             ? padded.filter { directBounds.intersects($0) }
             : padded
-        let directIntersectsObstacle = intersects(direct, obstacles: padded)
+        // The direct curve can only hit cards inside its control bounds. Reuse the dense-graph spatial filter here;
+        // scanning every padded card for the initial test otherwise dominates the 600-edge fixture before routing even
+        // begins. For ordinary graphs this remains the same padded collection and therefore preserves geometry.
+        let directIntersectsObstacle = intersects(direct, obstacles: routingObstacles)
         guard directIntersectsObstacle
                 || sharesCorridor(direct, with: avoidingRoutes) else { return direct }
 
@@ -1350,10 +1380,11 @@ enum TrafficGraphLayout {
         let controlFactors: [CGFloat] = denseSearch ? [1, 2.6] : [1, CGFloat(4.0 / 3.0), 2, 2.6, 3.2]
         func staysInsideCanvas(_ candidate: TrafficGraphCurve) -> Bool {
             let steps = 64 * candidate.segments.count
-            return (0...steps).allSatisfy { step in
+            for step in 0...steps {
                 let point = candidate.point(at: CGFloat(step) / CGFloat(steps))
-                return point.y >= minimumY && point.y <= maximumY
+                guard point.y >= minimumY, point.y <= maximumY else { return false }
             }
+            return true
         }
         var obstacleClearFallback: TrafficGraphCurve?
         var fallbackOverlap = Int.max

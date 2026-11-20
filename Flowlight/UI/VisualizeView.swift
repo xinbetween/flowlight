@@ -1260,8 +1260,7 @@ private struct TrafficGraphCanvas: View {
 
     private func omittedRoutesNotice(count: Int) -> some View {
         let explanation = L(
-            "Map could not draw these relationships without crossing another card. "
-                + "List keeps every exact relationship."
+            "Map could not draw these relationships without crossing another card. List keeps every exact relationship."
         )
         return Label {
             Text("\(count) · \(L("Map")) → \(L("List"))")

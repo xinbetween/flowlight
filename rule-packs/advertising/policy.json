@@ -1,18 +1,18 @@
 {
   "format": 1,
-  "catalogSequence": 3,
-  "generatedAt": 1794787199,
-  "minimumAppVersion": "0.18.5",
+  "catalogSequence": 4,
+  "generatedAt": 1794904639,
+  "minimumAppVersion": "0.18.6",
   "balanced": {
     "id": "official.advertising",
-    "version": "2",
+    "version": "3",
     "title": "Advertising",
     "summary": "Known advertising delivery and auction hosts across apps.",
     "caveat": "Recommended balance. Hostname blocking cannot remove page layout gaps, same-origin ads, or overlays drawn by a browser or app."
   },
   "aggressive": {
     "id": "official.advertising-aggressive",
-    "version": "1",
+    "version": "2",
     "title": "Advertising — Aggressive",
     "summary": "Broader advertising hostname coverage for users who accept a higher risk of broken content.",
     "caveat": "Opt-in and higher breakage risk. This tier replaces Advertising; it does not stack with it."
@@ -25,7 +25,9 @@
     "dashboard.twitch.tv",
     "developers.facebook.com",
     "facebook.com",
+    "fbcdn.net",
     "google.com",
+    "googlevideo.com",
     "instagram.com",
     "login.twitch.tv",
     "meta.com",
@@ -35,7 +37,8 @@
     "twitch.tv",
     "web.whatsapp.com",
     "whatsapp.com",
-    "youtube.com"
+    "youtube.com",
+    "ytimg.com"
   ],
   "forbiddenHosts": [
     "pubadx.com"
@@ -54,9 +57,24 @@
         "host": "imp9.pubadx.one",
         "match": "exact",
         "evidence": "Observed advertising-related impression endpoint under pubadx.one; no pubadx.com ownership claim."
+      },
+      {
+        "host": "jo.cashooshut.com",
+        "match": "exact",
+        "evidence": "Observed iframe advertising endpoint on 69shuba.com; the locked HaGeZi Pro and Pro++ snapshots independently list cashooshut.com, while Flowlight narrows enforcement to this exact observed host."
       }
     ],
     "aggressive": [
+      {
+        "host": "googleleadservices.com",
+        "match": "suffix",
+        "evidence": "The locked HaGeZi Pro++ snapshot identifies this destination; it is limited to the explicit higher-breakage tier."
+      },
+      {
+        "host": "jo.cashooshut.com",
+        "match": "exact",
+        "evidence": "Observed iframe advertising endpoint on 69shuba.com; the locked HaGeZi Pro and Pro++ snapshots independently list cashooshut.com, while Flowlight narrows enforcement to this exact observed host."
+      },
       {
         "host": "pubadx.one",
         "match": "suffix",

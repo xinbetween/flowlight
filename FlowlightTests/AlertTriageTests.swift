@@ -216,6 +216,7 @@ final class AlertTriageTests: XCTestCase {
         try db.setAlertTriageState(.dismissed, ids: [dismissedB.id])
 
         let a = FocusScope(bundleIDs: ["a.app"])
+        XCTAssertEqual(try db.alerts(focus: a, triageFilter: .new).map(\.id), [openA.id])
         XCTAssertEqual(Set(try db.alerts(focus: a, triageFilter: .open).map(\.id)), [openA.id, investigatingA.id])
         XCTAssertEqual(try db.alerts(focus: a, triageFilter: .investigating).map(\.id), [investigatingA.id])
         XCTAssertEqual(try db.alerts(focus: a, triageFilter: .resolved).map(\.id), [resolvedA.id])

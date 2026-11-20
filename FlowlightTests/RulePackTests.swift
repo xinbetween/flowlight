@@ -2,6 +2,45 @@ import XCTest
 @testable import Flowlight
 
 final class RulePackTests: XCTestCase {
+    func testRuntimeDiagnosticsRequireExactGenerationAndDigest() {
+        let desired = UUID()
+        var diagnostics = RulePackStore.RuntimeDiagnostics(
+            desiredGeneration: desired,
+            desiredDigest: "digest",
+            extensionStatus: .committed,
+            extensionGeneration: UUID(),
+            extensionDigest: "digest",
+            proxyDigest: "digest",
+            runtimeStatus: .enforcing
+        )
+        XCTAssertFalse(diagnostics.isEnforcingDesiredDigest)
+        diagnostics.extensionGeneration = desired
+        XCTAssertTrue(diagnostics.isEnforcingDesiredDigest)
+    }
+
+    func testACommittedPolicyRevisionRearmsAnExistingTerminalFlowExactlyOnce() {
+        XCTAssertTrue(EnforcementRevisionGate.shouldEvaluate(lastJudgedRevision: nil, currentRevision: 7))
+        XCTAssertFalse(EnforcementRevisionGate.shouldEvaluate(lastJudgedRevision: 7, currentRevision: 7))
+        XCTAssertTrue(EnforcementRevisionGate.shouldEvaluate(lastJudgedRevision: 7, currentRevision: 8),
+                      "a connection judged before pack activation must be reconsidered for the new publication")
+        XCTAssertFalse(EnforcementRevisionGate.shouldRearmTerminalFlow(
+            lastJudgedRevision: nil,
+            currentRevision: 8
+        ), "an unsettled flow is already filtering and must not be reset")
+        XCTAssertFalse(EnforcementRevisionGate.shouldRearmTerminalFlow(
+            lastJudgedRevision: 8,
+            currentRevision: 8
+        ), "a terminal flow already judged under this publication stays terminal")
+        XCTAssertTrue(EnforcementRevisionGate.shouldRearmTerminalFlow(
+            lastJudgedRevision: 7,
+            currentRevision: 8
+        ), "an older terminal allow needs one real data callback under the new publication")
+        XCTAssertFalse(EnforcementRevisionGate.shouldAdvanceConnection(from: true, to: true),
+                       "durable delivery callbacks must not create synthetic enforcement publications")
+        XCTAssertTrue(EnforcementRevisionGate.shouldAdvanceConnection(from: true, to: false))
+        XCTAssertTrue(EnforcementRevisionGate.shouldAdvanceConnection(from: false, to: true))
+    }
+
     func testCanonicalizesCaseTrailingDotUnicodeAndAddresses() {
         XCTAssertEqual(HostCanonicalizer.host(" Example.COM. "), "example.com")
         XCTAssertEqual(HostCanonicalizer.host("bücher.example"), "xn--bcher-kva.example")
@@ -54,7 +93,7 @@ final class RulePackTests: XCTestCase {
         XCTAssertNil(AdvertisingPackTierPolicy.exclusivePeer(of: "official.tracking"))
     }
 
-    func testOfficialAdvertisingPreservesStableIDsAndPubADXBoundaries() throws {
+    func testOfficialAdvertisingPreservesStableIDsAndReviewedBoundaries() throws {
         let stableBalancedIDs = Dictionary(
             uniqueKeysWithValues: BuiltInRulePacks.advertising.entries
                 .filter { $0.id <= 12 }
@@ -88,6 +127,45 @@ final class RulePackTests: XCTestCase {
         for host in ["pubadx.com", "pubadx.one.example", "notpubadx.one", "pubаdx.one"] {
             XCTAssertTrue(aggressive.matches(host: host, bundleID: "app").isEmpty, host)
         }
+    }
+
+    func testGeneratedAdvertisingCatalogPreservesNewTargetsAndSharedProductBoundaries() throws {
+        let url = try XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "official-source", withExtension: "json")
+        )
+        let envelope = try JSONDecoder().decode(
+            RulePackCatalogEnvelope.self,
+            from: Data(contentsOf: url, options: .mappedIfSafe)
+        )
+        XCTAssertEqual(envelope.payload.sequence, 4)
+        let balancedDefinition = try XCTUnwrap(envelope.payload.packs.first {
+            $0.manifest.id == AdvertisingPackTierPolicy.balancedID
+        }?.definition)
+        let aggressiveDefinition = try XCTUnwrap(envelope.payload.packs.first {
+            $0.manifest.id == AdvertisingPackTierPolicy.aggressiveID
+        }?.definition)
+        XCTAssertEqual(balancedDefinition.manifest.version, "3")
+        XCTAssertEqual(aggressiveDefinition.manifest.version, "2")
+        XCTAssertEqual(balancedDefinition.manifest.minimumAppVersion, "0.18.6")
+        XCTAssertEqual(aggressiveDefinition.manifest.minimumAppVersion, "0.18.6")
+
+        let balanced = try RulePackMatcher(snapshot: snapshot(balancedDefinition))
+        let aggressive = try RulePackMatcher(snapshot: snapshot(aggressiveDefinition))
+        for matcher in [balanced, aggressive] {
+            XCTAssertEqual(matcher.matches(host: "pagead2.googlesyndication.com", bundleID: "app").map(\.entry.id),
+                           [42470])
+            XCTAssertEqual(matcher.matches(host: "jo.cashooshut.com", bundleID: "app").map(\.entry.id), [42474])
+            for host in ["cashooshut.com", "cdn.cashooshut.com", "sub.jo.cashooshut.com"] {
+                XCTAssertTrue(matcher.matches(host: host, bundleID: "app").isEmpty, host)
+            }
+            for host in ["googlevideo.com", "video.googlevideo.com", "ytimg.com", "i.ytimg.com",
+                         "fbcdn.net", "static.fbcdn.net", "youtube.com", "facebook.com", "meta.com"] {
+                XCTAssertTrue(matcher.matches(host: host, bundleID: "app").isEmpty, host)
+            }
+        }
+        XCTAssertTrue(balanced.matches(host: "googleleadservices.com", bundleID: "app").isEmpty)
+        XCTAssertEqual(aggressive.matches(host: "googleleadservices.com", bundleID: "app").map(\.entry.id), [42473])
+        XCTAssertEqual(aggressive.matches(host: "www.googleleadservices.com", bundleID: "app").map(\.entry.id), [42473])
     }
 
     func testMatcherRejectsDualEnabledAdvertisingTiers() {
@@ -190,7 +268,9 @@ final class RulePackTests: XCTestCase {
             overrides: [])
         let matcher = try RulePackMatcher(snapshot: value)
         XCTAssertEqual(matcher.matches(host: "ads.example", bundleID: "com.apple.Safari").count, 1)
-        XCTAssertTrue(matcher.matches(host: "ads.example", bundleID: "com.google.Chrome").isEmpty)
+        XCTAssertEqual(matcher.evaluate(host: "ads.example", bundleID: "com.google.Chrome"), .appScopeExcluded)
+        XCTAssertEqual(matcher.evaluate(host: "unlisted.example", bundleID: "com.apple.Safari"), .noMatch)
+        XCTAssertEqual(matcher.evaluate(host: "", bundleID: "com.apple.Safari"), .invalidHostname)
     }
 
     func testExactPackOverrideDoesNotSuppressSubdomains() throws {
@@ -203,7 +283,7 @@ final class RulePackTests: XCTestCase {
             overrides: [RulePackOverride(packID: definition.id, app: "com.example.app",
                                          host: "ads.example", match: .exact)])
         let matcher = try RulePackMatcher(snapshot: value)
-        XCTAssertTrue(matcher.matches(host: "ads.example", bundleID: "com.example.app").isEmpty)
+        XCTAssertEqual(matcher.evaluate(host: "ads.example", bundleID: "com.example.app"), .allowedByOverride)
         XCTAssertEqual(matcher.matches(host: "cdn.ads.example", bundleID: "com.example.app").count, 1)
     }
 
@@ -1824,9 +1904,9 @@ final class RulePackTests: XCTestCase {
         let fixture = try XCTUnwrap(Bundle.main.url(forResource: "official", withExtension: "json"))
         let data = try Data(contentsOf: fixture)
         let verified = try RulePackCatalogVerifier.verify(
-            data: data, now: 1_800_000_000, currentAppVersion: "0.18.5"
+            data: data, now: 1_800_000_000, currentAppVersion: "0.18.6"
         )
-        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.18.5")
+        let composed = try RulePackCatalogComposition.compose(verified, currentAppVersion: "0.18.6")
         _ = try db.acceptVerifiedRulePackCatalog(
             composed,
             checkedAt: Date(timeIntervalSince1970: 1_800_000_000),

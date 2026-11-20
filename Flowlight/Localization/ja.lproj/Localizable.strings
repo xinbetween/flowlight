@@ -1349,7 +1349,6 @@
 "%lld unacknowledged alerts" = "未確認のアラート %lld 件";
 "Open Flowlight" = "Flowlight を開く";
 "Show Dock Icon" = "Dock アイコンを表示";
-"Review Alerts…" = "アラートを確認…";
 "Update Available: Flowlight %@…" = "アップデートがあります: Flowlight %@…";
 "Quit" = "終了";
 "Check for updates automatically" = "自動的にアップデートを確認";
@@ -1378,7 +1377,6 @@
 /* UI/SharedStrings.swift */
 "Advertising" = "広告";
 "Known advertising delivery and auction hosts across apps." = "アプリをまたいで使われる既知の広告配信・広告オークションホスト。";
-"Connection blocking cannot remove page layout gaps, first-party ads, or overlays drawn by a browser or app." = "接続をブロックしても、ページレイアウトの空白、ファーストパーティ広告、ブラウザやアプリが表示するオーバーレイは削除できません。";
 "Cross-site tracking" = "サイト横断トラッキング";
 "Common analytics, session replay, and cross-site measurement hosts." = "一般的なアクセス解析、セッションリプレイ、サイト横断測定のホスト。";
 "Some apps use the same providers for feature flags. They may fall back to built-in defaults when a host is unavailable." = "一部のアプリは同じプロバイダを機能フラグにも使っています。ホストが利用できない場合、内蔵の既定値に切り替わることがあります。";
@@ -2113,3 +2111,21 @@
 "Opt-in · Higher breakage" = "任意 · 機能不全リスク高";
 "Attribution: %@" = "帰属表示: %@";
 "Source licenses: %@" = "ソースライセンス: %@";
+
+/* 0.18.6 alert review and enforcement diagnostics */
+"%lld new" = "%lld 件の新規";
+"Capture source" = "キャプチャソース";
+"Configured packs" = "設定済みパック";
+"Desired snapshot" = "目的のスナップショット";
+"Enforcement diagnostics" = "適用診断";
+"Filter acknowledgement" = "フィルタの確認応答";
+"Flowlight, %lld new alerts" = "Flowlight、新しいアラート %lld 件";
+"Flowlight, 1 new alert" = "Flowlight、新しいアラート 1 件";
+"Flowlight, filter update needs attention, %lld new alerts" = "Flowlight、フィルタの更新に対応が必要、新しいアラート %lld 件";
+"Flowlight, filter update needs attention, 1 new alert" = "Flowlight、フィルタの更新に対応が必要、新しいアラート 1 件";
+"Inspection matcher" = "インスペクションマッチャー";
+"No capture source" = "キャプチャソースなし";
+"No new alerts match the current Focus scope." = "現在のフォーカス範囲に一致する新しいアラートはありません。";
+"Review new alerts in Flowlight" = "Flowlight で新しいアラートを確認";
+"Runtime" = "ランタイム";
+"The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "選択したパックは設定されていますが、Network Extension とインスペクションマッチャーの両方が目的の正確なダイジェストを確認するまでブロックされません。";

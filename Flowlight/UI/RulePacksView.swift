@@ -35,6 +35,7 @@ private struct RulePacksContent: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 explanation
+                runtimeDiagnostics
                 officialUpdates
                 if let failure = packs.failureMessage {
                     Label(failure, systemImage: "exclamationmark.triangle")
@@ -79,6 +80,68 @@ private struct RulePacksContent: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 4)
+    }
+
+    private var runtimeDiagnostics: some View {
+        let diagnostics = packs.runtimeDiagnostics
+        return DisclosureGroup(L("Enforcement diagnostics")) {
+            VStack(alignment: .leading, spacing: 5) {
+                LabeledContent(L("Runtime"), value: runtimeStatusTitle)
+                LabeledContent(L("Capture source"), value: diagnostics.captureSource)
+                LabeledContent(L("Configured packs"),
+                               value: diagnostics.configuredPackIDs.isEmpty
+                               ? L("None") : diagnostics.configuredPackIDs.joined(separator: ", "))
+                LabeledContent(L("Desired snapshot"), value: diagnosticIdentity(
+                    generation: diagnostics.desiredGeneration,
+                    digest: diagnostics.desiredDigest
+                ))
+                LabeledContent(L("Filter acknowledgement"), value: diagnosticIdentity(
+                    generation: diagnostics.extensionGeneration,
+                    digest: diagnostics.extensionDigest,
+                    prefix: diagnostics.extensionStatus?.rawValue
+                ))
+                LabeledContent(L("Inspection matcher"), value: shortDigest(diagnostics.proxyDigest))
+                if packs.hasEnabledPacks && !diagnostics.isEnforcingDesiredDigest {
+                    Label(L("The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest."),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(FL.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !diagnostics.detail.isEmpty {
+                    Text(diagnostics.detail).foregroundStyle(FL.warning)
+                }
+            }
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
+            .padding(.top, 6)
+        }
+        .accessibilityIdentifier("managed-packs.enforcement-diagnostics")
+        .padding(12)
+        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private var runtimeStatusTitle: String {
+        switch packs.status {
+        case .off: return L("Off")
+        case .ready: return L("Ready")
+        case .applying: return L("Applying…")
+        case .enforcing: return L("Blocking")
+        case .watchingOnly: return L("Watching only")
+        case .incompatible: return L("Needs extension update")
+        case .failed: return L("Apply failed")
+        }
+    }
+
+    private func diagnosticIdentity(generation: UUID?, digest: String, prefix: String? = nil) -> String {
+        var parts = [String]()
+        if let prefix, !prefix.isEmpty { parts.append(prefix) }
+        if let generation { parts.append(String(generation.uuidString.lowercased().prefix(8))) }
+        if !digest.isEmpty { parts.append(shortDigest(digest)) }
+        return parts.isEmpty ? L("None") : parts.joined(separator: " · ")
+    }
+
+    private func shortDigest(_ digest: String) -> String {
+        digest.isEmpty ? L("None") : String(digest.prefix(12))
     }
 
     private var officialUpdates: some View {

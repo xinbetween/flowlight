@@ -229,6 +229,7 @@ enum AlertDisposition: String, CaseIterable, Sendable, Hashable {
 }
 
 enum AlertTriageFilter: String, CaseIterable, Sendable, Hashable {
+    case new
     case open
     case investigating
     case resolved
@@ -236,6 +237,7 @@ enum AlertTriageFilter: String, CaseIterable, Sendable, Hashable {
 
     fileprivate var states: [AlertTriageState] {
         switch self {
+        case .new: return [.new]
         case .open: return [.new, .acknowledged, .investigating]
         case .investigating: return [.investigating]
         case .resolved: return [.resolved]

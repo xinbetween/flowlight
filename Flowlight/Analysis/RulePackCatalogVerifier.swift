@@ -61,7 +61,7 @@ struct RulePackCatalogWirePack: Codable, Equatable, Sendable {
     var manifest: RulePackCatalogWireManifest
     var entries: [RulePackEntry]
 
-    fileprivate var definition: RulePackDefinition { manifest.definition(entries: entries) }
+    var definition: RulePackDefinition { manifest.definition(entries: entries) }
 }
 
 struct RulePackCatalogPayload: Codable, Equatable, Sendable {
@@ -434,18 +434,65 @@ enum RulePackCatalogVerifier {
         }
     }
 
-    private static func strictDecode(_ data: Data) throws -> RulePackCatalogEnvelope {
-        do {
-            var scanner = StrictJSONScanner(data: data)
-            try scanner.validate()
-            let object = try JSONSerialization.jsonObject(with: data)
-            try StrictSchema.validateEnvelope(object)
-            return try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: data)
-        } catch let error as RulePackCatalogVerificationError {
-            throw error
-        } catch {
-            throw RulePackCatalogVerificationError.invalidEnvelope
+    private final class StrictDecodeState: @unchecked Sendable {
+        private let lock = NSLock()
+        private(set) var scannerFailure: RulePackCatalogVerificationError?
+        private(set) var schemaFailure: RulePackCatalogVerificationError?
+        private(set) var decoded: RulePackCatalogEnvelope?
+
+        func setScannerFailure(_ error: RulePackCatalogVerificationError) {
+            lock.lock(); scannerFailure = error; lock.unlock()
         }
+
+        func setSchemaFailure(_ error: RulePackCatalogVerificationError) {
+            lock.lock(); schemaFailure = error; lock.unlock()
+        }
+
+        func setDecoded(_ envelope: RulePackCatalogEnvelope) {
+            lock.lock(); decoded = envelope; lock.unlock()
+        }
+    }
+
+    private static func strictDecode(_ data: Data) throws -> RulePackCatalogEnvelope {
+        // The scanner and Foundation decode perform independent checks over the same immutable bytes. Run them in
+        // parallel so a cold launch on the oldest supported toolchain does not pay both full JSON walks serially; both
+        // checks still complete before any catalog is accepted, and scanner failures retain precedence.
+        let group = DispatchGroup()
+        let state = StrictDecodeState()
+
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { group.leave() }
+            do {
+                var scanner = StrictJSONScanner(data: data)
+                try scanner.validate()
+            } catch let error as RulePackCatalogVerificationError {
+                state.setScannerFailure(error)
+            } catch {
+                state.setScannerFailure(.invalidEnvelope)
+            }
+        }
+
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { group.leave() }
+            do {
+                let object = try JSONSerialization.jsonObject(with: data)
+                try StrictSchema.validateEnvelope(object)
+                let envelope = try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: data)
+                state.setDecoded(envelope)
+            } catch let error as RulePackCatalogVerificationError {
+                state.setSchemaFailure(error)
+            } catch {
+                state.setSchemaFailure(.invalidEnvelope)
+            }
+        }
+        group.wait()
+
+        if let scannerFailure = state.scannerFailure { throw scannerFailure }
+        if let schemaFailure = state.schemaFailure { throw schemaFailure }
+        guard let decoded = state.decoded else { throw RulePackCatalogVerificationError.invalidEnvelope }
+        return decoded
     }
 
     private static func validateBoundedString(_ string: String) throws {

@@ -2,6 +2,11 @@ import Foundation
 import Network
 import NetworkExtension
 
+enum FlowTerminalDecision: Equatable, Sendable {
+    case allowed
+    case blocked
+}
+
 /// Per-flow state kept while a flow is alive.
 final class FlowState: @unchecked Sendable {
     let id: UUID
@@ -29,9 +34,59 @@ final class FlowState: @unchecked Sendable {
     var lastBytesOut: Int64 = 0
     var counted = false
     var lastActivity = Date()
-    /// Set once the block rules have ruled on this flow. Touched only from the data path, which macOS serializes
-    /// per flow, so it needs no more protection than `counted` does.
-    var judged = false
+    /// The enforcement publication that last reached a terminal decision for this flow. An in-flight evaluation and
+    /// a requested newer revision are tracked separately so a publication cannot miss a callback racing its scan.
+    private var terminalRevision: UInt64?
+    private var terminalDecision: FlowTerminalDecision?
+    private var evaluatingRevision: UInt64?
+    private var rearmRequestedRevision: UInt64?
+
+    var judgedRevision: UInt64? {
+        get { lock.lock(); defer { lock.unlock() }; return terminalRevision }
+    }
+
+    /// Claims one decision attempt for a publication. The caller invokes this while the enforcer's revision lock is
+    /// held, making the revision read and this claim atomic with respect to a publication scan.
+    func beginEvaluation(for revision: UInt64) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard terminalDecision != .blocked,
+              terminalRevision != revision,
+              evaluatingRevision != revision else { return false }
+        evaluatingRevision = revision
+        return true
+    }
+
+    func finishEvaluation(for revision: UInt64, decision: FlowTerminalDecision?) {
+        lock.lock(); defer { lock.unlock() }
+        guard evaluatingRevision == revision else { return }
+        evaluatingRevision = nil
+        if let pending = rearmRequestedRevision, pending > revision {
+            if decision == .blocked {
+                terminalRevision = revision
+                terminalDecision = .blocked
+                rearmRequestedRevision = nil
+            }
+            return
+        }
+        guard let decision else { return }
+        terminalRevision = revision
+        terminalDecision = decision
+        rearmRequestedRevision = nil
+    }
+
+    /// Marks an older terminal allow, or an in-flight decision from an older revision, for one bounded callback.
+    func needsReevaluation(for revision: UInt64) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        let oldTerminalAllow = terminalDecision == .allowed
+            && EnforcementRevisionGate.shouldRearmTerminalFlow(
+                lastJudgedRevision: terminalRevision,
+                currentRevision: revision
+            )
+        let oldEvaluation = evaluatingRevision.map { $0 != revision } ?? false
+        guard oldTerminalAllow || oldEvaluation else { return false }
+        rearmRequestedRevision = max(rearmRequestedRevision ?? 0, revision)
+        return true
+    }
 
     let outboundPeek: Int
     let inboundPeek: Int
@@ -168,6 +223,9 @@ final class FlowTracker: @unchecked Sendable {
     let aggregator = SecondAggregator()
     private let resolver = ProcessResolver()
     private var flows: [UUID: FlowState] = [:]
+    /// Keep the provider-owned flow object while its accounting state is live so a policy publication can use
+    /// the provider update API to put a terminally allowed socket back into data filtering in either direction.
+    private var socketFlows: [UUID: NEFilterSocketFlow] = [:]
     private let lock = NSLock()
     #if APP_STORE
     private var activeFilterGeneration: UInt64?
@@ -175,6 +233,7 @@ final class FlowTracker: @unchecked Sendable {
     func filterStarted(generation: UInt64) {
         lock.lock()
         flows.removeAll()
+        socketFlows.removeAll()
         activeFilterGeneration = generation
         lock.unlock()
     }
@@ -183,6 +242,7 @@ final class FlowTracker: @unchecked Sendable {
         lock.lock()
         activeFilterGeneration = nil
         flows.removeAll()
+        socketFlows.removeAll()
         lock.unlock()
     }
     #endif
@@ -237,6 +297,7 @@ final class FlowTracker: @unchecked Sendable {
         }
         #endif
         flows[flow.identifier] = state
+        socketFlows[flow.identifier] = flow
         lock.unlock()
         return state
     }
@@ -244,6 +305,17 @@ final class FlowTracker: @unchecked Sendable {
     func state(for flow: NEFilterFlow) -> FlowState? {
         lock.lock(); defer { lock.unlock() }
         return flows[flow.identifier]
+    }
+
+    /// Terminal `allow` verdicts stop data callbacks. Return only sockets decided under an older enforcement
+    /// publication so the provider can re-arm both directions with one byte of peeking. Unsettled flows are already
+    /// filtering and are deliberately left alone.
+    func flowsNeedingReevaluation(for revision: UInt64) -> [NEFilterSocketFlow] {
+        lock.lock(); defer { lock.unlock() }
+        return flows.compactMap { identifier, state in
+            guard state.needsReevaluation(for: revision) else { return nil }
+            return socketFlows[identifier]
+        }
     }
 
     /// Statistics reports carry cumulative byte counts; convert to deltas and aggregate.
@@ -258,7 +330,10 @@ final class FlowTracker: @unchecked Sendable {
         state.lastActivity = Date()
         let newFlow = !state.counted
         state.counted = true
-        if closed { flows.removeValue(forKey: flow.identifier) }
+        if closed {
+            flows.removeValue(forKey: flow.identifier)
+            socketFlows.removeValue(forKey: flow.identifier)
+        }
         lock.unlock()
 
         aggregator.add(state.key(), FlowCounters(bytesIn: deltaIn, bytesOut: deltaOut, flows: newFlow ? 1 : 0))
@@ -268,7 +343,13 @@ final class FlowTracker: @unchecked Sendable {
     func sweepStale() {
         let cutoff = Date().addingTimeInterval(-15 * 60)
         lock.lock(); defer { lock.unlock() }
-        flows = flows.filter { $0.value.lastActivity > cutoff }
+        let stale = flows.compactMap { identifier, state in
+            state.lastActivity <= cutoff ? identifier : nil
+        }
+        for identifier in stale {
+            flows.removeValue(forKey: identifier)
+            socketFlows.removeValue(forKey: identifier)
+        }
     }
 
     #if APP_STORE

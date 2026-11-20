@@ -15,6 +15,9 @@ final class BlockEnforcer: @unchecked Sendable {
     static let shared = BlockEnforcer()
 
     private let lock = NSLock()
+    /// Serializes the revision read/flow claim with publication mutation and reevaluation scanning. The lock is
+    /// released before the expensive process/rule/pack decision work runs.
+    private let revisionLock = NSLock()
     private var policies: [String: AgentPolicy] = [:]
     private var connectionState = EnforcementConnectionState()
     private var cache: [Int32: (agent: Agent?, at: Date)] = [:]
@@ -26,6 +29,10 @@ final class BlockEnforcer: @unchecked Sendable {
     private var packMatcher: RulePackMatcher?
     private var packGeneration: UUID?
     private var packDigest = ""
+    /// Every complete enforcement publication advances this value. The provider is notified after the mutation is
+    /// unlocked so it can put terminally allowed sockets back into data filtering for one bounded callback.
+    private var enforcementRevision: UInt64 = 1
+    private var reevaluateExistingFlows: ((UInt64) -> Void)?
     /// How many decisions each rule has made this run, for the rules that stop after a set number ("allow once").
     /// The app is the one that persists them; this is only what is needed to stop applying a spent rule.
     private var ruleHits: [UUID: Int] = [:]
@@ -47,26 +54,57 @@ final class BlockEnforcer: @unchecked Sendable {
         return !policies.isEmpty || !ruleSet.rules.isEmpty || packMatcher != nil
     }
 
+    func setFlowReevaluationHandler(_ handler: ((UInt64) -> Void)?) {
+        lock.lock()
+        reevaluateExistingFlows = handler
+        lock.unlock()
+    }
+
+    /// Called while the lock is held. The returned callback must run only after unlocking because it enters the
+    /// provider and tracker, which are independently synchronized.
+    private func advanceRevisionLocked() -> (revision: UInt64, callback: ((UInt64) -> Void)?) {
+        enforcementRevision &+= 1
+        return (enforcementRevision, reevaluateExistingFlows)
+    }
+
+    private func announce(_ publication: (revision: UInt64, callback: ((UInt64) -> Void)?)) {
+        // The provider schedules the actual Network Extension updates off the IPC/data queue. Keeping this call
+        // outside the state lock also preserves the short publication critical section.
+        publication.callback?(publication.revision)
+    }
+
     /// Replaces the enforcing set. The app sends this on connect and on every change, so it is always the whole
     /// list rather than a delta.
     func apply(_ list: [AgentPolicy]) -> Int {
-        lock.lock(); defer { lock.unlock() }
+        revisionLock.lock()
+        lock.lock()
         policies = Dictionary(list.filter { $0.enabled && $0.enforce }.map { ($0.agentID, $0) }, uniquingKeysWith: { a, _ in a })
         cache.removeAll()   // a policy change can change which process counts as an agent
-        return policies.count
+        let count = policies.count
+        let publication = advanceRevisionLocked()
+        lock.unlock()
+        announce(publication)
+        revisionLock.unlock()
+        return count
     }
 
     /// Replaces the rule list. Like `apply(_:)` above this is always the whole list, and the hit counts the app
     /// sends with it replace what this run has counted — the app is where they survive a restart.
     func apply(_ set: RuleSet) -> Int {
-        lock.lock(); defer { lock.unlock() }
+        revisionLock.lock()
+        lock.lock()
         ruleSet = set
         ruleHits = Dictionary(set.rules.map { rule in
             let published = rule.hits
             let runtime = ruleHits[rule.id] ?? published
             return (rule.id, set.resetHitCounts.contains(rule.id) ? published : max(published, runtime))
         }, uniquingKeysWith: { a, _ in a })
-        return set.rules.filter(\.enabled).count
+        let count = set.rules.filter(\.enabled).count
+        let publication = advanceRevisionLocked()
+        lock.unlock()
+        announce(publication)
+        revisionLock.unlock()
+        return count
     }
 
     /// Atomically spends one bounded rule for a connection the local proxy is about to decide. Unbounded rules need
@@ -86,21 +124,29 @@ final class BlockEnforcer: @unchecked Sendable {
 
     func apply(_ snapshot: RulePackSnapshot) throws -> RulePackApplyResult {
         let matcher = try RulePackMatcher(snapshot: snapshot)
+        revisionLock.lock()
         lock.lock()
         packMatcher = matcher
         packGeneration = snapshot.generation
         packDigest = snapshot.digest
+        let publication = advanceRevisionLocked()
         lock.unlock()
+        announce(publication)
+        revisionLock.unlock()
         return RulePackApplyResult(status: .committed, generation: snapshot.generation,
                                    activeDigest: snapshot.digest, activePacks: snapshot.configurations.filter(\.enabled).count)
     }
 
     func clearPacks() -> RulePackApplyResult {
+        revisionLock.lock()
         lock.lock()
         packMatcher = nil
         packGeneration = nil
         packDigest = ""
+        let publication = advanceRevisionLocked()
         lock.unlock()
+        announce(publication)
+        revisionLock.unlock()
         return RulePackApplyResult(status: .cleared)
     }
 
@@ -111,8 +157,21 @@ final class BlockEnforcer: @unchecked Sendable {
     }
 
     func appConnectionChanged(connected: Bool, now: Date = Date()) {
-        lock.lock(); defer { lock.unlock() }
+        revisionLock.lock()
+        lock.lock()
+        guard EnforcementRevisionGate.shouldAdvanceConnection(
+            from: connectionState.connected,
+            to: connected
+        ) else {
+            lock.unlock()
+            revisionLock.unlock()
+            return
+        }
         connectionState.update(connected: connected, now: now)
+        let publication = advanceRevisionLocked()
+        lock.unlock()
+        announce(publication)
+        revisionLock.unlock()
     }
 
     private func inForce() -> Bool {
@@ -120,11 +179,24 @@ final class BlockEnforcer: @unchecked Sendable {
         return connectionState.isInForce()
     }
 
+    private func beginDecision(for state: FlowState) -> UInt64? {
+        revisionLock.lock()
+        lock.lock()
+        let enforcing = !policies.isEmpty || !ruleSet.rules.isEmpty || packMatcher != nil
+        let revision = enforcementRevision
+        let claimed = enforcing && state.beginEvaluation(for: revision)
+        lock.unlock()
+        revisionLock.unlock()
+        return claimed ? revision : nil
+    }
+
     /// The filter's one question. True means refuse this flow — by then the refusal has already been reported.
-    /// Each flow is judged once: the answer can't change while it is open, and re-walking the process tree for
-    /// every packet would put the kernel process table on the data path.
+    /// Each flow is judged at most once per enforcement publication. A terminal allow can be re-armed for one real
+    /// callback after publication, while ordinary packet callbacks avoid re-walking the kernel process table.
     func refuses(_ state: FlowState) -> Bool {
-        guard isEnforcing, !state.judged else { return false }
+        guard let revision = beginDecision(for: state) else { return false }
+        var terminalDecision: FlowTerminalDecision?
+        defer { state.finishEvaluation(for: revision, decision: terminalDecision) }
         let agent = agent(for: state.process)
         let facts = FlowFacts(agentKey: agent?.key ?? state.process.bundleID, bundleID: state.process.bundleID,
                               host: state.domain, ip: state.remoteIP, port: state.remotePort,
@@ -137,12 +209,12 @@ final class BlockEnforcer: @unchecked Sendable {
         case .undecided:
             return false
         case .block:
-            state.judged = true
+            terminalDecision = .blocked
             return true
         case .allow where ruled.rule != nil:
             // An exception someone wrote, which is the only thing that outranks an allowlist. An allow with no
             // rule behind it is merely the absence of one, and says nothing about the policy below.
-            state.judged = true
+            terminalDecision = .allowed
             return false
         case .allow:
             break
@@ -154,32 +226,27 @@ final class BlockEnforcer: @unchecked Sendable {
         if packNeedsHostname(facts) { return false }
 
         if let match = packDecision(facts, process: state.process, agent: agent) {
-            state.judged = true
-            let minute = Int64(Date().timeIntervalSince1970) / 60 * 60
+            terminalDecision = .blocked
             let now = Int64(Date().timeIntervalSince1970)
-            reportPack(RulePackEvent(bucket: minute, packID: match.packID, packVersion: match.packVersion,
-                                     entryID: match.entry.id, category: match.entry.category,
-                                     match: match.entry.match, action: .block,
-                                     count: 1, firstAt: now, lastAt: now, bundleID: facts.bundleID,
-                                     appName: state.process.name, agentKey: facts.agentKey,
-                                     agentName: agent?.name ?? state.process.name, host: match.matchedHost,
-                                     matchedHost: match.entry.host, port: facts.port))
+            reportPack(.refusal(match: match, at: now, bundleID: facts.bundleID,
+                                appName: state.process.name, agentKey: facts.agentKey,
+                                agentName: agent?.name ?? state.process.name, port: facts.port))
             extensionLog.info("Pack \(match.packID, privacy: .public) refused \(match.entry.host, privacy: .public)")
             return true
         }
 
         guard let agent, let policy = policy(for: agent.key) else {
-            state.judged = true
+            terminalDecision = .allowed
             return false
         }
         switch BlockRules.verdict(for: facts, policy: policy, inForce: inForce()) {
         case .undecided:
             return false
         case .allow:
-            state.judged = true
+            terminalDecision = .allowed
             return false
         case .block:
-            state.judged = true
+            terminalDecision = .blocked
             let event = BlockEvent(at: Int64(Date().timeIntervalSince1970), agentKey: agent.key, agentName: agent.name,
                                    appName: state.process.name, bundleID: facts.bundleID,
                                    host: facts.host, ip: facts.ip, port: facts.port)

@@ -15,7 +15,7 @@ final class PerformanceBudgetTests: XCTestCase {
         let source = BudgetTrafficSource()
 
         let monitor: TrafficMonitor = try await assertBudget(
-            "launch startup", fixture: "\(recordCount) retained traffic rows + 84,892 catalog entries",
+            "launch startup", fixture: "\(recordCount) retained traffic rows + 84,895 catalog entries",
             budgetMilliseconds: 4_000
         ) {
             let monitor = TrafficMonitor(databaseURL: url, trafficSourceFactory: { source })
@@ -201,10 +201,10 @@ final class PerformanceBudgetTests: XCTestCase {
             try RulePackCatalogVerifier.verify(
                 data: signedSource,
                 now: 1_800_000_000,
-                currentAppVersion: "0.18.5"
+                currentAppVersion: "0.18.6"
             )
         }
-        XCTAssertEqual(verified.sequence, 3)
+        XCTAssertEqual(verified.sequence, 4)
         XCTAssertEqual(verified.signerKeyID, "flowlight-rule-packs-2026-11")
 
         let envelope: RulePackCatalogEnvelope = try assertBudget(
@@ -215,7 +215,7 @@ final class PerformanceBudgetTests: XCTestCase {
             try JSONDecoder().decode(RulePackCatalogEnvelope.self, from: source)
         }
         let totalEntries = envelope.payload.packs.reduce(0) { $0 + $1.entries.count }
-        XCTAssertEqual(totalEntries, 84_892)
+        XCTAssertEqual(totalEntries, 84_895)
 
         let canonical = try assertBudget(
             "rule-pack canonicalization",
