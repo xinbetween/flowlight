@@ -77,9 +77,8 @@ struct AlertsView: View {
             if let reviewSelectionStatus {
                 // Keep an explicit assistive-technology announcement outside the native Table. macOS can cache a
                 // Table cell's StaticText, while this status remains synchronized with the resolved review identity.
-                Text(L("Selected"))
+                Text("\(L("Selected")): \(reviewSelectionStatus.detail)")
                     .accessibilityIdentifier("alerts.review-selection")
-                    .accessibilityLabel("\(L("Selected")), \(reviewSelectionStatus.detail)")
                     .accessibilityValue(reviewSelectionStatus.detail)
                     .frame(width: 1, height: 1)
                     .opacity(0.01)
