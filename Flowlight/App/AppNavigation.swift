@@ -288,6 +288,8 @@ final class AppNavigation: ObservableObject {
     }()
     @Published var agentPolicyRequest: AgentPolicyRequest?
     @Published private(set) var alertReviewRequest: AlertReviewRequest?
+    /// Retains the resolved review row across multiple main-window scene instances and native Table rebuilds.
+    @Published private(set) var alertReviewSelectionID: AlertRecord.ID?
 
     private struct TrailEntry {
         var item: SidebarItem
@@ -341,8 +343,14 @@ final class AppNavigation: ObservableObject {
     }
 
     func reviewAlerts(_ target: AlertReviewTarget = .new) {
+        alertReviewSelectionID = nil
         alertReviewRequest = AlertReviewRequest(target: target)
         show(.alerts)
+    }
+
+    func publishAlertReviewSelection(_ id: AlertRecord.ID, for requestID: UUID) {
+        guard alertReviewRequest?.id == requestID else { return }
+        alertReviewSelectionID = id
     }
 
     func consumeAlertReviewRequest(id: UUID) {

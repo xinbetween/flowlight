@@ -135,6 +135,7 @@ struct AlertsView: View {
             .width(min: 140, ideal: 190)
             TableColumn(L("Detail"), value: \.detail) { a in
                 let isReviewSelected = selection.contains(a.id) || reviewSelectionID == a.id
+                    || nav.alertReviewSelectionID == a.id
                 HStack(spacing: 6) {
                     // Table's accessibility bridge exposes the detail Text as the identified StaticText, not the
                     // containing HStack. Publish the review selection on that same element so XCTest observes the
@@ -389,6 +390,7 @@ struct AlertsView: View {
                 reviewSelectionID = selectedID
                 if let selectedID {
                     selection = [selectedID]
+                    nav.publishAlertReviewSelection(selectedID, for: reviewRequest.id)
                 } else {
                     selection.removeAll()
                 }
