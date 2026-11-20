@@ -261,11 +261,11 @@ final class PoliciesInteractionUITests: XCTestCase {
         // verifies the behavior users need even when macOS's status-item accessibility label is stale.
         statusItem.click()
 
-        // MenuBarExtra promotes SwiftUI Buttons into native NSMenuItems. On the newest Xcode host the item keeps its
-        // visible label but drops the SwiftUI identifier, so query the user-facing action as a menu item first and
-        // retain the identifier path for hosts that preserve it.
+        // MenuBarExtra promotes SwiftUI Buttons into a host-native accessibility element. Newer Xcode hosts can expose
+        // that element as a Button rather than a MenuItem and can drop the SwiftUI identifier, so search the complete
+        // open-menu tree by its stable spoken label and its count-bearing visible label.
         let identified = element("menu.review-new-alerts")
-        let labeled = app.descendants(matching: .menuItem).matching(
+        let labeled = app.descendants(matching: .any).matching(
             NSPredicate(
                 format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR label CONTAINS[c] %@",
                 "unacknowledged alert",
