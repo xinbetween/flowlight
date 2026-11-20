@@ -275,6 +275,9 @@ struct MenuBarContent: View {
             Label(title, systemImage: "exclamationmark.triangle.fill")
                 .accessibilityIdentifier("menu.review-new-alerts.label")
         }
+        // Combine the Label into the action element before MenuBarExtra bridges it to AppKit. Without this, some
+        // Xcode/macOS hosts expose only a non-clickable text child and discard the Button's identifier.
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("menu.review-new-alerts")
         // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
         // SwiftUI's identifier during that promotion; the count remains visible in the menu title.
