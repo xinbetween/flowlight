@@ -297,7 +297,8 @@ final class PoliciesInteractionUITests: XCTestCase {
         let mainWindow = waitForMainWindow(timeout: 10)
         XCTAssertTrue(mainWindow.exists)
         XCTAssertTrue(element("alerts.table").waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForAccessibilityText(containing: "New", identifier: "alerts.filter", timeout: 3))
+        XCTAssertTrue(waitForValue("New", identifier: "alerts.filter", timeout: 3),
+                      "the alert review request must select the New filter")
         XCTAssertTrue(waitForValue("Selected", identifier: "alerts.row.2", timeout: 3),
                       "the newest New alert must receive keyboard selection")
         XCTAssertTrue(element("alerts.row.1").exists)

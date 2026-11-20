@@ -84,6 +84,12 @@ struct AlertsView: View {
         .onChange(of: nav.alertReviewRequest?.id, initial: true) { _, _ in
             prepareAlertReview()
         }
+        .onAppear {
+            // The menu can present the retained main window in the same update that swaps the sidebar destination.
+            // Re-apply the request once the Alerts view is mounted so a newly created state tree cannot fall back to
+            // the default Open filter before the first asynchronous load.
+            prepareAlertReview()
+        }
         .task(id: LoadKey(version: monitor.dataVersion, newAlerts: monitor.unacknowledgedAlerts,
                           focus: focus.scope, tab: nav.alertsTab, filter: triageFilter,
                           reviewRequestID: nav.alertReviewRequest?.id)) {
@@ -197,6 +203,10 @@ struct AlertsView: View {
                 }
                 .labelStyle(.titleAndIcon)
                 .accessibilityIdentifier("alerts.filter")
+                // MenuBarExtra review opens this filter through an identity-bearing navigation request. Publish the
+                // selected filter as the native control value so assistive technology and UI tests can observe the
+                // request after the asynchronous alert load completes.
+                .accessibilityValue(filterLabel)
                 .help(L("Filter which alerts are listed"))
 
                 Menu {
