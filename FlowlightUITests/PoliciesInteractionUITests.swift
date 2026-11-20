@@ -277,7 +277,16 @@ final class PoliciesInteractionUITests: XCTestCase {
             app.buttons.matching(predicate).firstMatch,
         ]
         guard let review = candidates.first(where: { $0.waitForExistence(timeout: 1) }) else {
-            XCTFail("the open menu must expose the actionable unacknowledged-alert item")
+            // Keep the failure actionable on hosts that bridge MenuBarExtra through an unexpected AX role. The
+            // type-scoped descriptions avoid the unbounded `.any` predicate that previously hid the real failure.
+            let diagnostics = [
+                "menus:\n\(app.menus.debugDescription)",
+                "menuItems:\n\(app.menuItems.debugDescription)",
+                "buttons:\n\(app.buttons.debugDescription)",
+                "staticTexts:\n\(app.staticTexts.debugDescription)",
+                "otherElements:\n\(app.otherElements.debugDescription)",
+            ].joined(separator: "\n")
+            XCTFail("the open menu must expose the actionable unacknowledged-alert item\n\(diagnostics)")
             return
         }
         review.click()
