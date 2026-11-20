@@ -262,20 +262,24 @@ final class PoliciesInteractionUITests: XCTestCase {
         statusItem.click()
 
         // MenuBarExtra promotes SwiftUI Buttons into a host-native accessibility element. Newer Xcode hosts can expose
-        // that element as a Button rather than a MenuItem and can drop the SwiftUI identifier, so search the complete
-        // open-menu tree by its stable spoken label and its count-bearing visible label.
-        let identified = element("menu.review-new-alerts")
-        let labeled = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR label CONTAINS[c] %@",
-                "unacknowledged alert",
-                "unacknowledged alert",
-                "Review new alerts"
-            )
-        ).firstMatch
-        let review = identified.waitForExistence(timeout: 1) ? identified : labeled
-        XCTAssertTrue(review.waitForExistence(timeout: 3),
-                      "the open menu must expose the actionable unacknowledged-alert item")
+        // that element as either a MenuItem or Button and can drop the SwiftUI identifier. Keep every query narrow:
+        // a broad `.any` query can make AX snapshot evaluation hit XCTest's 120-second timeout on this menu.
+        let predicate = NSPredicate(
+            format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR title CONTAINS[c] %@",
+            "unacknowledged alert",
+            "unacknowledged alert",
+            "Review new alerts"
+        )
+        let candidates = [
+            app.menuItems["menu.review-new-alerts"],
+            app.buttons["menu.review-new-alerts"],
+            app.menuItems.matching(predicate).firstMatch,
+            app.buttons.matching(predicate).firstMatch,
+        ]
+        guard let review = candidates.first(where: { $0.waitForExistence(timeout: 1) }) else {
+            XCTFail("the open menu must expose the actionable unacknowledged-alert item")
+            return
+        }
         review.click()
     }
 
