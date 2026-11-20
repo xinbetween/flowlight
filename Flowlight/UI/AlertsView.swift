@@ -134,6 +134,7 @@ struct AlertsView: View {
             }
             .width(min: 140, ideal: 190)
             TableColumn(L("Detail"), value: \.detail) { a in
+                let isReviewSelected = selection.contains(a.id) || reviewSelectionID == a.id
                 HStack(spacing: 6) {
                     // Table's accessibility bridge exposes the detail Text as the identified StaticText, not the
                     // containing HStack. Publish the review selection on that same element so XCTest observes the
@@ -142,15 +143,14 @@ struct AlertsView: View {
                         .lineLimit(2)
                         .help(a.detail)
                         .foregroundStyle(rowStyle(a))
+                        // SwiftUI's Table caches native cells by row identity. Include the review state in the
+                        // detail identity so the accessibility bridge rebuilds the cell when the request selects a row.
+                        .id("alerts.row.\(a.id).\(isReviewSelected)")
                         .accessibilityIdentifier("alerts.row.\(a.id)")
                         .accessibilityLabel(
-                            selection.contains(a.id) || reviewSelectionID == a.id
-                                ? "\(a.detail), \(L("Selected"))" : a.detail
+                            isReviewSelected ? "\(a.detail), \(L("Selected"))" : a.detail
                         )
-                        .accessibilityValue(
-                            selection.contains(a.id) || reviewSelectionID == a.id
-                                ? L("Selected") : ""
-                        )
+                        .accessibilityValue(isReviewSelected ? L("Selected") : "")
                     if !a.note.isEmpty {
                         Image(systemName: "note.text").foregroundStyle(.secondary).help(a.note)
                     }
