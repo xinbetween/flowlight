@@ -143,6 +143,10 @@ struct AlertsView: View {
                         .help(a.detail)
                         .foregroundStyle(rowStyle(a))
                         .accessibilityIdentifier("alerts.row.\(a.id)")
+                        .accessibilityLabel(
+                            selection.contains(a.id) || reviewSelectionID == a.id
+                                ? "\(a.detail), \(L("Selected"))" : a.detail
+                        )
                         .accessibilityValue(
                             selection.contains(a.id) || reviewSelectionID == a.id
                                 ? L("Selected") : ""
