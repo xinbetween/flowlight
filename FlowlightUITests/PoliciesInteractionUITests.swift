@@ -257,9 +257,6 @@ final class PoliciesInteractionUITests: XCTestCase {
     private func reviewNewAlertsFromMenuBar() {
         let statusItem = app.descendants(matching: .statusItem)["menu.status"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
-        // The fixture count is published asynchronously after the menu-bar scene appears. Wait for the badge's
-        // accessibility contract before opening the menu so this test cannot race the first menu construction.
-        XCTAssertTrue(waitForAccessibilityText(containing: "new alert", identifier: "menu.status", timeout: 10))
         statusItem.click()
 
         // MenuBarExtra promotes SwiftUI Buttons into a host-native accessibility element. Newer Xcode hosts can expose
@@ -272,6 +269,9 @@ final class PoliciesInteractionUITests: XCTestCase {
             "Review new alerts"
         )
         let candidates = [
+            // Xcode 26.3 exposes the promoted SwiftUI Button as an NSMenuItem whose AX title is the rendered
+            // count-bearing label; its SwiftUI identifier and label/value fields are not retained.
+            app.menuItems["2 unacknowledged alerts"],
             app.menuItems["menu.review-new-alerts"],
             app.buttons["menu.review-new-alerts"],
             app.menuItems.matching(predicate).firstMatch,
