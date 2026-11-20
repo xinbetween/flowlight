@@ -288,6 +288,8 @@ final class AppNavigation: ObservableObject {
     }()
     @Published var agentPolicyRequest: AgentPolicyRequest?
     @Published private(set) var alertReviewRequest: AlertReviewRequest?
+    /// Retains the active review target across multiple main-window scene instances and asynchronous loads.
+    @Published private(set) var alertReviewTarget: AlertReviewTarget?
     /// Retains the resolved review row across multiple main-window scene instances and native Table rebuilds.
     @Published private(set) var alertReviewSelectionID: AlertRecord.ID?
 
@@ -304,6 +306,10 @@ final class AppNavigation: ObservableObject {
     /// Sidebar choices start a new task. In-content links use `followLink` below so their exact origin can be restored.
     func show(_ item: SidebarItem) {
         guard SidebarItem.availableCases.contains(item) else { return }
+        if item != .alerts {
+            alertReviewTarget = nil
+            alertReviewSelectionID = nil
+        }
         trail.removeAll()
         if item == .alerts { alertsTab = .alerts }
         if item == .rules { rulesTab = .rules }
@@ -343,13 +349,18 @@ final class AppNavigation: ObservableObject {
     }
 
     func reviewAlerts(_ target: AlertReviewTarget = .new) {
+        alertReviewTarget = target
         alertReviewSelectionID = nil
         alertReviewRequest = AlertReviewRequest(target: target)
         show(.alerts)
     }
 
-    func publishAlertReviewSelection(_ id: AlertRecord.ID, for requestID: UUID) {
-        guard alertReviewRequest?.id == requestID else { return }
+    func publishAlertReviewSelection(_ id: AlertRecord.ID, for requestID: UUID? = nil) {
+        if let requestID {
+            guard alertReviewRequest?.id == requestID else { return }
+        } else {
+            guard alertReviewTarget != nil else { return }
+        }
         alertReviewSelectionID = id
     }
 

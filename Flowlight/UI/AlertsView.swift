@@ -379,31 +379,32 @@ struct AlertsView: View {
         }
         rule = AlertRuleSelection.retained(rule, in: loaded)
         alerts = loaded
-        if let reviewRequest {
+        if let reviewTarget = reviewRequest?.target ?? nav.alertReviewTarget {
             // Publish the fallback before yielding to AppKit. The native Table needs one main-queue turn after its
             // rows receive new data before its binding becomes keyboard selection, but a view or scene replacement
-            // must not lose the identity-bound target while that bridge catches up.
-            let selectedID = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded)
+            // must not lose the identity-bound target while that bridge catches up. The retained target also lets a
+            // replacement AlertsView finish the same review after another scene consumed the request UUID.
+            let selectedID = AlertReviewBehavior.selection(for: reviewTarget, in: loaded)
             reviewSelectionID = selectedID
             if let selectedID {
                 selection = [selectedID]
-                nav.publishAlertReviewSelection(selectedID, for: reviewRequest.id)
+                nav.publishAlertReviewSelection(selectedID, for: reviewRequest?.id)
             } else {
                 selection.removeAll()
             }
-            DispatchQueue.main.async {
-                guard nav.alertReviewRequest?.id == reviewRequest.id,
-                      nav.alertsTab == .alerts else { return }
-                if let selectedID {
-                    selection = [selectedID]
-                } else {
-                    selection.removeAll()
+            if let reviewRequest {
+                DispatchQueue.main.async {
+                    guard nav.alertReviewRequest?.id == reviewRequest.id,
+                          nav.alertsTab == .alerts else { return }
+                    if let selectedID {
+                        selection = [selectedID]
+                    } else {
+                        selection.removeAll()
+                    }
+                    nav.consumeAlertReviewRequest(id: reviewRequest.id)
                 }
-                nav.consumeAlertReviewRequest(id: reviewRequest.id)
             }
         } else {
-            // Keep the review target through the follow-up nil-request refresh. If the native Table briefly clears its
-            // binding while rebuilding rows, the accessibility fallback must still identify the requested row.
             selection.formIntersection(alerts.map(\.id))
         }
     }
