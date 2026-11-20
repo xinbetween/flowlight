@@ -387,7 +387,8 @@ struct AlertsView: View {
                 nav.consumeAlertReviewRequest(id: reviewRequest.id)
             }
         } else {
-            reviewSelectionID = nil
+            // Keep the review target through the follow-up nil-request refresh. If the native Table briefly clears its
+            // binding while rebuilding rows, the accessibility fallback must still identify the requested row.
             selection.formIntersection(alerts.map(\.id))
         }
     }
