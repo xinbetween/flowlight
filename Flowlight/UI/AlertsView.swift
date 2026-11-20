@@ -363,12 +363,20 @@ struct AlertsView: View {
         rule = AlertRuleSelection.retained(rule, in: loaded)
         alerts = loaded
         if let reviewRequest {
-            if let id = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded) {
-                selection = [id]
-            } else {
-                selection.removeAll()
+            // AppKit's Table needs one main-queue turn after its rows receive new data before a programmatic
+            // selection becomes an accessibility selection. Keep the request UUID until that turn so a newer menu
+            // request cannot be consumed by this older asynchronous load.
+            let selectedID = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded)
+            DispatchQueue.main.async {
+                guard nav.alertReviewRequest?.id == reviewRequest.id,
+                      nav.alertsTab == .alerts else { return }
+                if let selectedID {
+                    selection = [selectedID]
+                } else {
+                    selection.removeAll()
+                }
+                nav.consumeAlertReviewRequest(id: reviewRequest.id)
             }
-            nav.consumeAlertReviewRequest(id: reviewRequest.id)
         } else {
             selection.formIntersection(alerts.map(\.id))
         }
