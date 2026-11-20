@@ -32,6 +32,9 @@ struct AlertsView: View {
     @EnvironmentObject var focus: FocusStore
     @State private var alerts: [AlertRecord] = []
     @State private var selection = Set<AlertRecord.ID>()
+    /// The review target remains an accessibility fallback while AppKit finishes bridging Table selection. Once the
+    /// native binding reports a selection, the binding remains authoritative.
+    @State private var reviewSelectionID: AlertRecord.ID?
     @State private var sortOrder = [KeyPathComparator(\AlertRecord.timestamp, order: .reverse)]
     @State private var triageFilter: AlertTriageFilter = .open
     @State private var rule: String = ""
@@ -138,7 +141,12 @@ struct AlertsView: View {
                     }
                 }
                 .accessibilityIdentifier("alerts.row.\(a.id)")
-                .accessibilityValue(selection.contains(a.id) ? L("Selected") : "")
+                // SwiftUI's Table can delay propagating a programmatic selection to its cell accessibility tree. Keep
+                // the request target observable until the native selection binding reports a non-empty selection.
+                .accessibilityValue(
+                    selection.contains(a.id) || (selection.isEmpty && reviewSelectionID == a.id)
+                        ? L("Selected") : ""
+                )
             }
         }
         .accessibilityIdentifier("alerts.table")
@@ -370,6 +378,7 @@ struct AlertsView: View {
             DispatchQueue.main.async {
                 guard nav.alertReviewRequest?.id == reviewRequest.id,
                       nav.alertsTab == .alerts else { return }
+                reviewSelectionID = selectedID
                 if let selectedID {
                     selection = [selectedID]
                 } else {
@@ -378,6 +387,7 @@ struct AlertsView: View {
                 nav.consumeAlertReviewRequest(id: reviewRequest.id)
             }
         } else {
+            reviewSelectionID = nil
             selection.formIntersection(alerts.map(\.id))
         }
     }
