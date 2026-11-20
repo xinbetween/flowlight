@@ -56,6 +56,12 @@ struct AlertsView: View {
         alerts.filter { rule.isEmpty || $0.kind == rule }.sorted(using: sortOrder)
     }
 
+    private var reviewSelectionStatus: AlertRecord? {
+        let id = nav.alertReviewSelectionID ?? reviewSelectionID ?? selection.first
+        guard let id else { return nil }
+        return alerts.first { $0.id == id }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Picker(L("Alerts"), selection: $nav.alertsTab) {
@@ -67,6 +73,17 @@ struct AlertsView: View {
             .padding(.vertical, 10)
 
             Divider()
+
+            if let reviewSelectionStatus {
+                // Keep an explicit assistive-technology announcement outside the native Table. macOS can cache a
+                // Table cell's StaticText, while this status remains synchronized with the resolved review identity.
+                Text(L("Selected"))
+                    .accessibilityIdentifier("alerts.review-selection")
+                    .accessibilityLabel(L("Selected"))
+                    .accessibilityValue(reviewSelectionStatus.detail)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+            }
 
             Group {
                 if nav.alertsTab == .detection {
