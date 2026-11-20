@@ -197,6 +197,9 @@ struct AlertsView: View {
         } primaryAction: { ids in
             if let a = alert(ids.first) { openReport(a) }
         }
+        // SwiftUI's Table may retain its column closures while only external state changes. Rebuild the native table
+        // when the identity-bound review target changes so AppKit receives the selected accessibility label.
+        .id("alerts.table.\(reviewSelectionID ?? nav.alertReviewSelectionID ?? -1)")
     }
 
     @ToolbarContentBuilder
