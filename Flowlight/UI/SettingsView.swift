@@ -273,6 +273,7 @@ struct MenuBarContent: View {
                     ? L("%lld unacknowledged alert", reviewAlertCount)
                     : L("%lld unacknowledged alerts", reviewAlertCount)
             Label(title, systemImage: "exclamationmark.triangle.fill")
+                .accessibilityIdentifier("menu.review-new-alerts.label")
         }
         .accessibilityIdentifier("menu.review-new-alerts")
         // MenuBarExtra promotes this Button to an NSMenuItem. Keep a stable spoken label when the host drops
