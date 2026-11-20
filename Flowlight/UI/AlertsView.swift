@@ -79,7 +79,7 @@ struct AlertsView: View {
                 // Table cell's StaticText, while this status remains synchronized with the resolved review identity.
                 Text(L("Selected"))
                     .accessibilityIdentifier("alerts.review-selection")
-                    .accessibilityLabel(L("Selected"))
+                    .accessibilityLabel("\(L("Selected")), \(reviewSelectionStatus.detail)")
                     .accessibilityValue(reviewSelectionStatus.detail)
                     .frame(width: 1, height: 1)
                     .opacity(0.01)
