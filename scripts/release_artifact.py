@@ -108,17 +108,23 @@ def verify_run(document, artifacts_document, *, repository, workflow_id, run_id,
         raise ReleaseArtifactError("expected source SHA must be 40 lowercase hexadecimal characters")
     if not isinstance(document, dict):
         raise ReleaseArtifactError("run response must be an object")
+    event = document.get("event")
+    expected_branch = tag if event == "push" else f"release/{tag.removeprefix('v')}"
+    expected_source_sha = source_sha if event == "push" else None
     checks = {
         "run ID": (document.get("id"), run_id),
         "repository": (document.get("repository", {}).get("full_name"), repository),
         "workflow path": (document.get("path"), WORKFLOW_PATH),
         "workflow ID": (document.get("workflow_id"), int(workflow_id)),
-        "event": (document.get("event"), "push"),
-        "tag": (document.get("head_branch"), tag),
-        "source SHA": (document.get("head_sha"), source_sha),
+        "event": (event, "push" if event == "push" else "workflow_dispatch"),
+        "tag or preparation branch": (document.get("head_branch"), expected_branch),
+        "source SHA": (document.get("head_sha"), expected_source_sha) if expected_source_sha else None,
         "status": (document.get("status"), "completed"),
         "conclusion": (document.get("conclusion"), "success"),
     }
+    checks = {label: values for label, values in checks.items() if values is not None}
+    if event == "workflow_dispatch" and not SOURCE_SHA.fullmatch(document.get("head_sha", "")):
+        raise ReleaseArtifactError("workflow-dispatch preparation head SHA is malformed")
     for label, (actual, expected) in checks.items():
         if actual != expected:
             raise ReleaseArtifactError(f"preparation {label} is {actual!r}, expected {expected!r}")
