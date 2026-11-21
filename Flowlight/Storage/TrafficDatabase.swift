@@ -3264,6 +3264,8 @@ final class TrafficDatabase: @unchecked Sendable {
     /// Production paths never call this method; it prevents an older demo process from contaminating deterministic UI rows.
     func resetAlertsForDemo() throws {
         try conn.run("DELETE FROM alerts")
+        // The UI fixture asserts stable row identifiers; deleting rows alone leaves AUTOINCREMENT above 3.
+        try conn.run("DELETE FROM sqlite_sequence WHERE name = 'alerts'")
     }
 
     @discardableResult
