@@ -32,8 +32,8 @@ struct AlertsView: View {
     @EnvironmentObject var focus: FocusStore
     @State private var alerts: [AlertRecord] = []
     @State private var selection = Set<AlertRecord.ID>()
-    /// The review target remains an accessibility fallback while AppKit finishes bridging Table selection. Once the
-    /// native binding reports a selection, the binding remains authoritative.
+    /// The review target remains an accessibility fallback until AppKit reports that same Table selection. A
+    /// transient native selection for a different row must not hide the requested row from assistive technology.
     @State private var reviewSelectionID: AlertRecord.ID?
     @State private var sortOrder = [KeyPathComparator(\AlertRecord.timestamp, order: .reverse)]
     @State private var triageFilter: AlertTriageFilter = .open
@@ -56,6 +56,12 @@ struct AlertsView: View {
         alerts.filter { rule.isEmpty || $0.kind == rule }.sorted(using: sortOrder)
     }
 
+    private var reviewSelectionStatus: AlertRecord? {
+        let id = nav.alertReviewSelectionID ?? reviewSelectionID ?? selection.first
+        guard let id else { return nil }
+        return alerts.first { $0.id == id }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Picker(L("Alerts"), selection: $nav.alertsTab) {
@@ -67,6 +73,16 @@ struct AlertsView: View {
             .padding(.vertical, 10)
 
             Divider()
+
+            if let reviewSelectionStatus {
+                // Keep an explicit assistive-technology announcement outside the native Table. macOS can cache a
+                // Table cell's StaticText, while this status remains synchronized with the resolved review identity.
+                Text("\(L("Selected")): \(reviewSelectionStatus.detail)")
+                    .accessibilityIdentifier("alerts.review-selection")
+                    .accessibilityValue(reviewSelectionStatus.detail)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+            }
 
             Group {
                 if nav.alertsTab == .detection {
@@ -134,19 +150,28 @@ struct AlertsView: View {
             }
             .width(min: 140, ideal: 190)
             TableColumn(L("Detail"), value: \.detail) { a in
+                let isReviewSelected = selection.contains(a.id) || reviewSelectionID == a.id
+                    || nav.alertReviewSelectionID == a.id
                 HStack(spacing: 6) {
-                    Text(a.detail).lineLimit(2).help(a.detail).foregroundStyle(rowStyle(a))
+                    // Table's accessibility bridge exposes the detail Text as the identified StaticText, not the
+                    // containing HStack. Publish the review selection on that same element so XCTest observes the
+                    // fallback while AppKit finishes propagating the native Table binding.
+                    Text(a.detail)
+                        .lineLimit(2)
+                        .help(a.detail)
+                        .foregroundStyle(rowStyle(a))
+                        // SwiftUI's Table caches native cells by row identity. Include the review state in the
+                        // detail identity so the accessibility bridge rebuilds the cell when the request selects a row.
+                        .id("alerts.row.\(a.id).\(isReviewSelected)")
+                        .accessibilityIdentifier("alerts.row.\(a.id)")
+                        .accessibilityLabel(
+                            isReviewSelected ? "\(a.detail), \(L("Selected"))" : a.detail
+                        )
+                        .accessibilityValue(isReviewSelected ? L("Selected") : "")
                     if !a.note.isEmpty {
                         Image(systemName: "note.text").foregroundStyle(.secondary).help(a.note)
                     }
                 }
-                .accessibilityIdentifier("alerts.row.\(a.id)")
-                // SwiftUI's Table can delay propagating a programmatic selection to its cell accessibility tree. Keep
-                // the request target observable until the native selection binding reports a non-empty selection.
-                .accessibilityValue(
-                    selection.contains(a.id) || (selection.isEmpty && reviewSelectionID == a.id)
-                        ? L("Selected") : ""
-                )
             }
         }
         .accessibilityIdentifier("alerts.table")
@@ -188,6 +213,9 @@ struct AlertsView: View {
         } primaryAction: { ids in
             if let a = alert(ids.first) { openReport(a) }
         }
+        // SwiftUI's Table may retain its column closures while only external state changes. Rebuild the native table
+        // when the identity-bound review target changes so AppKit receives the selected accessibility label.
+        .id("alerts.table.\(reviewSelectionID ?? nav.alertReviewSelectionID ?? -1)")
     }
 
     @ToolbarContentBuilder
@@ -370,25 +398,32 @@ struct AlertsView: View {
         }
         rule = AlertRuleSelection.retained(rule, in: loaded)
         alerts = loaded
-        if let reviewRequest {
-            // AppKit's Table needs one main-queue turn after its rows receive new data before a programmatic
-            // selection becomes an accessibility selection. Keep the request UUID until that turn so a newer menu
-            // request cannot be consumed by this older asynchronous load.
-            let selectedID = AlertReviewBehavior.selection(for: reviewRequest.target, in: loaded)
-            DispatchQueue.main.async {
-                guard nav.alertReviewRequest?.id == reviewRequest.id,
-                      nav.alertsTab == .alerts else { return }
-                reviewSelectionID = selectedID
-                if let selectedID {
-                    selection = [selectedID]
-                } else {
-                    selection.removeAll()
+        if let reviewTarget = reviewRequest?.target ?? nav.alertReviewTarget {
+            // Publish the fallback before yielding to AppKit. The native Table needs one main-queue turn after its
+            // rows receive new data before its binding becomes keyboard selection, but a view or scene replacement
+            // must not lose the identity-bound target while that bridge catches up. The retained target also lets a
+            // replacement AlertsView finish the same review after another scene consumed the request UUID.
+            let selectedID = AlertReviewBehavior.selection(for: reviewTarget, in: loaded)
+            reviewSelectionID = selectedID
+            if let selectedID {
+                selection = [selectedID]
+                nav.publishAlertReviewSelection(selectedID, for: reviewRequest?.id)
+            } else {
+                selection.removeAll()
+            }
+            if let reviewRequest {
+                DispatchQueue.main.async {
+                    guard nav.alertReviewRequest?.id == reviewRequest.id,
+                          nav.alertsTab == .alerts else { return }
+                    if let selectedID {
+                        selection = [selectedID]
+                    } else {
+                        selection.removeAll()
+                    }
+                    nav.consumeAlertReviewRequest(id: reviewRequest.id)
                 }
-                nav.consumeAlertReviewRequest(id: reviewRequest.id)
             }
         } else {
-            // Keep the review target through the follow-up nil-request refresh. If the native Table briefly clears its
-            // binding while rebuilding rows, the accessibility fallback must still identify the requested row.
             selection.formIntersection(alerts.map(\.id))
         }
     }

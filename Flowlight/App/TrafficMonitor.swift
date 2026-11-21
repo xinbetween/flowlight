@@ -242,6 +242,11 @@ final class TrafficMonitor: ObservableObject {
                 print("Flowlight UI demo policy fixture failed: \(error)")
                 #endif
             }
+        }
+        // Alert-review launches are an explicit disposable fixture even when a newer Xcode host drops the broader
+        // UI-test flag. Keeping this branch keyed to the review opt-in prevents the bulk demo history from supplying
+        // an unrelated newest alert to the menu-bar review test.
+        if DemoData.showsAlertReview {
             do { try DemoData.seedAlertReview(db) }
             catch {
                 #if DEBUG
@@ -1315,6 +1320,24 @@ final class TrafficMonitor: ObservableObject {
                 self?.coverage = coverage
                 self?.hostnamesLearned = DNSCache.shared.learnedCount
                 self?.dataVersion += 1
+            }
+        }
+    }
+
+    /// Re-seeds the disposable review fixture at the moment the menu action is invoked. This closes the race with
+    /// an older demo process or a launch host that initialized the database before the review flag was visible.
+    func prepareAlertReviewDemo() {
+        guard DemoData.showsAlertReview else { return }
+        db.async { [weak self] db in
+            do { try DemoData.seedAlertReview(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo alert review refresh failed: \(error)")
+                #endif
+            }
+            Task { @MainActor in
+                self?.dataVersion += 1
+                self?.refreshAlertCount()
             }
         }
     }

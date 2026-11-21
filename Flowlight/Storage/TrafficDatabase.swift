@@ -3260,6 +3260,14 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: Alerts
 
+    /// Clears only the disposable alert table before an explicitly requested DemoData alert-review fixture is seeded.
+    /// Production paths never call this method; it prevents an older demo process from contaminating deterministic UI rows.
+    func resetAlertsForDemo() throws {
+        try conn.run("DELETE FROM alerts")
+        // The UI fixture asserts stable row identifiers; deleting rows alone leaves AUTOINCREMENT above 3.
+        try conn.run("DELETE FROM sqlite_sequence WHERE name = 'alerts'")
+    }
+
     @discardableResult
     func addAlert(kind: String, bundleID: String, appName: String, detail: String, severity: Int, at date: Date = Date(),
                   allowPattern: String = "") throws -> AlertRecord {

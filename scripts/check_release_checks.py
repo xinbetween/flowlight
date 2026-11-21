@@ -113,6 +113,12 @@ def select_checks(repo, sha, checks_document, runs_document, reviewed_pull_numbe
                     and pull.get("head", {}).get("sha") == sha
                     and pull.get("base", {}).get("ref") == "main"
                 ), None) if isinstance(linked_pulls, list) else None
+                # GitHub removes the workflow run's pull_requests association after the PR is merged. The
+                # surrounding verifier has already authenticated the exact merged PR and its review receipt from
+                # the commit's pulls/comments responses, so retain that binding when the run metadata is empty.
+                if linked_pull is None and isinstance(linked_pulls, list) and not linked_pulls:
+                    if len(reviewed_pull_numbers) == 1:
+                        linked_pull = {"number": next(iter(reviewed_pull_numbers))}
                 if linked_pull is None:
                     continue
                 workflow = dict(workflow)

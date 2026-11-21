@@ -126,6 +126,15 @@ class ReleaseCheckTests(unittest.TestCase):
         errors, _, _ = run_verify(pulls=pulls)
         self.assertEqual(errors, [])
 
+    def test_accepts_merged_pull_when_workflow_drops_pull_association(self):
+        checks, runs = successful_evidence()
+        for run in runs[0]["workflow_runs"]:
+            run["pull_requests"] = []
+        pulls = reviewed_pull(state="closed", merged_at="2026-11-04T00:00:00Z")
+        errors, _, receipts = run_verify(checks=checks, pulls=pulls, runs=runs)
+        self.assertEqual(errors, [])
+        self.assertEqual(receipts[0]["pull_request"], 76)
+
     def test_pr_author_body_marker_is_not_review_evidence(self):
         errors, _, _ = run_verify(comments=[])
         self.assertTrue(any("no authenticated exact-head review comment" in error for error in errors))

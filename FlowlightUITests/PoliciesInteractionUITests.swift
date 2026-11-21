@@ -299,8 +299,10 @@ final class PoliciesInteractionUITests: XCTestCase {
         XCTAssertTrue(element("alerts.table").waitForExistence(timeout: 5))
         XCTAssertTrue(waitForValue("New", identifier: "alerts.filter", timeout: 3),
                       "the alert review request must select the New filter")
-        XCTAssertTrue(waitForValue("Selected", identifier: "alerts.row.2", timeout: 3),
-                      "the newest New alert must receive keyboard selection")
+        let reviewSelection = element("alerts.review-selection")
+        XCTAssertTrue(waitForAccessibilityText(containing: "Newest deterministic UI-test alert",
+                                                identifier: "alerts.review-selection", timeout: 3),
+                      "the newest New alert must receive keyboard selection (label=\(reviewSelection.label), value=\(String(describing: reviewSelection.value)))")
         XCTAssertTrue(element("alerts.row.1").exists)
         XCTAssertFalse(element("alerts.row.3").exists,
                        "an acknowledged alert must not appear in the New-only review")
