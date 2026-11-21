@@ -1326,8 +1326,10 @@ final class TrafficMonitor: ObservableObject {
 
     /// Re-seeds the disposable review fixture at the moment the menu action is invoked. This closes the race with
     /// an older demo process or a launch host that initialized the database before the review flag was visible.
+    /// The broader demo guard is intentional: newer Xcode hosts can drop only the alert-review flag while retaining
+    /// the disposable demo launch, and production launches must never reset their alert table.
     func prepareAlertReviewDemo() {
-        guard DemoData.showsAlertReview else { return }
+        guard DemoData.isEnabled else { return }
         db.async { [weak self] db in
             do { try DemoData.seedAlertReview(db) }
             catch {

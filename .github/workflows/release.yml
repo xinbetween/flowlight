@@ -97,6 +97,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "source-sha=$EVENT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Require reviewed checks for the exact release commit
         env:
@@ -285,6 +286,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_BUILD: ${{ steps.version.outputs.build }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SOURCE_SHA: ${{ steps.version.outputs.source-sha }}
         run: |
           set -euo pipefail
           VERSION="$RELEASE_VERSION"
@@ -320,7 +322,7 @@ jobs:
             --bundle "$BUNDLE" \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$RELEASE_TAG" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$RELEASE_SOURCE_SHA" \
             --source-tree "$(git rev-parse 'HEAD^{tree}')" \
             --version "$VERSION" \
             --build "$RELEASE_BUILD" \
@@ -332,7 +334,7 @@ jobs:
             --bundle "$BUNDLE" \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$RELEASE_TAG" \
-            --source-sha "$GITHUB_SHA" \
+            --source-sha "$RELEASE_SOURCE_SHA" \
             --version "$VERSION" \
             --build "$RELEASE_BUILD" \
             --workflow-id "$WORKFLOW_ID" \
@@ -367,6 +369,7 @@ jobs:
       - name: Record the publication handoff
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SOURCE_SHA: ${{ steps.version.outputs.source-sha }}
           ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
           ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
         run: |
@@ -375,7 +378,7 @@ jobs:
             echo "### Signed release prepared once"
             echo
             echo "- Tag: \`$RELEASE_TAG\`"
-            echo "- Source: \`$GITHUB_SHA\`"
+            echo "- Source: \`$RELEASE_SOURCE_SHA\`"
             echo "- Preparation run: \`$GITHUB_RUN_ID\` (attempt $GITHUB_RUN_ATTEMPT)"
             echo "- Artifact ID: \`$ARTIFACT_ID\`"
             echo "- Artifact archive digest: \`$ARTIFACT_DIGEST\`"
