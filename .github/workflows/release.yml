@@ -407,6 +407,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Publication runs from the immutable tag, so overlay the current verifier before checking a retained artifact.
+      - name: Use current release artifact verifier
+        run: |
+          set -euo pipefail
+          git show origin/main:scripts/release_artifact.py > scripts/release_artifact.py
+
       - name: Check publication identity and exact tag
         id: version
         env:
