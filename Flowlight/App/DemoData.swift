@@ -359,6 +359,7 @@ enum DemoData {
     /// Stable, disposable rows for menu-bar alert-review lifecycle coverage. IDs are deterministic because UI-test
     /// demo databases are reset before this fixture runs; the acknowledged row proves the New filter is exact.
     static func seedAlertReview(_ db: TrafficDatabase, now: Date = Date()) throws {
+        try db.resetAlertsForDemo()
         _ = try db.addAlert(
             kind: AnomalyEngine.Kind.firstContact.rawValue,
             bundleID: "com.example.older",

@@ -3260,6 +3260,12 @@ final class TrafficDatabase: @unchecked Sendable {
 
     // MARK: Alerts
 
+    /// Clears only the disposable alert table before an explicitly requested DemoData alert-review fixture is seeded.
+    /// Production paths never call this method; it prevents an older demo process from contaminating deterministic UI rows.
+    func resetAlertsForDemo() throws {
+        try conn.run("DELETE FROM alerts")
+    }
+
     @discardableResult
     func addAlert(kind: String, bundleID: String, appName: String, detail: String, severity: Int, at date: Date = Date(),
                   allowPattern: String = "") throws -> AlertRecord {
