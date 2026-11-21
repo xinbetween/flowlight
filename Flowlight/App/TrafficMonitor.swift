@@ -242,6 +242,11 @@ final class TrafficMonitor: ObservableObject {
                 print("Flowlight UI demo policy fixture failed: \(error)")
                 #endif
             }
+        }
+        // Alert-review launches are an explicit disposable fixture even when a newer Xcode host drops the broader
+        // UI-test flag. Keeping this branch keyed to the review opt-in prevents the bulk demo history from supplying
+        // an unrelated newest alert to the menu-bar review test.
+        if DemoData.showsAlertReview {
             do { try DemoData.seedAlertReview(db) }
             catch {
                 #if DEBUG

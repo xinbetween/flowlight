@@ -57,14 +57,14 @@ enum DemoData {
         return arguments[arguments.index(after: index)].caseInsensitiveCompare("YES") == .orderedSame
     }
     static var shouldSeedBulkHistory: Bool {
-        shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting)
+        shouldSeedBulkHistory(isEnabled: isEnabled, isUITesting: isUITesting, showsAlertReview: showsAlertReview)
     }
     static var forcesExtensionUpdateWarning: Bool {
         isUITesting && UserDefaults.standard.bool(forKey: "FLDemoExtensionUpdateWarning")
     }
 
-    static func shouldSeedBulkHistory(isEnabled: Bool, isUITesting: Bool) -> Bool {
-        isEnabled && !isUITesting
+    static func shouldSeedBulkHistory(isEnabled: Bool, isUITesting: Bool, showsAlertReview: Bool = false) -> Bool {
+        isEnabled && !isUITesting && !showsAlertReview
     }
     static let uiTestRuleID = UUID(uuidString: "A14DA4C2-7930-45C0-A8B9-3B8CD69C4A4E")!
     static let appStorage = makeAppStorage(isUITesting: isUITesting)

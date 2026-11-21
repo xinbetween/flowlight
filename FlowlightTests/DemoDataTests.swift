@@ -52,6 +52,7 @@ final class DemoDataTests: XCTestCase {
         XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: false, isUITesting: false))
         XCTAssertTrue(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: false))
         XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: true))
+        XCTAssertFalse(DemoData.shouldSeedBulkHistory(isEnabled: true, isUITesting: false, showsAlertReview: true))
     }
 
     func testUITestAppStorageNeverChangesTheNormalPreferenceDomain() throws {
