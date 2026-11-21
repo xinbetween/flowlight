@@ -1324,6 +1324,24 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    /// Re-seeds the disposable review fixture at the moment the menu action is invoked. This closes the race with
+    /// an older demo process or a launch host that initialized the database before the review flag was visible.
+    func prepareAlertReviewDemo() {
+        guard DemoData.showsAlertReview else { return }
+        db.async { [weak self] db in
+            do { try DemoData.seedAlertReview(db) }
+            catch {
+                #if DEBUG
+                print("Flowlight UI demo alert review refresh failed: \(error)")
+                #endif
+            }
+            Task { @MainActor in
+                self?.dataVersion += 1
+                self?.refreshAlertCount()
+            }
+        }
+    }
+
     func refreshAlertCount() {
         // The UI alert fixture is deterministic and is seeded before startup work begins. Keep its badge stable while
         // the disposable database queue catches up; a transient pre-seed read must not remove the menu action that

@@ -308,6 +308,7 @@ struct MenuBarContent: View {
     }
 
     private func reviewNewAlerts() {
+        monitor.prepareAlertReviewDemo()
         nav.reviewAlerts(.new)
         mainWindowPresenter.present { openWindow(id: "main") }
     }
