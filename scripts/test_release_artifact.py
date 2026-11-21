@@ -175,6 +175,20 @@ class PreparationRunTests(unittest.TestCase):
         self.assertEqual(result["artifact_id"], 790)
         self.assertEqual(result["run_attempt"], 2)
 
+    def test_accepts_existing_tag_preparation_dispatch(self):
+        run, artifacts = run_fixture()
+        run["event"] = "workflow_dispatch"
+        run["head_branch"] = f"release/{TAG.removeprefix('v')}"
+        run["head_sha"] = "d" * 40
+
+        result = verify_run(
+            run, artifacts, repository=REPOSITORY, workflow_id=WORKFLOW_ID,
+            run_id=str(RUN_ID), tag=TAG, source_sha=SHA,
+            now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
+        )
+
+        self.assertEqual(result["artifact_id"], 789)
+
     def test_rejects_wrong_run_metadata_and_artifacts(self):
         mutations = {
             "nonnumeric run ID": lambda run, artifacts: (run, artifacts, "not-a-run"),
