@@ -483,6 +483,12 @@ jobs:
           echo "artifact_id=$(jq -r .artifact_id "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
           echo "artifact_digest=$(jq -r .artifact_digest "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
           echo "run_attempt=$(jq -r .run_attempt "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
+          echo "source_digest=$(jq -r .head_sha "$RUN_JSON")" >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r .event "$RUN_JSON")" == workflow_dispatch ]]; then
+            echo "source_ref=refs/heads/$(jq -r .head_branch "$RUN_JSON")" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_ref=refs/tags/$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download and verify the immutable artifact archive
         env:
@@ -514,6 +520,8 @@ jobs:
           WORKFLOW_ID: ${{ steps.prepared.outputs.workflow_id }}
           PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
           PREPARE_RUN_ATTEMPT: ${{ steps.prepared.outputs.run_attempt }}
+          PREPARATION_SOURCE_REF: ${{ steps.prepared.outputs.source_ref }}
+          PREPARATION_SOURCE_DIGEST: ${{ steps.prepared.outputs.source_digest }}
         run: |
           set -euo pipefail
           PREPARED="$RUNNER_TEMP/prepared-release"
@@ -530,8 +538,8 @@ jobs:
           for file in "$PREPARED"/*; do
             gh attestation verify "$file" \
               --repo "$GITHUB_REPOSITORY" \
-              --source-ref "refs/tags/$RELEASE_TAG" \
-              --source-digest "$RELEASE_SHA" \
+              --source-ref "$PREPARATION_SOURCE_REF" \
+              --source-digest "$PREPARATION_SOURCE_DIGEST" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
           done
 
@@ -667,7 +675,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.publish_tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -675,16 +683,20 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_REF: ${{ github.ref }}
-          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_REF: ${{ inputs.publish_tag && format('refs/tags/{0}', inputs.publish_tag) || github.ref }}
+          EVENT_TAG: ${{ inputs.publish_tag || github.ref_name }}
           EVENT_SHA: ${{ github.sha }}
+          PUBLISH_TAG: ${{ inputs.publish_tag }}
         run: |
           set -euo pipefail
-          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must run from a v* tag."; exit 1; }
+          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must use a v* tag."; exit 1; }
           VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           [[ "$EVENT_TAG" == "v$VERSION" ]] || { echo "::error::Tag $EVENT_TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
-          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the dispatch SHA."; exit 1; }
-          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^{}")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the dispatch SHA."; exit 1; }
+          if [[ -n "$PUBLISH_TAG" ]]; then
+            EVENT_SHA=$(git rev-parse "refs/tags/$EVENT_TAG^")
+          fi
+          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the immutable tag SHA."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the immutable tag SHA."; exit 1; }
           [[ "$(gh release view "$EVENT_TAG" --json isDraft --jq .isDraft)" == false ]] || {
             echo "::error::$EVENT_TAG is not a public release."
             exit 1
