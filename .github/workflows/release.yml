@@ -483,6 +483,12 @@ jobs:
           echo "artifact_id=$(jq -r .artifact_id "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
           echo "artifact_digest=$(jq -r .artifact_digest "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
           echo "run_attempt=$(jq -r .run_attempt "$RESULT_JSON")" >> "$GITHUB_OUTPUT"
+          echo "source_digest=$(jq -r .head_sha "$RUN_JSON")" >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r .event "$RUN_JSON")" == workflow_dispatch ]]; then
+            echo "source_ref=refs/heads/$(jq -r .head_branch "$RUN_JSON")" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_ref=refs/tags/$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download and verify the immutable artifact archive
         env:
@@ -514,6 +520,8 @@ jobs:
           WORKFLOW_ID: ${{ steps.prepared.outputs.workflow_id }}
           PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
           PREPARE_RUN_ATTEMPT: ${{ steps.prepared.outputs.run_attempt }}
+          PREPARATION_SOURCE_REF: ${{ steps.prepared.outputs.source_ref }}
+          PREPARATION_SOURCE_DIGEST: ${{ steps.prepared.outputs.source_digest }}
         run: |
           set -euo pipefail
           PREPARED="$RUNNER_TEMP/prepared-release"
@@ -530,8 +538,8 @@ jobs:
           for file in "$PREPARED"/*; do
             gh attestation verify "$file" \
               --repo "$GITHUB_REPOSITORY" \
-              --source-ref "refs/tags/$RELEASE_TAG" \
-              --source-digest "$RELEASE_SHA" \
+              --source-ref "$PREPARATION_SOURCE_REF" \
+              --source-digest "$PREPARATION_SOURCE_DIGEST" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
           done
 
