@@ -105,6 +105,10 @@ final class TrafficMonitor: ObservableObject {
     /// source is still the extension — this is not a preference being rewritten behind someone's back — so it
     /// lasts until they press Refresh, switch source, or relaunch.
     @Published private(set) var extensionFellBack = false
+    /// Ground-truth held-copy evidence can arrive before or after the reconnect ladder's version probe.
+    private var heldCopiesExpectedVersion: String?
+    /// True only after the selected Network Extension has actually failed; startup held-copy evidence stays quiet.
+    private var extensionOutageObserved = false
     /// One source of truth for both the persistent incident and its one-shot foreground presentation.
     @Published private var extensionUpdateState = ExtensionUpdateIncidentState()
     var extensionUpdateIncident: ExtensionUpdateIncident? { extensionUpdateState.active }
@@ -564,6 +568,7 @@ final class TrafficMonitor: ObservableObject {
         extensionRetry?.cancel()
         extensionRetryAttempt = 0
         extensionFellBack = false
+        extensionOutageObserved = false
         status = L("Reconnecting…")
         startSource()
     }
@@ -604,6 +609,7 @@ final class TrafficMonitor: ObservableObject {
         extensionRetry?.cancel()
         extensionRetryAttempt = 0
         extensionFellBack = false
+        extensionOutageObserved = false
         if newMode != .networkExtension { clearExtensionUpdateIncident() }
         UserDefaults.standard.set(newMode.rawValue, forKey: AnomalySettings.Keys.captureMode)
         startSource()
@@ -741,7 +747,10 @@ final class TrafficMonitor: ObservableObject {
                     guard let self, let extensionSource, self.source === extensionSource,
                           !UserDefaults.standard.bool(forKey: "FLForceFilterWarning") else { return }
                     self.captureWarning = running ? nil : message
-                    if running { self.extensionRecovered() }
+                    if running {
+                        self.extensionOutageObserved = false
+                        self.extensionRecovered()
+                    }
                 }
             }
             extensionSource.onIdentityMismatch = { [weak self, weak extensionSource] mismatch in
@@ -911,6 +920,26 @@ final class TrafficMonitor: ObservableObject {
                                              expected: mismatch.expected))
     }
 
+    /// Refresh scans and reconnect probes are separate asynchronous sources. Retain the scan's held-copy evidence so
+    /// a later outage can still open the restart recovery window even if the properties API omits those old copies.
+    func heldCopiesEvidenceChanged(_ expectedVersion: String?) {
+        heldCopiesExpectedVersion = expectedVersion
+        guard extensionOutageObserved, let expectedVersion, mode == .networkExtension else { return }
+        publishHeldCopiesIncident(expectedVersion)
+    }
+
+    private func publishHeldCopiesIncident(_ expectedVersion: String) {
+        guard mode == .networkExtension else { return }
+        status = L("Version %@ of the filter is installed, but macOS is still holding the previous version. Reinstall the filter or restart your Mac to finish the update.",
+                   expectedVersion)
+        publishExtensionUpdateIncident(.init(kind: .heldCopies, actual: nil, expected: expectedVersion))
+        #if !APP_STORE
+        fallBackToSampler()
+        #else
+        filterBecameUnavailable(status)
+        #endif
+    }
+
     private func publishExtensionUpdateIncident(_ incident: ExtensionUpdateIncident) {
         guard mode == .networkExtension else { return }
         if extensionUpdateIncident?.id != incident.id { extensionReinstallState = .idle }
@@ -991,13 +1020,10 @@ final class TrafficMonitor: ObservableObject {
     /// interrupt someone whose exact extension is registering and filtering; the modal needs both authoritative
     /// update evidence and an observed outage.
     func extensionVersionCheckCompleted(_ check: ExtensionManager.VersionCheck, outageProven: Bool = false) {
-        if check.needsRestart {
-            guard outageProven, mode == .networkExtension else { return }
-            status = L("Version %@ of the filter is installed, but macOS is still holding the previous version. Reinstall the filter or restart your Mac to finish the update.",
-                       check.expectedVersion)
-            publishExtensionUpdateIncident(.init(kind: .heldCopies, actual: nil,
-                                                 expected: check.expectedVersion))
-            fallBackToSampler()
+        let heldCopies = check.needsRestart || heldCopiesExpectedVersion == check.expectedVersion
+        if heldCopies {
+            guard outageProven || extensionOutageObserved, mode == .networkExtension else { return }
+            publishHeldCopiesIncident(check.expectedVersion)
             return
         }
         guard check.repairing else { return }
@@ -1020,6 +1046,10 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private func repairExtensionVersion() {
+        // This callback is reached only from the reconnect ladder after an actual XPC failure. Keep startup
+        // held-copy scans non-modal, but let either scan ordering publish the restart incident once the outage exists.
+        extensionOutageObserved = true
+        if let expected = heldCopiesExpectedVersion { publishHeldCopiesIncident(expected) }
         guard let manager = ExtensionManager.current else { return }
         manager.matchExtensionToApp { [weak self] check in
             Task { @MainActor in
