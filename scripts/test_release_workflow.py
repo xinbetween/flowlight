@@ -195,6 +195,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertRegex(self.homebrew, r"(?m)^    environment: release$")
         self.assertEqual(permissions(self.homebrew), {"contents": "read"})
         self.assertIn('gh release view "$EVENT_TAG" --json isDraft', self.homebrew)
+        self.assertIn('TAG_SHA=$(git rev-parse "refs/tags/$EVENT_TAG^{}")', self.homebrew)
         self.assertIn('gh release download "$EVENT_TAG"', self.homebrew)
         self.assertIn('ACTUAL=$(sha256sum "$PUBLIC/Flowlight.dmg"', self.homebrew)
         self.assertIn("REQUIRE_LOCAL_DMG=1", self.homebrew)
