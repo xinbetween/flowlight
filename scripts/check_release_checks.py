@@ -196,7 +196,11 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
             "comment_id": comment_id,
             "reviewer": reviewer,
             "author_association": association,
-            "reviewed_commit": associated_heads[pull_number],
+            # The release source may be a merge commit while the authenticated comment reviews the PR head.
+            # Keep the manifest's reviewed_commit bound to the release source for artifact verification, and
+            # retain the exact reviewed PR head separately for check provenance.
+            "reviewed_commit": sha,
+            "reviewed_head": associated_heads[pull_number],
             "url": html_url,
         })
     receipts.sort(key=lambda receipt: receipt["comment_id"])
@@ -208,7 +212,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         )
 
     reviewed_pull_heads = {
-        receipt["pull_request"]: associated_heads[receipt["pull_request"]]
+        receipt["pull_request"]: receipt.get("reviewed_head", receipt["reviewed_commit"])
         for receipt in receipts
     }
     latest, provenance = select_checks(
@@ -278,7 +282,7 @@ def main():
             checks_document,
             runs_document,
             {
-                receipt["pull_request"]: receipt["reviewed_commit"]
+                receipt["pull_request"]: receipt.get("reviewed_head", receipt["reviewed_commit"])
                 for receipt in review_receipts
             },
         )
