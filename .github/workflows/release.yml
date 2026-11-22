@@ -675,7 +675,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.publish_tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -683,16 +683,20 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_REF: ${{ github.ref }}
-          EVENT_TAG: ${{ github.ref_name }}
+          EVENT_REF: ${{ inputs.publish_tag && format('refs/tags/{0}', inputs.publish_tag) || github.ref }}
+          EVENT_TAG: ${{ inputs.publish_tag || github.ref_name }}
           EVENT_SHA: ${{ github.sha }}
+          PUBLISH_TAG: ${{ inputs.publish_tag }}
         run: |
           set -euo pipefail
-          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must run from a v* tag."; exit 1; }
+          [[ "$EVENT_REF" == refs/tags/v* ]] || { echo "::error::Homebrew publication must use a v* tag."; exit 1; }
           VERSION=$(sed -n 's/.*MARKETING_VERSION:[[:space:]]*"\(.*\)".*/\1/p' project.yml)
           [[ "$EVENT_TAG" == "v$VERSION" ]] || { echo "::error::Tag $EVENT_TAG doesn't match MARKETING_VERSION $VERSION."; exit 1; }
-          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the dispatch SHA."; exit 1; }
-          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^{}")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the dispatch SHA."; exit 1; }
+          if [[ -n "$PUBLISH_TAG" ]]; then
+            EVENT_SHA=$(git rev-parse "refs/tags/$EVENT_TAG^")
+          fi
+          [[ "$(git rev-parse HEAD)" == "$EVENT_SHA" ]] || { echo "::error::Checkout SHA differs from the immutable tag SHA."; exit 1; }
+          [[ "$(git rev-parse "refs/tags/$EVENT_TAG^")" == "$EVENT_SHA" ]] || { echo "::error::The tag doesn't peel to the immutable tag SHA."; exit 1; }
           [[ "$(gh release view "$EVENT_TAG" --json isDraft --jq .isDraft)" == false ]] || {
             echo "::error::$EVENT_TAG is not a public release."
             exit 1
