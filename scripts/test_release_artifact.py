@@ -347,6 +347,12 @@ class PreparedBundleTests(unittest.TestCase):
         (self.root / "RELEASE-NOTES.md").unlink()
         verify(self.root, public=True)
 
+    def test_accepts_reviewed_head_provenance(self):
+        manifest = self._load_manifest()
+        manifest["review_evidence"]["review_receipts"][0]["reviewed_head"] = "b" * 40
+        self._save_manifest(manifest)
+        verify(self.root)
+
     def test_accepts_github_association_metadata(self):
         for association in sorted(release_artifact.GITHUB_AUTHOR_ASSOCIATIONS):
             with self.subTest(association=association):
