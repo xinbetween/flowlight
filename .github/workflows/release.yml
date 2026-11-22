@@ -114,25 +114,50 @@ jobs:
           CHECKS="$RUNNER_TEMP/release-checks.json"
           PULLS="$RUNNER_TEMP/release-pulls.json"
           RUNS="$RUNNER_TEMP/release-workflow-runs.json"
+          CHECK_PAGES_DIR="$RUNNER_TEMP/release-check-pages"
+          RUN_PAGES_DIR="$RUNNER_TEMP/release-workflow-run-pages"
           COMMENTS="$RUNNER_TEMP/release-review-comments.json"
           COMMENTS_DIR="$RUNNER_TEMP/release-review-comment-pages"
           EVIDENCE="$RUNNER_TEMP/review-evidence.json"
-          mkdir -p "$COMMENTS_DIR"
+          mkdir -p "$CHECK_PAGES_DIR" "$RUN_PAGES_DIR" "$COMMENTS_DIR"
           verified=false
           for attempt in 1 2 3 4 5 6; do
-            gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?per_page=100" > "$CHECKS"
             gh api --paginate --slurp -H 'Accept: application/vnd.github+json' \
               "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls?per_page=100" > "$PULLS"
-            gh api --paginate --slurp \
-              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&event=pull_request&per_page=100" > "$RUNS"
 
             pull_numbers=$(jq -r --arg sha "$RELEASE_SHA" '
               .[][]
-              | select(.head.sha == $sha and .base.ref == "main")
+              | select(.base.ref == "main")
+              | select(.head.sha == $sha or .merge_commit_sha == $sha)
               | select(.state == "open" or .merged_at != null)
               | .number
             ' "$PULLS")
+            source_shas=$(jq -r --arg sha "$RELEASE_SHA" '
+              .[][]
+              | select(.base.ref == "main")
+              | select(.head.sha == $sha or .merge_commit_sha == $sha)
+              | select(.state == "open" or .merged_at != null)
+              | .head.sha
+            ' "$PULLS" | sort -u)
+            if [[ -z "$source_shas" ]]; then
+              source_shas="$RELEASE_SHA"
+            fi
+            rm -f "$CHECK_PAGES_DIR"/*.json "$RUN_PAGES_DIR"/*.json
+            source_index=0
+            while IFS= read -r source_sha; do
+              [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid release source SHA."; exit 1; }
+              gh api --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/commits/$source_sha/check-runs?per_page=100" \
+                > "$CHECK_PAGES_DIR/$source_index.json"
+              gh api --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$source_sha&event=pull_request&per_page=100" \
+                > "$RUN_PAGES_DIR/$source_index.json"
+              source_index=$((source_index + 1))
+            done <<< "$source_shas"
+            jq -s '{check_runs: [ .[] | .[] | .check_runs[] ]}' \
+              "$CHECK_PAGES_DIR"/*.json > "$CHECKS"
+            jq -s '{workflow_runs: [ .[] | .[] | .workflow_runs[] ]}' \
+              "$RUN_PAGES_DIR"/*.json > "$RUNS"
             comment_pages=()
             for pull_number in $pull_numbers; do
               [[ "$pull_number" =~ ^[0-9]+$ ]] || { echo "::error::Invalid pull request number."; exit 1; }

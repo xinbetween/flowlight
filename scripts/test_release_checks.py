@@ -18,6 +18,7 @@ verify = check_release_checks.verify
 
 REPO = "xinbetween/flowlight"
 SHA = "a" * 40
+MERGE_SHA = "m" * 40
 TRUSTED_REVIEWER = "release-reviewer"
 
 
@@ -125,6 +126,26 @@ class ReleaseCheckTests(unittest.TestCase):
         pulls = reviewed_pull(state="closed", merged_at="2026-11-04T00:00:00Z")
         errors, _, _ = run_verify(pulls=pulls)
         self.assertEqual(errors, [])
+
+    def test_accepts_merged_tag_commit_using_reviewed_head_checks(self):
+        checks, runs = successful_evidence()
+        pulls = reviewed_pull(
+            state="closed",
+            merged_at="2026-11-04T00:00:00Z",
+            merge_commit_sha=MERGE_SHA,
+        )
+        errors, pull_numbers, receipts = verify(
+            REPO,
+            MERGE_SHA,
+            checks,
+            pulls,
+            runs,
+            review_comment(),
+            TRUSTED_REVIEWER,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(pull_numbers, [76])
+        self.assertEqual(receipts[0]["reviewed_commit"], SHA)
 
     def test_accepts_merged_pull_when_workflow_drops_pull_association(self):
         checks, runs = successful_evidence()
