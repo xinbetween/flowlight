@@ -258,6 +258,12 @@ struct FlowlightApp: App {
         _focus = StateObject(wrappedValue: focus)
         _mainWindowPresenter = StateObject(wrappedValue: mainWindowPresenter)
 
+        // Refresh scans can discover reboot-held copies before the reconnect ladder asks for version properties. Keep
+        // that evidence attached to the monitor so an actual outage can present the existing restart recovery window.
+        extensionManager.onHeldCopiesChanged = { [weak monitor] expectedVersion in
+            monitor?.heldCopiesEvidenceChanged(expectedVersion)
+        }
+
         // SwiftUI may restore a background-only launch with no window and without rendering the menu-bar label yet.
         // Core services belong to the application lifecycle, not to either presentation path.
         guard !Self.runningTests else { return }

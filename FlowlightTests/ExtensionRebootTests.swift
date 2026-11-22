@@ -77,7 +77,24 @@ final class ExtensionRebootTests: XCTestCase {
             "\t\t38RJUJHKZS\tcom.flowlight.app.filter (0.9.7/21)\tFlowlight Filter\t[terminated waiting to uninstall on reboot]",
             "*\t*\t38RJUJHKZS\tcom.flowlight.app.filter (0.10.1/22)\tFlowlight Filter\t[activated enabled]",
         ].joined(separator: "\n")
-        XCTAssertTrue(ExtensionManager.isHoldingSlotPendingReboot(SystemExtensionScan.parse(output), expected: "0.10.1"))
+        let extensions = SystemExtensionScan.parse(output)
+        XCTAssertEqual(ExtensionManager.pendingRebootVersions(in: extensions, expected: "0.10.1"), ["0.9.7/21"])
+        XCTAssertTrue(ExtensionManager.isHoldingSlotPendingReboot(extensions, expected: "0.10.1"))
+    }
+
+    /// The OS properties callback can omit uninstalling copies even while systemextensionsctl reports them. The
+    /// scan-derived versions are the evidence merged into the outage probe so reconnecting can ask for a restart.
+    func testHeldSlotEvidenceDoesNotRequireThePropertiesCallbackToListOldCopies() {
+        let output = [
+            "--- com.apple.system_extension.network_extension (Go to 'System Settings')",
+            "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]",
+            "\t\t38RJUJHKZS\tcom.flowlight.app.filter (0.9.7/21)\tFlowlight Filter\t[terminated waiting to uninstall on reboot]",
+            "*\t*\t38RJUJHKZS\tcom.flowlight.app.filter (0.10.1/22)\tFlowlight Filter\t[activated enabled]",
+        ].joined(separator: "\n")
+        let scanned = ExtensionManager.pendingRebootVersions(in: SystemExtensionScan.parse(output), expected: "0.10.1")
+        let check = ExtensionManager.VersionCheck(installed: ["0.10.1/22"], expectedVersion: "0.10.1/22",
+                                                   awaitingReboot: scanned)
+        XCTAssertTrue(check.needsRestart)
     }
 
     /// A single healthy install is not a held slot — nothing is waiting to uninstall, so no tip.

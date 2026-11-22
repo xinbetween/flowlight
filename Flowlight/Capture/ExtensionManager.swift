@@ -99,6 +99,10 @@ final class ExtensionManager: NSObject, ObservableObject {
     }
 
     @Published private(set) var state: State = .unknown
+    /// Ground-truth held-copy evidence from systemextensionsctl. The version-properties API can omit these copies,
+    /// so capture keeps this fact long enough for an outage probe to turn it into an actionable restart incident.
+    private(set) var heldCopiesExpectedVersion: String?
+    var onHeldCopiesChanged: ((String?) -> Void)?
     #if APP_STORE
     private var storeReinstalling = false
     #endif
@@ -257,8 +261,14 @@ final class ExtensionManager: NSObject, ObservableObject {
     private func upgradeToNeedsRebootIfHeld() {
         Task { @MainActor in
             let extensions = await SystemExtensionScan.read()
-            guard self.state == .enabled,
-                  Self.isHoldingSlotPendingReboot(extensions, expected: Self.expectedExtensionVersion) else { return }
+            let expected = Self.expectedExtensionVersion
+            let held = !Self.pendingRebootVersions(in: extensions, expected: expected).isEmpty
+            let evidence = held ? expected : nil
+            if self.heldCopiesExpectedVersion != evidence {
+                self.heldCopiesExpectedVersion = evidence
+                self.onHeldCopiesChanged?(evidence)
+            }
+            guard self.state == .enabled, held else { return }
             self.state = .needsReboot
         }
     }
@@ -268,13 +278,19 @@ final class ExtensionManager: NSObject, ObservableObject {
     /// at least one earlier copy "waiting to uninstall on reboot". This is the reliable signal — read from what
     /// `systemextensionsctl list` actually prints — rather than the `OSSystemExtensionProperties` uninstalling flag,
     /// which does not mark copies deferred to a reboot. Pure, so the decision is tested against parsed output.
-    nonisolated static func isHoldingSlotPendingReboot(_ extensions: [InstalledSystemExtension], expected: String) -> Bool {
+    nonisolated static func pendingRebootVersions(in extensions: [InstalledSystemExtension], expected: String) -> [String] {
         let ours = extensions.filter(\.isOurs)
-        let rebootPending = ours.contains { $0.state.lowercased().contains("reboot") }
-        let currentEnabled = ours.contains {
+        guard ours.contains(where: {
             $0.state.contains("activated") && ExtensionVersion.compare($0.version, expected) == .orderedSame
-        }
-        return rebootPending && currentEnabled
+        }) else { return [] }
+        return ours
+            .filter { $0.state.lowercased().contains("reboot") }
+            .map(\.version)
+            .filter { ExtensionVersion.compare($0, expected) != .orderedSame }
+    }
+
+    nonisolated static func isHoldingSlotPendingReboot(_ extensions: [InstalledSystemExtension], expected: String) -> Bool {
+        !pendingRebootVersions(in: extensions, expected: expected).isEmpty
     }
 
     func activate() {
@@ -445,8 +461,14 @@ extension ExtensionManager: OSSystemExtensionRequestDelegate {
         let awaitingReboot = properties.filter(\.isUninstalling).map(Self.versionIdentity)
         Task { @MainActor in
             let expected = Self.expectedExtensionVersion
+            // OSSystemExtensionProperties does not consistently mark copies that systemextensionsctl reports as
+            // "terminated waiting to uninstall on reboot". Merge both authoritative views before deciding whether
+            // the reconnecting filter needs a restart; an incomplete properties reply otherwise turns a real held
+            // slot into an endless generic XPC retry.
+            let scannedAwaiting = Self.pendingRebootVersions(in: await SystemExtensionScan.read(), expected: expected)
+            let allAwaiting = Array(Set(awaitingReboot + scannedAwaiting)).sorted()
             self.versionCheckResult = VersionCheck(installed: installed, expectedVersion: expected,
-                                                   awaitingReboot: awaitingReboot)
+                                                   awaitingReboot: allAwaiting)
             // The matching build is installed and enabled, but macOS is holding older copies until the Mac
             // restarts, and they still occupy the one content-filter slot. Nothing is stale, so no repair helps —
             // make the state say so, authoritatively, rather than leaving the redial ladder to overwrite the one
