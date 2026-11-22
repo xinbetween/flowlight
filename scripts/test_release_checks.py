@@ -109,6 +109,7 @@ class ReleaseCheckTests(unittest.TestCase):
             "reviewer": TRUSTED_REVIEWER,
             "author_association": "OWNER",
             "reviewed_commit": SHA,
+            "reviewed_head": SHA,
             "url": f"https://github.com/{REPO}/pull/76#issuecomment-9001",
         }])
 
@@ -145,7 +146,8 @@ class ReleaseCheckTests(unittest.TestCase):
         )
         self.assertEqual(errors, [])
         self.assertEqual(pull_numbers, [76])
-        self.assertEqual(receipts[0]["reviewed_commit"], SHA)
+        self.assertEqual(receipts[0]["reviewed_commit"], MERGE_SHA)
+        self.assertEqual(receipts[0]["reviewed_head"], SHA)
 
     def test_accepts_merged_pull_when_workflow_drops_pull_association(self):
         checks, runs = successful_evidence()
