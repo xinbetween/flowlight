@@ -77,7 +77,7 @@ def issue_comments(document):
     return comments
 
 
-def select_checks(repo, sha, checks_document, runs_document, reviewed_pull_numbers=None):
+def select_checks(repo, sha, checks_document, runs_document, reviewed_pull_heads=None):
     actions_runs = {int(run.get("id", 0)): run for run in workflow_runs(runs_document)}
     latest = {}
     provenance = {}
@@ -100,25 +100,30 @@ def select_checks(repo, sha, checks_document, runs_document, reviewed_pull_numbe
                 continue
             if workflow.get("path") != EXPECTED_ACTIONS_WORKFLOWS[key]:
                 continue
-            if workflow.get("head_sha") != sha or workflow.get("event") != "pull_request":
+            workflow_sha = workflow.get("head_sha")
+            allowed_heads = set(reviewed_pull_heads.values()) if reviewed_pull_heads else set()
+            if workflow_sha != sha and workflow_sha not in allowed_heads:
+                continue
+            if workflow.get("event") != "pull_request":
                 continue
             if workflow.get("repository", {}).get("full_name") != repo:
                 continue
-            if reviewed_pull_numbers is not None:
+            if reviewed_pull_heads is not None:
                 linked_pulls = workflow.get("pull_requests")
                 linked_pull = next((
                     pull for pull in linked_pulls
                     if isinstance(pull, dict)
-                    and pull.get("number") in reviewed_pull_numbers
-                    and pull.get("head", {}).get("sha") == sha
+                    and pull.get("number") in reviewed_pull_heads
+                    and pull.get("head", {}).get("sha") == reviewed_pull_heads[pull.get("number")]
                     and pull.get("base", {}).get("ref") == "main"
                 ), None) if isinstance(linked_pulls, list) else None
                 # GitHub removes the workflow run's pull_requests association after the PR is merged. The
                 # surrounding verifier has already authenticated the exact merged PR and its review receipt from
                 # the commit's pulls/comments responses, so retain that binding when the run metadata is empty.
                 if linked_pull is None and isinstance(linked_pulls, list) and not linked_pulls:
-                    if len(reviewed_pull_numbers) == 1:
-                        linked_pull = {"number": next(iter(reviewed_pull_numbers))}
+                    matching = [number for number, head in reviewed_pull_heads.items() if head == workflow_sha]
+                    if len(matching) == 1:
+                        linked_pull = {"number": matching[0]}
                 if linked_pull is None:
                     continue
                 workflow = dict(workflow)
@@ -132,21 +137,29 @@ def select_checks(repo, sha, checks_document, runs_document, reviewed_pull_numbe
 def verify(repo, sha, checks_document, pulls_document, runs_document, comments_document, trusted_reviewers):
     errors = []
     associated_pulls = []
-    review_marker = f"Reviewed-Commit: {sha}"
     trusted_reviewers = {value.lower() for value in re.split(r"[\s,]+", trusted_reviewers) if value}
     if not trusted_reviewers:
         errors.append("no trusted release reviewers are configured")
     for pull in pull_requests(pulls_document):
         head_sha = pull.get("head", {}).get("sha")
+        merge_commit_sha = pull.get("merge_commit_sha")
         base_ref = pull.get("base", {}).get("ref")
         state = pull.get("state")
         merged = bool(pull.get("merged_at"))
-        if head_sha == sha and base_ref == "main" and (state == "open" or merged):
+        if (
+            (head_sha == sha or merge_commit_sha == sha)
+            and base_ref == "main"
+            and (state == "open" or merged)
+        ):
             associated_pulls.append(pull)
     if not associated_pulls:
-        errors.append("exact source commit has no open or merged pull request targeting main at that exact head")
+        errors.append("exact source commit has no open or merged pull request targeting main at that source")
 
     associated_numbers = {int(pull["number"]) for pull in associated_pulls}
+    associated_heads = {
+        int(pull["number"]): pull.get("head", {}).get("sha")
+        for pull in associated_pulls
+    }
     receipts = []
     issue_url = re.compile(rf"^https://api\.github\.com/repos/{re.escape(repo)}/issues/([0-9]+)$")
     for comment in issue_comments(comments_document):
@@ -160,6 +173,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
         body_lines = {line.strip() for line in body.splitlines()} if isinstance(body, str) else set()
         user = comment.get("user")
         reviewer = user.get("login") if isinstance(user, dict) else None
+        review_marker = f"Reviewed-Commit: {associated_heads[pull_number]}"
         if review_marker not in body_lines or not isinstance(reviewer, str) or reviewer.lower() not in trusted_reviewers:
             continue
         # `author_association` is viewer-dependent when organization membership is
@@ -182,7 +196,7 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
             "comment_id": comment_id,
             "reviewer": reviewer,
             "author_association": association,
-            "reviewed_commit": sha,
+            "reviewed_commit": associated_heads[pull_number],
             "url": html_url,
         })
     receipts.sort(key=lambda receipt: receipt["comment_id"])
@@ -193,9 +207,12 @@ def verify(repo, sha, checks_document, pulls_document, runs_document, comments_d
             "no authenticated exact-head review comment from a configured trusted reviewer"
         )
 
-    reviewed_pull_numbers = {receipt["pull_request"] for receipt in receipts}
+    reviewed_pull_heads = {
+        receipt["pull_request"]: associated_heads[receipt["pull_request"]]
+        for receipt in receipts
+    }
     latest, provenance = select_checks(
-        repo, sha, checks_document, runs_document, reviewed_pull_numbers
+        repo, sha, checks_document, runs_document, reviewed_pull_heads
     )
     for key in REQUIRED_CHECKS:
         check = latest.get(key)
@@ -260,7 +277,10 @@ def main():
             args.sha,
             checks_document,
             runs_document,
-            {receipt["pull_request"] for receipt in review_receipts},
+            {
+                receipt["pull_request"]: receipt["reviewed_commit"]
+                for receipt in review_receipts
+            },
         )
         evidence = {
             "repository": args.repo,
