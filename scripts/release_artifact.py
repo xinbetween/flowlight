@@ -73,12 +73,13 @@ def file_record(path):
     return {"name": path.name, "size": path.stat().st_size, "sha256": sha256(path)}
 
 
-def require_keys(value, expected, label):
+def require_keys(value, expected, label, optional=()):
     if not isinstance(value, dict):
         raise ReleaseArtifactError(f"{label} must be an object")
     actual = set(value)
     expected = set(expected)
-    if actual != expected:
+    optional = set(optional)
+    if not expected <= actual or not actual <= expected | optional:
         raise ReleaseArtifactError(
             f"{label} fields differ: missing={sorted(expected - actual)} extra={sorted(actual - expected)}"
         )
@@ -260,7 +261,13 @@ def verify_review_evidence(evidence, repository, source_sha):
             receipt,
             {"pull_request", "comment_id", "reviewer", "author_association", "reviewed_commit", "url"},
             "review receipt",
+            optional={"reviewed_head"},
         )
+        reviewed_head = receipt.get("reviewed_head")
+        if reviewed_head is not None and not isinstance(reviewed_head, str):
+            raise ReleaseArtifactError("review receipt reviewed head is malformed")
+        if reviewed_head is not None and not SOURCE_SHA.fullmatch(reviewed_head):
+            raise ReleaseArtifactError("review receipt reviewed head is malformed")
         pull_number = receipt["pull_request"]
         comment_id = receipt["comment_id"]
         if pull_number not in pulls:

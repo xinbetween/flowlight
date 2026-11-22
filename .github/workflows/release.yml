@@ -56,12 +56,13 @@ jobs:
           fetch-depth: 0
 
       # A dispatch preparation intentionally runs the current workflow against an unchanged immutable tag. Keep the
-      # corrected evidence verifier from the workflow branch after checking out the tag's exact product source.
-      - name: Use current release evidence verifier
+      # corrected release verifiers from the workflow branch after checking out the tag's exact product source.
+      - name: Use current release verifiers
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           git show origin/main:scripts/check_release_checks.py > scripts/check_release_checks.py
+          git show origin/main:scripts/release_artifact.py > scripts/release_artifact.py
 
       - name: Check who asked for this release
         env:
