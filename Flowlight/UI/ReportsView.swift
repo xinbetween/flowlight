@@ -444,6 +444,14 @@ struct ReportsView: View {
         chart
     }
 
+    private var reportIsFiltered: Bool {
+        !filter.isEmpty || !focus.scope.isEmpty
+    }
+
+    private var localRiskScopeSupported: Bool {
+        filter.owner == nil && filter.remoteIP == nil && filter.appProtocol == nil && filter.channel == nil
+    }
+
     private var reportContext: some View {
         HStack(spacing: 10) {
             Label(L("Range: %@", rangeLabel), systemImage: "calendar")
@@ -452,7 +460,7 @@ struct ReportsView: View {
             } else {
                 Text(L("Paused")).foregroundStyle(.secondary)
             }
-            if !filter.isEmpty {
+            if reportIsFiltered {
                 Text(L("Filtered")).foregroundStyle(.secondary)
             } else {
                 Text(L("All traffic")).foregroundStyle(.secondary)
@@ -464,7 +472,7 @@ struct ReportsView: View {
         .font(.caption)
         .lineLimit(1)
         .help(L("History report context: %@, %@, %@", rangeLabel,
-                filter.isEmpty ? L("all traffic") : L("filtered traffic"), grouping.title))
+                reportIsFiltered ? L("filtered traffic") : L("all traffic"), grouping.title))
         .accessibilityIdentifier("history.report-context")
     }
 
@@ -489,12 +497,16 @@ struct ReportsView: View {
 
     @ViewBuilder
     private var localRiskSummary: some View {
-        let hasDetails = LocalRiskSettings.isActive &&
+        let hasDetails = localRiskScopeSupported && LocalRiskSettings.isActive &&
             (localRiskCounts.totalPotentialHarm > 0 || localRiskCounts.unassessed > 0)
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
             Text(L("Potential harm")).font(.callout.bold())
-            if LocalRiskSettings.isActive {
+            if !localRiskScopeSupported {
+                Text(L("Unavailable for this scope"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .help(L("Local risk assessments cannot be matched to owner, IP address, protocol, or way-out filters. No finding is being claimed for this scope."))
+            } else if LocalRiskSettings.isActive {
                 Text(localRiskCounts.totalPotentialHarm > 0
                      ? L("%lld medium/high", localRiskCounts.totalPotentialHarm)
                      : L("No medium/high findings"))
@@ -516,10 +528,11 @@ struct ReportsView: View {
             .disabled(!LocalRiskSettings.canAnalyze)
             if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0
                 && InspectNavigationScope.canInspect(filter, requireDestination: false) {
-                Button(L("Show in Inspect")) {
+                Button(L("Show in Inspect · last 24 hours")) {
                     InspectNavigationScope.showInspect(nav, filter: filter, requireDestination: false,
-                                                       potentialHarmOnly: true)
+                                                       potentialHarmOnly: true, window: .day)
                 }
+                .help(L("Open Inspect with this traffic scope over the last 24 hours. The selected History interval is not available in Inspect."))
             }
         }
         .padding(.vertical, 5)

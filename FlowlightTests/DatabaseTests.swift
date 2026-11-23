@@ -698,7 +698,9 @@ final class DatabaseTests: XCTestCase {
                 TrafficRecord(key: key("com.example.agent", "named.example"),
                               counters: FlowCounters(bytesIn: 90, bytesOut: 10, flows: 1)),
                 TrafficRecord(key: key("com.example.other", ""),
-                              counters: FlowCounters(bytesIn: 100, bytesOut: 0, flows: 1))
+                              counters: FlowCounters(bytesIn: 100, bytesOut: 0, flows: 1)),
+                TrafficRecord(key: key("com.example.agent", "", ip: "(unconnected)"),
+                              counters: FlowCounters(bytesIn: 50, bytesOut: 0, flows: 1))
             ]),
             TrafficBatch(timestamp: t0 + 60, records: [
                 TrafficRecord(key: key("com.example.agent", ""),
@@ -713,8 +715,8 @@ final class DatabaseTests: XCTestCase {
         let selected = try db.coverage(.minute, from: from, to: firstMinute,
                                         filter: TrafficFilter(bundleID: "com.example.agent"))
         XCTAssertTrue(selected.hasTraffic)
-        XCTAssertEqual(selected.named, 1, accuracy: 0.0001)
-        XCTAssertEqual(selected.owned, 1, accuracy: 0.0001)
+        XCTAssertEqual(selected.named, 2.0 / 3.0, accuracy: 0.0001)
+        XCTAssertEqual(selected.owned, 2.0 / 3.0, accuracy: 0.0001)
 
         let later = try db.coverage(.minute, from: firstMinute, to: to,
                                      filter: TrafficFilter(bundleID: "com.example.agent"))

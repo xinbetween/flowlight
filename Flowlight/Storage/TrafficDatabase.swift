@@ -3268,7 +3268,7 @@ final class TrafficDatabase: @unchecked Sendable {
                    SUM(CASE WHEN domain != '' THEN bytes_in + bytes_out ELSE 0 END),
                    SUM(CASE WHEN domain != '' OR o.ip IS NOT NULL THEN bytes_in + bytes_out ELSE 0 END)
             FROM \(granularity.table) LEFT JOIN ip_owners o ON o.ip = remote_ip
-            WHERE \(clause) AND remote_ip != '(unconnected)'
+            WHERE \(clause)
             """, values) { ($0.double(0), $0.double(1), $0.double(2)) }.first
         guard let row, row.0 > 0 else { return (0, 0, false) }
         return (row.1 / row.0, row.2 / row.0, true)

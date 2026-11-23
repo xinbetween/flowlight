@@ -42,8 +42,10 @@ struct InspectMenuItems: View {
             // The destination form. Named separately from the app form below because in English the two differ
             // only by word order, which tells a translator nothing about which is which.
             if let host, !host.isEmpty {
-                Button(L("Inspect Traffic to %@", host)) { nav.showInspect(host: host, window: window) }
-                    .help(helpText)
+                Button(L("Inspect Traffic to %@", host)) {
+                    nav.showInspect(host: host, hostIncludesSubdomains: false, window: window)
+                }
+                .help(helpText)
             }
             if let app, !app.name.isEmpty {
                 Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app, window: window) }

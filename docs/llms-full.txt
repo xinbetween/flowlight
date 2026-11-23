@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.7, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.8, macOS 15 or later.
 
  On this page
 
@@ -935,7 +935,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.7macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.8macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1679,8 +1679,21 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.8
+November 22, 2026Latest
+
+ Inspect the app you just saw. Live now offers a discoverable app inspection action and carries the exact bundle ID into Inspect instead of turning a display name into a broad body search.
+
+ Keep the investigation window bounded. Live opens Inspect over the last hour, with the selected window visible and editable in Inspect.
+
+ Read History in context. History keeps the selected range, follow-now state, filter scope, and grouping visible while giving the breakdown table more room.
+
+ Make report evidence honest. Hostname coverage is calculated for the selected report window and filters, and unknown or owner-less traffic remains explicitly unknown rather than being treated as safe.
+
+ Keep local risk useful without taking over the page. The advisory status is compact when there are no actionable findings, while detailed medium/high and unassessed counts remain available when relevant.
+
  0.18.7
-November 21, 2026Latest
+November 21, 2026
 
  Recover cleanly after filter upgrades. When macOS keeps older Network Extension copies waiting for reboot, Flowlight now recognizes the held filter during reconnect and opens the existing recovery dialog instead of looping on an invalidated connection.
 
