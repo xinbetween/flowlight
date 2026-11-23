@@ -1682,7 +1682,11 @@ Releases
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
  0.18.8
-November 22, 2026Latest
+November 23, 2026Latest
+
+ Match local applications to signed advisories. Advisories scans accessible application bundles on this Mac, preserves explicit unknown and unassessed states, and never uploads the application inventory.
+
+ Keep catalog trust and recovery visible. A separately signed, bounded advisory catalog uses explicit bundle identity and Info.plist version evidence, opt-in refresh, anti-rollback checks, stale last-known-good handling, and clear recovery states.
 
  Inspect the app you just saw. Live now offers a discoverable app inspection action and carries the exact bundle ID into Inspect instead of turning a display name into a broad body search.
 

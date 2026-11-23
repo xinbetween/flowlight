@@ -13,8 +13,10 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.18.8</h2><time datetime="2026-11-22">November 22, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.18.8</h2><time datetime="2026-11-23">November 23, 2026</time><span class="tag">Latest</span></header>
         <ul>
+          <li><strong>Match local applications to signed advisories.</strong> Advisories scans accessible application bundles on this Mac, preserves explicit unknown and unassessed states, and never uploads the application inventory.</li>
+          <li><strong>Keep catalog trust and recovery visible.</strong> A separately signed, bounded advisory catalog uses explicit bundle identity and Info.plist version evidence, opt-in refresh, anti-rollback checks, stale last-known-good handling, and clear recovery states.</li>
           <li><strong>Inspect the app you just saw.</strong> Live now offers a discoverable app inspection action and carries the exact bundle ID into Inspect instead of turning a display name into a broad body search.</li>
           <li><strong>Keep the investigation window bounded.</strong> Live opens Inspect over the last hour, with the selected window visible and editable in Inspect.</li>
           <li><strong>Read History in context.</strong> History keeps the selected range, follow-now state, filter scope, and grouping visible while giving the breakdown table more room.</li>
