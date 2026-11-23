@@ -127,6 +127,8 @@ final class TrafficMonitor: ObservableObject {
     let rules = RuleStore()
     /// Official managed destination lists, kept separate from human-authored rules and disabled by default.
     let rulePacks: RulePackStore
+    /// Local CVE/advisory state. It is display-only and never participates in enforcement.
+    let advisories = AdvisoryStore()
     /// The exact extension-committed generation, readable from the inspection proxy's queue.
     private let liveRulePacks: LiveRulePacks
     /// Last extension acknowledgement, retained only for privacy-safe runtime diagnostics.
@@ -139,6 +141,8 @@ final class TrafficMonitor: ObservableObject {
     private var proxyRulePackEvents: RulePackEventDelivery!
     /// Signed official catalog bootstrap, cache re-verification, and bounded refresh state.
     private(set) var rulePackCatalog: RulePackCatalogUpdater!
+    /// Signed local CVE catalog. Advisory state never participates in enforcement.
+    private(set) var advisoryCatalog: AdvisoryCatalogUpdater!
     /// Which tools each agent may use, which is a different question from which hosts it may reach.
     let guardrails = GuardrailStore()
     /// Advisory inspection plugins: official built-ins first, installed third-party packs later.
@@ -265,6 +269,7 @@ final class TrafficMonitor: ObservableObject {
             unacknowledgedAlerts = DemoData.alertReviewNewCount
         }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
+        advisories.attach(db: db)
         engine = AnomalyEngine(db: db, activity: activity)
         providerProfiles.installRuntimeSink { [weak db] profiles in
             db?.async { $0.replaceProviderProfiles(profiles) }
@@ -292,6 +297,22 @@ final class TrafficMonitor: ObservableObject {
             transport: catalogTransport,
             trustedSigners: rulePackCatalogTrustedSigners
         )
+        advisoryCatalog = AdvisoryCatalogUpdater(
+            db: db,
+            store: advisories,
+            bundledCatalog: {
+                guard let url = Bundle.main.url(forResource: "advisories", withExtension: "json", subdirectory: "Advisories") else {
+                    throw AdvisoryCatalogPersistenceError.invalidCatalogID
+                }
+                return try Data(contentsOf: url)
+            }
+        )
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.advisoryCatalog.bootstrap()
+            // Network refresh is opt-in; local matching works from the verified bundled snapshot.
+            self.advisoryCatalog.startScheduling(networkingEnabled: false)
+        }
         IPOwnerLookup.shared.onResolved = { [db] ip, owner in
             db.async { try $0.saveOwner(ip: ip, owner) }
         }

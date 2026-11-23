@@ -7,6 +7,16 @@ import Foundation
 /// one. Typing "Cursor" has to become `com.todesktop.230313mzl4w4u92` somewhere, and the only place that mapping
 /// exists is the app bundles themselves.
 enum InstalledApps {
+    /// Evidence that the identity came from an application bundle discovered by the filesystem scan.
+    enum ScanEvidence: String, Equatable, Hashable, Sendable {
+        case applicationBundle
+    }
+
+    /// Evidence that version values came from the bundle's Info.plist, rather than a guessed filename or path.
+    enum VersionEvidence: String, Equatable, Hashable, Sendable {
+        case bundleInfoDictionary
+    }
+
     struct App: Equatable, Identifiable, Sendable {
         var name: String
         var bundleID: String
@@ -15,6 +25,14 @@ enum InstalledApps {
         /// What the app told macOS it wants Bluetooth for, when it declares a use. This is the app saying it is
         /// built to use the radio — not macOS saying it was granted access, which no ordinary app can read.
         var bluetoothPurpose: String?
+        /// The user-facing version from CFBundleShortVersionString, when the bundle provides one.
+        var marketingVersion: String?
+        /// The build identifier from CFBundleVersion, when the bundle provides one.
+        var buildVersion: String?
+        /// Identity evidence is explicit so downstream analysis never has to infer it from a path or filename.
+        var scanEvidence: ScanEvidence = .applicationBundle
+        /// Version evidence is nil when neither Info.plist version key contained a usable string.
+        var versionEvidence: VersionEvidence? = nil
     }
 
     struct ScanResult: Sendable {
@@ -37,7 +55,22 @@ enum InstalledApps {
     static func all() -> [App] { scan().apps }
 
     static func scan(refresh: Bool = false) -> ScanResult {
-        cachedScan(refresh: refresh) { scan(in: searchPaths) }
+        cachedScan(refresh: refresh) {
+            let result = scan(in: searchPaths)
+            #if APP_STORE
+            // Sandboxed Store builds cannot truthfully claim that standard roots are a complete inventory. A
+            // user-selected security-scoped location can be added later without changing the advisory matcher.
+            return ScanResult(apps: result.apps, complete: false)
+            #else
+            return result
+            #endif
+        }
+    }
+
+    private static func infoString(_ bundle: Bundle, key: String) -> String? {
+        guard let value = bundle.object(forInfoDictionaryKey: key) as? String else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     static func cachedScan(refresh: Bool = false, _ load: () -> ScanResult) -> ScanResult {
@@ -90,7 +123,13 @@ enum InstalledApps {
                     ?? url.deletingPathExtension().lastPathComponent
                 let purpose = (bundle.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "NSBluetoothPeripheralUsageDescription") as? String)
-                found[id] = App(name: name, bundleID: id, path: url.path, bluetoothPurpose: purpose)
+                let marketingVersion = infoString(bundle, key: "CFBundleShortVersionString")
+                let buildVersion = infoString(bundle, key: "CFBundleVersion")
+                let versionEvidence: VersionEvidence? = marketingVersion != nil || buildVersion != nil
+                    ? .bundleInfoDictionary : nil
+                found[id] = App(name: name, bundleID: id, path: url.path, bluetoothPurpose: purpose,
+                                marketingVersion: marketingVersion, buildVersion: buildVersion,
+                                scanEvidence: .applicationBundle, versionEvidence: versionEvidence)
             }
         }
         let result = ScanResult(

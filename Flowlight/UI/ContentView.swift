@@ -72,6 +72,7 @@ struct ContentView: View {
                 case .inspect: InspectView()
                 case .ask: AskView()
                 case .sources: SourcesView(selection: $nav.sourcesTab)
+                case .advisories: AdvisoriesView(store: monitor.advisories, updater: monitor.advisoryCatalog)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

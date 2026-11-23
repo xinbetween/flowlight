@@ -62,11 +62,20 @@
 		1F8686DCB3451158B115A8FD /* AgentLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440DB80190A1847AC834210D /* AgentLauncher.swift */; };
 		2072AA79A8637D84267BE43F /* MCPDomainsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34AD2BFFA35727FB39287960 /* MCPDomainsTests.swift */; };
 		216BDAB2AB83A06B61EE6325 /* InstalledApps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67F3203B4BE2D664F3B1EC9 /* InstalledApps.swift */; };
+		A61100000000000000000001 /* AdvisoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61100000000000000000004 /* AdvisoryModels.swift */; };
+		A61100000000000000000002 /* VersionRangeMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61100000000000000000005 /* VersionRangeMatcher.swift */; };
+		B61100000000000000000001 /* AdvisoryCatalogState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B61100000000000000000006 /* AdvisoryCatalogState.swift */; };
+		B61100000000000000000002 /* AdvisoryCatalogVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B61100000000000000000007 /* AdvisoryCatalogVerifier.swift */; };
+		B61100000000000000000003 /* AdvisoryCatalogUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = B61100000000000000000008 /* AdvisoryCatalogUpdater.swift */; };
+		B61100000000000000000004 /* AdvisoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B61100000000000000000009 /* AdvisoryStore.swift */; };
+		B61100000000000000000005 /* advisories.json in Resources */ = {isa = PBXBuildFile; fileRef = B6110000000000000000000A /* advisories.json */; };
+		C61100000000000000000001 /* AdvisoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61100000000000000000002 /* AdvisoriesView.swift */; };
 		21B9E226D66289FBC7175C11 /* PerformanceBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E1A246D41B7421BB0C2FC8 /* PerformanceBudgetTests.swift */; };
 		21D7D0DF6C5DF97EB3D1EFD9 /* RulePackCatalogComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E858E52F162361C6FD039F16 /* RulePackCatalogComposition.swift */; };
 		22B534F23EF9F05AE27A6D71 /* FeatureGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D568056D9E6FACAC42D563 /* FeatureGuide.swift */; };
 		239189796A5B358CF23BFCF9 /* MockRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8406C2280A8FF08E883A1E0 /* MockRulesView.swift */; };
 		2394FFF1E44E14D49C179431 /* AgentInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66BAB050ED19B968765F3A9 /* AgentInventoryTests.swift */; };
+		A61100000000000000000003 /* AdvisoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61100000000000000000006 /* AdvisoryTests.swift */; };
 		23CC0B3EE557E6F247EC4100 /* RuleEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08643257F8D11784563BD6CC /* RuleEditor.swift */; };
 		24582219230DE364D6B2E2D1 /* BlockingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F529FE0E06B11298D8CD1E90 /* BlockingTests.swift */; };
 		2497E16386CDFE769EFB0EF6 /* RulePackEditorDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089476A21B8A6AE7F3F4A53A /* RulePackEditorDraft.swift */; };
@@ -836,6 +845,7 @@
 		C4E1FBDB4AE42E05E5BE2131 /* AgentInventoryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInventoryModel.swift; sourceTree = "<group>"; };
 		C5E1A246D41B7421BB0C2FC8 /* PerformanceBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceBudgetTests.swift; sourceTree = "<group>"; };
 		C66BAB050ED19B968765F3A9 /* AgentInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInventoryTests.swift; sourceTree = "<group>"; };
+		A61100000000000000000006 /* AdvisoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryTests.swift; sourceTree = "<group>"; };
 		C8251DBDC21C44CB92CC1C67 /* SettingsEnforcer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsEnforcer.swift; sourceTree = "<group>"; };
 		CAC8A1658834152DBFBA4494 /* MockGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockGate.swift; sourceTree = "<group>"; };
 		CAFF4F331D37F34C6C131ED5 /* TrafficGraphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficGraphTests.swift; sourceTree = "<group>"; };
@@ -872,6 +882,7 @@
 		E858E52F162361C6FD039F16 /* RulePackCatalogComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackCatalogComposition.swift; sourceTree = "<group>"; };
 		E872723F2D92AA78F7941259 /* ActivityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitor.swift; sourceTree = "<group>"; };
 		EB04B24A750D5362449F8197 /* AlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertsView.swift; sourceTree = "<group>"; };
+		C61100000000000000000002 /* AdvisoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoriesView.swift; sourceTree = "<group>"; };
 		EBD012519AD3D674CC0D35FC /* CoverageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageTests.swift; sourceTree = "<group>"; };
 		EC292A1F1020AAA580DA3CDB /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		EC63F61F2956394B88C762F4 /* ExtensionRebootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionRebootTests.swift; sourceTree = "<group>"; };
@@ -888,6 +899,13 @@
 		F529FE0E06B11298D8CD1E90 /* BlockingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockingTests.swift; sourceTree = "<group>"; };
 		F61F7D8D3D08054C7697792D /* AnomalySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalySettings.swift; sourceTree = "<group>"; };
 		F67F3203B4BE2D664F3B1EC9 /* InstalledApps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledApps.swift; sourceTree = "<group>"; };
+		A61100000000000000000004 /* AdvisoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryModels.swift; sourceTree = "<group>"; };
+		A61100000000000000000005 /* VersionRangeMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionRangeMatcher.swift; sourceTree = "<group>"; };
+		B61100000000000000000006 /* AdvisoryCatalogState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryCatalogState.swift; sourceTree = "<group>"; };
+		B61100000000000000000007 /* AdvisoryCatalogVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryCatalogVerifier.swift; sourceTree = "<group>"; };
+		B61100000000000000000008 /* AdvisoryCatalogUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryCatalogUpdater.swift; sourceTree = "<group>"; };
+		B61100000000000000000009 /* AdvisoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryStore.swift; sourceTree = "<group>"; };
+		B6110000000000000000000A /* advisories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = advisories.json; sourceTree = "<group>"; };
 		F6B4B0B76D53D8089C95762F /* IPOwnerLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPOwnerLookup.swift; sourceTree = "<group>"; };
 		F8406C2280A8FF08E883A1E0 /* MockRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRulesView.swift; sourceTree = "<group>"; };
 		F8F8FB5C78D8391B25733C9B /* ResponseTransformRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseTransformRulesView.swift; sourceTree = "<group>"; };
@@ -1080,6 +1098,12 @@
 		3944E092E097CA9FE66602C2 /* Analysis */ = {
 			isa = PBXGroup;
 			children = (
+				A61100000000000000000004 /* AdvisoryModels.swift */,
+				A61100000000000000000005 /* VersionRangeMatcher.swift */,
+				B61100000000000000000006 /* AdvisoryCatalogState.swift */,
+				B61100000000000000000007 /* AdvisoryCatalogVerifier.swift */,
+				B61100000000000000000008 /* AdvisoryCatalogUpdater.swift */,
+				B61100000000000000000009 /* AdvisoryStore.swift */,
 				E872723F2D92AA78F7941259 /* ActivityMonitor.swift */,
 				41B98E13F994F7E684F57C07 /* AgentAttributor.swift */,
 				4E58A32D296749B9EA61F6D8 /* AgentGateway.swift */,
@@ -1111,6 +1135,7 @@
 		47D0F2D7B8D7DEDEA845284F /* FlowlightTests */ = {
 			isa = PBXGroup;
 			children = (
+				A61100000000000000000006 /* AdvisoryTests.swift */,
 				C66BAB050ED19B968765F3A9 /* AgentInventoryTests.swift */,
 				DD30777A046F705110A99269 /* AgentLauncherTests.swift */,
 				3B07796D1108F037FF196443 /* AgentPolicyTests.swift */,
@@ -1333,6 +1358,7 @@
 				082111849A66652DD9F1BE01 /* AgentsModel.swift */,
 				81434EE3C45929E8A768D42E /* AgentsView.swift */,
 				EB04B24A750D5362449F8197 /* AlertsView.swift */,
+				C61100000000000000000002 /* AdvisoriesView.swift */,
 				41AE1A6CC673544FCEC9E7F4 /* AskView.swift */,
 				5B9F2521A73E6E3264F557E6 /* CaptureView.swift */,
 				61823557D86136986EEE4A18 /* CaptureWarning.swift */,
@@ -1383,6 +1409,14 @@
 			path = Insights;
 			sourceTree = "<group>";
 		};
+		B6110000000000000000000B /* Advisories */ = {
+			isa = PBXGroup;
+			children = (
+				B6110000000000000000000A /* advisories.json */,
+			);
+			path = Advisories;
+			sourceTree = "<group>";
+		};
 		BA64269E7DEB0D9E7F9ED3D0 /* RulePacks */ = {
 			isa = PBXGroup;
 			children = (
@@ -1407,6 +1441,7 @@
 			isa = PBXGroup;
 			children = (
 				20C95610696E32B96E500E8F /* bpf-access.sh */,
+				B6110000000000000000000B /* Advisories */,
 				BA64269E7DEB0D9E7F9ED3D0 /* RulePacks */,
 			);
 			path = Resources;
@@ -1710,6 +1745,7 @@
 			files = (
 				93937351BA21608974D54900 /* Assets.xcassets in Resources */,
 				57DADB20CBF7D6EF6F6B8167 /* Localizable.strings in Resources */,
+				B61100000000000000000005 /* advisories.json in Resources */,
 				E384EA8E1EEBA1689E638B8C /* official-rule-packs-v1-public.pem in Resources */,
 				E4CEDC39319758D17EEC7713 /* official-rule-packs-v2-public.pem in Resources */,
 				7C4D73113ECB44CDDAB40D58 /* official.json in Resources */,
@@ -1732,7 +1768,8 @@
 			files = (
 				70B794AEAC36D7B581841A5D /* Assets.xcassets in Resources */,
 				C57A3811A5DB984FC0F2549A /* Localizable.strings in Resources */,
-				D5D014F2811B94832DC6CC81 /* bpf-access.sh in Resources */,
+				B61100000000000000000005 /* advisories.json in Resources */,
+					D5D014F2811B94832DC6CC81 /* bpf-access.sh in Resources */,
 				B5F94B9F6FC2B75A867FB2F8 /* official-rule-packs-v1-public.pem in Resources */,
 				4ACE13E005F5CFF56CA059E5 /* official-rule-packs-v2-public.pem in Resources */,
 				48CD1538B6B7899F0B8A83E8 /* official.json in Resources */,
@@ -1809,6 +1846,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A61100000000000000000003 /* AdvisoryTests.swift in Sources */,
 				2394FFF1E44E14D49C179431 /* AgentInventoryTests.swift in Sources */,
 				FF3F2EE3FE29F6827D527B31 /* AgentLauncherTests.swift in Sources */,
 				489DB4725FD189472CC078BE /* AgentPolicyTests.swift in Sources */,
@@ -1886,6 +1924,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				B9C2B47C6EC39C01E90F055B /* AITrafficGraph.swift in Sources */,
+				A61100000000000000000001 /* AdvisoryModels.swift in Sources */,
+				A61100000000000000000002 /* VersionRangeMatcher.swift in Sources */,
+				B61100000000000000000001 /* AdvisoryCatalogState.swift in Sources */,
+				B61100000000000000000002 /* AdvisoryCatalogVerifier.swift in Sources */,
+				B61100000000000000000003 /* AdvisoryCatalogUpdater.swift in Sources */,
+				B61100000000000000000004 /* AdvisoryStore.swift in Sources */,
+				C61100000000000000000001 /* AdvisoriesView.swift in Sources */,
 				89E518A6DD4F49D012E47AFE /* ActivityMonitor.swift in Sources */,
 				B1E5CA21DA13E924DD50CB51 /* AgentAttributor.swift in Sources */,
 				2D10E8EE0B452C5746D2AF73 /* AgentCatalog.swift in Sources */,
@@ -2107,6 +2152,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C4410D4E752D72D1934FDE9 /* AITrafficGraph.swift in Sources */,
+					A61100000000000000000001 /* AdvisoryModels.swift in Sources */,
+					B61100000000000000000001 /* AdvisoryCatalogState.swift in Sources */,
+					B61100000000000000000002 /* AdvisoryCatalogVerifier.swift in Sources */,
+					B61100000000000000000003 /* AdvisoryCatalogUpdater.swift in Sources */,
+					B61100000000000000000004 /* AdvisoryStore.swift in Sources */,
+					A61100000000000000000002 /* VersionRangeMatcher.swift in Sources */,
+				C61100000000000000000001 /* AdvisoriesView.swift in Sources */,
 				D30F3B5A02E089EEADBDE98B /* ActivityMonitor.swift in Sources */,
 				C35F10A4B87D29525A740DD5 /* AgentAttributor.swift in Sources */,
 				DDE2B0B0A807C428B9F78120 /* AgentCatalog.swift in Sources */,

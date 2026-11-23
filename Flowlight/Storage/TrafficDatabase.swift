@@ -860,6 +860,21 @@ final class TrafficDatabase: @unchecked Sendable {
             catalog_id TEXT PRIMARY KEY, automatic_refresh INTEGER NOT NULL DEFAULT 1,
             last_attempt INTEGER, last_success INTEGER, next_eligible_attempt INTEGER,
             failure_count INTEGER NOT NULL DEFAULT 0, last_status TEXT, last_error TEXT);
+        -- Advisory catalog trust is purpose-scoped and never shares rule-pack receipts or payload rows.
+        CREATE TABLE IF NOT EXISTS advisory_catalog_receipts (
+            catalog_id TEXT PRIMARY KEY, highest_sequence INTEGER NOT NULL,
+            canonical_digest TEXT NOT NULL, signer_key_id TEXT NOT NULL, accepted_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS advisory_catalog_cache (
+            catalog_id TEXT PRIMARY KEY, raw_envelope BLOB NOT NULL, etag TEXT,
+            last_modified TEXT, verified_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS advisory_catalog_updates (
+            catalog_id TEXT PRIMARY KEY, automatic_refresh INTEGER NOT NULL DEFAULT 0,
+            last_attempt INTEGER, last_success INTEGER, next_eligible_attempt INTEGER,
+            failure_count INTEGER NOT NULL DEFAULT 0, last_status TEXT, last_error TEXT);
+        CREATE TABLE IF NOT EXISTS advisories (
+            catalog_id TEXT NOT NULL, advisory_id TEXT NOT NULL, advisory TEXT NOT NULL, updated INTEGER NOT NULL,
+            PRIMARY KEY (catalog_id, advisory_id));
+        CREATE INDEX IF NOT EXISTS advisories_catalog_updated ON advisories(catalog_id, updated);
         CREATE TABLE IF NOT EXISTS rule_pack_overrides (
             id TEXT PRIMARY KEY, override TEXT NOT NULL, updated INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS rule_pack_event_rollups (
@@ -2190,6 +2205,157 @@ final class TrafficDatabase: @unchecked Sendable {
                 )
             }.first ?? RulePackCatalogUpdateState(catalogID: catalogID)
         return RulePackCatalogState(receipt: receipt, cache: cache, update: update)
+    }
+
+    // MARK: Advisory catalog trust and storage
+
+    func loadAdvisoryCatalogState(catalogID: String) throws -> AdvisoryCatalogState {
+        guard !catalogID.isEmpty else { throw AdvisoryCatalogPersistenceError.invalidCatalogID }
+        let receipt = try conn.query("""
+            SELECT highest_sequence, canonical_digest, signer_key_id, accepted_at
+            FROM advisory_catalog_receipts WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                AdvisoryCatalogReceipt(catalogID: catalogID, sequence: row.int(0), digest: row.text(1),
+                                       signerKeyID: row.text(2), acceptedAt: Date(timeIntervalSince1970: TimeInterval(row.int(3))))
+            }.first
+        let cache = try conn.query("""
+            SELECT raw_envelope, etag, last_modified, verified_at
+            FROM advisory_catalog_cache WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                AdvisoryCatalogCache(catalogID: catalogID, rawEnvelope: row.blob(0),
+                                     etag: row.isNull(1) ? nil : row.text(1),
+                                     lastModified: row.isNull(2) ? nil : row.text(2),
+                                     verifiedAt: Date(timeIntervalSince1970: TimeInterval(row.int(3))))
+            }.first
+        let update = try conn.query("""
+            SELECT automatic_refresh, last_attempt, last_success, next_eligible_attempt,
+                   failure_count, last_status, last_error
+            FROM advisory_catalog_updates WHERE catalog_id = ?
+            """, [.text(catalogID)]) { row in
+                AdvisoryCatalogUpdateState(catalogID: catalogID, automaticRefresh: row.int(0) != 0,
+                    lastAttempt: row.isNull(1) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(1))),
+                    lastSuccess: row.isNull(2) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(2))),
+                    nextEligibleAttempt: row.isNull(3) ? nil : Date(timeIntervalSince1970: TimeInterval(row.int(3))),
+                    failureCount: Int(row.int(4)), lastStatus: row.isNull(5) ? nil : row.text(5),
+                    lastError: row.isNull(6) ? nil : row.text(6))
+            }.first ?? AdvisoryCatalogUpdateState(catalogID: catalogID)
+        return AdvisoryCatalogState(receipt: receipt, cache: cache, update: update)
+    }
+
+    func loadAdvisories(catalogID: String = AdvisoryCatalogVerifier.catalogID) throws -> [SecurityAdvisory] {
+        guard !catalogID.isEmpty else { throw AdvisoryCatalogPersistenceError.invalidCatalogID }
+        return try conn.query("SELECT advisory FROM advisories WHERE catalog_id = ? ORDER BY advisory_id", [.text(catalogID)]) { $0.text(0) }.map {
+            try JSONDecoder().decode(SecurityAdvisory.self, from: Data($0.utf8))
+        }
+    }
+
+    func acceptVerifiedAdvisoryCatalog(_ catalog: VerifiedAdvisoryCatalog,
+                                       catalogID: String = AdvisoryCatalogVerifier.catalogID,
+                                       etag: String? = nil, lastModified: String? = nil,
+                                       checkedAt: Date, nextEligibleAt: Date) throws -> AdvisoryCatalogAcceptance {
+        guard catalogID == AdvisoryCatalogVerifier.catalogID else { throw AdvisoryCatalogPersistenceError.invalidCatalogID }
+        guard catalog.sequence > 0, !catalog.digest.isEmpty, !catalog.signerKeyID.isEmpty, !catalog.rawEnvelope.isEmpty else {
+            throw AdvisoryCatalogPersistenceError.invalidReceipt
+        }
+        var IDs = Set<String>()
+        guard catalog.advisories.allSatisfy({ IDs.insert($0.id).inserted }) else {
+            throw AdvisoryCatalogPersistenceError.invalidReceipt
+        }
+        let encoder = JSONEncoder()
+        try conn.transaction {
+            if let prior = try conn.query("SELECT highest_sequence, canonical_digest FROM advisory_catalog_receipts WHERE catalog_id = ?", [.text(catalogID)], map: { ($0.int(0), $0.text(1)) }).first {
+                if catalog.sequence < prior.0 { throw AdvisoryCatalogPersistenceError.rollback }
+                if catalog.sequence == prior.0, catalog.digest != prior.1 { throw AdvisoryCatalogPersistenceError.equivocation }
+            }
+            let accepted = Int64(checkedAt.timeIntervalSince1970)
+            let automaticRefresh = try conn.query(
+                "SELECT automatic_refresh FROM advisory_catalog_updates WHERE catalog_id = ?",
+                [.text(catalogID)], map: { $0.int(0) }
+            ).first ?? 0
+            try conn.run("""
+                INSERT INTO advisory_catalog_receipts (catalog_id, highest_sequence, canonical_digest, signer_key_id, accepted_at)
+                VALUES (?,?,?,?,?) ON CONFLICT(catalog_id) DO UPDATE SET
+                    highest_sequence = excluded.highest_sequence, canonical_digest = excluded.canonical_digest,
+                    signer_key_id = excluded.signer_key_id,
+                    accepted_at = CASE WHEN advisory_catalog_receipts.highest_sequence = excluded.highest_sequence
+                        AND advisory_catalog_receipts.canonical_digest = excluded.canonical_digest
+                        THEN advisory_catalog_receipts.accepted_at ELSE excluded.accepted_at END
+                """, [.text(catalogID), .int(catalog.sequence), .text(catalog.digest), .text(catalog.signerKeyID), .int(accepted)])
+            try conn.run("""
+                INSERT INTO advisory_catalog_cache (catalog_id, raw_envelope, etag, last_modified, verified_at)
+                VALUES (?,?,?,?,?) ON CONFLICT(catalog_id) DO UPDATE SET raw_envelope = excluded.raw_envelope,
+                    etag = excluded.etag, last_modified = excluded.last_modified, verified_at = excluded.verified_at
+                """, [.text(catalogID), .blob(catalog.rawEnvelope), etag.map(SQLValue.text) ?? .null,
+                      lastModified.map(SQLValue.text) ?? .null, .int(accepted)])
+            try conn.run("""
+                INSERT INTO advisory_catalog_updates (catalog_id, automatic_refresh, last_attempt, last_success,
+                    next_eligible_attempt, failure_count, last_status, last_error)
+                VALUES (?,?, ?,?,?,0,?,NULL) ON CONFLICT(catalog_id) DO UPDATE SET last_attempt = excluded.last_attempt,
+                    last_success = excluded.last_success, next_eligible_attempt = excluded.next_eligible_attempt,
+                    failure_count = 0, last_status = excluded.last_status, last_error = NULL
+                """, [.text(catalogID), .int(automaticRefresh), .int(accepted), .int(accepted), .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("accepted")])
+            try conn.run("DELETE FROM advisories WHERE catalog_id = ?", [.text(catalogID)])
+            for advisory in catalog.advisories {
+                let json = String(decoding: try encoder.encode(advisory), as: UTF8.self)
+                try conn.run("INSERT INTO advisories (catalog_id, advisory_id, advisory, updated) VALUES (?,?,?,?)",
+                             [.text(catalogID), .text(advisory.id), .text(json), .int(accepted)])
+            }
+        }
+        return AdvisoryCatalogAcceptance(state: try loadAdvisoryCatalogState(catalogID: catalogID), advisories: catalog.advisories)
+    }
+
+    func recordAdvisoryCatalogNotModified(catalogID: String, expectedSequence: Int64, expectedDigest: String,
+                                          checkedAt: Date, nextEligibleAt: Date) throws {
+        try conn.transaction {
+            guard let receipt = try conn.query("SELECT highest_sequence, canonical_digest FROM advisory_catalog_receipts WHERE catalog_id = ?", [.text(catalogID)], map: { ($0.int(0), $0.text(1)) }).first,
+                  receipt.0 == expectedSequence, receipt.1 == expectedDigest,
+                  try conn.query("SELECT 1 FROM advisory_catalog_cache WHERE catalog_id = ?", [.text(catalogID)], map: { $0.int(0) }).first == 1 else {
+                throw AdvisoryCatalogPersistenceError.invalidReceipt
+            }
+            let checked = Int64(checkedAt.timeIntervalSince1970)
+            let automaticRefresh = try conn.query(
+                "SELECT automatic_refresh FROM advisory_catalog_updates WHERE catalog_id = ?",
+                [.text(catalogID)], map: { $0.int(0) }
+            ).first ?? 0
+            try conn.run("""
+                INSERT INTO advisory_catalog_updates (catalog_id, automatic_refresh, last_attempt, last_success,
+                    next_eligible_attempt, failure_count, last_status, last_error)
+                VALUES (?,?, ?,?,?,0,?,NULL) ON CONFLICT(catalog_id) DO UPDATE SET last_attempt = excluded.last_attempt,
+                    last_success = excluded.last_success, next_eligible_attempt = excluded.next_eligible_attempt,
+                    failure_count = 0, last_status = excluded.last_status, last_error = NULL
+                """, [.text(catalogID), .int(automaticRefresh), .int(checked), .int(checked), .int(Int64(nextEligibleAt.timeIntervalSince1970)), .text("not-modified")])
+        }
+    }
+
+    func setAdvisoryCatalogAutomaticRefresh(catalogID: String, enabled: Bool) throws {
+        guard !catalogID.isEmpty else { throw AdvisoryCatalogPersistenceError.invalidCatalogID }
+        try conn.run("INSERT INTO advisory_catalog_updates (catalog_id, automatic_refresh, failure_count) VALUES (?,?,0) ON CONFLICT(catalog_id) DO UPDATE SET automatic_refresh = excluded.automatic_refresh", [.text(catalogID), .int(enabled ? 1 : 0)])
+    }
+
+    func clearAdvisoryCatalog(catalogID: String = AdvisoryCatalogVerifier.catalogID) throws {
+        guard !catalogID.isEmpty else { throw AdvisoryCatalogPersistenceError.invalidCatalogID }
+        try conn.transaction {
+            for table in ["advisories", "advisory_catalog_cache", "advisory_catalog_receipts", "advisory_catalog_updates"] {
+                try conn.run("DELETE FROM \(table) WHERE catalog_id = ?", [.text(catalogID)])
+            }
+        }
+    }
+
+    func recordAdvisoryCatalogFailure(catalogID: String, attemptedAt: Date, failureCount: Int,
+                                      nextEligibleAt: Date, status: String, error: String) throws {
+        guard !catalogID.isEmpty, failureCount > 0 else { throw AdvisoryCatalogPersistenceError.invalidReceipt }
+        let automaticRefresh = try conn.query(
+            "SELECT automatic_refresh FROM advisory_catalog_updates WHERE catalog_id = ?",
+            [.text(catalogID)], map: { $0.int(0) }
+        ).first ?? 0
+        try conn.run("""
+            INSERT INTO advisory_catalog_updates (catalog_id, automatic_refresh, last_attempt, last_success,
+                next_eligible_attempt, failure_count, last_status, last_error)
+            VALUES (?,?,?,NULL,?,?,?,?) ON CONFLICT(catalog_id) DO UPDATE SET last_attempt = excluded.last_attempt,
+                next_eligible_attempt = excluded.next_eligible_attempt, failure_count = excluded.failure_count,
+                last_status = excluded.last_status, last_error = excluded.last_error
+            """, [.text(catalogID), .int(automaticRefresh), .int(Int64(attemptedAt.timeIntervalSince1970)), .int(Int64(nextEligibleAt.timeIntervalSince1970)),
+                  .int(Int64(failureCount)), .text(status), .text(error)])
     }
 
     private func reconcileRulePackConfigurations(

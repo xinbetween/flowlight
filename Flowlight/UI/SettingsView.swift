@@ -77,6 +77,8 @@ struct DataPrivacySettingsTab: View {
                 Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
                     .font(.caption).foregroundStyle(.secondary)
             }
+            AdvisoryCatalogSettingsSection()
+
             Section {
                 LabeledContent(L("Database")) {
                     Text(monitor.db.url.path)
@@ -107,6 +109,66 @@ struct DataPrivacySettingsTab: View {
             Button(L("OK")) { monitor.lastError = nil }
         } message: {
             Text(monitor.lastError ?? "")
+        }
+    }
+}
+
+private struct AdvisoryCatalogSettingsSection: View {
+    @EnvironmentObject private var monitor: TrafficMonitor
+    @State private var automaticRefresh = false
+    @State private var showClearConfirmation = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $automaticRefresh) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Check for advisory updates automatically"))
+                    Text(L("Only a signed catalog is downloaded; your application inventory never leaves this Mac."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onChange(of: automaticRefresh) { _, enabled in
+                Task { await monitor.advisoryCatalog.setAutomaticRefresh(enabled) }
+            }
+            LabeledContent(L("Catalog source"), value: "flowlight.xinbetween.com")
+                .font(.caption)
+            LabeledContent(L("Catalog status"), value: statusTitle)
+                .font(.caption)
+            Button(L("Refresh advisory catalog now")) {
+                Task { await monitor.advisoryCatalog.checkNow() }
+            }
+            .disabled(monitor.advisoryCatalog.status == .checking)
+            Button(L("Clear downloaded advisory data…"), role: .destructive) {
+                showClearConfirmation = true
+            }
+        } header: {
+            Text(L("Application advisories"))
+        } footer: {
+            Text(L("Matching is local and advisory-only. Clearing this data removes the cached catalog and its local matches; the bundled catalog can be restored on the next launch."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .task {
+            automaticRefresh = monitor.advisoryCatalog.catalogState.update.automaticRefresh
+        }
+        .confirmationDialog(L("Clear the cached advisory catalog and local matches?"), isPresented: $showClearConfirmation,
+                            titleVisibility: .visible) {
+            Button(L("Clear advisory data"), role: .destructive) {
+                Task { await monitor.advisoryCatalog.clearLocalCatalog() }
+            }
+        }
+    }
+
+    private var statusTitle: String {
+        switch monitor.advisoryCatalog.status {
+        case .idle: return L("Not checked")
+        case .checking: return L("Checking…")
+        case .current: return L("Current")
+        case .stale: return L("Stale; using last verified catalog")
+        case .recovery: return L("Recovery required")
+        case .failed(_, let usingLastKnownGood):
+            return usingLastKnownGood ? L("Update failed; using last verified catalog") : L("Update failed")
         }
     }
 }

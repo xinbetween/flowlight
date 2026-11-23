@@ -167,6 +167,8 @@ open build/Build/Products/Release/Flowlight.app
 
  Sources⌘9Collector health and recovery, opt-in device channels, and coverage in three focused segments.
 
+ Advisories⌘0Local application inventory, version evidence and conservatively matched CVE advisories with catalog freshness and scope.
+
  The shortcuts follow the visible sidebar order and are the same in Developer ID and Mac App Store builds.
 
  Live, the screen Flowlight opens on.

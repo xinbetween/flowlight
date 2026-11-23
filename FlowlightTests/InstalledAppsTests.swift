@@ -83,6 +83,53 @@ final class InstalledAppsTests: XCTestCase {
         XCTAssertTrue(result.complete)
         XCTAssertEqual(result.apps.map(\.bundleID), ["com.example.Sample"])
     }
+
+    func testScanExtractsVersionEvidenceWithoutChangingBundleIdentity() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("installed-apps-version-\(UUID().uuidString)")
+        let app = root.appendingPathComponent("Sample.app")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let contents = app.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": "com.example.Sample",
+            "CFBundleName": "Sample",
+            "CFBundleShortVersionString": " 1.2.3 ",
+            "CFBundleVersion": "42",
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+
+        let result = InstalledApps.scan(in: [root.path])
+        let sample = try XCTUnwrap(result.apps.first)
+
+        XCTAssertEqual(sample.bundleID, "com.example.Sample")
+        XCTAssertEqual(sample.id, "com.example.Sample")
+        XCTAssertEqual(sample.marketingVersion, "1.2.3")
+        XCTAssertEqual(sample.buildVersion, "42")
+        XCTAssertEqual(sample.scanEvidence, .applicationBundle)
+        XCTAssertEqual(sample.versionEvidence, .bundleInfoDictionary)
+    }
+
+    func testScanDoesNotInventVersionEvidence() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("installed-apps-no-version-\(UUID().uuidString)")
+        let app = root.appendingPathComponent("Sample.app")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let contents = app.appendingPathComponent("Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": "com.example.Sample",
+            "CFBundleName": "Sample",
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+
+        let sample = try XCTUnwrap(InstalledApps.scan(in: [root.path]).apps.first)
+
+        XCTAssertNil(sample.marketingVersion)
+        XCTAssertNil(sample.buildVersion)
+        XCTAssertNil(sample.versionEvidence)
+        XCTAssertEqual(sample.scanEvidence, .applicationBundle)
+    }
 }
 
 /// Focus is symmetric: either half alone is a complete focus.
