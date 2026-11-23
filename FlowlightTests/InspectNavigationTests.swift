@@ -23,6 +23,18 @@ final class InspectNavigationTests: XCTestCase {
         XCTAssertEqual(nav.inspectRequest?.search, "claude")
     }
 
+    func testAppInspectCarriesExactIdentityAndBoundedWindow() throws {
+        let nav = AppNavigation()
+        nav.showInspect(app: ("com.example.agent", "Example Agent"), window: .hour)
+
+        let request = try XCTUnwrap(nav.inspectRequest)
+        XCTAssertEqual(nav.selection, .inspect)
+        XCTAssertEqual(request.search, "")
+        XCTAssertEqual(request.appID, "com.example.agent")
+        XCTAssertEqual(request.appName, "Example Agent")
+        XCTAssertEqual(request.window, .hour)
+    }
+
     /// The sidebar item has to exist for the request to land anywhere, and `SidebarItem` is what the help
     /// anchors and keyboard shortcuts are derived from.
     func testInspectIsAReachableScreen() {

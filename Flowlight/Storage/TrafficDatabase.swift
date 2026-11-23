@@ -3258,6 +3258,22 @@ final class TrafficDatabase: @unchecked Sendable {
         return (row.1 / row.0, row.2 / row.0, true)
     }
 
+    /// Coverage for the exact report interval and structured filter. Unlike the runtime health indicator above,
+    /// this never silently reports the last hour when History is showing a different window.
+    func coverage(_ granularity: Granularity, from: Date, to: Date,
+                  filter: TrafficFilter = .none) throws -> (named: Double, owned: Double, hasTraffic: Bool) {
+        let (clause, values) = whereClause(from: from, to: to, filter: filter)
+        let row = try conn.query("""
+            SELECT SUM(bytes_in + bytes_out),
+                   SUM(CASE WHEN domain != '' THEN bytes_in + bytes_out ELSE 0 END),
+                   SUM(CASE WHEN domain != '' OR o.ip IS NOT NULL THEN bytes_in + bytes_out ELSE 0 END)
+            FROM \(granularity.table) LEFT JOIN ip_owners o ON o.ip = remote_ip
+            WHERE \(clause) AND remote_ip != '(unconnected)'
+            """, values) { ($0.double(0), $0.double(1), $0.double(2)) }.first
+        guard let row, row.0 > 0 else { return (0, 0, false) }
+        return (row.1 / row.0, row.2 / row.0, true)
+    }
+
     // MARK: Alerts
 
     /// Clears only the disposable alert table before an explicitly requested DemoData alert-review fixture is seeded.

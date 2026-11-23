@@ -76,7 +76,8 @@ struct LiveView: View {
                     if let id = ids.first {
                         Button(L("Show in History")) { openReport(id) }
                         InspectMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id),
-                                         host: liveState.talkers.first { $0.bundleID == id }?.topDestination)
+                                         host: liveState.talkers.first { $0.bundleID == id }?.topDestination,
+                                         window: .hour)
                         FocusMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id))
                         Divider()
                         RuleMenuItems(app: (id, liveState.talkers.first { $0.bundleID == id }?.name ?? id),
@@ -96,6 +97,30 @@ struct LiveView: View {
         }
         .padding()
         .navigationTitle(L("Live"))
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    inspectSelectedApp()
+                } label: {
+                    Label(L("Inspect selected app"), systemImage: "lock.open.display")
+                }
+                .disabled(selectedTalker == nil)
+                .help(selectedTalker.map { L("Inspect %@ over the last hour", $0.name) }
+                      ?? L("Select an app to inspect its traffic over the last hour"))
+                .accessibilityIdentifier("live.inspect-selected-app")
+            }
+        }
+    }
+
+    private var selectedTalker: LiveTalker? {
+        guard let selection else { return nil }
+        return liveState.talkers.first { $0.bundleID == selection }
+    }
+
+    private func inspectSelectedApp() {
+        guard let talker = selectedTalker else { return }
+        let name = talker.name.isEmpty ? talker.bundleID : talker.name
+        nav.showInspect(app: (talker.bundleID, name), window: .hour)
     }
 
     private var liveChart: some View {

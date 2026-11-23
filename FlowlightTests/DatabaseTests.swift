@@ -691,6 +691,41 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(nodes.first { $0.bundleID == "com.a" }?.children?.first?.children?.first?.remoteIP, "1.2.3.4")
     }
 
+    func testHistoryCoverageUsesSelectedWindowAndExactAppScope() throws {
+        let t0: Int64 = 1_700_000_040 // minute-aligned rollup bucket
+        try db.insert([
+            TrafficBatch(timestamp: t0, records: [
+                TrafficRecord(key: key("com.example.agent", "named.example"),
+                              counters: FlowCounters(bytesIn: 90, bytesOut: 10, flows: 1)),
+                TrafficRecord(key: key("com.example.other", ""),
+                              counters: FlowCounters(bytesIn: 100, bytesOut: 0, flows: 1))
+            ]),
+            TrafficBatch(timestamp: t0 + 60, records: [
+                TrafficRecord(key: key("com.example.agent", ""),
+                              counters: FlowCounters(bytesIn: 50, bytesOut: 0, flows: 1))
+            ])
+        ])
+        try db.rollup(now: Date(timeIntervalSince1970: TimeInterval(t0 + 180)))
+
+        let from = Date(timeIntervalSince1970: TimeInterval(t0))
+        let firstMinute = Date(timeIntervalSince1970: TimeInterval(t0 + 60))
+        let to = Date(timeIntervalSince1970: TimeInterval(t0 + 120))
+        let selected = try db.coverage(.minute, from: from, to: firstMinute,
+                                        filter: TrafficFilter(bundleID: "com.example.agent"))
+        XCTAssertTrue(selected.hasTraffic)
+        XCTAssertEqual(selected.named, 1, accuracy: 0.0001)
+        XCTAssertEqual(selected.owned, 1, accuracy: 0.0001)
+
+        let later = try db.coverage(.minute, from: firstMinute, to: to,
+                                     filter: TrafficFilter(bundleID: "com.example.agent"))
+        XCTAssertTrue(later.hasTraffic)
+        XCTAssertEqual(later.named, 0, accuracy: 0.0001)
+
+        let empty = try db.coverage(.minute, from: to, to: to.addingTimeInterval(60),
+                                    filter: TrafficFilter(bundleID: "com.example.agent"))
+        XCTAssertFalse(empty.hasTraffic)
+    }
+
     func testTrafficVisualizationProjectionPreservesProtocolAndChannelScope() throws {
         let t0: Int64 = 1_700_000_000
         var https = key("com.example", "api.example.com", ip: "203.0.113.8")

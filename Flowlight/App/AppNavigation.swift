@@ -431,14 +431,15 @@ final class AppNavigation: ObservableObject {
                      appIDs: [String] = [], appName: String? = nil, host: String? = nil,
                      hostIncludesSubdomains: Bool = true,
                      includeAttributedChildren: Bool = false, agentParent: String? = nil,
-                     mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
+                     mcpServer: String? = nil, potentialHarmOnly: Bool = false,
+                     window: AgentWindow = .day) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID,
                                        appIDs: app == nil ? appIDs : [], appName: app?.name ?? appName, host: host,
                                        hostIncludesSubdomains: hostIncludesSubdomains,
                                        includeAttributedChildren: includeAttributedChildren,
                                        agentParent: agentParent, mcpServer: mcpServer,
-                                       potentialHarmOnly: potentialHarmOnly)
+                                       potentialHarmOnly: potentialHarmOnly, window: window)
         followLink(to: .inspect)
     }
 }
@@ -457,7 +458,8 @@ enum InspectNavigationScope {
     }
 
     static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil,
-                            requireDestination: Bool = true, potentialHarmOnly: Bool = false) {
+                            requireDestination: Bool = true, potentialHarmOnly: Bool = false,
+                            window: AgentWindow = .day) {
         guard canInspect(filter, requireDestination: requireDestination) else { return }
         let app = filter.bundleIDs.isEmpty
             ? filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
@@ -467,7 +469,7 @@ enum InspectNavigationScope {
                         host: host, hostIncludesSubdomains: false,
                         includeAttributedChildren: filter.includeAttributedChildren,
                         agentParent: filter.agentParent, mcpServer: filter.mcpServer,
-                        potentialHarmOnly: potentialHarmOnly)
+                        potentialHarmOnly: potentialHarmOnly, window: window)
     }
 }
 
@@ -489,5 +491,7 @@ struct InspectRequest: Equatable {
     var policySection: InspectPolicySection? = nil
     /// The exact retained policy to edit. Nil keeps section-level navigation for generic setup links.
     var policyID: UUID? = nil
+    /// A bounded inspection interval carried by an investigation action. Existing links retain the day default.
+    var window: AgentWindow = .day
     var id = UUID()
 }

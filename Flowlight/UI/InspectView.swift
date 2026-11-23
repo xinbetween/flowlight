@@ -191,6 +191,9 @@ private struct InspectContent: View {
             scopeAgentParent = request.agentParent
             scopeMCPServer = request.mcpServer
             potentialHarmOnly = request.potentialHarmOnly
+            // Consume the trusted bounded interval before clearing the one-shot request. This keeps a Live
+            // handoff narrow without turning the app display name into a free-text body search.
+            window = request.window
             if let section = request.policySection {
                 showSetup = true
                 openMocks = section == .mocks
@@ -413,7 +416,12 @@ private struct InspectContent: View {
             Picker(L("Window"), selection: $window) {
                 ForEach(AgentWindow.allCases) { Text($0.title).tag($0) }
             }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 240)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 240)
+            .accessibilityLabel(L("Inspection time window"))
+            .accessibilityValue(window.title)
+            .accessibilityIdentifier("inspect.window")
             if !DemoData.isEnabled {
                 #if !APP_STORE
                 Button(L("Open Inspected Terminal")) { inspection.openInspectedTerminal() }
@@ -446,6 +454,8 @@ private struct InspectContent: View {
                     potentialHarmOnly: potentialHarmOnly
                 ))
                 .font(.callout)
+                .help(scopeApp.map { L("Exact application scope: %@", $0.id) } ?? L("Structured inspection scope"))
+                .accessibilityIdentifier("inspect.scope")
                 Button {
                     scopeApp = nil
                     scopeAppIDs = []
