@@ -13,7 +13,17 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.18.8</h2><time datetime="2026-11-23">November 23, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.18.9</h2><time datetime="2026-11-23">November 23, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Inventory more than application bundles.</strong> Advisories now discovers accessible applications, standalone executables such as curl and wget, Homebrew formulae and casks, and npm packages under project folders you explicitly select.</li>
+          <li><strong>Keep software identity typed and evidence-based.</strong> Executables, Homebrew artifacts, applications, and npm packages remain separate identities; versions come from Info.plist, Homebrew receipts, or package manifests rather than filenames, paths, or arbitrary binary execution.</li>
+          <li><strong>Keep package discovery bounded.</strong> Standard locations are scanned without a home-directory crawl, selected folders use depth, visit, size, symlink, and permission boundaries, and incomplete sources remain visible.</li>
+          <li><strong>Keep matching local and conservative.</strong> Signed catalog targets are kind-qualified, npm versions use strict semver boundaries, legacy bundle-ID advisories remain compatible, and no advisory result changes traffic enforcement.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.18.8</h2><time datetime="2026-11-23">November 23, 2026</time></header>
         <ul>
           <li><strong>Match local applications to signed advisories.</strong> Advisories scans accessible application bundles on this Mac, preserves explicit unknown and unassessed states, and never uploads the application inventory.</li>
           <li><strong>Keep catalog trust and recovery visible.</strong> A separately signed, bounded advisory catalog uses explicit bundle identity and Info.plist version evidence, opt-in refresh, anti-rollback checks, stale last-known-good handling, and clear recovery states.</li>

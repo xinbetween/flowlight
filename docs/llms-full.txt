@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.8, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.9, macOS 15 or later.
 
  On this page
 
@@ -937,7 +937,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.8macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.9macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1681,8 +1681,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
- 0.18.8
+ 0.18.9
 November 23, 2026Latest
+
+ Inventory more than application bundles. Advisories now discovers accessible applications, standalone executables such as curl and wget, Homebrew formulae and casks, and npm packages under project folders you explicitly select.
+
+ Keep software identity typed and evidence-based. Executables, Homebrew artifacts, applications, and npm packages remain separate identities; versions come from Info.plist, Homebrew receipts, or package manifests rather than filenames, paths, or arbitrary binary execution.
+
+ Keep package discovery bounded. Standard locations are scanned without a home-directory crawl, selected folders use depth, visit, size, symlink, and permission boundaries, and incomplete sources remain visible.
+
+ Keep matching local and conservative. Signed catalog targets are kind-qualified, npm versions use strict semver boundaries, legacy bundle-ID advisories remain compatible, and no advisory result changes traffic enforcement.
+
+ 0.18.8
+November 23, 2026
 
  Match local applications to signed advisories. Advisories scans accessible application bundles on this Mac, preserves explicit unknown and unassessed states, and never uploads the application inventory.
 
